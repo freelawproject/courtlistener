@@ -263,12 +263,14 @@ class RecapDocketFetchApiTest(TestCase):
     fixtures = ["judge_judy.json", "test_objects_search.json"]
 
     COURT = "scotus"
-    USER = User.objects.get(username="recap")
+
+    def setUp(self):
+        self.user = User.objects.get(username="recap")
 
     def test_fetch_docket_by_docket_number(self):
         """Can we do a simple fetch of a docket from PACER?"""
         fq = PacerFetchQueue.objects.create(
-            user=self.USER,
+            user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
             court_id=self.COURT,
             docket_number=fakes.DOCKET_NUMBER,
@@ -282,7 +284,7 @@ class RecapDocketFetchApiTest(TestCase):
 
     def test_fetch_docket_by_pacer_case_id(self):
         fq = PacerFetchQueue.objects.create(
-            user=self.USER,
+            user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
             court_id=self.COURT,
             pacer_case_id="104490",
@@ -294,7 +296,7 @@ class RecapDocketFetchApiTest(TestCase):
 
     def test_fetch_docket_by_docket_id(self):
         fq = PacerFetchQueue.objects.create(
-            user=self.USER, request_type=REQUEST_TYPE.DOCKET, docket_id=1,
+            user=self.user, request_type=REQUEST_TYPE.DOCKET, docket_id=1,
         )
         result = do_pacer_fetch(fq)
         result.get()
@@ -315,11 +317,11 @@ class RecapPdfFetchApiTest(TestCase):
 
     fixtures = ["recap_docs.json"]
 
-    USER = User.objects.get(username="recap")
-
     def setUp(self):
         self.fq = PacerFetchQueue.objects.create(
-            user=self.USER, request_type=REQUEST_TYPE.PDF, recap_document_id=1,
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=1,
         )
         self.rd = self.fq.recap_document
 
@@ -358,11 +360,9 @@ class RecapPdfFetchApiTest(TestCase):
 class RecapAttPageFetchApiTest(TestCase):
     fixtures = ["recap_docs.json"]
 
-    USER = User.objects.get(username="recap")
-
     def setUp(self):
         self.fq = PacerFetchQueue.objects.create(
-            user=self.USER,
+            user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
             recap_document_id=1,
         )
