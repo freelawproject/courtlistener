@@ -37,8 +37,14 @@ from cl.recap.mergers import (
     update_case_names,
     update_docket_metadata,
 )
-from cl.recap.models import PROCESSING_STATUS, ProcessingQueue, UPLOAD_TYPE
 from cl.recap.mergers import find_docket_object
+from cl.recap.models import (
+    PacerFetchQueue,
+    PROCESSING_STATUS,
+    ProcessingQueue,
+    UPLOAD_TYPE,
+    REQUEST_TYPE,
+)
 from cl.recap.tasks import (
     process_recap_appellate_docket,
     process_recap_attachment,
@@ -46,6 +52,7 @@ from cl.recap.tasks import (
     process_recap_pdf,
     process_recap_zip,
     process_recap_claims_register,
+    do_pacer_fetch,
 )
 from cl.search.models import (
     Docket,
@@ -53,6 +60,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
+from cl.tests import fakes
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -236,6 +244,171 @@ class RecapUploadsTest(TestCase):
                 # noinspection PyStatementEffect
                 j[bad_key]
         mock.assert_called()
+
+
+@mock.patch(
+    "cl.corpus_importer.tasks.DocketReport", new=fakes.FakeDocketReport,
+)
+@mock.patch(
+    "cl.corpus_importer.tasks.PossibleCaseNumberApi",
+    new=fakes.FakePossibleCaseNumberApi,
+)
+class RecapDocketFetchApiTest(TestCase):
+    """Tests for the RECAP docket Fetch API
+
+    The general approach here is to use mocks to separate out the serialization
+    and API tests from the processing logic tests.
+    """
+
+    fixtures = ["judge_judy.json", "test_objects_search.json"]
+
+    COURT = "scotus"
+    USER = User.objects.get(username="recap")
+
+    def test_fetch_docket_by_docket_number(self):
+        """Can we do a simple fetch of a docket from PACER?"""
+        fq = PacerFetchQueue.objects.create(
+            user=self.USER,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.COURT,
+            docket_number=fakes.DOCKET_NUMBER,
+        )
+        result = do_pacer_fetch(fq)
+        # Wait for the chain to complete
+        result.get()
+
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    def test_fetch_docket_by_pacer_case_id(self):
+        fq = PacerFetchQueue.objects.create(
+            user=self.USER,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.COURT,
+            pacer_case_id="104490",
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    def test_fetch_docket_by_docket_id(self):
+        fq = PacerFetchQueue.objects.create(
+            user=self.USER, request_type=REQUEST_TYPE.DOCKET, docket_id=1,
+        )
+        result = do_pacer_fetch(fq)
+        result.get()
+        fq.refresh_from_db()
+        self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@mock.patch(
+    "cl.corpus_importer.tasks.FreeOpinionReport",
+    new=fakes.FakeFreeOpinionReport,
+)
+@mock.patch(
+    "cl.recap.tasks.get_pacer_cookie_from_cache",
+    return_value={"cookie": "foo"},
+)
+class RecapPdfFetchApiTest(TestCase):
+    """Can we fetch PDFs properly?"""
+
+    fixtures = ["recap_docs.json"]
+
+    USER = User.objects.get(username="recap")
+
+    def setUp(self):
+        self.fq = PacerFetchQueue.objects.create(
+            user=self.USER, request_type=REQUEST_TYPE.PDF, recap_document_id=1,
+        )
+        self.rd = self.fq.recap_document
+
+    def tearDown(self):
+        RECAPDocument.objects.update(is_available=True)
+        self.rd.refresh_from_db()
+
+    def test_fetch_unavailable_pdf(self, mock_get_cookie):
+        """Can we do a simple fetch of a PDF from PACER?"""
+        self.rd.is_available = False
+        self.rd.save()
+
+        self.assertFalse(self.rd.is_available)
+        result = do_pacer_fetch(self.fq)
+        result.get()
+        self.fq.refresh_from_db()
+        self.rd.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertTrue(self.rd.is_available)
+
+    def test_fetch_available_pdf(self, mock_get_cookie):
+        orig_date_modified = self.rd.date_modified
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.rd.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertEqual(
+            orig_date_modified,
+            self.rd.date_modified,
+            msg="rd updated even though it was available.",
+        )
+
+
+class RecapAttPageFetchApiTest(TestCase):
+    fixtures = ["recap_docs.json"]
+
+    USER = User.objects.get(username="recap")
+
+    def setUp(self):
+        self.fq = PacerFetchQueue.objects.create(
+            user=self.USER,
+            request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
+            recap_document_id=1,
+        )
+        self.rd = self.fq.recap_document
+        self.rd.pacer_doc_id = "17711118263"
+        self.rd.save()
+
+    def test_fetch_attachment_page_no_pacer_doc_id(self):
+        """Can we do a simple fetch of an attachment page from PACER?"""
+        self.rd.pacer_doc_id = ""
+        self.rd.save()
+
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.NEEDS_INFO)
+
+    def test_fetch_att_page_no_cookies(self):
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("Unable to find cached cookies", self.fq.message)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        return_value={"pacer_cookie": "foo"},
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.AttachmentPage",
+        new=fakes.FakeAttachmentPage,
+    )
+    @mock.patch(
+        "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage,
+    )
+    def test_fetch_att_page_all_systems_go(self, mock_get_cookies):
+        result = do_pacer_fetch(self.fq)
+        result.get()
+
+        self.fq.refresh_from_db()
+        self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertIn(
+            "Successfully completed fetch", self.fq.message,
+        )
 
 
 class ProcessingQueueApiFilterTest(TestCase):
