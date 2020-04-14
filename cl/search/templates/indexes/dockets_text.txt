@@ -24,7 +24,6 @@
     {{ docket.date_terminated|date:"j F Y" }}
     {{ docket.docket_number }}
     {{ docket.nature_of_suit }}
-    {{ docket.case }}
     {{ docket.jury_demand }}
 {% endwith %}
 
