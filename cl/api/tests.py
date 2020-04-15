@@ -8,6 +8,7 @@ from datetime import timedelta, date
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
+from django.core.cache import cache
 from django.core.management import call_command
 from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
@@ -144,6 +145,9 @@ class ApiQueryCountTests(TransactionTestCase):
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
+
+    def tearDown(self):
+        cache.clear()
 
     def test_audio_api_query_counts(self):
         with self.assertNumQueries(4):

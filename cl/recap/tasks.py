@@ -28,7 +28,6 @@ from cl.corpus_importer.tasks import (
     get_pacer_case_id_and_title,
     get_docket_by_pacer_case_id,
     get_attachment_page_by_rd,
-    make_attachment_pq_object,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
@@ -46,6 +45,9 @@ from cl.recap.mergers import (
     find_docket_object,
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
+    add_tags_to_objs,
+    merge_attachment_page_data,
+    get_data_from_att_report,
 )
 from cl.recap.models import (
     PacerHtmlFiles,
@@ -103,7 +105,7 @@ def do_pacer_fetch(fq):
     :param fq: The PacerFetchQueue item to process
     :return: None
     """
-    c = None
+    result = None
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
         court_id = fq.court_id or getattr(fq.docket, "court_id", None)
@@ -153,34 +155,19 @@ def do_pacer_fetch(fq):
             c = chain(get_docket_by_pacer_case_id.si(**kwargs))
         c |= add_or_update_recap_docket.s()
         c |= mark_fq_successful.si(fq.pk)
-        c.apply_async()
+        result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
         rd_pk = fq.recap_document_id
-        chain(
-            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk, fq.user_id),
+        result = chain(
+            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
             extract_recap_pdf.si(rd_pk),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             mark_fq_successful.si(fq.pk),
         ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
-        rd_pk = fq.recap_document_id
-        if not fq.recap_document.pacer_doc_id:
-            fq.status = PROCESSING_STATUS.NEEDS_INFO
-            fq.message = (
-                "Unable to get attachment page: Unknown pacer_doc_id for "
-                "RECAP Document object %s" % rd_pk
-            )
-            fq.save()
-            return
-
-        cookies = get_pacer_cookie_from_cache(fq.user_id)
-        chain(
-            get_attachment_page_by_rd.s(rd_pk, cookies),
-            make_attachment_pq_object.s(rd_pk, fq.user_id),
-            process_recap_attachment.s(),
-            mark_fq_status.s(fq.pk),
-        ).apply_async()
+        result = fetch_attachment_page.apply_async(args=(fq.pk,))
+    return result
 
 
 def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
@@ -379,9 +366,7 @@ def process_recap_pdf(self, pk):
         de_id=rd.docket_entry_id,
         rd_id=rd.pk,
     )
-    changed = mark_ia_upload_needed(rd.docket_entry.docket)
-    if changed:
-        rd.docket_entry.docket.save()
+    mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
     return rd
 
 
@@ -584,11 +569,9 @@ def process_recap_attachment(self, pk, tag_names=None):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    att_page = AttachmentPage(map_cl_to_pacer_id(pq.court_id))
     with open(pq.filepath_local.path) as f:
         text = f.read().decode("utf-8")
-    att_page._parse_text(text)
-    att_data = att_page.data
+    att_data = get_data_from_att_report(text, pq.court_id)
     logger.info("Parsing completed for item %s" % pq)
 
     if att_data == {}:
@@ -602,18 +585,17 @@ def process_recap_attachment(self, pk, tag_names=None):
         pq.pacer_case_id = att_data.get("pacer_case_id")
         pq.save()
 
-    # Merge the contents of the data into CL.
     try:
-        params = {
-            "pacer_doc_id": att_data["pacer_doc_id"],
-            "docket_entry__docket__court": pq.court,
-        }
-        if pq.pacer_case_id:
-            params["docket_entry__docket__pacer_case_id"] = pq.pacer_case_id
-        main_rd = RECAPDocument.objects.get(**params)
+        rds_affected, de = merge_attachment_page_data(
+            pq.court,
+            pq.pacer_case_id,
+            att_data["pacer_doc_id"],
+            att_data["document_number"],
+            text,
+            att_data["attachments"],
+            pq.debug,
+        )
     except RECAPDocument.MultipleObjectsReturned:
-        # Unclear how to proceed and we don't want to associate this data with
-        # the wrong case. We must punt.
         msg = (
             "Too many documents found when attempting to associate "
             "attachment data"
@@ -627,82 +609,7 @@ def process_recap_attachment(self, pk, tag_names=None):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    # We got the right item. Update/create all the attachments for
-    # the docket entry.
-    de = main_rd.docket_entry
-    if att_data["document_number"] is None:
-        # Bankruptcy attachment page. Use the document number from the Main doc
-        att_data["document_number"] = main_rd.document_number
-
-    rds_created = []
-    if not pq.debug:
-        # Save the old HTML to the docket entry.
-        pacer_file = PacerHtmlFiles(
-            content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
-        )
-        pacer_file.filepath.save(
-            "attachment_page.html",  # Irrelevant b/c UUIDFileSystemStorage
-            ContentFile(text),
-        )
-
-        # Create/update the attachment items.
-        tags = []
-        if tag_names:
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name)
-                tags.append(tag)
-        for attachment in att_data["attachments"]:
-            if all(
-                [
-                    attachment["attachment_number"],
-                    # Missing on sealed items.
-                    attachment.get("pacer_doc_id", False),
-                    # Missing on some restricted docs (see Juriscraper)
-                    attachment["page_count"] is not None,
-                    attachment["description"],
-                ]
-            ):
-                rd, created = RECAPDocument.objects.update_or_create(
-                    docket_entry=de,
-                    document_number=att_data["document_number"],
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
-                if created:
-                    rds_created.append(rd)
-                needs_save = False
-                for field in ["description", "pacer_doc_id"]:
-                    if attachment[field]:
-                        setattr(rd, field, attachment[field])
-                        needs_save = True
-
-                # Only set page_count and file_size if they're blank, in case
-                # we got the real value by measuring.
-                if rd.page_count is None:
-                    rd.page_count = attachment["page_count"]
-                if rd.file_size is None and attachment["file_size_str"]:
-                    try:
-                        rd.file_size = convert_size_to_bytes(
-                            attachment["file_size_str"]
-                        )
-                    except ValueError:
-                        pass
-
-                if needs_save:
-                    rd.save()
-                if tags:
-                    for tag in tags:
-                        tag.tag_object(rd)
-
-                # Do *not* do this async — that can cause race conditions.
-                add_items_to_solr([rd.pk], "search.RECAPDocument")
-
-    process_orphan_documents(
-        rds_created, pq.court_id, main_rd.docket_entry.docket.date_filed
-    )
-    changed = mark_ia_upload_needed(de.docket)
-    if changed:
-        de.docket.save()
+    add_tags_to_objs(tag_names, rds_affected)
     return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
 
 
@@ -1077,7 +984,7 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
+def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1085,7 +992,6 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
 
     :param rd_pk: The PK of the RECAP Document to get.
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param user_pk: The PK of the User that made the request.
     :return: The RECAPDocument PK
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1100,7 +1006,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
         self.request.chain = None
         return
 
-    cookies = get_pacer_cookie_from_cache(user_pk)
+    cookies = get_pacer_cookie_from_cache(fq.user_id)
     if not cookies:
         fq.status = PROCESSING_STATUS.FAILED
         fq.message = "Unable to find cached cookies. Aborting request."
@@ -1142,6 +1048,85 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk, user_pk):
     return rd.pk
 
 
+@app.task(
+    bind=True,
+    max_retries=3,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+@transaction.atomic
+def fetch_attachment_page(self, fq_pk):
+    """Fetch a PACER attachment page by rd_pk
+
+    This is very similar to process_recap_attachment, except that it manages
+    status as it proceeds and it gets the cookie info from redis.
+
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :return: None
+    """
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    fq.status = PROCESSING_STATUS.IN_PROGRESS
+    fq.save()
+
+    rd = fq.recap_document
+    if not rd.pacer_doc_id:
+        msg = (
+            "Unable to get attachment page: Unknown pacer_doc_id for "
+            "RECAP Document object %s" % rd.pk
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
+        return
+
+    cookies = get_pacer_cookie_from_cache(fq.user_id)
+    if not cookies:
+        msg = "Unable to find cached cookies. Aborting request."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
+    try:
+        r = get_attachment_page_by_rd(rd.pk, cookies)
+    except (requests.RequestException, HTTPError):
+        msg = "Failed to get attachment page from network."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+
+    text = r.response.text
+    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id,)
+
+    if att_data == {}:
+        msg = "Not a valid attachment page upload"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        return
+
+    try:
+        merge_attachment_page_data(
+            rd.docket_entry.docket.court,
+            rd.docket_entry.docket.pacer_case_id,
+            att_data["pacer_doc_id"],
+            att_data["document_number"],
+            text,
+            att_data["attachments"],
+        )
+    except RECAPDocument.MultipleObjectsReturned:
+        msg = (
+            "Too many documents found when attempting to associate "
+            "attachment data"
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        return
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            return
+        else:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+    msg = "Successfully completed fetch and save."
+    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+
+
 @app.task
 def mark_fq_successful(fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
@@ -1151,21 +1136,17 @@ def mark_fq_successful(fq_pk):
     fq.save()
 
 
-@app.task
-def mark_fq_status(data, fq_pk):
+def mark_fq_status(fq, msg, status):
     """Update the PacerFetchQueue item with the status and message provided
 
-    :param data: A tuple returned from a previous task. The tuple contains
-    the PROCESSING_STATUS value and a message.
-    :type data: Tuple
-    :param fq_pk: The PK of the PacerFetchQueue item to update
-    :type fq_pk: int
+    :param fq: The PacerFetchQueue item to update
+    :param msg: The message to associate
+    :param status: The status code to associate. If SUCCESSFUL, date_completed
+    is set as well.
     :return: None
-    :rtype: None
     """
-    status, msg = data[0:]
-    fq = PacerFetchQueue.objects.get(pk=fq_pk)
-    fq.status = status
-    fq.date_completed = now()
     fq.message = msg
+    fq.status = status
+    if status == PROCESSING_STATUS.SUCCESSFUL:
+        fq.date_completed = now()
     fq.save()

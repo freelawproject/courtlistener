@@ -1,6 +1,6 @@
 import re
-from datetime import timedelta
 from datetime import date
+from datetime import timedelta
 from urllib import urlencode
 from urlparse import parse_qs
 
@@ -11,16 +11,16 @@ from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.constants import (
     SOLR_OPINION_HL_FIELDS,
     SOLR_RECAP_HL_FIELDS,
     SOLR_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
 )
-from cl.citations.utils import get_citation_depth_between_clusters
-from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib import sunburnt
 from cl.search.forms import SearchForm
 from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
 
@@ -943,22 +943,9 @@ def get_citing_clusters_with_cache(cluster, is_bot):
 
 
 def is_related_beta_user(request):
-    """Check whether current user is allowed for related opinions beta test
-
-    Beta test:
-    - feature is only available for specific user groups
-    - for better performance, we try to avoid DB queries and, thus, check
-    - first if user is logged in and no admin/staff.
-    """
+    """Check whether current user is allowed for related opinions beta test"""
     if request.user.is_authenticated and (
-        request.user.is_superuser
-        or request.user.is_staff
-        or (
-            hasattr(settings, "RELATED_USER_GROUPS")
-            and request.user.groups.filter(
-                name__in=settings.RELATED_USER_GROUPS
-            ).exists()
-        )
+        request.user.is_superuser or request.user.profile.is_tester
     ):
         return True
     else:
@@ -1004,7 +991,14 @@ def get_related_clusters_with_cache(cluster, request):
 
         mlt_query = (
             conn.query(sub_opinion_query)
-            .mlt("text", count=settings.RELATED_COUNT)
+            .mlt(
+                "text",
+                count=settings.RELATED_COUNT,
+                maxqt=settings.RELATED_MLT_MAXQT,
+                mintf=settings.RELATED_MLT_MINTF,
+                minwl=settings.RELATED_MLT_MINWL,
+                maxwl=settings.RELATED_MLT_MAXWL,
+            )
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
         mlt_res = mlt_query.execute()
@@ -1055,7 +1049,10 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
     :param filter_query:
     :return: Executed SolrSearch
     """
-    hl_fields = SOLR_OPINION_HL_FIELDS
+    hl_fields = list(SOLR_OPINION_HL_FIELDS)
+
+    # Exclude citations from MLT highlighting
+    hl_fields.remove("citation")
 
     # Reset query for query builder
     cd["q"] = ""
@@ -1070,6 +1067,10 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
             "q": "id:(" + (" OR ".join(seed_pks)) + ")",
             "mlt": "true",  # Python boolean does not work here
             "mlt.fl": "text",
+            "mlt.maxqt": settings.RELATED_MLT_MAXQT,
+            "mlt.mintf": settings.RELATED_MLT_MINTF,
+            "mlt.minwl": settings.RELATED_MLT_MINWL,
+            "mlt.maxwl": settings.RELATED_MLT_MAXWL,
             # Retrieve fields as highlight replacement
             "fl": q["fl"] + "," + (",".join(hl_fields)),
             # Original query as filter query
