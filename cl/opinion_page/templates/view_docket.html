@@ -154,7 +154,7 @@
                              role="button"
                              class="btn btn-primary btn-xs"
                             {% if rd.date_upload %}
-                             title="Uploaded {{ rd.date_upload }}"
+                             title="Uploaded {{ rd.date_upload|timezone:timezone }}"
                             {% endif %}>
                             Download PDF
                           </a>
