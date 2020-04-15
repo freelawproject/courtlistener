@@ -321,7 +321,6 @@ def process_recap_pdf(self, pk):
                 rd = RECAPDocument(
                     docket_entry=de,
                     pacer_doc_id=pq.pacer_doc_id,
-                    date_upload=now(),
                     document_type=document_type,
                 )
 
@@ -359,6 +358,7 @@ def process_recap_pdf(self, pk):
         rd.ocr_status = None
         rd.is_available = True
         rd.sha1 = new_sha1
+        rd.date_upload = now()
 
     if not pq.debug:
         try:
