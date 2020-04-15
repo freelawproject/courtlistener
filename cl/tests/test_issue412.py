@@ -126,11 +126,13 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
             ".content .btn.btn-danger"
         )
         expected_btn_count = 1
+        actual_btn_count = len(btns)
         self.assertEqual(
-            len(btns),
+            actual_btn_count,
             expected_btn_count,
-            msg="Found button indicating the item is blocked, but user should "
-            "not have this access.",
+            msg="Found %s button(s), but expected %s. Does the user have "
+            "access to the blocked button they shouldn't or maybe the "
+            "page crashed?" % (actual_btn_count, expected_btn_count),
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
