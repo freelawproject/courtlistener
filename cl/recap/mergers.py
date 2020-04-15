@@ -1,16 +1,20 @@
+# coding=utf-8
 # Code for merging PACER content into the DB
 import logging
 import re
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.pacer import AttachmentPage
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
+from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import (
@@ -18,6 +22,7 @@ from cl.lib.pacer import (
     map_pacer_to_cl_id,
     normalize_attorney_contact,
     normalize_attorney_role,
+    map_cl_to_pacer_id,
 )
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
@@ -31,7 +36,12 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
-from cl.recap.models import ProcessingQueue, UPLOAD_TYPE, PROCESSING_STATUS
+from cl.recap.models import (
+    ProcessingQueue,
+    UPLOAD_TYPE,
+    PROCESSING_STATUS,
+    PacerHtmlFiles,
+)
 from cl.search.models import (
     BankruptcyInformation,
     Claim,
@@ -43,6 +53,7 @@ from cl.search.models import (
     Tag,
     Docket,
 )
+from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +232,7 @@ def update_docket_metadata(d, docket_data):
     or district) results.
     """
     d = update_case_names(d, docket_data["case_name"])
-    mark_ia_upload_needed(d)
+    mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
     d.date_filed = docket_data["date_filed"] or d.date_filed
     d.date_last_filing = (
@@ -1071,17 +1082,150 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
         )
         db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
-
-        # Add tags to claim
-        tags = []
-        if tag_names is not None:
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name)
-                tag.tag_object(db_claim)
-                tags.append(tag)
-
+        add_tags_to_objs(tag_names, [db_claim])
         for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
+
+
+def get_data_from_att_report(text, court_id):
+    att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
+    att_page._parse_text(text)
+    att_data = att_page.data
+    return att_data
+
+
+def add_tags_to_objs(tag_names, objs):
+    """Add tags by name to objects
+
+    :param tag_names: A list of tag name strings
+    :type tag_names: list
+    :param objs: A list of objects in need of tags
+    :type objs: list
+    :return: [] if no tag names, else a list of the tags created/found
+    """
+    if tag_names is None:
+        return []
+
+    tags = []
+    for tag_name in tag_names:
+        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tags.append(tag)
+
+    for tag in tags:
+        for obj in objs:
+            tag.tag_object(obj)
+    return tags
+
+
+@transaction.atomic
+def merge_attachment_page_data(
+    court,
+    pacer_case_id,
+    pacer_doc_id,
+    document_number,
+    text,
+    attachment_dicts,
+    debug=False,
+):
+    """Merge attachment page data into the docket
+
+    :param court: The court object we're working with
+    :param pacer_case_id: A PACER case ID
+    :param pacer_doc_id: A PACER document ID
+    :param document_number: The docket entry number
+    :param text: The text of the attachment page
+    :param attachment_dicts: A list of Juriscraper-parsed dicts for each
+    attachment.
+    :param debug: Whether to do saves during this process.
+    :return: A list of RECAPDocuments modified or created during the process,
+    and the DocketEntry object associated with the RECAPDocuments
+    :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
+    """
+    try:
+        params = {
+            "pacer_doc_id": pacer_doc_id,
+            "docket_entry__docket__court": court,
+        }
+        if pacer_case_id:
+            params["docket_entry__docket__pacer_case_id"] = pacer_case_id
+        main_rd = RECAPDocument.objects.get(**params)
+    except RECAPDocument.MultipleObjectsReturned as exc:
+        # Unclear how to proceed and we don't want to associate this data with
+        # the wrong case. We must punt.
+        raise exc
+    except RECAPDocument.DoesNotExist as exc:
+        # Can't find the docket to associate with the attachment metadata
+        raise exc
+
+    # We got the right item. Update/create all the attachments for
+    # the docket entry.
+    de = main_rd.docket_entry
+    if document_number is None:
+        # Bankruptcy attachment page. Use the document number from the Main doc
+        document_number = main_rd.document_number
+
+    if debug:
+        return [], de
+
+    # Save the old HTML to the docket entry.
+    pacer_file = PacerHtmlFiles(
+        content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
+    )
+    pacer_file.filepath.save(
+        "attachment_page.html",  # Irrelevant b/c UUIDFileSystemStorage
+        ContentFile(text),
+    )
+
+    # Create/update the attachment items.
+    rds_created = []
+    rds_affected = []
+    for attachment in attachment_dicts:
+        sanity_checks = [
+            attachment["attachment_number"],
+            # Missing on sealed items.
+            attachment.get("pacer_doc_id", False),
+            # Missing on some restricted docs (see Juriscraper)
+            attachment["page_count"] is not None,
+            attachment["description"],
+        ]
+        if not all(sanity_checks):
+            continue
+
+        rd, created = RECAPDocument.objects.update_or_create(
+            docket_entry=de,
+            document_number=document_number,
+            attachment_number=attachment["attachment_number"],
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        if created:
+            rds_created.append(rd)
+        rds_affected.append(rd)
+
+        for field in ["description", "pacer_doc_id"]:
+            if attachment[field]:
+                setattr(rd, field, attachment[field])
+
+        # Only set page_count and file_size if they're blank, in case
+        # we got the real value by measuring.
+        if rd.page_count is None:
+            rd.page_count = attachment["page_count"]
+        if rd.file_size is None and attachment["file_size_str"]:
+            try:
+                rd.file_size = convert_size_to_bytes(
+                    attachment["file_size_str"]
+                )
+            except ValueError:
+                pass
+        rd.save()
+
+        # Do *not* do this async — that can cause race conditions.
+        add_items_to_solr([rd.pk], "search.RECAPDocument")
+
+    mark_ia_upload_needed(de.docket, save_docket=True)
+    process_orphan_documents(
+        rds_created, court.pk, main_rd.docket_entry.docket.date_filed
+    )
+    return rds_affected, de
 
 
 def process_orphan_documents(rds_created, court_id, docket_date):
