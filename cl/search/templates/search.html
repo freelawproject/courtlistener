@@ -240,6 +240,9 @@
                           {% if cited_cluster %}
                             <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
                           {% endif %}
+                          {% if related_cluster %}
+                            <span class="gray alt">related to</span> {{ related_cluster.caption|safe|v_wrapper }}
+                          {% endif %}
                         {% elif type == 'r' %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
