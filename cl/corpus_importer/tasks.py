@@ -1420,6 +1420,7 @@ def update_rd_metadata(
     rd.filepath_local.save(file_name, cf, save=False)
     rd.file_size = rd.filepath_local.size
     rd.is_available = True  # We've got the PDF.
+    rd.date_upload = rd.date_upload or now()
 
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
