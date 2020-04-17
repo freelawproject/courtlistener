@@ -25,42 +25,11 @@
                 src="{{ STATIC_URL }}js/admin_tools.js"></script>
     {% endif %}
   <script type="text/javascript">
-    $(document).ready(function () {
-      window.addEventListener("message", function (event){
-        // If RECAP is installed, check whether we should allow this person to
-        // make more alerts. If so, tweak the events on the button to create
-        // the alert, not to show the "too many alerts" modal. Note that this
-        // is pretty nasty because we're introducing Django variables into our
-        // JavaScript code.
-        let max_free_docket_alerts = {{ MAX_FREE_DOCKET_ALERTS }},
-            user_alert_count = {{ user.docket_alerts.count|default:"0" }},
-            recap_bonus = {{ DOCKET_ALERT_RECAP_BONUS }},
-            bad_class = 'no-more-alerts-modal-trigger';
-        if (recapIsInstalled(event)){
-          console.log("You have RECAP installed. Applying docket alert bonus.");
-          let total_allowed_alerts = max_free_docket_alerts + recap_bonus;
-          if (user_alert_count < total_allowed_alerts){
-            // Disable the "Too many alerts" popup, and enable the function to
-            // toggle settings.
-            anchors = $('.' + bad_class);
-            anchors.off();
-            anchors.on("click", toggleSettings);
-          }
-        }
-      });
-    });
-
-    // If we have classes indicating too many alerts or logged out users,
-    // activate their modals.
-    $(".no-more-alerts-modal-trigger").on("click", function(e){
-      e.preventDefault();
-      $("#modal-no-more-alerts").modal('toggle');
-    });
-    $(".logged-out-modal-trigger").on("click", function(e) {
-      e.preventDefault();
-      $("#modal-logged-out").modal('toggle');
-    });
+    // Set this variable for the docket alerts script to find
+    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
   </script>
+  <script defer type="text/javascript"
+    src="{{ STATIC_URL }}js/docket_alerts.js"></script>
 
   {% include "includes/date_picker.html" %}
 {% endblock %}
