@@ -7,7 +7,7 @@
 {% block content %}
     <div class="col-sm-3">&nbsp;</div>
     <div class="col-sm-6">
-        <h2>You Are About to Delete Your Account</h2>
+        <h1>You Are About to Delete Your Account</h1>
         <h3>This <em>cannot</em> be undone.</h3>
         <p>We hope that you will have no need to delete your account, but we
             understand that sometimes people want a clean slate.</p>
@@ -34,10 +34,10 @@
         <p class="v-offset-below-3">If you have any last minute questions or comments, we hope you'll <a href="{% url "contact" %}" target="_blank">share them with us</a> before you delete your account.
         </p>
 
-        <a href="{% url "view_settings" %}" class="btn btn-success">Cancel and Go
+        <a href="{% url "view_settings" %}" class="btn btn-success btn-lg">Cancel and Go
             Back</a>&nbsp;&nbsp;
         <form action="" method="post" class="float-right">{% csrf_token %}
-            <button type="submit" class="btn btn-danger">Delete My Account Now</button>
+            <button type="submit" class="btn btn-danger btn-lg">Delete My Account Now</button>
         </form>
 
     </div>
