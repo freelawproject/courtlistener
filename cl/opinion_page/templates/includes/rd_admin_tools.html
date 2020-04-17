@@ -3,18 +3,18 @@
   <div class="sidebar-section">
     <h3><span>Admin</span></h3>
     <p>
-      {% if perms.search.change_docket %}
+      {% if perms.search.change_docket and d%}
         <a
-          href="{% url 'admin:search_docket_change' document.docket_entry.docket.pk %}"
+          href="{% url 'admin:search_docket_change' d.pk %}"
           class="btn btn-primary btn-xs">Docket</a>
       {% endif %}
-      {% if perms.search.change_docketentry %}
+      {% if perms.search.change_docketentry and de%}
         <a
-          href="{% url 'admin:search_docketentry_change' document.docket_entry.pk %}"
+          href="{% url 'admin:search_docketentry_change' de.pk %}"
           class="btn btn-primary btn-xs">Docket Entry</a>
       {% endif %}
-      {% if perms.search.change_recapdocument %}
-        <a href="{% url 'admin:search_recapdocument_change' document.pk %}"
+      {% if perms.search.change_recapdocument and rd%}
+        <a href="{% url 'admin:search_recapdocument_change' rd.pk %}"
            class="btn btn-primary btn-xs">RECAP Document</a>
       {% endif %}
     </p>
