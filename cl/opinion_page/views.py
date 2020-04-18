@@ -2,9 +2,6 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
-from django.conf import settings
-from django.core.cache import cache
-from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -29,7 +26,6 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot, is_og_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
@@ -92,9 +88,7 @@ def redirect_docket_recap(request, court, pacer_case_id):
     )
 
 
-def core_docket_data(request, pk):
-    """Gather the core data for a docket, party, or IDB page."""
-    docket = get_object_or_404(Docket, pk=pk)
+def make_docket_title(docket):
     title = ", ".join(
         [
             s
@@ -105,6 +99,22 @@ def core_docket_data(request, pk):
             if s.strip()
         ]
     )
+    return title
+
+
+def user_has_alert(user, docket):
+    has_alert = False
+    if user.is_authenticated:
+        has_alert = DocketAlert.objects.filter(
+            docket=docket, user=user
+        ).exists()
+    return has_alert
+
+
+def core_docket_data(request, pk):
+    """Gather the core data for a docket, party, or IDB page."""
+    docket = get_object_or_404(Docket, pk=pk)
+    title = make_docket_title(docket)
 
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
@@ -119,11 +129,7 @@ def core_docket_data(request, pk):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    has_alert = False
-    if request.user.is_authenticated:
-        has_alert = DocketAlert.objects.filter(
-            docket=docket, user=request.user
-        ).exists()
+    has_alert = user_has_alert(request.user, docket)
 
     return (
         docket,

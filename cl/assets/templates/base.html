@@ -450,7 +450,10 @@
 <script type="text/javascript">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
-      priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }});
+      priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
+      maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},
+      recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
+
 </script>
 
 {# Allows your own scripts in the footer. #}

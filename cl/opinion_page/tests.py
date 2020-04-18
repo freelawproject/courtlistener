@@ -6,6 +6,7 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
     HTTP_302_FOUND,
     HTTP_300_MULTIPLE_CHOICES,
+    HTTP_400_BAD_REQUEST,
 )
 
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -127,6 +128,37 @@ class ViewRecapDocketTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+
+
+class NewDocketAlertTest(TestCase):
+    fixtures = [
+        "test_objects_search.json",
+        "judge_judy.json",
+        "test_court.json",
+    ]
+
+    def test_bad_parameters(self):
+        """If we omit the pacer_case_id and court_id params, do things fail?"""
+        r = self.client.get(reverse("new_docket_alert"))
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+
+    def test_unknown_docket(self):
+        """What happens if no docket?"""
+        r = self.client.get(
+            reverse("new_docket_alert"),
+            data={"pacer_case_id": "blah", "court_id": "blah"},
+        )
+        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertIn("Refresh this Page", r.content)
+
+    def test_all_systems_go(self):
+        """Does everything work with good parameters and good data?"""
+        r = self.client.get(
+            reverse("new_docket_alert"),
+            data={"pacer_case_id": "666666", "court_id": "test"},
+        )
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertInHTML("Get Docket Alerts", r.content)
 
 
 @override_settings(
