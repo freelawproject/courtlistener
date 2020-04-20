@@ -641,3 +641,73 @@ def make_federal_judge(item, testing=False):
                 position.save()
             except Exception:
                 continue
+
+
+def make_mag_bk_judge(item, testing=False):
+    """Takes the federal judge data <item> and associates it with a Judge object.
+    Returns a Judge object.  To be used for importing bankruptcy and magistrate
+    judges.
+    """
+
+    if not testing:
+        name = "%s: %s %s" % (
+            item["CL_ID"],
+            item["NAME_FIRST"],
+            item["NAME_LAST"],
+        )
+        print("Now processing: %s" % name)
+
+        if not pd.isnull(item["NAME_MIDDLE"]):
+            if len(item["NAME_MIDDLE"]) == 1:
+                item["NAME_MIDDLE"] += "."
+
+        if not pd.isnull(item["GENDER"]):
+            gender = get_gender(item["GENDER"])
+
+        if not item["NAME_SUFFIX"] == '':
+            suffix = get_suffix(item["NAME_SUFFIX"])
+        else:
+            suffix = ''
+
+        # Instantiate Judge object.
+        person = Person(
+            name_first=item["NAME_FIRST"],
+            name_middle=item["NAME_MIDDLE"],
+            name_last=item["NAME_LAST"],
+            name_suffix=suffix,
+            gender=gender,
+            cl_id=item["CL_ID"],
+        )
+
+    if not testing:
+        person.save()
+
+    # Add position.
+    if re.search('Bankruptcy', item['COURT']):
+        position_type = "jud"
+        court = match_court_string(item['COURT'], bankruptcy=True)
+    else:
+        position_type = "mag"
+        court = match_court_string(item['COURT'], federal_district=True)
+
+    date_start = process_date_string(item['START_DATE'])
+
+    position = Position(
+        person=person,
+        position_type=position_type,
+        court_id=court,
+        date_start=date_start,
+        date_granularity_start=item['START_DATE_GRANULARITY'],
+    )
+
+    if not testing:
+        position.save()
+
+    sources = Source(
+        person=person,
+        url=item['SOURCE'],
+        date_accessed=str(date.today()),
+    )
+
+    if not testing:
+        sources.save()
