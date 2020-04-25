@@ -1402,7 +1402,13 @@ class Party(models.Model):
     )
     name = models.TextField(help_text="The name of the party.", db_index=True,)
     extra_info = models.TextField(
-        help_text="Additional info from PACER", db_index=True,
+        # See: 7d4c916a34207c3c55b58cc385425a9fc7021004
+        help_text="Prior to March, 2018, this field briefly held additional "
+        "info from PACER about particular parties. That was a modelling "
+        "mistake and the information has been moved to the "
+        "PartyType.extra_info field instead. This field will be removed in "
+        "October, 2020.",
+        db_index=True,
     )
 
     class Meta:
