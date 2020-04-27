@@ -989,16 +989,21 @@ def get_related_clusters_with_cache(cluster, request):
         for item in sub_opinion_queries:
             sub_opinion_query |= item
 
+        # Set MoreLikeThis parameters
+        # (see https://lucene.apache.org/solr/guide/6_6/other-parsers.html#OtherParsers-MoreLikeThisQueryParser)
+        mlt_params = dict(
+            fields="text",
+            count=settings.RELATED_COUNT,
+            maxqt=settings.RELATED_MLT_MAXQT,
+            mintf=settings.RELATED_MLT_MINTF,
+            minwl=settings.RELATED_MLT_MINWL,
+            maxwl=settings.RELATED_MLT_MAXWL,
+            maxdf=settings.RELATED_MLT_MAXDF,
+        )
+
         mlt_query = (
             conn.query(sub_opinion_query)
-            .mlt(
-                "text",
-                count=settings.RELATED_COUNT,
-                maxqt=settings.RELATED_MLT_MAXQT,
-                mintf=settings.RELATED_MLT_MINTF,
-                minwl=settings.RELATED_MLT_MINWL,
-                maxwl=settings.RELATED_MLT_MAXWL,
-            )
+            .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
         mlt_res = mlt_query.execute()
@@ -1071,6 +1076,7 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
             "mlt.mintf": settings.RELATED_MLT_MINTF,
             "mlt.minwl": settings.RELATED_MLT_MINWL,
             "mlt.maxwl": settings.RELATED_MLT_MAXWL,
+            "mlt.maxdf": settings.RELATED_MLT_MAXDF,
             # Retrieve fields as highlight replacement
             "fl": q["fl"] + "," + (",".join(hl_fields)),
             # Original query as filter query

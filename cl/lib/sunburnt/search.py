@@ -1,6 +1,9 @@
 from __future__ import absolute_import
 
-import collections, copy, operator, re
+import collections
+import copy
+import operator
+import re
 
 from .schema import (
     SolrError,
@@ -945,6 +948,7 @@ class MoreLikeThisOptions(Options):
         "count": int,
         "mintf": int,
         "mindf": int,
+        "maxdf": int,
         "minwl": int,
         "maxwl": int,
         "maxqt": int,
