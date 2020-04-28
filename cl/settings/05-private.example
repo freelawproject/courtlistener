@@ -26,6 +26,7 @@ DATABASES = {
         'NAME': 'courtlistener',
         'USER': 'postgres',  # Use 'django' in prod
         'PASSWORD': 'postgres',
+        'HOST': 'cl-postgresql',
         'CONN_MAX_AGE': 600,
     }
 }
