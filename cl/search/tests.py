@@ -1,23 +1,21 @@
 # coding=utf-8
 import StringIO
 import os
-
 from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
-from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
-from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import (
     SolrTestCase,
     IndexedSolrTestCase,
@@ -618,7 +616,15 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(r.status_code, HTTP_200_OK)
 
 
-@override_settings(RELATED_USE_CACHE=False,)
+@override_settings(
+    # MLT results should not be cached
+    RELATED_USE_CACHE=False,
+    # Default MLT settings limit the search space to minimize run time.
+    # These limitations are not needed on the small document collections during testing.
+    RELATED_MLT_MINTF=0,
+    RELATED_MLT_MAXQT=9999,
+    RELATED_MLT_MINWL=0,
+)
 class RelatedSearchTest(IndexedSolrTestCase):
     def setUp(self):
         # Add additional user fixtures
