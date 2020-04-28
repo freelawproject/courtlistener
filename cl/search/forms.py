@@ -23,6 +23,8 @@ OPINION_ORDER_BY_CHOICES = (
     ("citeCount asc", "Least Cited First"),
     ("dateArgued desc", "Newest First"),
     ("dateArgued asc", "Oldest First"),
+    ("entry_date_filed desc", "Newest Document First"),
+    ("entry_date_filed asc", "Oldest Document First"),
     ("name_reverse asc", "Name"),
     ("dob desc,name_reverse asc", "Most Recently Born"),
     ("dob asc,name_reverse asc", "Least Recently Born"),
