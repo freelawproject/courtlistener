@@ -991,15 +991,15 @@ def get_related_clusters_with_cache(cluster, request):
 
         # Set MoreLikeThis parameters
         # (see https://lucene.apache.org/solr/guide/6_6/other-parsers.html#OtherParsers-MoreLikeThisQueryParser)
-        mlt_params = dict(
-            fields="text",
-            count=settings.RELATED_COUNT,
-            maxqt=settings.RELATED_MLT_MAXQT,
-            mintf=settings.RELATED_MLT_MINTF,
-            minwl=settings.RELATED_MLT_MINWL,
-            maxwl=settings.RELATED_MLT_MAXWL,
-            maxdf=settings.RELATED_MLT_MAXDF,
-        )
+        mlt_params = {
+            "fields": "text",
+            "count": settings.RELATED_COUNT,
+            "maxqt": settings.RELATED_MLT_MAXQT,
+            "mintf": settings.RELATED_MLT_MINTF,
+            "minwl": settings.RELATED_MLT_MINWL,
+            "maxwl": settings.RELATED_MLT_MAXWL,
+            "maxdf": settings.RELATED_MLT_MAXDF,
+        }
 
         mlt_query = (
             conn.query(sub_opinion_query)
