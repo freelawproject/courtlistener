@@ -617,7 +617,10 @@ class SearchTest(IndexedSolrTestCase):
 
 
 @override_settings(
+    # MLT results should not be cached
     RELATED_USE_CACHE=False,
+    # Default MLT settings limit the search space to minimize run time.
+    # These limitations are not needed on the small document collections during testing.
     RELATED_MLT_MINTF=0,
     RELATED_MLT_MAXQT=9999,
     RELATED_MLT_MINWL=0,
