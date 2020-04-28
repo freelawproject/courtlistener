@@ -25,8 +25,8 @@
                     selected="selected"
                     {% endif %}>Oldest First</option>
         {% endif %}
-		{% if v == 'r' and request.user.profile.is_tester %}
-			<option value="entry_date_filed desc"
+    		{% if v == 'r' and request.user.profile.is_tester %}
+		    	<option value="entry_date_filed desc"
                     {% if search_form.order_by.value == "entry_date_filed desc" %}
                     selected="selected"
                     {% endif %}>Newest Document First</option>
