@@ -25,6 +25,16 @@
                     selected="selected"
                     {% endif %}>Oldest First</option>
         {% endif %}
+		{% if v == 'r' and request.user.profile.is_tester %}
+			<option value="entry_date_filed desc"
+                    {% if search_form.order_by.value == "entry_date_filed desc" %}
+                    selected="selected"
+                    {% endif %}>Newest Document First</option>
+             <option value="entry_date_filed asc"
+                    {% if search_form.order_by.value == "entry_date_filed asc" %}
+                    selected="selected"
+                    {% endif %}>Oldest Document First</option>
+        {% endif %}
 
         {% if v == 'o' %}
             <option value="citeCount desc"
