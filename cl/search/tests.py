@@ -635,7 +635,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
     def test_more_like_this_opinion(self):
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = 1
+        seed_pk = 1  # Paul Debbas v. Franklin
         expected_article_count = 3
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
@@ -660,9 +660,33 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
-    def test_more_like_this_opinion_detail(self):
-        """MoreLikeThis query on opinion detail page (cache must be disabled)"""
-        seed_pk = 1
+    def test_more_like_this_opinion_detail_detail(self):
+        """MoreLikeThis query on opinion detail page with status filter"""
+        seed_pk = 3  # case name cluster 3
+        expected_first_pk = 2  # Howard v. Honda
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            self.client.login(username="admin", password="password")
+        )
+
+        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        # Test if related opinion exist
+        self.assertGreater(
+            r.content.index(
+                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+            ),
+            0,
+            msg="Related opinion not found.",
+        )
+        self.client.logout()
+
+    @override_settings(RELATED_FILTER_BY_STATUS=None)
+    def test_more_like_this_opinion_detail_no_filter(self):
+        """MoreLikeThis query on opinion detail page (without filter)"""
+        seed_pk = 1  # Paul Debbas v. Franklin
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
 
