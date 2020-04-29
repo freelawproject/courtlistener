@@ -22,7 +22,12 @@ from cl.search.constants import (
     SOLR_PEOPLE_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
+from cl.search.models import (
+    Court,
+    OpinionCluster,
+    SEARCH_TYPES,
+    DOCUMENT_STATUSES,
+)
 
 BOOSTS = {
     "qf": {
@@ -957,11 +962,16 @@ def get_related_clusters_with_cache(cluster, request):
 
     :param cluster: The cluster we're targeting
     :param request: Request object for checking if user is permitted
-    :return: Tuple[List, List] Related clusters and sub-opinion IDs
+    :return: Tuple[List, List, Dict] Related clusters, sub-opinion IDs and URL parameters
     """
+
+    # By default all statuses are included
+    available_statuses = dict(DOCUMENT_STATUSES).values()
+    url_search_params = {"stat_" + v: "on" for v in available_statuses}
+
     if is_bot(request) or not is_related_beta_user(request):
         # If it is a bot or is not beta tester, return empty results
-        return [], []
+        return [], [], url_search_params
 
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
@@ -1006,6 +1016,18 @@ def get_related_clusters_with_cache(cluster, request):
             .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
+
+        if settings.RELATED_FILTER_BY_STATUS:
+            # Filter results by status (e.g., Precedential)
+            mlt_query = mlt_query.filter(
+                status_exact=settings.RELATED_FILTER_BY_STATUS
+            )
+
+            # Update URL parameters accordingly
+            url_search_params = {
+                "stat_" + settings.RELATED_FILTER_BY_STATUS: "on"
+            }
+
         mlt_res = mlt_query.execute()
 
         if mlt_res.more_like_this is not None:
@@ -1039,7 +1061,7 @@ def get_related_clusters_with_cache(cluster, request):
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
 
-    return related_clusters, sub_opinion_ids
+    return related_clusters, sub_opinion_ids, url_search_params
 
 
 def get_mlt_query(si, cd, facet, seed_pks, filter_query):
