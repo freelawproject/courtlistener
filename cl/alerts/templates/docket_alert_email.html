@@ -60,23 +60,25 @@
           <tr>
             <td style="text-align: center">{{ de.entry_number }}</td>
             <td>{{ de.date_filed|date:"M j, Y"|default:'<em>Unknown</em>' }}</td>
-            <td>
+            <td {% if not rd.document_number %}colspan="2"{% endif %}>
               {% if rd.description %}
                 {{ rd.description|safe }}
               {% else %}
                 {{ de.description|safe|default:"<em>Unknown</em>"|safe }}
               {% endif %}
             </td>
-            <td>
-              {% if rd.filepath_local %}
-                <a href="https://www.courtlistener.com/{{ rd.filepath_local }}">For free from RECAP
-                </a>
-              {% endif %}
-              {% if rd.filepath_local and rd.pacer_url %}<br>{% endif %}
-              {% if rd.pacer_url %}
-                <a href="{{ rd.pacer_url }}">Buy on PACER</a>
-              {% endif %}
-            </td>
+            {% if rd.document_number %}
+              <td>
+                {% if rd.filepath_local %}
+                  <a href="https://www.courtlistener.com/{{ rd.filepath_local }}">For free from RECAP
+                  </a>
+                {% endif %}
+                {% if rd.filepath_local and rd.pacer_url %}<br>{% endif %}
+                {% if rd.pacer_url %}
+                  <a href="{{ rd.pacer_url }}">Buy on PACER</a>
+                {% endif %}
+              </td>
+            {% endif %}
           </tr>
         {% endfor %}
       {% endfor %}
