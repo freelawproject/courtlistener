@@ -68,7 +68,11 @@ router.register(
 )
 
 # Visualizations
-router.register(r"visualizations", viz_views.VisualizationViewSet, base_name="visualizations")
+router.register(
+    r"visualizations",
+    viz_views.VisualizationViewSet,
+    base_name="visualizations",
+)
 
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(title=API_TITLE)
