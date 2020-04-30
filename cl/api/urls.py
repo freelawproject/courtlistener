@@ -69,6 +69,9 @@ router.register(
 
 # Visualizations
 router.register(
+    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion",
+)
+router.register(
     r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap",
 )
 
