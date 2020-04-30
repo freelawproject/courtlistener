@@ -43,6 +43,7 @@ class NameExistsError(Exception):
     def __str__(self):
         return repr(self.value)
 
+
 def transform_employ(string):
     if pd.isnull(string):
         return [None], [None], [None], [None]
@@ -706,9 +707,11 @@ def make_mag_bk_judge(item, testing=False):
     if Person.objects.filter(cl_id=item["CL_ID"]).exists():
         raise ValidationError("CL_ID already exists.")
 
-    if Person.objects.filter(name_first=item['NAME_FIRST'],
-                             name_middle=item['NAME_MIDDLE'],
-                             name_last=item['NAME_LAST']).exists():
+    if Person.objects.filter(
+        name_first=item["NAME_FIRST"],
+        name_middle=item["NAME_MIDDLE"],
+        name_last=item["NAME_LAST"],
+    ).exists():
         raise NameExistsError("")
 
     if not testing:
@@ -717,11 +720,11 @@ def make_mag_bk_judge(item, testing=False):
     # Add position.
     if re.search("Bankruptcy", item["POSITION"]):
         position_type = "jud"
-        court = BANKRUPTCY_COURTS.get(item['COURT'])
+        court = BANKRUPTCY_COURTS.get(item["COURT"])
         print(court)
     else:
         position_type = "mag"
-        court = DISTRICT_COURTS.get(item['COURT'])
+        court = DISTRICT_COURTS.get(item["COURT"])
 
     date_start = process_date_string(item["START_DATE"])
 

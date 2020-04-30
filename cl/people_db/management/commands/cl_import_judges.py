@@ -25,6 +25,7 @@ from cl.search.tasks import add_items_to_solr
 from django.core.exceptions import ValidationError
 from cl.people_db.import_judges.populate_fjc_judges import NameExistsError
 
+
 class Command(VerboseCommand):
     help = "Import judge data from various files."
 
@@ -324,9 +325,9 @@ class Command(VerboseCommand):
             "END_DATE_GRANULARITY",
         ]
         df = pd.read_csv(infile)
-        has_date = df['START_DATE_GRANULARITY'].notnull()
+        has_date = df["START_DATE_GRANULARITY"].notnull()
         df = df[has_date]
-        df = df[df['IN_CL'] != "Yes"]
+        df = df[df["IN_CL"] != "Yes"]
         df = df.replace(r"^\s+$", np.nan, regex=True)
         for x in textfields:
             df[x] = df[x].replace(np.nan, "", regex=True)
@@ -338,19 +339,26 @@ class Command(VerboseCommand):
             try:
                 make_mag_bk_judge(dict(row), testing=self.debug)
             except ValidationError:
-                bad_record.append("Person with this cl_id already exists: " +
-                                  row.CL_ID + " " +
-                                  row.NAME_FIRST + " " +
-                                  row.NAME_LAST)
+                bad_record.append(
+                    "Person with this cl_id already exists: "
+                    + row.CL_ID
+                    + " "
+                    + row.NAME_FIRST
+                    + " "
+                    + row.NAME_LAST
+                )
             except NameExistsError:
                 # On the chance we try creating a new record, with a different
                 # cl_id, for a magistrate/bankruptcy judge already in the
                 # database.
-                bad_record.append("Person with this name already exists: " +
-                                  row.NAME_FIRST + " " +
-                                  row.NAME_MIDDLE + " " +
-                                  row.NAME_LAST)
-
+                bad_record.append(
+                    "Person with this name already exists: "
+                    + row.NAME_FIRST
+                    + " "
+                    + row.NAME_MIDDLE
+                    + " "
+                    + row.NAME_LAST
+                )
 
         if len(bad_record) > 0:
             for b in bad_record:
