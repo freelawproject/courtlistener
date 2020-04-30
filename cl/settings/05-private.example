@@ -27,7 +27,6 @@ DATABASES = {
         'USER': 'postgres',  # Use 'django' in prod
         'PASSWORD': 'postgres',
         'CONN_MAX_AGE': 600,
-        'HOST': 'cl-postgresql'
     }
 }
 API_READ_DATABASES = ['replica']

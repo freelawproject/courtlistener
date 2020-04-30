@@ -6,6 +6,7 @@ from cl.visualizations.api_serializers import VisualizationSerializer
 
 from cl.visualizations.models import SCOTUSMap
 
+
 class VisualizationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = SCOTUSMap.objects.all()
     serializer_class = VisualizationSerializer
