@@ -19,22 +19,12 @@ MANAGERS = ADMINS
 
 
 DATABASES = {
-<<<<<<< HEAD:cl/settings/05-private.example
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'courtlistener',
         'USER': 'postgres',  # Use 'django' in prod
         'PASSWORD': 'postgres',
         'CONN_MAX_AGE': 600,
-=======
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "courtlistener",
-        "USER": "postgres",  # Use 'django' in prod
-        "PASSWORD": "postgres",
-        "CONN_MAX_AGE": 600,
-        "HOST": "cl-postgresql",
->>>>>>> 3ae07497bb981edf56c3edbf2ae21fffbcda38ba:cl/settings/05-private.example.py
     }
 }
 API_READ_DATABASES = ["replica"]
