@@ -6,13 +6,6 @@ from cl.visualizations.models import SCOTUSMap
 from cl.search.models import OpinionCluster
 from cl.recap.models import ProcessingQueue
 
-
-class VisualizationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SCOTUSMap
-        fields = ["id", "title", "cluster_start", "cluster_end"]
-
-
 class CreateVisualizationSerializer(serializers.ModelSerializer):
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
@@ -30,15 +23,3 @@ class CreateVisualizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = SCOTUSMap
         exclude = "uploader"  # Private
-
-    def validate(self, attrs):
-        for attr_name in ["cluster_start", "cluster_end"]:
-            if not attrs.get(attr_name):
-                raise ValidationError("%s is required!" % attr_name)
-            if attrs.get(attr_name) == "undefined":
-                raise ValidationError(
-                    "%s field cannot have the literal value 'undefined'"
-                    % attr_name
-                )
-
-        return attrs
