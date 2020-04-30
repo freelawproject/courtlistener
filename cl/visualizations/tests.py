@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion
-from cl.visualizations import utils, views
+from cl.visualizations import views
+from cl.visualizations.network_utils import reverse_endpoints_if_needed
 from cl.users.models import UserProfile
 from cl.search.models import OpinionCluster
 
@@ -25,7 +26,7 @@ class TestVizUtils(TestCase):
         end = OpinionCluster.objects.get(
             case_name="Town of Greece v. Galloway"
         )
-        new_start, new_end = utils.reverse_endpoints_if_needed(start, end)
+        new_start, new_end = reverse_endpoints_if_needed(start, end)
         self.assertEqual(new_start, start)
         self.assertEqual(new_end, end)
 
@@ -38,7 +39,7 @@ class TestVizUtils(TestCase):
             case_name="Town of Greece v. Galloway"
         )
         real_start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
-        reversed_start, reversed_end = utils.reverse_endpoints_if_needed(
+        reversed_start, reversed_end = reverse_endpoints_if_needed(
             real_end, real_start
         )
         self.assertEqual(real_start, reversed_start)
