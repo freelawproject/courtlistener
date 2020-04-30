@@ -6,10 +6,8 @@ from cl.visualizations.models import SCOTUSMap
 from cl.search.models import OpinionCluster
 from cl.recap.models import ProcessingQueue
 
-class CreateVisualizationSerializer(serializers.ModelSerializer):
-    uploader = serializers.HiddenField(
-        default=serializers.CurrentUserDefault(),
-    )
+class VisualizationSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault(),)
     title = serializers.CharField(max_length=200)
     cluster_start = serializers.PrimaryKeyRelatedField(
         queryset=OpinionCluster.objects.all(),
@@ -22,4 +20,4 @@ class CreateVisualizationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SCOTUSMap
-        exclude = "uploader"  # Private
+        fields = ["user", "title", "cluster_start", "cluster_end"]
