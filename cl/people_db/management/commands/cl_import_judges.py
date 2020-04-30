@@ -22,6 +22,8 @@ from cl.people_db.models import Person, Position
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
 
+from django.core.exceptions import ValidationError
+from cl.people_db.import_judges.populate_fjc_judges import NameExistsError
 
 class Command(VerboseCommand):
     help = "Import judge data from various files."
@@ -301,12 +303,12 @@ class Command(VerboseCommand):
                         position.save()
                         add_items_to_solr.delay([p.pk], "people_db.Person")
 
-
     def import_mag_bk_judges(self, infile=None):
 
         if infile is None:
             self.ensure_input_file()
             infile = self.options["input_file"]
+        bad_record = []
         textfields = [
             "CL_ID",
             "NAME_FIRST",
@@ -322,6 +324,9 @@ class Command(VerboseCommand):
             "END_DATE_GRANULARITY",
         ]
         df = pd.read_csv(infile)
+        has_date = df['START_DATE_GRANULARITY'].notnull()
+        df = df[has_date]
+        df = df[df['IN_CL'] != "Yes"]
         df = df.replace(r"^\s+$", np.nan, regex=True)
         for x in textfields:
             df[x] = df[x].replace(np.nan, "", regex=True)
@@ -330,8 +335,26 @@ class Command(VerboseCommand):
                 continue
             if i >= self.options["limit"] > 0:
                 break
-            make_mag_bk_judge(dict(row), testing=self.debug)
+            try:
+                make_mag_bk_judge(dict(row), testing=self.debug)
+            except ValidationError:
+                bad_record.append("Person with this cl_id already exists: " +
+                                  row.CL_ID + " " +
+                                  row.NAME_FIRST + " " +
+                                  row.NAME_LAST)
+            except NameExistsError:
+                # On the chance we try creating a new record, with a different
+                # cl_id, for a magistrate/bankruptcy judge already in the
+                # database.
+                bad_record.append("Person with this name already exists: " +
+                                  row.NAME_FIRST + " " +
+                                  row.NAME_MIDDLE + " " +
+                                  row.NAME_LAST)
 
+
+        if len(bad_record) > 0:
+            for b in bad_record:
+                print(b)
 
     VALID_ACTIONS = {
         "import-all": import_all,
