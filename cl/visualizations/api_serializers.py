@@ -6,7 +6,12 @@ from cl.visualizations.models import SCOTUSMap
 from cl.search.models import OpinionCluster
 from cl.recap.models import ProcessingQueue
 
+<<<<<<< HEAD
 class VisualizationSerializer(serializers.ModelSerializer):
+=======
+
+class CreateVisualizationSerializer(serializers.ModelSerializer):
+>>>>>>> 3ae07497bb981edf56c3edbf2ae21fffbcda38ba
     user = serializers.HiddenField(default=serializers.CurrentUserDefault(),)
     title = serializers.CharField(max_length=200)
     cluster_start = serializers.PrimaryKeyRelatedField(
