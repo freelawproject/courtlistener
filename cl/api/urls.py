@@ -69,9 +69,7 @@ router.register(
 
 # Visualizations
 router.register(
-    r"visualizations",
-    viz_views.VisualizationViewSet,
-    base_name="visualization",
+    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap",
 )
 
 API_TITLE = "CourtListener Legal Data API"
