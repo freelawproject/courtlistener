@@ -1295,6 +1295,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
         self.assertIn("Precedential Status", facet_sidebar.text)
 
+        # She notes her URL For after signing in
+        results_url = self.browser.current_url
+
         # Wanting to keep an eye on this Lissner guy, she decides to sign-in
         # and so she can create an alert
         sign_in = self.browser.find_element_by_link_text("Sign in / Register")
@@ -1314,8 +1317,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.find_element_by_id("password").send_keys("password")
         btn.click()
 
-        # upon redirect, she's brought back to her original search results
-        # for 'lissner'
+        # After logging in, she goes to the homepage. From there, she goes back
+        # to where she was, which still has "lissner" in the search box.
+        self.browser.get(results_url)
         page_text = self.browser.find_element_by_tag_name("body").text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
