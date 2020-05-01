@@ -118,7 +118,7 @@ def new_visualization(request):
                 title=cd["title"],
                 notes=cd["notes"],
             )
-            status, viz = build_visualization(viz, end)
+            status, viz = build_visualization(viz)
             if status == "too_many_nodes":
                 msg = message_dict[status]
                 messages.add_message(request, msg["level"], msg["message"])
