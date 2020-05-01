@@ -1,3 +1,5 @@
+from django.db.models import Q
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -27,7 +29,9 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified", "user")
 
     def get_queryset(self):
-        return SCOTUSMap.objects.filter(user=self.request.user).order_by("-id")
+        return SCOTUSMap.objects.filter(
+            Q(user=self.request.user) | Q(published=True)
+        ).order_by("-id")
 
     def create(self, request, *args, **kwargs):
         # Override create by copying from source so we can throw 403's
