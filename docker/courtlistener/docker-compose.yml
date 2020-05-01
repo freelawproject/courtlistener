@@ -1,85 +1,85 @@
 # Run using `docker-compose up`
 version: "3.7"
 networks:
-    cl_net_overlay:
-        driver: bridge
-        external: true
+  cl_net_overlay:
+    driver: bridge
+    external: true
 services:
-    # Redis for caching
-    cl-redis:
-        container_name: cl-redis
-        image: redis
-        ports:
-            - "6379:6379"
-        networks:
-            - cl_net_overlay
+  # Redis for caching
+  cl-redis:
+    container_name: cl-redis
+    image: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cl_net_overlay
 
-    # Database (postgresql)
-    # During tests this will be automatically migrated for you, but in regular
-    # use, you will have ot migrate it yourself. See DEVELOPING.md
-    cl-postgresql:
-        container_name: cl-postgres
-        ports:
-            - "5432:5432"
-        image: postgres:11-alpine
-        environment:
-            POSTGRES_USER: "postgres"
-            POSTGRES_PASSWORD: "postgres"
-            POSTGRES_DB: "courtlistener"
-        networks:
-            - cl_net_overlay
+  # Database (postgresql)
+  # During tests this will be automatically migrated for you, but in regular
+  # use, you will have ot migrate it yourself. See DEVELOPING.md
+  cl-postgresql:
+    container_name: cl-postgres
+    ports:
+      - "5432:5432"
+    image: postgres:11-alpine
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "courtlistener"
+    networks:
+      - cl_net_overlay
 
-    # Search engine
-    cl-solr:
-        container_name: cl-solr
-        image: freelawproject/solr:latest
-        ports:
-            - "8983:8983"
-        # needs chmod 777
-        volumes:
-            - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
-            - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
-        networks:
-            - cl_net_overlay
+  # Search engine
+  cl-solr:
+    container_name: cl-solr
+    image: freelawproject/solr:latest
+    ports:
+      - "8983:8983"
+    # needs chmod 777
+    volumes:
+      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
+      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
+    networks:
+      - cl_net_overlay
 
-    # Task Server
-    cl-celery:
-        container_name: cl-celery
-        image: freelawproject/task-server:latest
-        depends_on:
-            - cl-postgresql
-            - cl-redis
-        volumes:
-            - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
-            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-            - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
-        networks:
-            - cl_net_overlay
+  # Task Server
+  cl-celery:
+    container_name: cl-celery
+    image: freelawproject/task-server:latest
+    depends_on:
+      - cl-postgresql
+      - cl-redis
+    volumes:
+      - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
+      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+      - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
+    networks:
+      - cl_net_overlay
 
-    cl-django:
-        container_name: cl-django
-        image: freelawproject/courtlistener-django:latest
-        depends_on:
-            - cl-postgresql
-            - cl-redis
-            - cl-celery
-            - cl-solr
-            - cl-selenium
-        ports:
-            - "8000:8000"
-        volumes:
-            - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
-            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-        networks:
-            - cl_net_overlay
+  cl-django:
+    container_name: cl-django
+    image: freelawproject/courtlistener-django:latest
+    depends_on:
+      - cl-postgresql
+      - cl-redis
+      - cl-celery
+      - cl-solr
+      - cl-selenium
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+    networks:
+      - cl_net_overlay
 
-    cl-selenium:
-        container_name: cl-selenium
-        image: selenium/standalone-chrome-debug
-        ports:
-            - 4444:4444  # Selenium
-            - 5900:5900  # VNC server
-        volumes:
-            - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
-        networks:
-            - cl_net_overlay
+  cl-selenium:
+    container_name: cl-selenium
+    image: selenium/standalone-chrome-debug
+    ports:
+      - 4444:4444  # Selenium
+      - 5900:5900  # VNC server
+    volumes:
+      - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
+    networks:
+      - cl_net_overlay
