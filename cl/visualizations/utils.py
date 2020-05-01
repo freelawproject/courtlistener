@@ -4,26 +4,18 @@ from django.conf import settings
 from django.contrib import messages
 
 from cl.stats.utils import tally_stat
+from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.models import JSONVersion
 
 
-class TooManyNodes(Exception):
-    class SetupException(Exception):
-        def __init__(self, message):
-            Exception.__init__(self, message)
-
-
-def build_visualization(viz, end):
-    """
+def build_visualization(viz):
+    """Use the start and end points to generate a visualization
 
     :param viz: A Visualization object to work on
-    :param end: The ending Cluster object
-    :type end: OpinionCluster
-    :return:
-    :rtype:
+    :return: A tuple of (status<str>, viz)
     """
     build_kwargs = {
-        "parent_authority": end,
+        "parent_authority": viz.cluster_end,
         "visited_nodes": {},
         "good_nodes": {},
         "max_hops": 3,
