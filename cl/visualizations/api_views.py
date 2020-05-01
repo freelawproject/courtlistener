@@ -15,6 +15,7 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ModelViewSet):
+    permission_classes = [IsAuthenticated]
     serializer_class = JSONVersionSerializer
     ordering_fields = ("id", "date_created", "date_modified")
 
@@ -25,6 +26,7 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
 
 
 class VisualizationViewSet(LoggingMixin, ModelViewSet):
+    permission_classes = [IsAuthenticated]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
 
