@@ -1155,6 +1155,10 @@ def merge_attachment_page_data(
         raise exc
     except RECAPDocument.DoesNotExist as exc:
         # Can't find the docket to associate with the attachment metadata
+        # It may be possible to go look for orphaned documents at this stage
+        # and to then add them here, as we do when adding dockets. This need is
+        # particularly acute for those that get free look emails and then go to
+        # the attachment page.
         raise exc
 
     # We got the right item. Update/create all the attachments for

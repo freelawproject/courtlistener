@@ -19,11 +19,21 @@
             <option value="dateFiled desc"
                     {% if search_form.order_by.value == "dateFiled desc" %}
                     selected="selected"
-                    {% endif %}>Newest First</option>
+                    {% endif %}>Newest Cases First</option>
             <option value="dateFiled asc"
                     {% if search_form.order_by.value == "dateFiled asc" %}
                     selected="selected"
-                    {% endif %}>Oldest First</option>
+                    {% endif %}>Oldest Cases First</option>
+        {% endif %}
+    		{% if v == 'r' %}
+          <option value="entry_date_filed desc"
+                  {% if search_form.order_by.value == "entry_date_filed desc" %}
+                  selected="selected"
+                  {% endif %}>Newest Documents First</option>
+          <option value="entry_date_filed asc"
+                  {% if search_form.order_by.value == "entry_date_filed asc" %}
+                  selected="selected"
+                  {% endif %}>Oldest Documents First</option>
         {% endif %}
 
         {% if v == 'o' %}
