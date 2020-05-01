@@ -13,6 +13,7 @@ from django.core.management import call_command
 from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import (
+    APITestCase,
     Client,
     override_settings,
     RequestFactory,
@@ -20,7 +21,11 @@ from django.test import (
     TransactionTestCase,
 )
 from django.utils.timezone import now
-from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_403_FORBIDDEN,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 
 from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
@@ -40,6 +45,8 @@ from cl.search.models import (
     OpinionsCited,
 )
 from cl.stats.models import Event
+from cl.visualizations.models import SCOTUSMap
+from cl.visualizations.api_views import VisualizationViewSet
 
 
 class BasicAPIPageTest(TestCase):
@@ -956,4 +963,59 @@ class BulkDataTest(TestCase):
         self.assertTrue(Court.objects.count() > 0, "Court exist")
         self.assertEqual(
             Court.objects.get(pk="test").full_name, "Testing Supreme Court"
+        )
+
+
+class APIVisualizationTestCase(APITestCase):
+    """Check that visualizations are created properly."""
+
+    fixtures = ["user_with_recap_api_access.json", "api_visualizations.json"]
+
+    def flush_stats():
+        # Flush existing stats (else previous tests cause issues)
+        r = make_redis_interface("STATS")
+        r.flushdb()
+
+    def setUp(self):
+        # Add the permissions to the user.
+        self.user = User.objects.get(pk=6)
+        ps = Permission.objects.filter(codename="has_recap_api_access")
+        self.user.user_permissions.add(*ps)
+        self.flush_stats()
+
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        self.flush_stats()
+
+    def test_no_title_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1221)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def test_no_cluster_start_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1222)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def test_no_cluster_end_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1223)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def test_invalid_cluster_start_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1224)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def test_valid_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1224)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(
+            SCOTUSMap.objects.get().name, "My Valid Visualization"
         )
