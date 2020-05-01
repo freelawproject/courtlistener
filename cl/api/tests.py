@@ -13,13 +13,13 @@ from django.core.management import call_command
 from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import (
-    APITestCase,
     Client,
     override_settings,
     RequestFactory,
     TestCase,
     TransactionTestCase,
 )
+from rest_framework.test import APITestCase
 from django.utils.timezone import now
 from rest_framework.status import (
     HTTP_200_OK,
