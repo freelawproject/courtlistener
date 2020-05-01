@@ -1,0 +1,48 @@
+[
+  {
+    "pk": "1221",
+    "model": "visualizations.SCOTUSMap",
+    "fields": {
+      "title": "",
+      "cluster_start": "111014",
+      "cluster_end": "2674862"
+    }
+  },
+  {
+    "pk": "1222",
+    "model": "visualizations.SCOTUSMap",
+    "fields": {
+      "title": "My Invalid Visualization - No Cluster Start Provided",
+      "cluster_start": "",
+      "cluster_end": "2674862"
+    }
+  },
+  {
+    "pk": "1223",
+    "model": "visualizations.SCOTUSMap",
+    "fields": {
+      "title": "My Invalid Visualization - No Cluster End Provided",
+      "cluster_start": "111014",
+      "cluster_end": ""
+    }
+  },
+  {
+    "pk": "1224",
+    "model": "visualizations.SCOTUSMap",
+    "fields": {
+      "title": "My Invalid Visualization - No Cluster Start Found",
+      "cluster_start": "999999",
+      "cluster_end": "2674862"
+    }
+  },
+  {
+    "pk": "1225",
+    "model": "visualizations.SCOTUSMap",
+    "fields": {
+      "title": "My Valid Visualization",
+      "cluster_start": "999999",
+      "cluster_end": "2674862",
+      "date_created": "2020-05-01T20:28:19Z"
+    }
+  }
+]
