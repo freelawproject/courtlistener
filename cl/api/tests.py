@@ -1013,9 +1013,18 @@ class APIVisualizationTestCase(APITestCase):
 
     def test_valid_visualization_post(self):
         path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1224)
+        data = SCOTUSMap.objects.get(pk=1225)
         response = RequestFactory().post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(
             SCOTUSMap.objects.get().name, "My Valid Visualization"
         )
+
+    def test_valid_response_from_valid_visualization_post(self):
+        path = reverse("visualizations", kwargs={"version": "v3"})
+        data = SCOTUSMap.objects.get(pk=1225)
+        response = RequestFactory().post(path, data, format="json")
+        self.assertEqual(response.data.title, "My Valid Visualization")
+        self.assertEqual(response.data.cluster_start, "111014")
+        self.assertEqual(response.data.cluster_end, "2674862")
+        self.assertEqual(response.data.date_created, "2020-05-01T20:28:19Z")
