@@ -16,6 +16,7 @@ from cl.visualizations.network_utils import (
     graphs_intersect,
     within_max_hops,
 )
+from cl.visualizations.exceptions import TooManyNodes
 
 
 class SCOTUSMap(models.Model):
