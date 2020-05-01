@@ -114,7 +114,7 @@ Thus, `10-public.py` contains default settings for CourtListener and Celery. To 
 
 Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them. 
 
-You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth reading through.
+You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth skimming through. Please don't rename this file; copy it instead. If you rename it, sooner or later you'll accidentally commit the missing file into a PR.
 
 Files that are read later (with higher numbered file names) have access to the 
 context of files that are read earlier. For example, if `01-some-name.py` 

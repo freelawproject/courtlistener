@@ -1,23 +1,21 @@
 # coding=utf-8
 import StringIO
 import os
-
 from datetime import date
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
-from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
-from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import (
     SolrTestCase,
     IndexedSolrTestCase,
@@ -618,7 +616,15 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(r.status_code, HTTP_200_OK)
 
 
-@override_settings(RELATED_USE_CACHE=False,)
+@override_settings(
+    # MLT results should not be cached
+    RELATED_USE_CACHE=False,
+    # Default MLT settings limit the search space to minimize run time.
+    # These limitations are not needed on the small document collections during testing.
+    RELATED_MLT_MINTF=0,
+    RELATED_MLT_MAXQT=9999,
+    RELATED_MLT_MINWL=0,
+)
 class RelatedSearchTest(IndexedSolrTestCase):
     def setUp(self):
         # Add additional user fixtures
@@ -629,7 +635,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
     def test_more_like_this_opinion(self):
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = 1
+        seed_pk = 1  # Paul Debbas v. Franklin
         expected_article_count = 3
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
@@ -654,9 +660,33 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
-    def test_more_like_this_opinion_detail(self):
-        """MoreLikeThis query on opinion detail page (cache must be disabled)"""
-        seed_pk = 1
+    def test_more_like_this_opinion_detail_detail(self):
+        """MoreLikeThis query on opinion detail page with status filter"""
+        seed_pk = 3  # case name cluster 3
+        expected_first_pk = 2  # Howard v. Honda
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            self.client.login(username="admin", password="password")
+        )
+
+        r = self.client.get("/opinion/%i/asdf/" % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        # Test if related opinion exist
+        self.assertGreater(
+            r.content.index(
+                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+            ),
+            0,
+            msg="Related opinion not found.",
+        )
+        self.client.logout()
+
+    @override_settings(RELATED_FILTER_BY_STATUS=None)
+    def test_more_like_this_opinion_detail_no_filter(self):
+        """MoreLikeThis query on opinion detail page (without filter)"""
+        seed_pk = 1  # Paul Debbas v. Franklin
         expected_first_pk = 2  # Howard v. Honda
         expected_second_pk = 3  # case name cluster 3
 

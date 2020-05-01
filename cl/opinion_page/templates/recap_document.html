@@ -36,7 +36,7 @@
             </h4>
         </div>
 
-        {% include "includes/rd_admin_tools.html" %}
+        {% include "includes/rd_admin_tools.html" with d=document.docket_entry.docket de=document.docket_entry rd=document %}
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
