@@ -9,8 +9,6 @@ from cl.search.models import OpinionCluster
 class JSONVersionSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId,
 ):
-    queryset = JSONVersion.objects.all()
-
     class Meta:
         model = JSONVersion
         fields = "__all__"
