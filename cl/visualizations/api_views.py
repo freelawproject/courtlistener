@@ -21,7 +21,7 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
 
     def get_queryset(self):
         return JSONVersion.objects.filter(
-            map__user=self.request.user
+            Q(map__user=self.request.user) | Q(map__published=True)
         ).order_by("-id")
 
 
