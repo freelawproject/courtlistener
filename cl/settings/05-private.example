@@ -9,13 +9,11 @@ DEBUG = True
 DEVELOPMENT = True
 
 if DEVELOPMENT:
-    ALLOWED_HOSTS = ['*']
+    ALLOWED_HOSTS = ["*"]
 else:
-    ALLOWED_HOSTS = ['127.0.0.1', '.courtlistener.com']
+    ALLOWED_HOSTS = ["127.0.0.1", ".courtlistener.com"]
 
-ADMINS = (
-    ('Joe Schmoe', 'joe@courtlistener.com'),
-)
+ADMINS = (("Joe Schmoe", "joe@courtlistener.com"),)
 
 MANAGERS = ADMINS
 
@@ -30,73 +28,73 @@ DATABASES = {
         'CONN_MAX_AGE': 600,
     }
 }
-API_READ_DATABASES = ['replica']
+API_READ_DATABASES = ["replica"]
 
 
-SOLR_HOST = 'http://cl-solr:8983'
+SOLR_HOST = "http://cl-solr:8983"
 SOLR_RECAP_HOST = SOLR_HOST
-SOLR_PAGERANK_DEST_DIR = '/tmp/'
+SOLR_PAGERANK_DEST_DIR = "/tmp/"
 
-REDIS_HOST = 'cl-redis'
+REDIS_HOST = "cl-redis"
 REDIS_PORT = 6379
 
-DOCKER_SELENIUM_HOST = 'http://cl-selenium:4444/wd/hub'
-DOCKER_DJANGO_HOST = 'cl-django'
+DOCKER_SELENIUM_HOST = "http://cl-selenium:4444/wd/hub"
+DOCKER_DJANGO_HOST = "cl-django"
 
 SELENIUM_HEADLESS = False
 
 # Make these unique, and don't share it with anybody.
-SECRET_KEY = 'your-secret-key'
+SECRET_KEY = "your-secret-key"
 
 
 # Payment secrets
-EIN_SECRET = ''  # The business tax ID.
+EIN_SECRET = ""  # The business tax ID.
 if DEVELOPMENT:
     PAYMENT_TESTING_MODE = True
 else:
     PAYMENT_TESTING_MODE = False
 if PAYMENT_TESTING_MODE:
-    PAYPAL_ENDPOINT = 'https://api.sandbox.paypal.com'
-    PAYPAL_ACCOUNT = 'donate@free.law'
-    PAYPAL_CLIENT_ID = ''
-    PAYPAL_SECRET_KEY = ''
-    STRIPE_SECRET_KEY = ''
-    STRIPE_PUBLIC_KEY = ''
+    PAYPAL_ENDPOINT = "https://api.sandbox.paypal.com"
+    PAYPAL_ACCOUNT = "donate@free.law"
+    PAYPAL_CLIENT_ID = ""
+    PAYPAL_SECRET_KEY = ""
+    STRIPE_SECRET_KEY = ""
+    STRIPE_PUBLIC_KEY = ""
 else:
-    PAYPAL_ENDPOINT = 'https://api.paypal.com'
-    PAYPAL_ACCOUNT = 'donate@free.law'
-    PAYPAL_CLIENT_ID = ''
-    PAYPAL_SECRET_KEY = ''
-    STRIPE_SECRET_KEY = ''
-    STRIPE_PUBLIC_KEY = ''
+    PAYPAL_ENDPOINT = "https://api.paypal.com"
+    PAYPAL_ACCOUNT = "donate@free.law"
+    PAYPAL_CLIENT_ID = ""
+    PAYPAL_SECRET_KEY = ""
+    STRIPE_SECRET_KEY = ""
+    STRIPE_PUBLIC_KEY = ""
 
 # Key for Follow the Money API
-FTM_KEY = ''
+FTM_KEY = ""
 FTM_LAST_UPDATED = date.today()
 
 # Internet Archive
-IA_ACCESS_KEY = ''
-IA_SECRET_KEY = ''
+IA_ACCESS_KEY = ""
+IA_SECRET_KEY = ""
 IA_COLLECTIONS = []
-IA_OA_COLLECTIONS = ['uscourtsoralargumentsdev']
+IA_OA_COLLECTIONS = ["uscourtsoralargumentsdev"]
 
 
 # Mailchimp secret (used for webhook URLs)
-MAILCHIMP_SECRET = ''
-MAILCHIMP_API_KEY = ''
+MAILCHIMP_SECRET = ""
+MAILCHIMP_API_KEY = ""
 
 # PACER
-PACER_USERNAME = ''
-PACER_PASSWORD = ''
+PACER_USERNAME = ""
+PACER_PASSWORD = ""
 
-#LASC MAP
-LASC_USERNAME = ''
-LASC_PASSWORD = ''
+# LASC MAP
+LASC_USERNAME = ""
+LASC_PASSWORD = ""
 
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
-    'PATH': os.path.join(here, 'google_auth.json'),
-    'PROJECT': 'courtlistener-development',
+    "PATH": os.path.join(here, "google_auth.json"),
+    "PROJECT": "courtlistener-development",
 }
 
 # Local time zone for this installation. Choices can be found here:
@@ -104,13 +102,11 @@ GOOGLE_AUTH = {
 # although not all choices may be available on all operating systems.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = 'America/Los_Angeles'
+TIME_ZONE = "America/Los_Angeles"
 
 FUNDRAISING_MODE = False
 
-AWS_ACCESS_KEY_ID = ''
-AWS_SECRET_ACCESS_KEY = ''
+AWS_ACCESS_KEY_ID = ""
+AWS_SECRET_ACCESS_KEY = ""
 
 # Development credentials available upon request
-
-
