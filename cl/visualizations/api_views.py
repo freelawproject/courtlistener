@@ -58,5 +58,5 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
         viz = serializer.save(
             user=self.request.user, cluster_start=start, cluster_end=end
         )
-        status, viz = build_visualization(viz, end)
+        status, viz = build_visualization(viz)
         return status
