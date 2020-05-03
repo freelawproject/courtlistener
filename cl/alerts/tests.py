@@ -82,10 +82,10 @@ class DocketAlertTest(TestCase):
         # Create a new docket
         self.docket = Docket.objects.create(
             source=Docket.RECAP,
-            court_id="scotus",
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
+            court_id="cand",
+            pacer_case_id="186730",
+            docket_number="06-cv-07294",
+            case_name="Foley v. Bates",
         )
 
         # Add an alert for it

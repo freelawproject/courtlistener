@@ -11,6 +11,7 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
+from juriscraper.pacer import CaseQuery, PacerSession
 
 
 def make_alert_key(d_pk):
@@ -41,6 +42,17 @@ def enqueue_docket_alert(d_pk):
     return True
 
 
+def update_docket_date_last_filing(docket):
+    s = PacerSession(
+        username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
+    )
+    s.login()
+    report = CaseQuery(docket.court_id, s)
+    report.query(docket.pacer_case_id)
+    docket.date_last_filing = report.metadata["date_last_filing"]
+    docket.date_last_filing_updated = now()
+
+
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
 def send_docket_alert(d_pk, since):
@@ -62,20 +74,57 @@ def send_docket_alert(d_pk, since):
             date_created__gte=since, docket=docket
         )
 
+        trigger = False
         if new_des.count() > 0:
+            trigger = True
+        elif (
+            settings.PACER_USERNAME
+        ):  # if no credentials available, scraping is pointless. Required to pass tests.
+            # No new docket entries, check date_last_filing
+            if docket.date_last_filing_updated is not None:
+                time_since_last_scrape = (
+                    now() - docket.date_last_filing_updated
+                )
+            if (
+                not docket.date_last_filing_updated
+                or time_since_last_scrape.total_seconds() > 3600
+            ):  # Scrape if date_last_filing updated more than an hour ago or nonexistent
+                update_docket_date_last_filing(docket)
+            if docket.date_last_filing > since.date():
+                trigger = True
+        if trigger:
             # Notify every user that's subscribed to this alert.
-            case_name = trunc(best_case_name(docket), 100, ellipsis="...")
-            subject_template = loader.get_template("docket_alert_subject.txt")
-            subject = subject_template.render(
-                {
-                    "docket": docket,
-                    "count": new_des.count(),
-                    "case_name": case_name,
-                }
-            ).strip()  # Remove newlines that editors can insist on adding.
-            email_context = {"new_des": new_des, "docket": docket}
-            txt_template = loader.get_template("docket_alert_email.txt")
-            html_template = loader.get_template("docket_alert_email.html")
+            if new_des.count() > 0:
+                case_name = trunc(best_case_name(docket), 100, ellipsis="...")
+                subject_template = loader.get_template(
+                    "docket_alert_subject.txt"
+                )
+                subject = subject_template.render(
+                    {
+                        "docket": docket,
+                        "count": new_des.count(),
+                        "case_name": case_name,
+                    }
+                ).strip()  # Remove newlines that editors can insist on adding.
+                email_context = {"new_des": new_des, "docket": docket}
+                txt_template = loader.get_template("docket_alert_email.txt")
+                html_template = loader.get_template("docket_alert_email.html")
+            else:
+                case_name = trunc(best_case_name(docket), 100, ellipsis="...")
+                subject_template = loader.get_template(
+                    "pacer_docket_alert_subject.txt"
+                )
+                subject = subject_template.render(
+                    {"docket": docket, "case_name": case_name,}
+                ).strip()  # Remove newlines that editors can insist on adding.
+                email_context = {"docket": docket}
+                txt_template = loader.get_template(
+                    "pacer_docket_alert_email.txt"
+                )
+                html_template = loader.get_template(
+                    "pacer_docket_alert_email.html"
+                )
+
             messages = []
             for email_address in email_addresses:
                 msg = EmailMultiAlternatives(
