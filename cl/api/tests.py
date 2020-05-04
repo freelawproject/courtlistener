@@ -19,17 +19,14 @@ from django.test import (
     TestCase,
     TransactionTestCase,
 )
-from rest_framework.test import (
-    APIClient,
-    APITestCase
-)
+from rest_framework.test import APIClient, APITestCase
 from django.utils.timezone import now
 from rest_framework.authtoken.models import Token
 from rest_framework.status import (
     HTTP_200_OK,
+    HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
-    HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
 from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
@@ -52,7 +49,6 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.visualizations.models import SCOTUSMap
 from cl.visualizations.api_views import VisualizationViewSet
-
 
 
 class BasicAPIPageTest(TestCase):
@@ -975,7 +971,10 @@ class BulkDataTest(TestCase):
 class APIVisualizationTestCase(APITestCase):
     """Check that visualizations are created properly through the API."""
 
-    fixtures = ["judge_judy.json", "test_objects_search.json", "user_with_recap_api_access.json"]
+    fixtures = [
+        "api_scotus_map_data.json",
+        "user_with_recap_api_access.json",
+    ]
 
     def setUp(self):
         u = User.objects.get(pk=6)
@@ -987,63 +986,78 @@ class APIVisualizationTestCase(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=token_header)
 
     def test_no_title_visualization_post(self):
-        path = "/api/rest/v3/visualizations/"
+        path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "",
-            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
-            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+            "cluster_start": "/api/rest/v3/clusters/1",
+            "cluster_end": "/api/rest/v3/clusters/2",
         }
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         response_data = response.json()
-        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
+        self.assertContains(
+            response_data,
+            "This field may not be blank." or "This field may not be null.",
+        )
 
     def test_no_cluster_start_visualization_post(self):
-        path = "/api/rest/v3/visualizations/"
+        path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster Start Provided",
             "cluster_start": "",
-            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+            "cluster_end": "/api/rest/v3/clusters/2",
         }
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         response_data = response.json()
-        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
+        self.assertContains(
+            response_data,
+            "This field may not be blank." or "This field may not be null.",
+        )
 
     def test_no_cluster_end_visualization_post(self):
-        path = "/api/rest/v3/visualizations/"
+        path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster End Provided",
-            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
+            "cluster_start": "/api/rest/v3/clusters/1",
             "cluster_end": "",
         }
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         response_data = response.json()
-        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
+        self.assertContains(
+            response_data,
+            "This field may not be blank." or "This field may not be null.",
+        )
 
     def test_invalid_cluster_start_visualization_post(self):
-        path = "/api/rest/v3/visualizations/"
+        path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster Exists",
-            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/999",
-            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+            "cluster_start": "/api/rest/v3/clusters/999",
+            "cluster_end": "/api/rest/v3/clusters/2",
         }
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         response_data = response.json()
-        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
+        self.assertIn(
+            response_data,
+            "This field may not be blank." or "This field may not be null.",
+        )
 
     def test_valid_visualization_post(self):
-        path = "/api/rest/v3/visualizations/"
+        path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Valid Visualization",
-            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
-            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
         }
         response = self.client.post(path, data, format="json")
-        self.assertIsInstance(response, JsonResponse)
-        self.assertEqual(response.status_code, HTTP_200_OK) 
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
         response_data = response.json()
         self.assertContains(response_data, "date_created")
         self.assertEqual(response_data.title, "My Valid Visualization")
