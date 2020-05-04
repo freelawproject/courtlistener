@@ -1,6 +1,6 @@
 # coding=utf-8
 from __future__ import print_function
-
+import pdb
 import json
 import shutil
 from datetime import timedelta, date
@@ -19,10 +19,15 @@ from django.test import (
     TestCase,
     TransactionTestCase,
 )
-from rest_framework.test import APITestCase
+from rest_framework.test import (
+    APIClient,
+    APITestCase
+)
 from django.utils.timezone import now
+from rest_framework.authtoken.models import Token
 from rest_framework.status import (
     HTTP_200_OK,
+    HTTP_400_BAD_REQUEST,
     HTTP_403_FORBIDDEN,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -47,6 +52,7 @@ from cl.search.models import (
 from cl.stats.models import Event
 from cl.visualizations.models import SCOTUSMap
 from cl.visualizations.api_views import VisualizationViewSet
+
 
 
 class BasicAPIPageTest(TestCase):
@@ -967,64 +973,79 @@ class BulkDataTest(TestCase):
 
 
 class APIVisualizationTestCase(APITestCase):
-    """Check that visualizations are created properly."""
+    """Check that visualizations are created properly through the API."""
 
-    fixtures = ["user_with_recap_api_access.json", "api_visualizations.json"]
-
-    def flush_stats():
-        # Flush existing stats (else previous tests cause issues)
-        r = make_redis_interface("STATS")
-        r.flushdb()
+    fixtures = ["judge_judy.json", "test_objects_search.json", "user_with_recap_api_access.json"]
 
     def setUp(self):
-        # Add the permissions to the user.
-        self.user = User.objects.get(pk=6)
+        u = User.objects.get(pk=6)
         ps = Permission.objects.filter(codename="has_recap_api_access")
-        self.user.user_permissions.add(*ps)
-        self.flush_stats()
-
-    def tearDown(self):
-        SCOTUSMap.objects.all().delete()
-        self.flush_stats()
+        u.user_permissions.add(*ps)
+        token, created = Token.objects.get_or_create(user=u)
+        token_header = "Token %s" % token
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=token_header)
 
     def test_no_title_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1221)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+        path = "/api/rest/v3/visualizations/"
+        data = {
+            "title": "",
+            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
+            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+        }
+        response = self.client.post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response_data = response.json()
+        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
 
     def test_no_cluster_start_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1222)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+        path = "/api/rest/v3/visualizations/"
+        data = {
+            "title": "My Invalid Visualization - No Cluster Start Provided",
+            "cluster_start": "",
+            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+        }
+        response = self.client.post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response_data = response.json()
+        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
 
     def test_no_cluster_end_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1223)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+        path = "/api/rest/v3/visualizations/"
+        data = {
+            "title": "My Invalid Visualization - No Cluster End Provided",
+            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
+            "cluster_end": "",
+        }
+        response = self.client.post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response_data = response.json()
+        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
 
     def test_invalid_cluster_start_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1224)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_500_INTERNAL_SERVER_ERROR)
+        path = "/api/rest/v3/visualizations/"
+        data = {
+            "title": "My Invalid Visualization - No Cluster Exists",
+            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/999",
+            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+        }
+        response = self.client.post(path, data, format="json")
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response_data = response.json()
+        self.assertContains(response_data, 'This field may not be blank.' or 'This field may not be null.')
 
     def test_valid_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1225)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(
-            SCOTUSMap.objects.get().name, "My Valid Visualization"
-        )
-
-    def test_valid_response_from_valid_visualization_post(self):
-        path = reverse("visualizations", kwargs={"version": "v3"})
-        data = SCOTUSMap.objects.get(pk=1225)
-        response = RequestFactory().post(path, data, format="json")
-        self.assertEqual(response.data.title, "My Valid Visualization")
-        self.assertEqual(response.data.cluster_start, "111014")
-        self.assertEqual(response.data.cluster_end, "2674862")
-        self.assertEqual(response.data.date_created, "2020-05-01T20:28:19Z")
+        path = "/api/rest/v3/visualizations/"
+        data = {
+            "title": "My Valid Visualization",
+            "cluster_start": "http://localhost:8000/api/rest/v3/clusters/1",
+            "cluster_end": "http://localhost:8000/api/rest/v3/clusters/2",
+        }
+        response = self.client.post(path, data, format="json")
+        self.assertIsInstance(response, JsonResponse)
+        self.assertEqual(response.status_code, HTTP_200_OK) 
+        response_data = response.json()
+        self.assertContains(response_data, "date_created")
+        self.assertEqual(response_data.title, "My Valid Visualization")
+        self.assertEqual(response_data.data.cluster_start, "111014")
+        self.assertEqual(response_data.data.cluster_end, "2674862")

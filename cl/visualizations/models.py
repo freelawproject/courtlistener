@@ -18,7 +18,6 @@ from cl.visualizations.network_utils import (
 )
 from cl.visualizations.exceptions import TooManyNodes
 
-
 class SCOTUSMap(models.Model):
     user = models.ForeignKey(
         User,
