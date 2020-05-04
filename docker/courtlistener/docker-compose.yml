@@ -1,5 +1,9 @@
 # Run using `docker-compose up`
 version: "3.7"
+
+volumes:
+  pg-data:
+
 networks:
   cl_net_overlay:
     driver: bridge
@@ -51,7 +55,7 @@ services:
       - cl-redis
     volumes:
       - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
-      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+      - pg-data:/var/run/postgresql
       - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
     networks:
       - cl_net_overlay
@@ -69,7 +73,7 @@ services:
       - "8000:8000"
     volumes:
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
-      - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+      - pg-data:/var/run/postgresql
     networks:
       - cl_net_overlay
 
@@ -77,8 +81,8 @@ services:
     container_name: cl-selenium
     image: selenium/standalone-chrome-debug
     ports:
-      - 4444:4444  # Selenium
-      - 5900:5900  # VNC server
+      - 4444:4444 # Selenium
+      - 5900:5900 # VNC server
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
     networks:
