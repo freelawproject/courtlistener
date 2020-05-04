@@ -51,6 +51,7 @@ def update_docket_date_last_filing(docket):
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
     docket.date_last_filing_updated = now()
+    docket.save()
 
 
 # Ignore the result or else we'll use a lot of memory.
