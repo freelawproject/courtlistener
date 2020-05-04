@@ -9,6 +9,8 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+from datetime import datetime
+from django.conf import settings
 
 
 class AlertTest(TestCase):
@@ -102,6 +104,19 @@ class DocketAlertTest(TestCase):
         )
         self.after = now()
 
+        # Create a new docket without any entries
+        self.docket2 = Docket.objects.create(
+            source=Docket.RECAP,
+            court_id="dcd",
+            pacer_case_id="191424",
+            docket_number="17-cv-02534",
+            case_name="ENGLISH v. TRUMP",
+        )
+        # Add an alert for it
+        DocketAlert.objects.create(docket=self.docket2, user_id=1001)
+        self.old = datetime(2018, 7, 17, 23, 55, 59, 100)
+        self.new = datetime(2018, 7, 18, 23, 55, 59, 100)
+
     def tearDown(self):
         Docket.objects.all().delete()
         DocketAlert.objects.all().delete()
@@ -115,6 +130,21 @@ class DocketAlertTest(TestCase):
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_triggering_pacer_docket_alert(self):
+        """Does the alert trigger for pacer date_last_filing?"""
+        send_docket_alert(self.docket2.pk, self.old)
+        # Does the alert go out? It should.
+        if (
+            settings.PACER_USERNAME
+        ):  # hack to make tests work even without credentials
+            self.assertEqual(len(mail.outbox), 1)
+
+    def test_nothing_happens_for_timers_after_pacer_docket_date(self):
+        """Do we avoid sending alerts for timers after pacer date_last_filing?"""
+        send_docket_alert(self.docket2.pk, self.new)
+        # Do zero emails go out? None should.
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_nothing_happens_for_timers_after_de_creation(self):
         """Do we avoid sending alerts for timers after the de was created?"""
