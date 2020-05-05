@@ -289,11 +289,12 @@ class PacerFetchQueue(models.Model):
         on_delete=models.CASCADE,
         null=True,
     )
+
     # PDF and attachment pages use this
     recap_document = models.ForeignKey(
         RECAPDocument,
-        help_text="The ID of the RECAP Document or attachment page in the "
-        "CourtListener databae that you wish to fetch or update.",
+        help_text="The ID of the RECAP Document in the CourtListener databae "
+        "that you wish to fetch or update.",
         related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
