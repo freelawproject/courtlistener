@@ -1,6 +1,5 @@
 # coding=utf-8
 from __future__ import print_function
-import pdb
 import json
 import shutil
 from datetime import timedelta, date
@@ -1052,8 +1051,9 @@ class APIVisualizationTestCase(APITestCase):
 
     def test_valid_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
+        title = "My Valid Visualization"
         data = {
-            "title": "My Valid Visualization",
+            "title": title,
             "cluster_start": reverse(
                 "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
             ),
@@ -1064,7 +1064,7 @@ class APIVisualizationTestCase(APITestCase):
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         res = response.json()
-        self.assertEqual(res["title"], "My Valid Visualization")
+        self.assertEqual(res["title"], title)
 
         """cluster_start and cluster_end are reversed"""
         self.assertEqual(
