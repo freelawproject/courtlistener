@@ -835,7 +835,7 @@ class Docket(models.Model):
                 # Ensure that loops to bleed into each other
                 out_copy = out.copy()
                 out_copy.update(rd_out)
-                out_copy.update(rd_out)
+                out_copy.update(de_out)
 
                 search_list.append(normalize_search_dicts(out_copy))
 
