@@ -1066,7 +1066,7 @@ class APIVisualizationTestCase(APITestCase):
         res = response.json()
         self.assertEqual(res["title"], title)
 
-        """cluster_start and cluster_end are reversed"""
+        # cluster_start and cluster_end are reversed
         self.assertEqual(
             res["cluster_start"],
             "http://testserver%s"
