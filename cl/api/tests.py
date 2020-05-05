@@ -989,60 +989,65 @@ class APIVisualizationTestCase(APITestCase):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "",
-            "cluster_start": "/api/rest/v3/clusters/1",
-            "cluster_end": "/api/rest/v3/clusters/2",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
         }
         response = self.client.post(path, data, format="json")
+        res = response.json()
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        response_data = response.json()
-        self.assertContains(
-            response_data,
-            "This field may not be blank." or "This field may not be null.",
-        )
+        self.assertEqual(res["title"][0], "This field may not be blank.")
 
     def test_no_cluster_start_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster Start Provided",
             "cluster_start": "",
-            "cluster_end": "/api/rest/v3/clusters/2",
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
         }
         response = self.client.post(path, data, format="json")
+        res = response.json()
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        response_data = response.json()
-        self.assertContains(
-            response_data,
-            "This field may not be blank." or "This field may not be null.",
+        self.assertEqual(
+            res["cluster_start"][0], "This field may not be null."
         )
 
     def test_no_cluster_end_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster End Provided",
-            "cluster_start": "/api/rest/v3/clusters/1",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
             "cluster_end": "",
         }
         response = self.client.post(path, data, format="json")
+        res = response.json()
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        response_data = response.json()
-        self.assertContains(
-            response_data,
-            "This field may not be blank." or "This field may not be null.",
-        )
+        self.assertEqual(res["cluster_end"][0], "This field may not be null.")
 
     def test_invalid_cluster_start_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
         data = {
             "title": "My Invalid Visualization - No Cluster Exists",
-            "cluster_start": "/api/rest/v3/clusters/999",
-            "cluster_end": "/api/rest/v3/clusters/2",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 999}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
         }
         response = self.client.post(path, data, format="json")
+        res = response.json()
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        response_data = response.json()
-        self.assertIn(
-            response_data,
-            "This field may not be blank." or "This field may not be null.",
+        self.assertEqual(
+            res["cluster_start"][0],
+            "Invalid hyperlink - Object does not exist.",
         )
 
     def test_valid_visualization_post(self):
@@ -1058,8 +1063,21 @@ class APIVisualizationTestCase(APITestCase):
         }
         response = self.client.post(path, data, format="json")
         self.assertEqual(response.status_code, HTTP_201_CREATED)
-        response_data = response.json()
-        self.assertContains(response_data, "date_created")
-        self.assertEqual(response_data.title, "My Valid Visualization")
-        self.assertEqual(response_data.data.cluster_start, "111014")
-        self.assertEqual(response_data.data.cluster_end, "2674862")
+        res = response.json()
+        self.assertEqual(res["title"], "My Valid Visualization")
+
+        """cluster_start and cluster_end are reversed"""
+        self.assertEqual(
+            res["cluster_start"],
+            "http://testserver%s"
+            % reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        )
+        self.assertEqual(
+            res["cluster_end"],
+            "http://testserver%s"
+            % reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+        )
