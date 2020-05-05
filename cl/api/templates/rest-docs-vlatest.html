@@ -852,9 +852,9 @@ PACER_TO_CL_IDS = {
     </p>
       To create a new visualization, POST a title, a starting cluster ID and an ending cluster ID to <strong>{% url "scotusmap-list" version="v3" %}</strong>:</p>
     <pre class="scrollable">curl -X POST \
-  --data 'cluster_start=xyz' \
-  --data 'cluster_end=abc' \
-  --data 'title=A map from xyz to abc' \
+  --data 'cluster_start=/api/rest/v3/clusters/105659/' \
+  --data 'cluster_end=/api/rest/v3/clusters/111891/' \
+  --data 'title=A map from Trop to Salerno' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   {% get_full_host %}{% url "scotusmap-list" version="v3" %}</pre>
     <p>A visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
