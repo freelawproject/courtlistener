@@ -462,6 +462,9 @@
     var _paq = window._paq || [];
     _paq.push(['trackPageView']);
     _paq.push(['enableLinkTracking']);
+    {% if user.is_authenticated %}
+      _paq.push(['setUserId', '{{ user.pk }}']);
+    {% endif %}
     (function () {
       var u = "{{ MATOMO_FRONTEND_BASE_URL }}";
       _paq.push(['setTrackerUrl', u + 'matomo.php']);
