@@ -857,7 +857,8 @@ PACER_TO_CL_IDS = {
   --data 'title=A map from Trop to Salerno' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   {% get_full_host %}{% url "scotusmap-list" version="v3" %}</pre>
-    <p>A visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
+    <p>Note that the <code>cluster_start</code> and <code>cluster_end</code> parameters use URLs instead of IDs. This is in keeping with our API, which uses hyperlinks as identifiers.</p>
+    <p>Once <code>POST</code>ed, a visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
     <p>Changing data for an existing item can be done via <code>PATCH</code> requests. For example, to make an item <code>published</code> (so it's publicly viewable), you can do:</p>
     <pre class="scrollable">curl -X PATCH \
   --data 'published=True' \
