@@ -483,7 +483,7 @@ class Position(models.Model):
             (
                 # Acting
                 (ACTING_JUDGE, "Acting Judge"),
-                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge", ),
+                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge",),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
@@ -541,15 +541,20 @@ class Position(models.Model):
             (
                 (ATTORNEY_GENERAL, "Attorney General"),
                 (ASSISTANT_ATTORNEY_GENERAL, "Assistant Attorney General"),
-                (SPECIAL_ASSISTANT_ATTORNEY_GENERAL, "Special Assistant Attorney General"),
+                (
+                    SPECIAL_ASSISTANT_ATTORNEY_GENERAL,
+                    "Special Assistant Attorney General",
+                ),
                 (SENIOR_COUNSEL, "Senior Counsel"),
                 (DEPUTY_SOLICITOR_GENERAL, "Deputy Solicitor General"),
             ),
         ),
         (
             "Appointing Authority",
-            ((USA_PRESIDENT, "President of the United States"),
-              (GOVERNOR, "Governor"),),
+            (
+                (USA_PRESIDENT, "President of the United States"),
+                (GOVERNOR, "Governor"),
+            ),
         ),
         (
             "Clerkships",
