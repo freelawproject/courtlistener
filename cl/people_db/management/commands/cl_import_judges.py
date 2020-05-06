@@ -360,9 +360,8 @@ class Command(VerboseCommand):
                     + row.NAME_LAST
                 )
 
-        if len(bad_record) > 0:
-            for b in bad_record:
-                print(b)
+        for b in bad_record:
+            print(b)
 
     VALID_ACTIONS = {
         "import-all": import_all,
