@@ -488,7 +488,7 @@ body {
 }
 
 /* New case view styling, including citations */
-#default-text pre {
+#default-text pre, .plaintext .citation {
   background-color: transparent;
   margin: 0;
   padding: 0;
