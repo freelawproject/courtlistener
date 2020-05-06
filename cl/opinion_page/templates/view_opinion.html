@@ -421,7 +421,12 @@
                         {% endif %}
                             <div id="opinion-content"> {# used by Zotero, Juris-M #}
                                 {% if sub_opinion.html_with_citations %}
-                                  <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+                                  {% if cluster.source == "C" %}
+                                    {# It's a PDF with no HTML enrichment #}
+                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe }}</div>
+                                  {% else %}
+                                    <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+                                  {% endif %}
                                 {% elif sub_opinion.html_columbia %}
                                   <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
                                 {% elif sub_opinion.html_lawbox %}
