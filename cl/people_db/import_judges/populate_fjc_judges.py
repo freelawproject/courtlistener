@@ -30,8 +30,8 @@ from cl.people_db.models import (
     Source,
 )
 from cl.people_db.management.constants import (
-    BANKRUPTCY_COURTS,
-    DISTRICT_COURTS,
+    FJC_BANKRUPTCY_COURTS,
+    FJC_DISTRICT_COURTS,
 )
 from django.core.exceptions import ValidationError
 
@@ -675,12 +675,11 @@ def make_mag_bk_judge(item, testing=False):
     SOURCE: https://www.uscourts.gov/judicial-milestones/phyllis-m-jones
     """
 
-    name = "%s: %s %s" % (
-        item["CL_ID"],
-        item["NAME_FIRST"],
-        item["NAME_LAST"],
-    )
+    name = "{CL_ID}: {NAME_FIRST} {NAME_LAST}".format(**item)
     print("Now processing: %s" % name)
+
+    if Person.objects.filter(cl_id=item["CL_ID"]).exists():
+        raise ValidationError("CL_ID already exists.")
 
     if not pd.isnull(item["NAME_MIDDLE"]):
         if len(item["NAME_MIDDLE"]) == 1:
@@ -704,9 +703,6 @@ def make_mag_bk_judge(item, testing=False):
         cl_id=item["CL_ID"],
     )
 
-    if Person.objects.filter(cl_id=item["CL_ID"]).exists():
-        raise ValidationError("CL_ID already exists.")
-
     if Person.objects.filter(
         name_first=item["NAME_FIRST"],
         name_middle=item["NAME_MIDDLE"],
@@ -719,12 +715,13 @@ def make_mag_bk_judge(item, testing=False):
 
     # Add position.
     if re.search("Bankruptcy", item["POSITION"]):
-        position_type = "jud"
-        court = BANKRUPTCY_COURTS.get(item["COURT"])
-        print(court)
+        position_type = Position.JUDGE
+        if item["COURT"]:
+            court = FJC_BANKRUPTCY_COURTS.get(item["COURT"])
     else:
-        position_type = "mag"
-        court = DISTRICT_COURTS.get(item["COURT"])
+        position_type = Position.MAGISTRATE
+        if item["COURT"]:
+            court = FJC_DISTRICT_COURTS.get(item["COURT"])
 
     date_start = process_date_string(item["START_DATE"])
 

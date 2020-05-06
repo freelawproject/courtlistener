@@ -412,88 +412,154 @@ class School(models.Model):
 class Position(models.Model):
     """A role held by a person, and the details about it."""
 
+    JUDGE = "jud"
+    # Acting
+    ACTING_JUDGE = "act-jud"
+    ACTING_PRESIDING_JUDGE = "act-pres-jud"
+    # Associate
+    ASSOCIATE_JUDGE = "ass-jud"
+    ASSOCIATE_CHIEF_JUDGE = "ass-c-jud"
+    ASSOCIATE_PRESIDING_JUDGE = "ass-pres-jud"
+    JUSTICE = "jus"
+    # Chief
+    CHIEF_JUDGE = "c-jud"
+    CHIEF_JUSTICE = "c-jus"
+    CHIEF_MAGISTRATE = "c-mag"
+    CHIEF_SPECIAL_MASTER = "c-spec-m"
+    PRESIDING_JUDGE = "pres-jud"
+    PRESIDING_JUSTICE = "pres-jus"
+    PRESIDING_MAGISTRATE = "pres-mag"
+    # Commissioner
+    COMMISSIONER = "com"
+    DEPUTY_COMMISSIONER = "com-dep"
+    # Pro Tem
+    JUDGE_PRO_TEM = "jud-pt"
+    JUSTICE_PRO_TEM = "jus-pt"
+    MAGISTRATE_PRO_TEM = "mag-pt"
+    # Referee
+    JUDGE_TRIAL_REFEREE = "ref-jud-tr"
+    OFFICIAL_REFEREE = "ref-off"
+    STATE_TRIAL_REFEREE = "ref-state-trial"
+    # Retired
+    ACTIVE_RETIRED_JUSTICE = "ret-act-jus"
+    RETIRED_ASSOCIATE_JUDGE = "ret-ass-jud"
+    RETIRED_CHIEF_JUDGE = "ret-c-jud"
+    RETIRED_JUSTICE = "ret-jus"
+    SENIOR_JUDGE = "ret-senior-jud"
+    # Special
+    SPECIAL_CHAIRMAN = "spec-chair"
+    SPECIAL_JUDGE = "spec-jud"
+    SPECIAL_MASTER = "spec-m"
+    SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES = "spec-scjcbc"
+    # Other
+    CHAIRMAN = "chair"
+    CHANCELLOR = "chan"
+    MAGISTRATE = "mag"
+    PRESIDENT = "presi-jud"
+    RESERVE_JUDGE = "res-jud"
+    TRIAL_JUDGE = "trial-jud"
+    VICE_CHANCELLOR = "vice-chan"
+    VICE_CHIEF_JUDGE = "vice-cj"
+    # Attorney General
+    ATTORNEY_GENERAL = "att-gen"
+    ASSISTANT_ATTORNEY_GENERAL = "att-gen-ass"
+    SPECIAL_ASSISTANT_ATTORNEY_GENERAL = "att-gen-ass-spec"
+    SENIOR_COUNSEL = "sen-counsel"
+    DEPUTY_SOLICITOR_GENERAL = "dep-sol-gen"
+    # More roles
+    USA_PRESIDENT = "pres"
+    GOVERNOR = "gov"
+    CLERK = "clerk"
+    STAFF_ATTORNEY = "staff-atty"
+    PROFESSOR = "prof"
+    PRACTITIONER = "Practitioner"
+    PROSECUTOR = "Prosecutor"
+    PUBLIC_DEFENDER = "Public Defender"
+    LEGISLATOR = "legis"
+
     POSITION_TYPES = (
         (
             "Judge",
             (
                 # Acting
-                ("act-jud", "Acting Judge"),
-                ("act-pres-jud", "Acting Presiding Judge"),
+                (ACTING_JUDGE, "Acting Judge"),
+                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge", ),
                 # Associate
-                ("ass-jud", "Associate Judge"),
-                ("ass-c-jud", "Associate Chief Judge"),
-                ("ass-pres-jud", "Associate Presiding Judge"),
-                ("jud", "Judge"),
-                ("jus", "Justice"),
+                (ASSOCIATE_JUDGE, "Associate Judge"),
+                (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
+                (ASSOCIATE_PRESIDING_JUDGE, "Associate Presiding Judge"),
+                (JUDGE, "Judge"),
+                (JUSTICE, "Justice"),
                 # Chief
-                ("c-jud", "Chief Judge"),
-                ("c-jus", "Chief Justice"),
-                ("c-mag", "Chief Magistrate"),
-                ("c-spec-m", "Chief Special Master"),
-                ("pres-jud", "Presiding Judge"),
-                ("pres-jus", "Presiding Justice"),
-                ("pres-mag", "Presiding Magistrate"),
+                (CHIEF_JUDGE, "Chief Judge"),
+                (CHIEF_JUSTICE, "Chief Justice"),
+                (CHIEF_MAGISTRATE, "Chief Magistrate"),
+                (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
+                (PRESIDING_JUDGE, "Presiding Judge"),
+                (PRESIDING_JUSTICE, "Presiding Justice"),
+                (PRESIDING_MAGISTRATE, "Presiding Magistrate"),
                 # Commissioner
-                ("com", "Commissioner"),
-                ("com-dep", "Deputy Commissioner"),
+                (COMMISSIONER, "Commissioner"),
+                (DEPUTY_COMMISSIONER, "Deputy Commissioner"),
                 # Pro Tem
-                ("jud-pt", "Judge Pro Tem"),
-                ("jus-pt", "Justice Pro Tem"),
-                ("mag-pt", "Magistrate Pro Tem"),
+                (JUDGE_PRO_TEM, "Judge Pro Tem"),
+                (JUSTICE_PRO_TEM, "Justice Pro Tem"),
+                (MAGISTRATE_PRO_TEM, "Magistrate Pro Tem"),
                 # Referee
-                ("ref-jud-tr", "Judge Trial Referee"),
-                ("ref-off", "Official Referee"),
-                ("ref-state-trial", "State Trial Referee"),
+                (JUDGE_TRIAL_REFEREE, "Judge Trial Referee"),
+                (OFFICIAL_REFEREE, "Official Referee"),
+                (STATE_TRIAL_REFEREE, "State Trial Referee"),
                 # Retired
-                ("ret-act-jus", "Active Retired Justice"),
-                ("ret-ass-jud", "Retired Associate Judge"),
-                ("ret-c-jud", "Retired Chief Judge"),
-                ("ret-jus", "Retired Justice"),
-                ("ret-senior-jud", "Senior Judge"),
+                (ACTIVE_RETIRED_JUSTICE, "Active Retired Justice"),
+                (RETIRED_ASSOCIATE_JUDGE, "Retired Associate Judge"),
+                (RETIRED_CHIEF_JUDGE, "Retired Chief Judge"),
+                (RETIRED_JUSTICE, "Retired Justice"),
+                (SENIOR_JUDGE, "Senior Judge"),
                 # Special
-                ("spec-chair", "Special Chairman"),
-                ("spec-jud", "Special Judge"),
-                ("spec-m", "Special Master"),
+                (SPECIAL_CHAIRMAN, "Special Chairman"),
+                (SPECIAL_JUDGE, "Special Judge"),
+                (SPECIAL_MASTER, "Special Master"),
                 (
-                    "spec-scjcbc",
+                    SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES,
                     "Special Superior Court Judge for Complex Business "
                     "Cases",
                 ),
                 # Other
-                ("chair", "Chairman"),
-                ("chan", "Chancellor"),
-                ("mag", "Magistrate"),
-                ("presi-jud", "President"),
-                ("res-jud", "Reserve Judge"),
-                ("trial-jud", "Trial Judge"),
-                ("vice-chan", "Vice Chancellor"),
-                ("vice-cj", "Vice Chief Judge"),
+                (CHAIRMAN, "Chairman"),
+                (CHANCELLOR, "Chancellor"),
+                (MAGISTRATE, "Magistrate"),
+                (PRESIDENT, "President"),
+                (RESERVE_JUDGE, "Reserve Judge"),
+                (TRIAL_JUDGE, "Trial Judge"),
+                (VICE_CHANCELLOR, "Vice Chancellor"),
+                (VICE_CHIEF_JUDGE, "Vice Chief Judge"),
             ),
         ),
         # Sometimes attorney generals write opinions too
         (
             "Attorney General",
             (
-                ("att-gen", "Attorney General"),
-                ("att-gen-ass", "Assistant Attorney General"),
-                ("att-gen-ass-spec", "Special Assistant Attorney General"),
-                ("sen-counsel", "Senior Counsel"),
-                ("dep-sol-gen", "Deputy Solicitor General"),
+                (ATTORNEY_GENERAL, "Attorney General"),
+                (ASSISTANT_ATTORNEY_GENERAL, "Assistant Attorney General"),
+                (SPECIAL_ASSISTANT_ATTORNEY_GENERAL, "Special Assistant Attorney General"),
+                (SENIOR_COUNSEL, "Senior Counsel"),
+                (DEPUTY_SOLICITOR_GENERAL, "Deputy Solicitor General"),
             ),
         ),
         (
             "Appointing Authority",
-            (("pres", "President of the United States"), ("gov", "Governor"),),
+            ((USA_PRESIDENT, "President of the United States"),
+              (GOVERNOR, "Governor"),),
         ),
         (
             "Clerkships",
-            (("clerk", "Clerk"), ("staff-atty", "Staff Attorney"),),
+            ((CLERK, "Clerk"), (STAFF_ATTORNEY, "Staff Attorney"),),
         ),
-        ("prof", "Professor"),
-        ("prac", "Practitioner"),
-        ("pros", "Prosecutor"),
-        ("pub_def", "Public Defender"),
-        ("legis", "Legislator"),
+        (PROFESSOR, "Professor"),
+        (PRACTITIONER, "Practitioner"),
+        (PROSECUTOR, "Prosecutor"),
+        (PUBLIC_DEFENDER, "Public Defender"),
+        (LEGISLATOR, "Legislator"),
     )
     POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
     NOMINATION_PROCESSES = (
