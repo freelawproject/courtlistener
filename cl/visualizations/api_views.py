@@ -5,6 +5,10 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import LoggingMixin
+from cl.visualizations.api_permissions import (
+    IsVisualizationOwner,
+    IsParentVisualizationOwner,
+)
 from cl.visualizations.api_serializers import (
     VisualizationSerializer,
     JSONVersionSerializer,
@@ -15,7 +19,7 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsParentVisualizationOwner]
     serializer_class = JSONVersionSerializer
     ordering_fields = ("id", "date_created", "date_modified")
 
@@ -26,7 +30,7 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
 
 
 class VisualizationViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsVisualizationOwner]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
 
