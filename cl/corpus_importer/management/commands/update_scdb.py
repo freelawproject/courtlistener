@@ -178,9 +178,10 @@ class Command(VerboseCommand):
                     "Unable to parse citation for: %s", scdb_info[scdb_field]
                 )
             else:
-                cite = cluster.citations.filter(reporter=reporter_info[0])
-                if cite:
+                cites = cluster.citations.filter(reporter=reporter_info[0])
+                if cites.count() == 1:
                     # Update the existing citation.
+                    cite = cites[0]
                     cite.volume = citation_obj.volume
                     cite.reporter = citation_obj.reporter
                     cite.page = citation_obj.page
