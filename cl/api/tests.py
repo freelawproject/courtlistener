@@ -18,15 +18,8 @@ from django.test import (
     TestCase,
     TransactionTestCase,
 )
-from rest_framework.test import APIClient, APITestCase
 from django.utils.timezone import now
-from rest_framework.authtoken.models import Token
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
-)
+from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
 from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
 from cl.api.views import coverage_data
@@ -46,8 +39,6 @@ from cl.search.models import (
     OpinionsCited,
 )
 from cl.stats.models import Event
-from cl.visualizations.models import SCOTUSMap
-from cl.visualizations.api_views import VisualizationViewSet
 
 
 class BasicAPIPageTest(TestCase):
@@ -967,117 +958,3 @@ class BulkDataTest(TestCase):
         )
 
 
-class APIVisualizationTestCase(APITestCase):
-    """Check that visualizations are created properly through the API."""
-
-    fixtures = [
-        "api_scotus_map_data.json",
-        "user_with_recap_api_access.json",
-    ]
-
-    def setUp(self):
-        u = User.objects.get(pk=6)
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        u.user_permissions.add(*ps)
-        token, created = Token.objects.get_or_create(user=u)
-        token_header = "Token %s" % token
-        self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=token_header)
-
-    def test_no_title_visualization_post(self):
-        path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        data = {
-            "title": "",
-            "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
-            "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        }
-        response = self.client.post(path, data, format="json")
-        res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(res["title"][0], "This field may not be blank.")
-
-    def test_no_cluster_start_visualization_post(self):
-        path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        data = {
-            "title": "My Invalid Visualization - No Cluster Start Provided",
-            "cluster_start": "",
-            "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        }
-        response = self.client.post(path, data, format="json")
-        res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            res["cluster_start"][0], "This field may not be null."
-        )
-
-    def test_no_cluster_end_visualization_post(self):
-        path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        data = {
-            "title": "My Invalid Visualization - No Cluster End Provided",
-            "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
-            "cluster_end": "",
-        }
-        response = self.client.post(path, data, format="json")
-        res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(res["cluster_end"][0], "This field may not be null.")
-
-    def test_invalid_cluster_start_visualization_post(self):
-        path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        data = {
-            "title": "My Invalid Visualization - No Cluster Exists",
-            "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 999}
-            ),
-            "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        }
-        response = self.client.post(path, data, format="json")
-        res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            res["cluster_start"][0],
-            "Invalid hyperlink - Object does not exist.",
-        )
-
-    def test_valid_visualization_post(self):
-        path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        title = "My Valid Visualization"
-        data = {
-            "title": title,
-            "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
-            "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        }
-        response = self.client.post(path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
-        res = response.json()
-        self.assertEqual(res["title"], title)
-
-        # cluster_start and cluster_end are reversed
-        self.assertEqual(
-            res["cluster_start"],
-            "http://testserver%s"
-            % reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        )
-        self.assertEqual(
-            res["cluster_end"],
-            "http://testserver%s"
-            % reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
-        )
