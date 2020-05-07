@@ -5,7 +5,13 @@ from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User, Permission
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_201_CREATED
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+)
 from rest_framework.test import APITestCase, APIClient
 
 from cl.visualizations.forms import VizForm
@@ -318,14 +324,35 @@ class APIVisualizationTestCase(APITestCase):
     fixtures = [
         "api_scotus_map_data.json",
         "user_with_recap_api_access.json",
+        "authtest_data.json",
     ]
 
-    def setUp(self):
-        u = User.objects.get(pk=6)
-        token, created = Token.objects.get_or_create(user=u)
+    @staticmethod
+    def make_client(user_pk):
+        user = User.objects.get(pk=user_pk)
+        token, created = Token.objects.get_or_create(user=user)
         token_header = "Token %s" % token
-        self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=token_header)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=token_header)
+        return client
+
+    def setUp(self):
+        self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
+        self.client = self.make_client(6)
+        self.rando_client = self.make_client(1001)
+
+    def make_good_visualization(self, title):
+        data = {
+            "title": title,
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        }
+        response = self.client.post(self.path, data, format="json")
+        return response
 
     def test_no_title_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
@@ -395,16 +422,7 @@ class APIVisualizationTestCase(APITestCase):
     def test_valid_visualization_post(self):
         path = reverse("scotusmap-list", kwargs={"version": "v3"})
         title = "My Valid Visualization"
-        data = {
-            "title": title,
-            "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
-            ),
-            "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-            ),
-        }
-        response = self.client.post(path, data, format="json")
+        response = self.make_good_visualization(title)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
         res = response.json()
         self.assertEqual(res["title"], title)
@@ -424,3 +442,51 @@ class APIVisualizationTestCase(APITestCase):
                 "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
             ),
         )
+
+    def test_visualization_permissions(self):
+        """Are some non-owners rejected from editing visualizations?"""
+        response = self.make_good_visualization("Some title")
+
+        # Try to edit it as the current user; should work
+        j = response.json()
+        path = j["resource_uri"]
+        response = self.client.patch(path, {"published": True}, format="json")
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # Try to edit it as a different user; should fail
+        response = self.rando_client.patch(
+            path, {"published": True}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
+
+    def test_json_data_permissions(self):
+        """Are non-owners rejected from editing JSON data?"""
+        response = self.make_good_visualization("some title")
+
+        # Try to edit the JSON as current user; should work
+        j = response.json()
+        vis_path = j["resource_uri"]
+        json_path = j["json_versions"][0]["resource_uri"]
+        response = self.client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # Try to edit the JSON as different user, while private; should fail;
+        # user shouldn't know it exists.
+        response = self.rando_client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+        # Try to edit the JSON as different user, while public; should fail
+        # Make it public
+        response = self.client.patch(
+            vis_path, {"published": True}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # Try to patch it as a random user
+        response = self.rando_client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
