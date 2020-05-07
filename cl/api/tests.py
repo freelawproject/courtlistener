@@ -956,5 +956,3 @@ class BulkDataTest(TestCase):
         self.assertEqual(
             Court.objects.get(pk="test").full_name, "Testing Supreme Court"
         )
-
-
