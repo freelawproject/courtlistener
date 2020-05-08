@@ -50,6 +50,7 @@ def update_docket_date_last_filing(docket):
     report = CaseQuery(docket.court_id, s)
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
+    docket.date_terminated = report.metadata["date_terminated"]
     docket.date_last_filing_updated = now()
     docket.save()
 
@@ -89,6 +90,7 @@ def send_docket_alert(d_pk, since):
             if (
                 not docket.date_last_filing_updated
                 or time_since_last_scrape.total_seconds() > 3600
+                and docket.date_last_filing < today()
             ):  # Scrape if date_last_filing updated more than an hour ago or nonexistent
                 update_docket_date_last_filing(docket)
             if docket.date_last_filing > since.date():
@@ -145,7 +147,9 @@ def send_docket_alert(d_pk, since):
             connection.send_messages(messages)
             tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
 
-        DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
+            DocketAlert.objects.filter(docket=docket).update(
+                date_last_hit=now()
+            )
 
     # Work completed, clear the semaphore
     r = make_redis_interface("ALERTS")
