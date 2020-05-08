@@ -12,6 +12,7 @@ from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
 from juriscraper.pacer import CaseQuery, PacerSession
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 
 
 def make_alert_key(d_pk):
@@ -43,10 +44,12 @@ def enqueue_docket_alert(d_pk):
 
 
 def update_docket_date_last_filing(docket):
-    s = PacerSession(
-        username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
     )
-    s.login()
+    s = PacerSession(cookies=cookies)
     report = CaseQuery(docket.court_id, s)
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
