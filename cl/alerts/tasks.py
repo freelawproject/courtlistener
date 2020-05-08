@@ -91,6 +91,7 @@ def send_docket_alert(d_pk, since):
                 not docket.date_last_filing_updated
                 or time_since_last_scrape.total_seconds() > 3600
                 and docket.date_last_filing < today()
+                and docket.date_last_filing < since.date()
             ):  # Scrape if date_last_filing updated more than an hour ago or nonexistent
                 update_docket_date_last_filing(docket)
             if docket.date_last_filing > since.date():
