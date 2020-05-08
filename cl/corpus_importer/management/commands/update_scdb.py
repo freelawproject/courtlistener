@@ -165,6 +165,8 @@ class Command(VerboseCommand):
             "lexisCite": ("U.S. LEXIS", Citation.LEXIS),
         }
         for scdb_field, reporter_info in fields.items():
+            if not scdb_info[scdb_field]:
+                continue
             try:
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
@@ -402,6 +404,10 @@ class Command(VerboseCommand):
                     scdb_id="",
                 )
                 cluster_count = clusters.count()
+                if cluster_count == 1:
+                    # Winnow these by name too. Date isn't enough.
+                    clusters = self.winnow_by_case_name(clusters, d)
+                    cluster_count = clusters.count()
                 logger.info("%s matches found.", cluster_count)
 
             if cluster_count > 1:
