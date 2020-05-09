@@ -54,7 +54,6 @@ def update_docket_date_last_filing(docket):
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
     docket.date_terminated = report.metadata["date_terminated"]
-    docket.date_last_filing_updated = now()
     docket.save()
 
 
@@ -86,16 +85,10 @@ def send_docket_alert(d_pk, since):
             settings.PACER_USERNAME
         ):  # if no credentials available, scraping is pointless. Required to pass tests.
             # No new docket entries, check date_last_filing
-            if docket.date_last_filing_updated is not None:
-                time_since_last_scrape = (
-                    now() - docket.date_last_filing_updated
-                )
             if (
-                not docket.date_last_filing_updated
-                or time_since_last_scrape.total_seconds() > 3600
-                and docket.date_last_filing < today()
+                docket.date_last_filing < today()
                 and docket.date_last_filing < since.date()
-            ):  # Scrape if date_last_filing updated more than an hour ago or nonexistent
+            ):  # Scrape iquery if date_last_filing is before today and before the last trigger
                 update_docket_date_last_filing(docket)
             if docket.date_last_filing > since.date():
                 trigger = True

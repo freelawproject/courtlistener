@@ -430,13 +430,6 @@ class Docket(models.Model):
         blank=True,
         null=True,
     )
-    date_last_filing_updated = models.DateTimeField(
-        help_text=(
-            "The time the date_last_filing field was last scraped from PACER"
-        ),
-        blank=True,
-        null=True,
-    )
     case_name_short = models.TextField(
         help_text="The abridged name of the case, often a single word, e.g. "
         "'Marsh'",
