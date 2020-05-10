@@ -68,3 +68,17 @@
     template:
       src="../../scripts/supervisor/pacer_rss_scraper.ini"
       dest="{{ program_dir}}/pacer_rss_scraper.ini"
+
+- hosts: iquery-scraper
+  vars:
+    supervisor_conf: "/etc/supervisord.conf"
+    program_dir: "/etc/supervisor"
+  tasks:
+  - include_vars: ../defaults.yml
+
+  - name: Add supervisor configuration for the PACER iquery scraper
+    become: yes
+    become_user: root
+    template:
+      src="../../scripts/supervisor/pacer_iquery-scraper.ini"
+      dest="{{ program_dir}}/pacer_iquery-scraper.ini"
