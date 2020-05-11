@@ -10,7 +10,7 @@ from cl.lib.db_tools import queryset_generator
 from cl.search.models import Docket
 from cl.alerts.models import DocketAlert
 from cl.alerts.tasks import send_docket_alert
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class Command(VerboseCommand):
@@ -59,5 +59,10 @@ class Command(VerboseCommand):
                         and (date.date() - docket.date_last_filing) < 90
                     )
                 ):  # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
-                    send_docket_alert.delay(docket.pk, date)
+                    since = DocketAlert.objects.filter(docket=docket)[
+                        0
+                    ].date_last_hit or date - timedelta(
+                        days=1
+                    )  # if never hit, check if new filing since yesterday
+                    send_docket_alert.delay(docket.pk, since)
         return
