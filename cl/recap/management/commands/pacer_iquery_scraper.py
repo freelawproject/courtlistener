@@ -54,8 +54,10 @@ class Command(VerboseCommand):
                 if (
                     not docket.date_terminated
                     or old_terminated
-                    or (terminated and (date.date() - docket.date_last_filing))
-                    < 90
+                    or (
+                        terminated
+                        and (date.date() - docket.date_last_filing) < 90
+                    )
                 ):  # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
                     send_docket_alert.delay(docket.pk, date)
         return
