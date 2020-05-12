@@ -40,9 +40,10 @@ class Command(VerboseCommand):
                 else:
                     min_alerts = 3  # default hourly check for dockets with at least 3 alerts
             else:  # not on an hour or a half hour schedule, so return
-                debug = False
+                debug = False  # makes it easy to test: just change this line to True and it'll do every docket
                 if not debug:
-                    return
+                    time.sleep(30)
+                    continue
                 min_alerts = 0
                 crawl_old_terminated = True
 
