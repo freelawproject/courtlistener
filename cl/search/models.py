@@ -2101,7 +2101,8 @@ class OpinionCluster(models.Model):
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
             elif (
-                citations[0].type == Citation.WEST
+                citations.count() > 2
+                and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
             ):
                 caption += ", %s, %s" % (citations[0], citations[1])
