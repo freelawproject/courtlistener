@@ -347,24 +347,16 @@ class Command(VerboseCommand):
                     make_mag_bk_judge(dict(row), testing=self.debug)
                 except ValidationError:
                     bad_record.append(
-                        "Person with this cl_id already exists: "
-                        + row.CL_ID
-                        + " "
-                        + row.NAME_FIRST
-                        + " "
-                        + row.NAME_LAST
+                        "Person with this cl_id already exists {CL_ID} "
+                        "{NAME_FIRST} {NAME_LAST}".format(**row)
                     )
                 except NameExistsError:
                     # On the chance we try creating a new record, with a
-                    # differentcl_id, for a magistrate/bankruptcy judge
+                    # different cl_id, for a magistrate/bankruptcy judge
                     # already in the database.
                     bad_record.append(
-                        "Person with this name already exists: "
-                        + row.NAME_FIRST
-                        + " "
-                        + row.NAME_MIDDLE
-                        + " "
-                        + row.NAME_LAST
+                        "Person with this name already exists {NAME_FIRST} "
+                        "{NAME_MIDDLE} {NAME_LAST}".format(**row)
                     )
 
             for b in bad_record:
