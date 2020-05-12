@@ -10,9 +10,11 @@ from juriscraper.pacer import CaseQuery, PacerSession
 from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
+from cl.recap.mergers import update_case_names
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
 
@@ -45,7 +47,8 @@ def enqueue_docket_alert(d_pk):
     return True
 
 
-def update_docket_info_iqeury(docket):
+@app.task()
+def update_docket_info_iqeury(docket,since=None):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -62,11 +65,11 @@ def update_docket_info_iqeury(docket):
     docket.date_terminated = report.metadata["date_terminated"]
     docket.assigned_to_str = report.metadata["assigned_to_str"]
     if docket.case_name != report.metadata["case_name"]:
-        cl.recap.mergers.update_case_names(
+        update_case_names(
             docket, report.metadata["case_name"]
         )
     docket.save()
-
+    return docket.pk,since
 
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
@@ -88,47 +91,25 @@ def send_docket_alert(d_pk, since):
         new_des = DocketEntry.objects.filter(
             date_created__gte=since, docket=docket
         )
-
-        trigger = False
-        if new_des.count() > 0:
-            trigger = True
-        elif (
-            settings.PACER_USERNAME
-        ):  # if no credentials available, scraping is pointless. Required to pass tests.
-            # No new docket entries, check date_last_filing
-            if (
-                not docket.date_last_filing
-                or docket.date_last_filing < datetime.today().date()
-                and docket.date_last_filing < since.date()
-            ):  # Scrape iquery if date_last_filing is before today and before the last trigger
-                update_docket_info_iqeury(docket)
-            if docket.date_last_filing > since.date():
-                trigger = True
-        if trigger:
+        if (
+            new_des.count() > 0
+            or docket.date_last_filing
+            and docket.date_last_filing > since.date()
+        ):
             # Notify every user that's subscribed to this alert.
+            case_name = trunc(best_case_name(docket), 100, ellipsis="...")
             if new_des.count() > 0:
-                case_name = trunc(best_case_name(docket), 100, ellipsis="...")
                 subject_template = loader.get_template(
                     "docket_alert_subject.txt"
                 )
-                subject = subject_template.render(
-                    {
-                        "docket": docket,
-                        "count": new_des.count(),
-                        "case_name": case_name,
-                    }
-                ).strip()  # Remove newlines that editors can insist on adding.
+
                 email_context = {"new_des": new_des, "docket": docket}
                 txt_template = loader.get_template("docket_alert_email.txt")
                 html_template = loader.get_template("docket_alert_email.html")
             else:
-                case_name = trunc(best_case_name(docket), 100, ellipsis="...")
                 subject_template = loader.get_template(
                     "pacer_docket_alert_subject.txt"
                 )
-                subject = subject_template.render(
-                    {"docket": docket, "case_name": case_name,}
-                ).strip()  # Remove newlines that editors can insist on adding.
                 email_context = {"docket": docket}
                 txt_template = loader.get_template(
                     "pacer_docket_alert_email.txt"
@@ -137,6 +118,13 @@ def send_docket_alert(d_pk, since):
                     "pacer_docket_alert_email.html"
                 )
 
+            subject = subject_template.render(
+                {
+                    "docket": docket,
+                    "count": new_des.count(),
+                    "case_name": case_name,
+                }
+            ).strip()  # Remove newlines that editors can insist on adding.
             messages = []
             for email_address in email_addresses:
                 msg = EmailMultiAlternatives(

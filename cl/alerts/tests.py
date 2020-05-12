@@ -9,7 +9,7 @@ from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.models import Alert, DocketAlert
-from cl.alerts.tasks import send_docket_alert
+from cl.alerts.tasks import send_docket_alert, update_docket_info_iqeury
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -103,6 +103,8 @@ class DocketAlertTest(TestCase):
             pacer_doc_id="232322332",
             is_available=False,
         )
+
+
         self.after = now()
 
         # Create a new docket without any entries
@@ -117,6 +119,8 @@ class DocketAlertTest(TestCase):
         DocketAlert.objects.create(docket=self.docket2, user_id=1001)
         self.old = datetime(2018, 7, 17, 23, 55, 59, 100)
         self.new = datetime(2018, 7, 18, 23, 55, 59, 100)
+        # Update iquery
+        update_docket_info_iqeury(self.docket2)
 
     def tearDown(self):
         Docket.objects.all().delete()
