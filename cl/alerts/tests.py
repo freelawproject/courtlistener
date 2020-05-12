@@ -1,7 +1,10 @@
+from datetime import datetime
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.urls import reverse
 from django.test import Client, TestCase
+from django.urls import reverse
 from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
@@ -9,8 +12,6 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
-from datetime import datetime
-from django.conf import settings
 
 
 class AlertTest(TestCase):
