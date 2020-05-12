@@ -768,14 +768,16 @@ def print_params(params):
         )
         # print results_si.execute()
 
+
 # FOR MIKE: Where to move this to?
 def cleanup_main_query(query_string):
     first_char = query_string[0]
     is_number = re.search(r"\d", first_char)
     if is_number:
-        return "\"" + query_string + "\""
+        return '"' + query_string + '"'
     else:
         return query_string
+
 
 def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
     main_params = {
