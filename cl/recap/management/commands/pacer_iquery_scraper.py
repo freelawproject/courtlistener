@@ -5,9 +5,11 @@ from datetime import datetime, timedelta
 from django.db.models import Count
 
 from cl.alerts.models import DocketAlert
-from cl.alerts.tasks import send_docket_alert
+from cl.alerts.tasks import send_docket_alert, enqueue_docket_alert, \
+    update_docket_info_iqeury
 from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Docket
+from cl.search.tasks import add_or_update_recap_docket
 
 
 class Command(VerboseCommand):
@@ -31,13 +33,16 @@ class Command(VerboseCommand):
                     min_alerts = 1
                     crawl_terminated = True
                     # check terminated dockets once a day
+
                     if date.weekday() == 6:
                         # check old terminated dockets (>90 days) on Sunday
                         crawl_old_terminated = True
             else:
                 min_alerts = 3  # default hourly check for dockets with at least 3 alerts
         else:  # not on an hour or a half hour schedule, so return
-            return
+            if not debug:
+                return
+            min_alerts=0
         # list of all dockets that need to be checked
         docket_list = DocketAlert.objects.values("docket").annotate(
             alerts=Count("id")
@@ -51,11 +56,23 @@ class Command(VerboseCommand):
                     and (date.date() - docket.date_last_filing) < 90
                 )
                 # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
-                since = DocketAlert.objects.filter(docket=docket)[
-                    0
-                ].date_last_hit or date - timedelta(days=1)
-                # if never hit, check if new filing since yesterday
-                newly_enqueued = enqueue_docket_alert(docket.pk)
-                if newly_enqueued:
-                    send_docket_alert.delay(docket.pk, since)
+                if (
+                    docket_not_terminated
+                    or crawl_old_terminated
+                    or terminated_recently
+                ):
+                    since = DocketAlert.objects.filter(docket=docket)[
+                        0
+                    ].date_last_hit or date - timedelta(days=1)
+                    # if never hit, check if new filing since yesterday
+                    if (
+                        not docket.date_last_filing
+                        or docket.date_last_filing < date.date()
+                        and docket.date_last_filing < since.date()
+                    ):
+                        newly_enqueued = enqueue_docket_alert(docket.pk)
+                        if newly_enqueued:
+                            chain(update_docket_info_iqeury.s(docket.pk),
+                            send_docket_alert.s(docket.pk, since),
+                            add_or_update_recap_docket.s()).apply_async()
         return
