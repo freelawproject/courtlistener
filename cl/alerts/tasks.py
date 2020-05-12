@@ -167,10 +167,11 @@ def send_docket_alert(d_pk, since):
 @app.task()
 def update_docket_and_send_alert(docket, since, update=True):
     if not docket.date_last_filing or docket.date_last_filing < since.date():
-        update_docket_info_iqeury(docket, update)
-        newly_enqueued = enqueue_docket_alert(docket.pk)
-        if newly_enqueued:
-            send_docket_alert(docket.pk, since)
+        if settings.PACER_USERNAME:
+            update_docket_info_iqeury(docket, update)
+            newly_enqueued = enqueue_docket_alert(docket.pk)
+            if newly_enqueued:
+                send_docket_alert(docket.pk, since)
 
 
 @app.task(ignore_result=True)
