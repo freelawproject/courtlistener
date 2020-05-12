@@ -1048,6 +1048,19 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element_by_id("result-count")
         self.assertIn("Opinions", result_count.text)
 
+    def test_main_query_cleanup(self):
+        # Dora goes to CL and performs a Search using a numbered citation
+        # (e.g. "12-9238" or "3:18-cv-2383")
+        self.browser.get(self.live_server_url)
+        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox.clear()
+        searchbox.send_keys("12-9238")
+        searchbox.submit()
+        result_count = self.browser.find_element_by_id("result-count")
+        # without the cleanup_main_query function, there are 4 results
+        # with the query, there should be none
+        self.assertEqual(result_count.text, "")
+
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
         # Dora navigates to the global SERP from the homepage
