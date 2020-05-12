@@ -1,19 +1,20 @@
+from datetime import datetime
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import loader
 from django.utils.timezone import now
+from juriscraper.pacer import CaseQuery, PacerSession
 
 from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
-from juriscraper.pacer import CaseQuery, PacerSession
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
-from datetime import datetime
 
 
 def make_alert_key(d_pk):
@@ -44,7 +45,7 @@ def enqueue_docket_alert(d_pk):
     return True
 
 
-def update_docket_date_last_filing(docket):
+def update_docket_info_iqeury(docket):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -59,6 +60,9 @@ def update_docket_date_last_filing(docket):
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
     docket.date_terminated = report.metadata["date_terminated"]
+    docket.assigned_to_str = report.metadata["assigned_to_str"]
+    if docket.case_name != report.metadata["case_name"]:
+        cl.recap.mergers.update_case_names(docket, report.metadata["case_name"])
     docket.save()
 
 
@@ -95,7 +99,7 @@ def send_docket_alert(d_pk, since):
                 or docket.date_last_filing < datetime.today().date()
                 and docket.date_last_filing < since.date()
             ):  # Scrape iquery if date_last_filing is before today and before the last trigger
-                update_docket_date_last_filing(docket)
+                update_docket_info_iqeury(docket)
             if docket.date_last_filing > since.date():
                 trigger = True
         if trigger:
