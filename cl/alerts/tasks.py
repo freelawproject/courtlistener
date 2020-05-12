@@ -56,7 +56,7 @@ def update_docket_info_iqeury(docket):
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    report = CaseQuery(docket.court_id, s)
+    report = CaseQuery(map_cl_to_pacer_id(docket.court_id), s)
     report.query(docket.pacer_case_id)
     docket.date_last_filing = report.metadata["date_last_filing"]
     docket.date_terminated = report.metadata["date_terminated"]
