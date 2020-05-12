@@ -49,7 +49,7 @@ def enqueue_docket_alert(d_pk):
 
 
 @app.task()
-def update_docket_info_iqeury(docket):
+def update_docket_info_iqeury(docket, update=True):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -76,9 +76,10 @@ def update_docket_info_iqeury(docket):
         update_case_names(docket, report.metadata["case_name"])
         changes = True
     docket.save()
-    add_or_update_recap_docket(
-        {"docket_pk": docket.pk, "content_updated": changes}
-    )
+    if update:
+        add_or_update_recap_docket(
+            {"docket_pk": docket.pk, "content_updated": changes}
+        )
 
 
 # Ignore the result or else we'll use a lot of memory.
@@ -164,9 +165,9 @@ def send_docket_alert(d_pk, since):
 
 
 @app.task()
-def update_docket_and_send_alert(docket, since):
+def update_docket_and_send_alert(docket, since, update=True):
     if not docket.date_last_filing or docket.date_last_filing < since.date():
-        update_docket_info_iqeury(docket)
+        update_docket_info_iqeury(docket, update)
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
             send_docket_alert(docket.pk, since)
