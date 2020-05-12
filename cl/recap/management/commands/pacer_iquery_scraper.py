@@ -19,25 +19,20 @@ class Command(VerboseCommand):
 
         crawl_terminated = False
         crawl_old_terminated = False
-        if (
-            date.minute == 30
-        ):  # we're on a half hour schedule, so only scrape dockets with at least 10 alerts
+        if date.minute == 30:
+            # we're on a half hour schedule, so only scrape dockets with at least 10 alerts
             min_alerts = 10
         elif date.minute == 0:  # we're on an hour schedule
-            if (
-                date.hour % 6
-            ) == 0:  # this triggers 4 times a day, for dockets with at least 2 alerts
+            if date.hour % 6 == 0:
+                # this triggers 4 times a day, for dockets with at least 2 alerts
                 min_alerts = 2
-                if (
-                    date.hour == 0
-                ):  # triggers once per day, check everything but terminated
+                if date.hour == 0:
+                    # triggers once per day, check everything but terminated
                     min_alerts = 1
-                    crawl_terminated = (
-                        True  # check terminated dockets once a day
-                    )
-                    if (
-                        date.weekday() == 6
-                    ):  # check old terminated dockets (>90 days) on Sunday
+                    crawl_terminated = True
+                    # check terminated dockets once a day
+                    if date.weekday() == 6:
+                        # check old terminated dockets (>90 days) on Sunday
                         crawl_old_terminated = True
             else:
                 min_alerts = 3  # default hourly check for dockets with at least 3 alerts
@@ -54,14 +49,13 @@ class Command(VerboseCommand):
                 terminated_recently = (
                     crawl_terminated
                     and (date.date() - docket.date_last_filing) < 90
-                )  # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
+                )
+                # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
                 since = DocketAlert.objects.filter(docket=docket)[
                     0
-                ].date_last_hit or date - timedelta(
-                    days=1
-                )  # if never hit, check if new filing since yesterday
+                ].date_last_hit or date - timedelta(days=1)
+                # if never hit, check if new filing since yesterday
                 newly_enqueued = enqueue_docket_alert(docket.pk)
                 if newly_enqueued:
                     send_docket_alert.delay(docket.pk, since)
-
         return

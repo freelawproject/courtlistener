@@ -62,7 +62,9 @@ def update_docket_info_iqeury(docket):
     docket.date_terminated = report.metadata["date_terminated"]
     docket.assigned_to_str = report.metadata["assigned_to_str"]
     if docket.case_name != report.metadata["case_name"]:
-        cl.recap.mergers.update_case_names(docket, report.metadata["case_name"])
+        cl.recap.mergers.update_case_names(
+            docket, report.metadata["case_name"]
+        )
     docket.save()
 
 
