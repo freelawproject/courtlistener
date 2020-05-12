@@ -16,6 +16,7 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.recap.mergers import update_case_names
 from cl.search.models import Docket, DocketEntry
+from cl.search.tasks import add_or_update_recap_docket
 from cl.stats.utils import tally_stat
 
 
@@ -48,7 +49,7 @@ def enqueue_docket_alert(d_pk):
 
 
 @app.task()
-def update_docket_info_iqeury(docket,since=None):
+def update_docket_info_iqeury(docket):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -61,15 +62,24 @@ def update_docket_info_iqeury(docket,since=None):
     )
     report = CaseQuery(map_cl_to_pacer_id(docket.court_id), s)
     report.query(docket.pacer_case_id)
-    docket.date_last_filing = report.metadata["date_last_filing"]
-    docket.date_terminated = report.metadata["date_terminated"]
-    docket.assigned_to_str = report.metadata["assigned_to_str"]
+    changes = False
+    if docket.date_last_filing != report.metadata["date_last_filing"]:
+        docket.date_last_filing = report.metadata["date_last_filing"]
+        changes = True
+    if docket.date_terminated != report.metadata["date_terminated"]:
+        docket.date_terminated = report.metadata["date_terminated"]
+        changes = True
+    if docket.assigned_to_str != report.metadata["assigned_to_str"]:
+        docket.assigned_to_str = report.metadata["assigned_to_str"]
+        changes = True
     if docket.case_name != report.metadata["case_name"]:
-        update_case_names(
-            docket, report.metadata["case_name"]
-        )
+        update_case_names(docket, report.metadata["case_name"])
+        changes = True
     docket.save()
-    return docket.pk,since
+    add_or_update_recap_docket(
+        {"docket_pk": docket.pk, "content_updated": changes}
+    )
+
 
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
@@ -151,6 +161,15 @@ def send_docket_alert(d_pk, since):
     # Work completed, clear the semaphore
     r = make_redis_interface("ALERTS")
     r.delete(make_alert_key(d_pk))
+
+
+@app.task()
+def update_docket_and_send_alert(docket, since):
+    if not docket.date_last_filing or docket.date_last_filing < since.date():
+        update_docket_info_iqeury(docket)
+        newly_enqueued = enqueue_docket_alert(docket.pk)
+        if newly_enqueued:
+            send_docket_alert(docket.pk, since)
 
 
 @app.task(ignore_result=True)

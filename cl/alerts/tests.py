@@ -9,7 +9,7 @@ from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.models import Alert, DocketAlert
-from cl.alerts.tasks import send_docket_alert, update_docket_info_iqeury
+from cl.alerts.tasks import send_docket_alert, update_docket_and_send_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
@@ -104,7 +104,6 @@ class DocketAlertTest(TestCase):
             is_available=False,
         )
 
-
         self.after = now()
 
         # Create a new docket without any entries
@@ -119,8 +118,6 @@ class DocketAlertTest(TestCase):
         DocketAlert.objects.create(docket=self.docket2, user_id=1001)
         self.old = datetime(2018, 7, 17, 23, 55, 59, 100)
         self.new = datetime(2018, 7, 18, 23, 55, 59, 100)
-        # Update iquery
-        update_docket_info_iqeury(self.docket2)
 
     def tearDown(self):
         Docket.objects.all().delete()
@@ -138,7 +135,7 @@ class DocketAlertTest(TestCase):
 
     def test_triggering_pacer_docket_alert(self):
         """Does the alert trigger for pacer date_last_filing?"""
-        send_docket_alert(self.docket2.pk, self.old)
+        update_docket_and_send_alert(self.docket2, self.old)
         # Does the alert go out? It should.
         if (
             settings.PACER_USERNAME
@@ -147,7 +144,7 @@ class DocketAlertTest(TestCase):
 
     def test_nothing_happens_for_timers_after_pacer_docket_date(self):
         """Do we avoid sending alerts for timers after pacer date_last_filing?"""
-        send_docket_alert(self.docket2.pk, self.new)
+        update_docket_and_send_alert(self.docket2, self.new)
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
 
