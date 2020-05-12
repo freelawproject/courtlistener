@@ -304,64 +304,74 @@ class Command(VerboseCommand):
                         position.save()
                         add_items_to_solr.delay([p.pk], "people_db.Person")
 
-    def import_mag_bk_judges(self, infile=None):
+    def import_mag_bk_judges(self):
+        def read_mag_bk_csv(infile=None):
 
-        if infile is None:
-            self.ensure_input_file()
-            infile = self.options["input_file"]
-        bad_record = []
-        textfields = [
-            "CL_ID",
-            "NAME_FIRST",
-            "NAME_MIDDLE",
-            "NAME_LAST",
-            "NAME_SUFFIX",
-            "GENDER",
-            "POSITION",
-            "COURT",
-            "START_DATE",
-            "START_DATE_GRANULARITY",
-            "END_DATE",
-            "END_DATE_GRANULARITY",
-        ]
-        df = pd.read_csv(infile)
-        has_date = df["START_DATE_GRANULARITY"].notnull()
-        df = df[has_date]
-        df = df[df["IN_CL"] != "Yes"]
-        df = df.replace(r"^\s+$", np.nan, regex=True)
-        for x in textfields:
-            df[x] = df[x].replace(np.nan, "", regex=True)
-        for i, row in df.iterrows():
-            if i < self.options["offset"]:
-                continue
-            if i >= self.options["limit"] > 0:
-                break
-            try:
-                make_mag_bk_judge(dict(row), testing=self.debug)
-            except ValidationError:
-                bad_record.append(
-                    "Person with this cl_id already exists: "
-                    + row.CL_ID
-                    + " "
-                    + row.NAME_FIRST
-                    + " "
-                    + row.NAME_LAST
-                )
-            except NameExistsError:
-                # On the chance we try creating a new record, with a different
-                # cl_id, for a magistrate/bankruptcy judge already in the
-                # database.
-                bad_record.append(
-                    "Person with this name already exists: "
-                    + row.NAME_FIRST
-                    + " "
-                    + row.NAME_MIDDLE
-                    + " "
-                    + row.NAME_LAST
-                )
+            if infile is None:
+                self.ensure_input_file()
+                infile = self.options["input_file"]
+            df = pd.read_csv(infile)
+            has_date = df["START_DATE_GRANULARITY"].notnull()
+            df = df[has_date]
+            df = df[df["IN_CL"] != "Yes"]
+            df = df.replace(r"^\s+$", np.nan, regex=True)
+            return df
 
-        for b in bad_record:
-            print(b)
+        def process_mag_bk_entries(df):
+
+            bad_record = []
+
+            textfields = [
+                "CL_ID",
+                "NAME_FIRST",
+                "NAME_MIDDLE",
+                "NAME_LAST",
+                "NAME_SUFFIX",
+                "GENDER",
+                "POSITION",
+                "COURT",
+                "START_DATE",
+                "START_DATE_GRANULARITY",
+                "END_DATE",
+                "END_DATE_GRANULARITY",
+            ]
+
+            for x in textfields:
+                df[x] = df[x].replace(np.nan, "", regex=True)
+            for i, row in df.iterrows():
+                if i < self.options["offset"]:
+                    continue
+                if i >= self.options["limit"] > 0:
+                    break
+                try:
+                    make_mag_bk_judge(dict(row), testing=self.debug)
+                except ValidationError:
+                    bad_record.append(
+                        "Person with this cl_id already exists: "
+                        + row.CL_ID
+                        + " "
+                        + row.NAME_FIRST
+                        + " "
+                        + row.NAME_LAST
+                    )
+                except NameExistsError:
+                    # On the chance we try creating a new record, with a
+                    # differentcl_id, for a magistrate/bankruptcy judge
+                    # already in the database.
+                    bad_record.append(
+                        "Person with this name already exists: "
+                        + row.NAME_FIRST
+                        + " "
+                        + row.NAME_MIDDLE
+                        + " "
+                        + row.NAME_LAST
+                    )
+
+            for b in bad_record:
+                print(b)
+
+        df = read_mag_bk_csv()
+        process_mag_bk_entries(df)
 
     VALID_ACTIONS = {
         "import-all": import_all,
