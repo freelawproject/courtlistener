@@ -66,9 +66,17 @@ def check_schedule(now):
 class Command(VerboseCommand):
     help = "Scrape PACER iquery report and send alerts"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--test_date",
+            type=datetime.date,
+            default=None,
+            help="The number of dockets to check. Default is None, which means "
+            "to check everything",
+        )
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        add_argument("test_count",)
 
         while True:
             now = datetime.now()
@@ -87,16 +95,20 @@ class Command(VerboseCommand):
                 min_alerts, crawl_types = check_schedule(now)
 
             # list of all dockets that need to be checked
-            docket_list = (
-                DocketAlert.objects.values("docket")
-                .order_by("pk")
-                .annotate(alerts_count=Count("id"))
+            docket_list = DocketAlert.objects.values("docket").annotate(
+                alerts_count=Count("id")
             )
+            test_date = options["test_date"]
             for item in docket_list:
                 if item["alerts_count"] < min_alerts:
                     continue
-
                 docket = Docket.objects.get(pk=item["docket"])
+                if (
+                    test_date
+                    and docket.date_filed
+                    and docket.date_filed > test_date
+                ):
+                    continue
                 terminated_recently = (
                     "terminated" in crawl_types
                     and docket.date_terminated
