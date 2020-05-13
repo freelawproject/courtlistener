@@ -11,6 +11,7 @@ cryptography==2.2.2
 defusedxml==0.6.0
 disposable-email-domains
 Django~=1.11.0
+django-cache-memoize~=0.1
 django-cors-headers==3.0.2
 django-extensions~=2.2.0
 django-filter==1.1

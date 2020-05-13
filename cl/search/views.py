@@ -3,6 +3,7 @@ import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -210,6 +211,7 @@ def do_search(
     }
 
 
+@cache_memoize(5 * 60)
 def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
