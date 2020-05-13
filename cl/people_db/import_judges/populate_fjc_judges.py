@@ -29,6 +29,12 @@ from cl.people_db.models import (
     GRANULARITY_YEAR,
     Source,
 )
+from cl.people_db.management.constants import (
+    FJC_BANKRUPTCY_COURTS,
+    FJC_DISTRICT_COURTS,
+)
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
 
 def transform_employ(string):
@@ -641,3 +647,96 @@ def make_federal_judge(item, testing=False):
                 position.save()
             except Exception:
                 continue
+
+
+@transaction.atomic()
+def make_mag_bk_judge(item, testing=False):
+    """Takes the federal judge data <item> and associates it with a Judge
+    object.  Returns a Judge object.  To be used for importing bankruptcy
+    and magistrate judges.  Example data below:
+
+    CL_ID: fjc-bk-12
+    COURT: AR,E
+    JUDGE_NAME: JONES, PHYLLIS M.
+    POSITION: Bankruptcy
+    NAME_LAST: Jones
+    NAME_FIRST: Phyllis
+    NAME_MIDDLE: M.
+    NAME_SUFFIX:
+    GENDER: Female
+    START_DATE: 2015-01-07
+    START_DATE_GRANULARITY: %Y-%m-%d
+    SOURCE: https://www.uscourts.gov/judicial-milestones/phyllis-m-jones
+    """
+
+    name = "{CL_ID}: {NAME_FIRST} {NAME_LAST}".format(**item)
+    print("Now processing: %s" % name)
+
+    if Person.objects.filter(cl_id=item["CL_ID"]).exists():
+        raise ValidationError(
+            "CL_ID already exists for the record being imported: %s" % name
+        )
+
+    if Person.objects.filter(
+        name_first=item["NAME_FIRST"],
+        name_middle=item["NAME_MIDDLE"],
+        name_last=item["NAME_LAST"],
+    ).exists():
+        raise ValidationError(
+            "Name already exists for record being imported %s" % name
+        )
+
+    if not pd.isnull(item["NAME_MIDDLE"]):
+        if len(item["NAME_MIDDLE"]) == 1:
+            item["NAME_MIDDLE"] += "."
+
+    if not pd.isnull(item["GENDER"]):
+        gender = get_gender(item["GENDER"])
+
+    if not item["NAME_SUFFIX"] == "":
+        suffix = get_suffix(item["NAME_SUFFIX"])
+    else:
+        suffix = ""
+
+    # Instantiate Judge object.
+    person = Person(
+        name_first=item["NAME_FIRST"],
+        name_middle=item["NAME_MIDDLE"],
+        name_last=item["NAME_LAST"],
+        name_suffix=suffix,
+        gender=gender,
+        cl_id=item["CL_ID"],
+    )
+
+    if not testing:
+        person.save()
+
+    # Add position.
+    if re.search("Bankruptcy", item["POSITION"]):
+        position_type = Position.JUDGE
+        if item["COURT"]:
+            court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
+    else:
+        position_type = Position.MAGISTRATE
+        if item["COURT"]:
+            court = FJC_DISTRICT_COURTS[item["COURT"]]
+
+    date_start = process_date_string(item["START_DATE"])
+
+    position = Position(
+        person=person,
+        position_type=position_type,
+        court_id=court,
+        date_start=date_start,
+        date_granularity_start=item["START_DATE_GRANULARITY"],
+    )
+
+    if not testing:
+        position.save()
+
+    sources = Source(
+        person=person, url=item["SOURCE"], date_accessed=str(date.today()),
+    )
+
+    if not testing:
+        sources.save()
