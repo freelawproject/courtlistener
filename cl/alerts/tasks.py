@@ -14,9 +14,12 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
-from cl.recap.mergers import update_case_names
+from cl.recap.mergers import (
+    update_docket_metadata,
+    add_bankruptcy_data_to_docket,
+)
 from cl.search.models import Docket, DocketEntry
-from cl.search.tasks import add_or_update_recap_docket
+from cl.search.tasks import add_items_to_solr
 from cl.stats.utils import tally_stat
 
 
@@ -60,26 +63,12 @@ def update_docket_info_iqeury(docket, update=True):
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    report = CaseQuery(map_cl_to_pacer_id(docket.court_id), s)
-    report.query(docket.pacer_case_id)
-    changes = False
-    if docket.date_last_filing != report.metadata["date_last_filing"]:
-        docket.date_last_filing = report.metadata["date_last_filing"]
-        changes = True
-    if docket.date_terminated != report.metadata["date_terminated"]:
-        docket.date_terminated = report.metadata["date_terminated"]
-        changes = True
-    if docket.assigned_to_str != report.metadata["assigned_to_str"]:
-        docket.assigned_to_str = report.metadata["assigned_to_str"]
-        changes = True
-    if docket.case_name != report.metadata["case_name"]:
-        update_case_names(docket, report.metadata["case_name"])
-        changes = True
-    docket.save()
-    if update:
-        add_or_update_recap_docket(
-            {"docket_pk": docket.pk, "content_updated": changes}
-        )
+    report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
+    report.query(d.pacer_case_id)
+    d = update_docket_metadata(d, report.metadata)
+    d.save()
+    add_bankruptcy_data_to_docket(d, report.metadata)
+    add_items_to_solr([d.pk], "search.Docket")
 
 
 # Ignore the result or else we'll use a lot of memory.
