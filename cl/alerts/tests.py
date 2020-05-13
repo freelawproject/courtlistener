@@ -135,7 +135,7 @@ class DocketAlertTest(TestCase):
 
     def test_triggering_pacer_docket_alert(self):
         """Does the alert trigger for pacer date_last_filing?"""
-        update_docket_and_send_alert(self.docket2, self.old, False)
+        update_docket_and_send_alert(self.docket2, self.old)
         # Does the alert go out? It should.
         if settings.PACER_USERNAME:
             # hack to make tests work even without credentials
@@ -143,7 +143,7 @@ class DocketAlertTest(TestCase):
 
     def test_nothing_happens_for_timers_after_pacer_docket_date(self):
         """Do we avoid sending alerts for timers after pacer date_last_filing?"""
-        update_docket_and_send_alert(self.docket2, self.new, False)
+        update_docket_and_send_alert(self.docket2, self.new)
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
 

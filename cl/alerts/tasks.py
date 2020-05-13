@@ -52,7 +52,7 @@ def enqueue_docket_alert(d_pk):
 
 
 @app.task()
-def update_docket_info_iqeury(docket, update=True):
+def update_docket_info_iqeury(d):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -164,13 +164,16 @@ def send_docket_alert(d_pk, since):
 
 
 @app.task()
-def update_docket_and_send_alert(docket, since, update=True):
+def update_docket_and_send_alert(docket_id, since):
+    if not settings.PACER_USERNAME:
+        return
+
+    docket = Docket.objects.get(pk=docket_id)
     if not docket.date_last_filing or docket.date_last_filing < since.date():
-        if settings.PACER_USERNAME:
-            update_docket_info_iqeury(docket, update)
-            newly_enqueued = enqueue_docket_alert(docket.pk)
-            if newly_enqueued:
-                send_docket_alert(docket.pk, since)
+        update_docket_info_iqeury(docket)
+        newly_enqueued = enqueue_docket_alert(docket_id)
+        if newly_enqueued:
+            send_docket_alert(docket_id, since)
 
 
 @app.task(ignore_result=True)
