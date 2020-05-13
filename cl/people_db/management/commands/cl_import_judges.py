@@ -345,7 +345,6 @@ class Command(VerboseCommand):
         df = pd.read_csv(infile)
         has_date = df["START_DATE_GRANULARITY"].notnull()
         df = df[has_date]
-        df = df[df["IN_CL"] != "Yes"]
         df = df.replace(r"^\s+$", np.nan, regex=True)
         self.process_mag_bk_entries(df)
 
