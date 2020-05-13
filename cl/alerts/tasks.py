@@ -121,7 +121,18 @@ def send_docket_alert(d_pk, since):
                 subject_template = loader.get_template(
                     "pacer_docket_alert_subject.txt"
                 )
-                email_context = {"docket": docket}
+                try:
+                    latest_entry_date = (
+                        DocketEntry.objects.filter(docket=docket)
+                        .latest("date_filed")
+                        .date_filed
+                    )
+                except DocketEntry.DoesNotExist:
+                    latest_entry_date = None
+                email_context = {
+                    "docket": docket,
+                    "latest_entry_date": latest_entry_date,
+                }
                 txt_template = loader.get_template(
                     "pacer_docket_alert_email.txt"
                 )
