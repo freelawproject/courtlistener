@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
@@ -6,9 +8,10 @@ from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import update_docket_and_send_alert
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.opinion_page.views import make_docket_title, user_has_alert
-from cl.search.models import Docket
+from cl.search.models import Docket, DocketEntry
 
 
 @login_required
@@ -98,15 +101,32 @@ def toggle_docket_alert(request):
     """Use Ajax to create or delete an alert for a user."""
     if request.is_ajax() and request.method == "POST":
         docket_pk = request.POST.get("id")
-        existing_alert = DocketAlert.objects.filter(
+        existing_alert_for_user = DocketAlert.objects.filter(
             user=request.user, docket_id=docket_pk
         )
-        if existing_alert.exists():
-            existing_alert.delete()
+        if existing_alert_for_user.exists():
+            existing_alert_for_user.delete()
             msg = "Alert disabled successfully"
         else:
+            existing_alert = DocketAlert.objects.filter(
+                docket_id=docket_pk
+            ).exists()
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
             msg = "Alerts are now enabled for this docket"
+            if not existing_alert:
+                # Nobody else has an alert for this docket. Go check if it has
+                # updates, and if so send an alert immediately.
+                try:
+                    since = (
+                        DocketEntry.objects.filter(docket_id=docket_pk)
+                        .latest("date_filed")
+                        .date_filed
+                    )
+                except DocketEntry.DoesNotExist:
+                    # No entries at this time. Weird. Send them an alert if
+                    # there are entries since 1970.
+                    since = datetime(1970, 1, 1)
+                update_docket_and_send_alert.delay(docket_pk, since=since)
         return HttpResponse(msg)
     else:
         return HttpResponseNotAllowed(
