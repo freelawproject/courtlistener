@@ -36,6 +36,7 @@ from cl.people_db.management.constants import (
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+
 class NameExistsError(Exception):
     def __init__(self, value):
         self.value = value
@@ -680,16 +681,18 @@ def make_mag_bk_judge(item, testing=False):
     print("Now processing: %s" % name)
 
     if Person.objects.filter(cl_id=item["CL_ID"]).exists():
-        raise ValidationError("CL_ID already exists for the record "
-                              "being imported: %s" % name)
+        raise ValidationError(
+            "CL_ID already exists for the record " "being imported: %s" % name
+        )
 
     if Person.objects.filter(
         name_first=item["NAME_FIRST"],
         name_middle=item["NAME_MIDDLE"],
         name_last=item["NAME_LAST"],
     ).exists():
-        raise ValidationError("Name already exists for record being "
-                              "imported %s" % name)
+        raise ValidationError(
+            "Name already exists for record being " "imported %s" % name
+        )
 
     if not pd.isnull(item["NAME_MIDDLE"]):
         if len(item["NAME_MIDDLE"]) == 1:
