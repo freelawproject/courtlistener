@@ -34,7 +34,7 @@ from cl.people_db.management.constants import (
     FJC_DISTRICT_COURTS,
 )
 from django.core.exceptions import ValidationError
-
+from django.db import transaction
 
 class NameExistsError(Exception):
     def __init__(self, value):
@@ -656,6 +656,7 @@ def make_federal_judge(item, testing=False):
                 continue
 
 
+@transaction.atomic()
 def make_mag_bk_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge
     object.  Returns a Judge object.  To be used for importing bankruptcy
@@ -679,7 +680,16 @@ def make_mag_bk_judge(item, testing=False):
     print("Now processing: %s" % name)
 
     if Person.objects.filter(cl_id=item["CL_ID"]).exists():
-        raise ValidationError("CL_ID already exists.")
+        raise ValidationError("CL_ID already exists for the record "
+                              "being imported: %s" % name)
+
+    if Person.objects.filter(
+        name_first=item["NAME_FIRST"],
+        name_middle=item["NAME_MIDDLE"],
+        name_last=item["NAME_LAST"],
+    ).exists():
+        raise ValidationError("Name already exists for record being "
+                              "imported %s" % name)
 
     if not pd.isnull(item["NAME_MIDDLE"]):
         if len(item["NAME_MIDDLE"]) == 1:
@@ -703,13 +713,6 @@ def make_mag_bk_judge(item, testing=False):
         cl_id=item["CL_ID"],
     )
 
-    if Person.objects.filter(
-        name_first=item["NAME_FIRST"],
-        name_middle=item["NAME_MIDDLE"],
-        name_last=item["NAME_LAST"],
-    ).exists():
-        raise NameExistsError("")
-
     if not testing:
         person.save()
 
@@ -717,11 +720,11 @@ def make_mag_bk_judge(item, testing=False):
     if re.search("Bankruptcy", item["POSITION"]):
         position_type = Position.JUDGE
         if item["COURT"]:
-            court = FJC_BANKRUPTCY_COURTS.get(item["COURT"])
+            court = FJC_BANKRUPTCY_COURTS[item["COURT"]]
     else:
         position_type = Position.MAGISTRATE
         if item["COURT"]:
-            court = FJC_DISTRICT_COURTS.get(item["COURT"])
+            court = FJC_DISTRICT_COURTS[item["COURT"]]
 
     date_start = process_date_string(item["START_DATE"])
 
