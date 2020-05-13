@@ -1,3 +1,4 @@
+# coding=utf-8
 from __future__ import print_function
 
 import time
@@ -11,64 +12,112 @@ from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Docket
 
 
+def check_schedule(now):
+    """Should we run the alerts?
+
+    Alerts are sent according to the following rules:
+
+                                   Num alerts
+                             +---+---+---+-----+------+
+                             | 0 | 1 | 2 | 3-9 | >=10 |
+          │                  +---+---+---+-----+------+
+          │         30 after | N | N | N |  N  |  Y   |
+       W  │                  +---+---+---+-----+------+
+       H  │           hourly | N | N | N |  Y  |  Y   |
+       E  │                  +---+---+---+-----+------+
+       N  │  6am, 6pm & noon | N | N | Y |  Y  |  Y   |
+       ?  │                  +---+---+---+-----+------+
+          │         Midnight | N | Y | Y |  Y  |  Y   |
+          │                  +---+---+---+-----+------+
+          │         Midnight | N | Y | Y |  Y  |  Y   | <-- Also old term. cases
+                      Sunday +---+---+---+-----+------+
+                               │
+                               └─never
+
+    :param now: datetime of when the current run was started
+    :return: tuple of (min_alerts, crawl_types). min_alerts is the minumum
+    number of alerts a docket must have to run alerts. crawle_types is a set
+    of the types of items to crawl.
+    """
+    crawl_types = set()
+    min_alerts = 0
+    if now.minute == 30:
+        # we're on a half hour schedule
+        min_alerts = 10
+    elif now.minute == 0:
+        if now.hour == 0:
+            # At midnight do all alerts + terminated
+            min_alerts = 1
+            crawl_types.add("terminated")
+        elif now.hour in [6, 12, 18]:
+            # Three extra times daily
+            min_alerts = 2
+        else:
+            # Default hourly schedule
+            min_alerts = 3
+
+    if now.minute == 0 and now.hour == 0 and now.weekday() == 6:
+        # check old terminated dockets (>90 days) on Sunday
+        crawl_types.add("old_terminated")
+
+    return min_alerts, crawl_types
+
+
 class Command(VerboseCommand):
-    help = "Scrape PACER for all alerts"
+    help = "Scrape PACER iquery report and send alerts"
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
+        add_argument("test_count",)
 
         while True:
-            date = datetime.now()
-            crawl_terminated = False
-            crawl_old_terminated = False
-            if date.minute == 30:
-                # we're on a half hour schedule, so only scrape dockets with at least 10 alerts
-                min_alerts = 10
-            elif date.minute == 0:  # we're on an hour schedule
-                if date.hour % 6 == 0:
-                    # this triggers 4 times a day, for dockets with at least 2 alerts
-                    min_alerts = 2
-                    if date.hour == 0:
-                        # triggers once per day, check everything but terminated
-                        min_alerts = 1
-                        crawl_terminated = True
-                        # check terminated dockets once a day
+            now = datetime.now()
+            crawl_types = set()
 
-                        if date.weekday() == 6:
-                            # check old terminated dockets (>90 days) on Sunday
-                            crawl_old_terminated = True
-                else:
-                    min_alerts = 3  # default hourly check for dockets with at least 3 alerts
-            else:  # not on an hour or a half hour schedule, so return
-                debug = False  # makes it easy to test: just change this line to True and it'll do every docket
+            if now.minute != 30 and now.minute != 0:
+                # Early abort unless debugging. Nothing fires except on the
+                # hour and the half.
+                debug = False
                 if not debug:
                     time.sleep(30)
                     continue
                 min_alerts = 0
-                crawl_old_terminated = True
+                crawl_types.add("old_terminated")
+            else:
+                min_alerts, crawl_types = check_schedule(now)
 
             # list of all dockets that need to be checked
-            docket_list = DocketAlert.objects.values("docket").annotate(
-                alerts=Count("id")
+            docket_list = (
+                DocketAlert.objects.values("docket")
+                .order_by("pk")
+                .annotate(alerts_count=Count("id"))
             )
             for item in docket_list:
-                if item["alerts"] >= min_alerts:
-                    docket = Docket.objects.get(pk=item["docket"])
-                    docket_not_terminated = not docket.date_terminated
-                    terminated_recently = (
-                        crawl_terminated
-                        and (date.date() - docket.date_last_filing) < 90
+                if item["alerts_count"] < min_alerts:
+                    continue
+
+                docket = Docket.objects.get(pk=item["docket"])
+                terminated_recently = (
+                    "terminated" in crawl_types
+                    and docket.date_terminated
+                    and (now.date() - docket.date_last_filing) < 90
+                )
+                # Send alerts for non-terminated, recently terminated, or
+                # old terminated dockets if properly timed
+                if (
+                    docket.date_terminated is None
+                    or terminated_recently
+                    or "old_terminated" in crawl_types
+                ):
+                    since = (
+                        DocketAlert.objects.filter(docket=docket)
+                        .latest("date_created")
+                        .date_last_hit
                     )
-                    # weekly check of all dockets including terminated, or daily check  of terminated dockets with filings in last 90 days
-                    if (
-                        docket_not_terminated
-                        or crawl_old_terminated
-                        or terminated_recently
-                    ):
-                        since = DocketAlert.objects.filter(docket=docket)[
-                            0
-                        ].date_last_hit or date - timedelta(days=1)
+                    if since is None:
                         # if never hit, check if new filing since yesterday
-                        update_docket_and_send_alert.delay(docket, since)
+                        since = now - timedelta(days=1)
+
+                    update_docket_and_send_alert.delay(docket.pk, since)
 
             time.sleep(60)
