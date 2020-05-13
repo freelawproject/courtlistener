@@ -23,7 +23,6 @@ from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
 
 from django.core.exceptions import ValidationError
-from cl.people_db.import_judges.populate_fjc_judges import NameExistsError
 
 
 class Command(VerboseCommand):
@@ -304,55 +303,51 @@ class Command(VerboseCommand):
                         position.save()
                         add_items_to_solr.delay([p.pk], "people_db.Person")
 
-    def import_mag_bk_judges(self):
-        def read_mag_bk_csv(infile=None):
+    def process_mag_bk_entries(self, df):
 
-            if infile is None:
-                self.ensure_input_file()
-                infile = self.options["input_file"]
-            df = pd.read_csv(infile)
-            has_date = df["START_DATE_GRANULARITY"].notnull()
-            df = df[has_date]
-            df = df[df["IN_CL"] != "Yes"]
-            df = df.replace(r"^\s+$", np.nan, regex=True)
-            return df
+        bad_record = []
 
-        def process_mag_bk_entries(df):
+        textfields = [
+            "CL_ID",
+            "NAME_FIRST",
+            "NAME_MIDDLE",
+            "NAME_LAST",
+            "NAME_SUFFIX",
+            "GENDER",
+            "POSITION",
+            "COURT",
+            "START_DATE",
+            "START_DATE_GRANULARITY",
+            "END_DATE",
+            "END_DATE_GRANULARITY",
+        ]
 
-            bad_record = []
+        for x in textfields:
+            df[x] = df[x].replace(np.nan, "", regex=True)
+        for i, row in df.iterrows():
+            if i < self.options["offset"]:
+                continue
+            if i >= self.options["limit"] > 0:
+                break
+            try:
+                make_mag_bk_judge(dict(row), testing=self.debug)
+            except ValidationError as e:
+                bad_record.append(e[0])
 
-            textfields = [
-                "CL_ID",
-                "NAME_FIRST",
-                "NAME_MIDDLE",
-                "NAME_LAST",
-                "NAME_SUFFIX",
-                "GENDER",
-                "POSITION",
-                "COURT",
-                "START_DATE",
-                "START_DATE_GRANULARITY",
-                "END_DATE",
-                "END_DATE_GRANULARITY",
-            ]
+        for b in bad_record:
+            print(b)
 
-            for x in textfields:
-                df[x] = df[x].replace(np.nan, "", regex=True)
-            for i, row in df.iterrows():
-                if i < self.options["offset"]:
-                    continue
-                if i >= self.options["limit"] > 0:
-                    break
-                try:
-                    make_mag_bk_judge(dict(row), testing=self.debug)
-                except (ValidationError) as e:
-                    bad_record.append(e[0])
+    def import_mag_bk_judges(self, infile=None):
 
-            for b in bad_record:
-                print(b)
-
-        df = read_mag_bk_csv()
-        process_mag_bk_entries(df)
+        if infile is None:
+            self.ensure_input_file()
+            infile = self.options["input_file"]
+        df = pd.read_csv(infile)
+        has_date = df["START_DATE_GRANULARITY"].notnull()
+        df = df[has_date]
+        df = df[df["IN_CL"] != "Yes"]
+        df = df.replace(r"^\s+$", np.nan, regex=True)
+        self.process_mag_bk_entries(df)
 
     VALID_ACTIONS = {
         "import-all": import_all,
