@@ -6,7 +6,7 @@ from django.core.cache import caches
 from ratelimit import UNSAFE
 from ratelimit.decorators import ratelimit
 from ratelimit.exceptions import Ratelimited
-
+from redis import ConnectionError
 
 ratelimiter_fast = ratelimit(key="ip", rate="250/h", block=True)
 ratelimiter_auth = ratelimit(key="ip", rate="10/m", method=UNSAFE, block=True)
@@ -36,6 +36,9 @@ def ratelimit_if_not_whitelisted(view):
                 return view(request, *args, **kwargs)
             else:
                 raise e
+        except ConnectionError:
+            # Unable to connect to redis, let the view proceed this time.
+            return view(request, *args, **kwargs)
 
     return wrapper
 
