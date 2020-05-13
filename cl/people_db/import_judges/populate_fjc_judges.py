@@ -37,14 +37,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 
-class NameExistsError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
 def transform_employ(string):
     if pd.isnull(string):
         return [None], [None], [None], [None]
@@ -682,7 +674,7 @@ def make_mag_bk_judge(item, testing=False):
 
     if Person.objects.filter(cl_id=item["CL_ID"]).exists():
         raise ValidationError(
-            "CL_ID already exists for the record " "being imported: %s" % name
+            "CL_ID already exists for the record being imported: %s" % name
         )
 
     if Person.objects.filter(
@@ -691,7 +683,7 @@ def make_mag_bk_judge(item, testing=False):
         name_last=item["NAME_LAST"],
     ).exists():
         raise ValidationError(
-            "Name already exists for record being " "imported %s" % name
+            "Name already exists for record being imported %s" % name
         )
 
     if not pd.isnull(item["NAME_MIDDLE"]):
