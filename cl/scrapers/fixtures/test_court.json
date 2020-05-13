@@ -36,5 +36,24 @@
             "has_oral_argument_scraper": true,
             "start_date": "1891-03-03"
         }
-    }
+    },
+  {
+  "fields": {
+    "jurisdiction": "FD",
+    "end_date": null,
+    "short_name": "District of Columbia",
+    "citation_string": "D.C.",
+    "in_use": true,
+    "url": "http://www.dcd.uscourts.gov/",
+    "notes": "Lawbox",
+    "date_modified": "2014-05-20T00:58:40.714Z",
+    "has_oral_argument_scraper": false,
+    "full_name": "District Court, District of Columbia",
+    "position": 200.5,
+    "has_opinion_scraper": true,
+    "start_date": null
+  },
+  "model": "search.court",
+  "pk": "dcd"
+}
 ]
