@@ -102,14 +102,13 @@ def send_docket_alert(d_pk, since):
         new_des = DocketEntry.objects.filter(
             date_created__gte=since, docket=docket
         )
-        if (
-            new_des.count() > 0
-            or docket.date_last_filing
-            and docket.date_last_filing > since.date()
+        new_des_count = new_des.count()
+        if new_des_count > 0 or (
+            docket.date_last_filing and docket.date_last_filing > since.date()
         ):
             # Notify every user that's subscribed to this alert.
             case_name = trunc(best_case_name(docket), 100, ellipsis="...")
-            if new_des.count() > 0:
+            if new_des_count > 0:
                 subject_template = loader.get_template(
                     "docket_alert_subject.txt"
                 )
@@ -143,7 +142,7 @@ def send_docket_alert(d_pk, since):
             subject = subject_template.render(
                 {
                     "docket": docket,
-                    "count": new_des.count(),
+                    "count": new_des_count,
                     "case_name": case_name,
                 }
             ).strip()  # Remove newlines that editors can insist on adding.
