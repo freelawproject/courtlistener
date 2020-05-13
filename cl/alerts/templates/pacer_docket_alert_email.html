@@ -41,7 +41,7 @@
         <a href="{{ docket.pacer_url }}">Buy Docket on PACER</a>
       {% endif %}
     </p>
-    Courtlistener does not have any new docket entries, but PACER reports the latest entry was filed on {{ docket.date_last_filing }}
+    CourtListener does not have any new docket entries{% if latest_entry_date %} since {{ latest_entry_date|date:"M j, Y" }}{% endif %}, but PACER reports the latest entry was filed on {{ docket.date_last_filing|date:"M j, Y" }}.
     <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
 
     <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">This alert was sent because you subscribed to this docket with your account on CourtListener.com. To disable this alert, <a href="https://www.courtlistener.com{{ docket.get_absolute_url }}">view the docket on CourtListener.com</a> and click the "disable" button.
