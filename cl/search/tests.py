@@ -41,6 +41,7 @@ from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
+from selenium.common.exceptions import NoSuchElementException
 
 class SetupException(Exception):
     def __init__(self, message):
@@ -1054,12 +1055,11 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         searchbox = self.browser.find_element_by_id("id_q")
         searchbox.clear()
-        searchbox.send_keys("12-9238")
+        searchbox.send_keys("19-2205")
         searchbox.submit()
-        result_count = self.browser.find_element_by_id("result-count")
         # without the cleanup_main_query function, there are 4 results
         # with the query, there should be none
-        self.assertEqual(result_count.text, "")
+        self.assertRaises(NoSuchElementException, self.browser.find_element_by_id, "result-count")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
