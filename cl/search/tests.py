@@ -43,6 +43,7 @@ from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 from selenium.common.exceptions import NoSuchElementException
 
+
 class SetupException(Exception):
     def __init__(self, message):
         Exception.__init__(self, message)
@@ -1059,7 +1060,11 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         searchbox.submit()
         # without the cleanup_main_query function, there are 4 results
         # with the query, there should be none
-        self.assertRaises(NoSuchElementException, self.browser.find_element_by_id, "result-count")
+        self.assertRaises(
+            NoSuchElementException,
+            self.browser.find_element_by_id,
+            "result-count",
+        )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
