@@ -773,7 +773,7 @@ def cleanup_main_query(query_string):
     cleaned_items = []
     for item in query_string.split():
         if re.search(r"\d", item[0]):
-            if re.search(r"\d{2}(cv|crimj|pi)\d{4,5}", item):
+            if re.search(r"\d{2}(cv|crimj|po)\d{4,5}", item):
                 case_type_regex = re.search(r"\D+", item)
                 start, end = case_type_regex.span()
 
