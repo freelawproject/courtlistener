@@ -776,17 +776,20 @@ def cleanup_main_query(query_string):
             if re.search(r"\d{2}(cv|crimj|pi)\d{4,5}", item):
                 case_type_regex = re.search(r"\D+", item)
                 start, end = case_type_regex.span()
-                
+
                 year = item[0:start]
                 case_type = case_type_regex.group()
                 number = item[end:]
 
-                cleaned_items.append('"' + year + "-" + case_type + "-" + number + '"')
+                cleaned_items.append(
+                    '"' + year + "-" + case_type + "-" + number + '"'
+                )
             else:
                 cleaned_items.append('"' + item + '"')
         else:
             cleaned_items.append(item)
     return " ".join(cleaned_items)
+
 
 def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
     main_params = {
