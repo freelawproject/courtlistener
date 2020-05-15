@@ -34,9 +34,7 @@ def get_dockets():
             "token_auth": settings.MATOMO_TOKEN,
         },
     )
-    visitsjson = json.loads(visits.text)
-    for item in visitsjson[:10]:
-        print(item["actionDetails"][0]["url"])
+    visitsjson = visits.json()
     urllist = [
         item["actionDetails"][0]["url"]
         if "url" in item["actionDetails"][0]
