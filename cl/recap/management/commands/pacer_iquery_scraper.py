@@ -35,19 +35,17 @@ def get_dockets():
             "token_auth": settings.MATOMO_TOKEN,
         },
     )
-    visitsjson = visits.json()
-    urllist = [
-        item["actionDetails"][0]["url"]
-        if "url" in item["actionDetails"][0]
-        else ""
-        for item in visitsjson
-    ]
-    urllistasstring = "|".join(urllist)
-    docket_list = set(re.findall("/docket/([0-9]+)/", urllistasstring))
-    docket_list.update(
+    docket_ids = set()
+    for item in visits.json():
+        for actiondetail in item["actionDetails"]:
+            url = actiondetail.get("url")
+            if url is None:
+                continue
+            docket_ids.update(re.findall("/docket/[0-9]+/", url))
+    docket_ids.update(
         [a["docket"] for a in DocketAlert.objects.values("docket")]
     )
-    return docket_list
+    return docket_ids
 
 
 @app.task()
