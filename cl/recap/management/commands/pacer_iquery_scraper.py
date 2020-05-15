@@ -22,7 +22,7 @@ from juriscraper.pacer import CaseQuery, PacerSession
 
 def get_dockets():
     visits = requests.get(
-        settings.MATOMO_URL,
+        settings.MATOMO_REPORT_URL,
         timeout=1,
         params={
             "idsite": settings.MATOMO_SITE_ID,
@@ -31,6 +31,7 @@ def get_dockets():
             "period": "week",
             "format": "json",
             "date": "today",
+            "token_auth": settings.MATOMO_TOKEN,
         },
     )
     visitsjson = json.loads(visits.text)

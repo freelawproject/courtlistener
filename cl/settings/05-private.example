@@ -85,6 +85,9 @@ IA_OA_COLLECTIONS = ['uscourtsoralargumentsdev']
 MAILCHIMP_SECRET = ''
 MAILCHIMP_API_KEY = ''
 
+# Matomo token (used for reporting API)
+MATOMO_TOKEN = ''
+
 # PACER
 PACER_USERNAME = ''
 PACER_PASSWORD = ''
