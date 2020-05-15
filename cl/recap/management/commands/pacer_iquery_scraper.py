@@ -8,17 +8,8 @@ import requests
 from django.conf import settings
 
 from cl.alerts.models import DocketAlert
-from cl.celery import app
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
-from cl.recap.mergers import (
-    update_docket_metadata,
-    add_bankruptcy_data_to_docket,
-)
-from cl.search.models import Docket
-from cl.search.tasks import add_items_to_solr
-from juriscraper.pacer import CaseQuery, PacerSession
+from cl.scrapers.tasks import update_docket_info_iquery
 
 
 def get_dockets():
@@ -46,27 +37,6 @@ def get_dockets():
         [a["docket"] for a in DocketAlert.objects.values("docket")]
     )
     return docket_ids
-
-
-@app.task()
-def update_docket_info_iquery(d_pk):
-    cookies = get_or_cache_pacer_cookies(
-        "pacer_scraper",
-        settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    s = PacerSession(
-        cookies=cookies,
-        username=settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    d = Docket.objects.get(pk=d_pk)
-    report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id)
-    d = update_docket_metadata(d, report.metadata)
-    d.save()
-    add_bankruptcy_data_to_docket(d, report.metadata)
-    add_items_to_solr([d.pk], "search.Docket")
 
 
 class Command(VerboseCommand):
