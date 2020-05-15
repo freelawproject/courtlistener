@@ -7,6 +7,7 @@ import re
 import requests
 from django.conf import settings
 
+from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -42,11 +43,15 @@ def get_dockets():
         for item in visitsjson
     ]
     urllistasstring = "|".join(urllist)
-    return set(re.findall("/docket/([0-9]+)/", urllistasstring))
+    docket_list = set(re.findall("/docket/([0-9]+)/", urllistasstring))
+    docket_list.update(
+        [a["docket"] for a in DocketAlert.objects.values("docket")]
+    )
+    return docket_list
 
 
 @app.task()
-def update_docket_info_iqeury(d_pk):
+def update_docket_info_iquery(d_pk):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -73,4 +78,4 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         docket_list = get_dockets()
         for item in docket_list:
-            update_docket_info_iqeury.delay(item)
+            update_docket_info_iquery.delay(item)
