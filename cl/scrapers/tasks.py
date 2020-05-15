@@ -8,11 +8,10 @@ import traceback
 import uuid
 from tempfile import NamedTemporaryFile
 
-from django.apps import apps
-from cl.lib.juriscraper_utils import get_scraper_object_by_name
 import eyed3
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
+from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import (
@@ -31,12 +30,21 @@ from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.mojibake import fix_mojibake
+from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
+from cl.recap.mergers import (
+    update_docket_metadata,
+    add_bankruptcy_data_to_docket,
+)
 from cl.scrapers.models import ErrorLog
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import Opinion, RECAPDocument, Docket
+from cl.search.tasks import add_items_to_solr
+from juriscraper.pacer import PacerSession, CaseQuery
 
 DEVNULL = open("/dev/null", "w")
 
@@ -597,3 +605,24 @@ def process_audio_file(pk):
     af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True
     af.save()
+
+
+@app.task()
+def update_docket_info_iquery(d_pk):
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    d = Docket.objects.get(pk=d_pk)
+    report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
+    report.query(d.pacer_case_id)
+    d = update_docket_metadata(d, report.metadata)
+    d.save()
+    add_bankruptcy_data_to_docket(d, report.metadata)
+    add_items_to_solr([d.pk], "search.Docket")
