@@ -1,25 +1,15 @@
-from datetime import datetime
-
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import loader
 from django.utils.timezone import now
-from juriscraper.pacer import CaseQuery, PacerSession
 
 from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
-from cl.recap.mergers import (
-    update_docket_metadata,
-    add_bankruptcy_data_to_docket,
-)
 from cl.search.models import Docket, DocketEntry
-from cl.search.tasks import add_items_to_solr
 from cl.stats.utils import tally_stat
 
 
@@ -51,26 +41,6 @@ def enqueue_docket_alert(d_pk):
     return True
 
 
-@app.task()
-def update_docket_info_iqeury(d):
-    cookies = get_or_cache_pacer_cookies(
-        "pacer_scraper",
-        settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    s = PacerSession(
-        cookies=cookies,
-        username=settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id)
-    d = update_docket_metadata(d, report.metadata)
-    d.save()
-    add_bankruptcy_data_to_docket(d, report.metadata)
-    add_items_to_solr([d.pk], "search.Docket")
-
-
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
 def send_docket_alert(d_pk, since):
@@ -91,50 +61,21 @@ def send_docket_alert(d_pk, since):
         new_des = DocketEntry.objects.filter(
             date_created__gte=since, docket=docket
         )
-        new_des_count = new_des.count()
-        if new_des_count > 0 or (
-            docket.date_last_filing and docket.date_last_filing > since.date()
-        ):
+
+        if new_des.count() > 0:
             # Notify every user that's subscribed to this alert.
             case_name = trunc(best_case_name(docket), 100, ellipsis="...")
-            if new_des_count > 0:
-                subject_template = loader.get_template(
-                    "docket_alert_subject.txt"
-                )
-
-                email_context = {"new_des": new_des, "docket": docket}
-                txt_template = loader.get_template("docket_alert_email.txt")
-                html_template = loader.get_template("docket_alert_email.html")
-            else:
-                subject_template = loader.get_template(
-                    "pacer_docket_alert_subject.txt"
-                )
-                try:
-                    latest_entry_date = (
-                        DocketEntry.objects.filter(docket=docket)
-                        .latest("date_filed")
-                        .date_filed
-                    )
-                except DocketEntry.DoesNotExist:
-                    latest_entry_date = None
-                email_context = {
-                    "docket": docket,
-                    "latest_entry_date": latest_entry_date,
-                }
-                txt_template = loader.get_template(
-                    "pacer_docket_alert_email.txt"
-                )
-                html_template = loader.get_template(
-                    "pacer_docket_alert_email.html"
-                )
-
+            subject_template = loader.get_template("docket_alert_subject.txt")
             subject = subject_template.render(
                 {
                     "docket": docket,
-                    "count": new_des_count,
+                    "count": new_des.count(),
                     "case_name": case_name,
                 }
             ).strip()  # Remove newlines that editors can insist on adding.
+            email_context = {"new_des": new_des, "docket": docket}
+            txt_template = loader.get_template("docket_alert_email.txt")
+            html_template = loader.get_template("docket_alert_email.html")
             messages = []
             for email_address in email_addresses:
                 msg = EmailMultiAlternatives(
@@ -154,26 +95,11 @@ def send_docket_alert(d_pk, since):
             connection.send_messages(messages)
             tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
 
-            DocketAlert.objects.filter(docket=docket).update(
-                date_last_hit=now()
-            )
+        DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
 
     # Work completed, clear the semaphore
     r = make_redis_interface("ALERTS")
     r.delete(make_alert_key(d_pk))
-
-
-@app.task()
-def update_docket_and_send_alert(docket_id, since):
-    if not settings.PACER_USERNAME:
-        return
-
-    docket = Docket.objects.get(pk=docket_id)
-    if not docket.date_last_filing or docket.date_last_filing < since.date():
-        update_docket_info_iqeury(docket)
-        newly_enqueued = enqueue_docket_alert(docket_id)
-        if newly_enqueued:
-            send_docket_alert(docket_id, since)
 
 
 @app.task(ignore_result=True)
