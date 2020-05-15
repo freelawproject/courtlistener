@@ -32,7 +32,10 @@ def get_dockets():
             url = actiondetail.get("url")
             if url is None:
                 continue
-            docket_ids.update(re.findall("/docket/[0-9]+/", url))
+            match = re.search("/docket/([0-9]+)/", url)
+            if match is None:
+                continue
+            docket_ids.add(match.group(1))
     docket_ids.update(
         [a["docket"] for a in DocketAlert.objects.values("docket")]
     )
