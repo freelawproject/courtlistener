@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import print_function
 
+import datetime
 import re
 
 import requests
@@ -10,6 +11,7 @@ from cl.alerts.models import DocketAlert
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
+from cl.search.models import Docket
 
 
 def get_dockets():
@@ -61,12 +63,16 @@ class Command(VerboseCommand):
         )
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
+        now = datetime.now().date
         for i, item in enumerate(docket_list):
             throttle.maybe_wait()
 
             if i % 500 == 0:
                 logger.info("Sent %s items to celery for crawling so far.")
 
+            d = Docket.objects.get(pk=item)
+            if d.date_terminated - now > 90 and d.date_last_filing - now > 90:
+                continue
             update_docket_info_iquery.apply_async(args=(item,), queue=queue)
 
         logger.info("Done!")
