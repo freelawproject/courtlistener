@@ -774,9 +774,35 @@ def print_params(params):
         # print results_si.execute()
 
 
+def cleanup_main_query(query_string):
+    """Enhance the query string with some simple fixes
+    
+     - Make any numerical queries into phrases
+     - Add hyphens to district docket numbers that lack them
+     
+    :param query_string: The query string from the form
+    :return The enhanced query string
+    """
+    cleaned_items = []
+    for item in query_string.split():
+        if not item[0].isdigit():
+            cleaned_items.append(item)
+            continue
+
+        m = re.match(r"(\d{2})(cv|cr|mj|po)(\d{1,5})", item)
+        if m:
+            # It's a docket number missing hyphens, e.g. 19cv38374
+            item = "-".join(m.groups())
+
+        # Some sort of number, probably a docket number.
+        # Wrap in quotes to do a phrase search
+        cleaned_items.append('"' + item + '"')
+    return " ".join(cleaned_items)
+
+
 def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
     main_params = {
-        "q": cd["q"] or "*",
+        "q": cleanup_main_query(cd["q"] or "*"),
         "sort": cd.get("order_by", order_by),
         "caller": "build_main_query",
     }
@@ -839,7 +865,7 @@ def build_alert_estimation_query(cd, day_count):
     triggered.
     """
     params = {
-        "q": cd["q"] or "*",
+        "q": cleanup_main_query(cd["q"] or "*"),
         "rows": 0,
         "caller": "alert_estimator",
     }
