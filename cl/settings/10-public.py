@@ -413,7 +413,7 @@ MATOMO_SITE_ID = "1"
 # SCDB #
 ########
 # SCOTUS cases after this date aren't expected to have SCDB data.
-SCDB_LATEST_CASE = datetime.datetime(2017, 6, 26)
+SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 
 
 ######################
