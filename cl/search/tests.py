@@ -17,6 +17,8 @@ from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
+from cl.lib.search_utils import cleanup_main_query
+
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import (
     SolrTestCase,
@@ -1050,7 +1052,21 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element_by_id("result-count")
         self.assertIn("Opinions", result_count.text)
 
-    def test_main_query_cleanup(self):
+    def test_query_cleanup_function(self):
+        # Send string of search_query to the function and expect it
+        # to be encoded properly
+        result1 = cleanup_main_query("12-9238 happy Gilmore")
+        result2 = cleanup_main_query("1chicken NUGGET")
+        result3 = cleanup_main_query("We can drive her home with 1headlight")
+        result4 = cleanup_main_query("Look Ma, no numbers!")
+        result5 = cleanup_main_query("12cv9834 Monkey Goose")
+        self.assertEqual(result1, '"12-9238" happy Gilmore')
+        self.assertEqual(result2, '"1chicken" NUGGET')
+        self.assertEqual(result3, 'We can drive her home with "1headlight"')
+        self.assertEqual(result4, "Look Ma, no numbers!")
+        self.assertEqual(result5, '"12-cv-9834" Monkey Goose')
+
+    def test_query_cleanup_integration(self):
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
         self.browser.get(self.live_server_url)
