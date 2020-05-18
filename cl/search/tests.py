@@ -16,6 +16,8 @@ from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from timeout_decorator import timeout_decorator
 
+from cl.lib.search_utils import cleanup_main_query
+from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import (
     SolrTestCase,
     IndexedSolrTestCase,
@@ -38,6 +40,8 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+
+from selenium.common.exceptions import NoSuchElementException
 
 
 class SetupException(Exception):
@@ -1077,6 +1081,36 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         searchbox.submit()
         result_count = self.browser.find_element_by_id("result-count")
         self.assertIn("Opinions", result_count.text)
+
+    def test_query_cleanup_function(self):
+        # Send string of search_query to the function and expect it
+        # to be encoded properly
+        result1 = cleanup_main_query("12-9238 happy Gilmore")
+        result2 = cleanup_main_query("1chicken NUGGET")
+        result3 = cleanup_main_query("We can drive her home with 1headlight")
+        result4 = cleanup_main_query("Look Ma, no numbers!")
+        result5 = cleanup_main_query("12cv9834 Monkey Goose")
+        self.assertEqual(result1, '"12-9238" happy Gilmore')
+        self.assertEqual(result2, '"1chicken" NUGGET')
+        self.assertEqual(result3, 'We can drive her home with "1headlight"')
+        self.assertEqual(result4, "Look Ma, no numbers!")
+        self.assertEqual(result5, '"12-cv-9834" Monkey Goose')
+
+    def test_query_cleanup_integration(self):
+        # Dora goes to CL and performs a Search using a numbered citation
+        # (e.g. "12-9238" or "3:18-cv-2383")
+        self.browser.get(self.live_server_url)
+        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox.clear()
+        searchbox.send_keys("19-2205")
+        searchbox.submit()
+        # without the cleanup_main_query function, there are 4 results
+        # with the query, there should be none
+        self.assertRaises(
+            NoSuchElementException,
+            self.browser.find_element_by_id,
+            "result-count",
+        )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self):
