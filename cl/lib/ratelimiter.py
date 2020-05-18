@@ -1,5 +1,6 @@
 import functools
 import socket
+import sys
 
 from django.conf import settings
 from django.core.cache import caches
@@ -10,7 +11,13 @@ from redis import ConnectionError
 
 ratelimiter_fast = ratelimit(key="ip", rate="250/h", block=True)
 ratelimiter_auth = ratelimit(key="ip", rate="10/m", method=UNSAFE, block=True)
-ratelimiter_slow = ratelimit(key="ip", rate="1/m", method=UNSAFE, block=True)
+# Decorators can't easily be mocked, and we need to not trigger this decorator
+# during tests or else the first test works and the rest are blocked. So,
+# check if we're doing a test and adjust the decorator accordingly.
+if "test" in sys.argv:
+    ratelimiter_slow = lambda func: func
+else:
+    ratelimiter_slow = ratelimit(key="ip", rate="1/m", method=UNSAFE, block=True)
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
