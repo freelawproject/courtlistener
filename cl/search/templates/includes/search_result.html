@@ -215,26 +215,28 @@
         </time>
       </div>
     {% elif type == 'p' or type_override == 'p' %}
-      <div class="inline-block">
-        <span class="meta-data-header">Born:</span>
-        <span class="meta-data-value"
-              datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
-          {% granular_date result 'dob' granularity=result.date_granularity_dob %}
-          {% spaceless %}
-          {% if result.solr_highlights.dob_city or result.solr_highlights.dob_state %}
-            <span class="gray">in </span>
-            {% if result.solr_highlights.dob_city %}
-              <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
+      {% if result.dob %}
+        <div class="inline-block">
+          <span class="meta-data-header">Born:</span>
+          <span class="meta-data-value"
+                datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
+            {% granular_date result 'dob' granularity=result.date_granularity_dob %}
+            {% spaceless %}
+            {% if result.solr_highlights.dob_city or result.solr_highlights.dob_state %}
+              <span class="gray">in </span>
+              {% if result.solr_highlights.dob_city %}
+                <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
+              {% endif %}
+              {% if result.solr_highlights.dob_city and result.solr_highlights.dob_state %}<span class="gray">, </span>
+              {% endif %}
+              {% if result.solr_highlights.dob_state %}
+                <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
+              {% endif %}
             {% endif %}
-            {% if result.solr_highlights.dob_city and result.solr_highlights.dob_state %}<span class="gray">, </span>
-            {% endif %}
-            {% if result.solr_highlights.dob_state %}
-              <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
-            {% endif %}
-          {% endif %}
-          {% endspaceless %}
-        </span>
-      </div>
+            {% endspaceless %}
+          </span>
+        </div>
+      {% endif %}
       {% if result.dod %}
         <div class="inline-block">
           <span class="meta-data-header">Deceased:</span>
