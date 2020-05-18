@@ -778,7 +778,7 @@ class Docket(models.Model):
                     out["firm"].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
-        for de in self.docket_entries.all():
+        for de in self.docket_entries.all().iterator():
             # Docket Entry
             de_out = {
                 "description": de.description,
