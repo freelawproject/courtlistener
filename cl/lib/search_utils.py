@@ -788,8 +788,8 @@ def cleanup_main_query(query_string):
         if m:
             # It's a docket number missing hyphens, e.g. 19cv38374
             item = "-".join(m.groups())
-            
-        # Some sort of number, probably a docket number. 
+
+        # Some sort of number, probably a docket number.
         # Wrap in quotes to do a phrase search
         cleaned_items.append('"' + item + '"')
     return " ".join(cleaned_items)
