@@ -17,7 +17,9 @@ ratelimiter_auth = ratelimit(key="ip", rate="10/m", method=UNSAFE, block=True)
 if "test" in sys.argv:
     ratelimiter_slow = lambda func: func
 else:
-    ratelimiter_slow = ratelimit(key="ip", rate="1/m", method=UNSAFE, block=True)
+    ratelimiter_slow = ratelimit(
+        key="ip", rate="1/m", method=UNSAFE, block=True
+    )
 
 # See: https://www.bing.com/webmaster/help/how-to-verify-bingbot-3905dc26
 # and: https://support.google.com/webmasters/answer/80553?hl=en
