@@ -770,6 +770,14 @@ def print_params(params):
 
 
 def cleanup_main_query(query_string):
+    """Enhance the query string with some simple fixes
+    
+     - Make any numerical queries into phrases
+     - Add hyphens to district docket numbers that lack them
+     
+    :param query_string: The query string from the form
+    :return The enhanced query string
+    """
     cleaned_items = []
     for item in query_string.split():
         if not item[0].isdigit():
