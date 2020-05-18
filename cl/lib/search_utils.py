@@ -772,22 +772,18 @@ def print_params(params):
 def cleanup_main_query(query_string):
     cleaned_items = []
     for item in query_string.split():
-        if re.search(r"\d", item[0]):
-            if re.search(r"\d{2}(cv|crimj|po)\d{4,5}", item):
-                case_type_regex = re.search(r"\D+", item)
-                start, end = case_type_regex.span()
-
-                year = item[0:start]
-                case_type = case_type_regex.group()
-                number = item[end:]
-
-                cleaned_items.append(
-                    '"' + year + "-" + case_type + "-" + number + '"'
-                )
-            else:
-                cleaned_items.append('"' + item + '"')
-        else:
+        if not item[0].isdigit():
             cleaned_items.append(item)
+            continue
+
+        m = re.match(r"(\d{2})(cv|cr|mj|po)(\d{1,5})", item)
+        if m:
+            # It's a docket number missing hyphens, e.g. 19cv38374
+            item = "-".join(m.groups())
+            
+        # Some sort of number, probably a docket number. 
+        # Wrap in quotes to do a phrase search
+        cleaned_items.append('"' + item + '"')
     return " ".join(cleaned_items)
 
 
