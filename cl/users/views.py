@@ -149,7 +149,12 @@ def view_api(request):
     return render(request, "profile/api.html", {"private": True})
 
 
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    # Contains password info
+    "user_cd",
+    # Contains activation key
+    "email",
+)
 @login_required
 @never_cache
 def view_settings(request):
@@ -276,7 +281,12 @@ def take_out_done(request):
 
 
 @sensitive_post_parameters("password1", "password2")
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    # Contains password info
+    "cd",
+    # Contains activation key
+    "email",
+)
 @check_honeypot(field_name="skip_me_if_alive")
 @never_cache
 def register(request):
@@ -386,6 +396,7 @@ def register_success(request):
     )
 
 
+@sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
@@ -437,7 +448,11 @@ def confirm_email(request, activation_key):
     )
 
 
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    "activation_key",
+    # Contains activation key
+    "email",
+)
 @check_honeypot(field_name="skip_me_if_alive")
 def request_email_confirmation(request):
     """Send an email confirmation email"""

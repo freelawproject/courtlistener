@@ -1,5 +1,3 @@
-import time
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -21,13 +19,10 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.model_helpers import suppress_autotime
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizForm, VizEditForm
-from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
+from cl.visualizations.models import SCOTUSMap, Referer
 from cl.visualizations.tasks import get_title
-from cl.visualizations.utils import (
-    reverse_endpoints_if_needed,
-    TooManyNodes,
-    message_dict,
-)
+from cl.visualizations.utils import message_dict, build_visualization
+from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 
 def render_visualization_page(request, pk, embed):
@@ -123,48 +118,19 @@ def new_visualization(request):
                 title=cd["title"],
                 notes=cd["notes"],
             )
-
-            build_kwargs = {
-                "parent_authority": end,
-                "visited_nodes": {},
-                "good_nodes": {},
-                "max_hops": 3,
-            }
-            t1 = time.time()
-            try:
-                g = viz.build_nx_digraph(**build_kwargs)
-            except TooManyNodes:
-                try:
-                    # Try with fewer hops.
-                    build_kwargs["max_hops"] = 2
-                    g = viz.build_nx_digraph(**build_kwargs)
-                    msg = message_dict["fewer_hops_delivered"]
-                    messages.add_message(request, msg["level"], msg["message"])
-                except TooManyNodes:
-                    # Still too many hops. Abort.
-                    tally_stat("visualization.too_many_nodes_failure")
-                    msg = message_dict["too_many_nodes"]
-                    messages.add_message(request, msg["level"], msg["message"])
-                    return render(request, "new_visualization.html", context)
-
-            if len(g.edges()) == 0:
-                tally_stat("visualization.too_few_nodes_failure")
-                msg = message_dict["too_few_nodes"]
+            status, viz = build_visualization(viz)
+            if status == "too_many_nodes":
+                msg = message_dict[status]
+                messages.add_message(request, msg["level"], msg["message"])
+                return render(request, "new_visualization.html", context)
+            elif status == "too_few_nodes":
+                msg = message_dict[status]
                 messages.add_message(request, msg["level"], msg["message"])
                 return render(
                     request,
                     "new_visualization.html",
                     {"form": form, "private": True},
                 )
-
-            t2 = time.time()
-            viz.generation_time = t2 - t1
-
-            viz.save()
-            viz.add_clusters(g)
-            j = viz.to_json(g)
-            jv = JSONVersion(map=viz, json_data=j)
-            jv.save()
 
             return HttpResponseRedirect(
                 reverse(

@@ -165,7 +165,7 @@ emails = {
         "We're always adding features and listening to your requests. "
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
-        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject or https://twitter.com/courtlistener\n"
+        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
         " - Check our blog for the latest news and updates: https://free.law/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
         "The CourtListener Team\n\n"

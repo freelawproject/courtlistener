@@ -191,6 +191,7 @@
             "state": "CA",
             "user": 1005,
             "email_confirmed": true,
+            "is_tester": true,
             "zip_code": null
         }
     }
