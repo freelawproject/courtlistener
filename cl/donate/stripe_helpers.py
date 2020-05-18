@@ -96,8 +96,8 @@ def process_stripe_callback(request):
 
             # Sometimes stripe can process a transaction and call our callback
             # faster than we can even save things to our own DB. If that
-            # happens wait a second up to five times until it works.
-            retry_count = 5
+            # happens wait a bit until it works.
+            retry_count = 10
             d = None
             while retry_count > 0:
                 try:

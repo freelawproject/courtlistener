@@ -22,7 +22,12 @@ from cl.search.constants import (
     SOLR_PEOPLE_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import Court, OpinionCluster, SEARCH_TYPES
+from cl.search.models import (
+    Court,
+    OpinionCluster,
+    SEARCH_TYPES,
+    DOCUMENT_STATUSES,
+)
 
 BOOSTS = {
     "qf": {
@@ -983,11 +988,16 @@ def get_related_clusters_with_cache(cluster, request):
 
     :param cluster: The cluster we're targeting
     :param request: Request object for checking if user is permitted
-    :return: Tuple[List, List] Related clusters and sub-opinion IDs
+    :return: Tuple[List, List, Dict] Related clusters, sub-opinion IDs and URL parameters
     """
+
+    # By default all statuses are included
+    available_statuses = dict(DOCUMENT_STATUSES).values()
+    url_search_params = {"stat_" + v: "on" for v in available_statuses}
+
     if is_bot(request) or not is_related_beta_user(request):
         # If it is a bot or is not beta tester, return empty results
-        return [], []
+        return [], [], url_search_params
 
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
@@ -1015,18 +1025,35 @@ def get_related_clusters_with_cache(cluster, request):
         for item in sub_opinion_queries:
             sub_opinion_query |= item
 
+        # Set MoreLikeThis parameters
+        # (see https://lucene.apache.org/solr/guide/6_6/other-parsers.html#OtherParsers-MoreLikeThisQueryParser)
+        mlt_params = {
+            "fields": "text",
+            "count": settings.RELATED_COUNT,
+            "maxqt": settings.RELATED_MLT_MAXQT,
+            "mintf": settings.RELATED_MLT_MINTF,
+            "minwl": settings.RELATED_MLT_MINWL,
+            "maxwl": settings.RELATED_MLT_MAXWL,
+            "maxdf": settings.RELATED_MLT_MAXDF,
+        }
+
         mlt_query = (
             conn.query(sub_opinion_query)
-            .mlt(
-                "text",
-                count=settings.RELATED_COUNT,
-                maxqt=settings.RELATED_MLT_MAXQT,
-                mintf=settings.RELATED_MLT_MINTF,
-                minwl=settings.RELATED_MLT_MINWL,
-                maxwl=settings.RELATED_MLT_MAXWL,
-            )
+            .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
+
+        if settings.RELATED_FILTER_BY_STATUS:
+            # Filter results by status (e.g., Precedential)
+            mlt_query = mlt_query.filter(
+                status_exact=settings.RELATED_FILTER_BY_STATUS
+            )
+
+            # Update URL parameters accordingly
+            url_search_params = {
+                "stat_" + settings.RELATED_FILTER_BY_STATUS: "on"
+            }
+
         mlt_res = mlt_query.execute()
 
         if mlt_res.more_like_this is not None:
@@ -1060,7 +1087,7 @@ def get_related_clusters_with_cache(cluster, request):
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
 
-    return related_clusters, sub_opinion_ids
+    return related_clusters, sub_opinion_ids, url_search_params
 
 
 def get_mlt_query(si, cd, facet, seed_pks, filter_query):
@@ -1097,6 +1124,7 @@ def get_mlt_query(si, cd, facet, seed_pks, filter_query):
             "mlt.mintf": settings.RELATED_MLT_MINTF,
             "mlt.minwl": settings.RELATED_MLT_MINWL,
             "mlt.maxwl": settings.RELATED_MLT_MAXWL,
+            "mlt.maxdf": settings.RELATED_MLT_MAXDF,
             # Retrieve fields as highlight replacement
             "fl": q["fl"] + "," + (",".join(hl_fields)),
             # Original query as filter query

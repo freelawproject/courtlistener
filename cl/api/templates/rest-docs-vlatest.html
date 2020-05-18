@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.9 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.10 &ndash; CourtListener.com{% endblock %}
 {% block description %}
   REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
   <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.9</h1>
+    <h1 id="about">REST API &ndash; v3.10</h1>
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -841,6 +841,31 @@ PACER_TO_CL_IDS = {
     </p>
     <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
     </p>
+
+
+    <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
+      <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
+    <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
+    </p>
+    <p>
+
+    </p>
+      To create a new visualization, POST a title, a starting cluster ID and an ending cluster ID to <strong>{% url "scotusmap-list" version="v3" %}</strong>:</p>
+    <pre class="scrollable">curl -X POST \
+  --data 'cluster_start=/api/rest/v3/clusters/105659/' \
+  --data 'cluster_end=/api/rest/v3/clusters/111891/' \
+  --data 'title=A map from Trop to Salerno' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "scotusmap-list" version="v3" %}</pre>
+    <p>Note that the <code>cluster_start</code> and <code>cluster_end</code> parameters use URLs instead of IDs. This is in keeping with our API, which uses hyperlinks as identifiers.</p>
+    <p>Once <code>POST</code>ed, a visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
+    <p>Changing data for an existing item can be done via <code>PATCH</code> requests. For example, to make an item <code>published</code> (so it's publicly viewable), you can do:</p>
+    <pre class="scrollable">curl -X PATCH \
+  --data 'published=True' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "scotusmap-detail" version="v3" pk="1" %}</pre>
+    <p>Similar commands can be used to update other non-readonly fields if desired.</p>
+    <p>Visualizations can be marked as deleted by flipping the <code>deleted</code> field to <code>True</code>, or can be deleted forthright via a <code>DELETE</code> request.</p>
 
     <h2>Footnotes</h2>
     <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.

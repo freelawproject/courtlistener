@@ -375,9 +375,11 @@ def view_opinion(request, pk, _):
 
     citing_clusters = get_citing_clusters_with_cache(cluster, is_bot(request))
 
-    related_clusters, sub_opinion_ids = get_related_clusters_with_cache(
-        cluster, request
-    )
+    (
+        related_clusters,
+        sub_opinion_ids,
+        related_search_params,
+    ) = get_related_clusters_with_cache(cluster, request)
 
     return render(
         request,
@@ -396,8 +398,7 @@ def view_opinion(request, pk, _):
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
-            "related_search_params": "&"
-            + urlencode({"stat_" + v: "on" for s, v in DOCUMENT_STATUSES}),
+            "related_search_params": "&" + urlencode(related_search_params),
         },
     )
 

@@ -434,6 +434,11 @@ mark {
 }
 
 .serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
+.serif-text{
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+}
 .meta-data-header{ font-weight: bold; }
 .meta-data-value{ margin-right: 2em; }
 
@@ -483,7 +488,7 @@ body {
 }
 
 /* New case view styling, including citations */
-#default-text pre, .citation {
+#default-text pre, .plaintext .citation {
   background-color: transparent;
   margin: 0;
   padding: 0;

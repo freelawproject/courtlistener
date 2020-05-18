@@ -7,6 +7,7 @@ from cl.audio import api_views as audio_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
 from cl.search import api_views as search_views
+from cl.visualizations import api_views as viz_views
 
 router = DefaultRouter()
 # Search & Audio
@@ -64,6 +65,14 @@ router.register(
 )
 router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
+)
+
+# Visualizations
+router.register(
+    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion",
+)
+router.register(
+    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap",
 )
 
 API_TITLE = "CourtListener Legal Data API"

@@ -2,7 +2,7 @@
 # Code for merging PACER content into the DB
 import logging
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -584,7 +584,15 @@ def add_docket_entries(d, docket_entries, tags=None):
             de, de_created = response[0], response[1]
 
         de.description = docket_entry["description"] or de.description
-        de.date_filed = docket_entry["date_filed"] or de.date_filed
+        date_filed = docket_entry["date_filed"]
+        if isinstance(date_filed, datetime):
+            # For now we do dumb date conversion. This simply returns a date
+            # object with the same year, month, and day, ignoring time and
+            # timezones. Once the DB is upgraded to support timezones, we can
+            # do better.
+            date_filed = date_filed.date()
+
+        de.date_filed = date_filed or de.date_filed
         de.pacer_sequence_number = (
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )
@@ -1155,6 +1163,10 @@ def merge_attachment_page_data(
         raise exc
     except RECAPDocument.DoesNotExist as exc:
         # Can't find the docket to associate with the attachment metadata
+        # It may be possible to go look for orphaned documents at this stage
+        # and to then add them here, as we do when adding dockets. This need is
+        # particularly acute for those that get free look emails and then go to
+        # the attachment page.
         raise exc
 
     # We got the right item. Update/create all the attachments for
