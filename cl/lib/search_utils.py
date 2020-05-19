@@ -776,16 +776,23 @@ def print_params(params):
 
 def cleanup_main_query(query_string):
     """Enhance the query string with some simple fixes
-    
-     - Make any numerical queries into phrases
+
+     - Make any numerical queries into phrases (except dates)
      - Add hyphens to district docket numbers that lack them
-     
+     - Handle query punctuation correctly by mostly ignoring it
+
     :param query_string: The query string from the form
     :return The enhanced query string
     """
     cleaned_items = []
-    for item in query_string.split():
-        if not item[0].isdigit():
+    for item in re.split('([^a-zA-Z0-9_\-":]+)', query_string):
+        if not item:
+            continue
+        not_numeric = not item[0].isdigit()
+        is_date_str = re.match(
+            "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
+        )
+        if any([not_numeric, is_date_str]):
             cleaned_items.append(item)
             continue
 
@@ -797,7 +804,7 @@ def cleanup_main_query(query_string):
         # Some sort of number, probably a docket number.
         # Wrap in quotes to do a phrase search
         cleaned_items.append('"' + item + '"')
-    return " ".join(cleaned_items)
+    return "".join(cleaned_items)
 
 
 def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
