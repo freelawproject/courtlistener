@@ -1085,16 +1085,33 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     def test_query_cleanup_function(self):
         # Send string of search_query to the function and expect it
         # to be encoded properly
-        result1 = cleanup_main_query("12-9238 happy Gilmore")
-        result2 = cleanup_main_query("1chicken NUGGET")
-        result3 = cleanup_main_query("We can drive her home with 1headlight")
-        result4 = cleanup_main_query("Look Ma, no numbers!")
-        result5 = cleanup_main_query("12cv9834 Monkey Goose")
-        self.assertEqual(result1, '"12-9238" happy Gilmore')
-        self.assertEqual(result2, '"1chicken" NUGGET')
-        self.assertEqual(result3, 'We can drive her home with "1headlight"')
-        self.assertEqual(result4, "Look Ma, no numbers!")
-        self.assertEqual(result5, '"12-cv-9834" Monkey Goose')
+        q_a = (
+            ("12-9238 happy Gilmore", '"12-9238" happy Gilmore'),
+            ("1chicken NUGGET", '"1chicken" NUGGET'),
+            (
+                "We can drive her home with 1headlight",
+                'We can drive her home with "1headlight"',
+            ),
+            ("Look Ma, no numbers!", "Look Ma, no numbers!"),
+            ("12cv9834 Monkey Goose", '"12-cv-9834" Monkey Goose'),
+            (
+                "2020-10-31T00:00:00Z Monkey Goose",
+                "2020-10-31T00:00:00Z Monkey Goose",
+            ),
+            (
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+                "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
+            ),
+            ("id:10", "id:10"),
+            ("id:[* TO 5] Monkey Goose", 'id:[* TO "5"] Monkey Goose'),
+            (
+                "(Tempura AND 12cv3392) OR sushi",
+                '(Tempura AND "12-cv-3392") OR sushi',
+            ),
+        )
+        for q, a in q_a:
+            print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
+            self.assertEqual(cleanup_main_query(q), a)
 
     def test_query_cleanup_integration(self):
         # Dora goes to CL and performs a Search using a numbered citation
