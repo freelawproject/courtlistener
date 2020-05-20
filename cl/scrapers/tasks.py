@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import os
+import logging
 import random
 import subprocess
 import traceback
@@ -9,6 +10,7 @@ import uuid
 from tempfile import NamedTemporaryFile
 
 import eyed3
+import requests
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
 from django.apps import apps
@@ -47,6 +49,8 @@ from cl.search.tasks import add_items_to_solr
 from juriscraper.pacer import PacerSession, CaseQuery
 
 DEVNULL = open("/dev/null", "w")
+
+logger = logging.getLogger(__name__)
 
 
 def get_clean_body_content(content):
@@ -607,8 +611,8 @@ def process_audio_file(pk):
     af.save()
 
 
-@app.task()
-def update_docket_info_iquery(d_pk):
+@app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
+def update_docket_info_iquery(self, d_pk):
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -621,7 +625,16 @@ def update_docket_info_iquery(d_pk):
     )
     d = Docket.objects.get(pk=d_pk)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
-    report.query(d.pacer_case_id)
+    try:
+        report.query(d.pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
     d = update_docket_metadata(d, report.metadata)
     d.save()
     add_bankruptcy_data_to_docket(d, report.metadata)
