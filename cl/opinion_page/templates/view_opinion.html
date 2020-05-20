@@ -23,6 +23,13 @@
             <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
         {% endif %}
     {% endif %}
+
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/related_feedback.js"></script>
+    <script type="text/javascript">
+    $(document).ready(function () {
+      insertFeedbackForm({{ cluster.pk }}, {{ related_feedback_ratio }});
+    });
+    </script>
 {% endblock %}
 
 {% block matomo-scripts %}
@@ -159,12 +166,11 @@
                 {% url 'show_results' as show_results_url %}
 
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
-                {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
-                {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
-
-                  {% include 'includes/opinions_sidebar.html' %}
-
-                {% endwith %}{% endwith %}{% endwith %}
+                  {% with related_seed_title=cluster|best_case_name|truncatewords:10 %}
+                  {% with related_seed=pk_str %}
+                  {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
+                    {% include 'includes/opinions_sidebar.html' %}
+                {% endwith %}{% endwith %}{% endwith %}{% endwith %}
             </div>
         {% endif %}
 

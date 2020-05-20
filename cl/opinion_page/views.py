@@ -390,6 +390,7 @@ def view_opinion(request, pk, _):
             "authorities_count": len(cluster.authorities_with_data),
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
+            "related_feedback_ratio": settings.RELATED_FEEDBACK_RATIO,
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": "&" + urlencode(related_search_params),
