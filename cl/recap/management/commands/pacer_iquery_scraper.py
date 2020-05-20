@@ -8,18 +8,19 @@ import requests
 from django.conf import settings
 
 from cl.alerts.models import DocketAlert
+from cl.favorites.models import Favorite
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Docket
 
 
-def get_dockets():
+def get_docket_ids():
     visits = requests.get(
         settings.MATOMO_REPORT_URL,
-        timeout=1,
+        timeout=10,
         params={
-            "idsite": settings.MATOMO_SITE_ID,
+            "idSite": settings.MATOMO_SITE_ID,
             "module": "API",
             "method": "Live.getLastVisitsDetails",
             "period": "week",
@@ -34,12 +35,19 @@ def get_dockets():
             url = actiondetail.get("url")
             if url is None:
                 continue
-            match = re.search("/docket/([0-9]+)/", url)
+            match = re.search(
+                "^https://www.courtlistener\.com/docket/([0-9]+)/", url
+            )
             if match is None:
                 continue
             docket_ids.add(match.group(1))
+
+    # Add in docket IDs that have docket alerts or are favorited
+    docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
     docket_ids.update(
-        [a["docket"] for a in DocketAlert.objects.values("docket")]
+        Favorite.objects.exclude(docket_id=None).values_list(
+            "docket_id", Flat=True
+        )
     )
     return docket_ids
 
