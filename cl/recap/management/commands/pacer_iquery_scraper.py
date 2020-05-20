@@ -1,8 +1,8 @@
 # coding=utf-8
 from __future__ import print_function
 
-import datetime
 import re
+from datetime import datetime
 
 import requests
 from django.conf import settings
@@ -64,23 +64,35 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        docket_list = get_dockets()
+        docket_ids = get_docket_ids()
         logger.info(
             "iQuery crawling starting up. Will crawl %s dockets",
-            len(docket_list),
+            len(docket_ids),
         )
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date
-        for i, item in enumerate(docket_list):
+        for i, docket_id in enumerate(docket_ids):
             throttle.maybe_wait()
 
             if i % 500 == 0:
                 logger.info("Sent %s items to celery for crawling so far.")
 
-            d = Docket.objects.get(pk=item)
-            if d.date_terminated - now > 90 and d.date_last_filing - now > 90:
+            d = Docket.objects.get(pk=docket_id).only(
+                "date_terminated", "date_last_filing", "pacer_case_id"
+            )
+            too_many_days_old = 90
+            if all(
+                [
+                    d.date_terminated,
+                    d.pacer_case_id,
+                    d.date_terminated - now > too_many_days_old,
+                    d.date_last_filing - now > too_many_days_old,
+                ]
+            ):
                 continue
-            update_docket_info_iquery.apply_async(args=(item,), queue=queue)
+            update_docket_info_iquery.apply_async(
+                args=(docket_id,), queue=queue
+            )
 
         logger.info("Done!")
