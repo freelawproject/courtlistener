@@ -406,6 +406,7 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 
 MATOMO_URL = "http://192.168.0.243/piwik.php"
+MATOMO_REPORT_URL = "http://192.168.0.243/"
 MATOMO_FRONTEND_BASE_URL = "//matomo.courtlistener.com/"
 MATOMO_SITE_ID = "1"
 
