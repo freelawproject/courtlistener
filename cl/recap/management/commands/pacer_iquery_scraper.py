@@ -12,7 +12,7 @@ from cl.favorites.models import Favorite
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
-from cl.search.models import Docket
+from cl.search.models import Docket, Court
 
 
 def get_docket_ids():
@@ -86,7 +86,7 @@ class Command(VerboseCommand):
             if i % 500 == 0:
                 logger.info("Sent %s items to celery for crawling so far.", i)
 
-            d = Docket.objects.get(pk=docket_id)
+            d = Docket.objects.filter(pk=docket_id).select_related("court")[0]
             too_many_days_old = 90
             terminated_too_long_ago = (
                 d.date_terminated
@@ -108,6 +108,13 @@ class Command(VerboseCommand):
 
             if not d.pacer_case_id:
                 # No case ID, can't crawl it. Skip.
+                continue
+
+            if d.court.jurisdiction not in [
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+            ]:
+                # Appeals or other kind of court that got sweapt up. Punt.
                 continue
 
             update_docket_info_iquery.apply_async(
