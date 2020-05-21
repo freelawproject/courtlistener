@@ -85,12 +85,17 @@ class Command(VerboseCommand):
             if all(
                 [
                     d.date_terminated,
-                    d.pacer_case_id,
-                    d.date_terminated - now > too_many_days_old,
-                    d.date_last_filing - now > too_many_days_old,
+                    now - d.date_terminated > too_many_days_old,
+                    now - d.date_last_filing > too_many_days_old,
                 ]
             ):
+                # Skip old terminated cases
                 continue
+
+            if not d.pacer_case_id:
+                # No case ID, can't crawl it. Skip.
+                continue
+
             update_docket_info_iquery.apply_async(
                 args=(docket_id,), queue=queue
             )
