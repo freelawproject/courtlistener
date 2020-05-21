@@ -953,26 +953,22 @@ def add_bankruptcy_data_to_docket(d, claims_data):
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    bankr_data.date_converted = (
-        claims_data.get("date_converted") or bankr_data.date_converted
-    )
-    bankr_data.date_last_to_file_claims = (
-        claims_data.get("date_last_to_file_claims")
-        or bankr_data.date_last_to_file_claims
-    )
-    bankr_data.date_last_to_file_govt = (
-        claims_data.get("date_last_to_file_govt")
-        or bankr_data.date_last_to_file_govt
-    )
-    bankr_data.date_debtor_dismissed = (
-        claims_data.get("date_debtor_dismissed")
-        or bankr_data.date_debtor_dismissed
-    )
-    bankr_data.chapter = claims_data.get("chapter") or bankr_data.chapter
-    bankr_data.trustee_str = (
-        claims_data.get("trustee_str") or bankr_data.trustee_str
-    )
-    bankr_data.save()
+    fields = [
+        "date_converted",
+        "date_last_to_file_claims",
+        "date_last_to_file_govt",
+        "date_debtor_dismissed",
+        "chapter",
+        "trustee_str",
+    ]
+    do_save = False
+    for field in fields:
+        if claims_data.get(field):
+            do_save = True
+            setattr(bankr_data, field, claims_data[field])
+
+    if do_save:
+        bankr_data.save()
 
 
 def add_claim_history_entry(new_history, claim):
