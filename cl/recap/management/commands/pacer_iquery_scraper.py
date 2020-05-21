@@ -61,6 +61,11 @@ class Command(VerboseCommand):
             default="batch1",
             help="The celery queue where the tasks should be processed.",
         )
+        parser.add_argument(
+            "--include-old-terminated",
+            default=False,
+            help="Whether to scrape dockets terminated and with no new filings in 90 days",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -72,6 +77,7 @@ class Command(VerboseCommand):
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date
+        include_old_terminated = options["include-old-terminated"]
         for i, docket_id in enumerate(docket_ids):
             throttle.maybe_wait()
 
@@ -84,6 +90,7 @@ class Command(VerboseCommand):
             too_many_days_old = 90
             if all(
                 [
+                    not include_old_terminated,
                     d.date_terminated,
                     now - d.date_terminated > too_many_days_old,
                     now - d.date_last_filing > too_many_days_old,
