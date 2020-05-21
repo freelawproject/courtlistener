@@ -66,7 +66,7 @@ class Command(VerboseCommand):
             action="store_true",
             default=False,
             help="Whether to scrape dockets terminated and with no new "
-                 "filings in 90 days",
+            "filings in 90 days",
         )
 
     def handle(self, *args, **options):
@@ -86,9 +86,7 @@ class Command(VerboseCommand):
             if i % 500 == 0:
                 logger.info("Sent %s items to celery for crawling so far.", i)
 
-            d = Docket.objects.get(pk=docket_id).only(
-                "date_terminated", "date_last_filing", "pacer_case_id"
-            )
+            d = Docket.objects.get(pk=docket_id)
             too_many_days_old = 90
             if all(
                 [
