@@ -63,8 +63,10 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--include-old-terminated",
+            action="store_true",
             default=False,
-            help="Whether to scrape dockets terminated and with no new filings in 90 days",
+            help="Whether to scrape dockets terminated and with no new "
+                 "filings in 90 days",
         )
 
     def handle(self, *args, **options):
@@ -77,12 +79,12 @@ class Command(VerboseCommand):
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date
-        include_old_terminated = options["include-old-terminated"]
+        include_old_terminated = options["include_old_terminated"]
         for i, docket_id in enumerate(docket_ids):
             throttle.maybe_wait()
 
             if i % 500 == 0:
-                logger.info("Sent %s items to celery for crawling so far.")
+                logger.info("Sent %s items to celery for crawling so far.", i)
 
             d = Docket.objects.get(pk=docket_id).only(
                 "date_terminated", "date_last_filing", "pacer_case_id"
