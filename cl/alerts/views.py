@@ -145,7 +145,9 @@ def new_docket_alert(request):
             status=HTTP_404_NOT_FOUND,
         )
     except Docket.MultipleObjectsReturned as exc:
-        raise exc
+        docket = Docket.objects.filter(
+            pacer_case_id=pacer_case_id, court_id=court_id
+        ).earliest("date_created")
 
     title = "New Docket Alert for %s" % make_docket_title(docket)
     has_alert = user_has_alert(request.user, docket)
