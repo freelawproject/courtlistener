@@ -88,12 +88,19 @@ class Command(VerboseCommand):
 
             d = Docket.objects.get(pk=docket_id)
             too_many_days_old = 90
+            terminated_too_long_ago = (
+                d.date_terminated
+                and (now - d.date_terminated).days > too_many_days_old
+            )
+            last_filing_too_long_ago = (
+                d.date_last_filing
+                and (now - d.date_last_filing).days > too_many_days_old
+            )
             if all(
                 [
                     not include_old_terminated,
-                    d.date_terminated,
-                    (now - d.date_terminated).days > too_many_days_old,
-                    (now - d.date_last_filing).days > too_many_days_old,
+                    terminated_too_long_ago,
+                    last_filing_too_long_ago,
                 ]
             ):
                 # Skip old terminated cases
