@@ -46,7 +46,7 @@ def get_docket_ids():
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
     docket_ids.update(
         Favorite.objects.exclude(docket_id=None).values_list(
-            "docket_id", Flat=True
+            "docket_id", flat=True
         )
     )
     return docket_ids
