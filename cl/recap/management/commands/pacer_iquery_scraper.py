@@ -92,8 +92,8 @@ class Command(VerboseCommand):
                 [
                     not include_old_terminated,
                     d.date_terminated,
-                    now - d.date_terminated > too_many_days_old,
-                    now - d.date_last_filing > too_many_days_old,
+                    (now - d.date_terminated).days > too_many_days_old,
+                    (now - d.date_last_filing).days > too_many_days_old,
                 ]
             ):
                 # Skip old terminated cases
