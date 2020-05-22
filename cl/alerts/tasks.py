@@ -1,16 +1,28 @@
+import logging
+
+import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import loader
 from django.utils.timezone import now
 
+# TODO: Write MobileQuery code
+from juriscraper.pacer import PacerSession, MobileQuery
+
 from cl.alerts.models import DocketAlert
 from cl.celery import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
+from cl.scrapers.models import PACERMobilePageData
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
+
+
+logger = logging.getLogger(__name__)
 
 
 def make_alert_key(d_pk):
@@ -122,3 +134,50 @@ def send_docket_alerts(data):
         send_docket_alert(*args)
 
     return data.get("rds_for_solr", [])
+
+
+@app.task(ind=True, max_retries=2, interval_start=5, interval_step=5)
+def crawl_pacer_mobile_page(self, d_pk):
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    d = Docket.objects.get(pk=d_pk)
+    report = MobileQuery(map_cl_to_pacer_id(d.court_id), s)
+    try:
+        report.query(d.pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+
+    entry_count = report.metadata["entry_count"]
+    mobile_page, created = PACERMobilePageData.objects.get_or_create(docket=d)
+    if created:
+        # No alerts on first crawl because no baseline to compare to; punt
+        pass
+    elif (
+        entry_count
+        > mobile_page.count_last_mobile_crawl
+        + mobile_page.count_last_rss_crawl
+    ):
+        # Send the alert
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            # TODO: Write this function
+            send_mobile_page_alert(d.pk)
+
+    mobile_page.count_last_mobile_crawl = entry_count
+    mobile_page.date_last_mobile_crawl = now()
+    mobile_page.count_last_rss_crawl = 0
+    mobile_page.save()
