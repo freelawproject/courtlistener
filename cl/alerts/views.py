@@ -6,8 +6,10 @@ from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import crawl_pacer_mobile_page
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.opinion_page.views import make_docket_title, user_has_alert
+from cl.scrapers.models import PACERMobilePageData
 from cl.search.models import Docket
 
 
@@ -98,13 +100,20 @@ def toggle_docket_alert(request):
     """Use Ajax to create or delete an alert for a user."""
     if request.is_ajax() and request.method == "POST":
         docket_pk = request.POST.get("id")
-        existing_alert = DocketAlert.objects.filter(
+        existing_alert_for_user = DocketAlert.objects.filter(
             user=request.user, docket_id=docket_pk
         )
-        if existing_alert.exists():
-            existing_alert.delete()
+        if existing_alert_for_user.exists():
+            existing_alert_for_user.delete()
             msg = "Alert disabled successfully"
         else:
+            mobile_tracking = PACERMobilePageData.objects.filter(
+                docket_id=docket_pk
+            )
+            if not mobile_tracking.exists():
+                # Nobody is tracking this docket yet; crawl it.
+                crawl_pacer_mobile_page.delay(docket_pk)
+
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
             msg = "Alerts are now enabled for this docket"
         return HttpResponse(msg)
