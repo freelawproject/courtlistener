@@ -26,6 +26,7 @@ def get_docket_ids_missing_info(num_to_get):
     )
     return docket_ids
 
+
 def get_docket_ids():
     visits = requests.get(
         settings.MATOMO_REPORT_URL,
@@ -59,6 +60,11 @@ def get_docket_ids():
         Favorite.objects.exclude(docket_id=None).values_list(
             "docket_id", flat=True
         )
+    )
+    docket_ids.update(
+        Docket.objects.filter(
+            case_name__isnull=True, source__in=Docket.RECAP_SOURCES
+        ).values_list("pk", flat=True)
     )
     return docket_ids
 
@@ -123,9 +129,10 @@ class Command(VerboseCommand):
                     terminated_too_long_ago,
                     last_filing_too_long_ago,
                     d.date_filed,
+                    d.case_name,
                 ]
             ):
-                # Skip old terminated cases
+                # Skip old terminated cases, but do them if we're missing date_filed or case_name
                 continue
 
             if not d.pacer_case_id:
