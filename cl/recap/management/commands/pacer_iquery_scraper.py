@@ -16,15 +16,13 @@ from cl.search.models import Docket, Court
 
 
 def get_docket_ids_missing_info(num_to_get):
-    docket_ids = set()
-    docket_ids.update(
+    return set(
         Docket.objects.filter(
             date_filed__isnull=True, source__in=Docket.RECAP_SOURCES
         )
         .order_by("-view_count")[:num_to_get]
         .values_list("pk", flat=True)
     )
-    return docket_ids
 
 
 def get_docket_ids():
