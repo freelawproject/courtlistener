@@ -15,6 +15,16 @@ from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Docket, Court
 
 
+def get_docket_ids_missing_info(num_to_get):
+    return set(
+        Docket.objects.filter(
+            date_filed__isnull=True, source__in=Docket.RECAP_SOURCES
+        )
+        .order_by("-view_count")[:num_to_get]
+        .values_list("pk", flat=True)
+    )
+
+
 def get_docket_ids():
     visits = requests.get(
         settings.MATOMO_REPORT_URL,
@@ -49,6 +59,11 @@ def get_docket_ids():
             "docket_id", flat=True
         )
     )
+    docket_ids.update(
+        Docket.objects.filter(
+            case_name__isnull=True, source__in=Docket.RECAP_SOURCES
+        ).values_list("pk", flat=True)
+    )
     return docket_ids
 
 
@@ -68,10 +83,21 @@ class Command(VerboseCommand):
             help="Whether to scrape dockets terminated and with no new "
             "filings in 90 days",
         )
+        parser.add_argument(
+            "--do-missing-date-filed",
+            default=False,
+            help="Whether to scrape dockets with missing date_filed field."
+            "if set, should be the number of dockets to scrape",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        docket_ids = get_docket_ids()
+        do_missing_date_filed = options["do_missing_date_filed"]
+        if do_missing_date_filed:
+            docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
+        else:
+            docket_ids = get_docket_ids()
+        # docket_ids = get_docket_ids().union(get_docket_ids_missing_info(100000)) #once initial scrape filling in date_filed is done, uncomment this to do these nightly
         logger.info(
             "iQuery crawling starting up. Will crawl %s dockets",
             len(docket_ids),
@@ -101,9 +127,11 @@ class Command(VerboseCommand):
                     not include_old_terminated,
                     terminated_too_long_ago,
                     last_filing_too_long_ago,
+                    d.date_filed,
+                    d.case_name,
                 ]
             ):
-                # Skip old terminated cases
+                # Skip old terminated cases, but do them if we're missing date_filed or case_name
                 continue
 
             if not d.pacer_case_id:
