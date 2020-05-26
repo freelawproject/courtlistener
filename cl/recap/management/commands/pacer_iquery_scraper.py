@@ -97,6 +97,7 @@ class Command(VerboseCommand):
             docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
         else:
             docket_ids = get_docket_ids()
+        # docket_ids = get_docket_ids().union(get_docket_ids_missing_info(100000)) #once initial scrape filling in date_filed is done, uncomment this to do these nightly
         logger.info(
             "iQuery crawling starting up. Will crawl %s dockets",
             len(docket_ids),
