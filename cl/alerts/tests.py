@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.core import mail
 from django.urls import reverse
@@ -5,6 +7,9 @@ from django.test import Client, TestCase
 from django.utils.timezone import now
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.management.commands.handle_old_docket_alerts import (
+    build_user_report,
+)
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
@@ -122,6 +127,67 @@ class DocketAlertTest(TestCase):
 
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
+
+
+class DisableDocketAlertTest(TestCase):
+    """Do old docket alerts get disabled or alerted properly?"""
+
+    fixtures = ["test_court.json", "authtest_data.json"]
+
+    def setUp(self):
+        self.now = now()
+
+        # Create a terminated docket
+        self.docket = Docket.objects.create(
+            source=Docket.RECAP,
+            court_id="scotus",
+            date_terminated="2020-01-01",
+            pacer_case_id="asdf",
+            docket_number="12-cv-02354",
+            case_name="Vargas v. Wilkins",
+        )
+
+        # Add an alert for it
+        self.user = User.objects.get(pk=1001)
+        self.alert = DocketAlert.objects.create(
+            docket=self.docket, user=self.user
+        )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+        DocketAlert.objects.all().delete()
+
+    def backdate_alert(self):
+        self.alert.date_created = self.now - timedelta(days=365)
+        self.alert.save()
+
+    def test_alert_created_recently_termination_year_ago(self):
+        self.docket.date_terminated = now() - timedelta(days=365)
+        self.docket.save()
+
+        report = build_user_report(self.user)
+        for key, value in report.items():
+            # This alert was recent (the test created it a few seconds ago),
+            # so no actions should be taken
+            self.assertEqual(
+                value,
+                [],
+                msg="Didn't get empty list in user report for "
+                "key '%s'. Got: %s" % (key, value),
+            )
+
+    def test_old_alert_recent_termination(self):
+        """Flag it if alert is old and item was terminated 30-36 days ago"""
+        self.backdate_alert()
+        for i in range(30, 37):
+            new_date_terminated = now() - timedelta(days=i)
+            self.docket.date_terminated = new_date_terminated
+            self.docket.save()
+            print("Trying a date_terminated of %s" % new_date_terminated)
+            report = build_user_report(self.user)
+            self.assertEqual(
+                report["thirty_ago"], [self.docket],
+            )
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
