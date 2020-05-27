@@ -179,7 +179,8 @@ def view_settings(request):
             # resubscribe it when they confirm it later).
             update_mailchimp.delay(old_email, "unsubscribed")
 
-            # Send the email.
+            # Send an email to the new and old addresses. New for verification;
+            # old for notification of the change.
             email = emails["email_changed_successfully"]
             send_mail(
                 email["subject"],
@@ -187,7 +188,13 @@ def view_settings(request):
                 email["from"],
                 [new_email],
             )
-
+            email = emails["notify_old_address"]
+            send_mail(
+                email["subject"],
+                email["body"] % (user.username, old_email, new_email),
+                email["from"],
+                [old_email],
+            )
             msg = message_dict["email_changed_successfully"]
             messages.add_message(request, msg["level"], msg["message"])
             logout(request)

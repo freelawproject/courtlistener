@@ -148,10 +148,26 @@ emails = {
         "following link within five days:\n\n"
         "https://www.courtlistener.com/email/confirm/%s\n\n"
         "Thanks for using our site,\n\n"
-        "The CourtListener team\n\n"
+        "The Free Law Project Team\n\n"
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
+        "from": settings.DEFAULT_FROM_EMAIL,
+    },
+    "notify_old_address": {
+        "subject": "This email address is no longer in use on CourtListener",
+        "body": "Hello %s,\n\n"
+        "A moment ago somebody, hopefully you, changed the email address on "
+        "your CourtListener account. Previously, it used:\n\n"
+        "    %s\n\n"
+        "But now it is set to:\n\n"
+        "    %s\n\n"
+        "If you made this change, no action is needed. If you did not make "
+        "this change, please get in touch with us as soon as possible by "
+        "sending a message to:\n\n"
+        "    security@free.law\n\n"
+        "Thanks for using our site,\n\n"
+        "The Free Law Project Team\n\n",
         "from": settings.DEFAULT_FROM_EMAIL,
     },
     "confirm_your_new_account": {
@@ -168,7 +184,7 @@ emails = {
         " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
         " - Check our blog for the latest news and updates: https://free.law/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
-        "The CourtListener Team\n\n"
+        "The Free Law Project Team\n\n"
         "-------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
@@ -184,7 +200,7 @@ emails = {
         "https://www.courtlistener.com/email/confirm/%s\n\n"
         "If this was not you, you can disregard this email.\n\n"
         "Thanks for using our site,\n"
-        "The CourtListener Team\n\n"
+        "The Free Law Project Team\n\n"
         "-------\n"
         "For questions or comments, please visit our contact page, "
         "https://www.courtlistener.com/contact/\n"
@@ -215,7 +231,7 @@ emails = {
         u""
         u"Thanks for using our site,\n\n"
         u""
-        u"The CourtListener Team\n\n"
+        u"The Free Law Project Team\n\n"
         u"-------\n"
         u"For questions or comments, please visit our contact page, "
         u"https://www.courtlistener.com/contact/\n"
@@ -234,7 +250,7 @@ emails = {
         "will stop receiving alerts, and will eventually be deleted "
         "from our system.\n\n"
         "Thanks for using our site,\n\n"
-        "The CourtListener team\n\n\n"
+        "The Free Law Project Team\n\n\n"
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
