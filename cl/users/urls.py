@@ -34,13 +34,16 @@ urlpatterns = [
     ),
     url(
         r"^reset-password/$",
-        ratelimiter_auth(auth_views.password_reset),
-        {
-            "template_name": "register/password_reset_form.html",
-            "email_template_name": "register/password_reset_email.html",
-            "extra_context": {"private": False},
-            "password_reset_form": CustomPasswordResetForm,
-        },
+        ratelimiter_auth(
+            auth_views.PasswordResetView.as_view(
+                **{
+                    "template_name": "register/password_reset_form.html",
+                    "email_template_name": "register/password_reset_email.html",
+                    "extra_context": {"private": False},
+                    "form_class": CustomPasswordResetForm,
+                }
+            )
+        ),
         name="password_reset",
     ),
     url(
