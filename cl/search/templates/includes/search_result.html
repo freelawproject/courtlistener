@@ -222,14 +222,14 @@
                 datetime="{% granular_date result 'dob' granularity=result.date_granularity_dob iso=True %}">
             {% granular_date result 'dob' granularity=result.date_granularity_dob %}
             {% spaceless %}
-            {% if result.solr_highlights.dob_city or result.solr_highlights.dob_state %}
+            {% if result.solr_highlights.dob_city.0 or result.solr_highlights.dob_state.0 %}
               <span class="gray">in </span>
-              {% if result.solr_highlights.dob_city %}
+              {% if result.solr_highlights.dob_city.0 %}
                 <span>{{ result.solr_highlights.dob_city.0|safe }}</span>
               {% endif %}
-              {% if result.solr_highlights.dob_city and result.solr_highlights.dob_state %}<span class="gray">, </span>
+              {% if result.solr_highlights.dob_city.0 and result.solr_highlights.dob_state.0 %}<span class="gray">, </span>
               {% endif %}
-              {% if result.solr_highlights.dob_state %}
+              {% if result.solr_highlights.dob_state.0 %}
                 <span>{{ result.solr_highlights.dob_state.0|safe }}</span>
               {% endif %}
             {% endif %}
