@@ -3,8 +3,11 @@ import os
 import re
 import sys
 
+import sentry_sdk
 from django.contrib.messages import constants as message_constants
 from judge_pics import judge_root
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
 
 INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..",)
 
@@ -444,6 +447,12 @@ else:
 ########################
 # Logging Machinations #
 ########################
+if not DEVELOPMENT:
+    sentry_sdk.init(
+        dsn="https://18f5941395e249f48e746dd7c6de84b1@o399720.ingest.sentry.io/5257254",
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+    )
+
 # From: http://stackoverflow.com/questions/1598823/elegant-setup-of-python-logging-in-django
 LOGGING = {
     "version": 1,
