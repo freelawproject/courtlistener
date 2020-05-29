@@ -1,5 +1,6 @@
 from django.http import HttpResponse
 
+from cl.celery import fail_task
 from cl.lib.redis_utils import make_redis_interface
 
 
@@ -16,3 +17,12 @@ def redis_writes(request):
         r.set(key, 0)
 
     return HttpResponse("Successful Redis write.")
+
+
+def sentry_fail(request):
+    division_by_zero = 1 / 0
+
+
+def celery_fail(request):
+    fail_task.delay()
+    return HttpResponse("Successfully failed Celery.")
