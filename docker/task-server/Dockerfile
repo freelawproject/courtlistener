@@ -23,7 +23,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements-dev.txt && \
     pip install --no-cache-dir -r requirements.txt
-RUN pip install git+https://github.com/freelawproject/judge-pics@1.1.1 && \
+RUN pip install git+https://github.com/freelawproject/judge-pics@1.1.2 && \
     update-seals -f
 
 COPY requirements-flp.txt ./
