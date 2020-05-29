@@ -458,9 +458,6 @@ LOGGING = {
             "format": "[%(server_time)s] %(message)s",
         },
     },
-    "filters": {
-        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}
-    },
     "handlers": {
         "null": {"level": "DEBUG", "class": "logging.NullHandler",},
         "console": {
@@ -475,12 +472,6 @@ LOGGING = {
             "maxBytes": "16777216",  # 16 megabytes
             "formatter": "verbose",
         },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-            "include_html": True,
-        },
         "django.server": {
             "level": "INFO",
             "class": "logging.StreamHandler",
@@ -488,11 +479,6 @@ LOGGING = {
         },
     },
     "loggers": {
-        "django": {
-            "handlers": ["mail_admins"],
-            "level": "ERROR",
-            "propagate": True,
-        },
         # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
         # HTTP_HOST" header messages.) This appears to be caused by clients that
         # don't support SNI, and which are browsing to other domains on the
