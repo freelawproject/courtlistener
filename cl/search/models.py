@@ -2094,10 +2094,11 @@ class OpinionCluster(models.Model):
         caption = best_case_name(self)
         citations = sorted(self.citations.all(), key=sort_cites)
         if not citations:
-            caption += ", %s" % self.docket.docket_number
+            if self.docket.docket_number:
+                caption += u", %s" % self.docket.docket_number
         else:
             if citations[0].type == Citation.NEUTRAL:
-                caption += ", %s" % citations[0]
+                caption += u", %s" % citations[0]
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
             elif (
@@ -2105,15 +2106,15 @@ class OpinionCluster(models.Model):
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
             ):
-                caption += ", %s, %s" % (citations[0], citations[1])
+                caption += u", %s, %s" % (citations[0], citations[1])
             else:
-                caption += ", %s" % citations[0]
+                caption += u", %s" % citations[0]
 
-        if self.docket.court_id != "scotus":
+        if self.docket.court_id != u"scotus":
             court = re.sub(u" ", u"&nbsp;", self.docket.court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
             year = self.date_filed.isoformat().split("-")[0]
-            caption += "&nbsp;({court}&nbsp;{year})".format(
+            caption += u"&nbsp;({court}&nbsp;{year})".format(
                 court=court, year=year
             )
         return caption
