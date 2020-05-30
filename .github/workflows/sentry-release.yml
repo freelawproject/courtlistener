@@ -14,5 +14,5 @@ jobs:
           SENTRY_ORG: freelawproject
           SENTRY_PROJECT: courtlistener
         with:
-          tagName: ${{ github.ref }}
+          tagName: ${{ github.sha }}
           environment: prod
