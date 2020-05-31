@@ -112,6 +112,7 @@ def do_search(
     query_citation = None
     error = False
     paged_results = None
+    cited_cluster = None
     courts = Court.objects.filter(in_use=True)
     related_cluster_pks = None
 
@@ -159,6 +160,11 @@ def do_search(
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )
+            cited_cluster = add_depth_counts(
+                # Also returns cited cluster if found
+                search_data=cd,
+                search_results=paged_results,
+            )
         except (NotImplementedError, RequestException, SolrError) as e:
             error = True
             logger.warning(
@@ -186,9 +192,6 @@ def do_search(
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
-    cited_cluster = add_depth_counts(  # Also returns cited cluster if found
-        search_data=cd, search_results=paged_results,
-    )
     related_cluster = (
         OpinionCluster.objects.get(sub_opinions__pk__in=related_cluster_pks)
         if related_cluster_pks
