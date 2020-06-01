@@ -18,7 +18,6 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
@@ -210,7 +209,7 @@ def get_pdfs(options):
     logger.info("%s %s items from PACER." % (task_name, count))
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
-    for row in queryset_generator(rows):
+    for row in rows.iterator():
         throttle.maybe_wait()
         if completed % 30000 == 0:
             pacer_session = PacerSession(

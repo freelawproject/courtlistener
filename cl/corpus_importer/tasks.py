@@ -349,7 +349,13 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def process_free_opinion_result(self, row_pk, cnt):
     """Process a single result from the free opinion report"""
-    result = PACERFreeDocumentRow.objects.get(pk=row_pk)
+    try:
+        result = PACERFreeDocumentRow.objects.get(pk=row_pk)
+    except PACERFreeDocumentRow.DoesNotExist:
+        logger.warning("Unable to find PACERFreeDocumentRow: %s" % row_pk)
+        self.request.chain = None
+        return
+
     result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
     result.case_name_short = cnt.make_case_name_short(result.case_name)
