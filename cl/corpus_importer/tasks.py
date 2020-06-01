@@ -382,14 +382,23 @@ def process_free_opinion_result(self, row_pk, cnt):
             mark_ia_upload_needed(d, save_docket=False)
             d.save()
 
-            de, de_created = DocketEntry.objects.update_or_create(
-                docket=d,
-                entry_number=result.document_number,
-                defaults={
-                    "date_filed": result.date_filed,
-                    "description": result.description,
-                },
-            )
+            try:
+                de, _ = DocketEntry.objects.update_or_create(
+                    docket=d,
+                    entry_number=result.document_number,
+                    defaults={
+                        "date_filed": result.date_filed,
+                        "description": result.description,
+                    },
+                )
+            except DocketEntry.MultipleObjectsReturned:
+                # This shouldn't happen, but sometimes it does. Handle it.
+                de = DocketEntry.objects.filter(
+                    docket=d, entry_number=result.document_number
+                ).earliest("pk")
+                de.date_filed = result.date_filed
+                de.description = result.description
+
             # Update the psn if we have a new value
             de.pacer_sequence_number = (
                 result.pacer_seq_no or de.pacer_sequence_number
