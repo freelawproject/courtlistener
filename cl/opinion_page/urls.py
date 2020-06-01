@@ -62,12 +62,12 @@ urlpatterns = [
         name="view_recap_attachment",
     ),
     url(
-        r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>.*)/)?$",
+        r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,10})/(?P<page>.*)/)?$",
         citation_redirector,
         name="citation_redirector",
     ),
     url(
-        r"^c/(?P<reporter>.*)/(?P<volume>\d{1,4})/$",
+        r"^c/(?P<reporter>.*)/(?P<volume>\d{1,10})/$",
         citation_redirector,
         name="citation_redirector",
     ),
