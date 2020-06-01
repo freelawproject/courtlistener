@@ -182,10 +182,11 @@ def cache_hash(item_hash):
         return True
 
 
-@app.task
-def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
+@app.task(bind=True, max_retries=1)
+def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
     """Merge the rss feed contents into CourtListener
 
+    :param self: The Celery task
     :param feed_data: The data parameter of a PacerRssFeed object that has
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
@@ -224,7 +225,12 @@ def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
             update_docket_metadata(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
-            d.save()
+            try:
+                d.save()
+            except IntegrityError as exc:
+                # The docket was created while we looked it up. Retry and it
+                # should associate with the new one instead.
+                raise self.retry(exc=exc)
             rds_created, content_updated = add_docket_entries(
                 d, docket["docket_entries"]
             )
