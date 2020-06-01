@@ -25,7 +25,15 @@ def get_docket_ids_missing_info(num_to_get):
     )
 
 
-def get_docket_ids():
+def get_docket_ids(last_x_days):
+    """
+
+    :param last_x_days: How many of the last days relative to today should we
+    inspect? E.g. 1 means just today, 2 means today and yesterday, etc.
+    :type last_x_days: int
+    :return: docket IDs for which we should crawl iquery
+    :rtype: set
+    """
     visits = requests.get(
         settings.MATOMO_REPORT_URL,
         timeout=10,
@@ -33,9 +41,9 @@ def get_docket_ids():
             "idSite": settings.MATOMO_SITE_ID,
             "module": "API",
             "method": "Live.getLastVisitsDetails",
-            "period": "week",
+            "period": "day",
             "format": "json",
-            "date": "today",
+            "date": "last%s" % last_x_days,
             "token_auth": settings.MATOMO_TOKEN,
         },
     )
@@ -89,6 +97,14 @@ class Command(VerboseCommand):
             help="Whether to scrape dockets with missing date_filed field."
             "if set, should be the number of dockets to scrape",
         )
+        parser.add_argument(
+            "--day-count",
+            default=1,
+            type=int,
+            help="We will run iQuery for any case that was visited the last "
+            "XX days, as tracked in Matomo. By default, it's just the last 1 "
+            "day, but you can have it go back further via this parameter",
+        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -96,7 +112,7 @@ class Command(VerboseCommand):
         if do_missing_date_filed:
             docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
         else:
-            docket_ids = get_docket_ids()
+            docket_ids = get_docket_ids(last_x_days=options["day_count"])
         # docket_ids = get_docket_ids().union(get_docket_ids_missing_info(100000)) #once initial scrape filling in date_filed is done, uncomment this to do these nightly
         logger.info(
             "iQuery crawling starting up. Will crawl %s dockets",
