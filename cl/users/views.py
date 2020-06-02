@@ -26,7 +26,7 @@ from django.views.decorators.debug import (
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket, Court
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm,
@@ -73,15 +73,37 @@ def view_alerts(request):
 @never_cache
 def view_favorites(request):
     favorites = request.user.favorites.all().order_by("pk")
-    favorite_forms = []
+    favorite_district_forms = []
+    favorite_opinion_forms = []
+    favorite_oral_forms = []
+    favorite_appeals_forms = []
+    favorite_document_forms = []
     for favorite in favorites:
-        favorite_forms.append(FavoriteForm(instance=favorite))
+        if favorite.cluster_id:
+            favorite_opinion_forms.append(FavoriteForm(instance=favorite))
+        elif favorite.audio_id:
+            favorite_oral_forms.append(FavoriteForm(instance=favorite))
+        elif favorite.recap_doc_id:
+            favorite_document_forms.append(FavoriteForm(instance=favorite))
+        elif favorite.docket_id:
+            if favorite.docket_id.court.jurisdiction in [
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+            ]:
+                favorite_district_forms.append(FavoriteForm(instance=favorite))
+            else:
+                favorite_appeals_forms.append(FavoriteForm(instance=favorite))
+
     return render(
         request,
         "profile/favorites.html",
         {
             "private": True,
-            "favorite_forms": favorite_forms,
+            "favorite_district_forms": favorite_district_forms,
+            "favorite_opinion_forms": favorite_opinion_forms,
+            "favorite_oral_forms": favorite_oral_forms,
+            "favorite_appeals_forms": favorite_appeals_forms,
+            "favorite_document_forms": favorite_document_forms,
             "blank_favorite_form": FavoriteForm(),
         },
     )

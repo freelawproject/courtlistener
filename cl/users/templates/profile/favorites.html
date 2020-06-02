@@ -30,82 +30,260 @@
     <div class="col-xs-12">
       {% if user.favorites.all %}
         <h2>Your Favorites</h2>
+        {% if favorite_district_forms %}
         <div class="table-responsive">
+          <h3> Dockets </h3>
           <table class="table settings-table">
           <thead>
             <tr>
               <th>Name</th>
+              <th colspan="1">Date of Last Filing</th>
               <th colspan="2">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {% for favorite_form in favorite_forms %}
+            {% for favorite_form in favorite_district_forms %}
               <tr id="favorite-row-{{ favorite_form.instance.id }}">
                 <td id="name-{{ favorite_form.instance.id }}">
-                  {% if favorite_form.instance.cluster_id %}
-                    <i class="fa-book fa gray" title="Opinion"></i>
-                    <a href="{{ favorite_form.instance.cluster_id.get_absolute_url }}">
-                        {{favorite_form.instance.name }}
-                    </a>
-                  {% elif favorite_form.instance.audio_id %}
-                    <i class="fa-volume-up fa grey" title="Oral Argument"></i>
-                    <a href="{{ favorite_form.instance.audio_id.get_absolute_url }}">
-                        {{ favorite_form.instance.name }}
-                    </a>
-                  {% elif favorite_form.instance.docket_id %}
-                    <i class="fa-list fa grey"
-                       title="Docket"></i>
-                    <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}">
-                        {{ favorite_form.instance.name }}
-                    </a>
-                  {% elif favorite_form.instance.recap_doc_id %}
-                    <i class="fa-file-text-o fa grey"
-                       title="RECAP Document"></i>
-                    <a href="{{ favorite_form.instance.recap_doc_id.get_absolute_url }}">
-                        {{ favorite_form.instance.name }}
-                    </a>
-                  {% endif %}
-                </td>
-                <td id="notes-{{ favorite_form.instance.id }}">
-                  {{ favorite_form.instance.notes|default:"(none)" }}
-                </td>
-                <td class="align-top">
-                  <div data-toggle="modal"
-                       data-target="#modal-save-favorite">
-                    <a class="inline edit-favorite-trigger nowrap cursor"
-                       data-id="{{ favorite_form.instance.id }}">Edit / Delete
-                      <i class="fa fa-pencil gray"></i>
-                    </a>
-
+                <i class="fa-list fa grey"
+                   title="Docket"></i>
+                <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}">
+                  {{ favorite_form.instance.name }}
+                </a>
+              </td>
+              <td id="date_last_filing-{{ favorite_form.instance.id }}">
+                {{ favorite_form.instance.docket_id.date_last_filing|default:"(none)" }}
+              </td>
+              <td id="notes-{{ favorite_form.instance.id }}">
+                {{ favorite_form.instance.notes|default:"(none)" }}
+              </td>
+              <td class="align-top">
+                <div data-toggle="modal"
+                     data-target="#modal-save-favorite">
+                  <a class="inline edit-favorite-trigger nowrap cursor"
+                     data-id="{{ favorite_form.instance.id }}">Edit / Delete
+                    <i class="fa fa-pencil gray"></i>
+                  </a>
                     <div id="data-store-{{ favorite_form.instance.id }}"
                          class="hidden"
-                         data-cluster_id="{{ favorite_form.instance.cluster_id.pk|default_if_none:"" }}"
-                         data-audio_id="{{ favorite_form.instance.audio_id.pk|default_if_none:"" }}"
-                         data-docket_id="{{ favorite_form.instance.docket_id.pk|default_if_none:"" }}"
-                         data-recap_doc_id="{{ favorite_form.instance.recap_doc_id.pk|default_if_none:"" }}"
-                         data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
-                         data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
+                         data-docket_id="{{ favorite_form.instance.docket_id.pk|default_if_none:'' }}"
+                         data-name="{{ favorite_form.instance.name|default_if_none:'' }}"
+                         data-notes="{{ favorite_form.instance.notes|default_if_none:'' }}"
+                         data-date_last_filing="{{ favorite_form.instance.docket_id.date_last_filing|default_if_none:'' }}">
                     </div>
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
+                </div>
+               </td>
+      </tr>
+      {% endfor %}
 
-            {# modal & data storage #}
-            {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
-          </tbody>
-          </table>
+      {# modal & data storage #}
+      {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+      </tbody>
+      </table>
+      {% endif %}
+      {% if favorite_appeals_forms %}
+      <div class="table-responsive">
+        <h3>Appeals Dockets</h3>
+        <table class="table settings-table">
+          <thead>
+          <tr>
+            <th>Name</th>
+            <th colspan="2">Notes</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for favorite_form in favorite_appeals_forms %}
+          <tr id="favorite-row-{{ favorite_form.instance.id }}">
+            <td id="name-{{ favorite_form.instance.id }}">
+              <i class="fa-list fa grey"
+                 title="Docket"></i>
+              <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}">
+                {{ favorite_form.instance.name }}
+              </a>
+            </td>
+            <td id="notes-{{ favorite_form.instance.id }}">
+              {{ favorite_form.instance.notes|default:"(none)" }}
+            </td>
+            <td class="align-top">
+              <div data-toggle="modal"
+                   data-target="#modal-save-favorite">
+                <a class="inline edit-favorite-trigger nowrap cursor"
+                   data-id="{{ favorite_form.instance.id }}">Edit / Delete
+                  <i class="fa fa-pencil gray"></i>
+                </a>
+
+                <div id="data-store-{{ favorite_form.instance.id }}"
+                      class="hidden"
+                      data-docket_id="{{ favorite_form.instance.docket_id.pk|default_if_none:"" }}"
+                      data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
+                      data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
+              </div>
+      </div>
+      </td>
+      </tr>
+      {% endfor %}
+
+      {# modal & data storage #}
+      {% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+      </tbody>
+      </table>
+    </div>
+{% endif %}
+{% if favorite_opinion_forms %}
+<div class="table-responsive">
+  <h3> Opinions </h3>
+  <table class="table settings-table">
+    <thead>
+    <tr>
+      <th>Name</th>
+      <th colspan="2">Notes</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for favorite_form in favorite_opinion_forms %}
+    <tr id="favorite-row-{{ favorite_form.instance.id }}">
+      <td id="name-{{ favorite_form.instance.id }}">
+        <i class="fa-book fa gray" title="Opinion"></i>
+        <a href="{{ favorite_form.instance.cluster_id.get_absolute_url }}">
+          {{favorite_form.instance.name }}
+        </a>
+
+      </td>
+      <td id="notes-{{ favorite_form.instance.id }}">
+        {{ favorite_form.instance.notes|default:"(none)" }}
+      </td>
+      <td class="align-top">
+        <div data-toggle="modal"
+             data-target="#modal-save-favorite">
+          <a class="inline edit-favorite-trigger nowrap cursor"
+             data-id="{{ favorite_form.instance.id }}">Edit / Delete
+            <i class="fa fa-pencil gray"></i>
+          </a>
+
+          <div id="data-store-{{ favorite_form.instance.id }}"
+               class="hidden"
+               data-cluster_id="{{ favorite_form.instance.cluster_id.pk|default_if_none:"" }}"
+          data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
+          data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
         </div>
-      {% else %}
-        <div class="row">
-          <div class="hidden-xs col-sm-1 col-md-3"></div>
-          <div class="col-xs-12 col-sm-10 col-md-6 text-center">
-            <h1><i class="fa fa-star gold"></i>&nbsp;CourtListener Favorites</h1>
-            <h3 class="gray caps">You Have Not Saved Any&nbsp;Favorites</h3>
-            <p>Favorites can help you keep track of cases and opinions</p>
-            <p>To save a favorite, click the gold star next to the title of an opinion, docket, RECAP document, or oral argument. From there you can give it a title and make a note.
-            </p>
-          </div>
+</div>
+</td>
+</tr>
+{% endfor %}
+
+{# modal & data storage #}
+{% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+</tbody>
+</table>
+</div>
+{% endif %}
+{% if favorite_oral_forms %}
+<div class="table-responsive">
+  <h3>Oral Arguments</h3>
+  <table class="table settings-table">
+    <thead>
+    <tr>
+      <th>Name</th>
+      <th colspan="2">Notes</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for favorite_form in favorite_oral_forms %}
+    <tr id="favorite-row-{{ favorite_form.instance.id }}">
+      <td id="name-{{ favorite_form.instance.id }}">
+        <i class="fa-volume-up fa grey" title="Oral Argument"></i>
+        <a href="{{ favorite_form.instance.audio_id.get_absolute_url }}">
+          {{ favorite_form.instance.name }}
+        </a>
+      </td>
+      <td id="notes-{{ favorite_form.instance.id }}">
+        {{ favorite_form.instance.notes|default:"(none)" }}
+      </td>
+      <td class="align-top">
+        <div data-toggle="modal"
+             data-target="#modal-save-favorite">
+          <a class="inline edit-favorite-trigger nowrap cursor"
+             data-id="{{ favorite_form.instance.id }}">Edit / Delete
+            <i class="fa fa-pencil gray"></i>
+          </a>
+
+          <div id="data-store-{{ favorite_form.instance.id }}"
+               class="hidden"
+               data-audio_id="{{ favorite_form.instance.audio_id.pk|default_if_none:"" }}"
+          data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
+          data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
+        </div>
+</div>
+
+</td>
+</tr>
+{% endfor %}
+
+{# modal & data storage #}
+{% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+</tbody>
+</table>
+</div>
+{% endif %}
+{% if favorite_document_forms %}
+<div class="table-responsive">
+  <h3>RECAP Documents</h3>
+  <table class="table settings-table">
+    <thead>
+    <tr>
+      <th>Name</th>
+      <th colspan="2">Notes</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for favorite_form in favorite_document_forms %}
+    <tr id="favorite-row-{{ favorite_form.instance.id }}">
+      <td id="name-{{ favorite_form.instance.id }}">
+        <i class="fa-file-text-o fa grey"
+           title="RECAP Document"></i>
+        <a href="{{ favorite_form.instance.recap_doc_id.get_absolute_url }}">
+          {{ favorite_form.instance.name }}
+        </a>
+      </td>
+      <td id="notes-{{ favorite_form.instance.id }}">
+        {{ favorite_form.instance.notes|default:"(none)" }}
+      </td>
+      <td class="align-top">
+        <div data-toggle="modal"
+             data-target="#modal-save-favorite">
+          <a class="inline edit-favorite-trigger nowrap cursor"
+             data-id="{{ favorite_form.instance.id }}">Edit / Delete
+            <i class="fa fa-pencil gray"></i>
+          </a>
+
+          <div id="data-store-{{ favorite_form.instance.id }}"
+               class="hidden"
+               data-recap_doc_id="{{ favorite_form.instance.recap_doc_id.pk|default_if_none:"" }}"
+          data-name="{{ favorite_form.instance.name|default_if_none:"" }}"
+          data-notes="{{ favorite_form.instance.notes|default_if_none:"" }}">
+        </div>
+</div>
+</td>
+</tr>
+{% endfor %}
+
+{# modal & data storage #}
+{% include "includes/favorites_modal.html" with favorite_form=blank_favorite_form edit=True%}
+</tbody>
+</table>
+</div>
+{% endif %}
+{% else %}
+<div class="row">
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+  <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+    <h1><i class="fa fa-star gold"></i>&nbsp;CourtListener Favorites</h1>
+    <h3 class="gray caps">You Have Not Saved Any&nbsp;Favorites</h3>
+    <p>Favorites can help you keep track of cases and opinions</p>
+    <p>To save a favorite, click the gold star next to the title of an opinion, docket, RECAP document, or oral
+      argument. From there you can give it a title and make a note.
+    </p>
+  </div>
         </div>
       {% endif %}
     </div>
