@@ -296,12 +296,15 @@ def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
-    item = get_object_or_404(
-        RECAPDocument,
-        docket_entry__docket__id=docket_id,
-        document_number=doc_num,
-        attachment_number=att_num,
-    )
+    try:
+        item = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=att_num,
+        ).order_by("pk")[0]
+    except IndexError:
+        raise Http404("No RECAPDocument matches the given query.")
+
     title = make_rd_title(item)
     if is_og_bot(request):
         make_thumb_if_needed(item)
