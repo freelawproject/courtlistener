@@ -923,7 +923,7 @@ class Position(models.Model):
             if self.court:
                 s += self.court.full_name
             elif self.school:
-                s += self.school
+                s += self.school.name
             elif self.organization_name:
                 s += self.organization_name
 
