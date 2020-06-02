@@ -99,11 +99,13 @@ def view_favorites(request):
         "profile/favorites.html",
         {
             "private": True,
-            "favorite_district_forms": favorite_district_forms,
-            "favorite_opinion_forms": favorite_opinion_forms,
-            "favorite_oral_forms": favorite_oral_forms,
-            "favorite_appeals_forms": favorite_appeals_forms,
-            "favorite_document_forms": favorite_document_forms,
+            "favorite_forms_list": (
+                ("Dockets", favorite_district_forms),
+                ("Appeals", favorite_appeals_forms),
+                ("Opinions", favorite_opinion_forms),
+                ("Oral Arguments", favorite_oral_forms),
+                ("RECAP Documents", favorite_document_forms),
+            ),
             "blank_favorite_form": FavoriteForm(),
         },
     )
