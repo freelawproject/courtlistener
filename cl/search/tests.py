@@ -1092,12 +1092,20 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
                 "We can drive her home with 1headlight",
                 'We can drive her home with "1headlight"',
             ),
+            # Tildes are ignored even though they have numbers?
+            ('"net neutrality"~2', '"net neutrality"~2'),
+            # No changes to regular queries?
             ("Look Ma, no numbers!", "Look Ma, no numbers!"),
+            # Docket numbers hyphenated into phrases?
             ("12cv9834 Monkey Goose", '"12-cv-9834" Monkey Goose'),
+            # Valid dates ignored?
             (
                 "2020-10-31T00:00:00Z Monkey Goose",
                 "2020-10-31T00:00:00Z Monkey Goose",
             ),
+            # Simple range query?
+            ("[1 TO 4]", '["1" TO "4"]'),
+            # Dates ignored in ranges?
             (
                 "[* TO 2020-10-31T00:00:00Z] Monkey Goose",
                 "[* TO 2020-10-31T00:00:00Z] Monkey Goose",

@@ -785,7 +785,7 @@ def cleanup_main_query(query_string):
     :return The enhanced query string
     """
     cleaned_items = []
-    for item in re.split('([^a-zA-Z0-9_\-":]+)', query_string):
+    for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
         if not item:
             continue
         not_numeric = not item[0].isdigit()
