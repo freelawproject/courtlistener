@@ -1,6 +1,6 @@
 name: sentry-release
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   createSentryRelease:
