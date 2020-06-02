@@ -11,8 +11,17 @@ from rest_framework.status import (
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
-from cl.search.models import Citation
+from cl.opinion_page.views import make_docket_title
+from cl.search.models import Citation, Docket
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
+
+
+class TitleTest(TestCase):
+    def test_make_title_no_docket_number(self):
+        """Can we make titles?"""
+        # No docket number
+        d = Docket(case_name="foo", docket_number=None)
+        self.assertEqual(make_docket_title(d), "foo")
 
 
 class ViewDocumentTest(TestCase):
