@@ -1,5 +1,5 @@
 import logging
-import re
+from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
@@ -73,39 +73,28 @@ def view_alerts(request):
 @never_cache
 def view_favorites(request):
     favorites = request.user.favorites.all().order_by("pk")
-    favorite_district_forms = []
-    favorite_opinion_forms = []
-    favorite_oral_forms = []
-    favorite_appeals_forms = []
-    favorite_document_forms = []
+    favorite_forms = OrderedDict()
+    favorite_forms["Dockets"] = []
+    favorite_forms["RECAP Documents"] = []
+    favorite_forms["Opinions"] = []
+    favorite_forms["Oral Arguments"] = []
     for favorite in favorites:
         if favorite.cluster_id:
-            favorite_opinion_forms.append(FavoriteForm(instance=favorite))
+            key = "Opinions"
         elif favorite.audio_id:
-            favorite_oral_forms.append(FavoriteForm(instance=favorite))
+            key = "Oral Arguments"
         elif favorite.recap_doc_id:
-            favorite_document_forms.append(FavoriteForm(instance=favorite))
+            key = "RECAP Documents"
         elif favorite.docket_id:
-            if favorite.docket_id.court.jurisdiction in [
-                Court.FEDERAL_DISTRICT,
-                Court.FEDERAL_BANKRUPTCY,
-            ]:
-                favorite_district_forms.append(FavoriteForm(instance=favorite))
-            else:
-                favorite_appeals_forms.append(FavoriteForm(instance=favorite))
+            key = "Dockets"
+        favorite_forms[key].append(FavoriteForm(instance=favorite))
 
     return render(
         request,
         "profile/favorites.html",
         {
             "private": True,
-            "favorite_forms_list": (
-                ("Dockets", favorite_district_forms),
-                ("Appeals", favorite_appeals_forms),
-                ("Opinions", favorite_opinion_forms),
-                ("Oral Arguments", favorite_oral_forms),
-                ("RECAP Documents", favorite_document_forms),
-            ),
+            "favorite_forms": favorite_forms,
             "blank_favorite_form": FavoriteForm(),
         },
     )
