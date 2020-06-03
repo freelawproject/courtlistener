@@ -31,9 +31,9 @@
     {% if user.favorites.exists %}
       {# Set up the pills #}
       <ul class="nav nav-pills">
-      {% for type in favorite_forms.keys %}
+      {% for type, typed_favorite_forms in favorite_forms.items %}
         <li class="{% if forloop.first %}active{% endif %} medium">
-          <a href="#{{ type|slugify }}" data-toggle="tab">{{ type }}</a>
+          <a href="#{{ type|slugify }}" data-toggle="tab">{{ type }} <span class="badge">{{ typed_favorite_forms|length }}</span></a>
         </li>
       {% endfor %}
       </ul>
