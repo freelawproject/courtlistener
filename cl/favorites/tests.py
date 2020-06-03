@@ -215,6 +215,9 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assertIn("Favorites", self.browser.title)
         table = self.browser.find_element_by_css_selector(".settings-table")
         table_header = table.find_element_by_tag_name("thead")
+        # Select the opinions pill
+        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill.click()
         [
             self.assertIn(heading, table_header.text)
             for heading in ("Name", "Notes")
@@ -261,6 +264,9 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # She sees an edit link next to one of them and clicks it
         self.assertIn("Favorites", self.browser.title)
+        # Select the opinions pill
+        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill.click()
         self.assert_text_in_node(
             "Totes my Notes 2", "body"
         )  # in favorites.json
@@ -302,5 +308,8 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # Skeptical, she hits refresh to be sure
         self.browser.refresh()
+        # Select the opinions pill
+        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill.click()
         self.assert_text_in_node("Renamed Favorite", "body")
         self.assert_text_in_node("Modified Notes", "body")

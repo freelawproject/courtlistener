@@ -1,5 +1,5 @@
 import logging
-import re
+from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
@@ -73,9 +73,22 @@ def view_alerts(request):
 @never_cache
 def view_favorites(request):
     favorites = request.user.favorites.all().order_by("pk")
-    favorite_forms = []
+    favorite_forms = OrderedDict()
+    favorite_forms["Dockets"] = []
+    favorite_forms["RECAP Documents"] = []
+    favorite_forms["Opinions"] = []
+    favorite_forms["Oral Arguments"] = []
     for favorite in favorites:
-        favorite_forms.append(FavoriteForm(instance=favorite))
+        if favorite.cluster_id:
+            key = "Opinions"
+        elif favorite.audio_id:
+            key = "Oral Arguments"
+        elif favorite.recap_doc_id:
+            key = "RECAP Documents"
+        elif favorite.docket_id:
+            key = "Dockets"
+        favorite_forms[key].append(FavoriteForm(instance=favorite))
+
     return render(
         request,
         "profile/favorites.html",
