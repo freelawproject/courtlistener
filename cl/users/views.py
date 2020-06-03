@@ -26,7 +26,7 @@ from django.views.decorators.debug import (
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
-from cl.search.models import SEARCH_TYPES, Docket, Court
+from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
     ProfileForm,
