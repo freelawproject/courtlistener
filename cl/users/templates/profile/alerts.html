@@ -62,7 +62,7 @@
                 </p>
               </td>
               <td>{{ alert.get_rate_display }}</td>
-              <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+              <td>{{ alert.date_last_hit|date:"M j, Y"|default:"Never" }}</td>
               <td class="right">
                 {% if alert.type == 'o' or alert.type == 'r' %}
                   <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
