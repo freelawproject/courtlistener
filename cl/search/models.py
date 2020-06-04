@@ -1141,6 +1141,18 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
                 )
 
     @property
+    def has_valid_pdf(self):
+        return all(
+            [
+                self.is_available,
+                (
+                    self.filepath_local
+                    and os.path.isfile(self.filepath_local.path)
+                ),
+            ]
+        )
+
+    @property
     def needs_extraction(self):
         """Does the item need extraction and does it have all the right
         fields? Items needing OCR still need extraction.
@@ -1148,10 +1160,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         return all(
             [
                 self.ocr_status is None or self.ocr_status == self.OCR_NEEDED,
-                self.is_available is True,
-                # Has a value in filepath field, which points to a file.
-                self.filepath_local
-                and os.path.isfile(self.filepath_local.path),
+                self.has_valid_pdf,
             ]
         )
 
