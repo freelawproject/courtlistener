@@ -26,7 +26,7 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib.bot_detector import is_bot, is_og_bot
+from cl.lib.bot_detector import is_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
@@ -306,9 +306,7 @@ def view_recap_document(
         raise Http404("No RECAPDocument matches the given query.")
 
     title = make_rd_title(item)
-    if is_og_bot(request):
-        make_thumb_if_needed(item)
-        item.refresh_from_db()
+    item = make_thumb_if_needed(request, item)
     try:
         fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
