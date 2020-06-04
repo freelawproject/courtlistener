@@ -782,15 +782,29 @@ def cleanup_main_query(query_string):
 
      - Make any numerical queries into phrases (except dates)
      - Add hyphens to district docket numbers that lack them
+     - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
 
     :param query_string: The query string from the form
     :return The enhanced query string
     """
+    inside_a_phrase = False
     cleaned_items = []
     for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
         if not item:
             continue
+
+        if item.startswith('"') or item.endswith('"'):
+            # Start or end of a phrase; flip whether we're inside a phrase
+            inside_a_phrase = not inside_a_phrase
+            cleaned_items.append(item)
+            continue
+
+        if inside_a_phrase:
+            # Don't do anything if we're already in a phrase query
+            cleaned_items.append(item)
+            continue
+
         not_numeric = not item[0].isdigit()
         is_date_str = re.match(
             "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
