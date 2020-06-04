@@ -619,6 +619,22 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
+    def test_issue_1296_abnormal_citation_type_queries(self):
+        """Does search work OK when there are supra, id, or non-opinion
+        citations in the query?
+        """
+        params = (
+            {"type": SEARCH_TYPES.OPINION, "q": "42 U.S.C. § ·1383a(a)(3)(A)"},
+            {"type": SEARCH_TYPES.OPINION, "q": "supra, at 22"},
+        )
+        for param in params:
+            r = self.client.get(reverse("show_results"), param,)
+            self.assertEqual(
+                r.status_code,
+                HTTP_200_OK,
+                msg="Didn't get good status code with params: %s" % param,
+            )
+
 
 @override_settings(
     # MLT results should not be cached
