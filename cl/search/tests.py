@@ -1132,6 +1132,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
                 "(Tempura AND 12cv3392) OR sushi",
                 '(Tempura AND "12-cv-3392") OR sushi',
             ),
+            # Phrase search with numbers (w/and w/o § mark)?
+            ('"18 USC 242"', '"18 USC 242"'),
+            ('"18 USC §242"', '"18 USC §242"'),
+            ('"this is a test" asdf', '"this is a test" asdf'),
+            ('asdf "this is a test" asdf', 'asdf "this is a test" asdf'),
+            ('"this is a test" 22cv3332', '"this is a test" "22-cv-3332"'),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
