@@ -11,6 +11,7 @@ from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.citations.models import Citation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
@@ -109,6 +110,8 @@ def get_query_citation(cd):
     citations = get_citations(
         cd["q"], html=False, do_post_citation=False, do_defendant=False
     )
+
+    citations = [c for c in citations if isinstance(c, Citation)]
 
     matches = None
     if len(citations) == 1:
