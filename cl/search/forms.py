@@ -26,6 +26,8 @@ OPINION_ORDER_BY_CHOICES = (
     ("dateArgued asc", "Oldest First"),
     ("entry_date_filed desc", "Newest Document First"),
     ("entry_date_filed asc", "Oldest Document First"),
+    ("date_upload desc", "Newest Document Uploaded First"),
+    ("date_upload asc", "Oldest Document Uploaded First"),
     ("name_reverse asc", "Name"),
     ("dob desc,name_reverse asc", "Most Recently Born"),
     ("dob asc,name_reverse asc", "Least Recently Born"),
