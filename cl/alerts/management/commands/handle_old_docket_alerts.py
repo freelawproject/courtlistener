@@ -66,9 +66,11 @@ def send_old_alert_warning(user, report_data):
         return
     subject_template = loader.get_template("emails/old_email_subject.txt")
     subject = subject_template.render({"count": count}).strip()
-    txt = loader.get_template("emails/old_alert_email.txt").render(report_data)
+    txt = loader.get_template("emails/old_alert_email.txt").render(
+        {"report_data": report_data},
+    )
     html = loader.get_template("emails/old_alert_email.html").render(
-        report_data
+        {"report_data": report_data},
     )
     msg = EmailMultiAlternatives(
         subject, txt, settings.DEFAULT_ALERTS_EMAIL, [user.email]
