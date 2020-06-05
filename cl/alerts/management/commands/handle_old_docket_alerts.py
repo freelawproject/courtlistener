@@ -10,10 +10,11 @@ from django.utils.timezone import now
 from cl.lib.command_utils import VerboseCommand
 
 
-def build_user_report(user):
+def build_user_report(user, delete=False):
     """Figure out which alerts are old or too old; delete very old ones
 
     :param user: A user that has alerts
+    :param delete: Whether to nuke really old alerts
     :return A dict indicating the counts of old alerts.
     """
     report = {
@@ -32,13 +33,21 @@ def build_user_report(user):
         if alert.date_last_hit is not None:
             threshold_date = max(threshold_date, alert.date_last_hit.date())
         days_since_last_touch = (now().date() - threshold_date).days
-        if days_since_last_touch >= 187:
-            report["disabled_dockets"].append(alert.docket)
-            alert.delete()
-        elif 180 <= days_since_last_touch <= 186:
-            report["one_eighty_ago"].append(alert.docket)
-        elif 90 <= days_since_last_touch <= 96:
-            report["ninety_ago"].append(alert.docket)
+        if delete:
+            if days_since_last_touch >= 187:
+                report["disabled_dockets"].append(alert.docket)
+                alert.delete()
+            elif 180 <= days_since_last_touch <= 186:
+                report["one_eighty_ago"].append(alert.docket)
+            elif 90 <= days_since_last_touch <= 96:
+                report["ninety_ago"].append(alert.docket)
+        else:
+            # Useful for first run, when ew *only* want to warn and not to
+            # disable.
+            if days_since_last_touch >= 180:
+                report["one_eighty_ago"].append(alert.docket)
+            elif 90 <= days_since_last_touch <= 96:
+                report["ninety_ago"].append(alert.docket)
 
     return report
 
@@ -96,6 +105,20 @@ The schedule is thus:
         parser.formatter_class = RawTextHelpFormatter
         return parser
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--delete-old-alerts",
+            action="store_true",
+            default=False,
+            help="Make sure to use this flag to delete old alerts",
+        )
+        parser.add_argument(
+            "--send-alerts",
+            action="store_true",
+            default=False,
+            help="Make sure to use this flag to send emails",
+        )
+
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
@@ -105,5 +128,8 @@ The schedule is thus:
         )
 
         for user in users_with_alerts:
-            report_data = build_user_report(user)
-            send_old_alert_warning(user, report_data)
+            report_data = build_user_report(
+                user, delete=options["delete_old_alerts"]
+            )
+            if options["send_alerts"]:
+                send_old_alert_warning(user, report_data)
