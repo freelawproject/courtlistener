@@ -1372,7 +1372,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
         facet_sidebar = self.browser.find_element_by_id(
-            "sidebar-facet-placeholder"
+            "extra-search-fields"
         )
         self.assertIn("Precedential Status", facet_sidebar.text)
 
