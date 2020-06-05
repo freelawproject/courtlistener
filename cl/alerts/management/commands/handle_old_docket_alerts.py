@@ -88,8 +88,8 @@ The schedule is thus:
    T+187-∞ ─┴─ Item terminated more than 180 days ago and
                alert is disabled.
 """.decode(
-    "utf-8"
-)
+        "utf-8"
+    )
 
     def create_parser(self, *args, **kwargs):
         parser = super(Command, self).create_parser(*args, **kwargs)
