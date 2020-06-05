@@ -15,7 +15,6 @@ def build_user_report(user):
     :return A dict indicating the counts of old alerts.
     """
     report = {
-        "thirty_ago": [],
         "ninety_ago": [],
         "one_eighty_ago": [],
         "disabled_dockets": [],
@@ -27,7 +26,7 @@ def build_user_report(user):
         date_terminated = alert.docket.date_terminated
         # Use the more recent of the date the alert was created, the date it
         # was last triggered, or the date_terminated of the docket
-        threshold_date = max(date_terminated, alert.date_created.date(),)
+        threshold_date = max(date_terminated, alert.date_created.date())
         if alert.date_last_hit is not None:
             threshold_date = max(threshold_date, alert.date_last_hit.date())
         days_since_last_touch = (now().date() - threshold_date).days
@@ -38,8 +37,6 @@ def build_user_report(user):
             report["one_eighty_ago"].append(alert.docket)
         elif 90 <= days_since_last_touch <= 96:
             report["ninety_ago"].append(alert.docket)
-        elif 30 <= days_since_last_touch <= 36:
-            report["thirty_ago"].append(alert.docket)
 
     return report
 
@@ -54,9 +51,10 @@ def send_old_alert_warning(user, report_data):
     count = 0
     for value in report_data.values():
         count += len(value)
-    subject = (
-        "You have %s old or expiring PACER " "alerts at CourtListener" % count
-    )
+    if count == 0:
+        return
+    subject_template = loader.get_template("emails/old_email_subject.txt")
+    subject = subject_template.render({"count": count}).strip()
     txt = loader.get_template("emails/old_alert_email.txt").render(report_data)
     html = loader.get_template("emails/old_alert_email.html").render(
         report_data
@@ -78,9 +76,6 @@ class Command(VerboseCommand):
 
          Day 0 ─┬─ Item is terminated
                 │
-                │
-       T+30-36 ─┼─ Item terminated about 30 days ago,
-                │  did you want to disable it?
                 │
        T+90-96 ─┼─ Item terminated about 90 days ago,
                 │  did you want to disable it?

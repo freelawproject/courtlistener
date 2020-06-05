@@ -1,11 +1,13 @@
 {% load text_filters %}{% load humanize %}************************************************************
-CourtListener Weekly Report of Old or Expiring Docket Alerts
+Weekly CourtListener Report of Old or Expiring Docket Alerts
 ************************************************************
 
-This email lists old docket alerts that you may want to disable. The cases
-shown below are terminated and have not received recent updates.
+This email lists old docket alerts that you may want to disable or that have
+been automatically disabled by our systems. The cases shown below are all
+terminated and have not received recent updates.
 
-Disabling these alerts will prevent them from counting towards your quota.
+Disabling these alerts will prevent them from counting towards your quota and
+will help ease the load on our servers.
 
 
 {% if report_data.disabled_dockets %}Automatically Disabled Alerts
@@ -26,8 +28,10 @@ https://www.courtlistener.com{{ docket.get_absolute_url }}
 The following cases terminated about *180* days ago and have not had updates
 since.
 
-The alerts for these cases will be disabled in one week unless you take action.
-Disable and re-enable these alerts to keep them running another 180 days.
+*The alerts for these cases will be disabled next week unless you take action.*
+
+Please disable and re-enable these alerts if you are still monitoring these
+cases. Doing so will keep them running another 180 days.
 
 {% for docket in report_data.one_eighty_ago %}{{ docket|best_case_name }}
 Terminated: {{ docket.date_terminated|date:"M j, Y" }}
@@ -41,17 +45,6 @@ The following cases terminated about *90* days ago and have not had updates
 since.
 
 {% for docket in report_data.ninety_ago %}{{ docket|best_case_name }}
-Terminated: {{ docket.date_terminated|date:"M j, Y" }}
-https://www.courtlistener.com{{ docket.get_absolute_url }}
-
-{% endfor %}
-{% endif %}{% if report_data.thirty_ago %}Recently Terminated Cases
--------------------------
-
-The following cases terminated about *30* days ago and have not had updates
-since.
-
-{% for docket in report_data.thirty_ago %}{{ docket|best_case_name }}
 Terminated: {{ docket.date_terminated|date:"M j, Y" }}
 https://www.courtlistener.com{{ docket.get_absolute_url }}
 
