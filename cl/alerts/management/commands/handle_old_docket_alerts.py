@@ -1,4 +1,6 @@
 # coding=utf-8
+from argparse import RawTextHelpFormatter
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -69,23 +71,30 @@ def send_old_alert_warning(user, report_data):
 class Command(VerboseCommand):
     help = """Check for old docket alerts and email or disable them.
 
-    Alerts are sent weekly, therefore we have to capture things in date ranges.
-    This prevents us from sending too many notifications or not enough.
+Alerts are sent weekly, therefore we have to capture things in date ranges.
+This prevents us from sending too many notifications or not enough.
 
-    The schedule is thus:
+The schedule is thus:
 
-         Day 0 ─┬─ Item is terminated
-                │
-                │
-       T+90-96 ─┼─ Item terminated about 90 days ago,
-                │  did you want to disable it?
-                │
-     T+180-186 ─┼─ Item terminated about 180 days ago, alerts will be disabled
-                │  in one week if you do not disable and re-enable your alert.
-                │
-       T+187-∞ ─┴─ Item terminated more than 180 days ago and
-                   alert is disabled.
-    """
+     Day 0 ─┬─ Item is terminated
+            │
+            │
+   T+90-96 ─┼─ Item terminated about 90 days ago,
+            │  did you want to disable it?
+            │
+ T+180-186 ─┼─ Item terminated about 180 days ago, alerts will be disabled
+            │  in one week if you do not disable and re-enable your alert.
+            │
+   T+187-∞ ─┴─ Item terminated more than 180 days ago and
+               alert is disabled.
+""".decode(
+    "utf-8"
+)
+
+    def create_parser(self, *args, **kwargs):
+        parser = super(Command, self).create_parser(*args, **kwargs)
+        parser.formatter_class = RawTextHelpFormatter
+        return parser
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
