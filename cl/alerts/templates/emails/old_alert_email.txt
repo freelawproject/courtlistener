@@ -1,10 +1,9 @@
-{% load text_filters %}{% load humanize %}************************************************************
-Weekly CourtListener Report of Old or Expiring Docket Alerts
-************************************************************
+{% load text_filters %}{% load humanize %}***************************************
+Report of Old or Expiring Docket Alerts
+***************************************
 
-This email lists old docket alerts that you may want to disable or that have
-been automatically disabled by our systems. The cases shown below are all
-terminated and have not received recent updates.
+This email lists docket alerts on long-terminated cases that you may want to
+disable or that have been automatically disabled by our systems.
 
 Disabling these alerts will prevent them from counting towards your quota and
 will help ease the load on our servers.
