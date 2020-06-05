@@ -179,15 +179,14 @@ class DisableDocketAlertTest(TestCase):
     def test_old_alert_recent_termination(self):
         """Flag it if alert is old and item was terminated 30-36 days ago"""
         self.backdate_alert()
-        for i in range(30, 37):
+        # 89-96 days finds ones that are 90-97 days old, oof.
+        for i in range(89, 96):
             new_date_terminated = now() - timedelta(days=i)
+            print("Trying a date_terminated of %s" % new_date_terminated)
             self.docket.date_terminated = new_date_terminated
             self.docket.save()
-            print("Trying a date_terminated of %s" % new_date_terminated)
             report = build_user_report(self.user)
-            self.assertEqual(
-                report["thirty_ago"], [self.docket],
-            )
+            self.assertEqual(report["ninety_ago"], [self.docket])
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
