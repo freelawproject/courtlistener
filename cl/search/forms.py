@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 from django import forms
 from django.forms import DateField, ChoiceField
+from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
@@ -650,8 +651,13 @@ class SearchForm(forms.Form):
         if all courts are being queried.
         :returns A dictionary of the data
         """
+        # The search type is usually provided by cleaned data, but can be
+        # missing when the form is invalid (and lacks it). If so, just give up.
+        try:
+            search_type = self.data["type"]
+        except MultiValueDictKeyError:
+            return {}
         display_dict = OrderedDict({"Courts": court_count_human})
-        search_type = self.data["type"]
         for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue
