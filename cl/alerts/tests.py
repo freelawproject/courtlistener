@@ -166,15 +166,14 @@ class DisableDocketAlertTest(TestCase):
         self.docket.save()
 
         report = build_user_report(self.user)
-        for key, value in report.items():
-            # This alert was recent (the test created it a few seconds ago),
-            # so no actions should be taken
-            self.assertEqual(
-                value,
-                [],
-                msg="Didn't get empty list in user report for "
-                "key '%s'. Got: %s" % (key, value),
-            )
+        # This alert was recent (the test created it a few seconds ago),
+        # so no actions should be taken
+        self.assertEqual(
+            report.total_count(),
+            0,
+            msg="Got dockets when we shouldn't have gotten any: %s"
+            % report.__dict__,
+        )
 
     def test_old_alert_recent_termination(self):
         """Flag it if alert is old and item was terminated 90-97 days ago"""
@@ -185,7 +184,7 @@ class DisableDocketAlertTest(TestCase):
             self.docket.date_terminated = new_date_terminated
             self.docket.save()
             report = build_user_report(self.user, delete=True)
-            self.assertEqual(report["ninety_ago"], [self.docket])
+            self.assertEqual(report.ninety_ago, [self.docket])
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
