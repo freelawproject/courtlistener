@@ -592,7 +592,7 @@
         <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
         </p>
         <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
-        <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns.
+        <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns. You can also sort by date_upload on the front end or at this endpoint.
         </p>
       </li>
       <li>
