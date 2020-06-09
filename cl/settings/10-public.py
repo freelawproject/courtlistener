@@ -518,7 +518,7 @@ LOGGING = {
 
 if DEVELOPMENT:
     LOGGING["loggers"]["django.db.backends"] = {
-        "handlers": ["log_file"],
+        "handlers": ["console"],
         "level": "DEBUG",
         "propagate": False,
     }
