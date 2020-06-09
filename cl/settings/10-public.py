@@ -524,6 +524,7 @@ LOGGING = {
             "formatter": "django.server",
             "filters": ["skip_unreadable_posts"],
         },
+        "mail_admins": {"class": "logging.NullHandler"},
     },
     "loggers": {
         # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
