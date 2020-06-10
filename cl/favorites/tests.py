@@ -10,6 +10,7 @@ from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 class FavoriteTest(TestCase):
     fixtures = [
+        "test_court.json",
         "authtest_data.json",
         "test_objects_search.json",
         "judge_judy.json",
