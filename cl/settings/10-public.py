@@ -5,12 +5,14 @@ import sys
 
 import sentry_sdk
 from django.contrib.messages import constants as message_constants
+from django.http import UnreadablePostError
 from judge_pics import judge_root
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 
+from cl.lib.redis_utils import make_redis_interface
 
 INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..",)
 
@@ -463,10 +465,34 @@ if not DEVELOPMENT:
         ],
     )
 
-# From: http://stackoverflow.com/questions/1598823/elegant-setup-of-python-logging-in-django
+
+def skip_unreadable_post(record):
+    if record.exc_info:
+        exc_value = record.exc_info[1]
+        if isinstance(exc_value, UnreadablePostError):
+            cache_key = "settings.unreadable_post_error"
+            r = make_redis_interface("CACHE")
+            if r.get(cache_key) is not None:
+                # We've seen this recently; let it through; hitting it a lot
+                # might mean something.
+                return True
+            else:
+                # Haven't seen this recently; cache it with a minute expiry,
+                # and don't let it through.
+                r.set(cache_key, "True", ex=60)
+                return False
+    return True
+
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "skip_unreadable_posts": {
+            "()": "django.utils.log.CallbackFilter",
+            "callback": skip_unreadable_post,
+        },
+    },
     "formatters": {
         "verbose": {
             "format": '%(levelname)s %(asctime)s (%(pathname)s %(funcName)s): "%(message)s"'
@@ -490,18 +516,21 @@ LOGGING = {
             "filename": "/var/log/courtlistener/django.log",
             "maxBytes": "16777216",  # 16 megabytes
             "formatter": "verbose",
+            "filters": ["skip_unreadable_posts"],
         },
         "django.server": {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "django.server",
+            "filters": ["skip_unreadable_posts"],
         },
+        "mail_admins": {"class": "logging.NullHandler"},
     },
     "loggers": {
         # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
-        # HTTP_HOST" header messages.) This appears to be caused by clients that
-        # don't support SNI, and which are browsing to other domains on the
-        # server. The most relevant bad client is the googlebot.
+        # HTTP_HOST" header messages.) This appears to be caused by clients
+        # that don't support SNI, and which are browsing to other domains on
+        # the server. The most relevant bad client is the googlebot.
         "django.security.DisallowedHost": {
             "handlers": ["null"],
             "propagate": False,
@@ -518,7 +547,7 @@ LOGGING = {
 
 if DEVELOPMENT:
     LOGGING["loggers"]["django.db.backends"] = {
-        "handlers": ["log_file"],
+        "handlers": ["console"],
         "level": "DEBUG",
         "propagate": False,
     }

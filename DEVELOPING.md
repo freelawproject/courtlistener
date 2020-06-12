@@ -103,7 +103,7 @@ You can see most of the logs via docker when you start it. CourtListener also ke
 
     docker exec -it cl-django tail -f /var/log/courtlistener/django.log
     
-The one nice thing about that log is that it contains SQL queries, which can be important for performance tuning. Otherwise the docker logs will be all you need.
+But usually you won't need to look at these logs.
 
 
 ## How Settings Work in CourtListener

@@ -106,7 +106,14 @@ class SCOTUSMap(models.Model):
     @property
     def json(self):
         """Returns the most recent version"""
-        return self.json_versions.all()[0].json_data
+        try:
+            # Imagine that you cache a viz, then delete it from disk if that
+            # happens, you will still think the viz exists (it's in the cache),
+            # but when you try to get the json data, it'll crash. Catch that
+            # exception. See: #1310.
+            return self.json_versions.all()[0].json_data
+        except IndexError:
+            return None
 
     @property
     def referers_displayed(self):
