@@ -5,6 +5,7 @@ from django.test import Client, TestCase
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.models import Favorite
+from cl.search.views import get_homepage_stats
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 
 
@@ -72,6 +73,10 @@ class UserFavoritesTest(BaseSeleniumTest):
         "test_objects_search.json",
         "favorites.json",
     ]
+
+    def setUp(self):
+        get_homepage_stats.invalidate()
+        super(UserFavoritesTest, self).setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
