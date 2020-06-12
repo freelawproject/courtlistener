@@ -54,8 +54,7 @@ def view_person(request, pk, slug):
             )
         )
 
-    # Make the title string.
-    title = "Judge %s" % make_title_str(person)
+    title = make_title_str(person)
 
     img_path = make_img_path(person)
 
