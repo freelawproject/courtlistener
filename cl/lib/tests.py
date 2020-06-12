@@ -331,8 +331,8 @@ class TestMaintenanceMiddleware(TestCase):
         self.assertEqual(
             r.status_code,
             HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status code "
-            "of: %s instead of %s" % (r.status_code, HTTP_200_OK),
+            "Staff did not get through, but should have. Staff got status "
+            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
         )
 
 
