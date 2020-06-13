@@ -135,11 +135,11 @@ The schedule is thus:
         super(Command, self).handle(*args, **options)
 
         # Needs to be user-oriented so that we only send one email per person.
-        users_with_alerts = User.objects.exclude(
-            docket_alerts__docket__date_terminated=None
-        )
+        users_with_alerts = User.objects.filter(
+            docket_alerts__docket__date_terminated__isnull=False
+        ).distinct()
         logger.info(
-            "%s users have old alerts to check.", users_with_alerts.count()
+            "%s users have terminated alerts to check.", len(users_with_alerts)
         )
         emails_sent = 0
         alerts_deleted = 0
