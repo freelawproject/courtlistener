@@ -1,6 +1,6 @@
 from django.db import models
 
-from cl.search.models import Court
+from cl.search.models import Court, Docket
 
 
 class UrlHash(models.Model):
@@ -102,3 +102,45 @@ class PACERFreeDocumentRow(models.Model):
     nature_of_suit = models.TextField()
     cause = models.CharField(max_length=2000,)
     error_msg = models.TextField()
+
+
+class PACERMobilePageData(models.Model):
+    """Status information about crawling the PACER Mobile UI for a docket"""
+
+    docket = models.OneToOneField(
+        Docket,
+        help_text="The docket we are tracking.",
+        on_delete=models.CASCADE,
+        related_name="mobile_crawl_status",
+    )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_last_mobile_crawl = models.DateTimeField(
+        help_text="When the Mobile UI was last crawled",
+        db_index=True,
+        null=True,
+    )
+    count_last_mobile_crawl = models.IntegerField(
+        help_text="The number of items found during the last crawl", null=True,
+    )
+    count_last_rss_crawl = models.IntegerField(
+        help_text="The number of items added from RSS that had a date after "
+        "date_last_mobile_crawl",
+        default=0,
+    )
+
+    def __unicode__(self):
+        return u"<%s: Docket %s crawled at %s with %s results>" % (
+            self.pk,
+            self.docket_id,
+            self.date_last_mobile_crawl,
+            self.count_last_mobile_crawl,
+        )
