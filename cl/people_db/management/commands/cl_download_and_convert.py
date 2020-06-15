@@ -5,13 +5,56 @@ import glob
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
 from django.conf import settings
+from cl.people_db.models import FinancialDisclosure
 
 from PyPDF2 import PdfFileMerger, PdfFileReader
 from PIL import Image
+import textract
 
 import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
+
+
+def get_page_count_ocr(im):
+    pixel_width, pixel_height = 794, 1046
+    pgnumber_coords = (0, 0, 320, 90)
+    width, height = im.size
+    nth_page = 2
+    page_count_px = float(height) / pixel_height
+    im_pg2 = get_nth_page(im, 2)
+    im_pgnumber = im_pg2.crop(pgnumber_coords)
+    im_pgnumber.save("pgnum.png")
+    content = str(textract.process("pgnum.png", method="tesseract"))
+    pagination = re.search("Page \d+ of \d+", content, flags=re.IGNORECASE)
+    try:
+        page_count_ocr = pagination.group().split()[3]
+    except IndexError:
+        page_count_ocr = None
+
+    if os.path.exists("pgnum.png"):
+        os.remove("pgnum.png")
+    return page_count_ocr, page_count_px
+
+
+def get_judge_position_ocr(im):
+    # crop position from page 1
+    first_page = get_nth_page(im, 1)
+    title_coords_pg1 = (190, 196, 215, 215)
+    first_page.crop(title_coords_pg1).save("position.png")
+    # OCR cropped image
+    content = str(textract.process("position.png")).strip()
+
+    if os.path.exists("position.png"):
+        os.remove("position.png")
+    return content
+
+
+def get_nth_page(im, n):
+    pixel_width, pixel_height = 794, 1046
+    width, height = im.size
+    im_nth_page = im.crop((0, (n - 1) * pixel_height, width, n * pixel_height))
+    return im_nth_page
 
 
 def download_new_disclosures(options):
