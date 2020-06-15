@@ -56,6 +56,7 @@ def get_nth_page(im, n):
     im_nth_page = im.crop((0, (n - 1) * pixel_height, width, n * pixel_height))
     return im_nth_page
 
+
 def get_fd_year(key, prefix):
     subdir = os.path.relpath(key, start=prefix).split("/")[0]
     if subdir == "judicial-watch":
@@ -107,6 +108,18 @@ def find_judge(item):
                 % (item["name_first"], item["name_middle"], item["name_last"])
             )
     return fd_judge
+
+
+def add_file_to_db(item):
+    fd = FinancialDisclosure(
+        person=item["person"],
+        year=item["year"],
+        filepath=item["filepath"],
+        thumbnail=item["thumbnail"],
+        thumbnail_status=item["thumbnail_status"],
+        page_count=item["page_count"],
+    )
+    fd.save()
 
 
 def download_new_disclosures(options):
