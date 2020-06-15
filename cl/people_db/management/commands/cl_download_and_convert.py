@@ -170,14 +170,6 @@ def append_pdfs(filepath, filepath_appendpdf):
     merger.write(filepath)
 
 
-def get_judge_info(key):
-    year = None
-    subdir = os.path.relpath(key, start=prefix).split("/")[0]
-
-    if subdir == "judicial-watch":
-        subdir = re.search(r"\d{4}", key).group()
-
-
 def upload_pdfs(options):
     pattern = os.path.join(
         settings.MEDIA_ROOT, "financial-disclosures/**/*.pdf"
