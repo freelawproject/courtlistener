@@ -56,6 +56,58 @@ def get_nth_page(im, n):
     im_nth_page = im.crop((0, (n - 1) * pixel_height, width, n * pixel_height))
     return im_nth_page
 
+def get_fd_year(key, prefix):
+    subdir = os.path.relpath(key, start=prefix).split("/")[0]
+    if subdir == "judicial-watch":
+        subdir = re.search(r"\d{4}", key).group()
+    year = subdir
+    return year
+
+
+def find_judge(item):
+    fd_judge = None
+    person = Person.objects.filter(
+        name_first=item["name_first"],
+        name_middle=item["name_middle"],
+        name_last=item["name_last"],
+        # name_suffix=item["name_suffix"],
+    )
+
+    if len(person) == 1:
+        fd_judge = person[0]
+    elif len(person) == 0:
+        # no person found
+        logger.info(
+            "Judge not found: %s %s %s"
+            % (item["name_first"], item["name_middle"], item["name_last"])
+        )
+    else:
+        position = Position.objects.filter(
+            person=person,
+            position_type=item["position_type"],
+            # job_title=item['job_title'],
+            court=item["court"],
+        )
+        if len(position) == 1:
+            fd_judge = position.person
+        elif len(position) == 0:
+            logger.info(
+                "Judge not found: %s %s %s (%s, %s)"
+                % (
+                    item["name_first"],
+                    item["name_middle"],
+                    item["name_last"],
+                    item["position_type"],
+                    item["court"],
+                )
+            )
+        else:
+            logger.info(
+                "Multiple judges found for %s %s %s"
+                % (item["name_first"], item["name_middle"], item["name_last"])
+            )
+    return fd_judge
+
 
 def download_new_disclosures(options):
     bucket = "com-courtlistener-storage"
