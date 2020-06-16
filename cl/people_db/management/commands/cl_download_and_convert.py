@@ -181,20 +181,24 @@ def get_page_count_ocr(im):
     return page_count_ocr, page_count_px
 
 
-def get_judge_name_ocr(im):
-    temp_filepath = temp_filepath = os.path.join(settings.MEDIA_ROOT,
-                                                 'financial-disclosures',
-                                                 'page.png')
-    namecrop = im.crop((0, 350, 700, 400))
-    namecrop.save(temp_filepath)
+def get_judge_info_ocr(im, boundary):
+    temp_filepath = temp_filepath = os.path.join(
+        settings.MEDIA_ROOT, "financial-disclosures", "crop.png"
+    )
+    infocrop = im.crop(boundary)
+    infocrop.save(temp_filepath)
     content = str(textract.process(temp_filepath))
-    try:
-        fullname = content.split('/')[1].split('\\')[0].strip()
-    except:
-        fullname = None
 
     if os.path.exists(temp_filepath):
         os.remove(temp_filepath)
+    return content
+
+
+def clean_judge_name(namestring):
+    try:
+        fullname = namestring.split("/")[1].split("\\")[0].strip()
+    except:
+        fullname = None
     return fullname
 
 
@@ -300,10 +304,13 @@ def download_new_disclosures(options):
 
 def add_judge_to_disclosure(options):
     disclosures = []
-    for doc in glob.iglob(os.path.join(settings.MEDIA_ROOT, 'financial-disclosures','*.pdf')):
+    for doc in glob.iglob(
+        os.path.join(settings.MEDIA_ROOT, "financial-disclosures", "*.pdf")
+    ):
         item = {}
-        pdf = PdfFileReader(open(doc, 'rb'))
-        item['page_count'] = pdf.getNumPages()
+        pdf = PdfFileReader(open(doc, "rb"))
+        item["page_count"] = pdf.getNumPages()
+
         print(item)
         disclosures.append(item)
 
