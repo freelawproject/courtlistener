@@ -78,6 +78,30 @@ class FD(object):
         )
         logger.info("Converted file: %s" % filepath)
 
+        lastpage = xlist[-1]
+        content = get_judge_info_ocr(lastpage, (0, 350, 700, 400))
+        fullname = clean_judge_name(content)
+
+        logger.info("Full name extracted by OCR: %s" % fullname)
+
+        title = get_judge_info_ocr(im, (41, 196, 195, 215))
+        logger.info("Title extracted by OCR: %s", title)
+
+        court = get_judge_info_ocr(im, (345, 130, 500, 145))
+        logger.info("Court extracted by OCR: %s", court)
+
+        location = get_judge_info_ocr(im, (45, 289, 185, 300))
+        logger.info("Location extracted by OCR: %s", location)
+
+        self.judge_info.append(
+            {
+                "fullname": fullname,
+                "title": title,
+                "court": court,
+                "location": location,
+            }
+        )
+
     def create_pdf(self):
         pdf_basename = os.path.basename(self.download_list[-1]) + ".pdf"
         pdf_path = os.path.join(
@@ -143,12 +167,9 @@ class FD(object):
 
                 self.create_pdf()
 
-                # HEre we have one PDF
-
-                # Everything is the same here... one pdf to process
-                # OCR the docuemnt, grab the judge names the locations
-                # Ocr the LAST page - signature page to get a better name, or both
-                # At teh metadata into the PDF here
+                # TODO: grab the judge names, locations
+                # TODO: OCR signature page to get a better name
+                # TODO: add metadata into the PDF here
 
                 break
 
