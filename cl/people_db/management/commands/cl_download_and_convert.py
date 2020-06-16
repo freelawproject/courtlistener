@@ -33,7 +33,7 @@ class FD(object):
         )
         self.download_list = []
         self.download_urls = []
-        self.full_name = []
+        self.judge_info = []
 
     def sorted_list_of_images(self):
         key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
