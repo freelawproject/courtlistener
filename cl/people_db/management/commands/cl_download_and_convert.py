@@ -270,69 +270,6 @@ def download_new_disclosures(options):
     new_disclosures.iterate_over_aws()
 
 
-def convert_images(options):
-    pattern = os.path.join(
-        settings.MEDIA_ROOT, "financial-disclosures/**/*.tiff"
-    )
-    for filepath in glob.iglob(pattern):
-        multipage_basename = re.split(
-            r"_Page_\d+.tiff$", filepath, flags=re.IGNORECASE
-        )[0]
-
-        if multipage_basename.endswith(".tiff"):
-            outpath = "%s.pdf" % os.path.splitext(filepath)[0]
-            if os.path.exists(outpath):
-                logger.info("Already converted: %s", outpath)
-                continue
-
-            logger.info("Converting: %s", outpath)
-            fullimage = Image.open(filepath)
-            width, height = fullimage.size
-            page_count = height / options["page_height"]
-
-            for i in range(page_count):
-                im = fullimage.crop(
-                    (
-                        0,
-                        options["page_height"] * i,
-                        width,
-                        options["page_height"] * (i + 1),
-                    )
-                )
-                if i == 0:
-                    im.save(outpath)
-                    continue
-                pdfpagepath = "%s_im.pdf" % os.path.splitext(filepath)[0]
-                im.save(pdfpagepath)
-                append_pdfs(outpath, pdfpagepath)
-        else:
-            outpath = "%s.pdf" % multipage_basename
-            if os.path.exists(outpath):
-                logger.info("Already converted: %s", outpath)
-                continue
-
-            logger.info("Converting: %s", outpath)
-            multipage_paths = glob.glob("%s*.tiff" % multipage_basename)
-            for i, pg in enumerate(multipage_paths):
-                im = Image.open(pg)
-                if i == 0:
-                    im.save(outpath)
-                    continue
-                pdfpagepath = "%s_im.pdf" % os.path.splitext(filepath)[0]
-                im.save(pdfpagepath)
-                append_pdfs(outpath, pdfpagepath)
-
-    if os.path.exists(pdfpagepath):
-        os.remove(pdfpagepath)
-
-
-def append_pdfs(filepath, filepath_appendpdf):
-    merger = PdfFileMerger()
-    merger.append(PdfFileReader(file(filepath, "rb")))
-    merger.append(PdfFileReader(file(filepath_appendpdf, "rb")))
-    merger.write(filepath)
-
-
 def upload_pdfs(options):
     pattern = os.path.join(
         settings.MEDIA_ROOT, "financial-disclosures/**/*.pdf"
