@@ -9,7 +9,7 @@ from urllib import quote
 import requests
 
 from io import BytesIO, StringIO
-from PyPDF2 import PdfFileMerger, PdfFileReader
+from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from PIL import Image
 import textract
 
@@ -33,6 +33,7 @@ class FD(object):
         )
         self.download_list = []
         self.download_urls = []
+        self.full_name = []
 
     def sorted_list_of_images(self):
         key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
@@ -180,6 +181,23 @@ def get_page_count_ocr(im):
     return page_count_ocr, page_count_px
 
 
+def get_judge_name_ocr(im):
+    temp_filepath = temp_filepath = os.path.join(settings.MEDIA_ROOT,
+                                                 'financial-disclosures',
+                                                 'page.png')
+    namecrop = im.crop((0, 350, 700, 400))
+    namecrop.save(temp_filepath)
+    content = str(textract.process(temp_filepath))
+    try:
+        fullname = content.split('/')[1].split('\\')[0].strip()
+    except:
+        fullname = None
+
+    if os.path.exists(temp_filepath):
+        os.remove(temp_filepath)
+    return fullname
+
+
 def get_judge_position_ocr(im):
     # crop position from page 1
     first_page = get_nth_page(im, 1)
@@ -210,8 +228,7 @@ def get_fd_year(key, prefix):
 
 def create_judge(item):
     person = Person(
-        name_first=item["name_first"],
-        name_last=item["name_last"],
+        name_first=item["name_first"], name_last=item["name_last"],
     )
     person.save()
 
@@ -366,6 +383,6 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         "download-files": download_new_disclosures,
-        'assign-judges': add_judge_to_disclosure,
+        "assign-judges": add_judge_to_disclosure,
         "upload-pdfs": upload_pdfs,
     }
