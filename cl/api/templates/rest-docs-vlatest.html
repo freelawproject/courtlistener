@@ -589,11 +589,12 @@
       <li>
         <p><strong>Ordering</strong>: Instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
         </p>
-        <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
+        <p>Additionally, there are two extra sorting fields that are available: <code>random</code> for any object <code>type</code> and <code>date_upload</code> for RECAP objects (see below for info on types). These sorting fields can be used in the front end or the API, but they do not appear in the drop down on the front end, so you'll have to URL hack to use them there.</p>
+
+        <p>Using <code>random_{your-seed} desc/asc</code> as your sort parameter will sort your results randomly. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
         </p>
         <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
-        <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns. You can also sort by date_upload on the front end or at this endpoint.
-        </p>
+
       </li>
       <li>
         <p><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax. To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you want and then using that query (and variations thereof) to query the API. On the backend, very similar code serves both the API and the front end.
