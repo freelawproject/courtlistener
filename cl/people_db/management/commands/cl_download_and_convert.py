@@ -208,11 +208,19 @@ def get_fd_year(key, prefix):
     return year
 
 
+def create_judge(item):
+    person = Person(
+        name_first=item["name_first"],
+        name_last=item["name_last"],
+    )
+    person.save()
+
+
 def find_judge(item):
     fd_judge = None
     person = Person.objects.filter(
         name_first=item["name_first"],
-        name_middle=item["name_middle"],
+        # name_middle=item["name_middle"],
         name_last=item["name_last"],
         # name_suffix=item["name_suffix"],
     )
@@ -225,6 +233,7 @@ def find_judge(item):
             "Judge not found: %s %s %s"
             % (item["name_first"], item["name_middle"], item["name_last"])
         )
+        create_judge(item)
     else:
         position = Position.objects.filter(
             person=person,
@@ -235,6 +244,7 @@ def find_judge(item):
         if len(position) == 1:
             fd_judge = position.person
         elif len(position) == 0:
+            # No person found
             logger.info(
                 "Judge not found: %s %s %s (%s, %s)"
                 % (
@@ -245,6 +255,7 @@ def find_judge(item):
                     item["court"],
                 )
             )
+            create_judge(item)
         else:
             logger.info(
                 "Multiple judges found for %s %s %s"
@@ -268,6 +279,16 @@ def add_file_to_db(item):
 def download_new_disclosures(options):
     new_disclosures = FD()
     new_disclosures.iterate_over_aws()
+
+
+def add_judge_to_disclosure(options):
+    disclosures = []
+    for doc in glob.iglob(os.path.join(settings.MEDIA_ROOT, 'financial-disclosures','*.pdf')):
+        item = {}
+        pdf = PdfFileReader(open(doc, 'rb'))
+        item['page_count'] = pdf.getNumPages()
+        print(item)
+        disclosures.append(item)
 
 
 def upload_pdfs(options):
@@ -345,5 +366,6 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         "download-files": download_new_disclosures,
+        'assign-judges': add_judge_to_disclosure,
         "upload-pdfs": upload_pdfs,
     }
