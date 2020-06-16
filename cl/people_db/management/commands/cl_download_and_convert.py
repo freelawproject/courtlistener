@@ -63,13 +63,8 @@ class FD(object):
         self.assemble_pdf(xlist)
 
     def assemble_pdf(self, xlist):
-        filename = (
-            os.path.basename(self.download_list[-1])
-            + ".pdf"
-        )
-        assetdir = os.path.join(
-            settings.MEDIA_ROOT,
-            'financial-disclosures')
+        filename = os.path.basename(self.download_list[-1]) + ".pdf"
+        assetdir = os.path.join(settings.MEDIA_ROOT, "financial-disclosures")
         mkdir_p(assetdir)
         filepath = os.path.join(assetdir, filename)
         im = xlist.pop(0)
@@ -80,13 +75,15 @@ class FD(object):
             save_all=True,
             append_images=xlist,
         )
-        logger.info('Converted file: %s' % filepath)
+        logger.info("Converted file: %s" % filepath)
 
     def create_pdf(self):
         pdf_basename = os.path.basename(self.download_list[-1]) + ".pdf"
-        pdf_path = os.path.join(settings.MEDIA_ROOT, 'financial-disclosures', pdf_basename)
+        pdf_path = os.path.join(
+            settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
+        )
         if os.path.exists(pdf_path):
-            logger.info('Already converted: %s' % pdf_path)
+            logger.info("Already converted: %s" % pdf_path)
         else:
             if len(self.download_urls) > 1:
                 self.sorted_list_of_images()
@@ -160,7 +157,6 @@ class FD(object):
                 ]
             except KeyError:
                 break
-
 
 
 def get_page_count_ocr(im):
@@ -412,6 +408,5 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         "download-files": download_new_disclosures,
-        "convert-images": convert_images,
         "upload-pdfs": upload_pdfs,
     }
