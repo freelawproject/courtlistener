@@ -527,6 +527,11 @@ LOGGING = {
         "mail_admins": {"class": "logging.NullHandler"},
     },
     "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
         # HTTP_HOST" header messages.) This appears to be caused by clients
         # that don't support SNI, and which are browsing to other domains on
