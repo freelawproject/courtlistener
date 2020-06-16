@@ -2,18 +2,165 @@ import os
 import re
 import argparse
 import glob
+import boto3
+from botocore import UNSIGNED
+from botocore.client import Config
+from urllib import quote
+import requests
+
+from io import BytesIO, StringIO
+from PyPDF2 import PdfFileMerger, PdfFileReader
+from PIL import Image
+import textract
+
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
 from django.conf import settings
 from cl.people_db.models import FinancialDisclosure
 
-from PyPDF2 import PdfFileMerger, PdfFileReader
-from PIL import Image
-import textract
 
-import boto3
-from botocore import UNSIGNED
-from botocore.client import Config
+class FD(object):
+    def __init__(self):
+        self.s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+        self.bucket = "com-courtlistener-storage"
+        self.prefix = "financial-disclosures"
+        # self.prefix = "financial-disclosures/2014/A-F/Collings-RB"
+        # self.prefix = "financial-disclosures/2011/A-E/Aldisert-RJ/Aldisert-RJ"
+        # self.prefix = "financial-disclosures/2011/A-E/Albritton-WH. J3. 11. ALM. resp.tiff"
+        self.kwargs = {"Bucket": self.bucket, "Prefix": self.prefix}
+        self.parent_url = (
+            "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
+        )
+        self.download_list = []
+        self.download_urls = []
+
+    def sorted_list_of_images(self):
+        key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
+
+        def key(item):
+            m = key_pat.match(item)
+            return int(m.group(2))
+
+        self.download_urls.sort(key=key)
+
+        xlist = []
+        for link in self.download_urls:
+            img = Image.open(requests.get(link, stream=True).raw)
+            xlist.append(img)
+        self.assemble_pdf(xlist)
+
+    def grab_and_split_image(self):
+        img = Image.open(requests.get(self.download_urls[0], stream=True).raw)
+        width, height = img.size
+        xlist = []
+        i, page_width, page_height = 0, width, (1046 * (width / 792))
+        while i < (height / page_height):
+            image = img.crop(
+                (0, (i * page_height), page_width, (i + 1) * page_height)
+            )
+            xlist.append(image)
+            i += 1
+        self.assemble_pdf(xlist)
+
+    def assemble_pdf(self, xlist):
+        filename = (
+            os.path.basename(self.download_list[-1])
+            + ".pdf"
+        )
+        assetdir = os.path.join(
+            settings.MEDIA_ROOT,
+            'financial-disclosures')
+        mkdir_p(assetdir)
+        filepath = os.path.join(assetdir, filename)
+        im = xlist.pop(0)
+        im.save(
+            filepath,
+            "PDF",
+            resolution=100.0,
+            save_all=True,
+            append_images=xlist,
+        )
+        logger.info('Converted file: %s' % filepath)
+
+    def create_pdf(self):
+        pdf_basename = os.path.basename(self.download_list[-1]) + ".pdf"
+        pdf_path = os.path.join(settings.MEDIA_ROOT, 'financial-disclosures', pdf_basename)
+        if os.path.exists(pdf_path):
+            logger.info('Already converted: %s' % pdf_path)
+        else:
+            if len(self.download_urls) > 1:
+                self.sorted_list_of_images()
+            else:
+                if not self.download_urls[0].endswith("pdf"):
+                    self.grab_and_split_image()
+
+    def iterate_over_aws(self):
+        while True:
+            resp = self.s3.list_objects_v2(**self.kwargs)
+
+            for obj in resp["Contents"]:
+                key = obj["Key"]
+
+                if "Thumbs.db" in key:
+                    continue
+
+                # Check if we have key, or want to use this key.
+                self.download_urls = []
+                if key.endswith("pdf"):
+                    # Judicial Watch PDF
+                    self.download_urls.append(self.parent_url + quote(key))
+                    xkey = os.path.splitext(key)[0]
+                    self.download_urls.append(self.parent_url + quote(key))
+                    self.download_list.append(xkey)
+                    # cd['type'] = "pdf"
+                    # cd['urls'] = download_urls
+
+                elif "Page_" in key:
+                    # Older Pre-split TIFFs
+                    if key.split("Page")[0] in self.download_list:
+                        continue
+                    # if "2014/A-F/Collings-RB" in key:
+                    #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
+                    # else:
+                    #     xkey = key.split("Page")[0]
+                    xkey = key.split("_Page")[0]
+                    bundle_query = {"Bucket": self.bucket, "Prefix": xkey}
+                    second_response = self.s3.list_objects_v2(**bundle_query)
+                    for obj in second_response["Contents"]:
+                        key = obj["Key"]
+                        if "Thumbs.db" not in key:
+                            self.download_urls.append(
+                                self.parent_url + quote(key)
+                            )
+                    self.download_list.append(xkey)
+                else:
+                    # Regular old Large TIFF
+                    xkey = os.path.splitext(key)[0]
+                    self.download_urls.append(self.parent_url + quote(key))
+                    self.download_list.append(xkey)
+
+                # print(len(self.download_urls))
+                # print(self.download_urls)
+                # print(self.download_list)
+
+                self.create_pdf()
+
+                # HEre we have one PDF
+
+                # Everything is the same here... one pdf to process
+                # OCR the docuemnt, grab the judge names the locations
+                # Ocr the LAST page - signature page to get a better name, or both
+                # At teh metadata into the PDF here
+
+                break
+
+            try:
+                self.kwargs["ContinuationToken"] = resp[
+                    "NextContinuationToken"
+                ]
+            except KeyError:
+                break
+
 
 
 def get_page_count_ocr(im):
@@ -123,53 +270,8 @@ def add_file_to_db(item):
 
 
 def download_new_disclosures(options):
-    bucket = "com-courtlistener-storage"
-    prefix = "financial-disclosures"
-
-    assetdir = os.path.join(settings.MEDIA_ROOT, prefix)
-
-    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-
-    # access_key = settings.AWS_ACCESS_KEY_ID
-    # secret_key = settings.AWS_SECRET_ACCESS_KEY
-    # s3 = boto3.client(
-    #     "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-    # )
-
-    kwargs = {"Bucket": bucket, "Prefix": prefix}
-    # ctr = 0
-    resp = s3.list_objects_v2(**kwargs)
-    while True:
-        for obj in resp["Contents"]:
-            # if count == ctr:
-            #     break
-
-            # ctr += 1
-            key = obj["Key"]
-
-            subdir = os.path.relpath(key, start=prefix).split("/")[0]
-
-            if subdir == "judicial-watch":
-                subdir = re.search(r"\d{4}", key).group()
-
-            print(subdir)
-
-            directory = os.path.join(assetdir, subdir)
-            file_path = os.path.join(directory, os.path.basename(key))
-
-            if os.path.exists(file_path):
-                logger.info("Already captured: %s", file_path)
-                continue
-
-            logger.info("Capturing: %s", file_path)
-            mkdir_p(directory)
-
-            with open(file_path, "wb") as f:
-                s3.download_fileobj(bucket, key, f)
-            try:
-                kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-            except KeyError:
-                break
+    new_disclosures = FD()
+    new_disclosures.iterate_over_aws()
 
 
 def convert_images(options):
