@@ -267,18 +267,6 @@ def clean_judge_name(namestring):
     return fullname
 
 
-def get_judge_position_ocr(im):
-    # crop position from page 1
-    first_page = get_nth_page(im, 1)
-    title_coords_pg1 = (190, 196, 215, 215)
-    first_page.crop(title_coords_pg1).save("position.png")
-    # OCR cropped image
-    content = str(textract.process("position.png")).strip()
-
-    if os.path.exists("position.png"):
-        os.remove("position.png")
-    return content
-
 
 def get_nth_page(im, n):
     pixel_width, pixel_height = 794, 1046
