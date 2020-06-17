@@ -101,17 +101,6 @@ class FD(object):
             }
         )
 
-        # add_metadata_to_pdf(
-        #     infilepath,
-        #     outfilepath,
-        #     {
-        #         "/fullname": fullname,
-        #         "/title": title,
-        #         "/court": court,
-        #         "/loc": location,
-        #     },
-        # )
-
         logger.info("Converted file: %s" % filepath)
 
     def create_pdf(self):
@@ -182,6 +171,17 @@ class FD(object):
                 # TODO: grab the judge names, locations
                 # TODO: OCR signature page to get a better name
                 # TODO: add metadata into the PDF here
+
+                # add_metadata_to_pdf(
+                #     infilepath,
+                #     outfilepath,
+                #     {
+                #         "/fullname": fullname,
+                #         "/title": title,
+                #         "/court": court,
+                #         "/loc": location,
+                #     },
+                # )
 
                 break
 
@@ -265,7 +265,6 @@ def clean_judge_name(namestring):
     except:
         fullname = None
     return fullname
-
 
 
 def get_nth_page(im, n):
