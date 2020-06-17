@@ -76,7 +76,6 @@ class FD(object):
             save_all=True,
             append_images=xlist,
         )
-        logger.info("Converted file: %s" % filepath)
 
         lastpage = xlist[-1]
         content = get_judge_info_ocr(lastpage, (0, 350, 700, 400))
@@ -101,6 +100,19 @@ class FD(object):
                 "location": location,
             }
         )
+
+        # add_metadata_to_pdf(
+        #     infilepath,
+        #     outfilepath,
+        #     {
+        #         "/fullname": fullname,
+        #         "/title": title,
+        #         "/court": court,
+        #         "/loc": location,
+        #     },
+        # )
+
+        logger.info("Converted file: %s" % filepath)
 
     def create_pdf(self):
         pdf_basename = os.path.basename(self.download_list[-1]) + ".pdf"
@@ -179,6 +191,39 @@ class FD(object):
                 ]
             except KeyError:
                 break
+
+
+def add_metadata_to_pdf(infilepath, outfilepath, info):
+
+    fin = open(infilepath, "rb")
+    reader = PdfFileReader(fin)
+    writer = PdfFileWriter()
+
+    writer.appendPagesFromReader(reader)
+    metadata = reader.getDocumentInfo()
+    writer.addMetadata(metadata)
+
+    # Write your custom metadata here:
+    writer.addMetadata(info)
+
+    fout = open(outfilepath, "wb")
+    writer.write(fout)
+
+    fin.close()
+    fout.close()
+    if os.path.exists(infilepath):
+        os.remove(infilepath)
+
+    # get_metadata_from_pdf(outfilepath)
+
+
+def get_metadata_from_pdf(filepath):
+    with open(filepath, "rb") as f:
+        pdf = PdfFileReader(f)
+        info = pdf.getDocumentInfo()
+    print(info)
+    return info
+
 
 
 def get_page_count_ocr(im):
