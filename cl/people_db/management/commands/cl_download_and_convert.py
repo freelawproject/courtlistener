@@ -319,7 +319,7 @@ def find_judge(item):
             "Judge not found: %s %s %s"
             % (item["name_first"], item["name_middle"], item["name_last"])
         )
-        create_judge(item)
+        fd_judge = create_judge(item)
     else:
         position = Position.objects.filter(
             person=person,
@@ -341,7 +341,7 @@ def find_judge(item):
                     item["court"],
                 )
             )
-            create_judge(item)
+            fd_judge = create_judge(item)
         else:
             logger.info(
                 "Multiple judges found for %s %s %s"
