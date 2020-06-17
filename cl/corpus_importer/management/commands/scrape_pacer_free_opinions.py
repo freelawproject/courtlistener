@@ -95,14 +95,8 @@ def get_and_save_free_document_reports(options):
     ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED,)
 
     cl_court_ids = (
-        Court.objects.filter(
-            jurisdiction__in=[
-                Court.FEDERAL_DISTRICT,
-                Court.FEDERAL_BANKRUPTCY,
-            ],
-            in_use=True,
-            end_date=None,
-        )
+        Court.federal_courts.district_pacer_courts()
+        .filter(in_use=True, end_date=None,)
         .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"],)
         .values_list("pk", flat=True,)
     )
