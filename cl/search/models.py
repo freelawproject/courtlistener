@@ -1612,6 +1612,19 @@ class FederalCourtsQuerySet(models.QuerySet):
     def all(self):
         return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
+    def all_pacer_courts(self):
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                    Court.FEDERAL_APPELLATE,
+                ]
+            )
+            | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
+
     def district_pacer_courts(self):
         return self.filter(
             Q(
@@ -1621,18 +1634,21 @@ class FederalCourtsQuerySet(models.QuerySet):
                 ]
             )
             | Q(pk__in=["cit", "jpml", "uscfc"]),
+            end_date__isnull=True,
         )
 
     def appellate_pacer_courts(self):
         return self.filter(
-            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE])
-            |
+            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
-        )
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
 
     def bankruptcy_pacer_courts(self):
-        return self.filter(jurisdiction=Court.FEDERAL_BANKRUPTCY)
+        return self.filter(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True,
+        )
 
     def district_courts(self):
         return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
