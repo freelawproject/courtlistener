@@ -225,7 +225,6 @@ def get_metadata_from_pdf(filepath):
     return info
 
 
-
 def get_page_count_ocr(im):
     pixel_width, pixel_height = 794, 1046
     pgnumber_coords = (0, 0, 320, 90)
@@ -300,7 +299,7 @@ def create_judge(item):
     person = Person(
         name_first=item["name_first"], name_last=item["name_last"],
     )
-    person.save()
+    return person
 
 
 def find_judge(item):
