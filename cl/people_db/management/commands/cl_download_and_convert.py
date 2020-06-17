@@ -306,7 +306,7 @@ def find_judge(item):
     fd_judge = None
     person = Person.objects.filter(
         name_first=item["name_first"],
-        # name_middle=item["name_middle"],
+        name_middle=item["name_middle"],
         name_last=item["name_last"],
         # name_suffix=item["name_suffix"],
     )
