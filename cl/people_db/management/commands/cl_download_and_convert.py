@@ -375,7 +375,8 @@ def add_judge_to_disclosure(options):
         item = {}
         pdf = PdfFileReader(open(doc, "rb"))
         item["page_count"] = pdf.getNumPages()
-
+        item["filepath"] = doc
+        # TODO: get name, year
         print(item)
         disclosures.append(item)
 
