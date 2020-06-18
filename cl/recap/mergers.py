@@ -640,7 +640,7 @@ def add_docket_entries(d, docket_entries, tags=None):
                 continue
             rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
-            logger.error(
+            logger.info(
                 "Multiple recap documents found for document entry number'%s' "
                 "while processing '%s'" % (docket_entry["document_number"], d)
             )
