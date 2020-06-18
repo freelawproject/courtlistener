@@ -204,7 +204,7 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
             "redirect": stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.warn("Stripe was unable to process the payment: %s" % e)
+        logger.info("Stripe was unable to process the payment: %s" % e)
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]
