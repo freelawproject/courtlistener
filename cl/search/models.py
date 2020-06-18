@@ -1608,6 +1608,58 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         verbose_name_plural = "Claim History Entries"
 
 
+class FederalCourtsQuerySet(models.QuerySet):
+    def all(self):
+        return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
+
+    def all_pacer_courts(self):
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                    Court.FEDERAL_APPELLATE,
+                ]
+            )
+            | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
+
+    def district_pacer_courts(self):
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                ]
+            )
+            | Q(pk__in=["cit", "jpml", "uscfc"]),
+            end_date__isnull=True,
+        )
+
+    def appellate_pacer_courts(self):
+        return self.filter(
+            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
+            # Court of Appeals for Veterans Claims uses appellate PACER
+            Q(pk__in=["cavc"]),
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
+
+    def bankruptcy_pacer_courts(self):
+        return self.filter(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True,
+        )
+
+    def district_courts(self):
+        return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
+
+    def bankruptcy_courts(self):
+        return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
+
+    def appellate_courts(self):
+        return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
+
+
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -1758,6 +1810,9 @@ class Court(models.Model):
         "raw)",
         blank=True,
     )
+
+    objects = models.Manager()
+    federal_courts = FederalCourtsQuerySet.as_manager()
 
     def __unicode__(self):
         return u"{name}".format(name=self.full_name)

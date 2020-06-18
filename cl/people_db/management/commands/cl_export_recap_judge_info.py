@@ -48,9 +48,7 @@ class Command(VerboseCommand):
             }
         }
         """
-        courts = Court.objects.filter(
-            jurisdiction__in=Court.FEDERAL_JURISDICTIONS,
-        )
+        courts = Court.federal_courts.all()
         out = {}
         for court in courts:
             out[court.pk] = {}
