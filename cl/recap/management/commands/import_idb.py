@@ -240,8 +240,7 @@ class Command(VerboseCommand, CommandUtils):
             row["CIRCUIT"] = row["CIRCUIT"][1]
 
         if row["CIRCUIT"]:
-            matches = Court.objects.filter(
-                jurisdiction=Court.FEDERAL_APPELLATE,
+            matches = Court.federal_courts.appellate_courts().filter(
                 fjc_court_id=row["CIRCUIT"],
             )
             if matches.count() == 1:
@@ -254,13 +253,11 @@ class Command(VerboseCommand, CommandUtils):
 
         if row["DISTRICT"]:
             if self.filetype == BANKR_2017:
-                matches = Court.objects.filter(
-                    jurisdiction=Court.FEDERAL_BANKRUPTCY,
+                matches = Court.federal_courts.bankruptcy_courts().filter(
                     fjc_court_id=row["DISTRICT"],
                 )
             else:
-                matches = Court.objects.filter(
-                    jurisdiction=Court.FEDERAL_DISTRICT,
+                matches = Court.federal_courts.district_courts().filter(
                     fjc_court_id=row["DISTRICT"],
                 )
 
