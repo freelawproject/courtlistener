@@ -104,9 +104,11 @@ def idb_row_transform(row):
     :return row: A transformed version of the row
     """
     # Convert the court field from theirs to something bearable
-    row["court"] = Court.objects.get(
-        fjc_court_id=row["DISTRICT"], jurisdiction=Court.FEDERAL_BANKRUPTCY
-    ).pk
+    row["court"] = (
+        Court.federal_courts.bankruptcy_courts()
+        .get(fjc_court_id=row["DISTRICT"])
+        .pk
+    )
 
     # Set the case name to None. Alas, we don't get it, but we probably don't
     # need it either.
