@@ -232,7 +232,7 @@ def process_donation_forms(
                 payment_type,
             )
         except PaymentFailureException as e:
-            logger.critical("Payment failed. Message was: %s", e.message)
+            logger.info("Payment failed. Message was: %s", e.message)
             context["message"] = e.message
             response = {"status": "Failed"}
 
