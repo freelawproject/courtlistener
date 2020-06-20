@@ -217,7 +217,7 @@ fd_pairs = (
     (re.compile(u'Court of Claims', re.I), 'cc'),
         (re.compile(u'United States Claims Court', re.I), 'cc'),
     (re.compile(u'(^|\s)U\. S\. Court of Customs and Patent Appeals', re.I), 'ccpa'),
-    (re.compile(u'(^|\s)(U\. S\.)|(United States) Court of International Trade', re.I), 'cit'),
+    (re.compile(u'(^|\s)(U\. ?S\.)|(United States) Court of International Trade', re.I), 'cit'),
     (re.compile(u'(^|\s)U\. S\. Customs Court', re.I), 'cusc'),
     (re.compile(u'(^|\s)U\. S\. District Court for the District of Columbia', re.I), 'dcd'),
 
@@ -759,6 +759,7 @@ def match_court_string(
             if re.search(regex, court_str):
                 matches.append(value)
 
-    # Safety check. If we have more than one match, that's a problem.
+    # Safety check. If we have more than one match, that's a problem
+    print("Matches:", matches)
     assert len(matches) >= 1, "Too many matches for %s" % court_str
     return matches[0] if matches else None
