@@ -760,6 +760,5 @@ def match_court_string(
                 matches.append(value)
 
     # Safety check. If we have more than one match, that's a problem
-    print("Matches:", matches)
     assert len(matches) >= 1, "Too many matches for %s" % court_str
     return matches[0] if matches else None
