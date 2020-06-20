@@ -51,7 +51,7 @@ services:
             - cl-redis
         volumes:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
-#            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
         networks:
             - cl_net_overlay
@@ -69,7 +69,7 @@ services:
             - "8000:8000"
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
-#            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+            - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
         networks:
             - cl_net_overlay
 
