@@ -8,6 +8,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.date_time import dt_as_local_date
 
 
 class OldAlertReport:
@@ -36,13 +37,16 @@ def build_user_report(user, delete=False):
         docket__date_terminated=None
     ).select_related("docket")
     for alert in alerts:
-        date_terminated = alert.docket.date_terminated
         # Use the more recent of the date the alert was created, the date it
         # was last triggered, or the date_terminated of the docket
-        threshold_date = max(date_terminated, alert.date_created.date())
+        threshold_date = max(
+            alert.docket.date_terminated, dt_as_local_date(alert.date_created)
+        )
         if alert.date_last_hit is not None:
-            threshold_date = max(threshold_date, alert.date_last_hit.date())
-        days_since_last_touch = (now().date() - threshold_date).days
+            threshold_date = max(
+                threshold_date, dt_as_local_date(alert.date_last_hit)
+            )
+        days_since_last_touch = (dt_as_local_date(now()) - threshold_date).days
         if delete:
             if days_since_last_touch >= 187:
                 report.disabled_dockets.append(alert.docket)
@@ -131,11 +135,11 @@ The schedule is thus:
         super(Command, self).handle(*args, **options)
 
         # Needs to be user-oriented so that we only send one email per person.
-        users_with_alerts = User.objects.exclude(
-            docket_alerts__docket__date_terminated=None
-        )
+        users_with_alerts = User.objects.filter(
+            docket_alerts__docket__date_terminated__isnull=False
+        ).distinct()
         logger.info(
-            "%s users have old alerts to check.", users_with_alerts.count()
+            "%s users have terminated alerts to check.", len(users_with_alerts)
         )
         emails_sent = 0
         alerts_deleted = 0

@@ -7,6 +7,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 from cl.users.models import UserProfile
+from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
 class VisualizationCrudTests(BaseSeleniumTest):
@@ -23,6 +24,10 @@ class VisualizationCrudTests(BaseSeleniumTest):
             user=self.user, email_confirmed=True
         )
         super(VisualizationCrudTests, self).setUp()
+
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_creating_new_visualization(self):

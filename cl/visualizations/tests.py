@@ -121,6 +121,10 @@ class TestViews(TestCase):
             user=self.user, email_confirmed=True
         )
 
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
+
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
         self.assertTrue(
@@ -224,6 +228,10 @@ class TestVizAjaxCrud(TestCase):
         self.private_viz = SCOTUSMap.objects.get(pk=2)
         self.deleted_viz = SCOTUSMap.objects.get(pk=3)
         self.factory = RequestFactory()
+
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
 
     def _build_post(self, url, username=None, data=None):
         """ Helper method to build authenticated AJAX POST
@@ -340,6 +348,10 @@ class APIVisualizationTestCase(APITestCase):
         self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
         self.client = self.make_client(6)
         self.rando_client = self.make_client(1001)
+
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
 
     def make_good_visualization(self, title):
         data = {
