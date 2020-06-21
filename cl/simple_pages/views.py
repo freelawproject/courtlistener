@@ -79,8 +79,8 @@ def help_home(request):
 
 
 def alert_help(request):
-    no_feeds = Court.objects.filter(
-        jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT,],
+    no_feeds = Court.federal_courts.district_pacer_courts().filter(
+        jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT],
         pacer_has_rss_feed=False,
         end_date=None,
     )

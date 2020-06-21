@@ -10,7 +10,9 @@ from ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
 ratelimiter_fast = ratelimit(key="ip", rate="250/h", block=True)
-ratelimiter_auth = ratelimit(key="ip", rate="10/m", method=UNSAFE, block=True)
+ratelimiter_unsafe_methods = ratelimit(
+    key="ip", rate="10/m", method=UNSAFE, block=True
+)
 # Decorators can't easily be mocked, and we need to not trigger this decorator
 # during tests or else the first test works and the rest are blocked. So,
 # check if we're doing a test and adjust the decorator accordingly.

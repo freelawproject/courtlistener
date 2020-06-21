@@ -13,8 +13,6 @@ from cl.donate.utils import (
 )
 from cl.lib.command_utils import VerboseCommand
 
-subscription_failure_threshold = 3
-
 
 class Command(VerboseCommand):
     help = "Charges people that have monthly subscriptions."
@@ -51,14 +49,9 @@ class Command(VerboseCommand):
                 )
             except PaymentFailureException as e:
                 m_donation.failure_count += 1
-                if m_donation.failure_count == subscription_failure_threshold:
-                    m_donation.enabled = False
-                    send_failed_subscription_email(m_donation)
-
-                email = emails["admin_bad_subscription"]
-                body = email["body"] % (m_donation.pk, e.message)
-                send_mail(email["subject"], body, email["from"], email["to"])
+                m_donation.enabled = False
                 m_donation.save()
+                send_failed_subscription_email(m_donation)
                 continue
 
             if response.get("status") == Donation.AWAITING_PAYMENT:
