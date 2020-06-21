@@ -224,7 +224,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             courtid = match_court_string(
                 item["Court Name" + pos_str], federal_appeals=True
             )
-        elif re.search("district", item["Court Name" + pos_str], re.I):
+        elif re.search("district|trade", item["Court Name" + pos_str], re.I):
             courtid = match_court_string(
                 item["Court Name" + pos_str], federal_district=True
             )
