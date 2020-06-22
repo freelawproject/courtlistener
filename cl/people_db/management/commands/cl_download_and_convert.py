@@ -18,16 +18,18 @@ from cl.lib.utils import mkdir_p
 from django.conf import settings
 from cl.people_db.models import FinancialDisclosure
 
+prefix = "financial-disclosures"
+# prefix = "financial-disclosures/2014/A-F/Collings-RB"
+# prefix = "financial-disclosures/2011/A-E/Aldisert-RJ/Aldisert-RJ"
+# prefix = "financial-disclosures/2011/A-E/Albritton-WH. J3. 11. ALM. resp.tiff"
+
 
 class FD(object):
     def __init__(self):
         self.s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
         self.bucket = "com-courtlistener-storage"
-        self.prefix = "financial-disclosures"
-        # self.prefix = "financial-disclosures/2014/A-F/Collings-RB"
-        # self.prefix = "financial-disclosures/2011/A-E/Aldisert-RJ/Aldisert-RJ"
-        # self.prefix = "financial-disclosures/2011/A-E/Albritton-WH. J3. 11. ALM. resp.tiff"
-        self.kwargs = {"Bucket": self.bucket, "Prefix": self.prefix}
+
+        self.kwargs = {"Bucket": self.bucket, "Prefix": prefix}
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
