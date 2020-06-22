@@ -162,10 +162,6 @@ class FD(object):
                     self.download_urls.append(self.parent_url + quote(key))
                     self.download_list.append(xkey)
 
-                # print(len(self.download_urls))
-                # print(self.download_urls)
-                # print(self.download_list)
-
                 self.create_pdf()
 
                 # TODO: grab the judge names, locations
