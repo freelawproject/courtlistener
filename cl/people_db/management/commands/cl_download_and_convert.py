@@ -118,6 +118,7 @@ class FD(object):
                     self.grab_and_split_image()
 
     def iterate_over_aws(self):
+        download_list = []
         while True:
             resp = self.s3.list_objects_v2(**self.kwargs)
 
@@ -134,13 +135,13 @@ class FD(object):
                     self.download_urls.append(self.parent_url + quote(key))
                     xkey = os.path.splitext(key)[0]
                     self.download_urls.append(self.parent_url + quote(key))
-                    self.download_list.append(xkey)
+                    download_list.append(xkey)
                     # cd['type'] = "pdf"
                     # cd['urls'] = download_urls
 
                 elif "Page_" in key:
                     # Older Pre-split TIFFs
-                    if key.split("Page")[0] in self.download_list:
+                    if key.split("Page")[0] in download_list:
                         continue
                     # if "2014/A-F/Collings-RB" in key:
                     #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
@@ -155,12 +156,12 @@ class FD(object):
                             self.download_urls.append(
                                 self.parent_url + quote(key)
                             )
-                    self.download_list.append(xkey)
+                    download_list.append(xkey)
                 else:
                     # Regular old Large TIFF
                     xkey = os.path.splitext(key)[0]
                     self.download_urls.append(self.parent_url + quote(key))
-                    self.download_list.append(xkey)
+                    download_list.append(xkey)
 
                 self.create_pdf()
 
