@@ -63,8 +63,8 @@ class FD(object):
             i += 1
         self.assemble_pdf(xlist)
 
-    def assemble_pdf(self, xlist):
-        filename = os.path.basename(self.download_list[-1]) + ".pdf"
+    def assemble_pdf(self, xlist, download_list):
+        filename = os.path.basename(download_list[-1]) + ".pdf"
         assetdir = os.path.join(settings.MEDIA_ROOT, "financial-disclosures")
         mkdir_p(assetdir)
         filepath = os.path.join(assetdir, filename)
