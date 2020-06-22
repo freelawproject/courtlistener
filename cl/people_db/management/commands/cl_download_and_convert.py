@@ -11,7 +11,7 @@ import requests
 from io import BytesIO, StringIO
 from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from PIL import Image
-import textract
+from cl.scrapers.tasks import extract_by_ocr
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
@@ -230,7 +230,7 @@ def get_page_count_ocr(im):
     im_pg2 = get_nth_page(im, 2)
     im_pgnumber = im_pg2.crop(pgnumber_coords)
     im_pgnumber.save("pgnum.png")
-    content = str(textract.process("pgnum.png", method="tesseract"))
+    is_extracted, content = extract_by_ocr("pgnum.png")
     pagination = re.search("Page \d+ of \d+", content, flags=re.IGNORECASE)
     try:
         page_count_ocr = pagination.group().split()[3]
@@ -248,7 +248,7 @@ def get_judge_info_ocr(im, boundary):
     )
     infocrop = im.crop(boundary)
     infocrop.save(temp_filepath)
-    content = str(textract.process(temp_filepath))
+    is_extracted, content = extract_by_ocr(temp_filepath)
 
     if os.path.exists(temp_filepath):
         os.remove(temp_filepath)
