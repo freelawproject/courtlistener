@@ -50,7 +50,7 @@ class FD(object):
             xlist.append(img)
         self.assemble_pdf(xlist, download_list)
 
-    def grab_and_split_image(self):
+    def grab_and_split_image(self, download_list):
         img = Image.open(requests.get(self.download_urls[0], stream=True).raw)
         width, height = img.size
         xlist = []
@@ -61,7 +61,7 @@ class FD(object):
             )
             xlist.append(image)
             i += 1
-        self.assemble_pdf(xlist)
+        self.assemble_pdf(xlist, download_list)
 
     def assemble_pdf(self, xlist, download_list):
         filename = os.path.basename(download_list[-1]) + ".pdf"
@@ -163,7 +163,7 @@ class FD(object):
                     self.download_urls.append(self.parent_url + quote(key))
                     download_list.append(xkey)
 
-                self.create_pdf()
+                self.create_pdf(download_list)
 
                 # TODO: grab the judge names, locations
                 # TODO: OCR signature page to get a better name
