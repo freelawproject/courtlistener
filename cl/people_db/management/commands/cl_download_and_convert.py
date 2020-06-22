@@ -103,8 +103,8 @@ class FD(object):
 
         logger.info("Converted file: %s" % filepath)
 
-    def create_pdf(self):
-        pdf_basename = os.path.basename(self.download_list[-1]) + ".pdf"
+    def create_pdf(self, download_list):
+        pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
         pdf_path = os.path.join(
             settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
         )
