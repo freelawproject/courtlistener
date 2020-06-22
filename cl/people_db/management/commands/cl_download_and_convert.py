@@ -18,6 +18,7 @@ from cl.lib.utils import mkdir_p
 from django.conf import settings
 from cl.people_db.models import FinancialDisclosure
 
+bucket = "com-courtlistener-storage"
 prefix = "financial-disclosures"
 # prefix = "financial-disclosures/2014/A-F/Collings-RB"
 # prefix = "financial-disclosures/2011/A-E/Aldisert-RJ/Aldisert-RJ"
@@ -27,9 +28,7 @@ prefix = "financial-disclosures"
 class FD(object):
     def __init__(self):
         self.s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        self.bucket = "com-courtlistener-storage"
-
-        self.kwargs = {"Bucket": self.bucket, "Prefix": prefix}
+        self.kwargs = {"Bucket": bucket, "Prefix": prefix}
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
@@ -150,7 +149,7 @@ class FD(object):
                     # else:
                     #     xkey = key.split("Page")[0]
                     xkey = key.split("_Page")[0]
-                    bundle_query = {"Bucket": self.bucket, "Prefix": xkey}
+                    bundle_query = {"Bucket": bucket, "Prefix": xkey}
                     second_response = self.s3.list_objects_v2(**bundle_query)
                     for obj in second_response["Contents"]:
                         key = obj["Key"]
