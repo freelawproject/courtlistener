@@ -35,7 +35,7 @@ class FD(object):
         self.download_urls = []
         self.judge_info = []
 
-    def sorted_list_of_images(self):
+    def sorted_list_of_images(self, download_list):
         key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
 
         def key(item):
@@ -48,7 +48,7 @@ class FD(object):
         for link in self.download_urls:
             img = Image.open(requests.get(link, stream=True).raw)
             xlist.append(img)
-        self.assemble_pdf(xlist)
+        self.assemble_pdf(xlist, download_list)
 
     def grab_and_split_image(self):
         img = Image.open(requests.get(self.download_urls[0], stream=True).raw)
