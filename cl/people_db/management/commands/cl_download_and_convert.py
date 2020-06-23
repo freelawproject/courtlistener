@@ -7,6 +7,7 @@ from botocore import UNSIGNED
 from botocore.client import Config
 from urllib import quote
 import requests
+from tempfile import NamedTemporaryFile
 
 from io import BytesIO, StringIO
 from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
