@@ -34,11 +34,7 @@ def assemble_pdf(xlist, download_list):
     filepath = os.path.join(assetdir, filename)
     im = xlist.pop(0)
     im.save(
-        filepath,
-        "PDF",
-        resolution=100.0,
-        save_all=True,
-        append_images=xlist,
+        filepath, "PDF", resolution=100.0, save_all=True, append_images=xlist,
     )
 
     lastpage = xlist[-1]
