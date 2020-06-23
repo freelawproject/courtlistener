@@ -121,7 +121,7 @@ class FD(object):
         kwargs = {"Bucket": bucket, "Prefix": prefix}
         download_list = []
         while True:
-            resp = self.s3.list_objects_v2(**self.kwargs)
+            resp = self.s3.list_objects_v2(**kwargs)
 
             for obj in resp["Contents"]:
                 key = obj["Key"]
@@ -184,9 +184,7 @@ class FD(object):
                 break
 
             try:
-                self.kwargs["ContinuationToken"] = resp[
-                    "NextContinuationToken"
-                ]
+                kwargs["ContinuationToken"] = resp["NextContinuationToken"]
             except KeyError:
                 break
 
