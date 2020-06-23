@@ -27,7 +27,6 @@ prefix = "financial-disclosures"
 
 class FD(object):
     def __init__(self):
-        self.s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
