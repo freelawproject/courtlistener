@@ -243,7 +243,7 @@ def get_page_count_ocr(im):
 
 def get_judge_info_ocr(im, boundary):
     temp_filepath = temp_filepath = os.path.join(
-        settings.MEDIA_ROOT, "financial-disclosures", "crop.png"
+        settings.MEDIA_ROOT, "financial-disclosures", "crop.pdf"
     )
     infocrop = im.crop(boundary)
     infocrop.save(temp_filepath)
