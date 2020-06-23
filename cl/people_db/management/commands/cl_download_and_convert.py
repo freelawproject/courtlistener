@@ -110,7 +110,7 @@ class FD(object):
             logger.info("Already converted: %s" % pdf_path)
         else:
             if len(self.download_urls) > 1:
-                self.sorted_list_of_images()
+                self.sorted_list_of_images(download_list)
             else:
                 if not self.download_urls[0].endswith("pdf"):
                     self.grab_and_split_image()
