@@ -113,7 +113,7 @@ class FD(object):
                 self.sorted_list_of_images(download_list)
             else:
                 if not self.download_urls[0].endswith("pdf"):
-                    self.grab_and_split_image()
+                    self.grab_and_split_image(download_list)
 
     def iterate_over_aws(self):
         s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
