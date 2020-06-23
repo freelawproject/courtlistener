@@ -177,8 +177,6 @@ class FD(object):
                 #     },
                 # )
 
-                break
-
             try:
                 kwargs["ContinuationToken"] = resp["NextContinuationToken"]
             except KeyError:
