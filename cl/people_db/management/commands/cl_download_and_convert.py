@@ -28,7 +28,6 @@ prefix = "financial-disclosures"
 
 class FD(object):
     def __init__(self):
-        # self.download_urls = []
         self.judge_info = []
 
     def sorted_list_of_images(self, download_urls, download_list):
