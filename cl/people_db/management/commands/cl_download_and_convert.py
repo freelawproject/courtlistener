@@ -30,7 +30,6 @@ class FD(object):
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
-        self.download_list = []
         self.download_urls = []
         self.judge_info = []
 
