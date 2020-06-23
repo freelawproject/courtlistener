@@ -114,7 +114,7 @@ FUNDRAISING_MODE = False
 AWS_ACCESS_KEY_ID = ''
 AWS_SECRET_ACCESS_KEY = ''
 
-AWS_LAMBDA_PROXY_URL = 'https://3xuza7beb3.execute-api.us-west-2.amazonaws.com/v1/get'
+AWS_LAMBDA_PROXY_URL = 'https://xxx.execute-api.us-west-2.amazonaws.com/v1/get'
 
 # Development credentials available upon request
 
