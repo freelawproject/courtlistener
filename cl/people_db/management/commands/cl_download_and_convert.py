@@ -117,6 +117,7 @@ class FD(object):
                     self.grab_and_split_image()
 
     def iterate_over_aws(self):
+        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
         kwargs = {"Bucket": bucket, "Prefix": prefix}
         download_list = []
         while True:
