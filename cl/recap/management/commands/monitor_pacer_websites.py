@@ -25,7 +25,6 @@ def check_and_log_url(session, url, timeout=5):
     return session.get(url, timeout=timeout, verify=False)
 
 
-@retry(requests.RequestException)
 def check_if_global_outage(session, url):
     """Use our lambda proxy to see if it's actually down for me or if it's
     down for everybody
