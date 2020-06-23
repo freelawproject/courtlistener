@@ -12,7 +12,7 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.search.models import Court
 
 
-@retry(requests.RequestException)
+@retry(requests.RequestException, tries=2, backoff=1)
 def check_and_log_url(session, url, timeout=5):
     """Check if a URL is accessible by sending it a HEAD request
 
