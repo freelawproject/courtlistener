@@ -215,18 +215,19 @@ def process_docket_data(d, filepath, report_type):
         add_claims_to_docket,
     )
 
+    court_id = map_cl_to_pacer_id(d.court_id)
     if report_type == UPLOAD_TYPE.DOCKET:
-        report = DocketReport(map_cl_to_pacer_id(d.court_id))
+        report = DocketReport(court_id)
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
-        report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+        report = DocketHistoryReport(court_id)
     elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET:
-        report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
+        report = AppellateDocketReport(court_id)
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
-        report = InternetArchive()
+        report = InternetArchive(court_id)
     elif report_type == UPLOAD_TYPE.CASE_REPORT_PAGE:
-        report = CaseQuery(map_cl_to_pacer_id(d.court_id))
+        report = CaseQuery(court_id)
     elif report_type == UPLOAD_TYPE.CLAIMS_REGISTER:
-        report = ClaimsRegister(map_cl_to_pacer_id(d.court_id))
+        report = ClaimsRegister(court_id)
     else:
         raise NotImplementedError(
             "The report type with id '%s' is not yet "
