@@ -30,7 +30,7 @@ class FD(object):
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
-        self.download_urls = []
+        # self.download_urls = []
         self.judge_info = []
 
     def sorted_list_of_images(self, download_urls, download_list):
