@@ -101,7 +101,7 @@ class FD(object):
 
         logger.info("Converted file: %s" % filepath)
 
-    def create_pdf(self, download_list):
+    def create_pdf(self, download_urls, download_list):
         pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
         pdf_path = os.path.join(
             settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
@@ -109,11 +109,11 @@ class FD(object):
         if os.path.exists(pdf_path):
             logger.info("Already converted: %s" % pdf_path)
         else:
-            if len(self.download_urls) > 1:
-                self.sorted_list_of_images(download_list)
+            if len(download_urls) > 1:
+                self.sorted_list_of_images(download_urls, download_list)
             else:
-                if not self.download_urls[0].endswith("pdf"):
-                    self.grab_and_split_image(download_list)
+                if not download_urls[0].endswith("pdf"):
+                    self.grab_and_split_image(download_urls, download_list)
 
     def iterate_over_aws(self):
         s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
