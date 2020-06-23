@@ -76,7 +76,7 @@ class FD(object):
         for link in download_urls:
             img = Image.open(requests.get(link, stream=True).raw)
             xlist.append(img)
-        self.assemble_pdf(xlist, download_list)
+        assemble_pdf(xlist, download_list)
 
     def grab_and_split_image(self, download_urls, download_list):
         img = Image.open(requests.get(download_urls[0], stream=True).raw)
@@ -89,47 +89,7 @@ class FD(object):
             )
             xlist.append(image)
             i += 1
-        self.assemble_pdf(xlist, download_list)
-
-    def assemble_pdf(self, xlist, download_list):
-        filename = os.path.basename(download_list[-1]) + ".pdf"
-        assetdir = os.path.join(settings.MEDIA_ROOT, "financial-disclosures")
-        mkdir_p(assetdir)
-        filepath = os.path.join(assetdir, filename)
-        im = xlist.pop(0)
-        im.save(
-            filepath,
-            "PDF",
-            resolution=100.0,
-            save_all=True,
-            append_images=xlist,
-        )
-
-        lastpage = xlist[-1]
-        content = get_judge_info_ocr(lastpage, (0, 350, 700, 400))
-        fullname = clean_judge_name(content)
-
-        logger.info("Full name extracted by OCR: %s" % fullname)
-
-        title = get_judge_info_ocr(im, (41, 196, 195, 215))
-        logger.info("Title extracted by OCR: %s", title)
-
-        court = get_judge_info_ocr(im, (345, 130, 500, 145))
-        logger.info("Court extracted by OCR: %s", court)
-
-        location = get_judge_info_ocr(im, (45, 289, 185, 300))
-        logger.info("Location extracted by OCR: %s", location)
-
-        self.judge_info.append(
-            {
-                "fullname": fullname,
-                "title": title,
-                "court": court,
-                "location": location,
-            }
-        )
-
-        logger.info("Converted file: %s" % filepath)
+        assemble_pdf(xlist, download_list)
 
     def create_pdf(self, download_urls, download_list):
         pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
