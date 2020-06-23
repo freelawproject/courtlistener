@@ -16,7 +16,7 @@ from cl.scrapers.tasks import extract_by_ocr
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
 from django.conf import settings
-from cl.people_db.models import FinancialDisclosure
+from cl.people_db.models import FinancialDisclosure, Person, Position
 
 bucket = "com-courtlistener-storage"
 prefix = "financial-disclosures"
