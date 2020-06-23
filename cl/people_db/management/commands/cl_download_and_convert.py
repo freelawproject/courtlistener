@@ -324,7 +324,6 @@ def add_file_to_db(item):
 
 
 def download_new_disclosures(options):
-    new_disclosures = FD()
     iterate_over_aws()
 
 
