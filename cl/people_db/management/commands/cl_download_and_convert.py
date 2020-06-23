@@ -48,8 +48,8 @@ class FD(object):
             xlist.append(img)
         self.assemble_pdf(xlist, download_list)
 
-    def grab_and_split_image(self, download_list):
-        img = Image.open(requests.get(self.download_urls[0], stream=True).raw)
+    def grab_and_split_image(self, download_urls, download_list):
+        img = Image.open(requests.get(download_urls[0], stream=True).raw)
         width, height = img.size
         xlist = []
         i, page_width, page_height = 0, width, (1046 * (width / 792))
