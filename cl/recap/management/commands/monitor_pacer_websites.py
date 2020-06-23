@@ -36,7 +36,6 @@ def check_if_global_outage(session, url):
     """
     api_url = settings.AWS_LAMBDA_PROXY_URL
     response = session.get(api_url, params={"url": url}, timeout=20)
-    response.raise_for_status()
     if response.status_code != HTTP_200_OK:
         # Something went wrong with our request
         print(response.json())
@@ -71,6 +70,9 @@ def iterate_and_log_courts(courts):
             try:
                 proxy_response = check_if_global_outage(session, url)
             except requests.RequestException as e:
+                logger.error("Problem hitting proxy: %s", e)
+                continue
+            else:
                 j = proxy_response.json()
                 if j["status_code"] is not None:
                     # Something went wrong locally but not globally. We need
@@ -82,6 +84,13 @@ def iterate_and_log_courts(courts):
                         (now() - t1).seconds,
                         court.pk,
                         j["status_code"],
+                    )
+                else:
+                    logger.info(
+                        "After %s seconds, %s's PACER website is down for us "
+                        "and our proxy. OK.",
+                        (now() - t1).seconds,
+                        court.pk,
                     )
         else:
             duration = (now() - t1).seconds
