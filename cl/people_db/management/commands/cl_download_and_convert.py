@@ -56,9 +56,6 @@ def assemble_pdf(xlist, download_list):
 
 
 class FD(object):
-    def __init__(self):
-        self.judge_info = []
-
     def sorted_list_of_images(self, download_urls, download_list):
         key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
 
