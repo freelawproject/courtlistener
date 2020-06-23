@@ -33,17 +33,17 @@ class FD(object):
         self.download_urls = []
         self.judge_info = []
 
-    def sorted_list_of_images(self, download_list):
+    def sorted_list_of_images(self, download_urls, download_list):
         key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
 
         def key(item):
             m = key_pat.match(item)
             return int(m.group(2))
 
-        self.download_urls.sort(key=key)
+        download_urls.sort(key=key)
 
         xlist = []
-        for link in self.download_urls:
+        for link in download_urls:
             img = Image.open(requests.get(link, stream=True).raw)
             xlist.append(img)
         self.assemble_pdf(xlist, download_list)
