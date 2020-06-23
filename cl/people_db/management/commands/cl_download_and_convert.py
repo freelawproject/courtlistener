@@ -121,7 +121,7 @@ class FD(object):
         kwargs = {"Bucket": bucket, "Prefix": prefix}
         download_list = []
         while True:
-            resp = self.s3.list_objects_v2(**kwargs)
+            resp = s3.list_objects_v2(**kwargs)
 
             for obj in resp["Contents"]:
                 key = obj["Key"]
@@ -150,7 +150,7 @@ class FD(object):
                     #     xkey = key.split("Page")[0]
                     xkey = key.split("_Page")[0]
                     bundle_query = {"Bucket": bucket, "Prefix": xkey}
-                    second_response = self.s3.list_objects_v2(**bundle_query)
+                    second_response = s3.list_objects_v2(**bundle_query)
                     for obj in second_response["Contents"]:
                         key = obj["Key"]
                         if "Thumbs.db" not in key:
