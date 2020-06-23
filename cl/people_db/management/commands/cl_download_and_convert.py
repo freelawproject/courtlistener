@@ -55,22 +55,23 @@ def assemble_pdf(xlist, download_list):
     logger.info("Converted file: %s" % filepath)
 
 
+def sorted_list_of_images(download_urls, download_list):
+    key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
+
+    def key(item):
+        m = key_pat.match(item)
+        return int(m.group(2))
+
+    download_urls.sort(key=key)
+
+    xlist = []
+    for link in download_urls:
+        img = Image.open(requests.get(link, stream=True).raw)
+        xlist.append(img)
+    assemble_pdf(xlist, download_list)
+
+
 class FD(object):
-    def sorted_list_of_images(self, download_urls, download_list):
-        key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
-
-        def key(item):
-            m = key_pat.match(item)
-            return int(m.group(2))
-
-        download_urls.sort(key=key)
-
-        xlist = []
-        for link in download_urls:
-            img = Image.open(requests.get(link, stream=True).raw)
-            xlist.append(img)
-        assemble_pdf(xlist, download_list)
-
     def grab_and_split_image(self, download_urls, download_list):
         img = Image.open(requests.get(download_urls[0], stream=True).raw)
         width, height = img.size
@@ -93,7 +94,7 @@ class FD(object):
             logger.info("Already converted: %s" % pdf_path)
         else:
             if len(download_urls) > 1:
-                self.sorted_list_of_images(download_urls, download_list)
+                sorted_list_of_images(download_urls, download_list)
             else:
                 if not download_urls[0].endswith("pdf"):
                     self.grab_and_split_image(download_urls, download_list)
