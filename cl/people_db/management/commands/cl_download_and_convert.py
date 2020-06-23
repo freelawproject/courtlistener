@@ -168,10 +168,6 @@ def iterate_over_aws():
             break
 
 
-class FD(object):
-    pass
-
-
 def add_metadata_to_pdf(infilepath, outfilepath, info):
 
     fin = open(infilepath, "rb")
