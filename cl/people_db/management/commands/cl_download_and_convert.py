@@ -228,16 +228,16 @@ def get_page_count_ocr(im):
     page_count_px = float(height) / pixel_height
     im_pg2 = get_nth_page(im, 2)
     im_pgnumber = im_pg2.crop(pgnumber_coords)
-    im_pgnumber.save("pgnum.png")
-    is_extracted, content = extract_by_ocr("pgnum.png")
+    im_pgnumber.save("pgnum.pdf")
+    is_extracted, content = extract_by_ocr("pgnum.pdf")
     pagination = re.search("Page \d+ of \d+", content, flags=re.IGNORECASE)
     try:
         page_count_ocr = pagination.group().split()[3]
     except IndexError:
         page_count_ocr = None
 
-    if os.path.exists("pgnum.png"):
-        os.remove("pgnum.png")
+    if os.path.exists("pgnum.pdf"):
+        os.remove("pgnum.pdf")
     return page_count_ocr, page_count_px
 
 
