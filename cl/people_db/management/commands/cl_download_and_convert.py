@@ -129,12 +129,11 @@ class FD(object):
                     continue
 
                 # Check if we have key, or want to use this key.
-                self.download_urls = []
+                download_urls = []
                 if key.endswith("pdf"):
                     # Judicial Watch PDF
-                    self.download_urls.append(self.parent_url + quote(key))
+                    download_urls.append(self.parent_url + quote(key))
                     xkey = os.path.splitext(key)[0]
-                    self.download_urls.append(self.parent_url + quote(key))
                     download_list.append(xkey)
                     # cd['type'] = "pdf"
                     # cd['urls'] = download_urls
@@ -153,14 +152,12 @@ class FD(object):
                     for obj in second_response["Contents"]:
                         key = obj["Key"]
                         if "Thumbs.db" not in key:
-                            self.download_urls.append(
-                                self.parent_url + quote(key)
-                            )
+                            download_urls.append(self.parent_url + quote(key))
                     download_list.append(xkey)
                 else:
                     # Regular old Large TIFF
                     xkey = os.path.splitext(key)[0]
-                    self.download_urls.append(self.parent_url + quote(key))
+                    download_urls.append(self.parent_url + quote(key))
                     download_list.append(xkey)
 
                 self.create_pdf(download_list)
