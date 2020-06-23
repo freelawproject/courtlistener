@@ -28,9 +28,6 @@ prefix = "financial-disclosures"
 
 class FD(object):
     def __init__(self):
-        self.parent_url = (
-            "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
-        )
         # self.download_urls = []
         self.judge_info = []
 
