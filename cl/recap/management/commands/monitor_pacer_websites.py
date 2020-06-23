@@ -25,16 +25,24 @@ def check_and_log_url(session, url, timeout=5):
     return session.get(url, timeout=timeout, verify=False)
 
 
-def check_if_global_outage(session, url):
+def check_if_global_outage(session, url, timeout=5):
     """Use our lambda proxy to see if it's actually down for me or if it's
     down for everybody
 
     :param session: A requests.Session object
     :param url: A URL to check
+    :param timeout: The amount of time the *proxy* should wait (this function
+    will wait a little longer)
     :return True if unavailable to our proxy, else False.
     """
     api_url = settings.AWS_LAMBDA_PROXY_URL
-    response = session.get(api_url, params={"url": url}, timeout=20)
+    response = session.get(
+        api_url,
+        params={"url": url, "timeout": timeout},
+        # Make this timeout *after* the proxy would, so that we can get errors
+        # from the proxy, not from here.
+        timeout=timeout + 1,
+    )
     if response.status_code != HTTP_200_OK:
         # Something went wrong with our request
         print(response.json())
