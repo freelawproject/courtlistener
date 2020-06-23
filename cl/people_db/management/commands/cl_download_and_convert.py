@@ -231,8 +231,6 @@ def get_page_count_ocr(im):
     except IndexError:
         page_count_ocr = None
 
-    if os.path.exists("pgnum.pdf"):
-        os.remove("pgnum.pdf")
     return page_count_ocr, page_count_px
 
 
