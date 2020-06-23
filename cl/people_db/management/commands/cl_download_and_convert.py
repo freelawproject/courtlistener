@@ -71,20 +71,21 @@ def sorted_list_of_images(download_urls, download_list):
     assemble_pdf(xlist, download_list)
 
 
-class FD(object):
-    def grab_and_split_image(self, download_urls, download_list):
-        img = Image.open(requests.get(download_urls[0], stream=True).raw)
-        width, height = img.size
-        xlist = []
-        i, page_width, page_height = 0, width, (1046 * (width / 792))
-        while i < (height / page_height):
-            image = img.crop(
-                (0, (i * page_height), page_width, (i + 1) * page_height)
-            )
-            xlist.append(image)
-            i += 1
-        assemble_pdf(xlist, download_list)
+def grab_and_split_image(download_urls, download_list):
+    img = Image.open(requests.get(download_urls[0], stream=True).raw)
+    width, height = img.size
+    xlist = []
+    i, page_width, page_height = 0, width, (1046 * (width / 792))
+    while i < (height / page_height):
+        image = img.crop(
+            (0, (i * page_height), page_width, (i + 1) * page_height)
+        )
+        xlist.append(image)
+        i += 1
+    assemble_pdf(xlist, download_list)
 
+
+class FD(object):
     def create_pdf(self, download_urls, download_list):
         pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
         pdf_path = os.path.join(
@@ -97,7 +98,7 @@ class FD(object):
                 sorted_list_of_images(download_urls, download_list)
             else:
                 if not download_urls[0].endswith("pdf"):
-                    self.grab_and_split_image(download_urls, download_list)
+                    grab_and_split_image(download_urls, download_list)
 
     def iterate_over_aws(self):
         s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
