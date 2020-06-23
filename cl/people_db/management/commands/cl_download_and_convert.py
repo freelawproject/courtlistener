@@ -100,73 +100,76 @@ def create_pdf(download_urls, download_list):
                 grab_and_split_image(download_urls, download_list)
 
 
-class FD(object):
-    def iterate_over_aws(self):
-        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        kwargs = {"Bucket": bucket, "Prefix": prefix}
-        download_list = []
-        while True:
-            resp = s3.list_objects_v2(**kwargs)
+def iterate_over_aws():
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    kwargs = {"Bucket": bucket, "Prefix": prefix}
+    download_list = []
+    while True:
+        resp = s3.list_objects_v2(**kwargs)
 
-            for obj in resp["Contents"]:
-                key = obj["Key"]
+        for obj in resp["Contents"]:
+            key = obj["Key"]
 
-                if "Thumbs.db" in key:
+            if "Thumbs.db" in key:
+                continue
+
+            # Check if we have key, or want to use this key.
+            download_urls = []
+            if key.endswith("pdf"):
+                # Judicial Watch PDF
+                download_urls.append(parent_url + quote(key))
+                xkey = os.path.splitext(key)[0]
+                download_list.append(xkey)
+                # cd['type'] = "pdf"
+                # cd['urls'] = download_urls
+
+            elif "Page_" in key:
+                # Older Pre-split TIFFs
+                if key.split("Page")[0] in download_list:
                     continue
+                # if "2014/A-F/Collings-RB" in key:
+                #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
+                # else:
+                #     xkey = key.split("Page")[0]
+                xkey = key.split("_Page")[0]
+                bundle_query = {"Bucket": bucket, "Prefix": xkey}
+                second_response = s3.list_objects_v2(**bundle_query)
+                for obj in second_response["Contents"]:
+                    key = obj["Key"]
+                    if "Thumbs.db" not in key:
+                        download_urls.append(parent_url + quote(key))
+                download_list.append(xkey)
+            else:
+                # Regular old Large TIFF
+                xkey = os.path.splitext(key)[0]
+                download_urls.append(parent_url + quote(key))
+                download_list.append(xkey)
 
-                # Check if we have key, or want to use this key.
-                download_urls = []
-                if key.endswith("pdf"):
-                    # Judicial Watch PDF
-                    download_urls.append(parent_url + quote(key))
-                    xkey = os.path.splitext(key)[0]
-                    download_list.append(xkey)
-                    # cd['type'] = "pdf"
-                    # cd['urls'] = download_urls
+            create_pdf(download_urls, download_list)
 
-                elif "Page_" in key:
-                    # Older Pre-split TIFFs
-                    if key.split("Page")[0] in download_list:
-                        continue
-                    # if "2014/A-F/Collings-RB" in key:
-                    #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
-                    # else:
-                    #     xkey = key.split("Page")[0]
-                    xkey = key.split("_Page")[0]
-                    bundle_query = {"Bucket": bucket, "Prefix": xkey}
-                    second_response = s3.list_objects_v2(**bundle_query)
-                    for obj in second_response["Contents"]:
-                        key = obj["Key"]
-                        if "Thumbs.db" not in key:
-                            download_urls.append(parent_url + quote(key))
-                    download_list.append(xkey)
-                else:
-                    # Regular old Large TIFF
-                    xkey = os.path.splitext(key)[0]
-                    download_urls.append(parent_url + quote(key))
-                    download_list.append(xkey)
+            # TODO: grab the judge names, locations
+            # TODO: OCR signature page to get a better name
+            # TODO: add metadata into the PDF here
 
-                create_pdf(download_urls, download_list)
+            # add_metadata_to_pdf(
+            #     infilepath,
+            #     outfilepath,
+            #     {
+            #         "/fullname": fullname,
+            #         "/title": title,
+            #         "/court": court,
+            #         "/loc": location,
+            #     },
+            # )
 
-                # TODO: grab the judge names, locations
-                # TODO: OCR signature page to get a better name
-                # TODO: add metadata into the PDF here
+        try:
+            kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+        except KeyError:
+            break
 
-                # add_metadata_to_pdf(
-                #     infilepath,
-                #     outfilepath,
-                #     {
-                #         "/fullname": fullname,
-                #         "/title": title,
-                #         "/court": court,
-                #         "/loc": location,
-                #     },
-                # )
 
-            try:
-                kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-            except KeyError:
-                break
+class FD(object):
+    pass
 
 
 def add_metadata_to_pdf(infilepath, outfilepath, info):
@@ -322,7 +325,7 @@ def add_file_to_db(item):
 
 def download_new_disclosures(options):
     new_disclosures = FD()
-    new_disclosures.iterate_over_aws()
+    iterate_over_aws()
 
 
 def add_judge_to_disclosure(options):
