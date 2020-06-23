@@ -221,8 +221,10 @@ def get_page_count_ocr(im):
     page_count_px = float(height) / pixel_height
     im_pg2 = get_nth_page(im, 2)
     im_pgnumber = im_pg2.crop(pgnumber_coords)
-    im_pgnumber.save("pgnum.pdf")
-    is_extracted, content = extract_by_ocr("pgnum.pdf")
+    with NamedTemporaryFile(prefix="pgnum_", suffix=".pdf") as tmp:
+        im_pgnumber.save(tmp.name)
+        is_extracted, content = extract_by_ocr(tmp.name)
+
     pagination = re.search("Page \d+ of \d+", content, flags=re.IGNORECASE)
     try:
         page_count_ocr = pagination.group().split()[3]
