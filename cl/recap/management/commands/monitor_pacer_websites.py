@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import requests
+from django.conf import settings
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK
 
@@ -24,6 +25,26 @@ def check_and_log_url(session, url, timeout=5):
     return session.get(url, timeout=timeout, verify=False)
 
 
+@retry(requests.RequestException)
+def check_if_global_outage(session, url):
+    """Use our lambda proxy to see if it's actually down for me or if it's
+    down for everybody
+
+    :param session: A requests.Session object
+    :param url: A URL to check
+    :return True if unavailable to our proxy, else False.
+    """
+    api_url = settings.AWS_LAMBDA_PROXY_URL
+    response = session.get(api_url, params={"url": url}, timeout=20)
+    response.raise_for_status()
+    if response.status_code != HTTP_200_OK:
+        # Something went wrong with our request
+        print(response.json())
+        raise requests.RequestException("Didn't use proxy API correctly.")
+
+    return response
+
+
 def make_simple_url(court):
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
@@ -40,12 +61,28 @@ def iterate_and_log_courts(courts):
         try:
             response = check_and_log_url(session, url)
         except requests.RequestException as e:
-            logger.error(
-                "After %s seconds, failed to access URL %s with exception %s.",
+            # Didn't get it from our server, but what about from the cloud
+            logger.info(
+                "After %s seconds, didn't get URL '%s' from our server, "
+                "trying globally...",
                 (now() - t1).seconds,
                 url,
-                e,
             )
+            try:
+                proxy_response = check_if_global_outage(session, url)
+            except requests.RequestException as e:
+                j = proxy_response.json()
+                if j["status_code"] is not None:
+                    # Something went wrong locally but not globally. We need
+                    # do do something about this.
+                    logger.error(
+                        "After %s seconds, failed to access %s's PACER "
+                        "website from our server, but got it via our proxy "
+                        "with status code: %s.",
+                        (now() - t1).seconds,
+                        court.pk,
+                        j["status_code"],
+                    )
         else:
             duration = (now() - t1).seconds
             if response.status_code == HTTP_200_OK:
