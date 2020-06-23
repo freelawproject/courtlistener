@@ -28,7 +28,6 @@ prefix = "financial-disclosures"
 class FD(object):
     def __init__(self):
         self.s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        self.kwargs = {"Bucket": bucket, "Prefix": prefix}
         self.parent_url = (
             "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
         )
@@ -119,6 +118,7 @@ class FD(object):
                     self.grab_and_split_image()
 
     def iterate_over_aws(self):
+        kwargs = {"Bucket": bucket, "Prefix": prefix}
         download_list = []
         while True:
             resp = self.s3.list_objects_v2(**self.kwargs)
