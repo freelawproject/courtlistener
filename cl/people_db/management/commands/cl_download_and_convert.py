@@ -160,7 +160,7 @@ class FD(object):
                     download_urls.append(self.parent_url + quote(key))
                     download_list.append(xkey)
 
-                self.create_pdf(download_list)
+                self.create_pdf(download_urls, download_list)
 
                 # TODO: grab the judge names, locations
                 # TODO: OCR signature page to get a better name
