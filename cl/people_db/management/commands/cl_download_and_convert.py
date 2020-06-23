@@ -85,21 +85,22 @@ def grab_and_split_image(download_urls, download_list):
     assemble_pdf(xlist, download_list)
 
 
-class FD(object):
-    def create_pdf(self, download_urls, download_list):
-        pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
-        pdf_path = os.path.join(
-            settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
-        )
-        if os.path.exists(pdf_path):
-            logger.info("Already converted: %s" % pdf_path)
+def create_pdf(download_urls, download_list):
+    pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
+    pdf_path = os.path.join(
+        settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
+    )
+    if os.path.exists(pdf_path):
+        logger.info("Already converted: %s" % pdf_path)
+    else:
+        if len(download_urls) > 1:
+            sorted_list_of_images(download_urls, download_list)
         else:
-            if len(download_urls) > 1:
-                sorted_list_of_images(download_urls, download_list)
-            else:
-                if not download_urls[0].endswith("pdf"):
-                    grab_and_split_image(download_urls, download_list)
+            if not download_urls[0].endswith("pdf"):
+                grab_and_split_image(download_urls, download_list)
 
+
+class FD(object):
     def iterate_over_aws(self):
         s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
         kwargs = {"Bucket": bucket, "Prefix": prefix}
@@ -145,7 +146,7 @@ class FD(object):
                     download_urls.append(parent_url + quote(key))
                     download_list.append(xkey)
 
-                self.create_pdf(download_urls, download_list)
+                create_pdf(download_urls, download_list)
 
                 # TODO: grab the judge names, locations
                 # TODO: OCR signature page to get a better name
