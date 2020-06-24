@@ -101,12 +101,6 @@ def get_and_save_free_document_reports(options):
         .values_list("pk", flat=True,)
     )
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
-
-    pacer_session = PacerSession(
-        username=PACER_USERNAME, password=PACER_PASSWORD
-    )
-    pacer_session.login()
-
     today = now()
     for pacer_court_id in pacer_court_ids:
         while True:
@@ -121,10 +115,7 @@ def get_and_save_free_document_reports(options):
             mark_court_in_progress(pacer_court_id, next_end_d)
             try:
                 status = get_and_save_free_document_report(
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
-                    pacer_session.cookies,
+                    pacer_court_id, next_start_d, next_end_d,
                 )
             except RequestException:
                 logger.error(
@@ -205,14 +196,9 @@ def get_pdfs(options):
     completed = 0
     for row in rows.iterator():
         throttle.maybe_wait()
-        if completed % 30000 == 0:
-            pacer_session = PacerSession(
-                username=PACER_USERNAME, password=PACER_PASSWORD
-            )
-            pacer_session.login()
         c = chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(pacer_session.cookies, row.pk).set(queue=q),
+            get_and_process_pdf.s(row.pk).set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
         if index:

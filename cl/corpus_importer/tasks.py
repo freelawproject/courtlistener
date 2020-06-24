@@ -27,7 +27,7 @@ from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
-from juriscraper.lib.exceptions import ParsingException
+from juriscraper.lib.exceptions import ParsingException, PacerLoginException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
@@ -60,7 +60,10 @@ from cl.lib.pacer import (
     map_cl_to_pacer_id,
     get_first_missing_de_date,
 )
-from cl.lib.pacer_session import get_pacer_cookie_from_cache
+from cl.lib.pacer_session import (
+    get_pacer_cookie_from_cache,
+    get_or_cache_pacer_cookies,
+)
 from cl.lib.recap_utils import (
     get_document_filename,
     get_bucket_name,
@@ -270,45 +273,39 @@ def download_recap_item(self, url, filename, clobber=False):
 
 
 @app.task(bind=True, max_retries=2, soft_time_limit=240)
-def get_and_save_free_document_report(self, court_id, start, end, cookies):
+def get_and_save_free_document_report(self, court_id, start, end):
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
     :return: None
     """
-    s = PacerSession(
-        cookies=cookies,
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
+    s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(court_id, s)
+    msg = None
     try:
         report.query(start, end, sort="case_number")
     except (RequestException, ReadTimeoutError) as exc:
-        msg = "Unable to get free document report results from %s (%s to %s)."
-        if self.request.retries == self.max_retries:
-            logger.error(msg, court_id, start, end)
-            return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(msg + " Trying again.", court_id, start, end)
-        raise self.retry(exc=exc, countdown=5)
+        msg = "Unable to get free document report results at %s (%s to %s)."
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs at %s (%s to %s)."
     except ParsingException as exc:
         msg = "Didn't get nonce at %s (%s to %s)."
+    except SoftTimeLimitExceeded as exc:
+        msg = "Soft time limit exceeded at %s (%s to %s)."
+
+    if msg is not None:
         if self.request.retries == self.max_retries:
             logger.error(msg, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(msg + " Trying again.", court_id, start, end)
-        raise self.retry(exc=exc, countdown=5)
-    except SoftTimeLimitExceeded as exc:
-        msg = "Soft time limit exceeded at %s. %s retries remain."
-        if self.request.retries == self.max_retries:
-            logger.error(msg, court_id, 0)
-            return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(msg, court_id, (self.max_retries - self.request.retries))
+        logger.info(msg + " Retrying.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -475,7 +472,7 @@ def process_free_opinion_result(self, row_pk, cnt):
     interval_step=5,
     ignore_result=True,
 )
-def get_and_process_pdf(self, data, cookies, row_pk):
+def get_and_process_pdf(self, data, row_pk):
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param data: The returned results from the previous task, takes the form
@@ -483,18 +480,29 @@ def get_and_process_pdf(self, data, cookies, row_pk):
         {'result': <PACERFreeDocumentRow> object,
          'rd_pk': rd.pk,
          'pacer_court_id': result.court_id}
-
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
     :param row_pk: The PACERFreeDocumentRow operate on
     """
     if data is None:
         return
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
-    r = download_pacer_pdf_by_rd(
-        rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
     )
+    try:
+        r = download_pacer_pdf_by_rd(
+            rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+        )
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs."
+        if self.request.retries == self.max_retries:
+            logger.warning(msg)
+            self.request.chain = None
+            return
+        logger.info(msg + " Retrying.")
+        raise self.retry(exc=exc)
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
         self,
