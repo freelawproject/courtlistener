@@ -289,19 +289,12 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
     report = FreeOpinionReport(court_id, s)
     try:
         report.query(start, end, sort="case_number")
-    except (
-        ConnectionError,
-        ChunkedEncodingError,
-        ReadTimeoutError,
-        ReadTimeout,
-        ConnectTimeout,
-    ) as exc:
-        logger.warning(
-            "Unable to get free document report results from %s "
-            "(%s to %s). Trying again." % (court_id, start, end)
-        )
+    except (RequestException, ReadTimeoutError) as exc:
+        msg = "Unable to get free document report results from %s (%s to %s)."
         if self.request.retries == self.max_retries:
+            logger.error(msg, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
+        logger.info(msg + " Trying again.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
     except ParsingException as exc:
         msg = "Didn't get nonce at %s (%s to %s)."
@@ -311,13 +304,11 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
         logger.info(msg + " Trying again.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
     except SoftTimeLimitExceeded as exc:
-        logger.warning(
-            "Soft time limit exceeded at %s. %s retries remain.",
-            court_id,
-            (self.max_retries - self.request.retries),
-        )
+        msg = "Soft time limit exceeded at %s. %s retries remain."
         if self.request.retries == self.max_retries:
+            logger.error(msg, court_id, 0)
             return PACERFreeDocumentLog.SCRAPE_FAILED
+        logger.info(msg, court_id, (self.max_retries - self.request.retries))
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -1031,18 +1022,17 @@ def get_docket_by_pacer_case_id(
     logger.info("Querying docket report %s", logging_id)
     try:
         report.query(pacer_case_id, **kwargs)
-    except ConnectionError as exc:
-        logger.warning(
-            "Ran into ConnectionError while getting docket "
-            "for %s. Retrying.",
-            logging_id,
-        )
+    except (RequestException, ReadTimeoutError) as exc:
         if self.request.retries == self.max_retries:
             logger.error(
                 "Max retries exceeded for %s. Aborting chain.", logging_id
             )
             self.request.chain = None
             return None
+        logger.info(
+            "Ran into networking error while getting docket for %s. Retrying.",
+            logging_id,
+        )
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1262,21 +1252,20 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
         report.query(d.pacer_case_id, d.docket_number)
-    except ConnectionError as exc:
-        logger.warning(
-            "Ran into ConnectionError while getting claims "
-            "report for %s. Retrying.",
-            logging_id,
-        )
+    except (RequestException, ReadTimeoutError) as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
             logger.error(
-                "Max retries completed for %s. Unable to get "
-                "claims data. Aborting task, but allowing next task "
-                "to run.",
+                "Max retries completed for %s. Unable to get claims data. "
+                "Aborting task, but allowing next task to run.",
                 logging_id,
             )
             return data
+        logger.info(
+            "Ran into networking error while getting claims report for %s. "
+            "Retrying.",
+            logging_id,
+        )
         raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1369,13 +1358,12 @@ def download_pacer_pdf_by_rd(
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
-            logger.warning(
-                "Ran into HTTPError while getting PDF: %s. Retrying.",
-                exc.response.status_code,
-            )
+            msg = "Ran into HTTPError while getting PDF: %s."
             if self.request.retries == self.max_retries:
+                logger.error(msg, exc.response.status_code)
                 self.request.chain = None
                 return
+            logger.info(msg + " Retrying.", exc.response.status_code)
             raise self.retry(exc)
         else:
             logger.error(
@@ -1641,41 +1629,29 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
             )
         else:
             report.query(d.pacer_case_id, rd.document_number)
-    except (
-        ConnectTimeout,
-        ConnectionError,
-        ReadTimeout,
-        ReadTimeoutError,
-        ChunkedEncodingError,
-    ) as exc:
-        logger.warning("Unable to get PDF for %s" % rd)
+    except (RequestException, ReadTimeoutError) as exc:
+        msg = "Unable to get PDF for %s"
         if last_try:
+            logger.error(msg, rd)
             return
-        else:
-            raise self.retry(exc=exc)
+        logger.info(msg + " Retrying.", rd)
+        raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.response.status_code in [
+        status_code = exc.response.status_code
+        if status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
+            msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(
-                    "Ran into repeated HTTPErrors. No more retries. "
-                    "Aborting."
-                )
+                logger.error(msg + " Aborting.", status_code)
                 return
-            else:
-                logger.warning(
-                    "Ran into HTTPError: %s. Retrying."
-                    % exc.response.status_code
-                )
-                raise self.retry(exc)
+
+            logger.info(msg + " Retrying", status_code)
+            raise self.retry(exc)
         else:
-            msg = (
-                "Ran into unknown HTTPError. %s. Aborting."
-                % exc.response.status_code
-            )
-            logger.error(msg)
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, status_code)
             return
     try:
         pacer_doc_id = report.data
