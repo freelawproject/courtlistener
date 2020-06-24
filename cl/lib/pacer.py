@@ -493,7 +493,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
-        logger.warn(
+        logger.warning(
             "Unable to parse address (RepeatedLabelError): %s"
             % ", ".join(c.split("\n"))
         )
@@ -503,7 +503,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     address_info.pop("NotAddress", None)
 
     if any([address_type == "Ambiguous", "CountryName" in address_info]):
-        logger.warn(
+        logger.warning(
             "Unable to parse address (Ambiguous address type): %s"
             % ", ".join(c.split("\n"))
         )

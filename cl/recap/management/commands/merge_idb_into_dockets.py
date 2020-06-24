@@ -113,7 +113,7 @@ class Command(VerboseCommand, CommandUtils):
                     args=(d.pk, idb_row.pk), queue=q
                 )
             elif count > 1:
-                logger.warn(
+                logger.warning(
                     "%s: Unable to merge. Got %s dockets for row: %s",
                     i,
                     count,

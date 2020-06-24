@@ -48,7 +48,7 @@ def get_next_date_range(court_id, span=7):
             .latest("date_queried")
         )
     except PACERFreeDocumentLog.DoesNotExist:
-        logger.warn("FAILED ON: %s" % court_id)
+        logger.warning("FAILED ON: %s" % court_id)
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:

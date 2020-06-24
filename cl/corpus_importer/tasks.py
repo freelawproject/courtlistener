@@ -1564,7 +1564,7 @@ def get_pacer_doc_by_rd_and_description(
             return
 
     if not att_found.get("pacer_doc_id"):
-        logger.warn("No pacer_doc_id for document (is it sealed?)")
+        logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
         return
 

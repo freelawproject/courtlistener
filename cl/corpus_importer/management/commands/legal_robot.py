@@ -58,7 +58,7 @@ def get_documents(options):
         try:
             rd = RECAPDocument.objects.get(pk=result["id"])
         except RECAPDocument.DoesNotExist:
-            logger.warn(
+            logger.warning(
                 "Unable to find RECAP Document with id %s", result["id"]
             )
             continue

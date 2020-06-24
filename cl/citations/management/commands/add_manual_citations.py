@@ -44,7 +44,7 @@ def process_citations(data, debug):
                 % (msg, cite.pk, cite, cite.citing_opinion, cite.cited_opinion)
             )
         except Opinion.DoesNotExist:
-            logger.warn(
+            logger.warning(
                 "  Unable to create citation. Underlying Opinion doesn't "
                 "exist."
             )

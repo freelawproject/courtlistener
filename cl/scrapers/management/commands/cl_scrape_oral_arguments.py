@@ -118,7 +118,7 @@ class Command(cl_scrape_opinions.Command):
                     method=site.method,
                 )
                 if msg:
-                    logger.warn(msg)
+                    logger.warning(msg)
                     ErrorLog(
                         log_level="WARNING", court=court, message=msg
                     ).save()
