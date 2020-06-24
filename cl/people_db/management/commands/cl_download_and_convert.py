@@ -96,8 +96,7 @@ def create_pdf(download_urls, download_list):
         if len(download_urls) > 1:
             sorted_list_of_images(download_urls, download_list)
         else:
-            if not download_urls[0].endswith("pdf"):
-                grab_and_split_image(download_urls, download_list)
+            grab_and_split_image(download_urls, download_list)
 
 
 def iterate_over_aws():
