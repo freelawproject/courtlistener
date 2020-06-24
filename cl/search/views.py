@@ -64,7 +64,10 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
         if paged_results is not None:
             return paged_results
 
-    page = int(get_params.get("page", 1))
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
     check_pagination_depth(page)
 
     if cd["type"] == SEARCH_TYPES.RECAP:
