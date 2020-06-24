@@ -40,13 +40,7 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
     ClaimsRegister,
 )
-from requests.exceptions import (
-    ChunkedEncodingError,
-    HTTPError,
-    ConnectionError,
-    ReadTimeout,
-    ConnectTimeout,
-)
+from requests.exceptions import HTTPError, RequestException
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
@@ -308,6 +302,13 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
         )
         if self.request.retries == self.max_retries:
             return PACERFreeDocumentLog.SCRAPE_FAILED
+        raise self.retry(exc=exc, countdown=5)
+    except ParsingException as exc:
+        msg = "Didn't get nonce at %s (%s to %s)."
+        if self.request.retries == self.max_retries:
+            logger.error(msg, court_id, start, end)
+            return PACERFreeDocumentLog.SCRAPE_FAILED
+        logger.info(msg + " Trying again.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
     except SoftTimeLimitExceeded as exc:
         logger.warning(
