@@ -713,7 +713,10 @@ def mark_court_done_on_date(status, court_id, d):
 
 @app.task(ignore_result=True)
 def delete_pacer_row(data, pk):
-    PACERFreeDocumentRow.objects.get(pk=pk).delete()
+    try:
+        PACERFreeDocumentRow.objects.get(pk=pk).delete()
+    except PACERFreeDocumentRow.DoesNotExist:
+        pass
     return [data["rd_pk"]]
 
 
