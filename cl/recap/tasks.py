@@ -996,21 +996,18 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
-    fq.status = PROCESSING_STATUS.IN_PROGRESS
-    fq.save()
+    mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     if rd.is_available:
-        fq.status = PROCESSING_STATUS.SUCCESSFUL
-        fq.message = "PDF already marked as 'is_available'. Doing nothing."
-        fq.save()
+        msg = "PDF already marked as 'is_available'. Doing nothing."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
         self.request.chain = None
         return
 
     cookies = get_pacer_cookie_from_cache(fq.user_id)
     if not cookies:
-        fq.status = PROCESSING_STATUS.FAILED
-        fq.message = "Unable to find cached cookies. Aborting request."
-        fq.save()
+        msg = "Unable to find cached cookies. Aborting request."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
 
@@ -1020,9 +1017,8 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
             rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
         )
     except (requests.RequestException, HTTPError):
-        fq.status = PROCESSING_STATUS.FAILED
-        fq.message = "Failed to get PDF from network."
-        fq.save()
+        msg = "Failed to get PDF from network."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
 
@@ -1039,9 +1035,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
     )
 
     if success is False:
-        fq.status = PROCESSING_STATUS.FAILED
-        fq.message = msg
-        fq.save()
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
 
@@ -1066,8 +1060,7 @@ def fetch_attachment_page(self, fq_pk):
     :return: None
     """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
-    fq.status = PROCESSING_STATUS.IN_PROGRESS
-    fq.save()
+    mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     rd = fq.recap_document
     if not rd.pacer_doc_id:
@@ -1130,10 +1123,8 @@ def fetch_attachment_page(self, fq_pk):
 @app.task
 def mark_fq_successful(fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
-    fq.status = PROCESSING_STATUS.SUCCESSFUL
-    fq.date_completed = now()
-    fq.message = "Successfully completed fetch and save."
-    fq.save()
+    msg = "Successfully completed fetch and save."
+    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
 
 
 def mark_fq_status(fq, msg, status):
