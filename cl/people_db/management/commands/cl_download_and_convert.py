@@ -97,6 +97,7 @@ def create_pdf(download_urls, download_list):
             sorted_list_of_images(download_urls, download_list)
         else:
             grab_and_split_image(download_urls, download_list)
+    return pdf_path
 
 
 def iterate_over_aws():
@@ -144,7 +145,7 @@ def iterate_over_aws():
                 download_urls.append(parent_url + quote(key))
                 download_list.append(xkey)
 
-            create_pdf(download_urls, download_list)
+            pdf_path = create_pdf(download_urls, download_list)
 
             # TODO: grab the judge names, locations
             # TODO: OCR signature page to get a better name
