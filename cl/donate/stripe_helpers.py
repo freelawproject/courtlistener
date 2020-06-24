@@ -222,7 +222,7 @@ def create_stripe_customer(source, email):
     try:
         return stripe.Customer.create(source=source, email=email)
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.warn("Stripe was unable to create the customer: %s" % e)
+        logger.warning("Stripe was unable to create the customer: %s" % e)
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]

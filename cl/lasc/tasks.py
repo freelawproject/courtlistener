@@ -231,7 +231,7 @@ def add_or_update_case_db(self, case_id):
         else:
             logger.info("LASC case is already up to date: %s", case_id)
     else:
-        logger.warn(
+        logger.warning(
             "Issue adding or updating lasc case with ID '%s' - Too "
             "many cases in system with that ID (%s cases)",
             case_id,
@@ -326,7 +326,7 @@ def add_case_from_filepath(filepath):
     if ds.count() == 0:
         add_case(case_id, case_data, original_data)
     elif ds.count() == 1:
-        logger.warn(
+        logger.warning(
             "LASC case on file system at '%s' is already in the database ",
             filepath,
         )

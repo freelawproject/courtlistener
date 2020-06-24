@@ -59,7 +59,7 @@ def subscribe_to_mailchimp(self, email):
             update_mailchimp(email, "subscribed")
     else:
         j = r.json()
-        logger.warn(
+        logger.warning(
             "Did not subscribe '%s' to mailchimp: '%s: %s'",
             (email, r.status_code, j["title"]),
         )
@@ -98,7 +98,7 @@ def update_mailchimp(self, email, status):
             (status, email),
         )
     else:
-        logger.warn(
+        logger.warning(
             "Did not complete '%s' command on '%s' in mailchimp: '%s: %s'",
             (status, email, r.status_code),
         )

@@ -217,7 +217,7 @@ class Command(VerboseCommand):
                 method=site.method,
             )
             if msg:
-                logger.warn(msg)
+                logger.warning(msg)
                 ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 

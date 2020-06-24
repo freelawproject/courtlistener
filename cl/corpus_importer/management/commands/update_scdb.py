@@ -131,7 +131,7 @@ class Command(VerboseCommand):
                 values_differ = True
 
             if values_differ:
-                logger.warn(
+                logger.warning(
                     "WARNING: Didn't set '{attr}' attribute on obj {obj_id} "
                     "because it already had a value, but the new value "
                     "('{new}') differs from current value ('{current}')".format(
@@ -176,7 +176,7 @@ class Command(VerboseCommand):
                     disambiguate=False,
                 )[0]
             except IndexError:
-                logger.warn(
+                logger.warning(
                     "Unable to parse citation for: %s", scdb_info[scdb_field]
                 )
             else:
