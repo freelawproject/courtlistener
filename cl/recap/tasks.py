@@ -1116,25 +1116,24 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
 
 
 def fetch_docket_by_pacer_case_id(
-    session, court_id, pacer_case_id, docket_pk, **kwargs
+    session, court_id, pacer_case_id, fq,
 ):
     """Download the docket from PACER and merge it into CL
 
     :param session: A PacerSession object to work with
     :param court_id: The CL ID of the court
     :param pacer_case_id: The pacer_case_id of the docket, if known
-    :param docket_pk: The PK of the CL docket
-    :param kwargs: Arguments to pass to the downloader
+    :param fq: The PacerFetchQueue object
     :return: a dict with information about the docket and the new data
     """
     report = DocketReport(map_cl_to_pacer_id(court_id), session)
-    report.query(pacer_case_id, **kwargs)
+    report.query(pacer_case_id, **get_fq_docket_kwargs(fq))
 
     docket_data = report.data
     if not docket_data:
         raise ParsingException
-    if docket_pk:
-        d = Docket.objects.get(pk=docket_pk)
+    if fq.docket_id:
+        d = Docket.objects.get(pk=fq.docket_id)
     else:
         d, count = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
@@ -1218,18 +1217,8 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
-    docket_kwargs = get_fq_docket_kwargs(fq)
-    docket_kwargs.update(
-        {
-            "court_id": court_id,
-            "docket_pk": fq.docket_id,
-            "data": {"pacer_case_id": pacer_case_id,},
-        }
-    )
     try:
-        result = fetch_docket_by_pacer_case_id(
-            s, court_id, pacer_case_id, fq.docket_id, **docket_kwargs
-        )
+        result = fetch_docket_by_pacer_case_id(s, court_id, pacer_case_id, fq,)
     except (requests.RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting pacer_case_id for fq: %s."
         if self.request.retries == self.max_retries:
