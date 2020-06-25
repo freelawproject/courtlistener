@@ -10,24 +10,25 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
+from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import (
     AppellateDocketReport,
-    AttachmentPage,
     DocketHistoryReport,
     DocketReport,
     ClaimsRegister,
+    PacerSession,
+    PossibleCaseNumberApi,
 )
 from requests import HTTPError
+from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.celery import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
-    update_rd_metadata,
-    get_pacer_case_id_and_title,
-    get_docket_by_pacer_case_id,
     get_attachment_page_by_rd,
+    update_rd_metadata,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
@@ -37,31 +38,31 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename
 from cl.recap.mergers import (
-    add_docket_entries,
-    add_parties_and_attorneys,
-    update_docket_appellate_metadata,
-    update_docket_metadata,
-    process_orphan_documents,
-    find_docket_object,
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
+    add_docket_entries,
+    add_parties_and_attorneys,
     add_tags_to_objs,
-    merge_attachment_page_data,
+    find_docket_object,
     get_data_from_att_report,
+    merge_attachment_page_data,
+    merge_pacer_docket_into_cl_docket,
+    process_orphan_documents,
+    update_docket_appellate_metadata,
+    update_docket_metadata,
 )
 from cl.recap.models import (
+    FjcIntegratedDatabase,
+    PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
-    UPLOAD_TYPE,
-    FjcIntegratedDatabase,
-    REQUEST_TYPE,
-    PacerFetchQueue,
     PROCESSING_STATUS,
+    REQUEST_TYPE,
+    UPLOAD_TYPE,
 )
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
-from cl.search.models import Docket, DocketEntry, RECAPDocument, Tag
+from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
-
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -108,53 +109,11 @@ def do_pacer_fetch(fq):
     result = None
     if fq.request_type == REQUEST_TYPE.DOCKET:
         # Request by docket_id
-        court_id = fq.court_id or getattr(fq.docket, "court_id", None)
-        kwargs = {
-            # Universal params
-            "court_id": court_id,
-            "user_pk": fq.user_id,
-            "docket_pk": fq.docket_id,
-            # Scraping params
-            "doc_num_start": fq.de_number_start,
-            "doc_num_end": fq.de_number_end,
-            "date_start": fq.de_date_start,
-            "date_end": fq.de_date_end,
-            "show_parties_and_counsel": fq.show_parties_and_counsel,
-            "show_terminated_parties": fq.show_terminated_parties,
-            "show_list_of_member_cases": fq.show_list_of_member_cases,
-        }
-        if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
-            # We lack the pacer_case_id either on the docket or from the
-            # submission. Look it up.
-            docket_number = fq.docket_number or getattr(
-                fq.docket, "docket_number", None
-            )
-            c = chain(
-                get_pacer_case_id_and_title.si(
-                    pass_through=None,
-                    docket_number=docket_number,
-                    court_id=court_id,
-                    user_pk=fq.user_id,
-                ),
-                get_docket_by_pacer_case_id.s(**kwargs),
-            )
-        else:
-            if fq.docket_id is not None and fq.docket.pacer_case_id:
-                # We have the docket and its pacer_case_id
-                kwargs.update(
-                    {
-                        "data": {"pacer_case_id": fq.docket.pacer_case_id},
-                        "court_id": fq.docket.court_id,
-                    }
-                )
-            elif fq.pacer_case_id:
-                # We lack the docket, but have a pacer_case_id
-                kwargs.update(
-                    {"data": {"pacer_case_id": fq.pacer_case_id},}
-                )
-            c = chain(get_docket_by_pacer_case_id.si(**kwargs))
-        c |= add_or_update_recap_docket.s()
-        c |= mark_fq_successful.si(fq.pk)
+        c = chain(
+            fetch_docket.si(fq.pk),
+            add_or_update_recap_docket.s(),
+            mark_fq_successful.si(fq.pk),
+        )
         result = c.apply_async()
     elif fq.request_type == REQUEST_TYPE.PDF:
         # Request by recap_document_id
@@ -1118,6 +1077,176 @@ def fetch_attachment_page(self, fq_pk):
             raise self.retry(exc=exc)
     msg = "Successfully completed fetch and save."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+
+
+def get_fq_docket_kwargs(fq):
+    """Gather the kwargs for the Juriscraper DocketReport from the fq object
+
+    :param fq: The PacerFetchQueue object
+    :return: A dict of the kwargs we can send to the DocketReport
+    """
+    return {
+        "doc_num_start": fq.de_number_start,
+        "doc_num_end": fq.de_number_end,
+        "date_start": fq.de_date_start,
+        "date_end": fq.de_date_end,
+        "show_parties_and_counsel": fq.show_parties_and_counsel,
+        "show_terminated_parties": fq.show_terminated_parties,
+        "show_list_of_member_cases": fq.show_list_of_member_cases,
+    }
+
+
+def fetch_pacer_case_id_and_title(s, fq, court_id):
+    """Use PACER's hidden API to learn the pacer_case_id of a case
+
+    :param s: A PacerSession object to use
+    :param fq: The PacerFetchQueue object to use
+    :param court_id: The CL ID of the court
+    :return: A dict of the new information or an empty dict if it fails
+    """
+    if (fq.docket_id and not fq.docket.pacer_case_id) or fq.docket_number:
+        # We lack the pacer_case_id either on the docket or from the
+        # submission. Look it up.
+        docket_number = fq.docket_number or getattr(
+            fq.docket, "docket_number", None
+        )
+        report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
+        report.query(docket_number)
+        return report.data()
+    return {}
+
+
+def fetch_docket_by_pacer_case_id(
+    session, court_id, pacer_case_id, docket_pk, **kwargs
+):
+    """Download the docket from PACER and merge it into CL
+
+    :param session: A PacerSession object to work with
+    :param court_id: The CL ID of the court
+    :param pacer_case_id: The pacer_case_id of the docket, if known
+    :param docket_pk: The PK of the CL docket
+    :param kwargs: Arguments to pass to the downloader
+    :return: a dict with information about the docket and the new data
+    """
+    report = DocketReport(map_cl_to_pacer_id(court_id), session)
+    report.query(pacer_case_id, **kwargs)
+
+    docket_data = report.data
+    if not docket_data:
+        raise ParsingException
+    if docket_pk:
+        d = Docket.objects.get(pk=docket_pk)
+    else:
+        d, count = find_docket_object(
+            court_id, pacer_case_id, docket_data["docket_number"]
+        )
+        if count > 1:
+            d = d.earliest("date_created")
+    rds_created, content_updated = merge_pacer_docket_into_cl_docket(
+        d, pacer_case_id, docket_data, report, appellate=False,
+    )
+    return {
+        "docket_pk": d.pk,
+        "content_updated": bool(rds_created or content_updated),
+    }
+
+
+@app.task(
+    bind=True,
+    max_retries=3,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
+def fetch_docket(self, fq_pk):
+    """Fetch a docket from PACER
+
+    This mirrors code elsewhere that gets dockets, but manages status as it
+    goes through the process.
+
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :return: None
+    """
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
+
+    cookies = get_pacer_cookie_from_cache(fq.user_pk)
+    if cookies is None:
+        msg = (
+            "Cookie cache expired before task could run for user: %s"
+            % fq.user_pk
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+
+    court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+    s = PacerSession(cookies=cookies)
+
+    try:
+        result = fetch_pacer_case_id_and_title(s, fq, court_id)
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = "Network error getting pacer_case_id for fq: %s."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting pacer_case_id for fq: %s."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except ParsingException:
+        msg = "Unable to parse pacer_case_id for docket."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    pacer_case_id = fq.docket.pacer_case_id or result.get("pacer_case_id")
+    if not pacer_case_id:
+        msg = "Unable to determine pacer_case_id for docket."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    docket_kwargs = get_fq_docket_kwargs(fq)
+    docket_kwargs.update(
+        {
+            "court_id": court_id,
+            "docket_pk": fq.docket_id,
+            "data": {"pacer_case_id": pacer_case_id,},
+        }
+    )
+    try:
+        result = fetch_docket_by_pacer_case_id(
+            s, court_id, pacer_case_id, fq.docket_id, **docket_kwargs
+        )
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = "Network error getting pacer_case_id for fq: %s."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
+    except ParsingException:
+        msg = "Unable to parse pacer_case_id for docket."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
+    msg = "Successfully got and merged docket. Adding to Solr as final step."
+    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+    return result
 
 
 @app.task
