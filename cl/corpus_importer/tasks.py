@@ -815,18 +815,26 @@ def get_pacer_case_id_and_title(
         cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
+    msg = None
     try:
         report.query(docket_number)
-    except requests.RequestException as exc:
-        logger.warning(
-            "RequestException while running possible case number "
-            "query. Trying again if retries not exceeded: %s.%s",
-            court_id,
-            docket_number,
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = (
+            "Network error while running possible case number query on: "
+            "%s.%s"
         )
+    except PacerLoginException as exc:
+        msg = (
+            "PacerLoginException while running possible case number query on: "
+            "%s.%s"
+        )
+
+    if msg:
         if self.request.retries == self.max_retries:
+            logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
+        logger.info(msg + " Retrying.", court_id, docket_number)
         raise self.retry(exc=exc)
 
     try:
