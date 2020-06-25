@@ -84,13 +84,13 @@ def iterate_and_log_courts(courts):
                 if j["status_code"] is not None:
                     # Something went wrong locally but not globally. We need
                     # do do something about this.
+                    # Use % instead of normal logging parameters, to create
+                    # multiple issues in Sentry, not grouped ones.
                     logger.error(
                         "After %s seconds, failed to access %s's PACER "
                         "website from our server, but got it via our proxy "
-                        "with status code: %s.",
-                        (now() - t1).seconds,
-                        court.pk,
-                        j["status_code"],
+                        "with status code: %s."
+                        % ((now() - t1).seconds, court.pk, j["status_code"],)
                     )
                 else:
                     logger.info(
