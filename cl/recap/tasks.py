@@ -1207,6 +1207,16 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
+    # result can be one of three values:
+    #   None       --> Sealed or missing case
+    #   Empty dict --> Didn't run the pacer_case_id lookup (wasn't needed)
+    #   Full dict  --> Ran the query, got back results
+    if result is None:
+        msg = "Cannot find case by docket number (perhaps it's sealed?)"
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return None
+
     pacer_case_id = getattr(fq.docket, "pacer_case_id", None) or result.get(
         "pacer_case_id"
     )
