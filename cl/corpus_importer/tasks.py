@@ -980,7 +980,6 @@ def get_docket_by_pacer_case_id(
     data,
     court_id,
     cookies=None,
-    user_pk=None,
     docket_pk=None,
     tag_names=None,
     **kwargs
@@ -997,9 +996,6 @@ def get_docket_by_pacer_case_id(
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param user_pk: The PK of a user making the request. This can be provided
-    instead of the cookies parameter. If so, this will get the user's cookies
-    from redis instead of passing them in as an argument.
     :param docket_pk: The PK of the docket to update. Can also be provided in
     the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
@@ -1007,10 +1003,6 @@ def get_docket_by_pacer_case_id(
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
-    if not cookies:
-        # Get cookies from Redis if not provided
-        cookies = get_pacer_cookie_from_cache(user_pk)
-    s = PacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
@@ -1039,6 +1031,8 @@ def get_docket_by_pacer_case_id(
 
     logging_id = "%s.%s" % (court_id, pacer_case_id)
     logger.info("Querying docket report %s", logging_id)
+    s = PacerSession(cookies=cookies)
+    report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id, **kwargs)
     except (RequestException, ReadTimeoutError) as exc:
