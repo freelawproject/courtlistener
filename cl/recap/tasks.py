@@ -1072,9 +1072,8 @@ def fetch_attachment_page(self, fq_pk):
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             return
-        else:
-            mark_fq_status(fq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
-            raise self.retry(exc=exc)
+        mark_fq_status(fq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+        raise self.retry(exc=exc)
     msg = "Successfully completed fetch and save."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
 
