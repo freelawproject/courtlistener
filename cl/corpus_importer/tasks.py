@@ -1005,13 +1005,11 @@ def get_docket_by_pacer_case_id(
         self.request.chain = None
         return
 
+    # Attempt a light docket look up, we'll do better after fetching more data
     pacer_case_id = data.get("pacer_case_id")
-    report = DocketReport(map_cl_to_pacer_id(court_id), s)
-
+    docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = Docket.objects.get(pk=docket_pk)
-    elif data.get("docket_pk") is not None:
-        d = Docket.objects.get(pk=data["docket_pk"])
     else:
         try:
             d = Docket.objects.get(
@@ -1033,16 +1031,12 @@ def get_docket_by_pacer_case_id(
     try:
         report.query(pacer_case_id, **kwargs)
     except (RequestException, ReadTimeoutError) as exc:
+        msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(
-                "Max retries exceeded for %s. Aborting chain.", logging_id
-            )
+            logger.error(msg + " Aborting chain.", logging_id)
             self.request.chain = None
             return None
-        logger.info(
-            "Ran into networking error while getting docket for %s. Retrying.",
-            logging_id,
-        )
+        logger.info(msg + " Retrying.", logging_id)
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
