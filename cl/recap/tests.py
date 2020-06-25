@@ -247,10 +247,10 @@ class RecapUploadsTest(TestCase):
 
 
 @mock.patch(
-    "cl.corpus_importer.tasks.DocketReport", new=fakes.FakeDocketReport,
+    "cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport,
 )
 @mock.patch(
-    "cl.corpus_importer.tasks.PossibleCaseNumberApi",
+    "cl.recap.tasks.PossibleCaseNumberApi",
     new=fakes.FakePossibleCaseNumberApi,
 )
 class RecapDocketFetchApiTest(TestCase):
