@@ -1122,6 +1122,48 @@ def add_tags_to_objs(tag_names, objs):
 
 
 @transaction.atomic
+def merge_pacer_docket_into_cl_docket(
+    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None,
+):
+    # Ensure that we set the case ID. This is needed on dockets that have
+    # matching docket numbers, but that never got PACER data before. This was
+    # previously rare, but since we added the FJC data to the dockets table,
+    # this is now quite common.
+    if not d.pacer_case_id:
+        d.pacer_case_id = pacer_case_id
+
+    d.add_recap_source()
+    update_docket_metadata(d, docket_data)
+    d.save()
+
+    if appellate:
+        d, og_info = update_docket_appellate_metadata(d, docket_data)
+        if og_info is not None:
+            og_info.save()
+            d.originating_court_information = og_info
+
+    tags = add_tags_to_objs(tag_names, [d])
+
+    # Add the HTML to the docket in case we need it someday.
+    upload_type = (
+        UPLOAD_TYPE.APPELLATE_DOCKET if appellate else UPLOAD_TYPE.DOCKET
+    )
+    pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
+    pacer_file.filepath.save(
+        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    rds_created, content_updated = add_docket_entries(
+        d, docket_data["docket_entries"], tags=tags
+    )
+    add_parties_and_attorneys(d, docket_data["parties"])
+    process_orphan_documents(rds_created, d.court_id, d.date_filed)
+    logger.info("Created/updated docket: %s" % d)
+    return rds_created, content_updated
+
+
+@transaction.atomic
 def merge_attachment_page_data(
     court,
     pacer_case_id,

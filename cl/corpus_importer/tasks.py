@@ -72,16 +72,13 @@ from cl.lib.recap_utils import (
 from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
 from cl.recap.mergers import (
-    find_docket_object,
-    update_docket_metadata,
-    update_docket_appellate_metadata,
-    make_recap_sequence_number,
-    add_docket_entries,
-    add_parties_and_attorneys,
-    process_orphan_documents,
     add_claims_to_docket,
     add_bankruptcy_data_to_docket,
     add_tags_to_objs,
+    find_docket_object,
+    make_recap_sequence_number,
+    merge_pacer_docket_into_cl_docket,
+    update_docket_metadata,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
@@ -1055,7 +1052,6 @@ def get_docket_by_pacer_case_id(
         self.request.chain = None
         return
 
-    # Merge the contents into CL.
     if d is None:
         d, count = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
@@ -1063,32 +1059,14 @@ def get_docket_by_pacer_case_id(
         if count > 1:
             d = d.earliest("date_created")
 
-    # Ensure that we set the case ID. This is needed on dockets that have
-    # matching docket numbers, but that never got PACER data before. This was
-    # previously rare, but since we added the FJC data to the dockets table,
-    # this is now quite common.
-    d.pacer_case_id = pacer_case_id
-
-    d.add_recap_source()
-    update_docket_metadata(d, docket_data)
-    d.save()
-    tags = add_tags_to_objs(tag_names, [d])
-
-    # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(
-        content_object=d, upload_type=UPLOAD_TYPE.DOCKET
+    rds_created, content_updated = merge_pacer_docket_into_cl_docket(
+        d,
+        pacer_case_id,
+        docket_data,
+        report,
+        appellate=False,
+        tag_names=tag_names,
     )
-    pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
-        ContentFile(report.response.text),
-    )
-
-    rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
-    )
-    add_parties_and_attorneys(d, docket_data["parties"])
-    process_orphan_documents(rds_created, d.court_id, d.date_filed)
-    logger.info("Created/updated docket: %s" % d)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -1152,33 +1130,14 @@ def get_appellate_docket_by_docket_number(
         if count > 1:
             d = d.earliest("date_created")
 
-    d.add_recap_source()
-    update_docket_metadata(d, docket_data)
-    d, og_info = update_docket_appellate_metadata(d, docket_data)
-    if not d.pacer_case_id:
-        d.pacer_case_id = docket_number
-
-    if og_info is not None:
-        og_info.save()
-        d.originating_court_information = og_info
-    d.save()
-    tags = add_tags_to_objs(tag_names, [d])
-
-    # Save the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(
-        content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
+    rds_created, content_updated = merge_pacer_docket_into_cl_docket(
+        d,
+        docket_number,
+        docket_data,
+        report,
+        appellate=True,
+        tag_names=tag_names,
     )
-    pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
-        ContentFile(report.response.text),
-    )
-
-    rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
-    )
-    add_parties_and_attorneys(d, docket_data["parties"])
-    process_orphan_documents(rds_created, d.court_id, d.date_filed)
-    logger.info("Created/updated docket: %s" % d)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
