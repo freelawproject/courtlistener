@@ -1169,11 +1169,11 @@ def fetch_docket(self, fq_pk):
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    cookies = get_pacer_cookie_from_cache(fq.user_pk)
+    cookies = get_pacer_cookie_from_cache(fq.user_id)
     if cookies is None:
         msg = (
             "Cookie cache expired before task could run for user: %s"
-            % fq.user_pk
+            % fq.user_id
         )
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
 
@@ -1208,7 +1208,10 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
-    pacer_case_id = fq.docket.pacer_case_id or result.get("pacer_case_id")
+    pacer_case_id = getattr(fq.docket, "pacer_case_id", None) or result.get(
+        "pacer_case_id"
+    )
+
     if not pacer_case_id:
         msg = "Unable to determine pacer_case_id for docket."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
