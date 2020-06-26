@@ -180,7 +180,7 @@ def send_failed_subscription_email(m_donation):
     """
     email = emails["user_bad_subscription"]
     body = email["body"] % (
-        m_donation.user.first_name,
+        m_donation.donor.first_name,
         m_donation.monthly_donation_amount,
         reverse("donate"),
         m_donation.monthly_donation_amount,
