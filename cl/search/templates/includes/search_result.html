@@ -7,7 +7,7 @@
 <article>
   {% with doc0=result.doclist.docs.0 type=search_form.type.value %}
   <h3 class="bottom serif">
-    {% if type == 'p' or type_override == 'p' %}
+    {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.solr_highlights.name_reverse.0|safe }}
@@ -16,18 +16,18 @@
       {% endif %}
       </a>
 
-    {% elif type == 'r' or type_override == 'r' %}
+    {% elif type == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.RECAP %}
       <a href="{{ doc0.docket_absolute_url }}"
          class="visitable">
       {{ doc0.solr_highlights.caseName.0|safe }}
       ({% if doc0.court_id != 'scotus' %}{{ doc0.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
       </a>
 
-    {% elif type == 'oa' or type_override == 'oa' or type == 'o' or type_override == 'o' %}
+    {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
       <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
          class="visitable">
       {{ result.solr_highlights.caseName.0|safe }}
-      ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' or type_override == 'o' %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
+      ({% if result.court_id != 'scotus' %}{{ result.solr_highlights.court_citation_string.0|nbsp|safe }}&nbsp;{% endif %}{% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}{{ result.dateFiled|date:"Y" }}{% else %}{{ result.dateArgued|date:"Y" }}{% endif %})
       </a>
     {% endif %}
   </h3>
@@ -38,7 +38,7 @@
   </div>
   {% endif %}
 
-  {% if type == 'r' or type_override == 'r' %}
+  {% if type == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.RECAP %}
   <div class="bottom">
     {% if doc0.solr_highlights.docketNumber.0 %}
       <div class="inline-block">
@@ -191,7 +191,7 @@
   {% endif %}
 
   <div class="bottom">
-    {% if type == 'o' or type_override == 'o' %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
       <div class="inline-block">
         <span class="meta-data-header">Date Filed:</span>
         <time class="meta-data-value" datetime="{{ result.dateFiled|date:'Y-m-d' }}">
@@ -202,7 +202,7 @@
           {% endif %}
         </time>
       </div>
-    {% elif type == 'oa' or type_override == 'oa' %}
+    {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <div class="inline-block">
         <span class="meta-data-header">Date Argued:</span>
         <time class="meta-data-value"
@@ -214,7 +214,7 @@
           {% endif %}
         </time>
       </div>
-    {% elif type == 'p' or type_override == 'p' %}
+    {% elif type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       {% if result.dob %}
         <div class="inline-block">
           <span class="meta-data-header">Born:</span>
@@ -284,7 +284,7 @@
       {% endif %}
     {% endif %}
 
-    {% if type == 'o' or type_override == 'o' %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
       <div class="inline-block">
         <span class="meta-data-header">Status:</span>
         <span class="meta-data-value">{{ result.status }}</span>
@@ -296,7 +296,7 @@
         </div>
       {% endif %}
     {% endif %}
-    {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       {% if result.solr_highlights.docketNumber.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Docket Number:</span>
@@ -304,7 +304,7 @@
         </div>
       {% endif %}
     {% endif %}
-    {% if type == 'oa' or type_override == 'oa' %}
+    {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <div class="inline-block">
         <span class="meta-data-header">Duration:</span>
         <span class="meta-data-value">{{ result.duration|naturalduration }}</span>
@@ -312,7 +312,7 @@
     {% endif %}
   </div>
   <div class="bottom">
-    {% if type == 'oa' or type_override == 'oa' %}
+    {% if type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       {% if result.solr_highlights.judge.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Judge:</span>
@@ -320,7 +320,7 @@
         </div>
       {% endif %}
     {% endif %}
-    {% if type == 'o' or type_override == 'o' %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
       {% if result.solr_highlights.suitNature.0 %}
         <div class="inline-block">
           <span class="meta-data-header">Nature of Suit:</span>
@@ -331,7 +331,7 @@
           </span>
         </div>
       {% endif %}
-    {% elif type == 'p' or type_override == 'p' %}
+    {% elif type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
       {% if result.school %}
         <div class="inline-block">
           <span class="meta-data-header">Schools:</span>
@@ -340,7 +340,7 @@
       {% endif %}
     {% endif %}
   </div>
-  {% if type == 'o' or type_override == 'o' %}
+  {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
     {% if result.citeCount > 0 %}
       <div class="bottom" class="inline-block">
         <span class="meta-data-value">
@@ -352,7 +352,7 @@
     {% endif %}
   {% endif %}
   {% if simple != True %}
-    {% if type == 'o' or type_override == 'o' or type == 'oa' or type_override == 'oa' %}
+    {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
       <p>
         {% if request.GET.q %}&hellip;{% endif %}{% for frag in result.solr_highlights.text %}
           {{ frag|safe|underscore_to_space }}&hellip;
