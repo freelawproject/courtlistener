@@ -13,7 +13,7 @@ from cl.search.models import Court
 
 
 @retry(requests.RequestException, tries=2, backoff=1)
-def check_and_log_url(session, url, timeout=5):
+def check_and_log_url(session, url, timeout=10):
     """Check if a URL is accessible by sending it a HEAD request
 
     :param session: A requests.Session object
@@ -58,57 +58,54 @@ def make_simple_url(court):
         return "https://ecf.%s.uscourts.gov/" % map_cl_to_pacer_id(court.pk)
 
 
+def down_for_only_me(session, url):
+    """Check if a URL is down just our server, or globally
+
+    :return: True if the url is only down for me, or False if entirely up or
+    entirely down.
+    """
+    try:
+        check_and_log_url(session, url)
+    except requests.RequestException:
+        # Down from our server. Try from our proxy.
+        try:
+            proxy_response = check_if_global_outage(session, url)
+        except requests.RequestException as e:
+            logger.error("Problem hitting proxy: %s", e)
+            raise e
+
+        j = proxy_response.json()
+        if j["status_code"] is not None:
+            # Down from our server, but up from our proxy. Yikes!
+            return True
+        else:
+            # Down from our server, and down from our proxy. OK.
+            return False
+
+    # Up from our server. OK.
+    return False
+
+
 def iterate_and_log_courts(courts):
     session = requests.Session()
     for court in courts:
         url = make_simple_url(court)
         logger.info("Checking url for %s: %s", court.pk, url)
         t1 = now()
-        try:
-            response = check_and_log_url(session, url)
-        except requests.RequestException as e:
-            # Didn't get it from our server, but what about from the cloud
-            logger.info(
-                "After %s seconds, didn't get URL '%s' from our server, "
-                "trying globally...",
-                (now() - t1).seconds,
-                url,
-            )
-            try:
-                proxy_response = check_if_global_outage(session, url)
-            except requests.RequestException as e:
-                logger.error("Problem hitting proxy: %s", e)
-                continue
-            else:
-                j = proxy_response.json()
-                if j["status_code"] is not None:
-                    # Something went wrong locally but not globally. We need
-                    # do do something about this.
-                    # Use % instead of normal logging parameters, to create
-                    # multiple issues in Sentry, not grouped ones.
-                    logger.error(
-                        "After %s seconds, failed to access %s's PACER "
-                        "website from our server, but got it via our proxy "
-                        "with status code: %s."
-                        % ((now() - t1).seconds, court.pk, j["status_code"],)
-                    )
-                else:
-                    logger.info(
-                        "After %s seconds, %s's PACER website is down for us "
-                        "and our proxy. OK.",
-                        (now() - t1).seconds,
-                        court.pk,
-                    )
+        try_count = 3
+        while try_count > 0:
+            try_count -= 1
+            down_for_me = down_for_only_me(session, url)
+            if not down_for_me:
+                break
         else:
-            duration = (now() - t1).seconds
-            if response.status_code == HTTP_200_OK:
-                logger.info("Got 200 status code after %s seconds", duration)
-            else:
-                logger.error(
-                    "Got status code of %s after %s seconds",
-                    response.status,
-                    duration,
-                )
+            # Tried `try_count` times, and it was always down just for me. Oof.
+            # Use % instead of logging params to bypass Sentry issue grouping
+            logger.error(
+                "After %s seconds and %s tries, failed to access %s's PACER "
+                "website from our server, but got it via our proxy each time."
+                % ((now() - t1).seconds, try_count, court.pk,)
+            )
 
 
 class Command(VerboseCommand):
