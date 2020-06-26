@@ -100,6 +100,51 @@ def create_pdf(download_urls, download_list):
     return pdf_path
 
 
+def get_section_info_by_ocr(
+    filepath, page_num, lowerleft_pxcoord, upperright_pxcoord
+):
+    pixel_width, pixel_height = 794, 1046
+    fin = open(filepath, "rb")
+    reader = PdfFileReader(fin)
+    writer = PdfFileWriter()
+
+    page = reader.getPage(page_num)
+
+    width_ratio = float(page.mediaBox.getWidth()) / pixel_width
+    height_ratio = float(page.mediaBox.getHeight()) / pixel_height
+
+    lowerleft = (
+        lowerleft_pxcoord[0] * width_ratio,
+        lowerleft_pxcoord[1] * height_ratio,
+    )
+    upperright = (
+        upperright_pxcoord[0] * width_ratio,
+        upperright_pxcoord[1] * height_ratio,
+    )
+
+    # Top half of page
+    # lowerleft = (0, float(page.mediaBox.getHeight()) / 2)
+    # upperright = (
+    #     float(page.mediaBox.getWidth()),
+    #     float(page.mediaBox.getHeight()),
+    # )
+
+    page.cropBox.lowerLeft = lowerleft
+    page.cropBox.upperRight = upperright
+    page.mediaBox.lowerLeft = lowerleft
+    page.mediaBox.upperRight = upperright
+
+    writer.addPage(page)
+    with NamedTemporaryFile(prefix="crop_", suffix=".pdf") as tmp:
+        fout = open(tmp.name, "wb")
+        writer.write(fout)
+        is_extracted, content = extract_by_ocr(tmp.name)
+
+    fin.close()
+
+    return content
+
+
 def iterate_over_aws():
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     kwargs = {"Bucket": bucket, "Prefix": prefix}
