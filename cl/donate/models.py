@@ -149,3 +149,10 @@ class MonthlyDonation(models.Model):
         "threshold is exceeded, we disable the subscription.",
         default=0,
     )
+
+    def __unicode__(self):
+        return u"%s: $%s by %s" % (
+            self.pk,
+            self.monthly_donation_amount,
+            self.get_payment_provider_display(),
+        )
