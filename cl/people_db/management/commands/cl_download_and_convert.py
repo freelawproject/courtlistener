@@ -168,9 +168,9 @@ def iterate_over_aws():
                 # cd['type'] = "pdf"
                 # cd['urls'] = download_urls
 
-            elif "Page_" in key:
+            elif "_Page" in key:
                 # Older Pre-split TIFFs
-                if key.split("Page")[0] in download_list:
+                if key.split("_Page")[0] in download_list:
                     continue
                 # if "2014/A-F/Collings-RB" in key:
                 #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
