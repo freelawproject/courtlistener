@@ -284,7 +284,11 @@ def get_and_save_free_document_report(self, court_id, start, end):
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    s = PacerSession(cookies=cookies)
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
     report = FreeOpinionReport(court_id, s)
     msg = None
     try:
