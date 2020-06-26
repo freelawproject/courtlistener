@@ -75,7 +75,7 @@ def grab_and_split_image(download_urls, download_list):
     img = Image.open(requests.get(download_urls[0], stream=True).raw)
     width, height = img.size
     xlist = []
-    i, page_width, page_height = 0, width, (1046 * (width / 792))
+    i, page_width, page_height = 0, width, (1046 * (float(width) / 792))
     while i < (height / page_height):
         image = img.crop(
             (0, (i * page_height), page_width, (i + 1) * page_height)
