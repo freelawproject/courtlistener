@@ -10,25 +10,25 @@
 {% endblock %}
 
 {% block title %}
-    {% if search_form.type.value == 'o' %}
+    {% if search_form.type.value == SEARCH_TYPES.OPINION %}
         Advanced Legal Opinion Search – CourtListener.com
-    {% elif search_form.type.value == 'r' %}
+    {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         Advanced RECAP Archive Search for PACER – CourtListener.com
-    {% elif search_form.type.value == 'oa' %}
+    {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
         Advanced Oral Argument Search – CourtListener.com
-    {% elif search_form.type.value == 'p' %}
+    {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
         Advanced Judge Search – CourtListener.com
     {% endif %}
 {% endblock %}
 
 {% block og_title %}
-  {% if search_form.type.value == 'o' %}
+  {% if search_form.type.value == SEARCH_TYPES.OPINION %}
     Advanced Legal Opinion Search – CourtListener.com
-  {% elif search_form.type.value == 'r' %}
+  {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
     Advanced RECAP Archive Search for PACER – CourtListener.com
-  {% elif search_form.type.value == 'oa' %}
+  {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
     Advanced Oral Argument Search – CourtListener.com
-  {% elif search_form.type.value == 'p' %}
+  {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
     Advanced Judge Search – CourtListener.com
   {% endif %}
 {% endblock %}
@@ -66,11 +66,11 @@
 {% block content %}
     <div id="advanced-page" class="col-xs-12">
         <div id="above-main-query">
-            {% if search_form.type.value == 'o' %}
+            {% if search_form.type.value == SEARCH_TYPES.OPINION %}
                 <h1 class="text-center">Advanced Opinion Search</h1>
                 <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
                 </p>
-            {% elif search_form.type.value == 'r' %}
+            {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
                 <h1 class="text-center">Advanced RECAP Search</h1>
                 <p class="text-center gray large">Search our database of
                     millions of PACER documents and dockets.
@@ -78,11 +78,11 @@
                {% if not request.COOKIES.recap_install_plea %}
                  <p class="text-center gray large recap_install_plea">Install the free <a href="https://free.law/recap/">RECAP extensions for Firefox and Chrome</a> to contribute to this archive.</p>
                {% endif %}
-            {% elif search_form.type.value == 'oa' %}
+            {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
                 <h1 class="text-center">Advanced Oral Argument Search</h1>
                 <p class="text-center gray large">Search the biggest collection of oral argument audio on the Internet. Updated constantly.
                 </p>
-            {% elif search_form.type.value == 'p' %}
+            {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
                 <h1 class="text-center">Advanced Judge Search</h1>
                 <p class="text-center gray large">Search our database of thousands of State and Federal judges.
                 </p>
@@ -114,7 +114,7 @@
                 </div>
             </form>
         </div>
-        {% if search_form.type.value == 'o' %}
+        {% if search_form.type.value == SEARCH_TYPES.OPINION %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-9">
@@ -245,7 +245,7 @@
             </div>
         </div>
 
-        {% elif search_form.type.value == 'r' %}
+        {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         <div class="row">
             {# Modal is at bottom of results, so it loads last #}
             <div id="extra-sidebar-fields" class="col-sm-9">
@@ -370,7 +370,7 @@
         </div>
 
 
-        {% elif search_form.type.value == 'oa' %}
+        {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-9">
@@ -442,7 +442,7 @@
         </div>
 
 
-        {% elif search_form.type.value == 'p' %}
+        {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
         <div class="row">
             {#  Modal is at bottom of results, so it loads last. #}
             <div id="extra-sidebar-fields" class="col-sm-12">
@@ -532,7 +532,7 @@
         {% endif %}
 
 
-        {%  if search_form.type.value == 'o' %}
+        {%  if search_form.type.value == SEARCH_TYPES.OPINION %}
         <div class="row learn-more" id="about-opinions">
             <div class="col-xs-12">
                 <h2>About the CourtListener Corpus of Opinions</h2>
@@ -588,7 +588,7 @@
             </div>
         </div>
 
-        {% elif search_form.type.value == 'r' %}
+        {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         <div class="row learn-more" id="about-recap">
             <div class="col-xs-12">
                 <h2>About CourtListener's RECAP Archive</h2>
@@ -665,7 +665,7 @@
         </div>
 
 
-        {% elif search_form.type.value == 'oa' %}
+        {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
         <div class="row learn-more" id="about-oral-arguments">
             <div class="col-xs-12">
                 <h2>About the CourtListener Oral Argument Archive</h2>
@@ -713,7 +713,7 @@
             </div>
         </div>
 
-        {% elif search_form.type.value == 'p' %}
+        {% elif search_form.type.value == SEARCH_TYPES.PEOPLE %}
         <div class="row v-offset-above-2 learn-more" id="about-judges">
             <div class="col-xs-12">
                 <h2>About the CourtListener Judicial Database</h2>
