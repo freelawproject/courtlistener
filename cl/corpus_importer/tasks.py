@@ -504,6 +504,15 @@ def get_and_process_free_pdf(self, data, row_pk):
             return
         logger.info(msg + " Retrying.")
         raise self.retry(exc=exc)
+    except (ReadTimeoutError, requests.RequestException) as exc:
+        msg = "Request exception getting free PDF"
+        if self.request.retries == self.max_retries:
+            logger.warning(msg)
+            self.request.chain = None
+            return
+        logger.info(msg + " Retrying.")
+        raise self.retry(exc=exc)
+
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
         self,
