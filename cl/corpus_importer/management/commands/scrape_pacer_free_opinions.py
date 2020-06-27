@@ -6,14 +6,13 @@ from celery.canvas import chain
 from django.conf import settings
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer.http import PacerSession
 from requests import RequestException
 
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
     process_free_opinion_result,
-    get_and_process_pdf,
+    get_and_process_free_pdf,
     delete_pacer_row,
 )
 from cl.lib.celery_utils import CeleryThrottle
@@ -198,7 +197,7 @@ def get_pdfs(options):
         throttle.maybe_wait()
         c = chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(row.pk).set(queue=q),
+            get_and_process_free_pdf.s(row.pk).set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
         if index:
