@@ -17,7 +17,7 @@
       </div>
 
       {% include "includes/order_by_dropdown.html" %}
-      {% if type == 'o' %}
+      {% if type == SEARCH_TYPES.OPINION %}
         <div class="form-group">
           {{ search_form.case_name.label_tag }}
           {{ search_form.case_name }}
@@ -88,7 +88,7 @@
           </div>
         </div>
 
-      {% elif type == 'r' %}
+      {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
         <div class="form-group">
           <div class="sidebar-checkbox">
             {{ search_form.available_only }}
@@ -161,7 +161,7 @@
           {{ search_form.atty_name }}
         </div>
 
-      {% elif type == 'oa' %}
+      {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
         <div class="form-group">
           {{ search_form.case_name.label_tag }}
           {{ search_form.case_name }}
@@ -191,7 +191,7 @@
           {{ search_form.docket_number }}
         </div>
 
-      {% elif type == 'p' %}
+      {% elif type == SEARCH_TYPES.PEOPLE %}
         <div class="form-group">
           {{ search_form.name.label_tag }}
           {{ search_form.name }}
@@ -244,7 +244,7 @@
       </p>
     </div>
   </form>
-  {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+  {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
     {% if not error and get_string %}
       <p><a class="btn btn-block btn-success btn-lg"
         data-toggle="modal"

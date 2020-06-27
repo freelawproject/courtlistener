@@ -18,7 +18,7 @@
                                      <button type="button"
                                              class="btn btn-default"
                                              id="clear-all">Clear All</button>
-                                    {% if search_form.type.value != 'oa' and type != 'oa' %}
+                                    {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT and type != SEARCH_TYPES.ORAL_ARGUMENT %}
                                         <button type="button"
                                                 class="btn btn-default"
                                                 id="check-current">Check Current Tab</button>
@@ -64,7 +64,7 @@
                             <span class="hidden-md hidden-lg">Fed. App.</span>
                         </a>
                     </li>
-                    {% if v != 'oa' %}
+                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <li>
                             <a href="#tab-federal-district"
                                data-toggle="tab">
@@ -73,7 +73,7 @@
                             </a>
                         </li>
                     {% endif %}
-                    {% if v == 'o' or v == 'r' %}
+                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS %}
                         <li>
                             <a href="#tab-bankruptcy"
                                data-toggle="tab">
@@ -82,13 +82,13 @@
                             </a>
                         </li>
                     {% endif %}
-                    {% if v == 'o' or v == 'p' %}
+                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
                         <li>
                             <a href="#tab-state"
                                data-toggle="tab">State</a>
                         </li>
                     {% endif %}
-                    {% if v != 'oa' %}
+                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <li>
                             <a href="#tab-special"
                                data-toggle="tab">Special</a>
@@ -107,7 +107,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    {% if search_form.type.value != 'oa' %}
+                    {% if search_form.type.value != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <div class="tab-pane" id="tab-federal-district">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.district|dictsort:"is_terminated" by is_terminated as district_courts %}
@@ -133,7 +133,7 @@
                         </div>
                     {% endif %}
 
-                    {% if v == 'o' or v == 'r' %}
+                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or SEARCH_TYPES.DOCKETS %}
                         <div class="tab-pane" id="tab-bankruptcy">
                           {% if courts.bankruptcy_panel %}
                             <h3 class="bottom inline">
@@ -170,7 +170,7 @@
                         </div>
                     {% endif %}
 
-                    {% if v == 'o' or v == 'p' %}
+                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
                       <div class="tab-pane" id="tab-state">
                         <div class="row">
                           {% for col_bundle in courts.state %}
@@ -189,7 +189,7 @@
                         </div>
                       </div>
                     {% endif %}
-                    {% if v != 'oa' %}
+                    {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <div class="tab-pane" id="tab-special">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}

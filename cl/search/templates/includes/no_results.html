@@ -9,11 +9,11 @@
         <li>Check your spelling.</li>
         <li>Try fewer filters.</li>
         <li>Remove quotes if you used them.</li>
-        {% if type == 'o' or type_override == 'o' %}
+        {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
           <li>Did you mean to <a href="{% url "advanced_r" %}">search on the RECAP Archive</a>?</li>
         {% endif %}
     </ul>
-    {% if type == 'r' or type_override == 'r' %}
+    {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
         <p>The RECAP Archive only contains cases that were downloaded from PACER using the <a href="https://free.law/recap/">RECAP Extensions</a>. If you are looking for a certain case or document that has not yet been downloaded in this way, it will not appear here. If you are encountering this problem, please install the <a href="https://free.law/recap/">RECAP Extension</a>, and purchase this case from PACER.
         </p>
     {% else %}
