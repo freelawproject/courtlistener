@@ -473,7 +473,7 @@ def process_free_opinion_result(self, row_pk, cnt):
     interval_step=5,
     ignore_result=True,
 )
-def get_and_process_pdf(self, data, row_pk):
+def get_and_process_free_pdf(self, data, row_pk):
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param data: The returned results from the previous task, takes the form
