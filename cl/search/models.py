@@ -2934,11 +2934,13 @@ class Tag(models.Model):
 class SEARCH_TYPES:
     OPINION = "o"
     RECAP = "r"
+    DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
     )
