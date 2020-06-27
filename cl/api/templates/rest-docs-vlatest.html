@@ -612,14 +612,15 @@
       <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. Currently supported parameters are:
         <ul>
           <li><code>o</code> &mdash; Opinions</li>
-          <li><code>r</code> &mdash; The RECAP Archive (this endpoint in beta)</li>
+          <li><code>r</code> &mdash; Document-oriented results from the RECAP Archive</li>
+          <li><code>d</code> &mdash; Docket-oriented results from the RECAP Archive</li>
           <li><code>p</code> &mdash; Judges</li>
           <li><code>oa</code> &mdash; Oral Arguments</li>
         </ul>
       </li>
       <li>As in the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
       </li>
-      <li>The RECAP <code>type</code> returns a flat list of results, unlike as is done in the front end. This is to simplify the backend and to aid in performance of API requests. We hope to add nested results to a future version of the API.
+      <li>The <code>r</code> <code>type</code> returns a flat list of document results from the RECAP Archive, unlike as is done in the front end, where the results are nested. This is to simplify the backend and to aid in performance of API requests. The <code>d</code> <code>type</code> returns a flat list of docket results from the RECAP Archive.
       </li>
     </ul>
     <p>Some fields warrant more details:

@@ -13,8 +13,11 @@ def get_object_list(request, cd, paginator):
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
+    group = False
+    if cd["type"] == SEARCH_TYPES.DOCKETS:
+        group = True
     main_query = search_utils.build_main_query(
-        cd, highlight="text", facet=False, group=False
+        cd, highlight="text", facet=False, group=group,
     )
     main_query["caller"] = "api_search"
     if cd["type"] == SEARCH_TYPES.RECAP:
@@ -40,7 +43,7 @@ class SolrList(object):
             )
         elif self.type == SEARCH_TYPES.ORAL_ARGUMENT:
             self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r",)
-        elif self.type == SEARCH_TYPES.RECAP:
+        elif self.type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
             self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r",)
         elif self.type == SEARCH_TYPES.PEOPLE:
             self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r",)
