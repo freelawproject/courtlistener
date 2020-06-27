@@ -30,15 +30,18 @@ from cl.search.models import (
     DOCUMENT_STATUSES,
 )
 
+recap_boosts_qf = {
+    "text": 1,
+    "caseName": 4,
+    "docketNumber": 3,
+    "description": 2,
+}
+recap_boosts_pf = {"text": 3, "caseName": 3, "description": 3}
 BOOSTS = {
     "qf": {
         SEARCH_TYPES.OPINION: {"text": 1, "caseName": 4, "docketNumber": 2},
-        SEARCH_TYPES.RECAP: {
-            "text": 1,
-            "caseName": 4,
-            "docketNumber": 3,
-            "description": 2,
-        },
+        SEARCH_TYPES.RECAP: recap_boosts_qf,
+        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1,
             "caseName": 4,
@@ -57,7 +60,8 @@ BOOSTS = {
     # Phrase-based boosts.
     "pf": {
         SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3,},
-        SEARCH_TYPES.RECAP: {"text": 3, "caseName": 3, "description": 3},
+        SEARCH_TYPES.RECAP: recap_boosts_pf,
+        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
         SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3,},
         SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
@@ -71,7 +75,7 @@ def get_solr_interface(cd):
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    elif search_type == SEARCH_TYPES.RECAP:
+    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
     elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
         si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
@@ -425,6 +429,7 @@ def add_boosts(main_params, cd):
     if cd["type"] in [
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.ORAL_ARGUMENT,
     ]:
         # Give a boost on the case_name field if it's obviously a case_name
@@ -447,6 +452,7 @@ def add_boosts(main_params, cd):
     if cd["type"] in [
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.ORAL_ARGUMENT,
     ]:
         main_params["pf"] = make_boost_string(BOOSTS["pf"][cd["type"]])
@@ -512,7 +518,7 @@ def add_highlighting(main_params, cd, highlight):
             "status",
         ]
         hlfl = SOLR_OPINION_HL_FIELDS
-    elif cd["type"] == SEARCH_TYPES.RECAP:
+    elif cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         fl = [
             "absolute_url",
             "assigned_to_id",
@@ -599,7 +605,7 @@ def add_filter_queries(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd["type"] == SEARCH_TYPES.RECAP:
+    elif cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["description"]:
@@ -716,16 +722,23 @@ def add_grouping(main_params, cd, group):
         else:
             main_params["fq"] = group_fq
 
-    elif cd["type"] == SEARCH_TYPES.RECAP and group is True:
+    elif (
+        cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        and group is True
+    ):
         docket_query = re.match("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
             group_sort = "score desc"
+        if cd["type"] == SEARCH_TYPES.RECAP:
+            group_limit = 5 if not docket_query else 500
+        elif cd["type"] == SEARCH_TYPES.DOCKETS:
+            group_limit = 1 if not docket_query else 500
         group_params = {
             "group": "true",
             "group.ngroups": "true",
-            "group.limit": 5 if not docket_query else 500,
+            "group.limit": group_limit,
             "group.field": "docket_id",
             "group.sort": group_sort,
         }
