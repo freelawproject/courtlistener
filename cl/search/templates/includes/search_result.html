@@ -16,7 +16,7 @@
       {% endif %}
       </a>
 
-    {% elif type == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.RECAP %}
+    {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
       <a href="{{ doc0.docket_absolute_url }}"
          class="visitable">
       {{ doc0.solr_highlights.caseName.0|safe }}
@@ -38,7 +38,7 @@
   </div>
   {% endif %}
 
-  {% if type == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.RECAP %}
+  {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
   <div class="bottom">
     {% if doc0.solr_highlights.docketNumber.0 %}
       <div class="inline-block">
@@ -180,7 +180,7 @@
       {% with limit=results.object_list.params|get:"group.limit" %}
       {% with remaining=result.doclist.numFound|sub:limit %}
       {% if remaining > 0 %}
-      <a href="{% url "show_results" %}?type=r&amp;q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+      <a href="{% url "show_results" %}?type={{ type }}&amp;q=docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
           this Case</a>
       {% endif %}
       {% endwith %}
