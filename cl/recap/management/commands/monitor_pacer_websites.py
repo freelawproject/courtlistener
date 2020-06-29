@@ -92,19 +92,20 @@ def iterate_and_log_courts(courts):
         url = make_simple_url(court)
         logger.info("Checking url for %s: %s", court.pk, url)
         t1 = now()
-        try_count = 3
-        while try_count > 0:
-            try_count -= 1
+        max_tries = 3
+        try_number = 1
+        while try_number <= max_tries:
             down_for_me = down_for_only_me(session, url)
             if not down_for_me:
                 break
+            try_number += 1
         else:
             # Tried `try_count` times, and it was always down just for me. Oof.
             # Use % instead of logging params to bypass Sentry issue grouping
             logger.error(
                 "After %s seconds and %s tries, failed to access %s's PACER "
                 "website from our server, but got it via our proxy each time."
-                % ((now() - t1).seconds, try_count, court.pk,)
+                % ((now() - t1).seconds, try_number, court.pk,)
             )
 
 
