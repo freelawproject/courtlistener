@@ -113,14 +113,6 @@ def get_section_info_by_ocr(
     width_ratio = float(page.mediaBox.getWidth()) / pixel_width
     height_ratio = float(page.mediaBox.getHeight()) / pixel_height
 
-    lowerleft = (
-        lowerleft_pxcoord[0] * width_ratio,
-        lowerleft_pxcoord[1] * height_ratio,
-    )
-    upperright = (
-        upperright_pxcoord[0] * width_ratio,
-        upperright_pxcoord[1] * height_ratio,
-    )
 
     # Top half of page
     # lowerleft = (0, float(page.mediaBox.getHeight()) / 2)
@@ -191,8 +183,12 @@ def iterate_over_aws():
                 download_list.append(xkey)
 
             pdf_path = create_pdf(download_urls, download_list)
-
             # TODO: grab the judge names, locations
+            fullname = get_section_info_by_ocr(
+                pdf_path, 5, (345, 1045-390), (600, 1045-345)
+            )
+            logger.info("Fullname %s: %s" % (pdf_path, fullname))
+
             # TODO: OCR signature page to get a better name
             # TODO: add metadata into the PDF here
 
