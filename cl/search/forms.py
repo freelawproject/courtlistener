@@ -3,6 +3,7 @@ import re
 from collections import OrderedDict
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.forms import DateField, ChoiceField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
@@ -554,7 +555,12 @@ class SearchForm(forms.Form):
         return q
 
     def clean_order_by(self):
-        """Sets the default order_by value if one isn't provided by the user."""
+        """Sets the default order_by value if one isn't provided by the
+        user.
+        """
+        if not self.cleaned_data.get("type"):
+            raise ValidationError("Invalid value for type field")
+
         if (
             self.cleaned_data["type"] == SEARCH_TYPES.OPINION
             or not self.cleaned_data["type"]
