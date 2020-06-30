@@ -186,7 +186,11 @@ def do_search(
         ]:
             query_citation = get_query_citation(cd)
 
-        if cd["type"] == SEARCH_TYPES.RECAP:
+        if cd["type"] in [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.PEOPLE,
+        ]:
             panels = Court.FEDERAL_BANKRUPTCY_PANEL
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True
