@@ -101,7 +101,7 @@ def create_pdf(download_urls, download_list):
 
 
 def get_section_info_by_ocr(
-    filepath, page_num, lowerleft_pxcoord, upperright_pxcoord
+    filepath, page_num, lowerleft, upperright
 ):
     pixel_width, pixel_height = 794, 1046
     fin = open(filepath, "rb")
