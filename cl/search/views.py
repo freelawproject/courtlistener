@@ -70,7 +70,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
         page = 1
     check_pagination_depth(page)
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         rows = 10
 
     paginator = Paginator(results, rows)
@@ -179,7 +179,11 @@ def do_search(
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
-        if cd["type"] in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
+        if cd["type"] in [
+            SEARCH_TYPES.OPINION,
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        ]:
             query_citation = get_query_citation(cd)
 
         if cd["type"] == SEARCH_TYPES.RECAP:
@@ -461,7 +465,7 @@ def advanced(request):
             obj_type = SEARCH_TYPES.RECAP
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True,
-            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,)
+            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):
