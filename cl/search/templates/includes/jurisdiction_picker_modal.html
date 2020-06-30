@@ -53,7 +53,7 @@
                      opinions │   X  │   X   │   X   │   X   │    X    │
                         recap │   X  │   X   │   X   │       │    X    │
                     oral args │   X  │       │       │       │         │
-                       people │   X  │   X   │       │   X   │    X    │
+                       people │   X  │   X   │   X   │   X   │    X    │
                               └──────┴───────┴───────┴───────┴─────────┘
 
                     {% endcomment %}
@@ -72,8 +72,6 @@
                                 <span class="hidden-md hidden-lg">Fed. Dist.</span>
                             </a>
                         </li>
-                    {% endif %}
-                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS %}
                         <li>
                             <a href="#tab-bankruptcy"
                                data-toggle="tab">
@@ -131,9 +129,6 @@
                                 </div>
                             {% endfor %}
                         </div>
-                    {% endif %}
-
-                    {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or SEARCH_TYPES.DOCKETS or SEARCH_TYPES.PEOPLE %}
                         <div class="tab-pane" id="tab-bankruptcy">
                           {% if courts.bankruptcy_panel %}
                             <h3 class="bottom inline">
