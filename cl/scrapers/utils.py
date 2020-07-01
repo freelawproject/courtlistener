@@ -76,14 +76,15 @@ def get_extension(content):
             extension = ".pdf"
         else:
             extension = ".wpd"
-    if extension == ".wsdl":
-        # It's probably an HTML file, like those from Resource.org
-        extension = ".html"
-    if extension == ".ksh":
-        extension = ".txt"
-    if extension == ".asf":
-        extension = ".wma"
-    return extension
+    fixes = {
+        ".htm": ".html",
+        ".xml": ".html",
+        ".wsdl": ".html",
+        ".ksh": ".txt",
+        ".asf": ".wma",
+        ".dot": ".doc",
+    }
+    return fixes.get(extension, extension).lower()
 
 
 def get_binary_content(download_url, cookies, adapter, method="GET"):
