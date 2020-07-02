@@ -234,17 +234,14 @@ def process_recap_pdf(self, pk):
         except DocketEntry.DoesNotExist as exc:
             logger.warning(
                 "Unable to find docket entry for processing "
-                "queue '%s'. Retrying if max_retries is not "
-                "exceeded." % pq
+                "queue '%s'." % pq
             )
-            pq.error_message = "Unable to find docket entry for item."
+            msg = "Unable to find docket entry for item."
             if (self.request.retries == self.max_retries) or pq.debug:
-                pq.status = PROCESSING_STATUS.FAILED
-                pq.save()
+                mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
                 return None
             else:
-                pq.status = PROCESSING_STATUS.QUEUED_FOR_RETRY
-                pq.save()
+                mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
                 raise self.retry(exc=exc)
         else:
             # If we're here, we've got the docket and docket
@@ -274,7 +271,17 @@ def process_recap_pdf(self, pk):
     rd.attachment_number = pq.attachment_number
 
     # Do the file, finally.
-    content = pq.filepath_local.read()
+    try:
+        content = pq.filepath_local.read()
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
     new_sha1 = sha1(content)
     existing_document = all(
         [
@@ -442,7 +449,17 @@ def process_recap_docket(self, pk):
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
-    text = pq.filepath_local.read().decode("utf-8")
+
+    try:
+        text = pq.filepath_local.read().decode("utf-8")
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
 
     if "History/Documents" in text:
         # Prior to 1.1.8, we did not separate docket history reports into their
@@ -528,8 +545,17 @@ def process_recap_attachment(self, pk, tag_names=None):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    with open(pq.filepath_local.path) as f:
-        text = f.read().decode("utf-8")
+    try:
+        text = pq.filepath_local.read().decode("utf-8")
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
     att_data = get_data_from_att_report(text, pq.court_id)
     logger.info("Parsing completed for item %s" % pq)
 
@@ -593,8 +619,17 @@ def process_recap_claims_register(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    with open(pq.filepath_local.path) as f:
-        text = f.read().decode("utf-8")
+    try:
+        text = pq.filepath_local.read().decode("utf-8")
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
     report = ClaimsRegister(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
@@ -670,8 +705,17 @@ def process_recap_docket_history_report(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
-    with open(pq.filepath_local.path) as f:
-        text = f.read().decode("utf-8")
+    try:
+        text = pq.filepath_local.read().decode("utf-8")
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
     report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
@@ -773,7 +817,17 @@ def process_recap_appellate_docket(self, pk):
     )
 
     report = AppellateDocketReport(map_cl_to_pacer_id(pq.court_id))
-    text = pq.filepath_local.read().decode("utf-8")
+
+    try:
+        text = pq.filepath_local.read().decode("utf-8")
+    except IOError as exc:
+        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
 
     report._parse_text(text)
     data = report.data
