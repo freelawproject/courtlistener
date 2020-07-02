@@ -1131,7 +1131,7 @@ def fetch_docket_by_pacer_case_id(
 
     docket_data = report.data
     if not docket_data:
-        raise ParsingException
+        raise ParsingException("No data found in docket report.")
     if fq.docket_id:
         d = Docket.objects.get(pk=fq.docket_id)
     else:
