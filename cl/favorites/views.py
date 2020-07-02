@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 from django.http import (
     HttpResponse,
     HttpResponseServerError,
@@ -66,7 +67,11 @@ def save_or_update_favorite(request):
         if f.is_valid():
             new_fave = f.save(commit=False)
             new_fave.user = request.user
-            new_fave.save()
+            try:
+                new_fave.save()
+            except IntegrityError:
+                # User already has this favorite.
+                return HttpResponse("It worked")
         else:
             # Validation errors fail silently. Probably could be better.
             return HttpResponseServerError("Failure. Form invalid")
