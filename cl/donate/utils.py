@@ -185,4 +185,4 @@ def send_failed_subscription_email(m_donation):
         reverse("donate"),
         m_donation.monthly_donation_amount,
     )
-    send_mail(email["subject"], body, email["from"], [m_donation.user.email])
+    send_mail(email["subject"], body, email["from"], [m_donation.donor.email])
