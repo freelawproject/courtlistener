@@ -20,14 +20,7 @@
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
         Your alerts on the cases below have been automatically disabled. These terminated cases haven't had updates for over 180 days. If these alerts were disabled in error, you can recreate them by clicking below.
       </p>
-      <ul>
-        {% for docket in report_data.disabled_dockets %}
-          <li><p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-            <a href="https://www.courtlistener.com{{ docket.get_absolute_url }}">{{ docket|best_case_name }}</a><br>
-            Terminated: {{ docket.date_terminated|date:"M j, Y" }}
-          </p></li>
-        {% endfor %}
-      </ul>
+      {% include "includes/old_alert_docket_list.html" with dockets=report_data.disabled_dockets %}
     {% endif %}
 
     {% if report_data.one_eighty_ago %}
@@ -41,38 +34,28 @@
       </p>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">Please disable and re-enable these alerts if you are still monitoring these cases. Doing so will keep them running for another 180 days.
       </p>
-      <ul>
-        {% for docket in report_data.one_eighty_ago %}
-          <li><p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-            <a href="https://www.courtlistener.com{{ docket.get_absolute_url }}">{{ docket|best_case_name }}</a><br>
-            Terminated: {{ docket.date_terminated|date:"M j, Y" }}
-          </p></li>
-        {% endfor %}
-      </ul>
+      {% include "includes/old_alert_docket_list.html" with dockets=report_data.one_eighty_ago %}
     {% endif %}
 
     {% if report_data.ninety_ago %}
       <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
       <h2 style="font-size: 1.5em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">Cases Terminated about 90 Days Ago</h2>
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-        The following terminated cases were last updated about <strong>90</strong> days ago. Are you still monitoring them?
+        The following terminated cases were last updated about <strong>90</strong> days ago.
       </p>
-      <ul>
-        {% for docket in report_data.ninety_ago %}
-          <li><p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-            <a href="https://www.courtlistener.com{{ docket.get_absolute_url }}">{{ docket|best_case_name }}</a><br>
-            Terminated: {{ docket.date_terminated|date:"M j, Y" }}
-          </p></li>
-        {% endfor %}
-      </ul>
+      <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">If you are no longer monitoring these cases, you may want to disable their alerts by clicking below.</p>
+
+      {% include "includes/old_alert_docket_list.html" with dockets=report_data.ninety_ago %}
     {% endif %}
 
 
+    <hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em; border: none;">
     <p style="font-size: 110%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-      <strong>This message brought to you by the non-profit Free Law Project.
-        <a href="https://www.courtlistener.com{% url "donate" %}?referrer=disable-email" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
-          Please donate to support our work</a>.
-      </strong>
+      <strong>This message brought to you by the non-profit Free Law Project.</strong>
+    </p>
+    <p style="font-size: 110%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+      <a href="https://www.courtlistener.com{% url "donate" %}?referrer=disable-email" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+      Please donate to support our work</a>.
     </p>
   </body>
 </html>
