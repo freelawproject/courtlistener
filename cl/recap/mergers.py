@@ -234,7 +234,7 @@ def update_docket_metadata(d, docket_data):
     d = update_case_names(d, docket_data["case_name"])
     mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
-    d.date_filed = docket_data["date_filed"] or d.date_filed
+    d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (
         docket_data.get("date_last_filing") or d.date_last_filing
     )
