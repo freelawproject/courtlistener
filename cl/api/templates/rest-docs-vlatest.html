@@ -435,10 +435,11 @@
 
 
     <h3 id="upgrades">Upgrades and Fixes</h3>
-    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are very welcome. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
+    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
     </p>
-    <p>Getting this kind support is one of the most rewarding things possible and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
+    <p>Getting this kind support is one of the most rewarding things possible for an organization like ours and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
     </p>
+    <p>(Upgrades requiring downtime are scheduled according to our maintenance schedule as described in the sidebar below.)</p>
 
 
     <h2 id="endpoints">Endpoints</h2>
@@ -943,7 +944,9 @@ PACER_TO_CL_IDS = {
 
     <div class="sidebar-section">
       <h3><span>Maintenance Schedule</span></h3>
-      <p>We regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. If you need to do bulk crawling of our API, please be mindful of this schedule.
+      <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will scheudule that downtime during a weekly maintenance window from 21:00-23:59PST every Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
+      </p>
+      <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
       </p>
     </div>
 
