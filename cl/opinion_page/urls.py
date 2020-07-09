@@ -5,6 +5,7 @@ from cl.opinion_page.views import (
     block_item,
     cluster_visualizations,
     court_homepage,
+    court_publishpage,
     view_opinion,
     citation_redirector,
     redirect_docket_recap,
@@ -18,6 +19,7 @@ from cl.opinion_page.views import (
 urlpatterns = [
     # Court pages
     url(r"^court/(?P<pk>[^/]*)/$", court_homepage, name="court_homepage"),
+    url(r"^court/(?P<pk>[^/]*)/new/$", court_publishpage, name="court_publishpage"),
     # Opinion pages
     url(
         r"^opinion/(?P<pk>\d*)/(?P<slug>[^/]*)/authorities/$",
