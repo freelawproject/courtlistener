@@ -31,7 +31,7 @@ DATABASES = {
     }
 }
 API_READ_DATABASES = ['replica']
-
+MAX_REPLICATION_LAG = 1e+8  # 100MB
 
 SOLR_HOST = 'http://cl-solr:8983'
 SOLR_RECAP_HOST = SOLR_HOST
