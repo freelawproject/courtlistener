@@ -1,0 +1,17 @@
+*******************************
+Warning: Replication is lagging
+*******************************
+
+These slots are coming in above the allowed threshold:
+{% for error in bad_slots %}
+  {{ error }}
+{% endfor %}
+
+You can see the current statuses at the following URL:
+
+  https://www.courtlistener.com{% url "replication_status" %}
+
+And you can check it yourself with the following function:
+
+  from cl.api.utils import get_replication_statuses
+  statuses = get_replication_statuses()
