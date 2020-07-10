@@ -104,6 +104,11 @@ urlpatterns = [
         r"^api/replication/$", views.replication_docs, name="replication_docs"
     ),
     url(
+        r"^api/replication/status/$",
+        views.replication_status,
+        name="replication_status",
+    ),
+    url(
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,
         name="coverage_data",
