@@ -757,8 +757,8 @@ PACER_TO_CL_IDS = {
     </p>
     <p><strong>To purchase a PDF:</strong></p>
     <ol>
-      <li>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</li>
-      <li>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</li>
+      <li><p>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</p></li>
+      <li><p>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</p></li>
     </ol>
     <p>An example of downloading a PDF by <code>recap_document</code> ID might be:
     </p>
@@ -778,10 +778,17 @@ PACER_TO_CL_IDS = {
 
     <p><strong>Fetching dockets</strong> is done similarly:</p>
     <ol>
-      <li>Provide the <code>request_type</code> of <code>1</code> for dockets.</li>
-      <li>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair.</li>
-      Note that this is the CourtListener court ID, not the PACER court ID (they're usually the same, but not always).
-      <li>Set any options you need for the docket purchase itself (place an <code>OPTIONS</code> request to this API for details on the available fields).</li>
+      <li><p>Provide the <code>request_type</code> of <code>1</code> for dockets.</p></li>
+      <li>
+        <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair:</p>
+        <ul>
+          <li><p><code>pacer_case_id</code> is the internal ID in the PACER system.</p></li>
+          <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
+          <li><p><code>court</code> is the CourtListener court ID, <em>not</em> the PACER court ID (see the mapping above under <code>PACER_TO_CL_IDS</code>).</p>
+          </li>
+        </ul>
+      </li>
+      <li><p>Set any options you need for the docket purchase itself (place an HTTP <code>OPTIONS</code> request to this API for details on the available fields).</p></li>
     </ol>
     <p>For example, this request identifies a case by docket number and court:</p>
     <pre class="scrollable">curl -X POST \
@@ -792,7 +799,7 @@ PACER_TO_CL_IDS = {
   --data 'court=okwd' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
-    <p>This one gets it by docket number and court, including parties and counsel:</p>
+    <p>This is the same, but includes parties and counsel:</p>
     <pre class="scrollable">curl -X POST \
   --data 'request_type=1' \
   --data 'pacer_username=xxx' \
