@@ -4,7 +4,7 @@ Warning: Replication is lagging
 
 These slots are coming in above the allowed threshold:
 {% for error in bad_slots %}
-  {{ error }}
+  {{ error|safe }}
 {% endfor %}
 
 You can see the current statuses at the following URL:
