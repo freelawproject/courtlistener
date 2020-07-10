@@ -16,9 +16,9 @@
     <p>Are any publishers configured in <code>settings.DATABASES</code>?</p>
   {% else %}
     {% for server_name, rows in statuses.items %}
-      <h3><code>{{ server_name }}</code></h3>
+      <h3><code>Database: {{ server_name }}</code></h3>
       {% for row in rows %}
-        <p>{{ forloop.counter }}: <code>lsn_distance</code>: <code>{{ row.lsn_distance }} bytes</code></p>
+        <p>Slot {{ forloop.counter }}: <code>lsn_distance</code>: <code>{{ row.lsn_distance }} bytes</code></p>
       {% endfor %}
     {% endfor %}
   {% endif %}
