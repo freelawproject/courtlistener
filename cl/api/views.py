@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
+from cl.api.utils import get_replication_statuses
 from cl.lib import sunburnt
 from cl.lib.search_utils import (
     build_coverage_query,
@@ -82,6 +83,15 @@ def api_index(request):
 
 def replication_docs(request):
     return render(request, "replication.html", {"private": False,})
+
+
+def replication_status(request):
+    statuses = get_replication_statuses()
+    return render(
+        request,
+        "replication_status.html",
+        {"private": True, "statuses": statuses},
+    )
 
 
 def bulk_data_index(request):
