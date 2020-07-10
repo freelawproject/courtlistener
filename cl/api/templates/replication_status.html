@@ -1,3 +1,4 @@
+{% load humanize %}
 {% extends "base.html" %}
 
 {% block title %}PostgreSQL Replication Statuses – CourtListener.com{% endblock %}
@@ -18,7 +19,7 @@
     {% for server_name, rows in statuses.items %}
       <h3><code>Database: {{ server_name }}</code></h3>
       {% for row in rows %}
-        <p>Slot {{ forloop.counter }}: <code>lsn_distance</code>: <code>{{ row.lsn_distance }} bytes</code></p>
+        <p>Slot {{ forloop.counter }}: <code>lsn_distance</code>: <code>{{ row.lsn_distance|intcomma }} bytes</code></p>
       {% endfor %}
     {% endfor %}
   {% endif %}
