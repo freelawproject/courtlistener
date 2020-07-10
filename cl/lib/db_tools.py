@@ -49,33 +49,3 @@ def queryset_generator(queryset, chunksize=1000):
                 # n > 1 results, which require gte for subsequent iterations.
                 lookup = "pk__gt"
                 lowest_pk = row_id
-
-
-def queryset_generator_by_date(
-    queryset, date_field, start_date, end_date, chunksize=7
-):
-    """
-    Takes a queryset and chunks it by date. Useful if sorting by pk isn't
-    needed. For large querysets, such sorting can be very expensive.
-
-    date_field is the name of the date field that should be used for chunking.
-    This field should have db_index=True in your model.
-
-    Chunksize should be given in days, and start and end dates should be provided
-    as dates.
-    """
-    chunksize = timedelta(days=chunksize)
-    bottom_date = start_date
-    top_date = bottom_date + chunksize - timedelta(1)
-    while bottom_date <= end_date:
-        if top_date > end_date:
-            # Last iteration
-            top_date = end_date
-        keywords = {
-            "%s__gte" % date_field: bottom_date,
-            "%s__lte" % date_field: top_date,
-        }
-        bottom_date = bottom_date + chunksize
-        top_date = top_date + chunksize
-        for row in queryset.filter(**keywords):
-            yield row
