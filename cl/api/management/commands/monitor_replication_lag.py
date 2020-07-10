@@ -26,7 +26,7 @@ class Command(VerboseCommand):
                     )
 
         if bad_slots:
-            subject = "Replication is lagging on %s slots"
+            subject = "Replication is lagging on %s slots" % len(bad_slots)
             template = loader.get_template("emails/replication_lag_email.txt")
             send_mail(
                 subject=subject,
