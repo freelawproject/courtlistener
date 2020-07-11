@@ -16,7 +16,7 @@ urlpatterns = [
     # Sign in/out and password pages
     url(
         r"^sign-in/$",
-        auth_views.login,
+        ratelimiter_unsafe_methods(auth_views.login),
         {
             "template_name": "register/login.html",
             "authentication_form": ConfirmedEmailAuthenticationForm,
