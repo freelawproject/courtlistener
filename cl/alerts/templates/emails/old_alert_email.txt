@@ -22,7 +22,7 @@ disabled in error, you can recreate them by clicking below.
 
 The following terminated cases were last updated about *180* days ago.
 
-*The alerts for these cases will be disabled next week unless you take action.*
+*The alerts for these cases will be disabled in one week unless you take action.*
 
 Please disable and re-enable these alerts if you are still monitoring these
 cases. Doing so will keep them running another 180 days.

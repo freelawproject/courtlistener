@@ -7,9 +7,9 @@
         {% if docket.docket_number %}
           ({{ docket.docket_number }})
         {% endif %}
-      </a><br>
-      {{ docket.court }}
-      Terminated: {{ docket.date_terminated|date:"M j, Y" }}
+      </a>
+      <br>{{ docket.court }}
+      <br>Terminated: {{ docket.date_terminated|date:"M j, Y" }}
       {% if docket.date_last_filing %}<br>Last Entry: {{ docket.date_last_filing|date:"M j, Y" }}{% endif %}
     </p></li>
   {% endfor %}
