@@ -1,6 +1,7 @@
 # coding=utf-8
 import StringIO
 import os
+import time
 from datetime import date
 
 from django.conf import settings
@@ -1411,6 +1412,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             ".input-group-addon-blended i"
         )
         alert_bell.click()
+        time.sleep(1)  # Wait for the modal to open
         page_text = self.browser.find_element_by_tag_name("body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
