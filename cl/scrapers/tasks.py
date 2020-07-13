@@ -635,6 +635,8 @@ def update_docket_info_iquery(self, d_pk):
         if self.request.retries == self.max_retries:
             return
         raise self.retry(exc=exc)
+    if not report.data:
+        return
     d = update_docket_metadata(d, report.data)
     d.save()
     add_bankruptcy_data_to_docket(d, report.data)
