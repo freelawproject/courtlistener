@@ -2,6 +2,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Min, Q
 
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
+from cl.lib.utils import previous_and_next
 from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 
@@ -11,72 +12,58 @@ def find_person(
     court_id,
     name_first=None,
     case_date=None,
-    require_dates=False,
     raise_mult=False,
     raise_zero=False,
 ):
     """Uniquely identifies a judge by both name and metadata. Prints a warning
     if couldn't find and raises an exception if not unique.
     """
-
-    # don't check for dates
-    if not require_dates:
-        candidates = Person.objects.filter(
-            name_last__iexact=name_last, positions__court_id=court_id,
+    filter_sets = [
+        # check based on name and court first
+        [Q(name_last__iexact=name_last), Q(positions__court_id=court_id)],
+    ]
+    if case_date is not None:
+        # If we've got the date, narrow by date next
+        filter_sets.append(
+            [
+                Q(
+                    positions__date_start__lt=case_date
+                    + relativedelta(years=1)
+                ),
+                Q(
+                    positions__date_termination__gt=case_date
+                    - relativedelta(years=1)
+                )
+                | Q(positions__date_termination=None),
+            ]
         )
-        if len(candidates) == 0:
-            print(
-                "No judge: Last name '%s', position '%s'."
-                % (name_last.encode("utf-8"), court_id)
-            )
-            return None
-        if len(candidates) == 1:
-            return candidates[0]
-
-    if case_date is None:
-        raise Exception("No case date provided.")
-
-    # check based on dates
-    candidates = Person.objects.filter(
-        Q(name_last__iexact=name_last),
-        Q(positions__court_id=court_id),
-        Q(positions__date_start__lt=case_date + relativedelta(years=1)),
-        Q(positions__date_termination__gt=case_date - relativedelta(years=1))
-        | Q(positions__date_termination=None),
-    )
-    if len(candidates) == 1:
-        return candidates[0]
-
-    if len(candidates) == 0:
-        msg = "No judge: Last name '%s', position '%s'." % (
-            name_last,
-            court_id,
-        )
-        print(msg)
-        if raise_zero:
-            raise Exception(msg)
-        else:
-            return None
-
     if name_first is not None:
-        candidates = Person.objects.filter(
-            Q(name_last__iexact=name_last),
-            Q(name_first__iexact=name_first),
-            Q(positions__court_id=court_id),
-            Q(positions__date_start__lt=case_date + relativedelta(years=1)),
-            Q(
-                positions__date_termination__gt=case_date
-                - relativedelta(years=1)
+        # Finally if we have the first name, narrow by that
+        filter_sets.append([Q(name_first__iexact=name_first)])
+
+    # Iterate through the filter sets. Each time, add the current filters to
+    # the previous ones to progressively narrow the filter. If we get to zero
+    # results, raise. If we do all filtering and still have more than 1 result,
+    # raise.
+    for prev, filters, nxt in previous_and_next(filter_sets):
+        if prev is not None:
+            # Each time, add the current filters to those that came before.
+            filters = prev.extend(filters)
+        candidates = Person.objects.filter(*filters)
+        if len(candidates) == 0:
+            msg = "Unable to find judge with lname %s in court %s" % (
+                name_last,
+                court_id,
             )
-            | Q(positions__date_termination=None),
-        )
+            if raise_zero:
+                raise Exception(msg)
+            else:
+                return None
+
         if len(candidates) == 1:
             return candidates[0]
-        print(
-            "First name %s not found in group %s"
-            % (name_first, str([c.name_first for c in candidates]))
-        )
 
+    # Unable to get to one or zero results. Raise exception if desired.
     if raise_mult:
         raise Exception(
             "Multiple judges: Last name '%s', court '%s', options: %s."
