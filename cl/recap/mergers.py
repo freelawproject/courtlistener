@@ -249,7 +249,7 @@ def update_docket_metadata(d, docket_data):
     judges = get_candidate_judges(
         docket_data.get("assigned_to_str"),
         d.court_id,
-        docket_data["date_filed"],
+        docket_data.get("date_filed"),
     )
     if judges is not None and len(judges) == 1:
         d.assigned_to = judges[0]
@@ -257,7 +257,7 @@ def update_docket_metadata(d, docket_data):
     judges = get_candidate_judges(
         docket_data.get("referred_to_str"),
         d.court_id,
-        docket_data["date_filed"],
+        docket_data.get("date_filed"),
     )
     if judges is not None and len(judges) == 1:
         d.referred_to = judges[0]
