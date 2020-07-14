@@ -735,7 +735,8 @@ PACER_TO_CL_IDS = {
     --form court=dcd \
     --form pacer_case_id=&lt;some-value&gt; \
     --form debug=true \
-    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'</pre>
+    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'
+    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
     <p>And once you've completed your upload, you would have a <code>Processing Queue</code> object that you could monitor for completeness. Once its <code>status</code> field indicated that it was processed successfully, it would have  a link to the docket that was created or updated.
     </p>
     <h4 id="recap-query">{% url "fast-recapdocument-list" version="v3" %}</h4>
