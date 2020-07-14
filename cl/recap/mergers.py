@@ -859,6 +859,12 @@ def add_parties_and_attorneys(d, parties):
     :return: None
 
     """
+    if not parties:
+        # Exit early if no parties. Some dockets don't have any due to user
+        # preference, and if we don't bail early, we risk deleting everything
+        # we have.
+        return
+
     normalize_attorney_roles(parties)
 
     updated_parties = set()
