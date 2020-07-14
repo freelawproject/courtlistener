@@ -648,6 +648,6 @@ def update_docket_info_iquery(self, d_pk):
         if self.request.retries == self.max_retries:
             logger.warn(msg)
             return
-        logger.info(msg = " Retrying.")
+        logger.info(msg=" Retrying.")
         raise self.retry(exc=exc)
     add_items_to_solr([d.pk], "search.Docket")
