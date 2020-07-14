@@ -1070,6 +1070,12 @@ class TerminatedEntitiesTest(TestCase):
         role_count = Role.objects.filter(docket=self.d).count()
         self.assertEqual(role_count, 2)
 
+    def test_no_parties(self):
+        """Do we keep the old parties when the new case has none?"""
+        count_before = self.d.parties.count()
+        add_parties_and_attorneys(self.d, [])
+        self.assertEqual(self.d.parties.count(), count_before)
+
 
 class RecapMinuteEntriesTest(TestCase):
     """Can we ingest minute and numberless entries properly?"""
