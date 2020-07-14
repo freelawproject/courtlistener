@@ -16,6 +16,7 @@ from PyPDF2.utils import PdfReadError
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import IntegrityError
 from django.utils.encoding import (
     smart_text,
     DjangoUnicodeDecodeError,
@@ -637,7 +638,16 @@ def update_docket_info_iquery(self, d_pk):
         raise self.retry(exc=exc)
     if not report.data:
         return
+
     d = update_docket_metadata(d, report.data)
-    d.save()
-    add_bankruptcy_data_to_docket(d, report.data)
+    try:
+        d.save()
+        add_bankruptcy_data_to_docket(d, report.data)
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warn(msg)
+            return
+        logger.info(msg = " Retrying.")
+        raise self.retry(exc=exc)
     add_items_to_solr([d.pk], "search.Docket")
