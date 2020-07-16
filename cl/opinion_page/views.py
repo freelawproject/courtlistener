@@ -81,31 +81,6 @@ def court_homepage(request, pk):
     }
     return render(request, "court.html", render_dict)
 
-def court_publishpage(request, pk):
-    import datetime
-    now = datetime.datetime.now()
-
-    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
-        raise Http404("Court pages only implemented for Tennessee so far.")
-
-    render_dict = {"results_compcl": do_search(
-        request.GET.copy(),
-        rows=5,
-        override_params={
-            "order_by": "dateFiled desc",
-            "court": "tennworkcompcl",
-        },
-        facet=False,
-    )["results"], "results_compapp": do_search(
-        request.GET.copy(),
-        rows=5,
-        override_params={
-            "order_by": "dateFiled desc",
-            "court": "tennworkcompapp",
-        },
-        facet=False,
-    )["results"], "private": False, 'years': xrange(now.year, 2012, -1)}
-    return render(request, "publish.html", render_dict)
 
 def court_publishpage(request, pk):
     """Display uploader and intake publication of doc for Tenn. Workers Comp
