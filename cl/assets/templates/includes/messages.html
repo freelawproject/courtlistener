@@ -1,6 +1,6 @@
 {% if messages %}
     {% for message in messages %}
-      {% if "https" in message.extra_tags %}
+      {% if message.extra_tags %}
        <div class="alert {{message.tags}}" role="alert">
                 <div class="row">
                       <div class="col-sm-6 text-left">
