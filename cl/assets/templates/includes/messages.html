@@ -1,7 +1,22 @@
 {% if messages %}
     {% for message in messages %}
+      {% if "https" in message.extra_tags %}
+       <div class="alert {{message.tags}}" role="alert">
+                <div class="row">
+                      <div class="col-sm-6 text-left">
+                        {{ message }}
+                      </div>
+                    <div class="col-xs-6 text-right">
+                            <a class="btn btn-primary btn-sm"
+                             href="{{message.extra_tags}}">Go<span
+                                  class="hidden-xs"> to the Case</span></a>
+                      </div>
+                </div>
+              </div>
+      {% else %}
         <div class="alert {{message.tags}}" role="alert">
-            <p class="bottom">{{message|safe}}</p>
+            <p class="bottom">{{message|safe}} </p>
         </div>
+      {% endif %}
     {% endfor %}
 {% endif %}
