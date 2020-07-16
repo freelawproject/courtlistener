@@ -29,6 +29,7 @@ from cl.search.models import OpinionCluster
 die_now = False
 cnt = CaseNameTweaker()
 
+
 def make_citation(cite_str, cluster, cite_type):
     """Create and return a citation object for the input values."""
     citation_obj = get_citations(cite_str)[0]
@@ -39,6 +40,7 @@ def make_citation(cite_str, cluster, cite_type):
         page=citation_obj.page,
         type=cite_type,
     )
+
 
 def make_objects(item, court, sha1_hash, content):
     """Takes the meta data from the scraper and associates it with objects.
@@ -51,9 +53,9 @@ def make_objects(item, court, sha1_hash, content):
     else:
         date_blocked = None
 
-    case_name_short = item.get(
-        "case_name_shorts"
-    )  or cnt.make_case_name_short(item["case_names"])
+    case_name_short = item.get("case_name_shorts") or cnt.make_case_name_short(
+        item["case_names"]
+    )
 
     docket = Docket(
         docket_number=item.get("docket_numbers", ""),
@@ -104,9 +106,9 @@ def make_objects(item, court, sha1_hash, content):
         opinion.file_with_date = cluster.date_filed
         opinion.local_path.save(file_name, cf, save=False)
     except:
-        msg = (
-            "Unable to save binary to disk. Deleted "
-            "item: %s.\n %s" % (item["case_names"], traceback.format_exc())
+        msg = "Unable to save binary to disk. Deleted " "item: %s.\n %s" % (
+            item["case_names"],
+            traceback.format_exc(),
         )
         logger.critical(msg.encode("utf-8"))
         ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
@@ -145,6 +147,7 @@ def save_everything(items, index=False, backscrape=False):
         RealTimeQueue.objects.create(
             item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
         )
+
 
 class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
