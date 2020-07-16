@@ -2,6 +2,9 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
+from .forms import TennWorkersForm
+from django.contrib import messages
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -78,31 +81,35 @@ def court_homepage(request, pk):
     }
     return render(request, "court.html", render_dict)
 
+
 def court_publishpage(request, pk):
-    import datetime
-    now = datetime.datetime.now()
+    """Display uploader and intake publication of doc for Tenn. Workers Comp
+
+    :param request:
+    :param pk:
+    :return:
+    """
 
     if pk not in ["tennworkcompcl", "tennworkcompapp"]:
         raise Http404("Court pages only implemented for Tennessee so far.")
+    form = TennWorkersForm(pk=pk)
+    if request.method == "POST":
+        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        if form.is_valid():
+            cluster_id = form.save()
+            goto = "https://www.courtlistener.com/opinion/%s/go" % cluster_id
+            messages.info(
+                request, "Document uploaded successfully.", extra_tags=goto
+            )
+            return HttpResponseRedirect(
+                reverse("court_publishpage", kwargs={"pk": pk})
+            )
+        else:
+            messages.info(request, "Form incomplete, please review the form.")
+    return render(
+        request, "publish.html", {"form": form, "private": True, "pk": pk}
+    )
 
-    render_dict = {"results_compcl": do_search(
-        request.GET.copy(),
-        rows=5,
-        override_params={
-            "order_by": "dateFiled desc",
-            "court": "tennworkcompcl",
-        },
-        facet=False,
-    )["results"], "results_compapp": do_search(
-        request.GET.copy(),
-        rows=5,
-        override_params={
-            "order_by": "dateFiled desc",
-            "court": "tennworkcompapp",
-        },
-        facet=False,
-    )["results"], "private": False, 'years': xrange(now.year, 2012, -1)}
-    return render(request, "publish.html", render_dict)
 
 def redirect_docket_recap(request, court, pacer_case_id):
     docket = get_object_or_404(
