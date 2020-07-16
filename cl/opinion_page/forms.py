@@ -104,6 +104,11 @@ class TennWorkersForm(forms.Form):
         super(TennWorkersForm, self).__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
 
+        q_judges = Person.objects.filter(positions__court_id=self.pk)
+        self.fields["lead_author"].queryset = q_judges
+        self.fields["second_judge"].queryset = q_judges
+        self.fields["third_judge"].queryset = q_judges
+
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC", "TN WC")], attrs={"class": "form-control"}
@@ -156,25 +161,27 @@ class TennWorkersForm(forms.Form):
     )
 
     lead_author = forms.ModelChoiceField(
-        queryset=Person.objects.filter(dob_state="MA").order_by("name_last"),
+        queryset=Person.objects.none(),
         required=True,
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "placeholder": "Chose lead Author",
+                "placeholder": "Choose lead Author",
             }
         ),
     )
 
     second_judge = forms.ModelChoiceField(
-        queryset=Person.objects.filter(dob_state="MA").order_by("name_last"),
-        required=True,
+        queryset=Person.objects.none(),
+        required=False,
+        label="Second panelist",
         widget=forms.Select(attrs={"class": "form-control",}),
     )
 
     third_judge = forms.ModelChoiceField(
-        queryset=Person.objects.filter(dob_state="MA").order_by("name_last"),
-        required=True,
+        queryset=Person.objects.none(),
+        required=False,
+        label="Third panelist",
         widget=forms.Select(attrs={"class": "form-control",}),
     )
 
