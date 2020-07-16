@@ -4,7 +4,7 @@ from urllib import urlencode
 
 from .forms import TennWorkersForm
 from django.contrib import messages
-
+from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -82,6 +82,11 @@ def court_homepage(request, pk):
     return render(request, "court.html", render_dict)
 
 
+def must_be_authorized_uploader(user):
+    return user.groups.filter(name="Tennessee").count()
+
+
+@user_passes_test(must_be_authorized_uploader)
 def court_publishpage(request, pk):
     """Display uploader and intake publication of doc for Tenn. Workers Comp
 
