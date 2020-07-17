@@ -82,7 +82,7 @@ def court_homepage(request, pk):
     return render(request, "court.html", render_dict)
 
 
-@group_required('tenn_work_uploaders')
+@group_required("tenn_work_uploaders")
 def court_publishpage(request, pk):
     """Display uploader and intake publication of doc for Tenn. Workers Comp
 
