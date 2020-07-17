@@ -1,12 +1,4 @@
 [
-  {
-      "fields": {
-        "id": 3,
-        "name": "Tennessee"
-      },
-       "model": "auth_group",
-       "pk": 3
-    },
     {
         "fields": {
             "ftm_eid": null,
