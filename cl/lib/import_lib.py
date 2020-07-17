@@ -48,7 +48,7 @@ def find_person(
     for prev, filters, nxt in previous_and_next(filter_sets):
         if prev is not None:
             # Each time, add the current filters to those that came before.
-            filters = prev.extend(filters)
+            prev.extend(filters)
         candidates = Person.objects.filter(*filters)
         if len(candidates) == 0:
             msg = "Unable to find judge with lname %s in court %s" % (
