@@ -12,6 +12,17 @@ def load_fixtures(apps, schema_editor):
     for fixture in fixtures:
         load_migration_fixture(apps, schema_editor, fixture, 'people_db')
 
+def unload_fixture(apps, schema_editor):
+    Person = apps.get_model("people_db", "Person")
+    Position = apps.get_model("people_db", "Position")
+    # Source = apps.get_model("people_db", "Source")
+    new_pks = ['tennworkcompapp', 'tennworkcompcl']
+    for pk in new_pks:
+        for human in Position.objects.filter(court_id=pk):
+            pers = Person.objects.get(id=human.person_id)
+            human.delete()
+            pers.delete()
+
 
 class Migration(migrations.Migration):
 
@@ -20,5 +31,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(load_fixtures),
+        migrations.RunPython(load_fixtures, unload_fixture),
     ]
