@@ -490,7 +490,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         # Note the exclamation mark. In a URL this would look like
         # "?judge!=1". Fun stuff.
         self.q["person!"] = 2
-        self.assertCountInResults(18)  # Bill
+        self.assertCountInResults(1)  # Bill
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
