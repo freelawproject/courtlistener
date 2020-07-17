@@ -231,7 +231,7 @@ class TennWorkersForm(forms.Form):
                 self.cleaned_data.get("third_judge"),
             ]
         else:
-            self.cleaned_data["panel"] = []
+            self.cleaned_data["panel"] = [self.cleaned_data.get("lead_author")]
 
     def make_item_dict(self):
         self.cleaned_data["item"] = {
@@ -273,8 +273,6 @@ class TennWorkersForm(forms.Form):
             self.cleaned_data.get("pdf_upload"),
         )
 
-        opinion.author = self.cleaned_data.get("lead_author")
-
         save_everything(
             items={
                 "docket": docket,
@@ -285,14 +283,12 @@ class TennWorkersForm(forms.Form):
             index=False,
         )
 
-        for panel_judge in self.cleaned_data.get("panel"):
-            cluster.panel.add(panel_judge)
-
         extract_doc_content.delay(
             opinion.pk, do_ocr=True, citation_jitter=True,
         )
 
         logging.info(
-            "Successfully added Tennesee object cluster:%s", cluster.id
+            "Successfully added Tennessee object cluster: %s", cluster.id
         )
+
         return cluster.id
