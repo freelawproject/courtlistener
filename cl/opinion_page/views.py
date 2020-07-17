@@ -4,7 +4,6 @@ from urllib import urlencode
 
 from .forms import TennWorkersForm
 from django.contrib import messages
-from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -29,6 +28,7 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
+from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
@@ -82,11 +82,7 @@ def court_homepage(request, pk):
     return render(request, "court.html", render_dict)
 
 
-def must_be_authorized_uploader(user):
-    return user.groups.filter(name="Tennessee").count()
-
-
-@user_passes_test(must_be_authorized_uploader)
+@group_required('tenn_work_uploaders')
 def court_publishpage(request, pk):
     """Display uploader and intake publication of doc for Tenn. Workers Comp
 
