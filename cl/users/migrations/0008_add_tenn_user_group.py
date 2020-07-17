@@ -8,12 +8,12 @@ from django.db import migrations, models
 
 def make_tenn_group(apps, schema_editor):
     Group = apps.get_model("auth", "Group",)
-    Group.objects.create(name="Tennessee",)
+    Group.objects.create(name="tenn_work_uploaders",)
 
 
 def delete_tenn_group(apps, schema_editor):
     Group = apps.get_model("auth", "Group")
-    Group.objects.filter(name="Tennessee").delete()
+    Group.objects.filter(name="tenn_work_uploaders").delete()
 
 
 class Migration(migrations.Migration):
