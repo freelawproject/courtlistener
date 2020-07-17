@@ -22,6 +22,10 @@ def unload_fixture(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    run_before = [
+        ('people_db', '0043_load_tenn_judge_data'),
+    ]
+
     dependencies = [
         ('search', '0088_add_harvard_opinions'),
     ]
