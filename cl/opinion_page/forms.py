@@ -280,7 +280,7 @@ class TennWorkersForm(forms.Form):
                 "cluster": cluster,
                 "citations": citations,
             },
-            index=False,
+            index=True,
         )
 
         extract_doc_content.delay(
