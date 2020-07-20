@@ -1,6 +1,9 @@
 from django.conf import settings
 from django.urls import reverse
 from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.contrib.auth.models import User, Group
+
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_404_NOT_FOUND,
@@ -210,3 +213,34 @@ class OpinionSitemapTest(SitemapTest):
         # Class attributes are set, just run the test in super.
         self.expected_item_count = self.get_expected_item_count()
         super(OpinionSitemapTest, self).does_the_sitemap_have_content()
+
+
+class UploadPublication(TestCase):
+    def setUp(self):
+        self.client = Client()
+        tenn_group = Group.objects.get(name="tenn_work_uploaders")
+        self.tenn_user = User.objects.create_user(
+            "learned", "learnedhand@scotus.gov", "thehandofjustice"
+        )
+        self.reg_user = User.objects.create_user(
+            "test_user", "test_user@scotus.gov", "simplepassword"
+        )
+
+        self.tenn_user.groups.add(tenn_group)
+        self.tenn_user.save()
+
+    def test_access_upload_page(self):
+        # Test access to Tennesee publishing page
+        self.client.login(username="learned", password="thehandofjustice")
+        response = self.client.get(
+            reverse("court_publishpage", args=["tennworkcompcl"])
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_redirect_without_access(self):
+        # Test lack of access to Tennesee publishing page
+        self.client.login(username="test_user", password="simplepassword")
+        response = self.client.get(
+            reverse("court_publishpage", args=["tennworkcompcl"])
+        )
+        self.assertEqual(response.status_code, 302)
