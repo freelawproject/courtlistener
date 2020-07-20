@@ -16,6 +16,7 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.views import make_docket_title
 from cl.search.models import Citation, Docket
+from cl.people_db.models import Person
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
 
 
@@ -230,7 +231,7 @@ class UploadPublication(TestCase):
         self.tenn_user.save()
 
     def test_access_upload_page(self):
-        # Test access to Tennesee publishing page
+        # Test access to Tennessee publishing page
         self.client.login(username="learned", password="thehandofjustice")
         response = self.client.get(
             reverse("court_publishpage", args=["tennworkcompcl"])
@@ -238,7 +239,7 @@ class UploadPublication(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_redirect_without_access(self):
-        # Test lack of access to Tennesee publishing page
+        # Test lack of access to Tennessee publishing page
         self.client.login(username="test_user", password="simplepassword")
         response = self.client.get(
             reverse("court_publishpage", args=["tennworkcompcl"])
