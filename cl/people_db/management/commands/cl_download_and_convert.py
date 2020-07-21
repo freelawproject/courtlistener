@@ -52,7 +52,8 @@ def sorted_list_of_images(download_urls):
     combine_images_into_pdf(xlist, download_list)
 
 
-def split_single_image_into_image_list(download_urls, download_list):
+
+def split_single_image_into_image_list(download_urls):
     img = Image.open(requests.get(download_urls[0], stream=True).raw)
     width, height = img.size
     xlist = []
