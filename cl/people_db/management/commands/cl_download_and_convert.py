@@ -248,7 +248,7 @@ def find_judge(item):
         elif len(position) == 0:
             # No person found
             logger.info(
-                "Judge not found: %s %s %s (%s, %s)"
+                "Judge not found: %s %s (%s, %s)"
                 % (
                     item["name_first"],
                     item["name_last"],
