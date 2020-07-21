@@ -49,8 +49,7 @@ def sorted_list_of_images(download_urls):
     for link in download_urls:
         img = Image.open(requests.get(link, stream=True).raw)
         xlist.append(img)
-    combine_images_into_pdf(xlist, download_list)
-
+    return xlist
 
 
 def split_single_image_into_image_list(download_urls):
