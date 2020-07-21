@@ -63,7 +63,7 @@ def split_single_image_into_image_list(download_urls):
         )
         xlist.append(image)
         i += 1
-    combine_images_into_pdf(xlist, download_list)
+    return xlist
 
 
 def create_pdf(download_urls, download_list):
