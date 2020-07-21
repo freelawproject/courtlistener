@@ -311,10 +311,6 @@ def add_file_to_db(item):
     fd.save()
 
 
-def download_new_disclosures(options):
-    iterate_over_aws()
-
-
 def add_judge_to_disclosure(options):
     disclosures = []
     for doc in glob.iglob(
