@@ -225,8 +225,7 @@ def get_fd_year(key):
 def find_judge(item):
     fd_judge = None
     person = Person.objects.filter(
-        name_first=item["name_first"],
-        name_middle=item["name_middle"],
+        name_first_istartswith=item["name_first"],
         name_last=item["name_last"],
         # name_suffix=item["name_suffix"],
     )
@@ -236,8 +235,8 @@ def find_judge(item):
     elif len(person) == 0:
         # no person found
         logger.info(
-            "Judge not found: %s %s %s"
-            % (item["name_first"], item["name_middle"], item["name_last"])
+            "Judge not found: %s %s"
+            % (item["name_first"], item["name_last"])
         )
     else:
         position = Position.objects.filter(
@@ -254,7 +253,6 @@ def find_judge(item):
                 "Judge not found: %s %s %s (%s, %s)"
                 % (
                     item["name_first"],
-                    item["name_middle"],
                     item["name_last"],
                     item["position_type"],
                     item["court"],
@@ -263,7 +261,7 @@ def find_judge(item):
         else:
             logger.info(
                 "Multiple judges found for %s %s %s"
-                % (item["name_first"], item["name_middle"], item["name_last"])
+                % (item["name_first"], item["name_last"])
             )
     return fd_judge
 
