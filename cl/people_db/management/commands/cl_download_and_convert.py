@@ -74,11 +74,14 @@ def process_pdf(download_urls, document_xkey_list):
     if os.path.exists(pdf_path):
         logger.info("Already converted: %s" % pdf_path)
     else:
-        logger.info("Converting %s" % download_list[-1])
+        logger.info("Converting %s" % document_xkey_list[-1])
         if len(download_urls) > 1:
-            sorted_list_of_images(download_urls, download_list)
+            xlist = sorted_list_of_images(download_urls, document_xkey_list)
         else:
-            split_single_image_into_image_list(download_urls, download_list)
+            xlist = split_single_image_into_image_list(
+                download_urls, document_xkey_list
+            )
+
 
 
 def get_section_info_by_ocr(filepath, page_num, lowerleft, upperright):
