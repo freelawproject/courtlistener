@@ -128,8 +128,6 @@ def download_new_disclosures(options):
                 download_urls.append(parent_url + quote(key))
                 xkey = os.path.splitext(key)[0]
                 download_list.append(xkey)
-                # cd['type'] = "pdf"
-                # cd['urls'] = download_urls
 
             elif "_Page" in key:
                 # Older Pre-split TIFFs
