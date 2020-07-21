@@ -10,8 +10,8 @@ fixture = "tenn_judges"
 
 
 def load_fixtures(apps, schema_editor):
-    if "test" not in sys.argv:
-        load_migration_fixture(apps, schema_editor, fixture, "people_db")
+    # if "test" not in sys.argv:
+    load_migration_fixture(apps, schema_editor, fixture, "people_db")
 
 
 def unload_fixture(apps, schema_editor):
