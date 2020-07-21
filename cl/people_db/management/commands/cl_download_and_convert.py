@@ -122,10 +122,10 @@ def download_new_disclosures(options):
                 continue
 
             # Check if we have key, or want to use this key.
-            download_urls = []
+            document_urls_to_download = []
             if key.endswith("pdf"):
                 # Judicial Watch PDF
-                download_urls.append(parent_url + quote(key))
+                document_urls_to_download.append(parent_url + quote(key))
                 xkey = os.path.splitext(key)[0]
                 download_list.append(xkey)
 
@@ -139,12 +139,12 @@ def download_new_disclosures(options):
                 for obj in second_response["Contents"]:
                     key = obj["Key"]
                     if "Thumbs.db" not in key:
-                        download_urls.append(parent_url + quote(key))
+                        document_urls_to_download.append(parent_url + quote(key))
                 download_list.append(xkey)
             else:
                 # Regular old Large TIFF
                 xkey = os.path.splitext(key)[0]
-                download_urls.append(parent_url + quote(key))
+                document_urls_to_download.append(parent_url + quote(key))
                 download_list.append(xkey)
 
         try:
