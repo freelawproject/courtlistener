@@ -3,6 +3,10 @@ from django.urls import reverse
 from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.contrib.auth.models import User, Group
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+from .forms import TennWorkersForm
+import datetime
 
 from rest_framework.status import (
     HTTP_200_OK,
@@ -230,6 +234,39 @@ class UploadPublication(TestCase):
         self.tenn_user.groups.add(tenn_group)
         self.tenn_user.save()
 
+        self.pdf = SimpleUploadedFile(
+            "file.pdf", "file_content", content_type="application/pdf"
+        )
+        self.png = SimpleUploadedFile(
+            "file.png", "file_content", content_type="image/png"
+        )
+
+        self.work_comp_app_data = {
+            "case_title": "A Sample Case",
+            "lead_author": 9708,
+            "second_judge": 9709,
+            "third_judge": 9710,
+            "docket_number": "2016-231-12332",
+            "court_str": "tennworkcompapp",
+            "pk": "tennworkcompapp",
+            "cite_volume": "2020",
+            "cite_reporter": "TN WC App.",
+            "cite_page": "1",
+            "publication_date": datetime.date(2019, 4, 13),
+        }
+
+        self.work_comp_data = data = {
+            "lead_author": 9707,  # 9707 is one of the tenn judges
+            "case_title": "A Sample Case",
+            "docket_number": "2016-231-12332",
+            "court_str": "tenncompcl",
+            "pk": "tenncompcl",
+            "cite_volume": "2020",
+            "cite_reporter": "TN WC",
+            "cite_page": "1",
+            "publication_date": datetime.date(2019, 4, 13),
+        }
+
     def test_access_upload_page(self):
         # Test access to Tennessee publishing page
         self.client.login(username="learned", password="thehandofjustice")
@@ -245,3 +282,55 @@ class UploadPublication(TestCase):
             reverse("court_publishpage", args=["tennworkcompcl"])
         )
         self.assertEqual(response.status_code, 302)
+
+    def test_pdf_upload(self):
+
+        form = TennWorkersForm(
+            self.work_comp_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        self.assertEqual(form.is_valid(), True, form.errors)
+
+    def test_pdf_validation_failure(self):
+
+        form = TennWorkersForm(
+            self.work_comp_data, pk="tenncompcl", files={"pdf_upload": self.png}
+        )
+        form.fields["lead_author"].queryset = Person.objects.filter(
+            positions__court_id="tennworkcompcl"
+        )
+        self.assertEqual(form.is_valid(), False, form.errors)
+        self.assertEqual(
+            form.errors["pdf_upload"],
+            [
+                "File extension 'png' is not allowed. Allowed extensions are: 'pdf'."
+            ],
+        )
+
+    def test_tn_wc_app_upload(self):
+
+        form = TennWorkersForm(
+            self.work_comp_app_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+        )
+        qs = Person.objects.filter(positions__court_id="tennworkcompapp")
+        form.fields["lead_author"].queryset = qs
+        form.fields["second_judge"].queryset = qs
+        form.fields["third_judge"].queryset = qs
+
+        self.assertEqual(form.is_valid(), True, form.errors)
+
+    def test_required_case_title(self):
+
+        self.work_comp_app_data.pop("case_title")
+
+        form = TennWorkersForm(
+            self.work_comp_app_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+        )
+        qs = Person.objects.filter(positions__court_id="tennworkcompapp")
+        form.fields["lead_author"].queryset = qs
+        form.fields["second_judge"].queryset = qs
+        form.fields["third_judge"].queryset = qs
+
+        self.assertEqual(form.errors['case_title'], ["This field is required."])
