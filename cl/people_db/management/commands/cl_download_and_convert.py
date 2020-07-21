@@ -33,21 +33,6 @@ def assemble_pdf(xlist, download_list):
         filepath, "PDF", resolution=100.0, save_all=True, append_images=xlist,
     )
 
-    lastpage = xlist[-1]
-    content = get_judge_info_ocr(lastpage, (0, 350, 700, 400))
-    fullname = clean_judge_name(content)
-
-    logger.info("Full name extracted by OCR: %s" % fullname)
-
-    title = get_judge_info_ocr(im, (41, 196, 195, 215))
-    logger.info("Title extracted by OCR: %s", title)
-
-    court = get_judge_info_ocr(im, (345, 130, 500, 145))
-    logger.info("Court extracted by OCR: %s", court)
-
-    location = get_judge_info_ocr(im, (45, 289, 185, 300))
-    logger.info("Location extracted by OCR: %s", location)
-
     logger.info("Converted file: %s" % filepath)
 
 
