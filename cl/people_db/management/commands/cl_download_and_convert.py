@@ -18,8 +18,8 @@ from cl.lib.utils import mkdir_p
 from django.conf import settings
 from cl.people_db.models import FinancialDisclosure, Person, Position
 
-parent_url = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
-bucket = "com-courtlistener-storage"
+parent_url = "https://%s/" % settings.AWS_S3_CUSTOM_DOMAIN
+bucket = settings.AWS_STORAGE_BUCKET_NAME
 prefix = "financial-disclosures"
 
 
