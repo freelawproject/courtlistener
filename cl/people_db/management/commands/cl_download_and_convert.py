@@ -36,7 +36,7 @@ def combine_images_into_pdf(xlist, download_list):
     logger.info("Converted file: %s" % filepath)
 
 
-def sorted_list_of_images(download_urls, download_list):
+def sorted_list_of_images(download_urls):
     key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
 
     def key(item):
