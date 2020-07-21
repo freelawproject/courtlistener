@@ -251,13 +251,6 @@ def get_fd_year(key, prefix):
     return year
 
 
-def create_judge(item):
-    person = Person(
-        name_first=item["name_first"], name_last=item["name_last"],
-    )
-    return person
-
-
 def find_judge(item):
     fd_judge = None
     person = Person.objects.filter(
