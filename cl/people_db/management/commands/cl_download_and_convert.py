@@ -85,15 +85,11 @@ def process_pdf(download_urls, document_xkey_list):
 
 
 def get_section_info_by_ocr(filepath, page_num, lowerleft, upperright):
-    pixel_width, pixel_height = 794, 1046
     fin = open(filepath, "rb")
     reader = PdfFileReader(fin)
     writer = PdfFileWriter()
 
     page = reader.getPage(page_num)
-
-    width_ratio = float(page.mediaBox.getWidth()) / pixel_width
-    height_ratio = float(page.mediaBox.getHeight()) / pixel_height
 
     page.cropBox.lowerLeft = lowerleft
     page.cropBox.upperRight = upperright
