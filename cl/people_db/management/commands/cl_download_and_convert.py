@@ -110,7 +110,7 @@ def get_section_info_by_ocr(
     return content
 
 
-def iterate_over_aws():
+def download_new_disclosures(options):
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     kwargs = {"Bucket": bucket, "Prefix": prefix}
     download_list = []
