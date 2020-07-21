@@ -9,7 +9,6 @@ from urllib import quote
 import requests
 from tempfile import NamedTemporaryFile
 
-from io import BytesIO, StringIO
 from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from PIL import Image
 from cl.scrapers.tasks import extract_by_ocr
