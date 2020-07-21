@@ -142,7 +142,9 @@ def download_new_disclosures(options):
                 for obj in second_response["Contents"]:
                     key = obj["Key"]
                     if "Thumbs.db" not in key:
-                        document_urls_to_download.append(parent_url + quote(key))
+                        document_urls_to_download.append(
+                            parent_url + quote(key)
+                        )
                 document_keys_to_process.append(xkey)
             else:
                 # Regular old Large TIFF
