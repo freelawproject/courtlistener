@@ -76,11 +76,10 @@ def process_pdf(download_urls, document_xkey_list):
     else:
         logger.info("Converting %s" % document_xkey_list[-1])
         if len(download_urls) > 1:
-            xlist = sorted_list_of_images(download_urls, document_xkey_list)
+            xlist = sorted_list_of_images(download_urls)
         else:
             xlist = split_single_image_into_image_list(
-                download_urls, document_xkey_list
-            )
+                download_urls)
         combine_images_into_pdf(xlist, document_xkey_list)
 
 
