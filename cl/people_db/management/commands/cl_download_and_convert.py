@@ -23,7 +23,7 @@ bucket = settings.AWS_STORAGE_BUCKET_NAME
 prefix = "financial-disclosures"
 
 
-def assemble_pdf(xlist, download_list):
+def combine_images_into_pdf(xlist, download_list):
     filename = os.path.basename(download_list[-1]) + ".pdf"
     assetdir = os.path.join(settings.MEDIA_ROOT, "financial-disclosures")
     mkdir_p(assetdir)
@@ -49,7 +49,7 @@ def sorted_list_of_images(download_urls, download_list):
     for link in download_urls:
         img = Image.open(requests.get(link, stream=True).raw)
         xlist.append(img)
-    assemble_pdf(xlist, download_list)
+    combine_images_into_pdf(xlist, download_list)
 
 
 def grab_and_split_image(download_urls, download_list):
@@ -63,7 +63,7 @@ def grab_and_split_image(download_urls, download_list):
         )
         xlist.append(image)
         i += 1
-    assemble_pdf(xlist, download_list)
+    combine_images_into_pdf(xlist, download_list)
 
 
 def create_pdf(download_urls, download_list):
