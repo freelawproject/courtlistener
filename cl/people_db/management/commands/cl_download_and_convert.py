@@ -111,7 +111,7 @@ def get_section_info_by_ocr(filepath, page_num, lowerleft, upperright):
 def download_new_disclosures(options):
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     kwargs = {"Bucket": bucket, "Prefix": prefix}
-    download_list = []
+    document_keys_to_process = []
     while True:
         resp = s3.list_objects_v2(**kwargs)
 
@@ -127,11 +127,11 @@ def download_new_disclosures(options):
                 # Judicial Watch PDF
                 document_urls_to_download.append(parent_url + quote(key))
                 xkey = os.path.splitext(key)[0]
-                download_list.append(xkey)
+                document_keys_to_process.append(xkey)
 
             elif "_Page" in key:
                 # Older Pre-split TIFFs
-                if key.split("_Page")[0] in download_list:
+                if key.split("_Page")[0] in document_keys_to_process:
                     continue
                 xkey = key.split("_Page")[0]
                 bundle_query = {"Bucket": bucket, "Prefix": xkey}
@@ -140,12 +140,12 @@ def download_new_disclosures(options):
                     key = obj["Key"]
                     if "Thumbs.db" not in key:
                         document_urls_to_download.append(parent_url + quote(key))
-                download_list.append(xkey)
+                document_keys_to_process.append(xkey)
             else:
                 # Regular old Large TIFF
                 xkey = os.path.splitext(key)[0]
                 document_urls_to_download.append(parent_url + quote(key))
-                download_list.append(xkey)
+                document_keys_to_process.append(xkey)
 
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
