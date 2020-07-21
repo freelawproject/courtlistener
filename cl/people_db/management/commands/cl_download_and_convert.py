@@ -113,14 +113,6 @@ def get_section_info_by_ocr(
     width_ratio = float(page.mediaBox.getWidth()) / pixel_width
     height_ratio = float(page.mediaBox.getHeight()) / pixel_height
 
-
-    # Top half of page
-    # lowerleft = (0, float(page.mediaBox.getHeight()) / 2)
-    # upperright = (
-    #     float(page.mediaBox.getWidth()),
-    #     float(page.mediaBox.getHeight()),
-    # )
-
     page.cropBox.lowerLeft = lowerleft
     page.cropBox.upperRight = upperright
     page.mediaBox.lowerLeft = lowerleft
@@ -164,10 +156,6 @@ def iterate_over_aws():
                 # Older Pre-split TIFFs
                 if key.split("_Page")[0] in download_list:
                     continue
-                # if "2014/A-F/Collings-RB" in key:
-                #     xkey = "financial-disclosures/2014/A-F/Collings-RB"
-                # else:
-                #     xkey = key.split("Page")[0]
                 xkey = key.split("_Page")[0]
                 bundle_query = {"Bucket": bucket, "Prefix": xkey}
                 second_response = s3.list_objects_v2(**bundle_query)
@@ -191,17 +179,6 @@ def iterate_over_aws():
 
             # TODO: OCR signature page to get a better name
             # TODO: add metadata into the PDF here
-
-            # add_metadata_to_pdf(
-            #     infilepath,
-            #     outfilepath,
-            #     {
-            #         "/fullname": fullname,
-            #         "/title": title,
-            #         "/court": court,
-            #         "/loc": location,
-            #     },
-            # )
 
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
@@ -414,38 +391,6 @@ class Command(VerboseCommand):
             default=1046,
             type=int,
         )
-        # # Action-specific parameters
-        # parser.add_argument(
-        #     "--case",
-        #     help="A case that you want to download when using the add-case "
-        #     "action. For example, '19STCV25157;SS;CV'",
-        # )
-        # parser.add_argument(
-        #     "--directory-glob",
-        #     help="A directory glob to use when importing bulk JSON files, for "
-        #     "example, '/home/you/bulk-data/*.json'. Note that to avoid "
-        #     "the shell interpreting the glob, you'll want to put it in "
-        #     "single quotes.",
-        # )
-        # parser.add_argument(
-        #     "--skip-until",
-        #     type=str,
-        #     help="When using --directory-glob, skip processing until an item "
-        #     "at this location is encountered. Use a path comparable to "
-        #     "that passed to --directory-glob.",
-        # )
-        # parser.add_argument(
-        #     "--reporter",
-        #     help="Reporter abbreviation as saved on IA.",
-        #     required=False,
-        # )
-
-        # parser.add_argument(
-        #     "--make-searchable",
-        #     action="store_true",
-        #     help="Add items to solr as we create opinions. "
-        #     "Items are not searchable unless flag is raised.",
-        # )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
