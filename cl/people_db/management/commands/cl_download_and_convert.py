@@ -151,7 +151,7 @@ def download_new_disclosures(options):
 
             pdf_path = create_pdf(download_urls, download_list)
             fullname = get_section_info_by_ocr(
-                pdf_path, 5, (345, 1045-390), (600, 1045-345)
+                pdf_path, 5, (345, 1045 - 390), (600, 1045 - 345)
             )
             logger.info("Fullname %s: %s" % (pdf_path, fullname))
 
