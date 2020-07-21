@@ -264,6 +264,11 @@ class CiteTest(TestCase):
             # Test non-opinion citation
             (u'lorem ipsum see §99 of the U.S. code.',
              [NonopinionCitation(match_token=u'§99')]),
+            # Test address that's not a citation (#1338)
+            (u'lorem 111 S.W. 12th St.',
+             [],),
+            (u'lorem 111 N. W. 12th St.',
+             [],),
         )
         # fmt: on
         for q, a in test_pairs:
