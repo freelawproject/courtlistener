@@ -325,15 +325,6 @@ def add_judge_to_disclosure(options):
         disclosures.append(item)
 
 
-def upload_pdfs(options):
-    pattern = os.path.join(
-        settings.MEDIA_ROOT, "financial-disclosures/**/*.pdf"
-    )
-    for filepath in glob.iglob(pattern):
-        logger.info("Uploading: %s", filepath)
-        # TODO: upload PDF
-
-
 class Command(VerboseCommand):
     help = "Download and save financial disclosures for processing."
 
