@@ -152,6 +152,8 @@ def download_new_disclosures(options):
                 document_urls_to_download.append(parent_url + quote(key))
                 document_keys_to_process.append(xkey)
 
+            process_pdf(document_urls_to_download, document_keys_to_process)
+
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
