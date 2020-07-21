@@ -79,7 +79,6 @@ def create_pdf(download_urls, download_list):
             sorted_list_of_images(download_urls, download_list)
         else:
             grab_and_split_image(download_urls, download_list)
-    return pdf_path
 
 
 def get_section_info_by_ocr(
