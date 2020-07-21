@@ -280,19 +280,6 @@ def add_file_to_db(item):
     fd.save()
 
 
-def add_judge_to_disclosure(options):
-    disclosures = []
-    for doc in glob.iglob(
-        os.path.join(settings.MEDIA_ROOT, "financial-disclosures", "*.pdf")
-    ):
-        item = {}
-        pdf = PdfFileReader(open(doc, "rb"))
-        item["page_count"] = pdf.getNumPages()
-        item["filepath"] = doc
-        # TODO: get name, year
-        print(item)
-        disclosures.append(item)
-
 
 class Command(VerboseCommand):
     help = "Download and save financial disclosures for processing."
