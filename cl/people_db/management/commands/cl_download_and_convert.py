@@ -52,7 +52,7 @@ def sorted_list_of_images(download_urls, download_list):
     combine_images_into_pdf(xlist, download_list)
 
 
-def grab_and_split_image(download_urls, download_list):
+def split_single_image_into_image_list(download_urls, download_list):
     img = Image.open(requests.get(download_urls[0], stream=True).raw)
     width, height = img.size
     xlist = []
@@ -78,7 +78,7 @@ def create_pdf(download_urls, download_list):
         if len(download_urls) > 1:
             sorted_list_of_images(download_urls, download_list)
         else:
-            grab_and_split_image(download_urls, download_list)
+            split_single_image_into_image_list(download_urls, download_list)
 
 
 def get_section_info_by_ocr(filepath, page_num, lowerleft, upperright):
