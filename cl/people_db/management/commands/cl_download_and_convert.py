@@ -186,8 +186,6 @@ def add_metadata_to_pdf(infilepath, outfilepath, info):
     if os.path.exists(infilepath):
         os.remove(infilepath)
 
-    # get_metadata_from_pdf(outfilepath)
-
 
 def get_metadata_from_pdf(filepath):
     with open(filepath, "rb") as f:
