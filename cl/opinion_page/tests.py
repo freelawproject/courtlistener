@@ -221,6 +221,9 @@ class OpinionSitemapTest(SitemapTest):
 
 
 class UploadPublication(TestCase):
+
+    fixtures = ["tenn_judges.json"]
+
     def setUp(self):
         self.client = Client()
         tenn_group = Group.objects.get(name="tenn_work_uploaders")
