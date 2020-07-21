@@ -66,8 +66,8 @@ def split_single_image_into_image_list(download_urls):
     return xlist
 
 
-def create_pdf(download_urls, download_list):
-    pdf_basename = os.path.basename(download_list[-1]) + ".pdf"
+def process_pdf(download_urls, document_xkey_list):
+    pdf_basename = os.path.basename(document_xkey_list[-1]) + ".pdf"
     pdf_path = os.path.join(
         settings.MEDIA_ROOT, "financial-disclosures", pdf_basename
     )
