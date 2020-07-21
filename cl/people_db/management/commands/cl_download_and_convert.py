@@ -74,6 +74,7 @@ def create_pdf(download_urls, download_list):
     if os.path.exists(pdf_path):
         logger.info("Already converted: %s" % pdf_path)
     else:
+        logger.info("Converting %s" % download_list[-1])
         if len(download_urls) > 1:
             sorted_list_of_images(download_urls, download_list)
         else:
