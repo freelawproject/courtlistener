@@ -311,5 +311,4 @@ class Command(VerboseCommand):
 
     VALID_ACTIONS = {
         "download-files": download_new_disclosures,
-        "assign-judges": add_judge_to_disclosure,
     }
