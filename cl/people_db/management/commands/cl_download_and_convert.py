@@ -207,14 +207,6 @@ def get_page_count_ocr(im):
     return page_count_ocr, page_count_px
 
 
-def get_judge_info_ocr(im, boundary):
-    with NamedTemporaryFile(prefix="crop_", suffix=".pdf") as tmp:
-        infocrop = im.crop(boundary)
-        infocrop.save(tmp.name)
-        is_extracted, content = extract_by_ocr(tmp.name)
-    return content
-
-
 def clean_judge_name(namestring):
     try:
         fullname = namestring.split("/")[1].split("\\")[0].strip()
