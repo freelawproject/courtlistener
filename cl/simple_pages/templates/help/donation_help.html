@@ -36,22 +36,28 @@
 
     <hr>
     <h2>Questions about Donations</h2>
+    <h3>Do you accept matching donations from employers?</h3>
+    <p>Yes! Free Law Project is available in most employer matching tools. If your employer has a giving program, please use it so we can maximize your contribution. If your employer is unable to give to us, let us know and we can usually get things fixed in whatever system they use.</p>
+
     <h3>Do accept checks?</h3>
     <p>Yes, we do. Please <a href="{% url "contact" %}">send us an email</a> if you're interested and we'll follow up from there. Unfortunately, due to the nature of our work, we no longer publish our address online.
     </p>
 
-    <h3>Do you accept BitCoint or other Alt Coins?</h3>
-    <p>We do accept BitCoin, yes. You can make a bitcoin donation using the following QR code or bitcoin address:</p>
-    <img src="{{ STATIC_PREFIX }}png/bitcoin-qr-code.png"
-         width="200"
-         height="200"
-         class="img-responsive img-rounded center-block">
-    <p class="text-center"><a
-      href="bitcoin:18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27">18zToeKZZyqMP39WiNpCd6V6c1Fc1MbR27</a>
-    </p>
-    <p>We don't support any other altcoins at this time.
-    </p>
+    <h3>Do you accept BitCoin or other Cryptocurrencies?</h3>
+    <p>We do accept a few cryptocurrencies, yes. Please see the section for donating via those methods on the <a href="{% url "donate" %}">donate page</a>.</p>
 
+    <div id="other-ways">
+      <h3>Are there other ways to help?</h3>
+      <p>There are a few yes:</p>
+      <ul>
+        <li><p>You can <a href="https://smile.amazon.com/ch/46-3342480">shop using Amazon Smile</a> and give us a percentage of every purchase you make.</p></li>
+        <li><p><a href="https://www.paypal.com/us/fundraiser/charity/1686269">PayPal Giving Fund</a> will cover your credit card fees when you donate via their website.</p></li>
+        <li><p>You can <a href="https://help.nextdoor.com/s/article/About-Sell-for-Good">donate to Free Law Project when buying and selling on Nextdoor</a> through their "Sell for Good" initiative.</p></li>
+        <li><p>You can <a href="https://github.com/sponsors/freelawproject">sponsor Free Law Project via your Github account</a>.</p></li>
+        <li><p>You can <a href="https://charity.ebay.com/">donate while buying or selling on Ebay</a>.</p></li>
+      </ul>
+      <p>And of course, we are always <a href="{% url "contribute" %}">looking for volunteers</a>.</p>
+    </div>
 
     <hr>
     <h2>Recurring Donations</h2>
