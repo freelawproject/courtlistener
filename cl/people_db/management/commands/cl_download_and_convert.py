@@ -150,14 +150,10 @@ def download_new_disclosures(options):
                 download_list.append(xkey)
 
             pdf_path = create_pdf(download_urls, download_list)
-            # TODO: grab the judge names, locations
             fullname = get_section_info_by_ocr(
                 pdf_path, 5, (345, 1045-390), (600, 1045-345)
             )
             logger.info("Fullname %s: %s" % (pdf_path, fullname))
-
-            # TODO: OCR signature page to get a better name
-            # TODO: add metadata into the PDF here
 
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
