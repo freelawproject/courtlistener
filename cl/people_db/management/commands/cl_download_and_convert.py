@@ -235,7 +235,7 @@ def get_nth_page(im, n):
     return im_nth_page
 
 
-def get_fd_year(key, prefix):
+def get_fd_year(key):
     subdir = os.path.relpath(key, start=prefix).split("/")[0]
     if subdir == "judicial-watch":
         subdir = re.search(r"\d{4}", key).group()
