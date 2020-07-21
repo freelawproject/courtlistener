@@ -22,9 +22,6 @@ from cl.people_db.models import FinancialDisclosure, Person, Position
 parent_url = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
 bucket = "com-courtlistener-storage"
 prefix = "financial-disclosures"
-# prefix = "financial-disclosures/2014/A-F/Collings-RB"
-# prefix = "financial-disclosures/2011/A-E/Aldisert-RJ/Aldisert-RJ"
-# prefix = "financial-disclosures/2011/A-E/Albritton-WH. J3. 11. ALM. resp.tiff"
 
 
 def assemble_pdf(xlist, download_list):
