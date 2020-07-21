@@ -207,14 +207,6 @@ def get_page_count_ocr(im):
     return page_count_ocr, page_count_px
 
 
-def clean_judge_name(namestring):
-    try:
-        fullname = namestring.split("/")[1].split("\\")[0].strip()
-    except:
-        fullname = None
-    return fullname
-
-
 def get_nth_page(im, n):
     pixel_width, pixel_height = 794, 1046
     width, height = im.size
