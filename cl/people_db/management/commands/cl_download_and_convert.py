@@ -227,7 +227,6 @@ def find_judge(item):
     person = Person.objects.filter(
         name_first_istartswith=item["name_first"],
         name_last=item["name_last"],
-        # name_suffix=item["name_suffix"],
     )
 
     if len(person) == 1:
@@ -242,7 +241,6 @@ def find_judge(item):
         position = Position.objects.filter(
             person=person,
             position_type=item["position_type"],
-            # job_title=item['job_title'],
             court=item["court"],
         )
         if len(position) == 1:
