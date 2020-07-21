@@ -81,9 +81,7 @@ def create_pdf(download_urls, download_list):
             grab_and_split_image(download_urls, download_list)
 
 
-def get_section_info_by_ocr(
-    filepath, page_num, lowerleft, upperright
-):
+def get_section_info_by_ocr(filepath, page_num, lowerleft, upperright):
     pixel_width, pixel_height = 794, 1046
     fin = open(filepath, "rb")
     reader = PdfFileReader(fin)
