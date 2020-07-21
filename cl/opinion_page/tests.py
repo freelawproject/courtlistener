@@ -286,7 +286,9 @@ class UploadPublication(TestCase):
     def test_pdf_upload(self):
 
         form = TennWorkersForm(
-            self.work_comp_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+            self.work_comp_data,
+            pk="tenncompcl",
+            files={"pdf_upload": self.pdf},
         )
         form.fields["lead_author"].queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
@@ -296,7 +298,9 @@ class UploadPublication(TestCase):
     def test_pdf_validation_failure(self):
 
         form = TennWorkersForm(
-            self.work_comp_data, pk="tenncompcl", files={"pdf_upload": self.png}
+            self.work_comp_data,
+            pk="tenncompcl",
+            files={"pdf_upload": self.png},
         )
         form.fields["lead_author"].queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
@@ -312,7 +316,9 @@ class UploadPublication(TestCase):
     def test_tn_wc_app_upload(self):
 
         form = TennWorkersForm(
-            self.work_comp_app_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+            self.work_comp_app_data,
+            pk="tenncompcl",
+            files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
         form.fields["lead_author"].queryset = qs
@@ -326,11 +332,15 @@ class UploadPublication(TestCase):
         self.work_comp_app_data.pop("case_title")
 
         form = TennWorkersForm(
-            self.work_comp_app_data, pk="tenncompcl", files={"pdf_upload": self.pdf}
+            self.work_comp_app_data,
+            pk="tenncompcl",
+            files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
         form.fields["lead_author"].queryset = qs
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
 
-        self.assertEqual(form.errors['case_title'], ["This field is required."])
+        self.assertEqual(
+            form.errors["case_title"], ["This field is required."]
+        )
