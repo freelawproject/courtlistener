@@ -5,7 +5,7 @@ from django.test.client import Client
 from django.contrib.auth.models import User, Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from .forms import TennWorkersForm
+from cl.opinion_page.forms import TennWorkersForm
 import datetime
 
 from rest_framework.status import (
