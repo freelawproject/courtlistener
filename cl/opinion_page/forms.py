@@ -104,9 +104,9 @@ class TennWorkersForm(forms.Form):
         super(TennWorkersForm, self).__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
 
-        q_judges = Person.objects.filter(positions__court_id=self.pk).order_by(
-            "name_first"
-        )
+        q_judges = Person.objects.filter(
+            positions__court_id=self.pk, is_alias_of=None
+        ).order_by("name_first")
         self.fields["lead_author"].queryset = q_judges
         self.fields["second_judge"].queryset = q_judges
         self.fields["third_judge"].queryset = q_judges
