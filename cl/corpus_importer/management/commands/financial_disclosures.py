@@ -152,7 +152,9 @@ def convert_long_image_to_pdf(aws_path, pk):
     :param pk: The Person ID in CL db
     :return:
     """
-    img = Image.open(requests.get("%s%s" % (base_url, aws_path), stream=True).raw)
+    img = Image.open(
+        requests.get("%s%s" % (base_url, aws_path), stream=True).raw
+    )
 
     width, height = img.size
     image_list = []
@@ -230,10 +232,13 @@ def judicial_watch(options):
                 fd.page_count = num_pages
                 fd.person = Person.objects.get(id=pk)
                 fd.filepath.save("", ContentFile(response.content))
-                logger.info("Saved pdf at : %s", (
-                    "https://dev-com-courtlistener-storage.s3-us-west-2.amazonaws.com"
-                    + str(fd.filepath)
-                ))
+                logger.info(
+                    "Saved pdf at : %s",
+                    (
+                        "https://dev-com-courtlistener-storage.s3-us-west-2.amazonaws.com"
+                        + str(fd.filepath)
+                    ),
+                )
 
             else:
                 logger.info("Missing judge for filepath: %s", aws_path)
