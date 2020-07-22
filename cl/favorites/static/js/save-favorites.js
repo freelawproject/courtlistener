@@ -22,14 +22,18 @@ $(function () {
       docket_id = $('input#id_docket_id').val(),
       recap_doc_id = $('input#id_recap_doc_id').val(),
       name = $('input#save-favorite-name-field').val(),
-      notes = $('textarea#save-favorite-notes-field').val(),
-      dataString = `&cluster_id=${cluster_id}&audio_id=${audio_id}` +
-        `&docket_id=${docket_id}&recap_doc_id=${recap_doc_id}&notes=${notes}` +
-        `&name=${name}`;
+      notes = $('textarea#save-favorite-notes-field').val();
     $.ajax({
       method: 'POST',
       url: '/favorite/create-or-update/',
-      data: dataString,
+      data: {
+        cluster_id: cluster_id,
+        audio_id: audio_id,
+        docket_id: docket_id,
+        recap_doc_id: recap_doc_id,
+        notes: notes,
+        name: name
+      },
       success: function () {
         // Hide the modal box
         $('#modal-save-favorite').modal('hide');
