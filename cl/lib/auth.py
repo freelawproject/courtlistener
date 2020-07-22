@@ -5,7 +5,7 @@ def group_required(*group_names):
     """ Verify user group memebership
 
     :param group_names: Array of strings
-    :return: user_passes_test
+    :return: Whether the user is in one of the groups
     """
 
     def in_groups(u):
