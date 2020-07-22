@@ -225,6 +225,7 @@ class RECAPDocumentFilter(FilterSet):
             "date_upload": DATETIME_LOOKUPS,
             "document_type": ["exact"],
             "document_number": ["exact", "gte", "gt", "lte", "lt"],
+            # Parameter required in view.
             "pacer_doc_id": ["exact", "in"],
             "is_available": ["exact"],
             "sha1": ["exact"],
