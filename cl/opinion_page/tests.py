@@ -235,7 +235,6 @@ class UploadPublication(TestCase):
         )
 
         self.tenn_user.groups.add(tenn_group)
-        self.tenn_user.save()
 
         self.pdf = SimpleUploadedFile(
             "file.pdf", "file_content", content_type="application/pdf"
@@ -259,7 +258,7 @@ class UploadPublication(TestCase):
         }
 
         self.work_comp_data = data = {
-            "lead_author": 9707,  # 9707 is one of the tenn judges
+            "lead_author": 9694,  # 9707 is one of the tenn judges
             "case_title": "A Sample Case",
             "docket_number": "2016-231-12332",
             "court_str": "tenncompcl",

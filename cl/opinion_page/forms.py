@@ -244,7 +244,7 @@ class TennWorkersForm(forms.Form):
 
     def make_item_dict(self):
         self.cleaned_data["item"] = {
-            "case_names": self.cleaned_data["case_title"],
+            "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data["publication_date"],
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data["docket_number"],
