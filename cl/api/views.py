@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
+from django.template import TemplateDoesNotExist
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
@@ -63,13 +64,11 @@ def rest_docs(request, version):
     """Show the correct version of the rest docs"""
     courts = make_court_variable()
     court_count = len(courts)
-    if version is None:
-        version = "vlatest"
-    return render(
-        request,
-        "rest-docs-%s.html" % version,
-        {"court_count": court_count, "courts": courts, "private": False},
-    )
+    context = {"court_count": court_count, "courts": courts, "private": False}
+    try:
+        return render(request, "rest-docs-%s.html" % version, context)
+    except TemplateDoesNotExist:
+        return render(request, "rest-docs-vlatest.html" % version, context)
 
 
 def api_index(request):
