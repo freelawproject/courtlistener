@@ -1,7 +1,7 @@
 {% if messages %}
     {% for message in messages %}
-      {% if message.extra_tags %}
        <div class="alert {{message.tags}}" role="alert">
+            {% if message.extra_tags %}
                 <div class="row">
                       <div class="col-sm-6 text-left">
                         {{ message }}
@@ -12,11 +12,8 @@
                                   class="hidden-xs"> to the Case</span></a>
                       </div>
                 </div>
-              </div>
-      {% else %}
-        <div class="alert {{message.tags}}" role="alert">
+            {% else %}
             <p class="bottom">{{message|safe}} </p>
         </div>
-      {% endif %}
     {% endfor %}
 {% endif %}
