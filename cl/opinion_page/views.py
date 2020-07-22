@@ -2,7 +2,6 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
-from .forms import TennWorkersForm
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -38,7 +37,11 @@ from cl.lib.search_utils import (
     get_related_clusters_with_cache,
 )
 from cl.lib.string_utils import trunc
-from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.opinion_page.forms import (
+    CitationRedirectorForm,
+    DocketEntryFilterForm,
+    TennWorkersForm,
+)
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
