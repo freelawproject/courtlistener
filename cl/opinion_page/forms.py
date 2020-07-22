@@ -214,14 +214,20 @@ class TennWorkersForm(forms.Form):
     )
 
     def validate_neutral_citation(self):
-        cv = self.cleaned_data.get("cite_volume")
-        cr = self.cleaned_data.get("cite_reporter")
-        cp = self.cleaned_data.get("cite_page")
+        volume = self.cleaned_data["cite_volume"]
+        reporter = self.cleaned_data["cite_reporter"]
+        page = self.cleaned_data["cite_page"]
 
-        c = Citation.objects.filter(volume=cv, reporter=cr, page=cp).exists()
+        c = Citation.objects.filter(
+            volume=volume, reporter=reporter, page=page
+        ).exists()
         if c:
             raise ValidationError("Citation already in system")
-        self.cleaned_data["neutral_citation"] = "%s %s %s" % (cv, cr, cp)
+        self.cleaned_data["neutral_citation"] = "%s %s %s" % (
+            volume,
+            reporter,
+            page,
+        )
 
     def clean_pdf_upload(self):
         return self.cleaned_data.get("pdf_upload").read()
