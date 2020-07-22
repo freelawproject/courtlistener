@@ -20,7 +20,7 @@ from cl.lib.model_helpers import (
     validate_not_all,
     validate_at_most_n,
     validate_supervisor,
-    make_pdf_path
+    make_pdf_path,
 )
 from cl.lib.search_index_utils import (
     solr_list,

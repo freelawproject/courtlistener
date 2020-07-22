@@ -107,11 +107,14 @@ def make_pdf_path(instance, filename, thumbs=False):
         )
         return os.path.join(root, file_name)
     elif type(instance) == FinancialDisclosure:
-        root = "/us/federal/judicial/financial-disclosures/%s/" % instance.person.id
+        root = (
+            "/us/federal/judicial/financial-disclosures/%s/"
+            % instance.person.id
+        )
         file_name = "%s-%s-disclosure.%s.pdf" % (
             instance.person.name_first.lower(),
             instance.person.name_last.lower(),
-            instance.year
+            instance.year,
         )
         if thumbs:
             root = root + "-thumbnails"
