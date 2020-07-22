@@ -1,12 +1,11 @@
+import datetime
+
 from django.conf import settings
 from django.urls import reverse
 from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.contrib.auth.models import User, Group
 from django.core.files.uploadedfile import SimpleUploadedFile
-
-from cl.opinion_page.forms import TennWorkersForm
-import datetime
 
 from rest_framework.status import (
     HTTP_200_OK,
@@ -18,6 +17,7 @@ from rest_framework.status import (
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
+from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.search.models import Citation, Docket
 from cl.people_db.models import Person
