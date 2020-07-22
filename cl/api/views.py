@@ -68,7 +68,7 @@ def rest_docs(request, version):
     try:
         return render(request, "rest-docs-%s.html" % version, context)
     except TemplateDoesNotExist:
-        return render(request, "rest-docs-vlatest.html" % version, context)
+        return render(request, "rest-docs-vlatest.html", context)
 
 
 def api_index(request):
