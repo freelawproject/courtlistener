@@ -165,10 +165,11 @@ class TennWorkersForm(forms.Form):
     lead_author = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=True,
+        label="Lead Author",
         widget=forms.Select(
             attrs={
                 "class": "form-control",
-                "placeholder": "Choose lead Author",
+                "placeholder": "Choose Lead Author",
             }
         ),
     )
@@ -176,19 +177,19 @@ class TennWorkersForm(forms.Form):
     second_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
-        label="Second panelist",
+        label="Second Panelist",
         widget=forms.Select(attrs={"class": "form-control",}),
     )
 
     third_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
-        label="Third panelist",
+        label="Third Panelist",
         widget=forms.Select(attrs={"class": "form-control",}),
     )
 
     cite_volume = forms.IntegerField(
-        label="Cite year",
+        label="Cite Year",
         required=True,
         widget=forms.Select(
             choices=[(x, x) for x in xrange(datetime.now().year, 2013, -1)],
@@ -196,10 +197,10 @@ class TennWorkersForm(forms.Form):
         ),
     )
 
-    cite_reporter = forms.CharField(label="Cite reporter", required=True,)
+    cite_reporter = forms.CharField(label="Cite Reporter", required=True,)
 
     cite_page = forms.IntegerField(
-        label="Cite page",
+        label="Cite Page",
         required=True,
         widget=forms.TextInput(
             attrs={"class": "form-control", "autocomplete": "off",}
