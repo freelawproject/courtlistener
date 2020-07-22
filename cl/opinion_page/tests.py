@@ -19,8 +19,8 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
-from cl.search.models import Citation, Docket
 from cl.people_db.models import Person
+from cl.search.models import Citation, Docket
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
 
 
