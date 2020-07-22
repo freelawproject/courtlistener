@@ -230,32 +230,32 @@ class TennWorkersForm(forms.Form):
         )
 
     def clean_pdf_upload(self):
-        return self.cleaned_data.get("pdf_upload").read()
+        return self.cleaned_data["pdf_upload"].read()
 
     def make_panel(self):
         if self.pk == "tennworkcompapp":
             self.cleaned_data["panel"] = [
-                self.cleaned_data.get("lead_author"),
+                self.cleaned_data["lead_author"],
                 self.cleaned_data.get("second_judge"),
                 self.cleaned_data.get("third_judge"),
             ]
         else:
-            self.cleaned_data["panel"] = [self.cleaned_data.get("lead_author")]
+            self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
 
     def make_item_dict(self):
         self.cleaned_data["item"] = {
-            "case_names": self.cleaned_data.get("case_title"),
-            "case_dates": self.cleaned_data.get("publication_date"),
+            "case_names": self.cleaned_data["case_title"],
+            "case_dates": self.cleaned_data["publication_date"],
             "precedential_statuses": "Published",
-            "docket_numbers": self.cleaned_data.get("docket_number"),
+            "docket_numbers": self.cleaned_data["docket_number"],
             "judges": ", ".join(
                 [j.name_full for j in self.cleaned_data.get("panel")]
             ),
-            "author_id": self.cleaned_data.get("lead_author").id,
-            "author": self.cleaned_data.get("lead_author"),
+            "author_id": self.cleaned_data["lead_author"].id,
+            "author": self.cleaned_data["lead_author"],
             "date_filed_is_approximate": "False",
             "blocked_statuses": "False",
-            "neutral_citations": self.cleaned_data.get("neutral_citation"),
+            "neutral_citations": self.cleaned_data["neutral_citation"],
             "download_urls": "",
         }
 
