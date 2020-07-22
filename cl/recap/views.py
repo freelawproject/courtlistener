@@ -1,3 +1,4 @@
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
@@ -88,6 +89,14 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         if suffix:
             name += " " + suffix
         return name
+
+    def list(self, request, *args, **kwargs):
+        if not request.GET.get("pacer_doc_id"):
+            # This causes bad performance. Abort.
+            raise ValidationError("pacer_doc_id is a required filter.")
+        return super(PacerDocIdLookupViewSet, self).list(
+            request, *args, **kwargs
+        )
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
