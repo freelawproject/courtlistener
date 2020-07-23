@@ -19,10 +19,10 @@ def unload_fixture(apps, schema_editor):
     Position = apps.get_model("people_db", "Position")
     new_pks = ["tennworkcompapp", "tennworkcompcl"]
     for pk in new_pks:
-        for human in Position.objects.filter(court_id=pk):
-            pers = Person.objects.get(id=human.person_id)
-            human.delete()
-            pers.delete()
+        for position in Position.objects.filter(court_id=pk):
+            person = Person.objects.get(id=position.person_id)
+            position.delete()
+            person.delete()
 
 
 class Migration(migrations.Migration):
