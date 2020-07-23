@@ -244,11 +244,13 @@ def parse_page(page):
         # 2) A roman numeral. E.g., "250 Neb. xxiv (1996)"
         # 3) A special Connecticut or Illinois number. E.g., "13301-M"
         # 4) A page with a weird suffix. E.g., "559 N.W.2d 826|N.D."
+        # 5) A page with a ¶ symbol, star, and/or colon. E.g., "¶ 119:12-14"
         match = (
-            re.match(r"\d{1,6}-\d{1,6}", page)  # Page range
+            re.match(r"\d{1,6}-\d{1,6}", page)  # Simple page range
             or isroman(page)  # Roman numeral
             or re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page)  # CT/IL page
             or re.match(r"\d{1,6}", page)  # Weird suffix
+            or re.match(r"[*\u00b6\ ]*[0-9:\-]+", page)  # ¶, star, colon
         )
         if match:
             return match.group(0)
@@ -394,6 +396,40 @@ def extract_supra_citation(words, supra_index):
 
     # Return SupraCitation
     return SupraCitation(antecedent_guess, page=page, volume=volume)
+
+
+def extract_id_citation(words, id_index):
+    """Given a list of words and the index of an id token, gather the
+    immediately succeeding tokens to construct and return an IdCitation
+    object.
+    """
+
+    # List of literals that could come after an Id. token
+    ID_REFERENCE_TOKEN_LITERALS = set(
+        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶",]
+    )
+
+    # Helper function to see whether a token qualifies as a page candidate
+    def is_page_candidate(token):
+        return token in ID_REFERENCE_TOKEN_LITERALS or parse_page(token)
+
+    # Check if the post-id token is indeed a page candidate
+    if is_page_candidate(words[id_index + 1]):
+        # If it is, set the scan_index appropriately
+        scan_index = id_index + 2
+
+        # Also, keep trying to scan for more pages
+        while is_page_candidate(words[scan_index]):
+            scan_index += 1
+
+    # If it is not, simply set a naive anchor for the end of the scan_index
+    else:
+        scan_index = id_index + 3
+
+    # Only linkify the after tokens if a page is found
+    return IdCitation(
+        id_token=words[id_index], after_tokens=words[id_index + 1 : scan_index]
+    )
 
 
 def is_date_in_reporter(editions, year):
@@ -638,9 +674,7 @@ def get_citations(
         # document, but for safety we won't make that resolution until the
         # previous citation has been successfully matched to an opinion.
         elif citation_token.lower() in {"id.", "id.,"}:
-            citation = IdCitation(
-                id_token=citation_token, after_tokens=words[i + 1 : i + 3]
-            )
+            citation = extract_id_citation(words, i)
 
         # CASE 3: Citation token is an "Ibid." reference. Same logic as above.
         elif citation_token.lower() == "ibid.":
