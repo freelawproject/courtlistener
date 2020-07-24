@@ -86,11 +86,11 @@ def court_homepage(request, pk):
 
 
 @group_required("tenn_work_uploaders")
-def court_publishpage(request, pk):
-    """Display uploader and intake publication of doc for Tenn. Workers Comp
+def court_publish_page(request, pk):
+    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
 
-    :param request:
-    :param pk:
+    :param request: A GET or POST request for the page
+    :param pk: The CL Court ID for each court
     :return:
     """
 
@@ -106,7 +106,7 @@ def court_publishpage(request, pk):
                 request, "Document uploaded successfully.", extra_tags=goto
             )
             return HttpResponseRedirect(
-                reverse("court_publishpage", kwargs={"pk": pk})
+                reverse("court_publish_page", kwargs={"pk": pk})
             )
         else:
             messages.info(request, "Form incomplete, please review the form.")
