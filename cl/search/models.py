@@ -61,6 +61,7 @@ SOURCES = (
     ("ZL", "columbia merged with lawbox"),
     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
     ("CU", "court website merged with Harvard"),
+    ("D", "direct court input"),
 )
 
 
@@ -188,6 +189,8 @@ class Docket(models.Model):
     # source, you can add it to the previous one, and have a combined value.
     # For example, if you start with a RECAP docket (1), then add scraped
     # content (2), you can arrive at a combined docket (3) because 1 + 2 = 3.
+    # Put another way, this is a bitmask. We should eventually re-do it as a
+    # bitfield using, e.g. https://github.com/disqus/django-bitfield
     DEFAULT = 0
     RECAP = 1
     SCRAPER = 2
@@ -205,7 +208,8 @@ class Docket(models.Model):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17
+    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
+    DIRECT_INPUT = 32
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -228,6 +232,7 @@ class Docket(models.Model):
         ),
         (HARVARD, "Harvard"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (DIRECT_INPUT, "Direct court input"),
     )
     RECAP_SOURCES = [
         RECAP,
@@ -425,7 +430,7 @@ class Docket(models.Model):
     date_last_filing = models.DateField(
         help_text=(
             "The date the case was last updated in the docket, as shown "
-            "in PACER's Docket History report."
+            "in PACER's Docket History report or iquery page."
         ),
         blank=True,
         null=True,
@@ -1717,6 +1722,8 @@ class Court(models.Model):
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
+
+    # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
             "The numeric ID for the court in PACER. "
@@ -1733,6 +1740,18 @@ class Court(models.Model):
         ),
         blank=True,
     )
+    pacer_rss_entry_types = models.TextField(
+        help_text="The types of entries provided by the court's RSS feed.",
+        blank=True,
+    )
+    date_last_pacer_contact = models.DateTimeField(
+        help_text="The last time the PACER website for the court was "
+        "successfully contacted",
+        blank=True,
+        null=True,
+    )
+
+    # Other stuff
     fjc_court_id = models.CharField(
         help_text="The ID used by FJC in the Integrated Database",
         max_length=3,
