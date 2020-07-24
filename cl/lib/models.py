@@ -139,3 +139,28 @@ class AbstractJSON(AbstractFile):
 
     class Meta:
         abstract = True
+
+
+class Note(models.Model):
+    """An polymorphic field that can be used to add notes to most objects"""
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_entered = models.DateTimeField(
+        help_text="The datetime when the note was entered",
+        verbose_name="Note Creation Date",
+    )
+    notes = models.TextField(
+        help_text="Any notes you wish to keep about this item",
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()
