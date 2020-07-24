@@ -3,7 +3,9 @@ import traceback
 from datetime import date
 
 from django.core.files.base import ContentFile
+from django.db import transaction
 from django.utils.encoding import force_bytes
+from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
@@ -18,87 +20,91 @@ from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import get_extension, get_binary_content
 from cl.search.models import Court, Docket, SEARCH_TYPES
 
+cnt = CaseNameTweaker()
+
+
+@transaction.atomic
+def save_everything(items, index=False, backscrape=False):
+    docket, af = items["docket"], items["audio_file"]
+    docket.save()
+    af.docket = docket
+    af.save(index=index)
+    candidate_judges = []
+    if af.docket.court_id != "scotus":
+        if af.judges:
+            candidate_judges = get_candidate_judges(
+                af.judges, docket.court.pk, af.docket.date_argued,
+            )
+    else:
+        candidate_judges = get_scotus_judges(af.docket.date_argued)
+
+    for candidate in candidate_judges:
+        af.panel.add(candidate)
+    if not backscrape:
+        RealTimeQueue.objects.create(
+            item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
+        )
+
+
+@transaction.atomic
+def make_objects(item, court, sha1_hash, content):
+    blocked = item["blocked_statuses"]
+    if blocked:
+        date_blocked = date.today()
+    else:
+        date_blocked = None
+
+    case_name_short = item.get("case_name_shorts") or cnt.make_case_name_short(
+        item["case_names"]
+    )
+
+    docket = Docket(
+        docket_number=item.get("docket_numbers", ""),
+        case_name=item["case_names"],
+        case_name_short=case_name_short,
+        court=court,
+        blocked=blocked,
+        date_blocked=date_blocked,
+        date_argued=item["case_dates"],
+        source=item.get("source") or Docket.SCRAPER,
+    )
+
+    audio_file = Audio(
+        judges=item.get("judges", ""),
+        source=item.get("cluster_source") or "C",
+        case_name=item["case_names"],
+        case_name_short=case_name_short,
+        sha1=sha1_hash,
+        download_url=item["download_urls"],
+        blocked=blocked,
+        date_blocked=date_blocked,
+    )
+
+    error = False
+    try:
+        cf = ContentFile(content)
+        extension = get_extension(content)
+        if extension not in [".mp3", ".wma"]:
+            extension = "." + item["download_urls"].lower().rsplit(".", 1)[1]
+        # See bitbucket issue #215 for why this must be
+        # lower-cased.
+        file_name = trunc(item["case_names"].lower(), 75) + extension
+        audio_file.file_with_date = docket.date_argued
+        audio_file.local_path_original_file.save(file_name, cf, save=False)
+    except:
+        msg = (
+            "Unable to save binary to disk. Deleted audio file: %s.\n "
+            "%s" % (item["case_names"], traceback.format_exc())
+        )
+        logger.critical(msg.encode("utf-8"))
+        ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
+        error = True
+
+    return docket, audio_file, error
+
 
 class Command(cl_scrape_opinions.Command):
-    def make_objects(self, item, court, sha1_hash, content):
-        blocked = item["blocked_statuses"]
-        if blocked:
-            date_blocked = date.today()
-        else:
-            date_blocked = None
-
-        case_name_short = item.get(
-            "case_name_shorts"
-        ) or self.cnt.make_case_name_short(item["case_names"])
-
-        docket = Docket(
-            docket_number=item.get("docket_numbers", ""),
-            case_name=item["case_names"],
-            case_name_short=case_name_short,
-            court=court,
-            blocked=blocked,
-            date_blocked=date_blocked,
-            date_argued=item["case_dates"],
-            source=Docket.SCRAPER,
-        )
-
-        audio_file = Audio(
-            judges=item.get("judges", ""),
-            source="C",
-            case_name=item["case_names"],
-            case_name_short=case_name_short,
-            sha1=sha1_hash,
-            download_url=item["download_urls"],
-            blocked=blocked,
-            date_blocked=date_blocked,
-        )
-
-        error = False
-        try:
-            cf = ContentFile(content)
-            extension = get_extension(content)
-            if extension not in [".mp3", ".wma"]:
-                extension = (
-                    "." + item["download_urls"].lower().rsplit(".", 1)[1]
-                )
-            # See bitbucket issue #215 for why this must be
-            # lower-cased.
-            file_name = trunc(item["case_names"].lower(), 75) + extension
-            audio_file.file_with_date = docket.date_argued
-            audio_file.local_path_original_file.save(file_name, cf, save=False)
-        except:
-            msg = (
-                "Unable to save binary to disk. Deleted audio file: %s.\n "
-                "%s" % (item["case_names"], traceback.format_exc())
-            )
-            logger.critical(msg.encode("utf-8"))
-            ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
-            error = True
-
-        return docket, audio_file, error
-
-    def save_everything(self, items, index=False, backscrape=False):
-        docket, af = items["docket"], items["audio_file"]
-        docket.save()
-        af.docket = docket
-        af.save(index=index)
-        candidate_judges = []
-        if af.docket.court_id != "scotus":
-            if af.judges:
-                candidate_judges = get_candidate_judges(
-                    af.judges, docket.court.pk, af.docket.date_argued,
-                )
-        else:
-            candidate_judges = get_scotus_judges(af.docket.date_argued)
-
-        for candidate in candidate_judges:
-            af.panel.add(candidate)
-        if not backscrape:
-            RealTimeQueue.objects.create(
-                item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
-            )
-
-    def scrape_court(self, site, full_crawl=False):
+    def scrape_court(self, site, full_crawl=False, backscrape=False):
         download_error = False
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
@@ -153,7 +159,7 @@ class Command(cl_scrape_opinions.Command):
                     )
                     dup_checker.reset()
 
-                    docket, audio_file, error = self.make_objects(
+                    docket, audio_file, error = make_objects(
                         item, court, sha1_hash, content,
                     )
 
@@ -161,9 +167,10 @@ class Command(cl_scrape_opinions.Command):
                         download_error = True
                         continue
 
-                    self.save_everything(
+                    save_everything(
                         items={"docket": docket, "audio_file": audio_file,},
                         index=False,
+                        backscrape=backscrape,
                     )
                     process_audio_file.apply_async(
                         (audio_file.pk,), countdown=random.randint(0, 3600)
