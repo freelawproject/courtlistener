@@ -435,34 +435,6 @@ class IdCitation(Citation):
         )
 
 
-class IbidCitation(IdCitation):
-    """Convenience class which represents an 'ibid' citation, a special case
-    of an 'id' citation that doesn't have any attached page. Overrides the
-    as_html() method in order to only linkify the 'ibid' token itself, and
-    not any after tokens.
-
-    Example: "... foo bar," ibid.
-    """
-
-    def as_html(self):
-        span_class = "citation"
-        after_token_html = self.generate_after_token_html()
-        if self.match_url:
-            ibid_token = (
-                u'<a href="%s"><span class="ibid_token">%s</span></a>'
-                % (self.match_url, self.id_token,)
-            )
-            data_attr = u' data-id="%s"' % self.match_id
-        else:
-            ibid_token = u"%s" % self.id_token
-            span_class += " no-link"
-            data_attr = ""
-        return (
-            u'<span class="%s"%s>\\g<1><span class="ibid_token">%s</span>%s</span>'
-            % (span_class, data_attr, ibid_token, after_token_html,)
-        )
-
-
 class NonopinionCitation(object):
     """Convenience class which represents a citation to something that we know
     is not an opinion. This could be a citation to a statute, to the U.S. code,

@@ -320,7 +320,7 @@ class CiteTest(TestCase):
                            canonical_reporter=u'U.S.', reporter_index=4,
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Id.',
-                         after_tokens=['No', 'page'],
+                         after_tokens=['No', 'page', 'number.'],
                          should_linkify=False)]),
             # Test non-opinion citation
             (u'lorem ipsum see §99 of the U.S. code.',
@@ -624,7 +624,7 @@ class CiteTest(TestCase):
             # Ibid. citation ("... Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf</pre><span class="citation no-link">, '
-             '<span class="ibid_token">Ibid.</span> Lorem ipsum dolor </span>'
+             '<span class="id_token">Ibid.</span> Lorem ipsum dolor </span>'
              '<pre class="inline">sit amet</pre>'),
         ]
 
@@ -669,7 +669,7 @@ class CiteTest(TestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures."<span class="citation no-link"> <i><span class='
-             '"ibid_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
+             '"id_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
              '</p></div>'
             ),
         ]
