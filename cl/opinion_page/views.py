@@ -100,14 +100,11 @@ def court_publish_page(request, pk):
     if request.method == "POST":
         form = TennWorkersForm(request.POST, request.FILES, pk=pk)
         if form.is_valid():
-            try:
-                cluster = form.save()
-                goto = reverse("view_case", args=[cluster.pk, cluster.slug])
-                messages.info(
-                    request, "Document uploaded successfully.", extra_tags=goto
-                )
-            except:
-                messages.info(request, "Failure occurred during upload.")
+            cluster = form.save()
+            goto = reverse("view_case", args=[cluster.pk, cluster.slug])
+            messages.info(
+                request, "Document uploaded successfully.", extra_tags=goto
+            )
             return HttpResponseRedirect(
                 reverse("court_publish_page", kwargs={"pk": pk})
             )
