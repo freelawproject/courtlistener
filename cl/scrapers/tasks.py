@@ -254,21 +254,22 @@ def update_document_from_text(opinion):
     """
     court = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court)
-    if site is not None:
-        metadata_dict = site.extract_from_text(opinion.plain_text)
-        for model_name, data in metadata_dict.items():
-            ModelClass = apps.get_model("search.%s" % model_name)
-            if model_name == "Docket":
-                opinion.cluster.docket.__dict__.update(data)
-            elif model_name == "OpinionCluster":
-                opinion.cluster.__dict__.update(data)
-            elif model_name == "Citation":
-                data["cluster_id"] = opinion.cluster_id
-                ModelClass.objects.get_or_create(**data)
-            else:
-                raise NotImplementedError(
-                    "Object type of %s not yet supported." % model_name
-                )
+    if site is None:
+        return
+    metadata_dict = site.extract_from_text(opinion.plain_text)
+    for model_name, data in metadata_dict.items():
+        ModelClass = apps.get_model("search.%s" % model_name)
+        if model_name == "Docket":
+            opinion.cluster.docket.__dict__.update(data)
+        elif model_name == "OpinionCluster":
+            opinion.cluster.__dict__.update(data)
+        elif model_name == "Citation":
+            data["cluster_id"] = opinion.cluster_id
+            ModelClass.objects.get_or_create(**data)
+        else:
+            raise NotImplementedError(
+                "Object type of %s not yet supported." % model_name
+            )
 
 
 @app.task
