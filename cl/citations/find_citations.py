@@ -403,6 +403,8 @@ def extract_id_citation(words, id_index):
     immediately succeeding tokens to construct and return an IdCitation
     object.
     """
+    # Keep track of whether a page is detected or not
+    has_page = False
 
     # List of literals that could come after an Id. token
     ID_REFERENCE_TOKEN_LITERALS = set(
@@ -417,6 +419,7 @@ def extract_id_citation(words, id_index):
     if is_page_candidate(words[id_index + 1]):
         # If it is, set the scan_index appropriately
         scan_index = id_index + 2
+        has_page = True
 
         # Also, keep trying to scan for more pages
         while is_page_candidate(words[scan_index]):
@@ -424,11 +427,14 @@ def extract_id_citation(words, id_index):
 
     # If it is not, simply set a naive anchor for the end of the scan_index
     else:
+        has_page = False
         scan_index = id_index + 3
 
     # Only linkify the after tokens if a page is found
     return IdCitation(
-        id_token=words[id_index], after_tokens=words[id_index + 1 : scan_index]
+        id_token=words[id_index],
+        after_tokens=words[id_index + 1 : scan_index],
+        should_linkify=has_page,
     )
 
 
