@@ -253,7 +253,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             date_start = date_recess_appointment
         if pd.isnull(date_start):
             # if still no start date, skip
-            continue
+            date_start = None
         date_termination = process_date_string(
             item["Termination Date" + pos_str]
         )
@@ -595,7 +595,8 @@ def make_federal_judge(item, testing=False):
         job_title = job_title.strip()
 
         if pd.isnull(start_year) or start_year == "":
-            continue
+            date_start = None
+            date_start_granularity = ""
         else:
             try:
                 start_year = int(start_year)

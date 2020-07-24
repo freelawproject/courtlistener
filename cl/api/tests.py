@@ -72,19 +72,19 @@ class BasicAPIPageTest(TestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_coverage_api_via_url(self):
-        # Should hit something like:
-        #  https://www.courtlistener.com/api/rest/v2/coverage/ca1/
         r = self.client.get("/api/rest/v2/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     def test_api_info_page_displays_latest_rest_docs_by_default(self):
-        response = self.client.get("/api/rest-info/")
+        response = self.client.get(reverse("rest_docs"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "rest-docs-vlatest.html")
 
     def test_api_info_page_can_display_different_versions_of_rest_docs(self):
         for version in ["v1", "v2"]:
-            response = self.client.get("/api/rest-info/%s/" % (version,))
+            response = self.client.get(
+                reverse("rest_docs", kwargs={"version": version})
+            )
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, "rest-docs-%s.html" % (version,))
             header = "REST API &ndash; %s" % (version.upper(),)
@@ -183,14 +183,21 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_recap_upload_api_query_counts(self):
+    def test_recap_api_query_counts(self):
         with self.assertNumQueries(3):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
 
         with self.assertNumQueries(5):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
-            self.client.get(path)
+            self.client.get(path, {"pacer_doc_id": "17711118263"})
+
+    def test_recap_api_required_filter(self):
+        path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
+        r = self.client.get(path, {"pacer_doc_id": "17711118263"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
+        r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
 
 
 class ApiEventCreationTestCase(TestCase):
