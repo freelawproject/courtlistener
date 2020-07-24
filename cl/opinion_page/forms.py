@@ -203,16 +203,16 @@ class TennWorkersForm(forms.Form):
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"}
+                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"},
             )
             del self.fields["second_judge"]
             del self.fields["third_judge"]
-
         else:
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC App.", "TN WC App.")],
                 attrs={"class": "form-control"},
             )
+        self.fields["cite_reporter"].widget.attrs["readonly"] = True
 
     @staticmethod
     def person_label(obj):
@@ -261,10 +261,10 @@ class TennWorkersForm(forms.Form):
 
     def clean_pdf_upload(self):
         pdf_data = self.cleaned_data.get("pdf_upload").read()
-        sha_1 = sha1(force_bytes(pdf_data))
-        exists = Opinion.objects.filter(sha1=sha_1).exists()
-        if exists:
-            op = Opinion.objects.get(sha1=sha_1)
+        sha1_hash = sha1(force_bytes(pdf_data))
+        ops = Opinion.objects.filter(sha1=sha1_hash)
+        if len(ops) > 0:
+            op = ops[0]
             self.add_error(
                 "pdf_upload",
                 ValidationError(
