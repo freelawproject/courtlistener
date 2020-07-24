@@ -6,6 +6,7 @@ from datetime import date
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -42,6 +43,7 @@ def make_citation(cite_str, cluster, cite_type):
     )
 
 
+@transaction.atomic
 def make_objects(item, court, sha1_hash, content):
     """Takes the meta data from the scraper and associates it with objects.
 
@@ -64,7 +66,7 @@ def make_objects(item, court, sha1_hash, content):
         court=court,
         blocked=blocked,
         date_blocked=date_blocked,
-        source=Docket.SCRAPER,
+        source=item.get("source") or Docket.SCRAPER,
     )
 
     west_cite_str = item.get("west_citations", "")
@@ -76,7 +78,7 @@ def make_objects(item, court, sha1_hash, content):
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
-        source="C",
+        source=item.get("cluster_source") or "C",
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
         blocked=blocked,
@@ -117,6 +119,7 @@ def make_objects(item, court, sha1_hash, content):
     return docket, opinion, cluster, citations, error
 
 
+@transaction.atomic
 def save_everything(items, index=False, backscrape=False):
     """Saves all the sub items and associates them as appropriate.
     """
