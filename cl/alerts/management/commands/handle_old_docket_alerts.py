@@ -37,8 +37,8 @@ def build_user_report(user, delete=False):
         docket__date_terminated=None
     ).select_related("docket")
     for alert in alerts:
-        # Use the more recent of the date the alert was created, the date it
-        # was last triggered, or the date_terminated of the docket
+        # Use the most recent of several fields that might be related to the
+        # docket or the alert.
         threshold_date = max(
             alert.docket.date_terminated, dt_as_local_date(alert.date_created)
         )
@@ -46,6 +46,8 @@ def build_user_report(user, delete=False):
             threshold_date = max(
                 threshold_date, dt_as_local_date(alert.date_last_hit)
             )
+        if alert.docket.date_last_filing:
+            threshold_date = max(threshold_date, alert.docket.date_last_filing)
         days_since_last_touch = (dt_as_local_date(now()) - threshold_date).days
         if delete:
             if days_since_last_touch >= 187:
