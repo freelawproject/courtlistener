@@ -225,11 +225,9 @@ class TennWorkersForm(forms.Form):
 
         c = Citation.objects.filter(
             volume=volume, reporter=reporter, page=page
-        ).exists()
-        if c:
-            cite = Citation.objects.get(
-                volume=volume, reporter=reporter, page=page
-            )
+        )
+        if len(c):
+            cite = c[0]
             self.add_error(
                 "cite_page",
                 ValidationError(
