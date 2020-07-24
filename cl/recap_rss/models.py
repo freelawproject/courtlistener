@@ -1,5 +1,7 @@
 from django.db import models
 
+from cl.lib.model_helpers import make_path
+from cl.lib.storage import UUIDFileSystemStorage
 from cl.search.models import Court
 
 
@@ -73,3 +75,42 @@ class RssItemCache(models.Model):
         db_index=True,
     )
     hash = models.CharField(max_length=64, unique=True, db_index=True,)
+
+
+def make_rss_feed_path(instance, filename):
+    return make_path("pacer-rss-feeds", filename)
+
+
+class RssFeedData(models.Model):
+    """Store all old RSS data to disk for future analysis."""
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    court = models.ForeignKey(
+        Court,
+        help_text="The court where the RSS feed was found",
+        on_delete=models.CASCADE,
+        related_name="rss_feed_data",
+    )
+    filepath = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_rss_feed_path,
+        storage=UUIDFileSystemStorage(),
+        max_length=150,
+    )
+
+    @property
+    def file_contents(self):
+        with open(self.filepath.path, "r") as f:
+            return f.read().decode("utf-8")
+
+    def print_file_contents(self):
+        print(self.file_contents)
