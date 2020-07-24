@@ -203,15 +203,15 @@ class TennWorkersForm(forms.Form):
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"}
+                choices=[("TN WC", "TN WC")],
+                attrs={"class": "form-control", "disabled": "disabled"},
             )
             del self.fields["second_judge"]
             del self.fields["third_judge"]
-
         else:
             self.fields["cite_reporter"].widget = forms.Select(
                 choices=[("TN WC App.", "TN WC App.")],
-                attrs={"class": "form-control"},
+                attrs={"class": "form-control", "disabled": "disabled"},
             )
 
     def validate_neutral_citation(self):
