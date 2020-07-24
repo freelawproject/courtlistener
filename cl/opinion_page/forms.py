@@ -284,6 +284,8 @@ class TennWorkersForm(forms.Form):
 
     def make_item_dict(self):
         self.cleaned_data["item"] = {
+            "source": Docket.DIRECT_INPUT,
+            "cluster_source": "D",
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data["publication_date"],
             "precedential_statuses": "Published",
@@ -310,7 +312,7 @@ class TennWorkersForm(forms.Form):
     def save(self):
         """Save uploaded Tennessee Workers Comp/Appeal to db.
 
-        :return: Cluster ID
+        :return: Cluster
         """
 
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
@@ -333,7 +335,7 @@ class TennWorkersForm(forms.Form):
                 "cluster": cluster,
                 "citations": citations,
             },
-            index=True,
+            index=False,
         )
 
         extract_doc_content.delay(
@@ -344,4 +346,4 @@ class TennWorkersForm(forms.Form):
             "Successfully added Tennessee object cluster: %s", cluster.id
         )
 
-        return cluster.id
+        return cluster
