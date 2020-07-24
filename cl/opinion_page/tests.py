@@ -283,8 +283,6 @@ class UploadPublication(TestCase):
         if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
         Docket.objects.all().delete()
-        OpinionCluster.objects.all().delete()
-        Opinion.objects.all().delete()
 
     def test_access_upload_page(self):
         """Can we successfully access upload page with access?"""
