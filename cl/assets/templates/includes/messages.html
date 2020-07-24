@@ -1,7 +1,20 @@
 {% if messages %}
-    {% for message in messages %}
-        <div class="alert {{message.tags}}" role="alert">
-            <p class="bottom">{{message|safe}}</p>
+  {% for message in messages %}
+    <div class="alert {{message.tags}}" role="alert">
+      {% if message.extra_tags %}
+        <div class="row">
+          <div class="col-sm-6 text-left">
+            {{ message }}
+          </div>
+          <div class="col-xs-6 text-right">
+            <a class="btn btn-primary btn-sm"
+             href="{{message.extra_tags}}">Go<span
+                  class="hidden-xs"> to the Case</span></a>
+          </div>
         </div>
-    {% endfor %}
+      {% else %}
+        <p class="bottom">{{message|safe}} </p>
+      {% endif %}
+    </div>
+  {% endfor %}
 {% endif %}

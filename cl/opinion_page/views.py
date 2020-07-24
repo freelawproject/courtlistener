@@ -2,6 +2,7 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
+from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -26,6 +27,7 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
+from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
@@ -35,7 +37,11 @@ from cl.lib.search_utils import (
     get_related_clusters_with_cache,
 )
 from cl.lib.string_utils import trunc
-from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.opinion_page.forms import (
+    CitationRedirectorForm,
+    DocketEntryFilterForm,
+    TennWorkersForm,
+)
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
@@ -77,6 +83,38 @@ def court_homepage(request, pk):
         "private": False,
     }
     return render(request, "court.html", render_dict)
+
+
+@group_required("tenn_work_uploaders")
+def court_publish_page(request, pk):
+    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
+
+    :param request: A GET or POST request for the page
+    :param pk: The CL Court ID for each court
+    :return:
+    """
+
+    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
+        raise Http404("Court pages only implemented for Tennessee so far.")
+    form = TennWorkersForm(pk=pk)
+    if request.method == "POST":
+        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        if form.is_valid():
+            cluster = form.save()
+            goto = reverse("view_case", args=[cluster.pk, cluster.slug])
+            messages.info(
+                request, "Document uploaded successfully.", extra_tags=goto
+            )
+            return HttpResponseRedirect(
+                reverse("court_publish_page", kwargs={"pk": pk})
+            )
+        else:
+            messages.info(
+                request, "Error submitting form, please review below."
+            )
+    return render(
+        request, "publish.html", {"form": form, "private": True, "pk": pk}
+    )
 
 
 def redirect_docket_recap(request, court, pacer_case_id):
