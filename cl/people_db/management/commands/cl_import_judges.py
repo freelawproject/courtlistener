@@ -257,7 +257,7 @@ class Command(VerboseCommand):
                     date_start = date_recess_appointment
                 if pd.isnull(date_start):
                     # if still no start date, skip
-                    continue
+                    date_start = None
                 positions = Position.objects.filter(
                     person=p,
                     date_start=date_start,

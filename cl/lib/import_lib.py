@@ -26,10 +26,8 @@ def find_person(
         # If we've got the date, narrow by date next
         filter_sets.append(
             [
-                Q(
-                    positions__date_start__lt=case_date
-                    + relativedelta(years=1)
-                ),
+                Q(positions__date_start__lt=case_date + relativedelta(years=1))
+                | Q(positions__date_start=None),
                 Q(
                     positions__date_termination__gt=case_date
                     - relativedelta(years=1)
