@@ -61,6 +61,7 @@ SOURCES = (
     ("ZL", "columbia merged with lawbox"),
     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
     ("CU", "court website merged with Harvard"),
+    ("D", "direct court input"),
 )
 
 
@@ -205,7 +206,9 @@ class Docket(models.Model):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17
+    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 + 1
+    DIRECT_INPUT = 32
+
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -228,6 +231,7 @@ class Docket(models.Model):
         ),
         (HARVARD, "Harvard"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (DIRECT_INPUT, "Direct Input"),
     )
     RECAP_SOURCES = [
         RECAP,
