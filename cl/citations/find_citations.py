@@ -14,7 +14,6 @@ from cl.citations.models import (
     Citation,
     FullCitation,
     IdCitation,
-    IbidCitation,
     SupraCitation,
     ShortformCitation,
     NonopinionCitation,
@@ -406,7 +405,7 @@ def extract_id_citation(words, id_index):
     # Keep track of whether a page is detected or not
     has_page = False
 
-    # List of literals that could come after an Id. token
+    # List of literals that could come after an id token
     ID_REFERENCE_TOKEN_LITERALS = set(
         ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶",]
     )
@@ -428,7 +427,7 @@ def extract_id_citation(words, id_index):
     # If it is not, simply set a naive anchor for the end of the scan_index
     else:
         has_page = False
-        scan_index = id_index + 3
+        scan_index = id_index + 4
 
     # Only linkify the after tokens if a page is found
     return IdCitation(
@@ -675,20 +674,14 @@ def get_citations(
                     # Neither a full nor short form citation
                     continue
 
-        # CASE 2: Citation token is an "Id." reference.
+        # CASE 2: Citation token is an "Id." or "Ibid." reference.
         # In this case, the citation is simply to the immediately previous
         # document, but for safety we won't make that resolution until the
         # previous citation has been successfully matched to an opinion.
-        elif citation_token.lower() in {"id.", "id.,"}:
+        elif citation_token.lower() in {"id.", "id.,", "ibid."}:
             citation = extract_id_citation(words, i)
 
-        # CASE 3: Citation token is an "Ibid." reference. Same logic as above.
-        elif citation_token.lower() == "ibid.":
-            citation = IbidCitation(
-                id_token=citation_token, after_tokens=words[i + 1 : i + 4]
-            )
-
-        # CASE 4: Citation token is a "supra" reference.
+        # CASE 3: Citation token is a "supra" reference.
         # In this case, we're not sure yet what the citation's antecedent is.
         # It could be any of the previous citations above. Thus, like an Id.
         # citation, we won't be able to resolve this reference until the
@@ -696,14 +689,14 @@ def get_citations(
         elif strip_punct(citation_token.lower()) == "supra":
             citation = extract_supra_citation(words, i)
 
-        # CASE 5: Citation token is a section marker.
+        # CASE 4: Citation token is a section marker.
         # In this case, it's likely that this is a reference to a non-
         # opinion document. So we record this marker in order to keep
         # an accurate list of the possible antecedents for id citations.
         elif u"§" in citation_token:
             citation = NonopinionCitation(match_token=citation_token)
 
-        # CASE 6: The token is not a citation.
+        # CASE 5: The token is not a citation.
         else:
             continue
 
