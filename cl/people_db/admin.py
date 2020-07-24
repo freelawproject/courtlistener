@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.lib.admin import AdminTweaksMixin
+from cl.lib.admin import AdminTweaksMixin, NotesInline
 
 # Judge DB imports
 from cl.people_db.models import (
@@ -37,7 +37,7 @@ class RetentionEventInline(admin.TabularInline):
 @admin.register(Position)
 class PositionAdmin(admin.ModelAdmin):
     list_filter = ("court__jurisdiction",)
-    inlines = (RetentionEventInline,)
+    inlines = (RetentionEventInline, NotesInline)
     raw_id_fields = (
         "court",
         "school",
@@ -79,6 +79,7 @@ class SchoolAdmin(admin.ModelAdmin):
         "ein",
         "name",
     )
+    inlines = (NotesInline,)
 
 
 @admin.register(Education)
@@ -88,6 +89,7 @@ class EducationAdmin(admin.ModelAdmin):
         "school__ein",
         "school__pk",
     )
+    inlines = (NotesInline,)
 
 
 class EducationInline(admin.TabularInline):
@@ -114,6 +116,7 @@ class ABARatingInline(admin.TabularInline):
 @admin.register(FinancialDisclosure)
 class FinancialDisclosureAdmin(admin.ModelAdmin):
     raw_id_fields = ("person",)
+    inlines = (NotesInline,)
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -135,6 +138,7 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
         PoliticalAffiliationInline,
         SourceInline,
         ABARatingInline,
+        NotesInline,
     )
     search_fields = (
         "name_last",
