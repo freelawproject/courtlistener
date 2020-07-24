@@ -223,7 +223,18 @@ class TennWorkersForm(forms.Form):
             volume=volume, reporter=reporter, page=page
         ).exists()
         if c:
-            raise ValidationError("Citation already in system")
+            cite = Citation.objects.get(
+                volume=volume, reporter=reporter, page=page
+            )
+            self.add_error(
+                "cite_page",
+                ValidationError(
+                    format_html(
+                        'Citation already in database. See: <a href="%s">%s</a>'
+                        % (cite.get_absolute_url(), cite.cluster.case_name),
+                    )
+                ),
+            )
         self.cleaned_data["neutral_citation"] = "%s %s %s" % (
             volume,
             reporter,
@@ -231,7 +242,21 @@ class TennWorkersForm(forms.Form):
         )
 
     def clean_pdf_upload(self):
-        return self.cleaned_data["pdf_upload"].read()
+        pdf_data = self.cleaned_data.get("pdf_upload").read()
+        sha_1 = sha1(force_bytes(pdf_data))
+        exists = Opinion.objects.filter(sha1=sha_1).exists()
+        if exists:
+            op = Opinion.objects.get(sha1=sha_1)
+            self.add_error(
+                "pdf_upload",
+                ValidationError(
+                    format_html(
+                        'Document already in database. See: <a href="%s">%s</a>'
+                        % (op.get_absolute_url(), op.cluster.case_name),
+                    )
+                ),
+            )
+        return pdf_data
 
     def make_panel(self):
         if self.pk == "tennworkcompapp":
@@ -282,6 +307,9 @@ class TennWorkersForm(forms.Form):
             sha1_hash,
             self.cleaned_data.get("pdf_upload"),
         )
+
+        if error:
+            raise ValidationError("PDF failed to upload. %s")
 
         save_everything(
             items={
