@@ -2,6 +2,16 @@
   <h3><span>API Change Log</span></h3>
   <ul>
     <li>
+      <p><strong>v3.11</strong> &mdash; This version adds several fields and changes one.</p>
+      <p><code>Person.date_completed</code>: The date and time the person was last considered complete.</p>
+      <p><code>Person.dod_country</code> and <code>Person.dob_country</code>: The country where a person was born or died.</p>
+      <p><code>Position.sector</code>: Whether a position was in the private or public sector.</p>
+      <p><code>Court.date_last_pacer_contact</code>: This will track the last time we contacted PACER for a court.</p>
+      <p><code>Court.pacer_rss_entry_types</code>: This will track the types of entries available in a court's PACER RSS feed.</p>
+      <p><code>Position.date_started</code> is now a nullable field.</p>
+    </li>
+
+    <li>
       <p><strong>v3.10</strong> &mdash; This version introduces the visualization APIs.
       </p>
     </li>
