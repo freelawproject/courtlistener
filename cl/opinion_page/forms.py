@@ -1,25 +1,24 @@
 import logging
 from datetime import datetime
+
 from django import forms
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
+from django.utils.encoding import force_bytes
+from django.utils.html import format_html
 
 from cl.lib.crypto import sha1
 from cl.people_db.models import Person
-from cl.search.models import Court, Citation
-
-from cl.search.fields import (
-    CeilingDateField,
-    FloorDateField,
-)
-
 from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
     save_everything,
 )
 from cl.scrapers.tasks import extract_doc_content
-
-from django.utils.encoding import force_bytes
-from django.core.validators import FileExtensionValidator
-from django.core.exceptions import ValidationError
+from cl.search.fields import (
+    CeilingDateField,
+    FloorDateField,
+)
+from cl.search.models import Court, Citation, Docket, Opinion
 
 
 class CitationRedirectorForm(forms.Form):
@@ -99,30 +98,6 @@ class DocketEntryFilterForm(forms.Form):
 
 
 class TennWorkersForm(forms.Form):
-    def __init__(self, *args, **kwargs):
-        self.pk = kwargs.pop("pk", None)
-        super(TennWorkersForm, self).__init__(*args, **kwargs)
-        self.initial["court_str"] = self.pk
-
-        q_judges = Person.objects.filter(
-            positions__court_id=self.pk, is_alias_of=None
-        ).order_by("name_first")
-        self.fields["lead_author"].queryset = q_judges
-        self.fields["second_judge"].queryset = q_judges
-        self.fields["third_judge"].queryset = q_judges
-
-        if self.pk == "tennworkcompcl":
-            self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"}
-            )
-            del self.fields["second_judge"]
-            del self.fields["third_judge"]
-
-        else:
-            self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC App.", "TN WC App.")],
-                attrs={"class": "form-control"},
-            )
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput(),)
 
@@ -212,6 +187,32 @@ class TennWorkersForm(forms.Form):
         required=True,
         validators=[FileExtensionValidator(["pdf"])],
     )
+
+    def __init__(self, *args, **kwargs):
+        self.pk = kwargs.pop("pk", None)
+        super(TennWorkersForm, self).__init__(*args, **kwargs)
+        self.initial["court_str"] = self.pk
+        self.initial["court"] = Court.objects.get(pk=self.pk)
+
+        q_judges = Person.objects.filter(
+            positions__court_id=self.pk, is_alias_of=None
+        ).order_by("name_first")
+        self.fields["lead_author"].queryset = q_judges
+        self.fields["second_judge"].queryset = q_judges
+        self.fields["third_judge"].queryset = q_judges
+
+        if self.pk == "tennworkcompcl":
+            self.fields["cite_reporter"].widget = forms.Select(
+                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"}
+            )
+            del self.fields["second_judge"]
+            del self.fields["third_judge"]
+
+        else:
+            self.fields["cite_reporter"].widget = forms.Select(
+                choices=[("TN WC App.", "TN WC App.")],
+                attrs={"class": "form-control"},
+            )
 
     def validate_neutral_citation(self):
         volume = self.cleaned_data["cite_volume"]
