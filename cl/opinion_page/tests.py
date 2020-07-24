@@ -271,6 +271,13 @@ class UploadPublication(TestCase):
             "publication_date": datetime.date(2019, 4, 13),
         }
 
+    def tearDown(self):
+        if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
+            shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
+        Docket.objects.all().delete()
+        OpinionCluster.objects.all().delete()
+        Opinion.objects.all().delete()
+
     def test_access_upload_page(self):
         # Test access to Tennessee publishing page
         self.client.login(username="learned", password="thehandofjustice")
