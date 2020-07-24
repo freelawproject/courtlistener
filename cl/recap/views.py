@@ -91,8 +91,8 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         return name
 
     def list(self, request, *args, **kwargs):
-        if not request.GET.get("pacer_doc_id"):
-            # This causes bad performance. Abort.
+        if not [p.startswith("pacer_doc_id") for p in request.GET.keys()]:
+            # Not having this parameter causes bad performance. Abort.
             raise ValidationError("pacer_doc_id is a required filter.")
         return super(PacerDocIdLookupViewSet, self).list(
             request, *args, **kwargs
