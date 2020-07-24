@@ -2,11 +2,11 @@
     {
         "fields": {
             "ftm_eid": null,
-            "name_first": "Allen",
+            "name_first": "Theodore",
             "ftm_total_received": null,
             "dod_city": "",
             "dob_state": "",
-            "id": 9694,
+            "id": 694,
             "cl_id": "tenn-1",
             "name_middle": "",
             "religion": "",
@@ -16,8 +16,8 @@
             "date_dod": null,
             "date_granularity_dod": "",
             "dod_state": "",
-            "slug": "allen-phillips",
-            "name_last": "Phillips",
+            "slug": "theodore-something",
+            "name_last": "Something",
             "date_modified": "2020-07-16 17:58:34.127752",
             "gender": "m",
             "dob_city": "",
@@ -27,7 +27,7 @@
             "fjc_id": null
         },
         "model": "people_db.person",
-        "pk": 9694
+        "pk": 694
     },
     {
         "fields": {
@@ -35,7 +35,7 @@
             "date_referred_to_judicial_committee": null,
             "predecessor_id": null,
             "votes_no": null,
-            "id": 35703,
+            "id": 703,
             "date_granularity_start": "%Y",
             "location_city": "Memphis",
             "date_hearing": null,
@@ -46,7 +46,7 @@
             "date_retirement": null,
             "votes_no_percent": null,
             "date_elected": null,
-            "person_id": 9694,
+            "person_id": 694,
             "school_id": null,
             "job_title": "",
             "supervisor_id": null,
@@ -70,7 +70,7 @@
             "date_recess_appointment": null
         },
         "model": "people_db.position",
-        "pk": 35703
+        "pk": 703
     },
     {
         "fields": {
@@ -78,23 +78,23 @@
             "url": "",
             "notes": "Information extracted from Univ. of Tennessee database of case law for workers comp claims",
             "date_modified": "2020-07-16 17:58:34.152023",
-            "person_id": 9694,
+            "person_id": 694,
             "date_created": "2020-07-16 17:58:34.151991",
-            "id": 5407
+            "id": 407
         },
         "model": "people_db.source",
-        "pk": 5407
+        "pk": 407
     },
     {
         "fields": {
             "ftm_eid": null,
-            "name_first": "David",
+            "name_first": "William",
             "ftm_total_received": null,
             "dod_city": "",
             "dob_state": "",
-            "id": 9708,
+            "id": 708,
             "cl_id": "tenn-15",
-            "name_middle": "F.",
+            "name_middle": "E.",
             "religion": "",
             "is_alias_of_id": null,
             "date_dob": null,
@@ -102,8 +102,8 @@
             "date_dod": null,
             "date_granularity_dod": "",
             "dod_state": "",
-            "slug": "david-f-hensley",
-            "name_last": "Hensley",
+            "slug": "william-e-partner",
+            "name_last": "Partner",
             "date_modified": "2020-07-16 17:58:34.127752",
             "gender": "m",
             "dob_city": "",
@@ -113,7 +113,7 @@
             "fjc_id": null
         },
         "model": "people_db.person",
-        "pk": 9708
+        "pk": 708
     },
     {
         "fields": {
@@ -121,7 +121,7 @@
             "date_referred_to_judicial_committee": null,
             "predecessor_id": null,
             "votes_no": null,
-            "id": 35717,
+            "id": 5717,
             "date_granularity_start": "%Y",
             "location_city": "Chattanooga",
             "date_hearing": null,
@@ -132,7 +132,7 @@
             "date_retirement": null,
             "votes_no_percent": null,
             "date_elected": null,
-            "person_id": 9708,
+            "person_id": 708,
             "school_id": null,
             "job_title": "",
             "supervisor_id": null,
@@ -156,7 +156,7 @@
             "date_recess_appointment": null
         },
         "model": "people_db.position",
-        "pk": 35717
+        "pk": 717
     },
     {
         "fields": {
@@ -164,21 +164,21 @@
             "url": "",
             "notes": "Information extracted from Univ. of Tennessee database of case law for workers comp claims",
             "date_modified": "2020-07-16 17:58:34.152023",
-            "person_id": 9708,
+            "person_id": 708,
             "date_created": "2020-07-16 17:58:34.151991",
-            "id": 5421
+            "id": 421
         },
         "model": "people_db.source",
-        "pk": 5421
+        "pk": 421
     },
     {
         "fields": {
             "ftm_eid": null,
-            "name_first": "Timothy",
+            "name_first": "Joseph",
             "ftm_total_received": null,
             "dod_city": "",
             "dob_state": "",
-            "id": 9709,
+            "id": 709,
             "cl_id": "tenn-16",
             "name_middle": "W.",
             "religion": "",
@@ -188,8 +188,8 @@
             "date_dod": null,
             "date_granularity_dod": "",
             "dod_state": "",
-            "slug": "timothy-w-conner",
-            "name_last": "Conner",
+            "slug": "joseph-g-somerville",
+            "name_last": "Somerville",
             "date_modified": "2020-07-16 17:58:34.127752",
             "gender": "m",
             "dob_city": "",
@@ -199,7 +199,7 @@
             "fjc_id": null
         },
         "model": "people_db.person",
-        "pk": 9709
+        "pk": 709
     },
     {
         "fields": {
@@ -207,7 +207,7 @@
             "date_referred_to_judicial_committee": null,
             "predecessor_id": null,
             "votes_no": null,
-            "id": 35718,
+            "id": 5718,
             "date_granularity_start": "%Y",
             "location_city": "Knoxville",
             "date_hearing": null,
@@ -218,7 +218,7 @@
             "date_retirement": null,
             "votes_no_percent": null,
             "date_elected": null,
-            "person_id": 9709,
+            "person_id": 709,
             "school_id": null,
             "job_title": "",
             "supervisor_id": null,
@@ -242,7 +242,7 @@
             "date_recess_appointment": null
         },
         "model": "people_db.position",
-        "pk": 35718
+        "pk": 718
     },
     {
         "fields": {
@@ -250,23 +250,23 @@
             "url": "",
             "notes": "Information extracted from Univ. of Tennessee database of case law for workers comp claims",
             "date_modified": "2020-07-16 17:58:34.152023",
-            "person_id": 9709,
+            "person_id": 709,
             "date_created": "2020-07-16 17:58:34.151991",
-            "id": 5422
+            "id": 422
         },
         "model": "people_db.source",
-        "pk": 5422
+        "pk": 422
     },
     {
         "fields": {
             "ftm_eid": null,
-            "name_first": "Pele",
+            "name_first": "Mary",
             "ftm_total_received": null,
             "dod_city": "",
             "dob_state": "",
-            "id": 9710,
+            "id": 710,
             "cl_id": "tenn-17",
-            "name_middle": "I.",
+            "name_middle": "B.",
             "religion": "",
             "is_alias_of_id": null,
             "date_dob": null,
@@ -274,10 +274,10 @@
             "date_dod": null,
             "date_granularity_dod": "",
             "dod_state": "",
-            "slug": "pele-i-godkin",
-            "name_last": "Godkin",
+            "slug": "mary-b-georgia",
+            "name_last": "Georgia",
             "date_modified": "2020-07-16 17:58:34.127752",
-            "gender": "m",
+            "gender": "f",
             "dob_city": "",
             "name_suffix": "",
             "has_photo": false,
@@ -285,7 +285,7 @@
             "fjc_id": null
         },
         "model": "people_db.person",
-        "pk": 9710
+        "pk": 710
     },
     {
         "fields": {
@@ -293,7 +293,7 @@
             "date_referred_to_judicial_committee": null,
             "predecessor_id": null,
             "votes_no": null,
-            "id": 35719,
+            "id": 5719,
             "date_granularity_start": "%Y",
             "location_city": "Nashville",
             "date_hearing": null,
@@ -304,7 +304,7 @@
             "date_retirement": null,
             "votes_no_percent": null,
             "date_elected": null,
-            "person_id": 9710,
+            "person_id": 710,
             "school_id": null,
             "job_title": "",
             "supervisor_id": null,
@@ -328,7 +328,7 @@
             "date_recess_appointment": null
         },
         "model": "people_db.position",
-        "pk": 35719
+        "pk": 719
     },
     {
         "fields": {
@@ -336,11 +336,11 @@
             "url": "",
             "notes": "Information extracted from Univ. of Tennessee database of case law for workers comp claims",
             "date_modified": "2020-07-16 17:58:34.152023",
-            "person_id": 9710,
+            "person_id": 710,
             "date_created": "2020-07-16 17:58:34.151991",
-            "id": 5423
+            "id": 423
         },
         "model": "people_db.source",
-        "pk": 5423
+        "pk": 423
     }
 ]
