@@ -1,11 +1,13 @@
 import datetime
+import os
+import shutil
 
 from django.conf import settings
-from django.urls import reverse
-from django.test import TestCase, override_settings
-from django.test.client import Client
 from django.contrib.auth.models import User, Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.urls import reverse
 
 from rest_framework.status import (
     HTTP_200_OK,
@@ -20,7 +22,7 @@ from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.models import Person
-from cl.search.models import Citation, Docket
+from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
 
 
