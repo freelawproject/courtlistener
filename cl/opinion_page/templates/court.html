@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load auth %}
 
 {% block title %}
   Decisions for Tennessee Workers' Compensation Courts – CourtListener.com
@@ -102,6 +103,10 @@
     <div class="row v-offset-above-6">
       <div class="col-xs-4">
         <h3>Recent CWCC&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
+        {% if request.user|in_group:"tenn_work_uploaders" %}
+          <p><a href="{% url "court_publish_page" pk="tennworkcompcl" %}"
+                class="btn btn-default">Upload New CWCC Opinion</a></p>
+        {% endif %}
         {% if results_compcl.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_compcl type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
@@ -114,6 +119,10 @@
       </div>
       <div class="col-xs-4">
         <h3>Recent Appeals Board&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
+        {% if request.user|in_group:"tenn_work_uploaders" %}
+          <p><a href="{% url "court_publish_page" pk="tennworkcompapp" %}"
+                class="btn btn-default">Upload New Appeals Board Opinion</a></p>
+        {% endif %}
         {% if results_compapp.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_compapp type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
