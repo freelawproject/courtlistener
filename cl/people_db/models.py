@@ -90,6 +90,12 @@ class Person(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_completed = models.DateTimeField(
+        help_text="Whenever an editor last decided that a profile was "
+        "complete in some sense.",
+        blank=True,
+        null=True,
+    )
     fjc_id = models.IntegerField(
         help_text="The ID of a judge as assigned by the Federal Judicial "
         "Center.",
@@ -147,11 +153,23 @@ class Person(models.Model):
     dob_state = local_models.USStateField(
         help_text="The state where the person was born.", blank=True,
     )
+    dob_country = models.CharField(
+        help_text="The country where the person was born.",
+        blank=True,
+        default="United States",
+        max_length=50,
+    )
     dod_city = models.CharField(
         help_text="The city where the person died.", max_length=50, blank=True,
     )
     dod_state = local_models.USStateField(
         help_text="The state where the person died.", blank=True,
+    )
+    dod_country = models.CharField(
+        help_text="The country where the person died.",
+        blank=True,
+        default="United States",
+        max_length=50,
     )
     gender = models.CharField(
         help_text="The person's gender",
@@ -424,18 +442,15 @@ class Position(models.Model):
     # Chief
     CHIEF_JUDGE = "c-jud"
     CHIEF_JUSTICE = "c-jus"
-    CHIEF_MAGISTRATE = "c-mag"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
-    PRESIDING_MAGISTRATE = "pres-mag"
     # Commissioner
     COMMISSIONER = "com"
     DEPUTY_COMMISSIONER = "com-dep"
     # Pro Tem
     JUDGE_PRO_TEM = "jud-pt"
     JUSTICE_PRO_TEM = "jus-pt"
-    MAGISTRATE_PRO_TEM = "mag-pt"
     # Referee
     JUDGE_TRIAL_REFEREE = "ref-jud-tr"
     OFFICIAL_REFEREE = "ref-off"
@@ -446,6 +461,13 @@ class Position(models.Model):
     RETIRED_CHIEF_JUDGE = "ret-c-jud"
     RETIRED_JUSTICE = "ret-jus"
     SENIOR_JUDGE = "ret-senior-jud"
+    # Magistrate
+    MAGISTRATE = "mag"
+    CHIEF_MAGISTRATE = "c-mag"
+    PRESIDING_MAGISTRATE = "pres-mag"
+    MAGISTRATE_PRO_TEM = "mag-pt"
+    MAGISTRATE_RECALLED = "mag-rc"
+    MAGISTRATE_PART_TIME = "mag-part-time"
     # Special
     SPECIAL_CHAIRMAN = "spec-chair"
     SPECIAL_JUDGE = "spec-jud"
@@ -454,7 +476,6 @@ class Position(models.Model):
     # Other
     CHAIRMAN = "chair"
     CHANCELLOR = "chan"
-    MAGISTRATE = "mag"
     PRESIDENT = "presi-jud"
     RESERVE_JUDGE = "res-jud"
     TRIAL_JUDGE = "trial-jud"
@@ -470,6 +491,7 @@ class Position(models.Model):
     USA_PRESIDENT = "pres"
     GOVERNOR = "gov"
     CLERK = "clerk"
+    CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
     STAFF_ATTORNEY = "staff-atty"
     PROFESSOR = "prof"
     PRACTITIONER = "Practitioner"
@@ -493,18 +515,15 @@ class Position(models.Model):
                 # Chief
                 (CHIEF_JUDGE, "Chief Judge"),
                 (CHIEF_JUSTICE, "Chief Justice"),
-                (CHIEF_MAGISTRATE, "Chief Magistrate"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
-                (PRESIDING_MAGISTRATE, "Presiding Magistrate"),
                 # Commissioner
                 (COMMISSIONER, "Commissioner"),
                 (DEPUTY_COMMISSIONER, "Deputy Commissioner"),
                 # Pro Tem
                 (JUDGE_PRO_TEM, "Judge Pro Tem"),
                 (JUSTICE_PRO_TEM, "Justice Pro Tem"),
-                (MAGISTRATE_PRO_TEM, "Magistrate Pro Tem"),
                 # Referee
                 (JUDGE_TRIAL_REFEREE, "Judge Trial Referee"),
                 (OFFICIAL_REFEREE, "Official Referee"),
@@ -515,6 +534,13 @@ class Position(models.Model):
                 (RETIRED_CHIEF_JUDGE, "Retired Chief Judge"),
                 (RETIRED_JUSTICE, "Retired Justice"),
                 (SENIOR_JUDGE, "Senior Judge"),
+                # Magistrate
+                (MAGISTRATE, "Magistrate"),
+                (CHIEF_MAGISTRATE, "Chief Magistrate"),
+                (PRESIDING_MAGISTRATE, "Presiding Magistrate"),
+                (MAGISTRATE_PRO_TEM, "Magistrate Pro Tem"),
+                (MAGISTRATE_RECALLED, "Magistrate (Recalled)"),
+                (MAGISTRATE_PART_TIME, "Magistrate (Part-Time)"),
                 # Special
                 (SPECIAL_CHAIRMAN, "Special Chairman"),
                 (SPECIAL_JUDGE, "Special Judge"),
@@ -527,7 +553,6 @@ class Position(models.Model):
                 # Other
                 (CHAIRMAN, "Chairman"),
                 (CHANCELLOR, "Chancellor"),
-                (MAGISTRATE, "Magistrate"),
                 (PRESIDENT, "President"),
                 (RESERVE_JUDGE, "Reserve Judge"),
                 (TRIAL_JUDGE, "Trial Judge"),
@@ -558,7 +583,11 @@ class Position(models.Model):
         ),
         (
             "Clerkships",
-            ((CLERK, "Clerk"), (STAFF_ATTORNEY, "Staff Attorney"),),
+            (
+                (CLERK, "Clerk"),
+                (CLERK_CHIEF_DEPUTY, "Chief Deputy Clerk"),
+                (STAFF_ATTORNEY, "Staff Attorney"),
+            ),
         ),
         (PROFESSOR, "Professor"),
         (PRACTITIONER, "Practitioner"),
@@ -567,6 +596,12 @@ class Position(models.Model):
         (LEGISLATOR, "Legislator"),
     )
     POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
+    PRIVATE = 1
+    PUBLIC = 2
+    SECTORS = (
+        (PRIVATE, "Private sector"),
+        (PUBLIC, "Public sector"),
+    )
     NOMINATION_PROCESSES = (
         ("fed_senate", "U.S. Senate"),
         ("state_senate", "State Senate"),
@@ -618,8 +653,8 @@ class Position(models.Model):
         ("termed_out", "Term Limit Reached"),
     )
     position_type = models.CharField(
-        help_text="If this is a judicial position, this indicates the role the "
-        "person had. This field may be blank if job_title is "
+        help_text="If this is a judicial position, this indicates the role "
+        "the person had. This field may be blank if job_title is "
         "complete instead.",
         choices=POSITION_TYPES,
         max_length=20,
@@ -631,6 +666,13 @@ class Position(models.Model):
         "be entered here.",
         max_length=100,
         blank=True,
+    )
+    sector = models.SmallIntegerField(
+        help_text="Whether the job was private or public sector.",
+        choices=SECTORS,
+        default=None,
+        blank=True,
+        null=True,
     )
     person = models.ForeignKey(
         Person,
@@ -773,7 +815,10 @@ class Position(models.Model):
         db_index=True,
     )
     date_start = models.DateField(
-        help_text="The date the position starts active duty.", db_index=True,
+        help_text="The date the position starts active duty.",
+        blank=True,
+        null=True,
+        db_index=True,
     )
     date_granularity_start = models.CharField(
         choices=DATE_GRANULARITIES, max_length=15,
