@@ -557,6 +557,47 @@ def disambiguate_reporters(citations):
     return unambiguous_citations
 
 
+def remove_address_citations(citations):
+    """Some addresses look like citations, but they're not. Remove them.
+
+    An example might be 111 S.W. 23st St.
+
+    :param citations: A list of citations. These should generally be
+    disambiguated, but it's not essential.
+    :returns A list of citations with addresses removed.
+    """
+    coordinate_reporters = ("N.E.", "S.E.", "S.W.", "N.W.")
+    good_citations = []
+    for citation in citations:
+        if not isinstance(citation, FullCitation):
+            good_citations.append(citation)
+            continue
+
+        if not isinstance(citation.page, basestring):
+            good_citations.append(citation)
+            continue
+
+        page = citation.page.lower()
+        is_ordinal_page = (
+            page.endswith("st")
+            or page.endswith("nd")
+            or page.endswith("rd")
+            or page.endswith("th")
+        )
+        is_coordinate_reporter = (
+            # Assuming disambiguation was used, check the canonical_reporter
+            citation.canonical_reporter in coordinate_reporters
+            # If disambiguation wasn't used, check the reporter attr
+            or citation.reporter in coordinate_reporters
+        )
+        if is_ordinal_page and is_coordinate_reporter:
+            # It's an address. Skip it.
+            continue
+
+        good_citations.append(citation)
+    return good_citations
+
+
 def get_citations(
     text,
     html=True,
@@ -631,6 +672,8 @@ def get_citations(
     # Disambiguate each citation's reporter
     if disambiguate:
         citations = disambiguate_reporters(citations)
+
+    citations = remove_address_citations(citations)
 
     # Set each citation's court property to "scotus" by default
     for citation in citations:
