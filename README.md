@@ -92,8 +92,6 @@ The process now is:
     - Run ansible scripts (they still work)
  - Database:
     - default is migrated by ansible
-    - migrate replicated database on old CL via SQL 
-    psql -h localhost -U django --dbname courtlistener -p 5432 <  /var/www/courtlistener/cl/lasc/migrations/0002_auto_20191004_1431.sql 
     - migrate replicated database on AWS via SQL
     psql -h cl-replica.c3q1wkj3stig.us-west-2.rds.amazonaws.com -U django --dbname courtlistener -p 5432 <  /var/www/courtlistener/cl/lasc/migrations/0002_auto_20191004_1431.sql
  - Celery:
