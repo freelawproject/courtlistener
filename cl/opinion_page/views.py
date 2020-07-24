@@ -102,21 +102,19 @@ def court_publish_page(request, pk):
         if form.is_valid():
             try:
                 cluster = form.save()
-                goto = reverse("view_case",
-                               args=[cluster.pk, cluster.slug])
+                goto = reverse("view_case", args=[cluster.pk, cluster.slug])
                 messages.info(
-                    request, "Document uploaded successfully.",
-                    extra_tags=goto
+                    request, "Document uploaded successfully.", extra_tags=goto
                 )
             except:
-                messages.info(
-                    request, "Failure occurred during upload."
-                )
+                messages.info(request, "Failure occurred during upload.")
             return HttpResponseRedirect(
                 reverse("court_publish_page", kwargs={"pk": pk})
             )
         else:
-            messages.info(request, "Error submitting form, please review below.")
+            messages.info(
+                request, "Error submitting form, please review below."
+            )
     return render(
         request, "publish.html", {"form": form, "private": True, "pk": pk}
     )
