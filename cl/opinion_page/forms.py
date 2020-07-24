@@ -197,9 +197,9 @@ class TennWorkersForm(forms.Form):
         q_judges = Person.objects.filter(
             positions__court_id=self.pk, is_alias_of=None
         ).order_by("name_first")
-        self.fields["lead_author"].queryset = q_judges
-        self.fields["second_judge"].queryset = q_judges
-        self.fields["third_judge"].queryset = q_judges
+        for field_name in ["lead_author", "second_judge", "third_judge"]:
+            self.fields[field_name].queryset = q_judges
+            self.fields[field_name].label_from_instance = self.person_label
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
@@ -213,6 +213,10 @@ class TennWorkersForm(forms.Form):
                 choices=[("TN WC App.", "TN WC App.")],
                 attrs={"class": "form-control"},
             )
+
+    @staticmethod
+    def person_label(obj):
+        return obj.name_full
 
     def validate_neutral_citation(self):
         volume = self.cleaned_data["cite_volume"]
