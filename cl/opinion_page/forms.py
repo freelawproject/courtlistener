@@ -241,6 +241,20 @@ class TennWorkersForm(forms.Form):
             page,
         )
 
+    def verify_unique_judges(self):
+        if self.pk == "tennworkcompapp":
+            judges = [
+                self.cleaned_data["lead_author"],
+                self.cleaned_data["second_judge"],
+                self.cleaned_data["third_judge"],
+            ]
+            flag = len(set(judges)) == len(judges)
+            if not flag:
+                self.add_error(
+                    "lead_author",
+                    ValidationError("Please select each judge only once."),
+                )
+
     def clean_pdf_upload(self):
         pdf_data = self.cleaned_data.get("pdf_upload").read()
         sha_1 = sha1(force_bytes(pdf_data))
@@ -290,6 +304,7 @@ class TennWorkersForm(forms.Form):
         self.validate_neutral_citation()
         self.make_panel()
         self.make_item_dict()
+        self.verify_unique_judges()
         return self.cleaned_data
 
     def save(self):
