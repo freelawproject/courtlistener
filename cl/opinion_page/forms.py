@@ -257,10 +257,10 @@ class TennWorkersForm(forms.Form):
 
     def clean_pdf_upload(self):
         pdf_data = self.cleaned_data.get("pdf_upload").read()
-        sha_1 = sha1(force_bytes(pdf_data))
-        exists = Opinion.objects.filter(sha1=sha_1).exists()
-        if exists:
-            op = Opinion.objects.get(sha1=sha_1)
+        sha1_hash = sha1(force_bytes(pdf_data))
+        ops = Opinion.objects.filter(sha1=sha1_hash)
+        if len(ops) > 0:
+            op = ops[0]
             self.add_error(
                 "pdf_upload",
                 ValidationError(
