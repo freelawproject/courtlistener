@@ -6,6 +6,8 @@ from datetime import timedelta
 
 import requests
 from dateutil import parser
+from django.core.files.base import ContentFile
+from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -19,9 +21,40 @@ from cl.recap.mergers import (
     find_docket_object,
     update_docket_metadata,
 )
-from cl.recap_rss.models import RssFeedStatus, RssItemCache
+from cl.recap_rss.models import RssFeedStatus, RssItemCache, RssFeedData
+from cl.recap_rss.utils import emails
+from cl.search.models import Court
 
 logger = logging.getLogger(__name__)
+
+
+def update_entry_types(court_pk, description):
+    """Check the entry types of a feed. If changed update our record and
+    send an email.
+
+    :param court_pk: The CL identifier for the court
+    :param description: The <description> nodes in the feed
+    :return: None
+    """
+    m = re.search(r"entries of type: (.+)", description)
+    if not m:
+        logger.error("Unable to parse PACER RSS description: %s" % description)
+        return
+
+    new_entry_types = m.group(1)
+    court = Court.objects.get(pk=court_pk)
+    if court.pacer_rss_entry_types != new_entry_types:
+        # PACER CHANGED AN RSS FEED.
+        email = emails["changed_rss_feed"]
+        send_mail(
+            email["subject"] % court,
+            email["body"]
+            % (court, court.pacer_rss_entry_types, new_entry_types),
+            email["from"],
+            email["to"],
+        )
+        court.pacer_rss_entry_types = new_entry_types
+        court.save()
 
 
 def get_last_build_date(s):
@@ -149,6 +182,9 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         "%s: Got %s results to merge."
         % (feed_status.court_id, len(rss_feed.data))
     )
+
+    # Update entry types
+    update_entry_types(court_pk, rss_feed.feed.feed.description)
 
     return rss_feed.data
 
