@@ -144,8 +144,8 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
                 logger.warning(str(exc))
                 abort_or_retry(self, feed_status, exc)
                 return
-
-    current_build_date = get_last_build_date(rss_feed.response.content)
+    content = rss_feed.response.content
+    current_build_date = get_last_build_date(content)
     if not current_build_date:
         try:
             raise Exception(
@@ -186,6 +186,9 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     # Update entry types
     update_entry_types(court_pk, rss_feed.feed.feed.description)
 
+    # Save the feed to the DB
+    feed_data = RssFeedData(court_id=court_pk)
+    feed_data.filepath.save("rss.xml", ContentFile(content))
     return rss_feed.data
 
 
