@@ -297,8 +297,8 @@ class TennWorkersForm(forms.Form):
             ),
             "author_id": self.cleaned_data["lead_author"].id,
             "author": self.cleaned_data["lead_author"],
-            "date_filed_is_approximate": "False",
-            "blocked_statuses": "False",
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
             "neutral_citations": self.cleaned_data["neutral_citation"],
             "download_urls": "",
         }
