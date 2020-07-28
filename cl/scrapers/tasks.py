@@ -254,6 +254,8 @@ def update_document_from_text(opinion):
     """
     court = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court)
+    if site is None:
+        return
     metadata_dict = site.extract_from_text(opinion.plain_text)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model("search.%s" % model_name)

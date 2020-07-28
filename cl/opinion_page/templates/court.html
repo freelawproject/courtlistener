@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load auth %}
 
 {% block title %}
   Decisions for Tennessee Workers' Compensation Courts – CourtListener.com
@@ -102,6 +103,10 @@
     <div class="row v-offset-above-6">
       <div class="col-xs-4">
         <h3>Recent CWCC&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
+        {% if request.user|in_group:"tenn_work_uploaders" %}
+          <p><a href="{% url "court_publish_page" pk="tennworkcompcl" %}"
+                class="btn btn-default">Upload New CWCC Opinion</a></p>
+        {% endif %}
         {% if results_compcl.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_compcl type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
@@ -114,6 +119,10 @@
       </div>
       <div class="col-xs-4">
         <h3>Recent Appeals Board&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
+        {% if request.user|in_group:"tenn_work_uploaders" %}
+          <p><a href="{% url "court_publish_page" pk="tennworkcompapp" %}"
+                class="btn btn-default">Upload New Appeals Board Opinion</a></p>
+        {% endif %}
         {% if results_compapp.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_compapp type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
@@ -127,7 +136,7 @@
       </div>
       <div class="col-xs-4">
         <h3>Neutral Citations</h3>
-        <p>Beginning on XXX, the Tennessee Court of Workers’ Compensation Claims and the Appeals Board will accept pleadings, briefs, and other filings that include <a href="{% url "faq" %}#explain-neutral-citations">vendor neutral citations</a> to prior decisions as discussed below. All previous decisions have been retroactively assigned such a citation. These citations are created for each decision by the court itself instead of by a third party publisher. As a result, they can be cited immediately when the decision is published by the court.
+        <p>Beginning on January 1st, 2020 the Tennessee Court of Workers’ Compensation Claims and the Appeals Board will accept pleadings, briefs, and other filings that include <a href="{% url "faq" %}#explain-neutral-citations">vendor neutral citations</a> to prior decisions as discussed below. All previous decisions have been retroactively assigned such a citation. These citations are created for each decision by the court itself instead of by a third party publisher. As a result, they can be cited immediately when the decision is published by the court.
         </p>
         <h4>Format</h4>
         <p>Citations to the Claims Court take the form:</p>
