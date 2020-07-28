@@ -252,15 +252,76 @@ class CiteTest(TestCase):
                            canonical_reporter=u'U.S.', reporter_index=4,
                            reporter_found='U.S.', court='scotus'),
               IdCitation(id_token='Id.,',
-                         after_tokens=['at', '123.'])]),
+                         after_tokens=['at', '123.'],
+                         should_linkify=True)]),
             # Test italicized Id. citation
             ('<p>before asdf. <i>Id.,</i> at 123.</p> <p>foo bar</p>',
              [IdCitation(id_token='Id.,',
-                         after_tokens=['at', '123.'])]),
+                         after_tokens=['at', '123.'],
+                         should_linkify=True)]),
             # Test italicized Id. citation with another HTML tag in the way
             ('<p>before asdf. <i>Id.,</i> at <b>123.</b></p> <p>foo bar</p>',
              [IdCitation(id_token='Id.,',
-                         after_tokens=['at', '123.'])]),
+                         after_tokens=['at', '123.'],
+                         should_linkify=True)]),
+            # Test weirder Id. citations (#1344)
+            (u'foo v. bar 1 U.S. 12, 347-348. asdf. Id. ¶ 34. foo bar',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.',
+                         after_tokens=[u'¶', '34.'],
+                         should_linkify=True)]),
+            ('foo v. bar 1 U.S. 12, 347-348. asdf. Id. at 62-63, 67-68. f b',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.',
+                         after_tokens=['at', '62-63,', '67-68.'],
+                         should_linkify=True)]),
+            ('foo v. bar 1 U.S. 12, 347-348. asdf. Id., at *10. foo bar',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.,',
+                         after_tokens=['at', '*10.'],
+                         should_linkify=True)]),
+            (u'foo v. bar 1 U.S. 12, 347-348. asdf. Id. at 7-9, ¶¶ 38-53. f b',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.',
+                         after_tokens=['at', '7-9,', u'¶¶', '38-53.'],
+                         should_linkify=True)]),
+            ('foo v. bar 1 U.S. 12, 347-348. asdf. Id. at pp. 45, 64. foo bar',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.',
+                         after_tokens=['at', 'pp.', '45,', '64.'],
+                         should_linkify=True)]),
+            ('foo v. bar 1 U.S. 12, 347-348. asdf. id. 119:12-14. foo bar',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='id.',
+                         after_tokens=['119:12-14.'],
+                         should_linkify=True)]),
+            # Test Id. citation without page number
+            ('foo v. bar 1 U.S. 12, 347-348. asdf. Id. No page number.',
+             [FullCitation(plaintiff='foo', defendant=u'bar', volume=1,
+                           reporter='U.S.', page=12, lookup_index=0,
+                           canonical_reporter=u'U.S.', reporter_index=4,
+                           reporter_found='U.S.', court='scotus'),
+              IdCitation(id_token='Id.',
+                         after_tokens=['No', 'page', 'number.'],
+                         should_linkify=False)]),
             # Test non-opinion citation
             (u'lorem ipsum see §99 of the U.S. code.',
              [NonopinionCitation(match_token=u'§99')]),
@@ -550,7 +611,7 @@ class CiteTest(TestCase):
 
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf,</pre><span class="citation no-link"> '
+             '<pre class="inline">asdf</pre><span class="citation no-link">, '
              '<span class="id_token">id.,</span> at 123. </span><pre class="'
              'inline">Lorem ipsum dolor sit amet</pre>'),
 
@@ -562,8 +623,8 @@ class CiteTest(TestCase):
 
             # Ibid. citation ("... Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf,</pre><span class="citation no-link"> '
-             '<span class="ibid_token">Ibid.</span> Lorem ipsum dolor </span>'
+             '<pre class="inline">asdf</pre><span class="citation no-link">, '
+             '<span class="id_token">Ibid.</span> Lorem ipsum dolor </span>'
              '<pre class="inline">sit amet</pre>'),
         ]
 
@@ -608,7 +669,7 @@ class CiteTest(TestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures."<span class="citation no-link"> <i><span class='
-             '"ibid_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
+             '"id_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
              '</p></div>'
             ),
         ]
@@ -619,6 +680,57 @@ class CiteTest(TestCase):
             opinion = Opinion(html=s)
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
+            self.assertEqual(
+                created_html,
+                expected_html,
+                msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+            )
+            print "✓"
+
+    def test_make_html_from_matched_citation_objects(self):
+        """Can we render matched citation objects as HTML?"""
+        # This test case is similar to the two above, except it allows us to
+        # test the rendering of citation objects that we assert are correctly
+        # matched. (No matching is performed in the previous cases.)
+        # fmt: off
+
+        test_triples = [
+            # Id. citation with page number ("Id., at 123, 124")
+            ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
+             IdCitation(id_token='Id.,', after_tokens=['at', '123', '124'],
+                        should_linkify=True),
+             '<pre class="inline">asdf</pre><span class="citation" data-id="'
+             'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.,'
+             '</span> at 123, 124</a></span><pre class="inline">. Lorem ipsum'
+             ' dolor sit amet</pre>'),
+
+            # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
+            (u'asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
+             IdCitation(id_token='Id.',
+                        after_tokens=['@', '123:1', u'¶¶', '124'],
+                        should_linkify=True),
+             '<pre class="inline">asdf</pre><span class="citation" data-id="'
+             'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
+             '</span> @ 123:1, ¶¶ 124</a></span><pre class="inline">. Lorem '
+             'ipsum dolor sit amet</pre>'),
+
+            # Id. citation without page number ("Id. Something else")
+            ('asdf, Id. Lorem ipsum dolor sit amet',
+             IdCitation(id_token='Id.', after_tokens=['Lorem', 'ipsum'],
+                        should_linkify=False),
+             '<pre class="inline">asdf</pre><span class="citation" data-id='
+             '"MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
+             '</span></a> Lorem ipsum </span><pre class="inline">dolor sit '
+             'amet</pre>'),
+        ]
+
+        # fmt: on
+        for plain_text, citation, expected_html in test_triples:
+            print "Testing object to HTML rendering for %s..." % plain_text,
+            citation.match_url = "MATCH_URL"
+            citation.match_id = "MATCH_ID"
+            opinion = Opinion(plain_text=plain_text)
+            created_html = create_cited_html(opinion, [citation])
             self.assertEqual(
                 created_html,
                 expected_html,

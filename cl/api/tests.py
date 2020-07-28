@@ -192,6 +192,13 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
+    def test_recap_api_required_filter(self):
+        path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
+        r = self.client.get(path, {"pacer_doc_id": "17711118263"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
+        r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
+
 
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""

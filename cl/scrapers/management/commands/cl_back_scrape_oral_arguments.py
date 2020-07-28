@@ -10,7 +10,4 @@ class Command(cl_scrape_oral_arguments.Command):
 
         for site in site_yielder(mod.Site().back_scrape_iterable, mod):
             site.parse()
-            self.scrape_court(site, full_crawl=True)
-
-    def save_everything(self, items, index=False, backscrape=True):
-        super(Command, self).save_everything(items, index, backscrape)
+            self.scrape_court(site, full_crawl=True, backscrape=True)
