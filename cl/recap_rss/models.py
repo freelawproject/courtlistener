@@ -1,3 +1,5 @@
+import bz2
+
 from django.db import models
 
 from cl.lib.model_helpers import make_path
@@ -109,8 +111,8 @@ class RssFeedData(models.Model):
 
     @property
     def file_contents(self):
-        with open(self.filepath.path, "r") as f:
-            return f.read().decode("utf-8")
+        with open(self.filepath.path, "rb") as f:
+            return bz2.decompress(f.read()).decode("utf-8")
 
     def print_file_contents(self):
         print(self.file_contents)
