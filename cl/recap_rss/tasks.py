@@ -158,6 +158,9 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.warning(str(exc))
             abort_or_retry(self, feed_status, exc)
             return
+    else:
+        feed_status.date_last_build = current_build_date
+        feed_status.save()
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
@@ -175,9 +178,6 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         "%s: Feed changed or doing a sweep. Moving on to the merge."
         % feed_status.court_id
     )
-    feed_status.date_last_build = current_build_date
-    feed_status.save()
-
     rss_feed.parse()
     logger.info(
         "%s: Got %s results to merge."
