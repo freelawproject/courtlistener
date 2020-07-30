@@ -47,7 +47,9 @@ def update_entry_types(court_pk, description):
     else:
         m = re.search(r"entries of type: (.+)", description)
         if not m:
-            logger.error("Unable to parse PACER RSS description: %s" % description)
+            logger.error(
+                "Unable to parse PACER RSS description: %s" % description
+            )
             return
         new_entry_types = m.group(1)
 
