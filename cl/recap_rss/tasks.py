@@ -300,20 +300,18 @@ def mark_status_successful(feed_status_pk):
 
 
 @app.task
-def trim_rss_cache(days=2):
-    """Remove any entries in the RSS cache older than `days` days.
+def trim_rss_data(cache_days=2, status_days=14):
+    """Trim the various tracking objects used during RSS parsing
 
-    :returns The number removed.
+    :param cache_days: RssItemCache objects older than this number of days will
+    be deleted
+    :param status_days: RssFeedStatus objects older than this number of days
+    will be deleted.
     """
-    logger.info("Trimming RSS item cache.")
-    result = RssItemCache.objects.filter(
-        date_created__lt=now() - timedelta(days=days)
+    logger.info("Trimming RSS tracking items.")
+    RssItemCache.objects.filter(
+        date_created__lt=now() - timedelta(days=cache_days)
     ).delete()
-    if result is None:
-        return 0
-
-    # Deletions return a tuple of the total count and the individual item count
-    # if there is a cascade. We just want the total.
-    num_deleted = result[0]
-    logger.info("Trimmed %s items from the RSS cache." % num_deleted)
-    return num_deleted
+    RssFeedStatus.objects.filter(
+        date_created__lt=now() - timedelta(days=status_days)
+    ).delete()
