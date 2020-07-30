@@ -13,7 +13,7 @@ from cl.recap_rss.tasks import (
     check_if_feed_changed,
     merge_rss_feed_contents,
     mark_status_successful,
-    trim_rss_cache,
+    trim_rss_data,
 )
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
@@ -69,7 +69,7 @@ class Command(VerboseCommand):
                 except IOError:
                     print(
                         "Another instance of this program is running with "
-                        "for this combination of courts. Only one instance "
+                        "this combination of courts. Only one instance "
                         "can crawl these courts at a time: '%s'" % court_str
                     )
                     sys.exit(1)
@@ -120,7 +120,8 @@ class Command(VerboseCommand):
                         # Processed too recently. Try next court.
                         continue
 
-                # Give a court some time to complete during non-sweep crawls
+                # Don't crawl a court if it says it's been in progress just a
+                # little while. It's probably queued and on the way.
                 processing_cutoff = now() - timedelta(
                     seconds=self.RSS_MAX_PROCESSING_DURATION
                 )
@@ -163,7 +164,7 @@ class Command(VerboseCommand):
                 seconds=self.DELAY_BETWEEN_CACHE_TRIMS
             )
             if last_trim_date is None or trim_cutoff_date > last_trim_date:
-                trim_rss_cache.delay()
+                trim_rss_data.delay()
                 last_trim_date = now()
 
             # Wait, then attempt the courts again if iterations not exceeded.
