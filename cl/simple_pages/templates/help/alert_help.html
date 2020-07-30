@@ -127,7 +127,7 @@
       <div class="col-xs-12 col-sm-6">
         <ul>
         {% for court in row %}
-            <li>{{ court }}</li>
+            <li>{{ court.short_name }}</li>
           {% endfor %}
         </ul>
       </div>
@@ -154,7 +154,7 @@
         <div class="col-xs-12 col-sm-6">
           <ul>
             {% for court in row %}
-              <li>{{ court }}</li>
+              <li>{{ court.short_name }}</li>
             {% endfor %}
           </ul>
         </div>
