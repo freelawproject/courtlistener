@@ -169,4 +169,6 @@ class Command(VerboseCommand):
 
             # Wait, then attempt the courts again if iterations not exceeded.
             iterations_completed += 1
-            time.sleep(self.DELAY_BETWEEN_ITERATIONS)
+            remaining_iterations = options["iterations"] - iterations_completed
+            if remaining_iterations > 0:
+                time.sleep(self.DELAY_BETWEEN_ITERATIONS)
