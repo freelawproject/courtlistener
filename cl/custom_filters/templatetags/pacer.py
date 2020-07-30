@@ -6,7 +6,7 @@ register = template.Library()
 @register.filter
 def price(rd):
     if rd.is_free_on_pacer:
-        return "free"
+        return "0.00"
 
     if rd.page_count:
         cost = rd.page_count * 0.10
