@@ -80,9 +80,15 @@ def help_home(request):
 
 def alert_help(request):
     no_feeds = Court.federal_courts.district_pacer_courts().filter(
-        jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT],
         pacer_has_rss_feed=False,
-        end_date=None,
+    )
+    partial_feeds = (
+        Court.federal_courts.district_pacer_courts()
+        .filter(pacer_has_rss_feed=True)
+        .exclude(pacer_rss_entry_types="all")
+    )
+    full_feeds = Court.federal_courts.district_pacer_courts().filter(
+        pacer_has_rss_feed=True, pacer_rss_entry_types="all"
     )
     cache_key = "alert-help-stats"
     data = cache.get(cache_key)
@@ -99,6 +105,8 @@ def alert_help(request):
         cache.set(cache_key, data, one_day)
     context = {
         "no_feeds": no_feeds,
+        "partial_feeds": partial_feeds,
+        "full_feeds": full_feeds,
         "private": False,
     }
     context.update(data)

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load partition_util %}
 
 {% block title %}Help with Alerts – CourtListener.com{% endblock %}
 {% block footer-scripts %}
@@ -54,8 +55,9 @@
       <li>PACER judicial opinion scraper</li>
       <li>Client work that we do at Free Law Project</li>
       <li>PACER RSS feeds</li>
+      <li>The <a href="https://twitter.com/big_cases">Big Cases Twitter bot</a></li>
     </ul>
-    <p>For active cases, this means that alerts will come any time from about a minute after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
+    <p>For active cases, this means that alerts will come any time from a few seconds after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
     </p>
     <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
     </p>
@@ -115,17 +117,50 @@
     </p>
 
     <h3>Coverage Gaps</h3>
-    <p>Unfortunately, the sources for RECAP alerts do <strong>not</strong> provide complete coverage of everything being filed in PACER. There are two important gaps to note. First, although we collect more than 100,000 new docket entry descriptions every day from the RSS feeds, some courts do not provide such feeds and others only provide partial feeds.
+    <p>A major source we use for our alerts are RSS feeds provided by the courts. Unfortunately, even after supplementing these with <a href="{% url "coverage" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything being filed in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones:
     </p>
+    <h4>No RSS Feeds</h4>
     <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
     </p>
-    <ul>
-      {% for court in no_feeds %}
-        <li>{{ court }}</li>
+    <div class="row">
+    {% for row in no_feeds|rows:2 %}
+      <div class="col-xs-12 col-sm-6">
+        <ul>
+        {% for court in row %}
+            <li>{{ court }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+    </div>
+    <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+
+    <h4>Partial RSS Feeds</h4>
+    <p>Other courts only provide some types of documents in their RSS feeds. You can see which docket entry types are provided by these courts below.</p>
+    <table class="table table-striped">
+      {% for court in partial_feeds %}
+        <tr>
+          <td><span class="text-nowrap">{{ court.short_name }}</span></td>
+          <td>{{ court.pacer_rss_entry_types }}</td>
+        </tr>
       {% endfor %}
-    </ul>
-    <p>If you rely on one of these courts, we encourage you to contact the court to request a full and complete PACER RSS feed.
-    </p>
+    </table>
+    <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+
+    <h4>Full RSS Feeds</h4>
+    <p>Courts not mentioned above have complete RSS feeds:</p>
+    <div class="row">
+      {% for row in full_feeds|rows:2 %}
+        <div class="col-xs-12 col-sm-6">
+          <ul>
+            {% for court in row %}
+              <li>{{ court }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+
     <hr>
 
 
