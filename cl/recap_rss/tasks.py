@@ -134,18 +134,19 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         )
         abort_or_retry(self, feed_status, exc)
         return
-    else:
-        if not rss_feed.response.content:
-            try:
-                raise Exception(
-                    "Empty RSS document returned by PACER: %s"
-                    % feed_status.court_id
-                )
-            except Exception as exc:
-                logger.warning(str(exc))
-                abort_or_retry(self, feed_status, exc)
-                return
+
     content = rss_feed.response.content
+    if not content:
+        try:
+            raise Exception(
+                "Empty RSS document returned by PACER: %s"
+                % feed_status.court_id
+            )
+        except Exception as exc:
+            logger.warning(str(exc))
+            abort_or_retry(self, feed_status, exc)
+            return
+
     current_build_date = get_last_build_date(content)
     if not current_build_date:
         try:
@@ -159,17 +160,16 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             return
 
     # Only check for early abortion during partial crawls.
-    if not feed_status.is_sweep:
-        # Get the last time this feed was pulled successfully
-        if date_last_built == current_build_date:
-            logger.info(
-                "%s: Feed has not changed since %s. Aborting."
-                % (feed_status.court_id, date_last_built)
-            )
-            # Abort. Nothing has changed here.
-            self.request.chain = None
-            mark_status(feed_status, RssFeedStatus.UNCHANGED)
-            return
+    if date_last_built == current_build_date and not feed_status.is_sweep:
+        logger.info(
+            "%s: Feed has not changed since %s. Aborting.",
+            feed_status.court_id,
+            date_last_built,
+        )
+        # Abort. Nothing has changed here.
+        self.request.chain = None
+        mark_status(feed_status, RssFeedStatus.UNCHANGED)
+        return
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge."
@@ -184,7 +184,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         % (feed_status.court_id, len(rss_feed.data))
     )
 
-    # Update entry types
+    # Update RSS entry types in Court table
     update_entry_types(court_pk, rss_feed.feed.feed.description)
 
     # Save the feed to the DB
