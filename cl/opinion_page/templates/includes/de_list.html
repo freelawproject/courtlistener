@@ -1,3 +1,4 @@
+{% load pacer %}
 {% load tz %}
 
 
@@ -94,7 +95,7 @@
                           <a href="{{ rd.pacer_url }}"
                              target="_blank"
                              rel="nofollow">Buy on
-                            PACER</a>
+                            PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
                         </li>
                       {% endif %}
                     </ul>
@@ -107,7 +108,7 @@
                         <a href="{{ rd.pacer_url }}"
                            class="btn btn-default btn-xs"
                            target="_blank"
-                           rel="nofollow">Buy on PACER</a>
+                           rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
                       {% endif %}
                     {% endif %}
                   {% endif %}
@@ -122,17 +123,17 @@
                   {% else %}
                     {# We don't have it #}
                     {% if rd.is_sealed %}
-                      <span class="btn btn-primary btn-xs disabled"
+                      <span class="btn btn-default btn-xs disabled"
                             title="Sealed on PACER">
                               <i class="fa fa-ban"></i>
                             </span>
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
-                           class="btn btn-primary btn-xs"
+                           class="btn btn-default btn-xs"
                            target="_blank"
                            rel="nofollow"
-                           title="Buy on PACER"><i class="fa fa-download"></i></a>
+                           title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
                       {% endif %}
                     {% endif %}
                   {% endif %}
