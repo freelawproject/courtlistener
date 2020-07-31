@@ -446,10 +446,7 @@ def process_free_opinion_result(self, row_pk, cnt):
         return
 
     if not rd_created and rd.is_available:
-        # The item already exists and is available. Fantastic, mark it as free,
-        # and call it a day.
-        rd.is_free_on_pacer = True
-        rd.save()
+        # The item already exists and is available. Fantastic. Call it a day.
         result.delete()
         self.request.chain = None
         return
