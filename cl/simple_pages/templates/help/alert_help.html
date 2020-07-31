@@ -122,41 +122,81 @@
     <h4>No RSS Feeds</h4>
     <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
     </p>
-    <div class="row">
-    {% for row in no_feeds|rows:2 %}
-      <div class="col-xs-12 col-sm-6">
-        <ul>
-        {% for court in row %}
-            <li>{{ court.short_name }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endfor %}
+
+    <ul class="nav nav-tabs nav-justified" role="tablist">
+      <li role="presentation" class="active"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+    </ul>
+
+    {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
+    <div class="tab-content">
+      {% for group in no_feed_courts %}
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
+          <div class="row v-offset-above-1">
+            {% for row in group.list|rows:2 %}
+              <div class="col-xs-12 col-sm-6">
+                <ul>
+                  {% for court in row %}
+                    <li>{{ court.short_name }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
     </div>
+
     <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
 
     <h4>Partial RSS Feeds</h4>
     <p>Other courts only provide some types of documents in their RSS feeds. You can see which docket entry types are provided by these courts below.</p>
-    <table class="table table-striped">
-      {% for court in partial_feeds %}
-        <tr>
-          <td><span class="text-nowrap">{{ court.short_name }}</span></td>
-          <td>{{ court.pacer_rss_entry_types }}</td>
-        </tr>
+    <ul class="nav nav-tabs nav-justified" role="tablist">
+      <li role="presentation" class="active"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+    </ul>
+
+    {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
+    <div class="tab-content">
+      {% for group in partial_feed_courts %}
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
+          <table class="table table-striped">
+            {% for court in group.list %}
+              <tr>
+                <td><span class="text-nowrap">{{ court.short_name }}</span></td>
+                <td>{{ court.pacer_rss_entry_types }}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        </div>
       {% endfor %}
-    </table>
+    </div>
+
     <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
 
     <h4>Full RSS Feeds</h4>
     <p>Courts not mentioned above have complete RSS feeds:</p>
-    <div class="row">
-      {% for row in full_feeds|rows:2 %}
-        <div class="col-xs-12 col-sm-6">
-          <ul>
-            {% for court in row %}
-              <li>{{ court.short_name }}</li>
+
+    <ul class="nav nav-tabs nav-justified" role="tablist">
+      <li role="presentation" class="active"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+      <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+    </ul>
+
+    {% regroup full_feeds|dictsort:"jurisdiction" by jurisdiction as full_feed_courts %}
+    <div class="tab-content">
+      {% for group in full_feed_courts %}
+        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="full-feeds-{{ group.grouper }}">
+          <div class="row v-offset-above-1">
+            {% for row in group.list|rows:2 %}
+              <div class="col-xs-12 col-sm-6">
+                <ul>
+                  {% for court in row %}
+                    <li>{{ court.short_name }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
             {% endfor %}
-          </ul>
+          </div>
         </div>
       {% endfor %}
     </div>
