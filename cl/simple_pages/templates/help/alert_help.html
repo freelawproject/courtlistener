@@ -10,8 +10,8 @@
 
 
 {% block content %}
-  <div class="hidden-xs col-sm-2 col-md-3"></div>
-  <div class="col-xs-12 col-sm-8 col-md-6">
+  <div class="hidden-xs col-sm-1 col-md-2"></div>
+  <div class="col-xs-12 col-sm-10 col-md-8">
     <h1>Help with Alerts on CourtListener</h1>
     <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
     </p>
@@ -119,11 +119,11 @@
     <h3>Coverage Gaps</h3>
     <p>A major source we use for our alerts are RSS feeds provided by the courts. Unfortunately, even after supplementing these with <a href="{% url "coverage" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything being filed in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones:
     </p>
-    <h4>No RSS Feeds</h4>
+    <h4 class="v-offset-above-2">No RSS Feeds</h4>
     <p>In addition to the federal Circuit Courts, the following courts do not provide RSS feeds of their latest filings:
     </p>
 
-    <ul class="nav nav-tabs nav-justified" role="tablist">
+    <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
@@ -149,9 +149,9 @@
 
     <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
 
-    <h4>Partial RSS Feeds</h4>
+    <h4 class="v-offset-above-2">Partial RSS Feeds</h4>
     <p>Other courts only provide some types of documents in their RSS feeds. You can see which docket entry types are provided by these courts below.</p>
-    <ul class="nav nav-tabs nav-justified" role="tablist">
+    <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
@@ -174,10 +174,10 @@
 
     <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
 
-    <h4>Full RSS Feeds</h4>
+    <h4 class="v-offset-above-2">Full RSS Feeds</h4>
     <p>Courts not mentioned above have complete RSS feeds:</p>
 
-    <ul class="nav nav-tabs nav-justified" role="tablist">
+    <ul class="nav nav-tabs" role="tablist">
       <li role="presentation" class="active"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
       <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
     </ul>
