@@ -37,12 +37,22 @@ def update_entry_types(court_pk, description):
     :param description: The <description> nodes in the feed
     :return: None
     """
-    m = re.search(r"entries of type: (.+)", description)
-    if not m:
-        logger.error("Unable to parse PACER RSS description: %s" % description)
-        return
+    description = description.lower()
+    if description == "public filings in the last 24 hours":
+        # nyed: https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl
+        new_entry_types = "all"
+    elif description == "all docket entries.":
+        # ared: https://ecf.ared.uscourts.gov/cgi-bin/rss_outside4.pl
+        new_entry_types = "all"
+    else:
+        m = re.search(r"entries of type: (.+)", description)
+        if not m:
+            logger.error(
+                "Unable to parse PACER RSS description: %s" % description
+            )
+            return
+        new_entry_types = m.group(1)
 
-    new_entry_types = m.group(1)
     court = Court.objects.get(pk=court_pk)
     if court.pacer_rss_entry_types != new_entry_types:
         # PACER CHANGED AN RSS FEED.
