@@ -1010,16 +1010,6 @@ def get_citing_clusters_with_cache(cluster, is_bot):
     return citing_clusters
 
 
-def is_related_beta_user(request):
-    """Check whether current user is allowed for related opinions beta test"""
-    if request.user.is_authenticated and (
-        request.user.is_superuser or request.user.profile.is_tester
-    ):
-        return True
-    else:
-        return False
-
-
 def get_related_clusters_with_cache(cluster, request):
     """Use Solr to get related opinions with Solr-MoreLikeThis query
 
@@ -1032,7 +1022,7 @@ def get_related_clusters_with_cache(cluster, request):
     available_statuses = dict(DOCUMENT_STATUSES).values()
     url_search_params = {"stat_" + v: "on" for v in available_statuses}
 
-    if is_bot(request) or not is_related_beta_user(request):
+    if is_bot(request):
         # If it is a bot or is not beta tester, return empty results
         return [], [], url_search_params
 
