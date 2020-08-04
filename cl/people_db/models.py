@@ -821,7 +821,7 @@ class Position(models.Model):
         db_index=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     date_termination = models.DateField(
         help_text="The last date of their employment. The compliment to "
