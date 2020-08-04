@@ -12,8 +12,9 @@ from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import never_cache, cache_page
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.vary import vary_on_cookie
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -182,6 +183,8 @@ def core_docket_data(request, pk):
     )
 
 
+@cache_page(60)
+@vary_on_cookie
 @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket, context = core_docket_data(request, pk)
