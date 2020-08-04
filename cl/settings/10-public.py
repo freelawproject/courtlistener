@@ -236,11 +236,12 @@ CACHES = {
     "default": {
         "BACKEND": "redis_cache.RedisCache",
         "LOCATION": "%s:%s" % (REDIS_HOST, REDIS_PORT),
-        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"],},
+        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
     },
     "db_cache": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "django_cache",
+        "OPTIONS": {"MAX_ENTRIES": 2.5e5},
     },
 }
 # This sets Redis as the session backend. This is often advised against, but we
