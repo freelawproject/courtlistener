@@ -5,14 +5,15 @@ import re
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
-from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.template import loader
+from django.urls import reverse, NoReverseMatch
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
 from reporters_db import SPECIAL_FORMATS
 
+from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pst
@@ -29,7 +30,6 @@ from cl.lib.search_index_utils import (
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.citations.utils import get_citation_depth_between_clusters
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
