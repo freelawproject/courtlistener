@@ -2,7 +2,7 @@
 # encoding: utf-8
 import re
 
-from reporters_db import REPORTERS
+from reporters_db import REPORTERS, SPECIAL_FORMATS
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.search.models import Citation as ModelCitation
 
@@ -83,7 +83,9 @@ class Citation(object):
         pass
 
     def base_citation(self):
-        return u"%d %s %s" % (self.volume, self.reporter, self.page)
+        if self.reporter in SPECIAL_FORMATS.keys():
+            return SPECIAL_FORMATS[self.reporter].format(**self.__dict__)
+        return u"{volume} {reporter} {page}".format(**self.__dict__)
 
     def to_model(self):
         # Create a citation object as in our models. Eventually, the version in
