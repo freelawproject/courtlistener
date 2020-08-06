@@ -443,6 +443,7 @@ class Position(models.Model):
     CHIEF_JUDGE = "c-jud"
     CHIEF_JUSTICE = "c-jus"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
+    CHIEF_SPECIAL_TRIAL_JUDGE = "c-spec-tr-jud"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
     # Commissioner
@@ -473,6 +474,7 @@ class Position(models.Model):
     SPECIAL_JUDGE = "spec-jud"
     SPECIAL_MASTER = "spec-m"
     SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES = "spec-scjcbc"
+    SPECIAL_TRIAL_JUDGE = "spec-tr-jud"
     # Other
     CHAIRMAN = "chair"
     CHANCELLOR = "chan"
@@ -516,6 +518,7 @@ class Position(models.Model):
                 (CHIEF_JUDGE, "Chief Judge"),
                 (CHIEF_JUSTICE, "Chief Justice"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
+                (CHIEF_SPECIAL_TRIAL_JUDGE, "Chief Special Trial Judge"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
                 # Commissioner
@@ -550,6 +553,7 @@ class Position(models.Model):
                     "Special Superior Court Judge for Complex Business "
                     "Cases",
                 ),
+                (SPECIAL_TRIAL_JUDGE, "Special Trial Judge"),
                 # Other
                 (CHAIRMAN, "Chairman"),
                 (CHANCELLOR, "Chancellor"),
