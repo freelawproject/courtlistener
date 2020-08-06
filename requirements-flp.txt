@@ -2,4 +2,4 @@
 # to avoid rebuilding all the other dependencies when the only thing that
 # really changes frequently is juriscraper.
 juriscraper==1.28.11
-reporters-db
+reporters-db==2.0.4
