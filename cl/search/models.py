@@ -62,6 +62,7 @@ SOURCES = (
     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
     ("CU", "court website merged with Harvard"),
     ("D", "direct court input"),
+    ("X", "2020 anonymous database"),
 )
 
 
@@ -2445,7 +2446,9 @@ class Citation(models.Model):
         related_name="citations",
         on_delete=models.CASCADE,
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter",)
+    volume = models.TextField(
+        help_text="The volume of the reporter", null=True, blank=True,
+    )
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -2463,6 +2466,10 @@ class Citation(models.Model):
     )
     type = models.SmallIntegerField(
         help_text="The type of citation that this is.", choices=CITATION_TYPES,
+    )
+    raw = models.TextField(
+        help_text="The string of the citation we used to extract the citation.",
+        blank=True,
     )
 
     def __unicode__(self):
