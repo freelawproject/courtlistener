@@ -5,11 +5,12 @@ import sys
 
 from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
-from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
+from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY, SPECIAL_FORMATS
 
 from cl.citations import reporter_tokenizer
 from cl.lib.roman import isroman
 from cl.search.models import Court
+
 from cl.citations.models import (
     Citation,
     FullCitation,
@@ -257,6 +258,42 @@ def parse_page(page):
             return None
 
 
+def check_for_regexes(reporter, words, reporter_index):
+    """ Use regex data if available to parse citation
+
+    :param reporter: A string of the reporter, e.g. "F.2d" or "T.C. Memo"
+    :param words: An array of words containing the citation.
+    :param reporter_index: The location of the reporter in the words array.
+    :return: A Full citation object if found else None
+    """
+    if reporter not in EDITIONS.keys():
+        reporter = VARIATIONS_ONLY[reporter][0]
+
+    if reporter not in REPORTERS.keys():
+        reporter = EDITIONS.get(reporter)
+
+    if not REPORTERS[reporter][0].get("regexes"):
+        return None
+    for rgx in REPORTERS[reporter][0].get("regexes"):
+        matches = re.finditer(rgx, " ".join(words))
+        if not matches:
+            continue
+        # Some reporters' don't have volumes.
+        for match in matches:
+            if "volume" in match.groupdict().keys():
+                volume = match.group("volume")
+            else:
+                volume = ""
+            citation = FullCitation(
+                volume=volume,
+                reporter=match.group("reporter"),
+                page=match.group("page"),
+                reporter_found=match.group("reporter"),
+                reporter_index=reporter_index,
+            )
+            return citation
+
+
 def extract_full_citation(words, reporter_index):
     """Given a list of words and the index of a federal reporter, look before
     and after for volume and page. If found, construct and return a
@@ -271,23 +308,19 @@ def extract_full_citation(words, reporter_index):
     # Get reporter
     reporter = words[reporter_index]
 
-    # Handle tax citations
-    is_tax_citation = is_neutral_tc_reporter(reporter)
-    if is_tax_citation:
-        volume, page = (
-            words[reporter_index + 1]
-            .encode("utf-8")
-            .replace("–", "-")
-            .split("-")
-        )
+    # Use regex data for citation lookup if possible.
+    # This is normally used for atypical citation formats but
+    # is available to any reporter.
+    rgx_citation = check_for_regexes(reporter, words, reporter_index)
+    if rgx_citation:
+        return rgx_citation
 
     # Handle "normal" citations, e.g., XX F.2d YY
-    else:
-        # Don't check if we are at the beginning of a string
-        if reporter_index == 0:
-            return None
-        volume = strip_punct(words[reporter_index - 1])
-        page = strip_punct(words[reporter_index + 1])
+    # Don't check if we are at the beginning of a string
+    if reporter_index == 0:
+        return None
+    volume = strip_punct(words[reporter_index - 1])
+    page = strip_punct(words[reporter_index + 1])
 
     # Get volume
     if volume.isdigit():
