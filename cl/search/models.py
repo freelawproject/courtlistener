@@ -11,6 +11,7 @@ from django.db.models import Prefetch, Q
 from django.template import loader
 from django.utils.encoding import smart_unicode
 from django.utils.text import slugify
+from reporters_db import SPECIAL_FORMATS
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
@@ -2474,6 +2475,8 @@ class Citation(models.Model):
 
     def __unicode__(self):
         # Note this representation is used in the front end.
+        if self.reporter in SPECIAL_FORMATS.keys():
+            return SPECIAL_FORMATS[self.reporter].format(**self.__dict__)
         return u"{volume} {reporter} {page}".format(**self.__dict__)
 
     def get_absolute_url(self):
