@@ -73,10 +73,9 @@ class Favorite(models.Model):
 
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
+
     docket = models.ForeignKey(
-        Docket,
-        related_name="docket_tags",
-        on_delete=models.CASCADE,
+        Docket, related_name="docket_tags", on_delete=models.CASCADE,
     )
     tag = models.ForeignKey(
         "favorites.UserTag",
@@ -132,7 +131,11 @@ class UserTag(models.Model):
         default=False,
     )
 
+    def __unicode__(self):
+        return u"%s: %s by user %s" % (self.pk, self.name, self.user_id)
+
     class Meta:
+        unique_together = (("user", "name"),)
         index_together = (("user", "name"),)
 
 
