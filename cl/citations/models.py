@@ -212,7 +212,7 @@ class ShortformCitation(Citation):
         self.antecedent_guess = antecedent_guess
 
     def __repr__(self):
-        print_string = u"%s, %d %s, at %s" % (
+        print_string = u"%s, %s %s, at %s" % (
             self.antecedent_guess,
             self.volume,
             self.reporter,
