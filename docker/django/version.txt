@@ -1,1 +1,4 @@
 0.14.22
+
+python manage.py test cl.citations.tests.MatchingTest.test_citation_resolution --keepdb
+python manage.py test cl.citations.tests.UpdateTest.test_opinionscited_creation --keepdb

@@ -83,9 +83,7 @@ class Citation(object):
         pass
 
     def base_citation(self):
-        if self.reporter in SPECIAL_FORMATS.keys():
-            return SPECIAL_FORMATS[self.reporter].format(**self.__dict__)
-        return u"{volume} {reporter} {page}".format(**self.__dict__)
+        return u"%s %s %s" % (self.volume, self.reporter, self.page)
 
     def to_model(self):
         # Create a citation object as in our models. Eventually, the version in
