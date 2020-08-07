@@ -160,7 +160,8 @@
       "reporter": "state",
       "page": "1",
       "type": 1,
-      "cluster": 1
+      "cluster": 1,
+      "raw": ""
     },
     "model": "search.citation",
     "pk": 1
@@ -171,7 +172,8 @@
       "reporter": "AL",
       "page": "339",
       "type": 8,
-      "cluster": 2
+      "cluster": 2,
+      "raw": ""
     },
     "model": "search.citation",
     "pk": 2
@@ -182,7 +184,8 @@
       "reporter": "state",
       "page": "1",
       "type": 1,
-      "cluster": 2
+      "cluster": 2,
+      "raw": ""
     },
     "model": "search.citation",
     "pk": 3
@@ -193,7 +196,8 @@
       "reporter": "Yeates",
       "page": "1",
       "type": 5,
-      "cluster": 2
+      "cluster": 2,
+      "raw": ""
     },
     "model": "search.citation",
     "pk": 4
@@ -204,7 +208,8 @@
       "reporter": "F.2d",
       "page": "9",
       "type": 1,
-      "cluster": 2
+      "cluster": 2,
+      "raw": ""
     },
     "model": "search.citation",
     "pk": 5
