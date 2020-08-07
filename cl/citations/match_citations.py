@@ -212,7 +212,7 @@ def get_citation_matches(citing_opinion, citations):
                 for c in cm.cluster.citations.all():
                     if (
                         citation.reporter == c.reporter
-                        and citation.volume == c.volume
+                        and unicode(citation.volume) == c.volume
                     ):
                         candidates.append(cm)
 
