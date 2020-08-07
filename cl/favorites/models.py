@@ -71,6 +71,23 @@ class Favorite(models.Model):
         return u"Favorite %s" % self.id
 
 
+class DocketTag(models.Model):
+    """Through table linking dockets to tags"""
+    docket = models.ForeignKey(
+        Docket,
+        related_name="docket_tags",
+        on_delete=models.CASCADE,
+    )
+    tag = models.ForeignKey(
+        "favorites.UserTag",
+        related_name="docket_tags",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = (("docket", "tag"),)
+
+
 class UserTag(models.Model):
     """Tags that can be added by users to various objects"""
 
@@ -90,9 +107,13 @@ class UserTag(models.Model):
         related_name="user_tags",
         on_delete=models.CASCADE,
     )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey()
+    dockets = models.ManyToManyField(
+        Docket,
+        help_text="Dockets that are tagged with by this item",
+        related_name="user_tags",
+        through=DocketTag,
+        blank=True,
+    )
     name = models.SlugField(
         help_text="The name of the tag", max_length=50, db_index=True,
     )
