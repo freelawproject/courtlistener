@@ -4,11 +4,9 @@ from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from cl.api.api_permissions import IsOwner
 from cl.api.utils import LoggingMixin
-from cl.visualizations.api_permissions import (
-    IsVisualizationOwner,
-    IsParentVisualizationOwner,
-)
+from cl.visualizations.api_permissions import IsParentVisualizationOwner
 from cl.visualizations.api_serializers import (
     VisualizationSerializer,
     JSONVersionSerializer,
@@ -30,7 +28,7 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
 
 
 class VisualizationViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsVisualizationOwner]
+    permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
 

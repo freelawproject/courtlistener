@@ -2,9 +2,8 @@
 Unit tests for Visualizations
 """
 from django.test import TestCase, RequestFactory
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import User
 from django.urls import reverse
-from rest_framework.authtoken.models import Token
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -12,8 +11,9 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
-from rest_framework.test import APITestCase, APIClient
+from rest_framework.test import APITestCase
 
+from cl.tests.utils import make_client
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.visualizations import views
@@ -335,19 +335,10 @@ class APIVisualizationTestCase(APITestCase):
         "authtest_data.json",
     ]
 
-    @staticmethod
-    def make_client(user_pk):
-        user = User.objects.get(pk=user_pk)
-        token, created = Token.objects.get_or_create(user=user)
-        token_header = "Token %s" % token
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION=token_header)
-        return client
-
     def setUp(self):
         self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
-        self.client = self.make_client(6)
-        self.rando_client = self.make_client(1001)
+        self.client = make_client(6)
+        self.rando_client = make_client(1001)
 
     def tearDown(self):
         SCOTUSMap.objects.all().delete()

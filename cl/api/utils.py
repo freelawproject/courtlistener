@@ -32,6 +32,7 @@ from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
+BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
     "gte",

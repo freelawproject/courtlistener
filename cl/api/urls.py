@@ -4,6 +4,7 @@ from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
 from cl.api import views
 from cl.audio import api_views as audio_views
+from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
 from cl.search import api_views as search_views
@@ -65,6 +66,14 @@ router.register(
 )
 router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
+)
+
+# Tags
+router.register(
+    r"tags", favorite_views.UserTagViewSet, base_name="UserTag",
+)
+router.register(
+    r"docket-tags", favorite_views.DocketTagViewSet, base_name="DocketTag",
 )
 
 # Visualizations
