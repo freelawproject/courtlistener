@@ -38,6 +38,7 @@ from cl.lib.search_utils import (
     get_related_clusters_with_cache,
 )
 from cl.lib.string_utils import trunc
+from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
     DocketEntryFilterForm,
@@ -188,12 +189,7 @@ def core_docket_data(request, pk):
 @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket, context = core_docket_data(request, pk)
-    if not is_bot(request):
-        with suppress_autotime(docket, ["date_modified"]):
-            cached_count = docket.view_count
-            docket.view_count = F("view_count") + 1
-            docket.save()
-            docket.view_count = cached_count + 1
+    increment_view_count(docket, request)
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
     form = DocketEntryFilterForm(request.GET)
