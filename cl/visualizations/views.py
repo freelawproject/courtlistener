@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
-from django.db.models import F, Count
+from django.db.models import Count
 from django.http import (
     HttpResponseRedirect,
     HttpResponse,
@@ -16,7 +16,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import suppress_autotime
+from cl.lib.view_utils import increment_view_count
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizForm, VizEditForm
 from cl.visualizations.models import SCOTUSMap, Referer
@@ -27,17 +27,7 @@ from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
-
-    if not is_bot(request):
-        cached_value = viz.view_count
-
-        with suppress_autotime(viz, ["date_modified"]):
-            viz.view_count = F("view_count") + 1
-            viz.save()
-
-        # To get the new value, you either need to get the item from the DB a
-        # second time, or just manipulate it manually....
-        viz.view_count = cached_value + 1
+    increment_view_count(viz, request)
 
     status = None
     if viz.deleted:
