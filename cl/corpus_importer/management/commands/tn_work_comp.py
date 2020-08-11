@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 
 import requests
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.encoding import force_bytes
 
