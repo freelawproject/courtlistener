@@ -101,6 +101,7 @@ def import_tn(filepath):
                 "No PDF document available for this case %s", case["title"]
             )
             continue
+        logging.warn("Processing %s", case["title"])
 
         if len(Opinion.objects.filter(download_url=case["pdf_url"])) > 0:
             logging.warn("Case appears in system already %s", case["title"])
