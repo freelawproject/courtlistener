@@ -133,10 +133,8 @@ def import_tn(filepath):
             opinion.pk, do_ocr=True, citation_jitter=True,
         )
 
-        logging.warn("http://palin.local:8000%s" % cluster.get_absolute_url())
-
         logging.info(
-            "Successfully added Tennessee object cluster: %s", cluster.id
+            "https://www.courtlistener.com%s" % cluster.get_absolute_url()
         )
 
 
@@ -151,6 +149,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        settings.DEBUG = False
         filepath = options["filepath"]
         import_tn(filepath)
