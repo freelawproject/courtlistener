@@ -22,6 +22,12 @@ from cl.search.models import Court, Opinion, Docket
 
 
 def process_date(date_str):
+    """Process date strings into python date objects
+
+    :param date_str: A date string in various formats
+    :return: date
+    :type return: datetime.date
+    """
     if "-" in date_str[:4]:
         return datetime.strptime(date_str[:10], "%m-%d-%Y").date()
     return datetime.strptime(date_str[:10], "%Y-%m-%d").date()
@@ -31,9 +37,9 @@ def make_judges(case):
     """Make judge or panel
 
     :param case: Processed case data.
-    :type: dict
+    :type case: dict
     :return: Judge name(s)
-    :type: str
+    :type return: str
     """
     if case["court"] == "tennworkcompcl":
         return Person.objects.get(pk=case["lead_author_id"]).name_full
@@ -57,9 +63,9 @@ def make_case_dictionary(case):
 
     The dictionary can be loaded into make_objects from cl_scrape_opininons
     :param case: A case loaded from a preprocessed json file.
-    :type: dict
+    :type case: dict
     :return: Processed data used to add new tenn workers comp case.
-    :type: dict
+    :type return: dict
     """
 
     return {
@@ -84,7 +90,8 @@ def make_case_dictionary(case):
 def import_tn(filepath):
     """Corpus importer for Tenn Workers Comp. Boards
 
-    :param filepath: Path to cleaned json data used to import cases.
+    :param filepath: Filepath to the cleaned json data used to import cases.
+    :type filepath: str
     :return: None
     """
     with open(filepath, "r") as f:
