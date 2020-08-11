@@ -66,9 +66,8 @@ def make_case_dictionary(case):
     :return: Processed data used to add new tenn workers comp case.
     :type return: dict
     """
-
     return {
-        "source": Docket.DEFAULT,
+        "source": Docket.DIRECT_INPUT,
         "cluster_source": "D",
         "case_names": case["title"],
         "case_dates": process_date(case["pub_date"]),
