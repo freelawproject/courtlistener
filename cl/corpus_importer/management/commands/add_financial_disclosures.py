@@ -1,20 +1,19 @@
+import argparse
 import csv
-
-import boto3
 import io
 import re
-import argparse
-import requests
+
 import PyPDF2
+import boto3
+import requests
 from PIL import Image
 from botocore import UNSIGNED
 from botocore.client import Config
-
-from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.models import FinancialDisclosure, Person, Position
-
 from django.conf import settings
 from django.core.files.base import ContentFile
+
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.people_db.models import FinancialDisclosure, Person
 
 AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
 parent_url = "https://%s/" % settings.AWS_S3_CUSTOM_DOMAIN
