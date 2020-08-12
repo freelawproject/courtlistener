@@ -1374,6 +1374,13 @@ class FinancialDisclosure(models.Model):
     page_count = models.SmallIntegerField(
         help_text="The number of pages in the disclosure report",
     )
+    sha1 = models.CharField(
+        help_text="Unique ID for the document, as generated via SHA1 of the "
+        "binary file",
+        max_length=40,
+        db_index=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ("-year",)
