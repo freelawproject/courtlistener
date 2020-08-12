@@ -10,8 +10,11 @@ from PIL import Image
 from botocore import UNSIGNED
 from botocore.client import Config
 from django.core.files.base import ContentFile
+from django.utils.encoding import force_bytes
 
+from cl import settings
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.crypto import sha1
 from cl.people_db.models import FinancialDisclosure, Person
 
 s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
@@ -19,7 +22,10 @@ s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
 # test save into development.  This is why we are setting these values instead
 # of simply switching the defaults.
 AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
-AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
+AWS_S3_CUSTOM_DOMAIN = "https://%s.s3-%s.amazonaws.com/" % (
+    AWS_STORAGE_BUCKET_NAME,
+    "us-west-2",
+)
 
 
 def make_key_path_dictionary(filepath):
@@ -60,7 +66,7 @@ def make_pdf_from_image_array(image_list):
 
 
 def get_year_from_url(aws_url):
-    """Extract year data from aws_url_path
+    """Extract year data from aws_url
 
     :param aws_url: URL of image file we want to process
     :type aws_url: str
@@ -154,19 +160,30 @@ def process_muti_image_financial_disclosures(options):
 
             image_list = []
             for link in sorted_urls:
+                logger.warn("\t Downloading %s", link)
                 image_list.append(
                     Image.open(requests.get(link, stream=True).raw)
                 )
             pdf_content = make_pdf_from_image_array(image_list)
+
+            # Check if document already uploaded to AWS using SHA1_hash
+            sha1_hash = sha1(force_bytes(pdf_content))
+            if len(FinancialDisclosure.objects.filter(sha1=sha1_hash)) > 0:
+                logger.warn("File already uploaded to server.")
+                continue
 
             fd = FinancialDisclosure(
                 year=get_year_from_url(aws_path),
                 page_count=len(image_list),
                 person=Person.objects.get(id=judge_pk),
                 person_id=judge_pk,
+                sha1=sha1_hash,
             )
             fd.filepath.save("", ContentFile(pdf_content))
-
+            logger.info(
+                "Uploading disclosure to https://%s%s"
+                % (settings.AWS_S3_CUSTOM_DOMAIN, fd.filepath)
+            )
         try:
             # Add the continuation token to continue iterating
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
@@ -199,17 +216,27 @@ def process_single_image_financial_disclosures(options):
                 continue
 
             judge_pk = aws_dict[aws_path]
-            image_list = convert_long_image_to_pdf(aws_url_path=aws_path)
+            image_list = convert_long_image_to_pdf(aws_path)
             pdf_content = make_pdf_from_image_array(image_list)
+
+            # Check if document already uploaded to AWS using SHA1_hash
+            sha1_hash = sha1(force_bytes(pdf_content))
+            if len(FinancialDisclosure.objects.filter(sha1=sha1_hash)) > 0:
+                logger.warn("File already uploaded to server.")
+                continue
 
             fd = FinancialDisclosure(
                 year=get_year_from_url(aws_path),
                 page_count=len(image_list),
                 person=Person.objects.get(id=judge_pk),
                 person_id=judge_pk,
+                sha1=sha1_hash,
             )
             fd.filepath.save("", ContentFile(pdf_content))
-
+            logger.info(
+                "Uploading disclosure to https://%s%s"
+                % (settings.AWS_S3_CUSTOM_DOMAIN, fd.filepath)
+            )
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
@@ -255,13 +282,24 @@ def judicial_watch(options):
                 pdf_data = PyPDF2.PdfFileReader(open_pdf_file)
                 page_count = pdf_data.getNumPages()
 
+            # Check if document already uploaded to AWS using SHA1_hash
+            sha1_hash = sha1(force_bytes(pdf_content))
+            if len(FinancialDisclosure.objects.filter(sha1=sha1_hash)) > 0:
+                logger.warn("File already uploaded to server.")
+                continue
+
             fd = FinancialDisclosure(
                 year=year,
                 page_count=page_count,
                 person=judge,
                 person_id=judge_pk,
+                sha1=sha1_hash,
             )
             fd.filepath.save("", ContentFile(pdf_content))
+            logger.info(
+                "Uploading disclosure to https://%s%s"
+                % (settings.AWS_S3_CUSTOM_DOMAIN, fd.filepath)
+            )
         try:
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
