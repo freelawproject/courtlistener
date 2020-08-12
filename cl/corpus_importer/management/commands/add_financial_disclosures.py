@@ -9,25 +9,25 @@ import requests
 from PIL import Image
 from botocore import UNSIGNED
 from botocore.client import Config
-from django.conf import settings
 from django.core.files.base import ContentFile
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.models import FinancialDisclosure, Person
 
-AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
-parent_url = "https://%s/" % settings.AWS_S3_CUSTOM_DOMAIN
-base_url = "http://com-courtlistener-storage.s3-us-west-2.amazonaws.com/"
-prefix = "financial-disclosures"
-jw_prefix = "financial-disclosures/judicial-watch"
 s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+# We use the non-development bucket to test even though we eventually
+# test save into development.  This is why we are setting these values instead
+# of simply switching the defaults.
+AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
+AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
 
 
 def make_key_path_dictionary(filepath):
     """Generate our lookup dictionary
 
-    :param options:
-    :return: dictionary of url to judge PKs
+    :param filepath: Filepath to processed CSV file
+    :return: Object to lookup Judge PK from AWS URL
+    :type return: dict
     """
     lookup_dict = {}
     with open(filepath) as tsvfile:
@@ -39,10 +39,12 @@ def make_key_path_dictionary(filepath):
 
 
 def make_pdf_from_image_array(image_list):
-    """
+    """Make a pdf given an array of Image files
 
-    :param image_list:
-    :return:
+    :param image_list: List of images
+    :type image_list: list
+    :return: pdf_data
+    :type pdf_data: PDF as bytes
     """
     with io.BytesIO() as output:
         image_list[0].save(
@@ -57,28 +59,39 @@ def make_pdf_from_image_array(image_list):
     return pdf_data
 
 
-def get_year_from_url(aws_url_path):
-    """ Parse Year of FD from AWS url
+def get_year_from_url(aws_url):
+    """Extract year data from aws_url_path
 
-    :param aws_url_path:
-    :return:
+    :param aws_url: URL of image file we want to process
+    :type aws_url: str
+    :return: Year extract from url
+    :type return: str
     """
     year_regex = re.compile(r".*\/([0-9]{4})\/.*")
-    m = year_regex.match(aws_url_path)
+    m = year_regex.match(aws_url)
     year = m.group(1)
     return year
 
 
 def query_thumbs_db(aws_url):
+    """Query the indiviual image pages of a PDF based on the thumbs.db path.
+
+    The function queries aws and sorts files that may not have leading zeroes
+    correctly by page number.
+    :param aws_url: URL of image file we want to process
+    :type aws_url: str
+    :return: Sorted urls for document & the first response key
+    :type return: tuple
+    """
     kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": aws_url[:-10]}
     thumbs_db_query = s3.list_objects_v2(**kwargs)
     download_urls = [
-        base_url + x["Key"]
+        AWS_S3_CUSTOM_DOMAIN + x["Key"]
         for x in thumbs_db_query["Contents"]
         if "db" not in x["Key"]
     ]
-    page_regex = re.compile(r"(.*Page_)(.*)(\.tif)")
 
+    page_regex = re.compile(r"(.*Page_)(.*)(\.tif)")
     def key(item):
         m = page_regex.match(item)
         return int(m.group(2))
@@ -88,11 +101,14 @@ def query_thumbs_db(aws_url):
     return download_urls, thumbs_db_query["Contents"][0]["Key"]
 
 
-def convert_long_image_to_pdf(aws_url_path):
-    """
-    :param aws_url_path: AWS S3 Path
-    :param pk: The Person ID in CL db
-    :return:
+def convert_long_image_to_pdf(aws_url):
+    """Take a single image tiff and convert it into a multipage PDF.
+
+    Download a single image and split it into its component pages.
+    :param aws_url: URL of image file we want to process
+    :type aws_url: str
+    :return: An array of image data
+    :type return: list
     """
 
     img = Image.open(
@@ -110,15 +126,13 @@ def convert_long_image_to_pdf(aws_url_path):
     return image_list
 
 
-def parse_split_tiffs(options):
+def process_muti_image_financial_disclosures(options):
     """Find pre-split-tiffs and merge into a PDF
 
-    The server is full of presplit tiffs, which can be identified by the
-    Thumbs.db file. We can use the thumbs.db to organize how we query as to
-    avoid any messing parsing.
+    The server is full of folders of images that comprise a single pdf.
+    Identify split tiffs using the thumbail file and merge them together.
 
-    :param aws_dict: A dictionary of urls to judges in our system.
-    :type aws_dict: dict
+    :param options: The options provided at the command line.
     :return: None
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
@@ -130,6 +144,7 @@ def parse_split_tiffs(options):
             aws_path = obj["Key"]
             if "Thumbs.db" not in aws_path:
                 continue
+            logger.info("Processing %s" % aws_path)
 
             sorted_urls, lookup = query_thumbs_db(aws_path)
             judge_pk = aws_dict[lookup]
@@ -150,17 +165,18 @@ def parse_split_tiffs(options):
             fd.filepath.save("", ContentFile(pdf_content))
 
         try:
-            break
             # Add the continuation token to continue iterating
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
             # If no continuation token we have reached the end and break
             break
+    logger.info("No more PDFs to process.")
 
 
-def split_long_pdfs(options):
-    """
-    :param options:
+def process_single_image_financial_disclosures(options):
+    """Find download and convert single image Tiffs into multi-page PDFs
+
+    :param options: The options provided at the command line.
     :return:
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
@@ -189,28 +205,33 @@ def split_long_pdfs(options):
             fd.filepath.save("", ContentFile(pdf_content))
 
         try:
-            # break
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
             break
+    logger.info("No more PDFs to process.")
 
 
 def judicial_watch(options):
-    """
+    """Find download and convert Judicial Watch PDFs.
 
-    :param aws_dict:
-    :return:
+    :param options: The options provided at the command line.
+    :return: None
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
     kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": jw_prefix}
     while True:
+        logger.info("Querying Judicial Watch documents.")
+
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
             aws_path = obj["Key"]
             lookup_key = aws_path.replace("  ", " ")
             judge_pk = aws_dict[lookup_key]
 
-            pdf_content = requests.get("%s%s" % (base_url, aws_path)).content
+            pdf_content = requests.get(
+                "http://%s%s" % (AWS_S3_CUSTOM_DOMAIN, aws_path)
+            ).content
+
             with io.BytesIO(pdf_content) as open_pdf_file:
                 pdf_data = PyPDF2.PdfFileReader(open_pdf_file)
                 page_count = pdf_data.getNumPages()
@@ -222,20 +243,15 @@ def judicial_watch(options):
                 person=Person.objects.get(id=judge_pk),
                 person_id=judge_pk,
             )
-            print fd.filepath
-            # break
             fd.filepath.save("", ContentFile(pdf_content))
-            break
         try:
-            break
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
             break
-
-
+    logger.info("No more PDFs to process.")
 
 class Command(VerboseCommand):
-    help = "Convert Financial Disclousures into PDFs and add to db"
+    help = "Process and add Financial Disclousures on AWS into Courtlistener."
 
     def valid_actions(self, s):
         if s.lower() not in self.VALID_ACTIONS:
@@ -259,7 +275,7 @@ class Command(VerboseCommand):
             "--csv-path",
             default="cl/corpus_importer/tmp/target_pkupdated.csv",
             required=False,
-            help="AWS Path to PK db",
+            help="Path to our pre-generated csv file",
         )
 
     def handle(self, *args, **options):
@@ -267,7 +283,7 @@ class Command(VerboseCommand):
         options["action"](options)
 
     VALID_ACTIONS = {
-        "split-tiff": parse_split_tiffs,
-        "long-tiffs": split_long_pdfs,
+        "multiple-image-fd": process_muti_image_financial_disclosures,
+        "single-image-fd": process_single_image_financial_disclosures,
         "judicial-watch": judicial_watch,
     }
