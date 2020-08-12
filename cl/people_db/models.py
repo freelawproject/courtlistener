@@ -11,6 +11,7 @@ from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
+    make_pdf_path,
     validate_has_full_name,
     validate_is_not_alias,
     validate_partial_date,
@@ -26,7 +27,7 @@ from cl.lib.search_index_utils import (
     null_map,
     normalize_search_dicts,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import IncrementingFileSystemStorage, AWSMediaStorage
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
@@ -1354,14 +1355,14 @@ class FinancialDisclosure(models.Model):
     )
     filepath = models.FileField(
         help_text="The disclosure report itself",
-        upload_to="financial-disclosures/",
-        storage=IncrementingFileSystemStorage(),
+        upload_to=make_pdf_path,
+        storage=AWSMediaStorage(),
         db_index=True,
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form",
-        upload_to="financial-disclosures/thumbnails/",
-        storage=IncrementingFileSystemStorage(),
+        upload_to=make_pdf_path,
+        storage=AWSMediaStorage(),
         null=True,
         blank=True,
     )

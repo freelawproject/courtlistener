@@ -59,10 +59,25 @@ class UUIDFileSystemStorage(FileSystemStorage):
 class AWSMediaStorage(S3Boto3Storage):
     """Implements AWS file system storage.
 
-    We use AWSMediaStorage to upload LASC PDF files to AWS.
+    We use AWSMediaStorage to upload PDF files to AWS.
     """
 
     location = ""
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
     custom_domain = False
+
+    def get_available_name(self, name, max_length=None):
+        dir_name, file_name = os.path.split(name)
+        file_root, file_ext = os.path.splitext(file_name)
+        # If the filename already exists, add an underscore and a number (before
+        # the file extension, if one exists) to the filename until the generated
+        # filename doesn't exist.
+        count = itertools.count(1)
+        while self.exists(name):
+            # file_ext includes the dot.
+            name = os.path.join(
+                dir_name, "%s_%s%s" % (file_root, next(count), file_ext)
+            )
+
+        return name

@@ -86,6 +86,7 @@ def base_recap_path(instance, filename, base_dir):
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.search.models import ClaimHistory, RECAPDocument
     from cl.lasc.models import LASCPDF
+    from cl.people_db.models import FinancialDisclosure
 
     if type(instance) == RECAPDocument:
         root = "recap"
@@ -104,6 +105,20 @@ def make_pdf_path(instance, filename, thumbs=False):
             slug,
         )
 
+        return os.path.join(root, file_name)
+    elif type(instance) == FinancialDisclosure:
+        root = (
+            "/us/federal/judicial/financial-disclosures/%s/"
+            % instance.person.id
+        )
+        file_name = "%s-%s-disclosure.%s.pdf" % (
+            instance.person.name_first.lower(),
+            instance.person.name_last.lower(),
+            instance.year,
+        )
+        if thumbs:
+            root = root + "-thumbnails"
+            return os.path.join(root, file_name)
         return os.path.join(root, file_name)
     else:
         raise ValueError(
