@@ -92,6 +92,7 @@ def query_thumbs_db(aws_url):
     ]
 
     page_regex = re.compile(r"(.*Page_)(.*)(\.tif)")
+
     def key(item):
         m = page_regex.match(item)
         return int(m.group(2))
@@ -111,9 +112,7 @@ def convert_long_image_to_pdf(aws_url):
     :type return: list
     """
     img = Image.open(
-        requests.get(
-            "%s%s" % (AWS_S3_CUSTOM_DOMAIN, aws_url), stream=True
-        ).raw
+        requests.get("%s%s" % (AWS_S3_CUSTOM_DOMAIN, aws_url), stream=True).raw
     )
     width, height = img.size
     image_list = []
@@ -268,6 +267,7 @@ def judicial_watch(options):
         except KeyError:
             break
     logger.info("No more PDFs to process.")
+
 
 class Command(VerboseCommand):
     help = "Process and add Financial Disclousures on AWS into Courtlistener."
