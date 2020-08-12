@@ -23,38 +23,19 @@ jw_prefix = "financial-disclosures/judicial-watch"
 s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
 
 
-def make_key_path_dictionary(options):
+def make_key_path_dictionary(filepath):
     """Generate our lookup dictionary
 
     :param options:
     :return: dictionary of url to judge PKs
     """
     lookup_dict = {}
-    with open(options['tsv_path']) as tsvfile:
-        reader = csv.reader(tsvfile, delimiter="\t")
+    with open(filepath) as tsvfile:
+        reader = csv.reader(tsvfile)
+        next(reader)
         for row in reader:
-            # print row
-            lookup_dict[row[1].strip()] = row[0].strip()
+            lookup_dict[row[0].strip().replace("  ", " ")] = row[1].strip()
     return lookup_dict
-
-
-
-def find_pk(fp):
-    """ Lookup PK of judge based on AWS url
-
-    :param fp: AWS URL path
-    :return: PK of judge in DB
-    """
-    settings.DEBUG = False
-    import csv
-
-    with open("cl/corpus_importer/tmp/target.tsv") as tsvfile:
-        reader = csv.reader(tsvfile, delimiter="\t")
-        for row in reader:
-            if row[1].strip() == fp.split("/", 3)[-1]:
-                if row[0].strip() == "xxx":
-                    return False
-                return row[0]
 
 
 def make_pdf_from_image_array(image_list):
@@ -76,7 +57,7 @@ def make_pdf_from_image_array(image_list):
     return pdf_data
 
 
-def get_year(aws_url_path):
+def get_year_from_url(aws_url_path):
     """ Parse Year of FD from AWS url
 
     :param aws_url_path:
@@ -88,80 +69,26 @@ def get_year(aws_url_path):
     return year
 
 
-def download_convert_and_save(aws_url_path):
-    """
-    :param aws_url_path:
-    :return:
-    """
-    resp = s3.list_objects_v2(
-        **{"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": aws_url_path[:-10]}
-    )
+def query_thumbs_db(aws_url):
+    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": aws_url[:-10]}
+    thumbs_db_query = s3.list_objects_v2(**kwargs)
     download_urls = [
-        base_url + x["Key"] for x in resp["Contents"] if "db" not in x["Key"]
+        base_url + x["Key"]
+        for x in thumbs_db_query["Contents"]
+        if "db" not in x["Key"]
     ]
-    if len(download_urls) == 0:
-        # financial-disclosures/2012/A-H/Goldberg-MR. MP. 02. NYS   R_12/Thumbs.db
-        # Must be empty-
-        print "FAIL QUERY", aws_url_path
-        return
-
-    pk = find_pk(download_urls[0])
-
-    if not pk:
-        print "FAIL no ID", aws_url_path
-        return
-
-    key_pat = re.compile(r"(.*Page_)(.*)(\.tif)")
+    page_regex = re.compile(r"(.*Page_)(.*)(\.tif)")
 
     def key(item):
-        m = key_pat.match(item)
+        m = page_regex.match(item)
         return int(m.group(2))
 
     download_urls.sort(key=key)
 
-    image_list = []
-    for link in download_urls:
-        image_list.append(Image.open(requests.get(link, stream=True).raw))
-    pdf_data = make_pdf_from_image_array(image_list)
-
-    save_and_upload_fd(
-        year=get_year(aws_url_path),
-        page_count=len(image_list),
-        pk=pk,
-        pdf_data=pdf_data
-    )
+    return download_urls, thumbs_db_query["Contents"][0]["Key"]
 
 
-def parse_split_tiffs(options):
-    """
-    :param options:
-    :return:
-    """
-
-
-
-    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": prefix}
-    while True:
-        resp = s3.list_objects_v2(**kwargs)
-        for obj in resp["Contents"]:
-            aws_path = obj["Key"]
-            if "Thumbs.db" not in aws_path:
-                continue
-            if len(aws_path.split("/")) == 4:
-                continue
-            if ".pdf" in aws_path:
-                continue
-
-            download_convert_and_save(aws_path)
-
-        try:
-            # break
-            kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-        except KeyError:
-            break
-
-
-def convert_long_image_to_pdf(aws_url_path, pk):
+def convert_long_image_to_pdf(aws_url_path):
     """
     :param aws_url_path: AWS S3 Path
     :param pk: The Person ID in CL db
@@ -180,13 +107,55 @@ def convert_long_image_to_pdf(aws_url_path, pk):
         )
         image_list.append(image)
         i += 1
+    return image_list
 
-    save_and_upload_fd(
-        year=get_year(aws_url_path),
-        page_count=len(image_list),
-        pk=pk,
-        pdf_data=make_pdf_from_image_array(image_list)
-    )
+
+def parse_split_tiffs(options):
+    """Find pre-split-tiffs and merge into a PDF
+
+    The server is full of presplit tiffs, which can be identified by the
+    Thumbs.db file. We can use the thumbs.db to organize how we query as to
+    avoid any messing parsing.
+
+    :param aws_dict: A dictionary of urls to judges in our system.
+    :type aws_dict: dict
+    :return: None
+    """
+    aws_dict = make_key_path_dictionary(options["csv_path"])
+
+    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": prefix}
+    while True:
+        resp = s3.list_objects_v2(**kwargs)
+        for obj in resp["Contents"]:
+            aws_path = obj["Key"]
+            if "Thumbs.db" not in aws_path:
+                continue
+
+            sorted_urls, lookup = query_thumbs_db(aws_path)
+            judge_pk = aws_dict[lookup]
+
+            image_list = []
+            for link in sorted_urls:
+                image_list.append(
+                    Image.open(requests.get(link, stream=True).raw)
+                )
+            pdf_content = make_pdf_from_image_array(image_list)
+
+            fd = FinancialDisclosure(
+                year=get_year_from_url(aws_path),
+                page_count=len(image_list),
+                person=Person.objects.get(id=judge_pk),
+                person_id=judge_pk,
+            )
+            fd.filepath.save("", ContentFile(pdf_content))
+
+        try:
+            break
+            # Add the continuation token to continue iterating
+            kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+        except KeyError:
+            # If no continuation token we have reached the end and break
+            break
 
 
 def split_long_pdfs(options):
@@ -194,6 +163,7 @@ def split_long_pdfs(options):
     :param options:
     :return:
     """
+    aws_dict = make_key_path_dictionary(options["csv_path"])
     kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": prefix}
     while True:
         resp = s3.list_objects_v2(**kwargs)
@@ -206,11 +176,17 @@ def split_long_pdfs(options):
             if ".pdf" in aws_path:
                 continue
 
-            pk = find_pk(aws_path)
-            if pk:
-                convert_long_image_to_pdf(aws_path, pk)
+            judge_pk = aws_dict[aws_path]
+            image_list = convert_long_image_to_pdf(aws_url_path=aws_path)
+            pdf_content = make_pdf_from_image_array(image_list)
 
-            break
+            fd = FinancialDisclosure(
+                year=get_year_from_url(aws_path),
+                page_count=len(image_list),
+                person=Person.objects.get(id=judge_pk),
+                person_id=judge_pk,
+            )
+            fd.filepath.save("", ContentFile(pdf_content))
 
         try:
             # break
@@ -222,79 +198,41 @@ def split_long_pdfs(options):
 def judicial_watch(options):
     """
 
-    :param options:
+    :param aws_dict:
     :return:
     """
-
-    lookup_dict = make_key_path_dictionary(options)
-
+    aws_dict = make_key_path_dictionary(options["csv_path"])
     kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": jw_prefix}
     while True:
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
             aws_path = obj["Key"]
-            pk = lookup_dict[aws_path]
-            if not pk or pk == "xxx":
-                logger.info("Missing judge for filepath: %s", aws_path)
-                continue
+            lookup_key = aws_path.replace("  ", " ")
+            judge_pk = aws_dict[lookup_key]
 
-            pdf_url = "http://com-courtlistener-storage.s3-us-west-2.amazonaws.com/%s" % aws_path
-            response = requests.get(pdf_url)
-
-            with io.BytesIO(response.content) as open_pdf_file:
+            pdf_content = requests.get("%s%s" % (base_url, aws_path)).content
+            with io.BytesIO(pdf_content) as open_pdf_file:
                 pdf_data = PyPDF2.PdfFileReader(open_pdf_file)
-                num_pages = pdf_data.getNumPages()
+                page_count = pdf_data.getNumPages()
+            year = aws_path.split(" ")[-1][:4]
 
-            save_and_upload_fd(
-                year=aws_path.split(" ")[-1][:4],
-                page_count=num_pages,
-                pk=pk,
-                pdf_data=response.content
+            fd = FinancialDisclosure(
+                year=year,
+                page_count=page_count,
+                person=Person.objects.get(id=judge_pk),
+                person_id=judge_pk,
             )
-
+            print fd.filepath
+            # break
+            fd.filepath.save("", ContentFile(pdf_content))
+            break
         try:
+            break
             kwargs["ContinuationToken"] = resp["NextContinuationToken"]
         except KeyError:
             break
 
 
-def save_and_upload_fd(year, page_count, pk, pdf_data):
-    """
-
-    :param year:
-    :param page_count:
-    :param pk:
-    :param pdf_data:
-    :return:
-    """
-
-    fd = FinancialDisclosure()
-    fd.year = year
-    fd.page_count = page_count
-    fd.person = Person.objects.get(id=pk)
-    fd.filepath.save("", ContentFile(pdf_data))
-
-    logger.info(
-        "Saved pdf to : %s",
-        (
-            "https://dev-com-courtlistener-storage.s3-us-west-2.amazonaws.com"
-            + str(fd.filepath)
-        ),
-    )
-
-
-def test(options):
-
-
-    # print "https://dev-com-courtlistener-storage.s3-us-west-2.amazonaws.com/asdfa/asdf/asdf".split("/", 3)
-    # print options['tsv_path']
-    # lookup_dict = make_key_path_dictionary(options)
-    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": jw_prefix}
-    while True:
-        resp = s3.list_objects_v2(**kwargs)
-        for obj in resp["Contents"]:
-            aws_path = obj["Key"]
-            print obj
 
 class Command(VerboseCommand):
     help = "Convert Financial Disclousures into PDFs and add to db"
@@ -318,11 +256,11 @@ class Command(VerboseCommand):
         )
 
         parser.add_argument(
-            "--tsv-path",
-            required=True,
+            "--csv-path",
+            default="cl/corpus_importer/tmp/target_pkupdated.csv",
+            required=False,
             help="AWS Path to PK db",
         )
-
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -331,6 +269,5 @@ class Command(VerboseCommand):
     VALID_ACTIONS = {
         "split-tiff": parse_split_tiffs,
         "long-tiffs": split_long_pdfs,
-        "jw": judicial_watch,
-        "test": test,
+        "judicial-watch": judicial_watch,
     }
