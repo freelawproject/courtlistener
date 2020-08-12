@@ -110,9 +110,10 @@ def convert_long_image_to_pdf(aws_url):
     :return: An array of image data
     :type return: list
     """
-
     img = Image.open(
-        requests.get("%s%s" % (base_url, aws_url_path), stream=True).raw
+        requests.get(
+            "%s%s" % (AWS_S3_CUSTOM_DOMAIN, aws_url), stream=True
+        ).raw
     )
     width, height = img.size
     image_list = []
@@ -137,7 +138,10 @@ def process_muti_image_financial_disclosures(options):
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
 
-    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": prefix}
+    kwargs = {
+        "Bucket": AWS_STORAGE_BUCKET_NAME,
+        "Prefix": "financial-disclosures",
+    }
     while True:
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
@@ -180,7 +184,10 @@ def process_single_image_financial_disclosures(options):
     :return:
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
-    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": prefix}
+    kwargs = {
+        "Bucket": AWS_STORAGE_BUCKET_NAME,
+        "Prefix": "financial-disclosures",
+    }
     while True:
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
@@ -218,15 +225,28 @@ def judicial_watch(options):
     :return: None
     """
     aws_dict = make_key_path_dictionary(options["csv_path"])
-    kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": jw_prefix}
+    kwargs = {
+        "Bucket": AWS_STORAGE_BUCKET_NAME,
+        "Prefix": "financial-disclosures/judicial-watch",
+    }
     while True:
         logger.info("Querying Judicial Watch documents.")
 
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
             aws_path = obj["Key"]
+            year = aws_path.split(" ")[-1][:4]
             lookup_key = aws_path.replace("  ", " ")
             judge_pk = aws_dict[lookup_key]
+            judge = Person.objects.get(id=judge_pk)
+            logger.info("Processing financial disclosure for %s", judge)
+
+            check_for_fds = FinancialDisclosure.objects.filter(
+                year=year, person_id=judge_pk
+            )
+            if len(check_for_fds) > 0:
+                logger.warn("Judge may already be processed, skipping")
+                continue
 
             pdf_content = requests.get(
                 "http://%s%s" % (AWS_S3_CUSTOM_DOMAIN, aws_path)
@@ -235,12 +255,11 @@ def judicial_watch(options):
             with io.BytesIO(pdf_content) as open_pdf_file:
                 pdf_data = PyPDF2.PdfFileReader(open_pdf_file)
                 page_count = pdf_data.getNumPages()
-            year = aws_path.split(" ")[-1][:4]
 
             fd = FinancialDisclosure(
                 year=year,
                 page_count=page_count,
-                person=Person.objects.get(id=judge_pk),
+                person=judge,
                 person_id=judge_pk,
             )
             fd.filepath.save("", ContentFile(pdf_content))
@@ -259,7 +278,6 @@ class Command(VerboseCommand):
                 "Unable to parse action. Valid actions are: %s"
                 % (", ".join(self.VALID_ACTIONS.keys()))
             )
-
         return self.VALID_ACTIONS[s]
 
     def add_arguments(self, parser):
