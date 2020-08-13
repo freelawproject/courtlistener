@@ -7,6 +7,7 @@ import PyPDF2
 import boto3
 import requests
 from PIL import Image
+from PyPDF2 import PdfFileMerger
 from botocore import UNSIGNED
 from botocore.client import Config
 from django.core.files.base import ContentFile
@@ -132,6 +133,23 @@ def convert_long_image_to_pdf(aws_url):
     return image_list
 
 
+def remove_pdf_metadata_and_generate_hash(pdf_content):
+    """Remove metadata from PDF and generate hash
+
+    Metadata is generated containing PDF file creation and modification dates.
+    This causes an issue when comparing sha1 hashes for generated PDFs.
+    To make the comparison possible we zero out the two metadata fields for
+    the comparison only.  We don't upload the santized PDF content.
+    :return:Hash of santized PDF
+    """
+    pdf_merger = PdfFileMerger()
+    pdf_merger.append(io.BytesIO(pdf_content))
+    pdf_merger.addMetadata({"/CreationDate": "", "/ModDate": ""})
+    byte_writer = io.BytesIO()
+    pdf_merger.write(byte_writer)
+    return sha1(force_bytes(byte_writer.getvalue()))
+
+
 def process_muti_image_financial_disclosures(options):
     """Find pre-split-tiffs and merge into a PDF
 
@@ -167,7 +185,7 @@ def process_muti_image_financial_disclosures(options):
             pdf_content = make_pdf_from_image_array(image_list)
 
             # Check if document already uploaded to AWS using SHA1_hash
-            sha1_hash = sha1(force_bytes(pdf_content))
+            sha1_hash = remove_pdf_metadata_and_generate_hash(pdf_content)
             if len(FinancialDisclosure.objects.filter(sha1=sha1_hash)) > 0:
                 logger.warn("File already uploaded to server.")
                 continue
@@ -220,7 +238,7 @@ def process_single_image_financial_disclosures(options):
             pdf_content = make_pdf_from_image_array(image_list)
 
             # Check if document already uploaded to AWS using SHA1_hash
-            sha1_hash = sha1(force_bytes(pdf_content))
+            sha1_hash = remove_pdf_metadata_and_generate_hash(pdf_content)
             if len(FinancialDisclosure.objects.filter(sha1=sha1_hash)) > 0:
                 logger.warn("File already uploaded to server.")
                 continue
