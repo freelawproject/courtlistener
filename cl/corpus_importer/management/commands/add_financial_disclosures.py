@@ -77,11 +77,14 @@ def query_thumbs_db(aws_url):
     """
     kwargs = {"Bucket": AWS_STORAGE_BUCKET_NAME, "Prefix": aws_url[:-10]}
     thumbs_db_query = s3.list_objects_v2(**kwargs)
-    download_urls = [
-        AWS_S3_CUSTOM_DOMAIN + x["Key"]
+    # Filter out the proper url_paths excluding paths without Page in them
+    url_paths = [
+        x["Key"]
         for x in thumbs_db_query["Contents"]
-        if "db" not in x["Key"]
+        if ".db" not in x["Key"] and "Page" in x["Key"]
     ]
+    lookup_key = url_paths[0]
+    download_urls = [AWS_S3_CUSTOM_DOMAIN + path for path in url_paths]
 
     page_regex = re.compile(r"(.*Page_)(.*)(\.tif)")
 
@@ -90,8 +93,7 @@ def query_thumbs_db(aws_url):
         return int(m.group(2))
 
     download_urls.sort(key=key)
-
-    return download_urls, thumbs_db_query["Contents"][0]["Key"]
+    return download_urls, lookup_key
 
 
 def convert_long_image_to_pdf(aws_url):
