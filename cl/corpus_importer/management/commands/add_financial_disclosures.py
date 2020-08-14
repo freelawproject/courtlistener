@@ -157,6 +157,9 @@ def process_muti_image_financial_disclosures(options):
             aws_path = obj["Key"]
             if "Thumbs.db" not in aws_path:
                 continue
+            if len(aws_path.split("/")) < 5:
+                if len(aws_path.split("/")[2].replace(" ", "")) == 3:
+                    continue
             logger.info("Processing %s" % aws_path)
 
             sorted_urls, lookup = query_thumbs_db(aws_path)
@@ -212,11 +215,7 @@ def process_single_image_financial_disclosures(options):
         resp = s3.list_objects_v2(**kwargs)
         for obj in resp["Contents"]:
             aws_path = obj["Key"]
-            if "Thumbs.db" in aws_path:
-                continue
-            if "Page" in aws_path:
-                continue
-            if ".pdf" in aws_path:
+            if ".tif" not in aws_path:
                 continue
 
             judge_pk = aws_dict[aws_path]
