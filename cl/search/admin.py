@@ -115,7 +115,7 @@ class ClaimHistoryInline(admin.StackedInline):
 
 @admin.register(Claim)
 class ClaimAdmin(admin.ModelAdmin):
-    raw_id_fields = ("docket",)
+    raw_id_fields = ("docket", "tags")
 
     inlines = (ClaimHistoryInline,)
 
@@ -131,7 +131,7 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(admin.ModelAdmin):
-    raw_id_fields = ("docket_entry",)
+    raw_id_fields = ("docket_entry", "tags")
 
     readonly_fields = (
         "date_created",
@@ -147,6 +147,7 @@ class RECAPDocumentInline(admin.StackedInline):
         "date_created",
         "date_modified",
     )
+    raw_id_fields = ("tags",)
 
     # Essential so that we remove sealed content from Solr when updating it via
     # admin interface.
@@ -157,7 +158,7 @@ class RECAPDocumentInline(admin.StackedInline):
 @admin.register(DocketEntry)
 class DocketEntryAdmin(admin.ModelAdmin):
     inlines = (RECAPDocumentInline,)
-    raw_id_fields = ("docket",)
+    raw_id_fields = ("docket", "tags")
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -167,6 +168,7 @@ class DocketEntryAdmin(admin.ModelAdmin):
 class DocketEntryInline(admin.TabularInline):
     model = DocketEntry
     extra = 1
+    raw_id_fields = ("tags",)
 
 
 @admin.register(OriginatingCourtInformation)
@@ -190,6 +192,8 @@ class DocketAdmin(admin.ModelAdmin):
         "view_count",
     )
     raw_id_fields = (
+        "panel",
+        "tags",
         "assigned_to",
         "referred_to",
         "originating_court_information",
