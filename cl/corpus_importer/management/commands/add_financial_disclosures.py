@@ -169,7 +169,9 @@ def process_muti_image_financial_disclosures(options):
             for link in sorted_urls:
                 logger.warn("\t Downloading %s", link)
                 image_list.append(
-                    Image.open(requests.get(link, stream=True).raw)
+                    Image.open(requests.get(link, stream=True).raw).convert(
+                        "RGB"
+                    )
                 )
             pdf_content = make_pdf_from_image_array(image_list)
 
