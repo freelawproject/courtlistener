@@ -1,6 +1,7 @@
 import argparse
 import csv
 import io
+import json
 import re
 
 import PyPDF2
@@ -27,22 +28,6 @@ AWS_S3_CUSTOM_DOMAIN = "https://%s.s3-%s.amazonaws.com/" % (
     AWS_STORAGE_BUCKET_NAME,
     "us-west-2",
 )
-
-
-def make_key_path_dictionary(filepath):
-    """Generate our lookup dictionary
-
-    :param filepath: Filepath to processed CSV file
-    :return: Object to lookup Judge PK from AWS URL
-    :type return: dict
-    """
-    lookup_dict = {}
-    with open(filepath) as tsvfile:
-        reader = csv.reader(tsvfile)
-        next(reader)
-        for row in reader:
-            lookup_dict[row[0].strip().replace("  ", " ")] = row[1].strip()
-    return lookup_dict
 
 
 def make_pdf_from_image_array(image_list):
@@ -159,8 +144,7 @@ def process_muti_image_financial_disclosures(options):
     :param options: The options provided at the command line.
     :return: None
     """
-    aws_dict = make_key_path_dictionary(options["csv_path"])
-
+    aws_dict = json.loads(open(options["json-path"]).read())
     kwargs = {
         "Bucket": AWS_STORAGE_BUCKET_NAME,
         "Prefix": "financial-disclosures",
@@ -217,7 +201,7 @@ def process_single_image_financial_disclosures(options):
     :param options: The options provided at the command line.
     :return:
     """
-    aws_dict = make_key_path_dictionary(options["csv_path"])
+    aws_dict = json.loads(open(options["json_path"]).read())
     kwargs = {
         "Bucket": AWS_STORAGE_BUCKET_NAME,
         "Prefix": "financial-disclosures",
@@ -268,7 +252,7 @@ def judicial_watch(options):
     :param options: The options provided at the command line.
     :return: None
     """
-    aws_dict = make_key_path_dictionary(options["csv_path"])
+    aws_dict = json.loads(open(options["json_path"]).read())
     kwargs = {
         "Bucket": AWS_STORAGE_BUCKET_NAME,
         "Prefix": "financial-disclosures/judicial-watch",
@@ -346,10 +330,10 @@ class Command(VerboseCommand):
         )
 
         parser.add_argument(
-            "--csv-path",
-            default="cl/corpus_importer/tmp/target_pkupdated.csv",
+            "--json-path",
+            default="cl/corpus_importer/tmp/judge_url_pk_lookup.json",
             required=False,
-            help="Path to our pre-generated csv file",
+            help="Path to our pre-generated json file",
         )
 
     def handle(self, *args, **options):
