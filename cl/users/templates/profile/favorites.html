@@ -8,6 +8,10 @@
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.tablesorter.min.js"></script>
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/jquery.tablesorter.widgets.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function(){
             $(".edit-favorite-trigger").on("click", function (event) {
@@ -23,6 +27,14 @@
                 $("#modal-save-favorite").data("id", pk);
             });
         });
+
+        $(function() {
+        $("table").tablesorter({
+          theme: 'bootstrap',
+          headerTemplate: '{content} {icon}',
+          widgets : [ 'uitheme' ]
+          })
+    });
     </script>
 {% endblock %}
 
@@ -45,7 +57,7 @@
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
             {% if typed_favorite_forms %}
               <div class="table-responsive">
-                <table class="table settings-table">
+                <table class="table settings-table tablesorter-bootstrap">
                   <thead>
                   <tr>
                     <th>Name</th>
