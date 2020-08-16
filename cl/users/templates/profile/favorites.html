@@ -44,6 +44,10 @@
         {% for type, typed_favorite_forms in favorite_forms.items %}
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
             {% if typed_favorite_forms %}
+            {% if type == "Dockets" %}
+            <a href="{{ docket_search_url }}" >Search Within Dockets</a>
+            {% endif %}
+
               <div class="table-responsive">
                 <table class="table settings-table">
                   <thead>
