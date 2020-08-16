@@ -88,6 +88,12 @@ def view_favorites(request):
         elif favorite.docket_id:
             key = "Dockets"
         favorite_forms[key].append(FavoriteForm(instance=favorite))
+    docket_search_string = " or ".join(
+        [
+            "docket_id:" + str(a.instance.docket_id.pk)
+            for a in favorite_forms["Dockets"]
+        ]
+    )
 
     return render(
         request,
@@ -96,6 +102,9 @@ def view_favorites(request):
             "private": True,
             "favorite_forms": favorite_forms,
             "blank_favorite_form": FavoriteForm(),
+            "docket_search_url": "/?type=r&q=("
+            + docket_search_string
+            + ") and ",
         },
     )
 
