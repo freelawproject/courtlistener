@@ -89,14 +89,14 @@ def view_favorites(request):
             key = "Dockets"
         favorite_forms[key].append(FavoriteForm(instance=favorite))
     docket_search_string = (
-        "/?type=r&q=("
-        + " or ".join(
+        "/?type=r&q=docket_id:("
+        + " OR ".join(
             [
-                "docket_id:" + str(a.instance.docket_id.pk)
+                str(a.instance.docket_id.pk)
                 for a in favorite_forms["Dockets"]
             ]
         )
-        + ") and "
+        + ")"
     )
 
     return render(
