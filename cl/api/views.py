@@ -71,6 +71,14 @@ def rest_docs(request, version):
         return render(request, "rest-docs-vlatest.html", context)
 
 
+def rest_tutorial(request, version):
+    context = {"private": False}
+    try:
+        return render(request, "rest-tutorial-%s.html" % version, context)
+    except TemplateDoesNotExist:
+        return render(request, "rest-tutorial-vlatest.html", context)
+
+
 def api_index(request):
     court_count = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT

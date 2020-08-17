@@ -108,6 +108,11 @@ urlpatterns = [
         views.rest_docs,
         name="rest_docs",
     ),
+    url(
+        r"^api/tutorial/(?P<version>v[123])?/?$",
+        views.rest_tutorial,
+        name="rest_tutorial",
+    ),
     url(r"^api/bulk-info/$", views.bulk_data_index, name="bulk_data_index"),
     url(
         r"^api/replication/$", views.replication_docs, name="replication_docs"

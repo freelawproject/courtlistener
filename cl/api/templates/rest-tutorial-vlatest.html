@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}REST API Tutorial &ndash; CourtListener.com{% endblock %}
+{% block description %}
+  The official tutorial for the CourtListener REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
+{% endblock %}
+{% block og_description %}
+  The official tutorial for the CourtListener REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+  <div class="col-xs-12 col-md-10 col-lg-8">
+    <h1>REST API Tutorial</h1>
+    <p>The CourtListener API does a lot and can be big and complex. Below are a few example projects to help get you started.</p>
+
+    <h2>Understanding our Content</h2>
+    <p>CourtListener has four major types of data: audio files, PACER data (via the RECAP project), opinions, and judges. These object types are linked together where possible. For example, judges are linked as relational data from opinions, audio files, and PACER dockets.
+    </p>
+    <p>The biggest challenge when using these APIs is understanding how to fetch very large objects from it. For example, some of the dockets in our system have over 10,000 entries and some class action cases have thousands of parties. If a single API call could request this many objects from our database, we would struggle to keep up &mdash; generating and serving a JSON object with the text of thousands of documents is generally a bad idea! As a result, many of the objects, like dockets, are broken up into paginated API endpoints, each of which lets you get the parts you need, whether that's paginating over docket entries or over a list of parties. We'll give an example of this below.
+    </p>
+    <p>The other challenge of these APIs is that the data is <em>complex</em>. For example: federal dockets have parties; parties have attorneys which have roles in particular cases; and attorneys work at particular firms. Parties also have criminal complaints against them, those complaints have outcomes, etc. As an API user, you wind up needing to understand both the semantics (What is an "attorney-role"?) and the code (How do I fetch an attorney-role from the API?). None of this is easy, but we'll get into it below.
+    </p>
+    <p>Beyond these complexities, there are just things you have to know about the legal system. What's the best way to identify a case? What are the components of a docket number? What do jargony terms like <em>per curiam</em> and <em>en banc</em> mean? Some of these questions are beyond our purview, but we'll do our best to answer them when we can.
+    </p>
+
+
+    <h2>Finding a Case</h2>
+    <p>The most basic thing people try to do is find a case. There are two ways to do this. First, if you know the exact metadata for a case, you can often look it up that way. For example, if you know </p>
+
+    <h2>"Connecting Dots"</h2>
+    <p>The trickiest part about understanding the Courtlistener API is understanding how to connect different pieces of data together. For example, it's pretty easy to find a docket you're looking for by using the search interface. The trick for this is to simply make a query on the front end at a link like:
+    </p>
+
+    <h2>Finding docket entries /parties /etc for a docket</h2>  </div>
+  </div>
+{% endblock %}
