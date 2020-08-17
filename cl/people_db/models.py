@@ -1772,3 +1772,43 @@ class Agreement(models.Model):
         help_text="flag indicating whether this FD field is partially redacted"
     )
 
+
+class Reimbursement(models.Model):
+    financialdisclosure_id = models.ForeignKey(
+        FinancialDisclosure, on_delete=models.CASCADE
+    )
+    reimbursement_source = models.TextField(
+        help_text="the source of the reimbursement, ex. 'Marquette Law School'"
+    )
+    raw_dates_reimbursed_str = models.TextField(
+        help_text="the raw string containing the date range we extract start and end dates from"
+    )
+    date_start_reimbursed = models.DateField(
+        help_text="the first date that items were paid for and later reimbursed"
+    )
+    date_end_reimbursed = models.DateField(
+        help_text="the last date that items were paid for and later reimbursed"
+    )
+    date_granularity_start_reimbursed = models.CharField(
+        help_text="granularity of date_start_reimbursed",
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
+    )
+    date_granularity_end_reimbursed = models.CharField(
+        help_text="granularity of date_end_reimbursed",
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
+    )
+    location = models.TextField(help_text="location of reimbursed activity")
+    purpose = models.TextField(help_text="purpose of reimbursed activity")
+    items_reimbursed = models.TextField(
+        help_text="list of items that were purchased and later reimbursed"
+    )
+    is_field_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is redacted"
+    )
+    is_field_partially_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is partially redacted"
+    )
