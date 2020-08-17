@@ -91,10 +91,7 @@ def view_favorites(request):
     docket_search_string = (
         "/?type=r&q=docket_id:("
         + " OR ".join(
-            [
-                str(a.instance.docket_id.pk)
-                for a in favorite_forms["Dockets"]
-            ]
+            [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
         )
         + ")"
     )
