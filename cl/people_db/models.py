@@ -1744,3 +1744,31 @@ class AttorneyOrganization(models.Model):
             self.state,
             self.zip_code,
         )
+
+
+class Agreement(models.Model):
+    financialdisclosure_id = models.ForeignKey(
+        FinancialDisclosure, on_delete=models.CASCADE
+    )
+    date_agreement = models.DateField(
+        help_text="The date the agreement was made, for example '2016'"
+    )
+    date_granularity_agreement = models.CharField(
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+    )
+    raw_party_term_str = models.TextField(
+        help_text="the raw string we extract the party and terms of an agreement from"
+    )
+    party = models.TextField(
+        help_text="the party/parties that the agreement was made with, for example 'Harvard Law School'"
+    )
+    terms = models.TextField(
+        help_text="summarized terms of the agreement, for example 'Teaching in winter 2017'"
+    )
+    is_field_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is redacted"
+    )
+    is_field_partially_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is partially redacted"
+    )
+
