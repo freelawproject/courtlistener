@@ -1839,6 +1839,8 @@ class Liability(models.Model):
     is_field_partially_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is partially redacted"
     )
+
+
 class Gift(models.Model):
     financialdisclosure_id = models.ForeignKey(
         FinancialDisclosure,
