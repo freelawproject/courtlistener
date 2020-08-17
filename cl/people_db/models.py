@@ -1834,3 +1834,19 @@ class Liability(models.Model):
     is_field_partially_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is partially redacted"
     )
+class Gift(models.Model):
+    financialdisclosure_id = models.ForeignKey(
+        FinancialDisclosure,
+        on_delete=models.CASCADE,
+        help_text="ID of corresponding financial disclosure in "
+        "FinancialDisclosure model",
+    )
+    source = models.TextField(help_text="source of gift")
+    description = models.TextField(help_text="description of gift")
+    value = models.FloatField(help_text="value of the gift received")
+    is_field_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is redacted"
+    )
+    is_field_partially_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is partially redacted"
+    )
