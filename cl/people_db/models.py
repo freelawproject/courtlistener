@@ -1757,13 +1757,16 @@ class Agreement(models.Model):
         choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     raw_party_term_str = models.TextField(
-        help_text="the raw string we extract the party and terms of an agreement from"
+        help_text="the raw string we extract the party and terms of an "
+        "agreement from"
     )
     party = models.TextField(
-        help_text="the party/parties that the agreement was made with, for example 'Harvard Law School'"
+        help_text="the party/parties that the agreement was made with, for "
+        "example 'Harvard Law School'"
     )
     terms = models.TextField(
-        help_text="summarized terms of the agreement, for example 'Teaching in winter 2017'"
+        help_text="summarized terms of the agreement, for example 'Teaching in"
+        " winter 2017'"
     )
     is_field_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is redacted"
@@ -1781,10 +1784,12 @@ class Reimbursement(models.Model):
         help_text="the source of the reimbursement, ex. 'Marquette Law School'"
     )
     raw_dates_reimbursed_str = models.TextField(
-        help_text="the raw string containing the date range we extract start and end dates from"
+        help_text="the raw string containing the date range we extract start"
+        " and end dates from"
     )
     date_start_reimbursed = models.DateField(
-        help_text="the first date that items were paid for and later reimbursed"
+        help_text="the first date that items were paid for and later "
+        "reimbursed"
     )
     date_end_reimbursed = models.DateField(
         help_text="the last date that items were paid for and later reimbursed"
