@@ -1812,3 +1812,25 @@ class Reimbursement(models.Model):
     is_field_partially_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is partially redacted"
     )
+
+
+class Liability(models.Model):
+    financialdisclosure_id = models.ForeignKey(
+        FinancialDisclosure,
+        on_delete=models.CASCADE,
+        help_text="ID of corresponding financial disclosure in "
+        "FinancialDisclosure model",
+    )
+    creditor = models.TextField(help_text="creditor to whom liability is owed")
+    description = models.TextField(
+        help_text="description of the filer's liability"
+    )
+    value_code = models.CharField(
+        help_text="code indicating value range of the liability", max_length=2,
+    )
+    is_field_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is redacted"
+    )
+    is_field_partially_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is partially redacted"
+    )
