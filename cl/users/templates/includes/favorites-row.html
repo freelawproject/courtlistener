@@ -1,3 +1,6 @@
+{% load text_filters %}
+
+
 <tr id="favorite-row-{{ favorite_form.instance.id }}">
   <td id="name-{{ favorite_form.instance.id }}">
     {% if favorite_form.instance.cluster_id %}
@@ -26,7 +29,7 @@
   </td>
   {% if type == "Dockets" %}
     <td id="date_last_filing-{{ favorite_form.instance.id }}">
-      {{ favorite_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)" }}
+      {{ favorite_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
     </td>
   {% endif %}
   <td id="notes-{{ favorite_form.instance.id }}">
