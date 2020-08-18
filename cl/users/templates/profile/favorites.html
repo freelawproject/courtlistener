@@ -33,10 +33,13 @@
         $(function() {
         $("table").tablesorter({
           headerTemplate: '{content} {icon}',
-          widgets : [ 'uitheme' ],
-          sortInitialOrder: 'desc'
-          })
-    });
+          sortInitialOrder: 'desc',
+          cssIconAsc: 'fa-sort-asc',
+          cssIconDesc: 'fa-sort-desc',
+          cssIconNone: 'fa-sort',
+          cssIcon: 'fa'
+        })
+      });
     </script>
 {% endblock %}
 
