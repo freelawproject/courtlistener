@@ -56,7 +56,7 @@ def get_docket_ids(last_x_days):
                 if url is None:
                     continue
                 match = re.search(
-                    "^https://www.courtlistener\.com/docket/([0-9]+)/", url
+                    "^https://www\.courtlistener\.com/docket/([0-9]+)/", url
                 )
                 if match is None:
                     continue
