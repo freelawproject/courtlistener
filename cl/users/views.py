@@ -88,14 +88,40 @@ def view_favorites(request):
         elif favorite.docket_id:
             key = "Dockets"
         favorite_forms[key].append(FavoriteForm(instance=favorite))
-    docket_search_string = (
+    docket_search_url = (
         "/?type=r&q=docket_id:("
         + " OR ".join(
             [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
         )
         + ")"
     )
-
+    oral_search_url = (
+        "/?type=oa&q=id:("
+        + " OR ".join(
+            [
+                str(a.instance.audio_id.pk)
+                for a in favorite_forms["Oral Arguments"]
+            ]
+        )
+        + ")"
+    )
+    recap_search_url = (
+        "/?type=r&q=docket_entry_id:("
+        + " OR ".join(
+            [
+                str(a.instance.recap_doc_id.pk)
+                for a in favorite_forms["RECAP Documents"]
+            ]
+        )
+        + ")"
+    )
+    opinion_search_url = (
+        "/?q=cluster_id:("
+        + " OR ".join(
+            [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
+        )
+        + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
+    )
     return render(
         request,
         "profile/favorites.html",
@@ -103,7 +129,10 @@ def view_favorites(request):
             "private": True,
             "favorite_forms": favorite_forms,
             "blank_favorite_form": FavoriteForm(),
-            "docket_search_url": docket_search_string,
+            "docket_search_url": docket_search_url,
+            "oral_search_url": oral_search_url,
+            "recap_search_url": recap_search_url,
+            "opinion_search_url": opinion_search_url,
         },
     )
 
