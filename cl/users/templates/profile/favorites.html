@@ -8,7 +8,7 @@
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <link rel="stylesheet" href="{{ STATIC_URL }}/css/theme.bootstrap_3.min.css" />
+    <link rel="stylesheet" href="{{ STATIC_URL }}/css/custom_table_sorter.css" />
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.tablesorter.min.js"></script>
     <script defer type="text/javascript"
@@ -32,7 +32,6 @@
 
         $(function() {
         $("table").tablesorter({
-          theme: 'bootstrap',
           headerTemplate: '{content} {icon}',
           widgets : [ 'uitheme' ],
           sortInitialOrder: 'desc'
