@@ -12,7 +12,7 @@
 .tablesorter-bootstrap .tablesorter-header-inner {
   position: relative;
   /* Prevent overlap of icon and text */
-  padding-right: 14px;
+  padding-right: 20px;
 }
 
 /* bootstrap uses <i> for icons */
