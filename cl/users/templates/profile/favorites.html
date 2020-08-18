@@ -8,36 +8,38 @@
             src="{{ STATIC_URL }}js/save-favorites.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <link rel="stylesheet" href="{{ STATIC_URL }}/css/theme.bootstrap_3.min.css" />
+    <link rel="stylesheet" href="{{ STATIC_URL }}/css/custom_table_sorter.css" />
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.tablesorter.min.js"></script>
     <script defer type="text/javascript"
             src="{{ STATIC_URL }}js/jquery.tablesorter.widgets.min.js"></script>
 
     <script type="text/javascript">
-        $(document).ready(function(){
-            $(".edit-favorite-trigger").on("click", function (event) {
-                event.preventDefault();
-                var pk = $(this).data("id");
-                var ds = $("#data-store-" + pk);
-                $("#id_cluster_id").val(ds.data("cluster_id"));
-                $("#id_audio_id").val(ds.data("audio_id"));
-                $("#id_docket_id").val(ds.data("docket_id"));
-                $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
-                $("#save-favorite-notes-field").val(ds.data("notes"));
-                $("#save-favorite-name-field").val(ds.data("name"));
-                $("#modal-save-favorite").data("id", pk);
-            });
+      $(document).ready(function(){
+        $(".edit-favorite-trigger").on("click", function (event) {
+          event.preventDefault();
+          var pk = $(this).data("id");
+          var ds = $("#data-store-" + pk);
+          $("#id_cluster_id").val(ds.data("cluster_id"));
+          $("#id_audio_id").val(ds.data("audio_id"));
+          $("#id_docket_id").val(ds.data("docket_id"));
+          $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
+          $("#save-favorite-notes-field").val(ds.data("notes"));
+          $("#save-favorite-name-field").val(ds.data("name"));
+          $("#modal-save-favorite").data("id", pk);
         });
+      });
 
-        $(function() {
+      $(function() {
         $("table").tablesorter({
-          theme: 'bootstrap',
           headerTemplate: '{content} {icon}',
-          widgets : [ 'uitheme' ],
-          sortInitialOrder: 'desc'
-          })
-    });
+          sortInitialOrder: 'desc',
+          cssIconAsc: 'fa-sort-asc',
+          cssIconDesc: 'fa-sort-desc',
+          cssIconNone: 'fa-sort',
+          cssIcon: 'fa'
+        })
+      });
     </script>
 {% endblock %}
 
@@ -67,7 +69,19 @@
                     {% if type == "Dockets" %}
                       <th>Last Filing</th>
                     {% endif %}
-                    <th class="sorter-false" colspan="2">Notes</th>
+                    <th class="sorter-false">Notes</th>
+                    <th class="sorter-false">
+                      {% if type == "Dockets" %}
+                        <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
+                      {% elif type == "Oral Arguments" %}
+                        <a class="btn btn-default" href="{{ oral_search_url }}" role="button">
+                      {% elif type == "RECAP Documents" %}
+                        <a class="btn btn-default" href="{{ recap_search_url }}" role="button">
+                      {% elif type == "Opinions" %}
+                        <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
+                      {% endif %}
+                      <i class="fa fa-search"></i> Search Favorites</a>
+                    </th>
                   </tr>
                   </thead>
                   <tbody>
