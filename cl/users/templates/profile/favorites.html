@@ -15,22 +15,22 @@
             src="{{ STATIC_URL }}js/jquery.tablesorter.widgets.min.js"></script>
 
     <script type="text/javascript">
-        $(document).ready(function(){
-            $(".edit-favorite-trigger").on("click", function (event) {
-                event.preventDefault();
-                var pk = $(this).data("id");
-                var ds = $("#data-store-" + pk);
-                $("#id_cluster_id").val(ds.data("cluster_id"));
-                $("#id_audio_id").val(ds.data("audio_id"));
-                $("#id_docket_id").val(ds.data("docket_id"));
-                $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
-                $("#save-favorite-notes-field").val(ds.data("notes"));
-                $("#save-favorite-name-field").val(ds.data("name"));
-                $("#modal-save-favorite").data("id", pk);
-            });
+      $(document).ready(function(){
+        $(".edit-favorite-trigger").on("click", function (event) {
+          event.preventDefault();
+          var pk = $(this).data("id");
+          var ds = $("#data-store-" + pk);
+          $("#id_cluster_id").val(ds.data("cluster_id"));
+          $("#id_audio_id").val(ds.data("audio_id"));
+          $("#id_docket_id").val(ds.data("docket_id"));
+          $("#id_recap_doc_id").val(ds.data("recap_doc_id"));
+          $("#save-favorite-notes-field").val(ds.data("notes"));
+          $("#save-favorite-name-field").val(ds.data("name"));
+          $("#modal-save-favorite").data("id", pk);
         });
+      });
 
-        $(function() {
+      $(function() {
         $("table").tablesorter({
           headerTemplate: '{content} {icon}',
           sortInitialOrder: 'desc',
@@ -61,16 +61,6 @@
         {% for type, typed_favorite_forms in favorite_forms.items %}
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
             {% if typed_favorite_forms %}
-            {% if type == "Dockets" %}
-            <a class="btn btn-primary btn-lg" href="{{ docket_search_url }}" role="button">Search Within Dockets</a>
-            {% elif type == "Oral Arguments" %}
-            <a class="btn btn-primary btn-lg" href="{{ oral_search_url }}" role="button">Search Within Oral Arguments</a>
-            {% elif type == "RECAP Documents" %}
-            <a class="btn btn-primary btn-lg" href="{{ recap_search_url }}" role="button">Search Within RECAP Documents</a>
-            {% elif type == "Opinions" %}
-            <a class="btn btn-primary btn-lg" href="{{ opinion_search_url }}" role="button">Search Within Opinions</a>
-            {% endif %}
-
               <div class="table-responsive">
                 <table class="table settings-table tablesorter-bootstrap">
                   <thead>
@@ -79,7 +69,19 @@
                     {% if type == "Dockets" %}
                       <th>Last Filing</th>
                     {% endif %}
-                    <th class="sorter-false" colspan="2">Notes</th>
+                    <th class="sorter-false">Notes</th>
+                    <th class="sorter-false">
+                      {% if type == "Dockets" %}
+                        <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
+                      {% elif type == "Oral Arguments" %}
+                        <a class="btn btn-default" href="{{ oral_search_url }}" role="button">
+                      {% elif type == "RECAP Documents" %}
+                        <a class="btn btn-default" href="{{ recap_search_url }}" role="button">
+                      {% elif type == "Opinions" %}
+                        <a class="btn btn-default" href="{{ opinion_search_url }}" role="button">
+                      {% endif %}
+                      <i class="fa fa-search"></i> Search Favorites</a>
+                    </th>
                   </tr>
                   </thead>
                   <tbody>
