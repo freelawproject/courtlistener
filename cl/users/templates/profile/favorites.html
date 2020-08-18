@@ -45,7 +45,13 @@
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
             {% if typed_favorite_forms %}
             {% if type == "Dockets" %}
-            <a href="{{ docket_search_url }}" >Search Within Dockets</a>
+            <a class="btn btn-primary btn-lg" href="{{ docket_search_url }}" role="button">Search Within Dockets</a>
+            {% elif type == "Oral Arguments" %}
+            <a class="btn btn-primary btn-lg" href="{{ oral_search_url }}" role="button">Search Within Oral Arguments</a>
+            {% elif type == "RECAP Documents" %}
+            <a class="btn btn-primary btn-lg" href="{{ recap_search_url }}" role="button">Search Within RECAP Documents</a>
+            {% elif type == "Opinions" %}
+            <a class="btn btn-primary btn-lg" href="{{ opinion_search_url }}" role="button">Search Within Opinions</a>
             {% endif %}
 
               <div class="table-responsive">
