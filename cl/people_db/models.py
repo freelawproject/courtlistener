@@ -1808,6 +1808,16 @@ class Reimbursement(models.Model):
     financialdisclosure_id = models.ForeignKey(
         FinancialDisclosure, on_delete=models.CASCADE
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
     reimbursement_source = models.TextField(
         help_text="the source of the reimbursement, ex. 'Marquette Law School'"
     )
