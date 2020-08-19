@@ -166,3 +166,25 @@ def view_tags(request, username):
             "private": False,
         },
     )
+
+
+def view_tags(request, username):
+    """Show the user their tags if they're looking at their own, or show the
+    public tags of somebody else.
+    """
+    requested_user = get_object_or_404(User, username=username)
+    is_page_owner = request.user == requested_user
+    tags = requested_user.user_tags.all().order_by("name")
+    if not is_page_owner:
+        # Only show public tags
+        tags = tags.filter(published=True)
+    return render(
+        request,
+        "tag_list.html",
+        {
+            "requested_user": requested_user,
+            "is_page_owner": is_page_owner,
+            "tags": tags,
+            "private": False,
+        },
+    )
