@@ -9,7 +9,9 @@
       <span class="caret"></span>
     </button>
     <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-      <li><a href="">Remove from this Tag</a></li>
+      {% if tag.user == user %}
+        <li><a href="">Untag this item</a></li>
+      {% endif %}
       <li role="separator" class="divider"></li>
       {% if entry_count %}
         <li><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"><i class="fa fa-search"></i>&nbsp;Search this Docket</a></li>
