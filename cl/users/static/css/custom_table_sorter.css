@@ -1,0 +1,30 @@
+.tablesorter-bootstrap .tablesorter-header {
+  cursor: pointer;
+}
+.tablesorter-bootstrap .sorter-false {
+  cursor: default;
+}
+
+.tablesorter-bootstrap .tablesorter-header.sorter-false i.tablesorter-icon {
+  display: none;
+}
+
+.tablesorter-bootstrap .tablesorter-header-inner {
+  position: relative;
+  /* Prevent overlap of icon and text */
+  padding-right: 20px;
+}
+
+/* bootstrap uses <i> for icons */
+.tablesorter-bootstrap .tablesorter-header i.tablesorter-icon {
+  font-size: 11px;
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  margin-top: -7px; /* half the icon height; older IE doesn't like this */
+  width: 14px;
+  height: 14px;
+  background-repeat: no-repeat;
+  line-height: 14px;
+  display: inline-block;
+}

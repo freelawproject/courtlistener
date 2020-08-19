@@ -1,3 +1,6 @@
+{% load text_filters %}
+
+
 <tr id="favorite-row-{{ favorite_form.instance.id }}">
   <td id="name-{{ favorite_form.instance.id }}">
     {% if favorite_form.instance.cluster_id %}
@@ -25,8 +28,8 @@
     {% endif %}
   </td>
   {% if type == "Dockets" %}
-    <td id="date_last_filing-{{ favorite_form.instance.id }}">
-      {{ favorite_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)" }}
+    <td id="date_last_filing-{{ favorite_form.instance.id }}" data-text="{{  favorite_form.instance.docket_id.date_last_filing|date:"Ymd" }}">
+      {{ favorite_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
     </td>
   {% endif %}
   <td id="notes-{{ favorite_form.instance.id }}">
@@ -35,9 +38,8 @@
   <td class="align-top">
     <div data-toggle="modal"
          data-target="#modal-save-favorite">
-      <a class="inline edit-favorite-trigger nowrap cursor"
-         data-id="{{ favorite_form.instance.id }}">Edit / Delete
-        <i class="fa fa-pencil gray"></i>
+      <a class="inline edit-favorite-trigger nowrap btn btn-primary btn-sm"
+         data-id="{{ favorite_form.instance.id }}"><i class="fa fa-pencil"></i> Edit / Delete
       </a>
 
       <div id="data-store-{{ favorite_form.instance.id }}"
