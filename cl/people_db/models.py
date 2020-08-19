@@ -1746,6 +1746,24 @@ class AttorneyOrganization(models.Model):
         )
 
 
+class ValueCodes(models.Model):
+    code = models.CharField(
+        help_text="alphabetic codes representing value ranges for income, "
+                  "assets, etc",
+        max_length=2,
+        db_index=True,
+    )
+    min_value = models.IntegerField(
+        help_text="Minimum value of range, " "ex. 15,001"
+    )
+    max_value = models.IntegerField(
+        help_text="Maximum value of range, " "ex. 50,000"
+    )
+    is_income_gain = models.BooleanField(
+        help_text="Whether the value code " "represents income gain"
+    )
+
+
 class Agreement(models.Model):
     financialdisclosure_id = models.ForeignKey(
         FinancialDisclosure, on_delete=models.CASCADE
