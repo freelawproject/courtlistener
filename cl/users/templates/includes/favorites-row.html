@@ -28,7 +28,7 @@
     {% endif %}
   </td>
   {% if type == "Dockets" %}
-    <td id="date_last_filing-{{ favorite_form.instance.id }}">
+    <td id="date_last_filing-{{ favorite_form.instance.id }}" data-text="{{  favorite_form.instance.docket_id.date_last_filing|date:"Ymd" }}">
       {{ favorite_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
     </td>
   {% endif %}
