@@ -27,7 +27,7 @@
               <th>Name</th>
               <th>Title</th>
               <th>Created</th>
-              <th>Views</th>
+              <th colspan="2">Views</th>
               {% if is_page_owner %}
                 <th>Published</th>
               {% endif %}
@@ -39,11 +39,12 @@
       {# Normal row #}
       <tr>
         <td><a href="{% url "view_tag" requested_user tag.name %}" class="black-link"><span class="tag">{{ tag.name }}</span></a></td>
-        <td>{{ tag.title }}</td>
+        <td>{{ tag.title|default:"(none)" }}</td>
         <td>{{ tag.date_created|date:"M j, Y"|nbsp }}</td>
         <td>{{ tag.view_count }}</td>
         {% if is_page_owner %}
           <td>{{ tag.published|yesno|capfirst }}</td>
+          <td><a href="" class="btn btn-primary btn-sm inline"><i class="fa fa-pencil"></i>&nbsp;Edit</a></td>
          {% endif %}
       </tr>
       {% if forloop.last %}
@@ -52,7 +53,6 @@
         </div>
       {% endif %}
     {% empty %}
-      {# XXX DO THIS BETTER #}
       {% if is_page_owner %}
         <h3>You do not have any tags.</h3>
       {% else %}
