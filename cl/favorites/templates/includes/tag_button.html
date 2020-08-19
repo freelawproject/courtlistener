@@ -1,15 +1,15 @@
 <div class="btn-group">
-  <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-    Labels <span class="caret"></span>
+  <button type="button" class="btn btn-default dropdown-toggle"{% if not user.is_authenticated %} disabled="disabled{% endif %}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    Tags <span class="caret"></span>
   </button>
   <ul class="dropdown-menu">
-    <li><h6 class="list-group-item bold">Apply labels to this issue</h6></li>
+    <li><h6 class="list-group-item bold">Apply tags to this item</h6></li>
     <li>
       <div class="form-group list-group-item">
-        <input type="text" class="form-control" id="labelFilterInput" aria-describedby="labelFilterHelp" placeholder="Create a label">
+        <input type="text" class="form-control" id="labelFilterInput" aria-describedby="labelFilterHelp" placeholder="Create a tag">
       </div>
     </li>
-    <a href="/tags/edit/" class="list-group-item" id="editButton">
+    <a href="{% url "tag_list" request.user %}" class="list-group-item" id="editButton">
       <i class="fa fa-pencil"></i>
       Edit Labels
     </a>
