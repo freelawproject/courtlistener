@@ -13,20 +13,6 @@
 {% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-tag-300x300.png{% endblock %}
 
 
-{% block footer-scripts %}
-  {% if request.user.is_authenticated %}
-    <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/toggle_settings.js"></script>
-  {% endif %}
-  <script type="text/javascript">
-    // Set this variable for the docket alerts script to find
-    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
-  </script>
-  <script defer type="text/javascript"
-          src="{{ STATIC_URL }}js/docket_alerts.js?v=20200428"></script>
-{% endblock %}
-
-
 {% block sidebar %}{% endblock %}
 {% block content %}
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
