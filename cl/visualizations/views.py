@@ -52,7 +52,7 @@ def render_visualization_page(request, pk, embed):
     else:
         template = "visualization.html"
     return render(
-        request, template, {"viz": viz, "private": True}, status=status
+        request, template, {"viz": viz, "private": False}, status=status
     )
 
 
