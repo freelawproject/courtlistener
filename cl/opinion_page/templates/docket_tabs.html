@@ -30,6 +30,7 @@
   </script>
   <script defer type="text/javascript"
     src="{{ STATIC_URL }}js/docket_alerts.js?v=20200428"></script>
+  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag_utils.js"></script>
 
   {% include "includes/date_picker.html" %}
 {% endblock %}
@@ -60,7 +61,7 @@
        data-target="#modal-save-favorite, #modal-logged-out"
        title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
 
-    <h1 class="bottom inline">
+    <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
       {{ docket|best_case_name|safe|v_wrapper }}
       {% if docket.docket_number %}
         ({{ docket.docket_number }})
@@ -87,6 +88,9 @@
                class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
           </div>
         {% endif %}
+        <div class="left">
+          {% include "includes/tag_button.html" %}
+        </div>
         <div class="left">
           {% include "includes/docket_alerts_button.html" %}
           <a href="{% url "alert_help" %}#recap-alerts"
