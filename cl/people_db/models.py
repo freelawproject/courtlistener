@@ -1864,6 +1864,16 @@ class Liability(models.Model):
         help_text="ID of corresponding financial disclosure in "
         "FinancialDisclosure model",
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
     creditor = models.TextField(help_text="creditor to whom liability is owed")
     description = models.TextField(
         help_text="description of the filer's liability"
