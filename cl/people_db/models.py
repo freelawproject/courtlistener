@@ -1896,6 +1896,16 @@ class Gift(models.Model):
         help_text="ID of corresponding financial disclosure in "
         "FinancialDisclosure model",
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
     source = models.TextField(help_text="source of gift")
     description = models.TextField(help_text="description of gift")
     value = models.FloatField(help_text="value of the gift received")
