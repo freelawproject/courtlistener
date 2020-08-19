@@ -3,6 +3,7 @@ from cl.favorites.views import (
     save_or_update_favorite,
     delete_favorite,
     view_tag,
+    view_tags,
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
         view_tag,
         name="view_tag",
     ),
+    url(r"^tags/(?P<username>[^/]*)", view_tags, name="tag_list"),
 ]
