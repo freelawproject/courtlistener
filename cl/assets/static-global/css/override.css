@@ -520,6 +520,7 @@ div.shown ul {
 }
 
 #authorities ul,
+#docket-list ul,
 #cited-by ul,
 #visualizations ul,
 #recommendations ul,
@@ -539,6 +540,17 @@ div.shown ul {
   padding: 3px 0 2px 0;
   border-bottom: 1pt solid #DDD;
 }
+#docket-list > ul > li {
+  /* Use > b/c we don't want rule applying to drop downs */
+  list-style-type: none;
+  padding: 3px 0 5px 0;
+}
+
+.bullet-tail:after{
+  content: " \2022";
+  padding: 0.5em;
+}
+.bullet-tail:last-child:after { content: none; }
 
 .citation-name {
   font-size: 1.2em;
