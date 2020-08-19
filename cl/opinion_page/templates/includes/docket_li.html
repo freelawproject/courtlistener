@@ -1,0 +1,69 @@
+{% load text_filters %}
+{% load humanize %}
+
+{% with docket.docket_entries.count as entry_count %}
+<li>
+  <div class="dropdown float-right">
+    <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+      Actions
+      <span class="caret"></span>
+    </button>
+    <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+      <li><a href="">Remove from this Tag</a></li>
+      <li role="separator" class="divider"></li>
+      {% if entry_count %}
+        <li><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"><i class="fa fa-search"></i>&nbsp;Search this Docket</a></li>
+      {% endif %}
+      {% if docket.pacer_url %}
+        <li><a href="{{ docket.pacer_url }}"><i class="fa fa-external-link"></i> View on PACER</a></li>
+      {% endif %}
+    </ul>
+  </div>
+  <h4>
+    <a href="{{ docket.get_absolute_url }}" class="black-link no-underline">
+    {{ docket|best_case_name|safe|v_wrapper }}
+      {% if docket.docket_number %}
+        ({{ docket.docket_number }})
+      {% endif %}
+    </a>
+  </h4>
+  <p>
+    <span class="bullet-tail">{{ docket.court }}</span>
+    {% if docket.assigned_to or docket.assigned_to_str %}
+      <span class="bullet-tail">Hon.
+        {% if docket.assigned_to %}
+          <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+        {% elif docket.assigned_to_str %}
+          <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+        {% endif %}
+        presiding
+      </span>
+    {% endif %}
+
+    {% if docket.referred_to or docket.referred_to_str %}
+      <span class="bullet-tail">
+        Referred to
+        {% if docket.referred_to %}
+          <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+        {% elif docket.referred_to_str %}
+          <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+        {% endif %}
+      </span>
+    {% endif %}
+
+    {% if docket.date_filed %}
+      <span class="bullet-tail">Filed: {{ docket.date_filed }}</span>
+    {% endif %}
+    {% if docket.date_terminated %}
+      <span class="bullet-tail">Terminated: {{ docket.date_terminated }}</span>
+    {% endif %}
+    {% if docket.date_last_filing %}
+      <span class="bullet-tail">Last Filing: {{ docket.date_last_filing }}</span>
+    {% endif %}
+
+    <span class="bullet-tail">
+      {{ entry_count|intcomma }} entr{{ entry_count|pluralize:"y,ies" }}
+    </span>
+  </p>
+</li>
+{% endwith %}
