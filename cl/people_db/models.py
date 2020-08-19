@@ -1768,6 +1768,16 @@ class Agreement(models.Model):
     financialdisclosure_id = models.ForeignKey(
         FinancialDisclosure, on_delete=models.CASCADE
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
     date_agreement = models.DateField(
         help_text="The date the agreement was made, for example '2016'"
     )
