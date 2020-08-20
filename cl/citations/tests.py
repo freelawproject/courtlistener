@@ -615,6 +615,14 @@ class CiteTest(TestCase):
              '<span class="id_token">id.,</span> at 123. </span><pre class="'
              'inline">Lorem ipsum dolor sit amet</pre>'),
 
+            # Duplicate Id. citation
+            ('asd, id., at 123. Lo rem ip sum. asdf, id., at 123. Lo rem ip.',
+             '<pre class="inline">asd</pre><span class="citation no-link">, '
+             '<span class="id_token">id.,</span> at 123. </span><pre class="'
+             'inline">Lo rem ip sum. asdf</pre><span class="citation '
+             'no-link">, <span class="id_token">id.,</span> at 123. </span>'
+             '<pre class="inline">Lo rem ip.</pre>'),
+
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
              '<pre class="inline">asdf."</pre><span class="citation no-link"> '
