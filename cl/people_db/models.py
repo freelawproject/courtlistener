@@ -1878,8 +1878,10 @@ class Liability(models.Model):
     description = models.TextField(
         help_text="description of the filer's liability"
     )
-    value_code = models.CharField(
-        help_text="code indicating value range of the liability", max_length=2,
+    value_code = models.ForeignKey(
+        ValueCodes,
+        on_delete=models.CASCADE,
+        help_text="code indicating value range of the liability",
     )
     is_field_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is redacted"
