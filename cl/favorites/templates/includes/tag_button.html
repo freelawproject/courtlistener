@@ -2,10 +2,10 @@
   <button type="button" class="btn btn-default dropdown-toggle"{% if not user.is_authenticated %} disabled="disabled{% endif %}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
     Tags <span class="caret"></span>
   </button>
-  <ul class="dropdown-menu">
-    <li><h6 class="list-group-item bold">Apply tags to this item</h6></li>
-    <li>
-      <div class="form-group list-group-item">
+  <ul class="dropdown-menu" id="list-group">
+    <li class="list-group-item"><h6 class="bold">Apply tags to this item</h6></li>
+    <li class="list-group-item">
+      <div class="form-group">
         <input type="text" class="form-control" id="labelFilterInput" aria-describedby="labelFilterHelp" placeholder="Create a tag">
       </div>
     </li>
