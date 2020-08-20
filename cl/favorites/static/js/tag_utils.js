@@ -2,48 +2,69 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// TO DO: need mike input
-function extractObjectIds() {
-  // fetch object ids and return array of objects
-  // [{ type: "docket", id: '1234'}, {type: 'opinion', id: '5678' }]
-  return [];
+function getCookie(name) {
+  var cookieValue = null;
+  if (document.cookie && document.cookie != '') {
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+      var cookie = jQuery.trim(cookies[i]);
+      // Does this cookie string begin with the name we want?
+      if (cookie.substring(0, name.length + 1) == (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
 }
 
-function createListElement({ id, label, active }) {
+function getDocketIdFromH1Tag() {
+  const h1 = document.querySelector('h1[data-id]');
+  return parseInt(h1.dataset.id);
+}
+
+function createListElement({ item }) {
+  const { id, name, dockets, linkId } = item;
+
+  const active = dockets.includes(getDocketIdFromH1Tag());
   const listItem = document.createElement("li");
   listItem.classList +=
     "list-group-item list-group-item-action d-flex align-items-center filterable";
 
-  if (label.startsWith("Create Option:")) {
-    listItem.textContent = label;
-
+  if (name.startsWith("Create Option:")) {
+    listItem.textContent = name;
+    listItem.setAttribute('style', 'cursor:default;')
     // add the createNewOption click handler
     listItem.addEventListener("click", (ev) => {
-      ev.stopPropagation();
+      ev.stopImmediatePropagation();
       const newTag = ev.target.textContent.replace("Create Option: ", "");
       console.log(`Creating new option "${newTag}"`);
       // fire POST event
 
-      // in production, use fetch
-      // window.fetch("/tags/new", {
-      // method: "POST",
-      // credentials: 'include',
-      // headers: { "Content-Type": "application/json" },
-      // body: JSON.stringify({
-      // object (e.g., docket) identifier
-      // objectId: "1234",
-      // tag: {
-      // label: newTag,
-      // active: true
-      // }
-      // })
-      // })
-      // .then(res => res.json())
-
-      // in development, use mock data
-      Promise.resolve({ id: "-1000", label: newTag, active })
-        .then((data) => {
-          if (!data) return;
+      window.fetch("/api/rest/v3/tags/", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...csrfTokenHeader },
+        body: JSON.stringify({
+        // object (e.g., docket) identifier
+          name: newTag,
+        })
+      })
+      .then(res => res.json())
+      .then((data) => {
+        if (!data) return;
+        // create the association
+        window.fetch("/api/rest/v3/docket-tags/", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...csrfTokenHeader },
+          body: JSON.stringify({
+            tag: data.id,
+            docket: getDocketIdFromH1Tag(),
+          })
+        })
+        .then(res => res.json())
+        .then(linkData => {
           // reset the textInput
           document.getElementById("labelFilterInput").value = "";
           // update the data in the hiddenDiv
@@ -51,57 +72,54 @@ function createListElement({ id, label, active }) {
           const oldData = JSON.parse(hiddenDiv.textContent);
           const newData = [
             ...oldData,
-            { id: data.id, label: data.label, active: data.active }
+            // the association id should be the attached to the link
+            { id: data.id, name: data.name, dockets: [getDocketIdFromH1Tag()], linkId: linkData.id }
           ];
           hiddenDiv.textContent = JSON.stringify(newData);
           // rebuild the list
           removeListElements();
           addListElements({ data: newData });
         })
-        .catch((err) => console.error(err));
+      })
+      .catch((err) => console.error(err))
     });
   } else {
-    listItem.innerHTML = `
-      <div class="form-check form-check-inline">
-        <input type="checkbox" id=${id} value=${label} ${
-      !!active && "checked"
-    } class="form-check position-static ${active ? "checked" : ""}">
-        <label class="ml-4 form-check-label text-capitalize" for="${label}">${label}</label>
-      </div>
-    `;
-    listItem.addEventListener("click", (ev) => {
-      // stop click from closing form
-      ev.stopPropagation();
-      // make click on listItem set the checkbox
-      ev.currentTarget.querySelector("input").click();
-    });
-  }
+      listItem.innerHTML = `
+        <div class="form-check form-check-inline">
+          <input type="checkbox" id=${linkId} value=${name} ${
+        !!active && "checked"
+      } class="form-check position-static ${active ? "checked" : ""}" data-tagid="${id}">
+          <label class="ml-4 form-check-label text-capitalize" for="${name}">${name}</label>
+        </div>
+      `;
+      
+      createListClickHandler(listItem.querySelector('input'));
+
+      listItem.addEventListener("click", (ev) => {
+        // stop click from closing form
+        ev.stopImmediatePropagation();
+        // make click on listItem set the checkbox
+        ev.currentTarget.querySelector("input").click();
+      });
+    }
   return listItem;
 }
 
 function createListClickHandler(input) {
   return input.addEventListener("click", (ev) => {
+    ev.stopImmediatePropagation();
     // don't fire listItem handler
-    ev.stopPropagation();
 
-    // create the postPayload
-    const fetchOptions = {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        // object (e.g., docket) identifier
-        objectId: extractObjectIds(),
-        // tag identifier
-        tagId: input.id
-      })
-    };
     // remove association if already checked
     if (input.hasAttribute("checked")) {
       console.log(`Removing ${input.value} from tags`);
       // fire POST to backend
       window
-        .fetch("/tags/unlink", fetchOptions)
+        .fetch(`/api/rest/v3/docket-tags/${input.id}/`, {
+          method: "DELETE",
+          headers: csrfTokenHeader,
+          credentials: "include",
+        })
         .then((res) => input.removeAttribute("checked"))
         .catch((err) => console.error(err));
     } else {
@@ -109,33 +127,45 @@ function createListClickHandler(input) {
       console.log(`Adding ${input.value} to tags`);
       // fire POST to backend
       window
-        .fetch("/tags/link", fetchOptions)
-        .then((res) => input.setAttribute("checked", true))
+        .fetch('/api/rest/v3/docket-tags/', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...csrfTokenHeader },
+          body: JSON.stringify({
+            tag: input.dataset.tagid,
+            docket: getDocketIdFromH1Tag(),
+          })
+        })
+        .then((res) => res.json())
+        // update the id on the input to reflect the linkId
+        .then(data => {
+          input.setAttribute('id', data.id)
+          input.setAttribute("checked", true)
+        })
         .catch((err) => console.error(err));
     }
   });
 }
 
-function insertNewListElement(item) {
-  const list = document.querySelector("ul.list-group");
-  const editItem = document.querySelector("a#editButton");
-  list.insertBefore(createListElement(item), editItem);
-}
-
 function addListElements({ data }) {
+  const docketId = getDocketIdFromH1Tag();
   // create the list elements and inject them before the last one
-
   if (data !== undefined && data.length > 0) {
-    data.forEach((item) => insertNewListElement(item));
+    data.map((item) => {
+      const list = document.querySelector("ul#list-group");
+      const editItem = document.querySelector("a#editButton");
+      const newItem = createListElement({ item });
+      list.insertBefore(newItem, editItem);
+    });
     // change the placeholder on the textInput if items exist
     document
       .getElementById("labelFilterInput")
       .setAttribute("placeholder", "Filter labels");
   }
   // add listener for onChange to all checkboxes
-  [...document.querySelectorAll('input[type="checkbox"]')].map((input) =>
-    createListClickHandler(input)
-  );
+  // [...document.querySelectorAll('input[type="checkbox"]')].map((input) =>
+  //   createListClickHandler(input)
+  // );
 }
 
 function removeListElements() {
@@ -146,53 +176,70 @@ function removeListElements() {
 
 // script runtime start
 
-// 1. remove the click listener from the static listItems
-// to prevent form from closing on click
-[...document.querySelectorAll("li.list-group-item")].map((node) => {
-  return node.addEventListener("click", (e) => e.stopPropagation());
-});
+// 0. set the CSRF token
+const csrfTokenHeader = { 'X-CSRFToken': getCookie('csrftoken') };
 
-// 2. fetch the data from the backend and populate the list items
+window.onload = () => {
+  // 1. remove the click listener from the static listItems
+  // to prevent form from closing on click
+  [...document.querySelectorAll("li.list-group-item")].map((node) => {
+    return node.addEventListener("click", (e) => e.stopPropagation());
+  });
 
-// in production, use window.fetch
-// window.fetch("/tags/", {
-// method: "GET",
-// credentials: 'include',
-// headers: { "Content-Type": "application/json" },
-// })
-// .then(res => res.json())
+  // 2. fetch the data from the backend and populate the list items
+    window.fetch("/api/rest/v3/tags/", {
+      method: "GET",
+      headers: { "Content-Type": "application/json", ...csrfTokenHeader },
+    })
+    .then((res) => res.json())
+    .then((tags) => {
+      // fetch the associations
+      window.fetch('/api/rest/v3/docket-tags/', {
+        method: 'GET',
+        headers: {'Content-Type': 'application/json', ...csrfTokenHeader }
+      })
+      .then(res => res.json())
+      .then((resData) => {
+        // create the new data
+        const results = tags.results.map((tag) => {
+          const linkData = resData.results.find((link) => {
+            return link.tag === tag.id && link.docket === getDocketIdFromH1Tag();
+          })
+          return { ...tag, linkId: linkData?.id }
+        })
+        // stash the data in a hidden div
+        const hiddenDiv = document.createElement("div");
+        hiddenDiv.id = "tagData";
+        hiddenDiv.style.visibility = "hidden";
+        hiddenDiv.textContent = JSON.stringify(results);
+        document.querySelector("body").appendChild(hiddenDiv);
+        return results;
+      })
+      // iterate through the data to create the list Elements
+      .then(associatedTags => addListElements({ data: associatedTags }))
+    })
+    .catch(err => console.log(err.message));
 
-// in development, mock fetch call (returns promise)
-Promise.resolve([
-  { id: "1", label: "label4", active: true },
-  { id: "2", label: "label5", active: false },
-  { id: "3", label: "label6", active: undefined }
-]).then((res) => {
-  // stash the data in a hidden div
-  const hiddenDiv = document.createElement("div");
-  hiddenDiv.id = "tagData";
-  hiddenDiv.style.visibility = "hidden";
-  hiddenDiv.textContent = JSON.stringify(res);
-  document.querySelector("body").appendChild(hiddenDiv);
-  // iterate through the data to create the list Elements
-  addListElements({ data: res });
-});
+  // 3. add listener to the textInputSearch and change placeholder
 
-// 3. add listener to the textInputSearch and change placeholder
+  document.getElementById("labelFilterInput").addEventListener("keyup", (ev) => {
+    const { value } = ev.target;
+    // get the data from the hidden Div
+    const oldData = JSON.parse(document.getElementById("tagData").textContent);
+    // apply the filter
+    const filtered = oldData.filter(({ name }) => {
+      // don't use previous Create Option items
+      if (name.startsWith('Create Option:')) return false
+      return name.includes(value)
+    });
+    // remove the stale elements
+    removeListElements();
+    // inject the createOption listItem if no results found
+    const data =
+      filtered.length >= 1
+        ? filtered
+        : [{ id: '-1', name: `Create Option: ${capitalize(value)}`, dockets: [] }, ...filtered];
 
-document.getElementById("labelFilterInput").addEventListener("keyup", (ev) => {
-  const { value } = ev.target;
-  // get the data from the hidden Div
-  const oldData = JSON.parse(document.getElementById("tagData").textContent);
-  // apply the filter
-  const filtered = oldData.filter(({ label }) => label.includes(value));
-
-  // remove the stale elements
-  removeListElements();
-  // inject the createOption listItem if no results found
-  const data =
-    filtered.length >= 1
-      ? filtered
-      : [{ label: `Create Option: ${capitalize(value)}` }, ...filtered];
-  addListElements({ data });
-});
+    addListElements({ data });
+  });
+}
