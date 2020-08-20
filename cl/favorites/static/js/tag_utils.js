@@ -114,6 +114,7 @@ function createListElement(tag) {
         .catch((err) => console.error(err));
     });
   } else {
+    // associationId will be undefined unless an association exists
     listItem.innerHTML = `
         <div class="form-check form-check-inline">
           <input type="checkbox" id=${associationId} value=${name} ${
@@ -125,10 +126,12 @@ function createListElement(tag) {
         </div>
       `;
 
+    // attach the clickHandler
     createListClickHandler(listItem.querySelector("input"));
 
+    // make a click on the div click the checkbox
     listItem.addEventListener("click", (ev) => {
-      // stop click from closing form
+      // stop click from performing other actions
       ev.stopImmediatePropagation();
       // make click on listItem set the checkbox
       ev.currentTarget.querySelector("input").click();
@@ -183,7 +186,7 @@ function createListClickHandler(input) {
 
 // given data, create the listElements and inject
 // them into the DOM
-// ({ data }: {data: Tag[] }) => void;
+// ({ data }: { data: Tag[] }) => void;
 function addListElements({ data }) {
   const docketId = getDocketIdFromH1Tag();
   if (data === undefined || data.length < 1) return;
@@ -218,13 +221,17 @@ const csrfTokenHeader = {
 };
 
 window.onload = () => {
-  // 1. remove the click listener from the static listItems
+  // 1. check to see if the button is disabled - do nothing if it is
+  const tagButton = document.querySelector('button#tagSelect');
+  if (tagButton.disabled) return;
+
+  // 2. remove the click listener from the static listItems
   // to prevent form from closing on click
   [...document.querySelectorAll("li.list-group-item")].map((node) => {
     return node.addEventListener("click", (e) => e.stopPropagation());
   });
 
-  // 2. fetch the data from the backend and populate the list items
+  // 3. fetch the data from the backend and populate the list items
   window
     .fetch("/api/rest/v3/tags/", {
       method: "GET",
@@ -262,7 +269,7 @@ window.onload = () => {
     })
     .catch((err) => console.log(err.message));
 
-  // 3. add listener to the textInputSearch and change placeholder
+  // 4. add listener to the textInputSearch and change placeholder
 
   document
     .getElementById("labelFilterInput")
