@@ -1917,3 +1917,105 @@ class Gift(models.Model):
     is_field_partially_redacted = models.BooleanField(
         help_text="flag indicating whether this FD field is partially redacted"
     )
+
+
+class Income(models.Model):
+    VALUE_METHOD_CODES = (
+        ("Q", "Appraisal"),
+        ("R", "Cost (Real Estate Only)"),
+        ("S", "Assessment"),
+        ("T", "Cash Market"),
+        ("U", "Book Value"),
+        ("V", "Other"),
+        ("W", "Estimated"),
+    )
+
+    financialdisclosure_id = models.ForeignKey(
+        FinancialDisclosure, on_delete=models.CASCADE
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified",
+        auto_now=True,
+        db_index=True,
+    )
+    is_investment_income = models.BooleanField(
+        help_text="whether the income is derived from an investment"
+    )
+    is_spouse = models.BooleanField(
+        help_text="whether the income was earned by a spouse"
+    )
+    income_date = models.DateField(
+        help_text="date that income was earned, for example 2015"
+    )
+    income_date_granularity = models.CharField(
+        help_text="granularity of income date, ex. '%Y'",
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
+    )
+    raw_source_type_str = models.TextField(
+        help_text="the raw string we extract income source and type from"
+    )
+    income_source = models.TextField(
+        help_text="source of income, ex. 'Harvard Law School'"
+    )
+    income_type = models.TextField(help_text="type of income, ex. 'Teaching'")
+    income_amount = models.FloatField(
+        help_text="the amount of income reported, ex. 27200.00"
+    )
+    asset_type = models.TextField(
+        help_text="type of income derived from asset during reporting period"
+    )
+    asset_description = models.TextField(help_text="description of asset")
+    asset_income_amount_code = models.ForeignKey(
+        ValueCodes,
+        on_delete=models.CASCADE,
+        help_text="code indicating value range of income from asset during "
+        "reporting period",
+    )
+    gross_value_code = models.ForeignKey(
+        ValueCodes,
+        on_delete=models.CASCADE,
+        help_text="code indicating range of gross value of asset at the end of"
+        " the reporting period",
+    )
+    gross_value_method_code = models.CharField(
+        help_text="code indicating how gross value of asset was assessed, "
+        "ex. Q (appraisal)",
+        choices=VALUE_METHOD_CODES,
+        max_length=2,
+    )
+    transaction_type = models.TextField(
+        help_text="the type of transaction completed during the reporting "
+        "period that involves the asset, ex. 'buy'"
+    )
+    transaction_date = models.DateField(
+        help_text="date of transaction during the reporting period involving "
+        "the asset"
+    )
+    transaction_value_code = models.ForeignKey(
+        ValueCodes,
+        on_delete=models.CASCADE,
+        help_text="code indicating range of value of transaction during the "
+        "reporting period",
+    )
+    transaction_gain_code = models.ForeignKey(
+        ValueCodes,
+        on_delete=models.CASCADE,
+        help_text="code indicating range of gains from the transaction during "
+        "the reporting period",
+    )
+    private_transaction_partner = models.TextField(
+        help_text="identity of buyer or seller if the transaction is private"
+    )
+    is_field_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is redacted"
+    )
+    is_field_partially_redacted = models.BooleanField(
+        help_text="flag indicating whether this FD field is partially redacted"
+    )
