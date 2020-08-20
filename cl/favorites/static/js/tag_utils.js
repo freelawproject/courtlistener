@@ -1,8 +1,3 @@
-// (str: String) => String
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 // (name: String) => CsrfToken
 function getCookie(name) {
   var cookieValue = null;
@@ -113,7 +108,8 @@ function createListElement(tag) {
               // rebuild the list
               removeListElements();
               addListElements({ data });
-            });
+            })
+            .catch((err) => console.error(err));
         })
         .catch((err) => console.error(err));
     });
@@ -125,7 +121,7 @@ function createListElement(tag) {
     } class="form-check position-static ${
       active ? "checked" : ""
     }" data-tagid="${id}">
-          <label class="ml-4 form-check-label text-capitalize" for="${name}">${name}</label>
+          <label class="ml-4 form-check-label" for="${name}">${name}</label>
         </div>
       `;
 
@@ -284,18 +280,18 @@ window.onload = () => {
       });
       // remove the stale elements
       removeListElements();
-      // inject the createOption listItem if no results found
-      const data =
-        filtered.length >= 1
-          ? filtered
-          : [
-              {
-                id: "-1",
-                name: `Create Option: ${capitalize(value)}`,
-                dockets: []
-              },
-              ...filtered
-            ];
+      // inject the createOption listItem if it is not an exact result
+      const exactTagExists = filtered.find(({ name }) => name === value);
+      const data = exactTagExists
+        ? filtered
+        : [
+            {
+              id: "-1",
+              name: `Create Option: ${value}`,
+              dockets: []
+            },
+            ...filtered
+          ];
 
       addListElements({ data });
     });
