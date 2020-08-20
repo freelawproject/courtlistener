@@ -1749,7 +1749,7 @@ class AttorneyOrganization(models.Model):
 class ValueCodes(models.Model):
     code = models.CharField(
         help_text="alphabetic codes representing value ranges for income, "
-                  "assets, etc",
+        "assets, etc",
         max_length=2,
         db_index=True,
     )
