@@ -159,7 +159,7 @@ class FullCitation(Citation):
         return r"%d(\s+)%s(\s+)%s(\s?)" % (
             self.volume,
             re.escape(self.reporter_found),
-            self.page,
+            re.escape(self.page),
         )
 
     # TODO: Update css for no-link citations
@@ -223,7 +223,7 @@ class ShortformCitation(Citation):
             re.escape(self.antecedent_guess),
             self.volume,
             re.escape(self.reporter_found),
-            self.page,
+            re.escape(self.page),
         )
 
     def as_html(self):
@@ -283,7 +283,7 @@ class SupraCitation(Citation):
             s = r"%s(\s+)supra" % re.escape(self.antecedent_guess)
 
         if self.page:
-            s += r",(\s+)at(\s+)%s" % self.page
+            s += r",(\s+)at(\s+)%s" % re.escape(self.page)
 
         return s + r"(\s?)"
 
