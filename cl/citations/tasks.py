@@ -9,7 +9,10 @@ from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 from cl.citations.models import Citation
-from cl.citations.utils import is_balanced_html
+from cl.citations.utils import (
+    is_balanced_html,
+    remove_duplicate_citations_by_regex,
+)
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -76,6 +79,7 @@ def get_document_citations(opinion):
 def create_cited_html(opinion, citations):
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
+        citations = remove_duplicate_citations_by_regex(citations)
         for citation in citations:
             if isinstance(citation, Citation):
                 citation_regex = citation.as_regex()
@@ -90,6 +94,7 @@ def create_cited_html(opinion, citations):
                     )
     elif opinion.plain_text:
         inner_html = opinion.plain_text
+        citations = remove_duplicate_citations_by_regex(citations)
         for citation in citations:
             if isinstance(citation, Citation):
                 repl = u'</pre>%s<pre class="inline">' % citation.as_html()

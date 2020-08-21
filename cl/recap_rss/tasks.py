@@ -1,5 +1,6 @@
 # coding=utf-8
 import bz2
+import errno
 import json
 import logging
 import re
@@ -199,7 +200,16 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
 
     # Save the feed to the DB
     feed_data = RssFeedData(court_id=court_pk)
-    feed_data.filepath.save("rss.xml.bz2", ContentFile(bz2.compress(content)))
+    try:
+        feed_data.filepath.save(
+            "rss.xml.bz2", ContentFile(bz2.compress(content))
+        )
+    except OSError as exc:
+        if exc.errno == errno.EIO:
+            abort_or_retry(self, feed_status, exc)
+        else:
+            raise exc
+
     return rss_feed.data
 
 

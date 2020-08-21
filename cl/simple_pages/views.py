@@ -375,7 +375,7 @@ def ratelimited(request, exception):
     )
 
 
-@track_in_matomo
+@track_in_matomo(timeout=0.01)
 def serve_static_file(request, file_path=""):
     """Sends a static file to a user.
 
