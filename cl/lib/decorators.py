@@ -86,8 +86,8 @@ def track_in_matomo(original_func=None, timeout=0.5, check_bots=True):
     exclusively on Matomo's bot detection.
     :returns the result of the wrapped function
     """
-    def _decorate(f):
 
+    def _decorate(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             t1 = time.time()
