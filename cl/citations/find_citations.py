@@ -235,7 +235,7 @@ def parse_page(page):
 
     if page.isdigit():
         # First, check whether the page is a simple digit. Most will be.
-        return int(page)
+        return str(page)
     else:
         # Otherwise, check whether the "page" is really one of the following:
         # (ordered in descending order of likelihood)
@@ -252,7 +252,7 @@ def parse_page(page):
             or re.match(r"[*\u00b6\ ]*[0-9:\-]+", page)  # ¶, star, colon
         )
         if match:
-            return match.group(0)
+            return str(match.group(0))
         else:
             return None
 
