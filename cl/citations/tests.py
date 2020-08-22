@@ -635,6 +635,11 @@ class CiteTest(TestCase):
              '<pre class="inline">asdf</pre><span class="citation no-link">, '
              '<span class="id_token">Ibid.</span> Lorem ipsum dolor </span>'
              '<pre class="inline">sit amet</pre>'),
+
+            # NonopinionCitation (currently nothing should happen here)
+            (u'Lorem ipsum dolor sit amet. U.S. Code §3617. Foo bar.',
+             '<pre class="inline">Lorem ipsum dolor sit amet. U.S. Code '
+             '§3617. Foo bar.</pre>'),
         ]
 
         # fmt: on
