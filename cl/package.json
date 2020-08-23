@@ -1,0 +1,36 @@
+{
+  "name": "courtlistener-webpack-loader",
+  "version": "1.0.0",
+  "description": "use modern js frameworks with courtlistener",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "tests"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "scripts": {
+    "build": "./node_modules/.bin/webpack --config webpack.config.js",
+    "dev": "./node_modules/.bin/webpack --config webpack.config.js --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.11.4",
+    "@babel/preset-env": "^7.11.0",
+    "@babel/preset-react": "^7.10.4",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.4.1",
+    "babel-loader": "^8.1.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "prettier": "^2.0.5",
+    "react": "^16.13.1",
+    "react-refresh": "^0.8.3",
+    "webpack": "^4.44.1",
+    "webpack-bundle-tracker": "^1.0.0-alpha.1",
+    "webpack-cli": "^3.3.12",
+    "webpack-dev-server": "^3.11.0"
+  }
+}
