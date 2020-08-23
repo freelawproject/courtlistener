@@ -1,38 +1,49 @@
-const path = require("path");
-const webpack = require("webpack");
-const BundleTracker = require("webpack-bundle-tracker");
-const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin')
+const path = require('path');
+const webpack = require('webpack');
+const BundleTracker = require('webpack-bundle-tracker');
+const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
-const isDevelopment = process.env.NODE_ENV !== 'production'
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+const baseOutput = {
+  path: path.resolve('./assets/bundles'),
+  filename: '[name]-[hash].js',
+};
 
 module.exports = {
   mode: isDevelopment ? 'development' : 'production',
   context: __dirname,
 
   entry: [
-    'webpack-dev-server/client?http://localhost:3000',
-    "./assets/js/index", // entry point of our app. assets/js/index.js should require other js modules and dependencies it needs
+    './assets/react/index', // entry point of our app. assets/js/index.js should require other js modules and dependencies it needs
   ],
-  output: {
-    path: path.resolve("./assets/bundles/"),
-    filename: "[name]-[hash].js",
-    // Tell django to use this URL to load packages and not use STATIC_URL + bundle_name
-    publicPath: 'http://localhost:3000/assets/bundles/',
-  },
+  output: isDevelopment
+    ? // Tell django to use this URL to load packages and not use STATIC_URL + bundle_name
+      { ...baseOutput, publicPath: 'http://localhost:3000/assets/bundles/' }
+    : { ...baseOutput },
 
   plugins: [
     isDevelopment && new ReactRefreshWebpackPlugin(),
-    new BundleTracker({ filename: "./webpack-stats.json" }),
+    new BundleTracker({ filename: './webpack-stats.json' }),
   ].filter(Boolean),
 
   module: {
     rules: [
-      { test: /\.jsx?$/, exclude: /node_modules/, loader: "babel-loader" }, // to transform JSX into JS
+      {
+        test: /\.(jsx|ts|tsx)?$/,
+        include: path.join(__dirname, 'assets', 'react'),
+        exclude: /node_modules/,
+        loader: 'babel-loader',
+      },
     ],
   },
 
   resolve: {
-    modules: ["node_modules", "bower_components"],
-    extensions: [".js", ".jsx"],
+    modules: ['node_modules', 'bower_components'],
+    extensions: ['.js', '.jsx', '.ts', '.tsx'],
+  },
+  devServer: {
+    compress: true,
+    port: 3000,
   },
 };
