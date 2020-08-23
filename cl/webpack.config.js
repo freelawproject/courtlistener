@@ -6,13 +6,13 @@ const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin'
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const baseOutput = {
-  path: path.resolve('./assets/bundles'),
+  path: path.resolve('./assets/bundles/'),
   filename: '[name]-[hash].js',
 };
 
 module.exports = {
-  mode: isDevelopment ? 'development' : 'production',
   context: __dirname,
+  mode: isDevelopment ? 'development' : 'production',
 
   entry: [
     './assets/react/index', // entry point of our app. assets/js/index.js should require other js modules and dependencies it needs
