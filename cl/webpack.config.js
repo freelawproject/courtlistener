@@ -22,6 +22,13 @@ module.exports = {
       { ...baseOutput, publicPath: 'http://localhost:3000/assets/bundles/' }
     : { ...baseOutput },
 
+  optimization: {
+    removeAvailableModules: true,
+    splitChunks: {
+      chunks: 'all',
+      name: 'vendor',
+    },
+  },
   plugins: [
     isDevelopment && new ReactRefreshWebpackPlugin(),
     new BundleTracker({ filename: './webpack-stats.json' }),
@@ -32,14 +39,13 @@ module.exports = {
       {
         test: /\.(jsx|ts|tsx)?$/,
         include: path.join(__dirname, 'assets', 'react'),
-        exclude: /node_modules/,
         loader: 'babel-loader',
       },
     ],
   },
 
   resolve: {
-    modules: ['node_modules', 'bower_components'],
+    modules: ['node_modules'],
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
   },
   devServer: {
