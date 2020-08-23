@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "rest_framework_swagger",
     "django_filters",
     "storages",
+    "webpack_loader",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
@@ -277,6 +278,14 @@ STATIC_ROOT = os.path.join(INSTALL_ROOT, "cl/assets/static/")
 # Where should the bulk data be stored?
 BULK_DATA_DIR = os.path.join(INSTALL_ROOT, "cl/assets/media/bulk-data/")
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+WEBPACK_LOADER = {
+    'DEFAULT': {
+        'BUNDLE_DIR_NAME': 'bundles/',
+        'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.json'),
+    }
+}
 
 #####################
 # Payments & Prices #
