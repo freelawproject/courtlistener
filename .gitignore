@@ -8,6 +8,7 @@
 # Javascript Dev Bundles
 cl/node_modules/
 cl/assets/bundles
+cl/webpack-stats.json
 
 # Downloaded and generated assets
 cl/assets/media/doc/
