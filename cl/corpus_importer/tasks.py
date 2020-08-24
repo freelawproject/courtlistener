@@ -293,6 +293,9 @@ def get_and_save_free_document_report(self, court_id, start, end):
     msg = None
     try:
         report.query(start, end, sort="case_number")
+    except TypeError as exc:
+        msg = "TypeError getting free document report results, likely due " \
+              "to failure to get Nonce."
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Unable to get free document report results at %s (%s to %s)."
     except PacerLoginException as exc:
