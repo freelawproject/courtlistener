@@ -91,7 +91,7 @@ def process_stripe_callback(request):
         ):
             charge = event["data"]["object"]
 
-            if charge["application"] == settings.XERO_APPLICATION_ID:
+            if charge.get("application") == settings.XERO_APPLICATION_ID:
                 handle_xero_payment(charge)
 
             # Sometimes stripe can process a transaction and call our callback
