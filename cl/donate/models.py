@@ -51,6 +51,8 @@ class Donation(models.Model):
     FAILED = 6
     RECLAIMED_REFUNDED = 7
     CAPTURED = 8
+    DISPUTED = 9
+    DISPUTE_CLOSED = 10
     PAYMENT_STATUSES = (
         (AWAITING_PAYMENT, "Awaiting Payment"),
         (UNKNOWN_ERROR, "Unknown Error"),
@@ -62,6 +64,8 @@ class Donation(models.Model):
         (FAILED, "Failed"),
         (RECLAIMED_REFUNDED, "Reclaimed/Refunded"),
         (CAPTURED, "Captured"),
+        (DISPUTED, "Disputed"),
+        (DISPUTE_CLOSED, "Dispute closed"),
     )
     donor = models.ForeignKey(
         User,
