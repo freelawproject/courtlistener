@@ -1,13 +1,10 @@
 import React from 'react';
-import { render } from 'react-dom';
+import ReactDOM from 'react-dom';
+import TagSelect from './TagSelect';
 
-const App = () => {
-  return (
-    <div>
-      <h1>Hello, Mike!</h1>
-      <h3>This is my new react app!</h3>
-    </div>
-  );
-};
-
-render(<App />, document.getElementById('react-root'));
+ReactDOM.render(
+  <React.StrictMode>
+    <TagSelect />
+  </React.StrictMode>,
+  document.getElementById('react-root')
+);
