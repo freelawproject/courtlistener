@@ -12,7 +12,7 @@ module.exports = {
     'plugin:prettier/recommended',
   ],
   rules: {
-    'prettier/prettier': 'warn',
+    'prettier/prettier': 'error',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
   },
 };
