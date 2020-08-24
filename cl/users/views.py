@@ -89,14 +89,14 @@ def view_favorites(request):
             key = "Dockets"
         favorite_forms[key].append(FavoriteForm(instance=favorite))
     docket_search_url = (
-        "/?type=r&q=docket_id:("
+        "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
             [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
         )
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=id:("
+        "/?type=oa&q=xxx AND id:("
         + " OR ".join(
             [
                 str(a.instance.audio_id.pk)
@@ -106,7 +106,7 @@ def view_favorites(request):
         + ")"
     )
     recap_search_url = (
-        "/?type=r&q=docket_entry_id:("
+        "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
             [
                 str(a.instance.recap_doc_id.pk)
@@ -116,7 +116,7 @@ def view_favorites(request):
         + ")"
     )
     opinion_search_url = (
-        "/?q=cluster_id:("
+        "/?q=xxx AND cluster_id:("
         + " OR ".join(
             [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
         )
