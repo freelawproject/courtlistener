@@ -101,7 +101,12 @@ def process_stripe_callback(request):
             d = None
             while retry_count > 0:
                 try:
-                    d = Donation.objects.get(payment_id=charge["id"])
+                    if event["type"] == "charge.dispute.created":
+                        # I don't know why stripe doesn't use the "id" field on
+                        # disputes like they do everything else.
+                        d = Donation.objects.get(payment_id=charge["charge"])
+                    else:
+                        d = Donation.objects.get(payment_id=charge["id"])
                 except Donation.DoesNotExist:
                     time.sleep(1)
                     retry_count -= 1
@@ -148,6 +153,7 @@ def process_stripe_callback(request):
                     "Somebody has created a dispute in "
                     "Stripe: %s" % charge["id"]
                 )
+                d.status = Donation.DISPUTED
             elif event["type"].endswith("dispute.updated"):
                 logger.critical(
                     "The Stripe dispute on charge %s has been "
@@ -158,6 +164,7 @@ def process_stripe_callback(request):
                     "The Stripe dispute on charge %s has been "
                     "closed." % charge["id"]
                 )
+                d.status = Donation.DISPUTE_CLOSED
             d.save()
         return HttpResponse("<h1>200: OK</h1>")
     else:
