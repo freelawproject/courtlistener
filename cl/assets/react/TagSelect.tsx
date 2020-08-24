@@ -5,33 +5,15 @@ import { ListItem } from './ListItem';
 import { useTags } from './_useTags';
 import { Association } from './_types';
 
-function getDataFromReactRoot() {
-  const div = document.querySelector('div#react-root');
-  if (div && div instanceof HTMLElement) {
-    return {
-      isAuthenticated: div.dataset.authenticated === 'true',
-      editUrl: div.dataset.editUrl,
-    };
-  } else {
-    console.error('Unable to fetch credentials from server. Tags disabled.');
-    return { isAuthenticated: undefined, editUrl: undefined };
-  }
-}
-
+const isAuthenticated = true;
 function getDocketIdFromH1Tag() {
-  const h1 = document.querySelector('h1[data-id]');
-  if (h1 && h1 instanceof HTMLElement) {
-    return parseInt(h1.dataset.id as string);
-  } else {
-    console.error('Unable to fetch docket number from page. Tags disabled.');
-  }
+  // const h1 = document.querySelector("h1[data-id]");
+  // return parseInt(h1.dataset.id);
+  return 18; // mock 18 in dev
 }
 
 const TagSelect: React.FC = () => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
-
-  const { isAuthenticated, editUrl } = getDataFromReactRoot();
-
   const docket = getDocketIdFromH1Tag();
 
   const {
@@ -43,9 +25,9 @@ const TagSelect: React.FC = () => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket: docket as number, enabled: !!docket && isAuthenticated });
+  } = useTags({ docket });
 
-  const parentRef = React.useRef(null);
+  const parentRef = React.useRef();
   const rowVirtualizer = useVirtual({
     size: canFetchMore ? tags.length + 1 : tags.length,
     parentRef,
@@ -89,7 +71,6 @@ const TagSelect: React.FC = () => {
             ...changes,
             isOpen: true, // keep menu open after selection.
             highlightedIndex: state.highlightedIndex,
-            inputValue: '',
           };
         default:
           return changes;
@@ -97,13 +78,13 @@ const TagSelect: React.FC = () => {
     },
     onSelectedItemChange: ({ selectedItem }) => {
       if (!selectedItem) return;
-      const isCreateItemOption = selectedItem.name.startsWith('Create Tag:');
+      const isCreateItemOption = selectedItem.name.startsWith('Create Option:');
       if (isCreateItemOption) {
-        const validInput = textVal.match(/^[a-z0-9-]*$/);
+        const validInput = textVal.match(/^[a-z-]*$/);
         if (!validInput) {
-          return setValidationError("Only lowercase letters, numbers, and '-' allowed");
+          return setValidationError("Only lowercase letters and '-' allowed");
         }
-        return addNewTag({ name: selectedItem.name.replace('Create Tag: ', '') });
+        return addNewTag({ name: selectedItem.name.replace('Create Option: ', '') });
       }
       const isAlreadySelected = !associations
         ? false
@@ -122,75 +103,45 @@ const TagSelect: React.FC = () => {
         rowVirtualizer.scrollToIndex(highlightedIndex);
       }
     },
+    onInputValueChange: ({ inputValue }) => {
+      if (inputValue) {
+        setTextVal(inputValue);
+      }
+    },
   });
 
-  // manually type nativeEvent as any
-  // https://github.com/downshift-js/downshift/issues/734
-  const disableDownshiftMenuToggle = ({ nativeEvent }: { nativeEvent: any }) =>
-    (nativeEvent.preventDownshiftDefault = true);
-
   return (
-    <div style={{ paddingRight: '3px', position: 'relative' }}>
+    <div style={{ padding: '2rem' }}>
       <button
-        {...getToggleButtonProps({
-          onClick: (event) => {
-            // Anonymous user
-            if (!isAuthenticated) {
-              disableDownshiftMenuToggle(event);
-              // event.preventDefault();
-            }
-          },
-          onKeyDown: (event) => {
-            if (!isAuthenticated) {
-              disableDownshiftMenuToggle(event);
-            }
-          },
-        })}
+        {...getToggleButtonProps()}
+        disabled={!isAuthenticated}
         aria-label="toggle tag menu"
-        className={!isAuthenticated ? 'btn btn-primary logged-out-modal-trigger' : 'btn btn-primary'}
+        className="btn btn-primary"
       >
         Tags <span className="caret"></span>
       </button>
-
       <div
-        className="list-group"
         style={{
           marginTop: '2px',
           border: isOpen ? '1px solid grey' : 'none',
-          zIndex: isOpen ? 10 : 0,
-          minWidth: '300px',
-          maxWidth: '500px',
-          position: 'absolute',
+          maxWidth: '300px',
         }}
       >
-        <a
-          type="button"
-          className="list-group-item"
-          style={{ display: isOpen ? 'block' : 'none' }}
-          {...getLabelProps()}
-        >
+        <li className="list-group-item" style={{ display: isOpen ? 'block' : 'none' }} {...getLabelProps()}>
           Apply tags to this item
-        </a>
-        <a
-          type="button"
+        </li>
+        <li
           style={{ padding: '1em', display: isOpen ? 'block' : 'none' }}
           {...getComboboxProps()}
-          className="list-group-item"
+          className="list-group-item list-group-item-action"
         >
           <input
-            {...getInputProps({
-              onBlur: (e: React.FocusEvent) => setValidationError(null),
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTextVal(e.target.value),
-            })}
+            {...getInputProps({ onBlur: (e: React.FocusEvent) => setValidationError(null) })}
             className={`form-control ${validationError && 'is-invalid'}`}
-            placeholder="Search tags…"
+            placeholder="Search for a tag"
           />
-          {validationError && (
-            <div style={{ padding: '1px' }} className="invalid-feedback">
-              {validationError}
-            </div>
-          )}
-        </a>
+          {validationError && <div className="invalid-feedback">{validationError}</div>}
+        </li>
         <div
           style={{
             overflowY: isOpen ? 'scroll' : 'hidden',
@@ -198,6 +149,7 @@ const TagSelect: React.FC = () => {
           }}
         >
           <div
+            //@ts-ignore
             {...getMenuProps({ ref: parentRef })}
             style={{
               height: `${rowVirtualizer.totalSize}px`,
@@ -206,7 +158,7 @@ const TagSelect: React.FC = () => {
             }}
           >
             {isOpen &&
-              rowVirtualizer.virtualItems.map((virtualRow, index) => {
+              rowVirtualizer.virtualItems.map((virtualRow) => {
                 const isLoaderRow = virtualRow.index > tags.length - 1;
                 const tag = tags[virtualRow.index];
                 return (
@@ -222,11 +174,9 @@ const TagSelect: React.FC = () => {
                     }}
                   >
                     <div
+                      style={highlightedIndex === virtualRow.index ? { backgroundColor: '#bde4ff' } : {}}
                       key={tag ? tag.name : 'loading row'}
                       {...getItemProps({ item: tag, index: virtualRow.index })}
-                      style={{
-                        backgroundColor: highlightedIndex === virtualRow.index ? '#bde4ff' : '',
-                      }}
                     >
                       {isLoaderRow ? (
                         canFetchMore ? (
@@ -247,10 +197,12 @@ const TagSelect: React.FC = () => {
               })}
           </div>
         </div>
-        <a style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item" href={editUrl}>
-          <i className="fa fa-pencil" style={{ marginRight: '1em' }} />
-          Edit Tags
-        </a>
+        <li style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item list-group-item-action">
+          <a className="btn btn-default" href="/edit-tags-url">
+            <i className="fa fa-pencil mr-2" />
+            Edit Labels
+          </a>
+        </li>
       </div>
     </div>
   );

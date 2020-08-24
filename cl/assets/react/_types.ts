@@ -1,12 +1,8 @@
 export interface Tag {
   id: number;
   name: string;
-  date_created: string;
-  published: boolean;
   dockets: number[];
-  view_count: number;
   assocId?: number;
-  description:string;
 }
 export interface Association {
   id: number;
@@ -18,11 +14,4 @@ export interface ApiResult<T> {
   next: string;
   previous: string;
   results: T[];
-}
-
-export interface UserState {
-  userId?: number;
-  userName?: string;
-  editUrl?: string;
-  isPageOwner?: boolean;
 }
