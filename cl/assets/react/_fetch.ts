@@ -1,14 +1,17 @@
+import Cookies from 'js-cookie'
+
 interface FetchOptions {
   method?: 'GET' | 'POST' | 'DELETE' | 'PUT' | 'PATCH' | 'OPTIONS';
   headers?: { [key: string]: any };
   body?: { [key: string]: any } | string;
 }
-const csrfTokenHeader = {
-  'Content-Type': 'application/json',
-  'X-CSRFToken': 'FZQsIU1vTgiW5IOIxnKDGwOxNOCJXnvd3oyAOTtU64r1fJmZUU5ag5F5irCwjPu0',
-};
 
 export async function appFetch<T>(url: string, options?: FetchOptions): Promise<T | boolean> {
+  const csrfTokenHeader = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': Cookies.get('csrftoken')
+  };
+
   const mergedOptions: FetchOptions = {
     method: options?.method || 'GET',
     headers: options?.headers ? { ...csrfTokenHeader, ...options.headers } : csrfTokenHeader,

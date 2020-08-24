@@ -50,40 +50,43 @@ export const useTags = ({ docket }: UseTagsProps) => {
 
   const associations = assocData ? (assocData as ApiResult<Association>).results : [];
 
-  const {
-    status,
-    data: tags,
-    isFetching,
-    isFetchingMore,
-    fetchMore,
-    canFetchMore,
-  } = useInfiniteQuery('tags', getTags, {
-    // if the lastPage has a next key, extract the page number
-    getFetchMore: (lastPage, allPages) => {
-      const nextPage = (lastPage as ApiResult<Tag>).next;
-      if (!nextPage) return false;
-      const matches = nextPage.match(/page=(\d+)/);
-      return matches && matches[1] ? matches[1] : false;
-    },
-  });
+  const { status, data: tags, isFetching, isFetchingMore, fetchMore, canFetchMore } = useInfiniteQuery(
+    'tags',
+    getTags,
+    {
+      // if the lastPage has a next key, extract the page number
+      getFetchMore: (lastPage, allPages) => {
+        const nextPage = (lastPage as ApiResult<Tag>).next;
+        if (!nextPage) return false;
+        const matches = nextPage.match(/page=(\d+)/);
+        return matches && matches[1] ? matches[1] : false;
+      },
+    }
+  );
 
   const [deleteAssociation] = useMutation(deleteAssoc, {
     onSuccess: (data, variables) => {
       // update the cache to remove the just-deleted association
-      queryCache.setQueryData('associations', (old: any) => ({
-        ...old,
-        results: old.results.filter((assoc: Association) => assoc.id !== variables.assocId),
-      }));
+      queryCache.setQueryData('associations', (old: any) => {
+        console.log(data, old);
+        return {
+          ...old,
+          results: old.results.filter((assoc: Association) => assoc.id !== variables.assocId),
+        };
+      });
     },
   });
 
   const [addNewAssociation] = useMutation(postAssoc, {
     onSuccess: (data, variables) =>
       // update the cache to add the just created association
-      queryCache.setQueryData('associations', (old: any) => ({
-        ...old,
-        results: [...old.results, data],
-      })),
+      queryCache.setQueryData('associations', (old: any) => {
+        console.log(data, old);
+        return {
+          ...old,
+          results: [...old.results, data],
+        };
+      }),
   });
 
   const [addNewTag] = useMutation(postTag, {
@@ -97,10 +100,7 @@ export const useTags = ({ docket }: UseTagsProps) => {
         const lastResult = old[lastKey];
         const newResult = {
           ...lastResult,
-          results: [
-            ...lastResult.results,
-            { ...(data as Tag), dockets: [...(data as Tag).dockets, docket] },
-          ],
+          results: [...lastResult.results, { ...(data as Tag), dockets: [...(data as Tag).dockets, docket] }],
         };
         return { ...old, [lastKey]: newResult };
       });
@@ -133,6 +133,7 @@ export const useTags = ({ docket }: UseTagsProps) => {
     let exactMatch;
 
     const filtered: Tag[] | undefined = sortedTags.filter((tag: Tag) => {
+      console.log(textVal);
       if (!!textVal && tag.name === textVal) {
         exactMatch = true;
       }

@@ -7,9 +7,8 @@ import { Association } from './_types';
 
 const isAuthenticated = true;
 function getDocketIdFromH1Tag() {
-  // const h1 = document.querySelector("h1[data-id]");
-  // return parseInt(h1.dataset.id);
-  return 18; // mock 18 in dev
+  const h1 = document.querySelector('h1[data-id]');
+  return parseInt(h1.dataset.id);
 }
 
 const TagSelect: React.FC = () => {
@@ -27,7 +26,7 @@ const TagSelect: React.FC = () => {
     deleteAssociation,
   } = useTags({ docket });
 
-  const parentRef = React.useRef();
+  const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({
     size: canFetchMore ? tags.length + 1 : tags.length,
     parentRef,
@@ -71,6 +70,7 @@ const TagSelect: React.FC = () => {
             ...changes,
             isOpen: true, // keep menu open after selection.
             highlightedIndex: state.highlightedIndex,
+            inputValue: '',
           };
         default:
           return changes;
@@ -104,14 +104,12 @@ const TagSelect: React.FC = () => {
       }
     },
     onInputValueChange: ({ inputValue }) => {
-      if (inputValue) {
-        setTextVal(inputValue);
-      }
+      setTextVal(inputValue || '');
     },
   });
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ paddingRight: '3px', position: 'relative' }}>
       <button
         {...getToggleButtonProps()}
         disabled={!isAuthenticated}
@@ -121,26 +119,40 @@ const TagSelect: React.FC = () => {
         Tags <span className="caret"></span>
       </button>
       <div
+        className="list-group"
         style={{
           marginTop: '2px',
+          zIndex: isOpen ? 10 : 0,
           border: isOpen ? '1px solid grey' : 'none',
-          maxWidth: '300px',
+          minWidth: '300px',
+          maxWidth: '500px',
+          position: 'absolute',
         }}
       >
-        <li className="list-group-item" style={{ display: isOpen ? 'block' : 'none' }} {...getLabelProps()}>
+        <li
+          type="button"
+          className="list-group-item"
+          style={{ display: isOpen ? 'block' : 'none' }}
+          {...getLabelProps()}
+        >
           Apply tags to this item
         </li>
         <li
+          type="button"
           style={{ padding: '1em', display: isOpen ? 'block' : 'none' }}
           {...getComboboxProps()}
-          className="list-group-item list-group-item-action"
+          className="list-group-item"
         >
           <input
             {...getInputProps({ onBlur: (e: React.FocusEvent) => setValidationError(null) })}
             className={`form-control ${validationError && 'is-invalid'}`}
             placeholder="Search for a tag"
           />
-          {validationError && <div className="invalid-feedback">{validationError}</div>}
+          {validationError && (
+            <div style={{ padding: '1px' }} className="invalid-feedback">
+              {validationError}
+            </div>
+          )}
         </li>
         <div
           style={{
@@ -149,7 +161,6 @@ const TagSelect: React.FC = () => {
           }}
         >
           <div
-            //@ts-ignore
             {...getMenuProps({ ref: parentRef })}
             style={{
               height: `${rowVirtualizer.totalSize}px`,
@@ -158,7 +169,7 @@ const TagSelect: React.FC = () => {
             }}
           >
             {isOpen &&
-              rowVirtualizer.virtualItems.map((virtualRow) => {
+              rowVirtualizer.virtualItems.map((virtualRow, index) => {
                 const isLoaderRow = virtualRow.index > tags.length - 1;
                 const tag = tags[virtualRow.index];
                 return (
@@ -174,9 +185,11 @@ const TagSelect: React.FC = () => {
                     }}
                   >
                     <div
-                      style={highlightedIndex === virtualRow.index ? { backgroundColor: '#bde4ff' } : {}}
                       key={tag ? tag.name : 'loading row'}
                       {...getItemProps({ item: tag, index: virtualRow.index })}
+                      style={{
+                        backgroundColor: highlightedIndex === virtualRow.index ? '#bde4ff' : '',
+                      }}
                     >
                       {isLoaderRow ? (
                         canFetchMore ? (
@@ -197,7 +210,7 @@ const TagSelect: React.FC = () => {
               })}
           </div>
         </div>
-        <li style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item list-group-item-action">
+        <li style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item">
           <a className="btn btn-default" href="/edit-tags-url">
             <i className="fa fa-pencil mr-2" />
             Edit Labels
