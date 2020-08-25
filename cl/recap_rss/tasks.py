@@ -88,6 +88,11 @@ def get_last_build_date(s):
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
+def get_staleness(current_feed_date):
+    """Check how old an RSS feed is and return it as a timedelta"""
+    return now() - current_feed_date
+
+
 def mark_status(status_obj, status_value):
     """Update the status_obj object with a status_value"""
     status_obj.status = status_value
@@ -163,6 +168,21 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
+        # Check for stale feeds, see: #1390
+        staleness_limit = timedelta(minutes=2 * 60)
+        staleness = get_staleness(current_build_date)
+        if staleness > staleness_limit:
+            logger.warning(
+                "Feed in '%s' has not updated in %s minutes, which is more than "
+                "the limit of %s minutes: %s"
+                % (
+                    feed_status.court_id,
+                    round(staleness.total_seconds() / 60, 2),
+                    staleness_limit.total_seconds() / 60,
+                    rss_feed.url,
+                )
+            )
+
         feed_status.date_last_build = current_build_date
         feed_status.save()
     else:

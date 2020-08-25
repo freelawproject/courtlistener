@@ -14,7 +14,7 @@ from cl.search.models import Court
 
 @retry(requests.RequestException, tries=2, backoff=1)
 def check_and_log_url(session, url, timeout=10):
-    """Check if a URL is accessible by sending it a HEAD request
+    """Check if a URL is accessible by sending it a GET request
 
     :param session: A requests.Session object
     :param url: The URL to check
