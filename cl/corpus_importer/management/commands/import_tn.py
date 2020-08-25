@@ -62,6 +62,27 @@ def make_item(case):
     }
 
 
+def add_neutral_citations(tn_corpus):
+    """Add neutral citations to our dataset
+
+    :param tn_corpus: The case data.
+    :type: dict
+    :return: Our case data with neutral citations included.
+    :type: dict
+    """
+    results = []
+    for court in ['tennworkcompapp', 'tennworkcompcl']:
+        reporter = 'TN WC App.' if court == "tennworkcompapp" else "TN WC"
+        tn = [x for x in
+                sorted(tn_corpus, key=lambda x: (x["pub_date"], x['label'])) if
+                x['court'] == court]
+        for key, group in itertools.groupby(tn, lambda x: x["pub_date"][:4]):
+            count = 1
+            for case in list(group):
+                case['neutral_citation'] = "%s %s %s" % (key, reporter, count)
+                results.append(case)
+                count += 1
+    return results
 
 def import_tn_corpus(log, skip_until, dir):
     """Import TN Corpus
@@ -78,8 +99,7 @@ def import_tn_corpus(log, skip_until, dir):
 
     logging.info("Starting import")
     filepath = "%s/data.json" % dir
-    tn_corpus = json.loads(open(filepath, "r").read())
-
+    tn_corpus = add_neutral_citations(json.loads(open(filepath, "r").read()))
     if not ready:
         case = [x for x in tn_corpus if x["label"] == int(skip_until)][0]
         logging.info(
