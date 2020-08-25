@@ -33,6 +33,7 @@ def make_item(case):
         is_alias_of=None,
         name_first=first_name,
     )
+    # Four Panelists exist, one retired end of 2019 and the other joined.
     panelists = case["judge"]
     if case["court"] == "tennworkcompapp":
         exclude = (
@@ -62,7 +63,7 @@ def make_item(case):
     }
 
 
-def add_neutral_citations(tn_corpus):
+def add_neutral_citations(filepath):
     """Add neutral citations to our dataset
 
     :param tn_corpus: The case data.
@@ -70,6 +71,7 @@ def add_neutral_citations(tn_corpus):
     :return: Our case data with neutral citations included.
     :type: dict
     """
+    tn_corpus = json.loads(open(filepath, "r").read())
     results = []
     for court in ["tennworkcompapp", "tennworkcompcl"]:
         reporter = "TN WC App." if court == "tennworkcompapp" else "TN WC"
@@ -104,7 +106,7 @@ def import_tn_corpus(log, skip_until, dir):
 
     logging.info("Starting import")
     filepath = "%s/data.json" % dir
-    tn_corpus = add_neutral_citations(json.loads(open(filepath, "r").read()))
+    tn_corpus = add_neutral_citations(filepath)
     if not ready:
         case = [x for x in tn_corpus if x["label"] == int(skip_until)][0]
         logging.info(
