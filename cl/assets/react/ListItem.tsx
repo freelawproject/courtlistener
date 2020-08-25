@@ -12,7 +12,7 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
   const isCreateItem = name.startsWith('Create Option: ');
 
   return (
-    <li className="list-group-item" style={isCreateItem ? { cursor: 'default' } : {}}>
+    <a className="list-group-item" style={isCreateItem ? { cursor: 'default' } : {}}>
       {isCreateItem ? (
         <p>{name}</p>
       ) : (
@@ -30,6 +30,6 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
           <label className="form-check-label">{name}</label>
         </div>
       )}
-    </li>
+    </a>
   );
 };

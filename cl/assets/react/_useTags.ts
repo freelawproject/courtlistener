@@ -5,9 +5,10 @@ import { ApiResult, Tag, Association } from './_types';
 
 interface UseTagsProps {
   docket: number;
+  enabled?: boolean;
 }
 
-export const useTags = ({ docket }: UseTagsProps) => {
+export const useTags = ({ docket, enabled }: UseTagsProps) => {
   const [textVal, setTextVal] = React.useState<string>('');
 
   const getTags = React.useCallback(
@@ -46,7 +47,7 @@ export const useTags = ({ docket }: UseTagsProps) => {
     []
   );
 
-  const { data: assocData } = useQuery('associations', getAssociations);
+  const { data: assocData } = useQuery('associations', getAssociations, { enabled: enabled });
 
   const associations = assocData ? (assocData as ApiResult<Association>).results : [];
 
@@ -54,6 +55,7 @@ export const useTags = ({ docket }: UseTagsProps) => {
     'tags',
     getTags,
     {
+      enabled: enabled,
       // if the lastPage has a next key, extract the page number
       getFetchMore: (lastPage, allPages) => {
         const nextPage = (lastPage as ApiResult<Tag>).next;
