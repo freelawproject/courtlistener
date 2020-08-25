@@ -246,13 +246,14 @@ def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk):
+def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only):
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
     :param feed_data: The data parameter of a PacerRssFeed object that has
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
+    :param metadata_only: Whether to only do metadata and skip docket entries.
     :returns Dict containing keys:
       d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
       rds_for_solr: A list of RECAPDocument PKs for updating in Solr
@@ -294,6 +295,9 @@ def merge_rss_feed_contents(self, feed_data, court_pk):
                 # The docket was created while we looked it up. Retry and it
                 # should associate with the new one instead.
                 raise self.retry(exc=exc)
+            if metadata_only:
+                continue
+
             rds_created, content_updated = add_docket_entries(
                 d, docket["docket_entries"]
             )
