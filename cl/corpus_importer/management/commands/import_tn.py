@@ -92,9 +92,9 @@ def add_neutral_citations(tn_corpus):
 def import_tn_corpus(log, skip_until, dir):
     """Import TN Corpus
 
-    :param log: Should we should logs
+    :param log: Should we view logging info
     :param skip_until: Label ID, if any, to process first
-    :param dir: Location of pre-processed json
+    :param dir: Location of our import files
     :return: None
     """
     ready = False if skip_until else True
