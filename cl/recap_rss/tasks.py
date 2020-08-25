@@ -162,7 +162,10 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             return
 
     current_build_date = get_last_build_date(content)
-    if not current_build_date:
+    if current_build_date:
+        feed_status.date_last_build = current_build_date
+        feed_status.save()
+    else:
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
@@ -172,9 +175,6 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.warning(str(exc))
             abort_or_retry(self, feed_status, exc)
             return
-    else:
-        feed_status.date_last_build = current_build_date
-        feed_status.save()
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
