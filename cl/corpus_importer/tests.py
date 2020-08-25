@@ -5,6 +5,7 @@ import os
 import unittest
 from datetime import date, datetime
 import mock
+from mock import patch
 from glob import iglob
 
 import pytest
@@ -16,6 +17,7 @@ from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
+from cl.corpus_importer.management.commands.import_tn import import_tn_corpus
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.corpus_importer.management.commands.harvard_opinions import (
@@ -474,6 +476,62 @@ class IAUploaderTest(TestCase):
 
         with self.assertNumQueries(5):
             generate_ia_json(3)
+
+
+class TNCorpusTests(TestCase):
+    """Can we properly import the TN Corpus?"""
+
+    fixtures = ["tenn_court_fixture.json"]
+
+    test_dir = os.path.join(
+        settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
+    )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.import_tn.add_neutral_citations",
+        side_effect=[
+            json.loads(
+                open(
+                    os.path.join(test_dir, "tn_corpus_test_asset.json"), "r"
+                ).read()
+            )
+        ],
+    )
+    def test_import(self, add_neutral_citations):
+        """Can we import two cases successfully"""
+        pre_install_count = OpinionCluster.objects.all().count()
+        dir = os.path.join(self.test_dir, "tenn_test_files")
+        import_tn_corpus(log=True, skip_until=False, dir=dir)
+        post_install_count = OpinionCluster.objects.all().count()
+        self.assertEqual(
+            pre_install_count + 2,
+            post_install_count,
+            msg="Did not get two installs",
+        )
+
+    @mock.patch(
+        "cl.corpus_importer.management.commands.import_tn.add_neutral_citations",
+        side_effect=[
+            json.loads(
+                open(
+                    os.path.join(test_dir, "tn_corpus_test_asset.json"), "r"
+                ).read()
+            )
+        ],
+    )
+    def test_panel_selction(self, add_neutral_citations):
+        """Can we choose panelist correctly?"""
+        dir = os.path.join(self.test_dir, "tenn_test_files")
+        import_tn_corpus(log=False, skip_until=False, dir=dir)
+        oc = OpinionCluster.objects.get(citation="2019 TN WC App. 1")
+        self.assertEqual(
+            oc.judges,
+            "Timothy W. Conner, David F. Hensley, Marshall L. Davidson III",
+            msg="Did not identify the correct three panelists.",
+        )
 
 
 class HarvardTests(TestCase):
