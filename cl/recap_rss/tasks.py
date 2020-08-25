@@ -246,19 +246,18 @@ def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
+def merge_rss_feed_contents(self, feed_data, court_pk):
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
     :param feed_data: The data parameter of a PacerRssFeed object that has
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
-    :param feed_status_pk: The CL ID for the RSS status object.
-    :returns all_rds_created: A list of all the RDs created during the
-    processing.
+    :returns Dict containing keys:
+      d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
+      rds_for_solr: A list of RECAPDocument PKs for updating in Solr
     """
     start_time = now()
-    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
 
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
@@ -309,7 +308,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
     logger.info(
         "%s: Sending %s new RECAP documents to Solr for indexing and "
         "sending %s dockets for alerts.",
-        feed_status.court_id,
+        court_pk,
         len(all_rds_created),
         len(d_pks_to_alert),
     )
