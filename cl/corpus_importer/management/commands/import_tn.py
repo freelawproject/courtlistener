@@ -166,14 +166,14 @@ class Command(VerboseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--input-dir",
-            help="The directory containing all the PDFs.",
+            help="The directory containing our data.",
             required=True,
         )
         parser.add_argument(
             "--log",
             action="store_true",
             default=False,
-            help="Determine feedback level.",
+            help="Choose to view info log lines.",
         )
         parser.add_argument(
             "--skip-until", default=False, help="Skip until to process",
