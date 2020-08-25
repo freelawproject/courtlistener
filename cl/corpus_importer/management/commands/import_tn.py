@@ -71,18 +71,23 @@ def add_neutral_citations(tn_corpus):
     :type: dict
     """
     results = []
-    for court in ['tennworkcompapp', 'tennworkcompcl']:
-        reporter = 'TN WC App.' if court == "tennworkcompapp" else "TN WC"
-        tn = [x for x in
-                sorted(tn_corpus, key=lambda x: (x["pub_date"], x['label'])) if
-                x['court'] == court]
+    for court in ["tennworkcompapp", "tennworkcompcl"]:
+        reporter = "TN WC App." if court == "tennworkcompapp" else "TN WC"
+        tn = [
+            x
+            for x in sorted(
+                tn_corpus, key=lambda x: (x["pub_date"], x["label"])
+            )
+            if x["court"] == court
+        ]
         for key, group in itertools.groupby(tn, lambda x: x["pub_date"][:4]):
             count = 1
             for case in list(group):
-                case['neutral_citation'] = "%s %s %s" % (key, reporter, count)
+                case["neutral_citation"] = "%s %s %s" % (key, reporter, count)
                 results.append(case)
                 count += 1
     return results
+
 
 def import_tn_corpus(log, skip_until, dir):
     """Import TN Corpus
