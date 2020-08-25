@@ -1,8 +1,66 @@
+import itertools
 import json
+import logging
 from glob import glob
 
+from dateutil import parser
+from django.utils.encoding import force_bytes
+
 from cl.lib.command_utils import VerboseCommand
-import logging
+from cl.lib.crypto import sha1
+from cl.people_db.models import Person
+from cl.scrapers.management.commands.cl_scrape_opinions import (
+    make_objects,
+    save_everything,
+)
+from cl.scrapers.tasks import extract_doc_content
+from cl.search.models import Court, Docket, Opinion
+
+
+def make_item(case):
+    """Make an import item for our save everything function
+
+    :param case: Case data received from the court.
+    :return: Case information.
+    :type: dict
+    """
+
+    judges = case["judge"]
+    first_name = judges.split(" ")[0].title()
+
+    lead_author = Person.objects.get(
+        positions__court_id=case["court"],
+        is_alias_of=None,
+        name_first=first_name,
+    )
+    panelists = case["judge"]
+    if case["court"] == "tennworkcompapp":
+        exclude = (
+            "Marshall"
+            if parser.parse(case["pub_date"]).date().year == 2020
+            else "Pele"
+        )
+        panelists_query = Person.objects.filter(
+            positions__court_id=case["court"]
+        ).exclude(name_first=exclude)
+        panelists = ", ".join([x.name_full for x in panelists_query])
+
+    return {
+        "source": Docket.DIRECT_INPUT,
+        "cluster_source": "D",
+        "case_names": case["title"],
+        "case_dates": parser.parse(case["pub_date"]),
+        "precedential_statuses": "Published",
+        "docket_numbers": case["docket"],
+        "judges": panelists,
+        "author_id": lead_author.id,
+        "author": lead_author,
+        "date_filed_is_approximate": False,
+        "blocked_statuses": False,
+        "neutral_citations": case['neutral_citation'],
+        "download_urls": case["pdf_url"],
+    }
+
 
 
 def import_tn_corpus(log, skip_until, dir):
@@ -41,6 +99,40 @@ def import_tn_corpus(log, skip_until, dir):
             for x in glob("%s/%s/*.pdf" % (dir, case["label"]))
             if "stamped" not in x
         ][0]
+        pdf_data = open(pdf_path, "r").read()
+
+        sha1_hash = sha1(force_bytes(pdf_data))
+        ops = Opinion.objects.filter(sha1=sha1_hash)
+        if len(ops) > 0:
+            op = ops[0]
+            logging.warn(
+                "Document already in database. See: %s at %s"
+                % (op.get_absolute_url(), op.cluster.case_name)
+            )
+
+        docket, opinion, cluster, citations, error = make_objects(
+            make_item(case),
+            Court.objects.get(pk=case["court"]),
+            sha1(force_bytes(pdf_data)),
+            open(pdf_path, "r").read(),
+        )
+
+        save_everything(
+            items={
+                "docket": docket,
+                "opinion": opinion,
+                "cluster": cluster,
+                "citations": citations,
+            },
+            index=False,
+        )
+
+        extract_doc_content.delay(
+            opinion.pk, do_ocr=True, citation_jitter=True,
+        )
+        logging.info(
+            "Successfully added Tennessee object cluster: %s", cluster.id
+        )
 
 
 class Command(VerboseCommand):
@@ -74,3 +166,7 @@ class Command(VerboseCommand):
         import_tn_corpus(
             options["log"], options["skip_until"], options["input_dir"],
         )
+        # q_judges = Person.objects.get(
+        #     positions__court_id="tennworkcompcl", is_alias_of=None, name_first="Amber"
+        # )
+        # print(q_judges)
