@@ -57,7 +57,7 @@ def make_item(case):
         "author": lead_author,
         "date_filed_is_approximate": False,
         "blocked_statuses": False,
-        "neutral_citations": case['neutral_citation'],
+        "neutral_citations": case["neutral_citation"],
         "download_urls": case["pdf_url"],
     }
 
@@ -156,20 +156,13 @@ def import_tn_corpus(log, skip_until, dir):
 
 
 class Command(VerboseCommand):
-    help = "Import TN Corpus"
+    help = "Import TN data corpus received from TN Workers Comp boards."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--input-file",
-            help="The json file containing the data to analyze.",
-            default="cl/corpus_importer/tmp/data.json",
-            # required=True,
-        )
-        parser.add_argument(
             "--input-dir",
             help="The directory containing all the PDFs.",
-            default="utk_workerscomp",
-            # required=True,
+            required=True,
         )
         parser.add_argument(
             "--log",
@@ -186,7 +179,3 @@ class Command(VerboseCommand):
         import_tn_corpus(
             options["log"], options["skip_until"], options["input_dir"],
         )
-        # q_judges = Person.objects.get(
-        #     positions__court_id="tennworkcompcl", is_alias_of=None, name_first="Amber"
-        # )
-        # print(q_judges)
