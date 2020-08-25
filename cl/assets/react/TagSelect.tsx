@@ -5,14 +5,33 @@ import { ListItem } from './ListItem';
 import { useTags } from './_useTags';
 import { Association } from './_types';
 
-const isAuthenticated = true;
+function getDataFromReactRoot() {
+  const div = document.querySelector('div#react-root');
+  if (div && div instanceof HTMLElement) {
+    return {
+      isAuthenticated: div.dataset.authenticated === 'true',
+      editUrl: div.dataset.editUrl,
+    };
+  } else {
+    console.error('Unable to fetch credentials from server. Tags disabled.');
+    return { isAuthenticated: undefined, editUrl: undefined };
+  }
+}
+
 function getDocketIdFromH1Tag() {
   const h1 = document.querySelector('h1[data-id]');
-  return parseInt(h1.dataset.id);
+  if (h1 && h1 instanceof HTMLElement) {
+    return parseInt(h1.dataset.id as string);
+  } else {
+    console.error('Unable to fetch docket number from page. Tags disabled.');
+  }
 }
 
 const TagSelect: React.FC = () => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
+
+  const { isAuthenticated, editUrl } = getDataFromReactRoot();
+
   const docket = getDocketIdFromH1Tag();
 
   const {
@@ -24,7 +43,7 @@ const TagSelect: React.FC = () => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket });
+  } = useTags({ docket: docket as number, enabled: !!docket && isAuthenticated });
 
   const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({
@@ -112,32 +131,33 @@ const TagSelect: React.FC = () => {
     <div style={{ paddingRight: '3px', position: 'relative' }}>
       <button
         {...getToggleButtonProps()}
-        disabled={!isAuthenticated}
+        disabled={!isAuthenticated && docket !== undefined}
         aria-label="toggle tag menu"
         className="btn btn-primary"
       >
         Tags <span className="caret"></span>
       </button>
+
       <div
         className="list-group"
         style={{
           marginTop: '2px',
-          zIndex: isOpen ? 10 : 0,
           border: isOpen ? '1px solid grey' : 'none',
+          zIndex: isOpen ? 10 : 0,
           minWidth: '300px',
           maxWidth: '500px',
           position: 'absolute',
         }}
       >
-        <li
+        <a
           type="button"
           className="list-group-item"
           style={{ display: isOpen ? 'block' : 'none' }}
           {...getLabelProps()}
         >
           Apply tags to this item
-        </li>
-        <li
+        </a>
+        <a
           type="button"
           style={{ padding: '1em', display: isOpen ? 'block' : 'none' }}
           {...getComboboxProps()}
@@ -153,7 +173,7 @@ const TagSelect: React.FC = () => {
               {validationError}
             </div>
           )}
-        </li>
+        </a>
         <div
           style={{
             overflowY: isOpen ? 'scroll' : 'hidden',
@@ -210,12 +230,10 @@ const TagSelect: React.FC = () => {
               })}
           </div>
         </div>
-        <li style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item">
-          <a className="btn btn-default" href="/edit-tags-url">
-            <i className="fa fa-pencil mr-2" />
-            Edit Labels
-          </a>
-        </li>
+        <a style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item" href={editUrl}>
+          <i className="fa fa-pencil" style={{ marginRight: '1em' }} />
+          Edit Labels
+        </a>
       </div>
     </div>
   );
