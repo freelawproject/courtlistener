@@ -952,8 +952,10 @@ def add_parties_and_attorneys(d, parties):
 
 
 @transaction.atomic
-def add_bankruptcy_data_to_docket(d, claims_data):
-    """Add bankruptcy data to the docket from the claims data."""
+def add_bankruptcy_data_to_docket(d, metadata):
+    """Add bankruptcy data to the docket from the claims data, RSS feeds, or
+    another location.
+    """
     try:
         bankr_data = d.bankruptcy_information
     except BankruptcyInformation.DoesNotExist:
@@ -969,9 +971,9 @@ def add_bankruptcy_data_to_docket(d, claims_data):
     ]
     do_save = False
     for field in fields:
-        if claims_data.get(field):
+        if metadata.get(field):
             do_save = True
-            setattr(bankr_data, field, claims_data[field])
+            setattr(bankr_data, field, metadata[field])
 
     if do_save:
         bankr_data.save()
