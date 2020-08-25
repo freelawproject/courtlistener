@@ -22,6 +22,7 @@ from cl.recap.mergers import (
     add_docket_entries,
     find_docket_object,
     update_docket_metadata,
+    add_bankruptcy_data_to_docket,
 )
 from cl.recap_rss.models import RssFeedStatus, RssItemCache, RssFeedData
 from cl.recap_rss.utils import emails
@@ -75,6 +76,8 @@ def get_last_build_date(s):
     In this case we considered using lxml & xpath, which was 1000× faster than
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
+
+    :param s: The content of the RSS feed as a string
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
@@ -287,6 +290,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
                 d.pacer_case_id = docket["pacer_case_id"]
             try:
                 d.save()
+                add_bankruptcy_data_to_docket(d, docket)
             except IntegrityError as exc:
                 # The docket was created while we looked it up. Retry and it
                 # should associate with the new one instead.
