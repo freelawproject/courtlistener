@@ -35,7 +35,7 @@ def make_item(case):
     )
 
     # Four Panelists exist, one retired end of 2019 and the other joined.
-    pub_date_year = parser.parse(case["pub_date"]).date().year
+    pub_date = parser.parse(case["pub_date"])
     if case["court"] == "tennworkcompapp":
         exclude = "Marshall" if pub_date_year == 2020 else "Pele"
         panelists_query = Person.objects.filter(
