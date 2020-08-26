@@ -64,7 +64,7 @@ emails = {
         "Godspeed, fair admin.\n"
         "The CourtListener bots",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     }
 }
 
