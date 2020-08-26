@@ -111,7 +111,10 @@ def import_tn_corpus(log, skip_until, filepath):
             )
 
         docket, opinion, cluster, citations, error = make_objects(
-            make_item(case), courts[case["court"]], sha1_hash, pdf_data,
+            make_item(case),
+            courts[case["court"]],
+            sha1_hash,
+            pdf_data,
         )
 
         save_everything(
@@ -125,7 +128,9 @@ def import_tn_corpus(log, skip_until, filepath):
         )
 
         extract_doc_content.delay(
-            opinion.pk, do_ocr=True, citation_jitter=True,
+            opinion.pk,
+            do_ocr=True,
+            citation_jitter=True,
         )
         logging.info(
             "Successfully added Tennessee object cluster: %s", cluster.id
@@ -149,11 +154,15 @@ class Command(VerboseCommand):
             help="Choose to view info log lines.",
         )
         parser.add_argument(
-            "--skip-until", help="Skip until to process", type=int,
+            "--skip-until",
+            help="Skip until to process",
+            type=int,
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         import_tn_corpus(
-            options["log"], options["skip_until"], options["input_file"],
+            options["log"],
+            options["skip_until"],
+            options["input_file"],
         )
