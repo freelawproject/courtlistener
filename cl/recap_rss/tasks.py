@@ -88,9 +88,24 @@ def get_last_build_date(s):
     return parser.parse(last_build_date_str, fuzzy=False)
 
 
-def get_staleness(current_feed_date):
-    """Check how old an RSS feed is and return it as a timedelta"""
-    return now() - current_feed_date
+def alert_on_staleness(current_build_date, court_id, url):
+    """Send an alert email if a feed goes stale.
+
+    :param current_build_date: When the feed was updated
+    :param court_id: The CL ID of the court
+    :param url: The URL for the feed
+    """
+    staleness_limit = timedelta(minutes=2 * 60)
+    staleness = now() - current_build_date
+    if staleness > staleness_limit:
+        email = emails["stale_feed"]
+        send_mail(
+            email["subject"] % court_id,
+            email["body"]
+            % (court_id, round(staleness.total_seconds() / 60, 2), url),
+            email["from"],
+            email["to"],
+        )
 
 
 def mark_status(status_obj, status_value):
@@ -168,21 +183,9 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
-        # Check for stale feeds, see: #1390
-        staleness_limit = timedelta(minutes=2 * 60)
-        staleness = get_staleness(current_build_date)
-        if staleness > staleness_limit:
-            logger.warning(
-                "Feed in '%s' has not updated in %s minutes, which is more "
-                "than the limit of %s minutes: %s"
-                % (
-                    feed_status.court_id,
-                    round(staleness.total_seconds() / 60, 2),
-                    staleness_limit.total_seconds() / 60,
-                    rss_feed.url,
-                )
-            )
-
+        alert_on_staleness(
+            current_build_date, feed_status.court_id, rss_feed.url
+        )
         feed_status.date_last_build = current_build_date
         feed_status.save()
     else:
