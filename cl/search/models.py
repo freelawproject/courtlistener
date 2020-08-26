@@ -104,7 +104,7 @@ class OriginatingCourtInformation(models.Model):
         db_index=True,
     )
     docket_number = models.TextField(
-        help_text="The docket number in the lower court.", blank=True,
+        help_text="The docket number in the lower court.", blank=True
     )
     assigned_to = models.ForeignKey(
         "people_db.Person",
@@ -134,7 +134,7 @@ class OriginatingCourtInformation(models.Model):
         blank=True,
     )
     court_reporter = models.TextField(
-        help_text="The court reporter responsible for the case.", blank=True,
+        help_text="The court reporter responsible for the case.", blank=True
     )
     date_disposed = models.DateField(
         help_text="The date the case was disposed at the lower court.",
@@ -256,7 +256,7 @@ class Docket(models.Model):
     ]
 
     source = models.SmallIntegerField(
-        help_text="contains the source of the Docket.", choices=SOURCE_CHOICES,
+        help_text="contains the source of the Docket.", choices=SOURCE_CHOICES
     )
     court = models.ForeignKey(
         "Court",
@@ -422,10 +422,10 @@ class Docket(models.Model):
         db_index=True,
     )
     date_filed = models.DateField(
-        help_text="The date the case was filed.", blank=True, null=True,
+        help_text="The date the case was filed.", blank=True, null=True
     )
     date_terminated = models.DateField(
-        help_text="The date the case was terminated.", blank=True, null=True,
+        help_text="The date the case was terminated.", blank=True, null=True
     )
     date_last_filing = models.DateField(
         help_text=(
@@ -441,10 +441,10 @@ class Docket(models.Model):
         blank=True,
     )
     case_name = models.TextField(
-        help_text="The standard name of the case", blank=True,
+        help_text="The standard name of the case", blank=True
     )
     case_name_full = models.TextField(
-        help_text="The full name of the case", blank=True,
+        help_text="The full name of the case", blank=True
     )
     slug = models.SlugField(
         help_text="URL that the document should map to (the slug)",
@@ -497,7 +497,7 @@ class Docket(models.Model):
         blank=True,
     )
     jury_demand = models.CharField(
-        help_text="The compensation demand.", max_length=500, blank=True,
+        help_text="The compensation demand.", max_length=500, blank=True
     )
     jurisdiction_type = models.CharField(
         help_text=(
@@ -573,7 +573,7 @@ class Docket(models.Model):
         db_index=True,
     )
     view_count = models.IntegerField(
-        help_text="The number of times the docket has been seen.", default=0,
+        help_text="The number of times the docket has been seen.", default=0
     )
     date_blocked = models.DateField(
         help_text=(
@@ -677,7 +677,7 @@ class Docket(models.Model):
                 u"caseNum=%s&"
                 u"incOrigDkt=Y&"
                 u"incDktEntries=Y"
-            ) % (court_id, self.pacer_case_id,)
+            ) % (court_id, self.pacer_case_id)
         else:
             return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
                 court_id,
@@ -1027,9 +1027,7 @@ class AbstractPacerDocument(models.Model):
 
 
 class RECAPDocument(AbstractPacerDocument, AbstractPDF):
-    """
-        The model for Docket Documents and Attachments.
-    """
+    """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
@@ -1340,9 +1338,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         out = docket_metadata or self.get_docket_metadata()
 
         # IDs
-        out.update(
-            {"id": self.pk, "docket_entry_id": self.docket_entry.pk,}
-        )
+        out.update({"id": self.pk, "docket_entry_id": self.docket_entry.pk})
 
         # RECAPDocument
         out.update(
@@ -1394,7 +1390,7 @@ class BankruptcyInformation(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_converted = models.DateTimeField(
         help_text=(
@@ -1405,7 +1401,7 @@ class BankruptcyInformation(models.Model):
         null=True,
     )
     date_last_to_file_claims = models.DateTimeField(
-        help_text="The last date for filing claims.", blank=True, null=True,
+        help_text="The last date for filing claims.", blank=True, null=True
     )
     date_last_to_file_govt = models.DateTimeField(
         help_text="The last date for the government to file claims.",
@@ -1413,7 +1409,7 @@ class BankruptcyInformation(models.Model):
         null=True,
     )
     date_debtor_dismissed = models.DateTimeField(
-        help_text="The date the debtor was dismissed.", blank=True, null=True,
+        help_text="The date the debtor was dismissed.", blank=True, null=True
     )
     chapter = models.CharField(
         help_text="The chapter the bankruptcy is currently filed under.",
@@ -1421,7 +1417,7 @@ class BankruptcyInformation(models.Model):
         blank=True,
     )
     trustee_str = models.TextField(
-        help_text="The name of the trustee handling the case.", blank=True,
+        help_text="The name of the trustee handling the case.", blank=True
     )
 
     class Meta:
@@ -1450,7 +1446,7 @@ class Claim(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_claim_modified = models.DateTimeField(
         help_text="Date the claim was last modified to our knowledge.",
@@ -1473,7 +1469,7 @@ class Claim(models.Model):
         null=True,
     )
     date_last_amendment_filed = models.DateTimeField(
-        help_text="Date the last amendment was filed.", blank=True, null=True,
+        help_text="Date the last amendment was filed.", blank=True, null=True
     )
     claim_number = models.CharField(
         help_text="The number of the claim.",
@@ -1497,7 +1493,7 @@ class Claim(models.Model):
         blank=True,
     )
     status = models.CharField(
-        help_text="The status of the claim.", max_length=1000, blank=True,
+        help_text="The status of the claim.", max_length=1000, blank=True
     )
     entered_by = models.CharField(
         help_text="The person that entered the claim.",
@@ -1567,7 +1563,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         on_delete=models.CASCADE,
     )
     date_filed = models.DateField(
-        help_text="The created date of the claim.", null=True, blank=True,
+        help_text="The created date of the claim.", null=True, blank=True
     )
     claim_document_type = models.IntegerField(
         help_text=(
@@ -1652,7 +1648,7 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def bankruptcy_pacer_courts(self):
         return self.filter(
-            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True,
+            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
     def district_courts(self):
@@ -1798,10 +1794,10 @@ class Court(models.Model):
         blank=True,
     )
     short_name = models.CharField(
-        help_text="a short name of the court", max_length=100, blank=False,
+        help_text="a short name of the court", max_length=100, blank=False
     )
     full_name = models.CharField(
-        help_text="the full name of the court", max_length=200, blank=False,
+        help_text="the full name of the court", max_length=200, blank=False
     )
     url = models.URLField(
         help_text="the homepage for each court or the closest thing thereto",
@@ -2028,7 +2024,7 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     posture = models.TextField(
-        help_text="The procedural posture of the case.", blank=True,
+        help_text="The procedural posture of the case.", blank=True
     )
     syllabus = models.TextField(
         help_text=(
@@ -2256,7 +2252,7 @@ class OpinionCluster(models.Model):
         authorities_with_data = list(self.authorities)
         for authority in authorities_with_data:
             authority.citation_depth = get_citation_depth_between_clusters(
-                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
+                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
             )
 
         authorities_with_data.sort(
@@ -2445,7 +2441,7 @@ class Citation(models.Model):
         related_name="citations",
         on_delete=models.CASCADE,
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter",)
+    volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -2462,7 +2458,7 @@ class Citation(models.Model):
         ),
     )
     type = models.SmallIntegerField(
-        help_text="The type of citation that this is.", choices=CITATION_TYPES,
+        help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
     def __unicode__(self):
@@ -2616,7 +2612,7 @@ class Opinion(models.Model):
         auto_now=True,
         db_index=True,
     )
-    type = models.CharField(max_length=20, choices=OPINION_TYPES,)
+    type = models.CharField(max_length=20, choices=OPINION_TYPES)
     sha1 = models.CharField(
         help_text=(
             "unique ID for the document, as generated via SHA1 of the "
@@ -2668,10 +2664,10 @@ class Opinion(models.Model):
         help_text="HTML of Lawbox documents", blank=True
     )
     html_columbia = models.TextField(
-        help_text="HTML of Columbia archive", blank=True,
+        help_text="HTML of Columbia archive", blank=True
     )
     xml_harvard = models.TextField(
-        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True,
+        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
     html_with_citations = models.TextField(
         help_text=(
@@ -2694,7 +2690,7 @@ class Opinion(models.Model):
     def __unicode__(self):
         try:
             return u"{pk} - {cn}".format(
-                pk=getattr(self, "pk", None), cn=self.cluster.case_name,
+                pk=getattr(self, "pk", None), cn=self.cluster.case_name
             )
         except AttributeError:
             return u"Orphan opinion with ID: %s" % self.pk
@@ -2819,10 +2815,10 @@ class Opinion(models.Model):
 
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
-        Opinion, related_name="cited_opinions", on_delete=models.CASCADE,
+        Opinion, related_name="cited_opinions", on_delete=models.CASCADE
     )
     cited_opinion = models.ForeignKey(
-        Opinion, related_name="citing_opinions", on_delete=models.CASCADE,
+        Opinion, related_name="citing_opinions", on_delete=models.CASCADE
     )
     depth = models.IntegerField(
         help_text="The number of times the cited opinion was cited "

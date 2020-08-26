@@ -409,7 +409,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         rating = get_aba(item["ABA Rating" + pos_str])
         if rating is not None:
             nom_year = date_nominated.year
-            aba = ABARating(person=person, rating=rating, year_rated=nom_year,)
+            aba = ABARating(person=person, rating=rating, year_rated=nom_year)
             if not testing and save_this_position:
                 aba.save()
 
@@ -736,7 +736,7 @@ def make_mag_bk_judge(item, testing=False):
         position.save()
 
     sources = Source(
-        person=person, url=item["SOURCE"], date_accessed=str(date.today()),
+        person=person, url=item["SOURCE"], date_accessed=str(date.today())
     )
 
     if not testing:

@@ -244,7 +244,7 @@ class ShortformCitation(Citation):
             data_attr = ""
         return (
             u'<span class="%s"%s><span class="antecedent_guess">%s</span>\\g<1>%s</span>'
-            % (span_class, data_attr, self.antecedent_guess, inner_html,)
+            % (span_class, data_attr, self.antecedent_guess, inner_html)
         )
 
 

@@ -81,7 +81,7 @@ def api_index(request):
 
 
 def replication_docs(request):
-    return render(request, "replication.html", {"private": False,})
+    return render(request, "replication.html", {"private": False})
 
 
 def replication_status(request):

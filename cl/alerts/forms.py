@@ -37,6 +37,6 @@ class CreateAlertForm(ModelForm):
         )
         widgets = {
             "query": HiddenInput(),
-            "name": TextInput(attrs={"class": "form-control",}),
-            "rate": Select(attrs={"class": "form-control",}),
+            "name": TextInput(attrs={"class": "form-control"}),
+            "rate": Select(attrs={"class": "form-control"}),
         }

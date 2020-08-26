@@ -33,7 +33,7 @@ def save_everything(items, index=False, backscrape=False):
     if af.docket.court_id != "scotus":
         if af.judges:
             candidate_judges = get_candidate_judges(
-                af.judges, docket.court.pk, af.docket.date_argued,
+                af.judges, docket.court.pk, af.docket.date_argued
             )
     else:
         candidate_judges = get_scotus_judges(af.docket.date_argued)
@@ -160,7 +160,7 @@ class Command(cl_scrape_opinions.Command):
                     dup_checker.reset()
 
                     docket, audio_file, error = make_objects(
-                        item, court, sha1_hash, content,
+                        item, court, sha1_hash, content
                     )
 
                     if error:
@@ -168,7 +168,7 @@ class Command(cl_scrape_opinions.Command):
                         continue
 
                     save_everything(
-                        items={"docket": docket, "audio_file": audio_file,},
+                        items={"docket": docket, "audio_file": audio_file},
                         index=False,
                         backscrape=backscrape,
                     )

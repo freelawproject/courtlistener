@@ -4,7 +4,7 @@ from django.db import models
 class CharNullField(models.CharField):
     """
     Subclass of the CharField that allows empty strings to be stored as NULL.
-    
+
     https://stackoverflow.com/a/1934764/64911
     """
 

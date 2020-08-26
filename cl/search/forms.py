@@ -35,8 +35,7 @@ OPINION_ORDER_BY_CHOICES = (
 
 
 def _clean_form(get_params, cd, courts):
-    """Returns cleaned up values as a Form object.
-    """
+    """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
 
@@ -84,7 +83,7 @@ class SearchForm(forms.Form):
         ),
     )
     type.as_str_types = []
-    q = forms.CharField(required=False, label="Query",)
+    q = forms.CharField(required=False, label="Query")
     q.as_str_types = SEARCH_TYPES.ALL_TYPES
     court = forms.CharField(required=False, widget=forms.HiddenInput())
     court.as_str_types = []
@@ -154,7 +153,7 @@ class SearchForm(forms.Form):
         label_suffix="",
         required=False,
         widget=forms.CheckboxInput(
-            attrs={"class": "external-input form-control left",}
+            attrs={"class": "external-input form-control left"}
         ),
     )
     available_only.as_str_types = [SEARCH_TYPES.RECAP]

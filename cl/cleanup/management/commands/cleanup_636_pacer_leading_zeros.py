@@ -131,4 +131,4 @@ class Command(VerboseCommand):
             except IOError:
                 logger.info("Couldn't find docket at: %s" % docket_path)
             else:
-                _ = pacer_doc.make_documents(docket, debug=options["debug"],)
+                _ = pacer_doc.make_documents(docket, debug=options["debug"])

@@ -309,7 +309,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
         # Adjust if user has special privileges.
         override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
-            request.user.username, None,
+            request.user.username, None
         )
         if override_rate is not None:
             self.num_requests, self.duration = self.parse_rate(override_rate)
@@ -477,7 +477,7 @@ def invert_user_logs(start, end, add_usernames=True):
     pipe = r.pipeline()
 
     dates = [
-        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end,)
+        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
     ]
     for d in dates:
         pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)

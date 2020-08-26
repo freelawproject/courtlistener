@@ -136,13 +136,13 @@ class ExtractionTest(TestCase):
         extract_doc_content(pk=76, do_ocr=False)
         o.cluster.docket.refresh_from_db()
         self.assertEqual(
-            "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number,
+            "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number
         )
 
 
 class ExtensionIdentificationTest(TestCase):
     def setUp(self):
-        self.path = os.path.join(settings.MEDIA_ROOT, "test", "search",)
+        self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
     def test_wpd_extension(self):
         with open(os.path.join(self.path, "opinion_wpd.wpd"), "r") as f:

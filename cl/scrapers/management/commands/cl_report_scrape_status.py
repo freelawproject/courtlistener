@@ -16,8 +16,7 @@ from cl.search.models import Court, OpinionCluster
 
 
 def _make_query_dict(query_list):
-    """Reformat the results into dicts.
-    """
+    """Reformat the results into dicts."""
     result_dict = {}
     for item in query_list:
         result_dict[item["pk"]] = item["count"]
@@ -161,9 +160,7 @@ def tally_errors():
 
 
 def generate_report():
-    """Look at the counts and errors, generate and return a report.
-
-    """
+    """Look at the counts and errors, generate and return a report."""
     most_recent_opinions, recently_dying_courts = calculate_counts()
     errors = tally_errors()
     js_version = pkg_resources.get_distribution("juriscraper").version

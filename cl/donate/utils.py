@@ -127,7 +127,7 @@ emails = {
         "(Note that some of these charges still can fail to go "
         "through.)",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }
 

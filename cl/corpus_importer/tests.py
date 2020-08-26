@@ -49,8 +49,8 @@ class JudgeExtractionTest(unittest.TestCase):
                 "delivered the following opinion of this Court: ",
                 ["clayton"],
             ),
-            ("OVERTON, J. &#8212; ", ["overton"],),
-            ("BURWELL, J.:", ["burwell"],),
+            ("OVERTON, J. &#8212; ", ["overton"]),
+            ("BURWELL, J.:", ["burwell"]),
         )
         for q, a in tests:
             self.assertEqual(find_judge_names(q), a)
@@ -253,7 +253,7 @@ class CourtMatchingTest(unittest.TestCase):
                 "answer": "circtdel",
             },
             {
-                "args": ("Court of Common Pleas  Hartford County", "asdf",),
+                "args": ("Court of Common Pleas  Hartford County", "asdf"),
                 "answer": "connsuperct",
             },
         )
@@ -275,30 +275,28 @@ class CourtMatchingTest(unittest.TestCase):
             {"q": "Southern District of New York", "a": "nysd"},
             # When we have unknown first word, we assume it's errant.
             {"q": "Nathan District of New York", "a": "nyd"},
-            {"q": "Nate District of New York", "a": "nyd",},
-            {"q": "Middle District of Pennsylvania", "a": "pamd",},
-            {"q": "Middle Dist. of Pennsylvania", "a": "pamd",},
-            {"q": "M.D. of Pennsylvania", "a": "pamd",},
+            {"q": "Nate District of New York", "a": "nyd"},
+            {"q": "Middle District of Pennsylvania", "a": "pamd"},
+            {"q": "Middle Dist. of Pennsylvania", "a": "pamd"},
+            {"q": "M.D. of Pennsylvania", "a": "pamd"},
         )
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = match_court_string(test["q"], federal_district=True)
-            self.assertEqual(
-                test["a"], got,
-            )
+            self.assertEqual(test["a"], got)
 
     def test_get_appellate_court_object_from_string(self):
         """Can we get the correct federal appellate courts?"""
 
         pairs = (
-            {"q": "U. S. Court of Appeals for the Ninth Circuit", "a": "ca9",},
+            {"q": "U. S. Court of Appeals for the Ninth Circuit", "a": "ca9"},
             {
                 # FJC data does not appear to have a space between U. and S.
                 "q": "U.S. Court of Appeals for the Ninth Circuit",
                 "a": "ca9",
             },
-            {"q": "U. S. Circuit Court for the Ninth Circuit", "a": "ca9",},
-            {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9",},
+            {"q": "U. S. Circuit Court for the Ninth Circuit", "a": "ca9"},
+            {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9"},
         )
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
@@ -688,11 +686,11 @@ class HarvardTests(TestCase):
     def test_partial_dates(self):
         """Can we validate partial dates?"""
         pairs = (
-            {"q": "2019-01-01", "a": ("2019-01-01", False),},
-            {"q": "2019-01", "a": ("2019-01-15", True),},
-            {"q": "2019-05", "a": ("2019-05-15", True),},
-            {"q": "1870-05", "a": ("1870-05-15", True),},
-            {"q": "2019", "a": ("2019-07-01", True),},
+            {"q": "2019-01-01", "a": ("2019-01-01", False)},
+            {"q": "2019-01", "a": ("2019-01-15", True)},
+            {"q": "2019-05", "a": ("2019-05-15", True)},
+            {"q": "1870-05", "a": ("1870-05-15", True)},
+            {"q": "2019", "a": ("2019-07-01", True)},
         )
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))

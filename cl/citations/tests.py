@@ -1078,9 +1078,7 @@ class CitationFeedTest(IndexedSolrTestCase):
                 "//a:entry", namespaces={"a": "http://www.w3.org/2005/Atom"}
             )
         )
-        self.assertEqual(
-            count, expected_count,
-        )
+        self.assertEqual(count, expected_count)
 
     def test_basic_cited_by_feed(self):
         """Can we load the cited-by feed and does it have content?"""
@@ -1102,7 +1100,7 @@ class CitationFeedTest(IndexedSolrTestCase):
         OpinionCluster.objects.filter(pk=1).update(case_name=new_case_name)
 
         r = self.client.get(
-            reverse("search_feed", args=["search"]), {"q": "cites:1"},
+            reverse("search_feed", args=["search"]), {"q": "cites:1"}
         )
         self.assertEqual(r.status_code, 200)
 
@@ -1228,9 +1226,7 @@ class ParallelCitationTest(SimpleTestCase):
             ([1, 2, 3, 4], [(1, 2), (2, 3), (3, 4)]),
         ]
         for q, a in tests:
-            self.assertEqual(
-                make_edge_list(q), a,
-            )
+            self.assertEqual(make_edge_list(q), a)
 
     def test_hash(self):
         """Do two citation objects hash to the same?"""
@@ -1239,7 +1235,5 @@ class ParallelCitationTest(SimpleTestCase):
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=1),
             Citation(reporter=2, volume="U.S.", page="2", reporter_index=2),
         ]
-        self.assertEqual(
-            hash(citations[0]), hash(citations[1]),
-        )
+        self.assertEqual(hash(citations[0]), hash(citations[1]))
         Citation.fuzzy_hash = Citation.__hash__

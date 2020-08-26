@@ -111,7 +111,7 @@ class RecapUploadsTest(TestCase):
         docket due to the mock.
         """
         self.data.update(
-            {"upload_type": UPLOAD_TYPE.DOCKET, "document_number": "",}
+            {"upload_type": UPLOAD_TYPE.DOCKET, "document_number": ""}
         )
         del self.data["pacer_doc_id"]
         r = self.client.post(self.path, self.data)
@@ -170,9 +170,7 @@ class RecapUploadsTest(TestCase):
         """If you send a district court to an appellate endpoint, does it
         fail?
         """
-        self.data.update(
-            {"upload_type": UPLOAD_TYPE.APPELLATE_DOCKET,}
-        )
+        self.data.update({"upload_type": UPLOAD_TYPE.APPELLATE_DOCKET})
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = self.client.post(self.path, self.data)
@@ -183,7 +181,7 @@ class RecapUploadsTest(TestCase):
         fail?
         """
         self.data.update(
-            {"upload_type": UPLOAD_TYPE.DOCKET, "court": "scotus",}
+            {"upload_type": UPLOAD_TYPE.DOCKET, "court": "scotus"}
         )
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
@@ -246,9 +244,7 @@ class RecapUploadsTest(TestCase):
         mock.assert_called()
 
 
-@mock.patch(
-    "cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport,
-)
+@mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
     "cl.recap.tasks.PossibleCaseNumberApi",
     new=fakes.FakePossibleCaseNumberApi,
@@ -296,7 +292,7 @@ class RecapDocketFetchApiTest(TestCase):
 
     def test_fetch_docket_by_docket_id(self):
         fq = PacerFetchQueue.objects.create(
-            user=self.user, request_type=REQUEST_TYPE.DOCKET, docket_id=1,
+            user=self.user, request_type=REQUEST_TYPE.DOCKET, docket_id=1
         )
         result = do_pacer_fetch(fq)
         result.get()
@@ -398,7 +394,7 @@ class RecapAttPageFetchApiTest(TestCase):
         new=fakes.FakeAttachmentPage,
     )
     @mock.patch(
-        "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage,
+        "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage
     )
     def test_fetch_att_page_all_systems_go(self, mock_get_cookies):
         result = do_pacer_fetch(self.fq)
@@ -406,9 +402,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
         self.fq.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
-        self.assertIn(
-            "Successfully completed fetch", self.fq.message,
-        )
+        self.assertIn("Successfully completed fetch", self.fq.message)
 
 
 class ProcessingQueueApiFilterTest(TestCase):
@@ -448,12 +442,12 @@ class ProcessingQueueApiFilterTest(TestCase):
         self.assertEqual(j["count"], total_number_results)
 
         total_awaiting_processing = 1
-        r = self.client.get(self.path, {"status": PROCESSING_STATUS.ENQUEUED,})
+        r = self.client.get(self.path, {"status": PROCESSING_STATUS.ENQUEUED})
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_awaiting_processing)
 
         total_pdfs = 1
-        r = self.client.get(self.path, {"upload_type": UPLOAD_TYPE.PDF,})
+        r = self.client.get(self.path, {"upload_type": UPLOAD_TYPE.PDF})
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_pdfs)
 
@@ -465,9 +459,7 @@ class DebugRecapUploadtest(TestCase):
 
     def setUp(self):
         self.user = User.objects.get(username="recap")
-        self.pdf = SimpleUploadedFile(
-            "file.pdf", b"file content more content",
-        )
+        self.pdf = SimpleUploadedFile("file.pdf", b"file content more content")
         test_dir = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets"
         )
@@ -753,9 +745,7 @@ class RecapZipTaskTest(TestCase):
         # Are the PDF PQ's marked as successful?
         for new_pq in results["new_pqs"]:
             new_pq = ProcessingQueue.objects.get(pk=new_pq)
-            self.assertEqual(
-                new_pq.status, PROCESSING_STATUS.SUCCESSFUL,
-            )
+            self.assertEqual(new_pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
         # Are the documents marked as available?
         for doc in self.docs:
@@ -987,7 +977,7 @@ class TerminatedEntitiesTest(TestCase):
                 {
                     "contact": "",
                     "name": "Roosevelt",
-                    "roles": ["LEAD ATTORNEY",],
+                    "roles": ["LEAD ATTORNEY"],
                 }
             ],
             "date_terminated": None,
@@ -1299,7 +1289,7 @@ class RecapDocketTaskTest(TestCase):
     def test_parsing_docket_already_exists(self):
         """Can we parse an HTML docket for a docket we have in the DB?"""
         existing_d = Docket.objects.create(
-            source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus",
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus"
         )
         returned_data = process_recap_docket(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
@@ -1310,10 +1300,10 @@ class RecapDocketTaskTest(TestCase):
     def test_docket_and_de_already_exist(self):
         """Can we parse if the docket and the docket entry already exist?"""
         existing_d = Docket.objects.create(
-            source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus",
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus"
         )
         existing_de = DocketEntry.objects.create(
-            docket=existing_d, entry_number="1", date_filed=date(2008, 1, 1),
+            docket=existing_d, entry_number="1", date_filed=date(2008, 1, 1)
         )
         returned_data = process_recap_docket(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
@@ -1343,7 +1333,7 @@ class RecapDocketTaskTest(TestCase):
             pacer_doc_id="03504231050",
             document_number="1",
             filepath_local=SimpleUploadedFile(
-                "file.pdf", b"file content more content",
+                "file.pdf", b"file content more content"
             ),
             upload_type=UPLOAD_TYPE.PDF,
             status=PROCESSING_STATUS.FAILED,
@@ -1611,5 +1601,5 @@ class IdbImportTest(TestCase):
         for qa in qa:
             print("Testing CSV parser on: %s" % qa[0])
             self.assertEqual(
-                self.cmd.make_csv_row_dict(qa[0], ["1", "2", "3"]), qa[1],
+                self.cmd.make_csv_row_dict(qa[0], ["1", "2", "3"]), qa[1]
             )

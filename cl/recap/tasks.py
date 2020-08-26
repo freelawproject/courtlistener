@@ -197,7 +197,7 @@ def process_recap_pdf(self, pk):
         else:
             # Sometimes we don't have the case ID from PACER. Try to make this
             # work anyway.
-            rd = RECAPDocument.objects.get(pacer_doc_id=pq.pacer_doc_id,)
+            rd = RECAPDocument.objects.get(pacer_doc_id=pq.pacer_doc_id)
     except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
         try:
             d = Docket.objects.get(
@@ -1098,7 +1098,7 @@ def fetch_attachment_page(self, fq_pk):
         return
 
     text = r.response.text
-    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id,)
+    att_data = get_data_from_att_report(text, rd.docket_entry.docket.court_id)
 
     if att_data == {}:
         msg = "Not a valid attachment page upload"
@@ -1169,9 +1169,7 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
     return {}
 
 
-def fetch_docket_by_pacer_case_id(
-    session, court_id, pacer_case_id, fq,
-):
+def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
     """Download the docket from PACER and merge it into CL
 
     :param session: A PacerSession object to work with
@@ -1195,7 +1193,7 @@ def fetch_docket_by_pacer_case_id(
         if count > 1:
             d = d.earliest("date_created")
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
-        d, pacer_case_id, docket_data, report, appellate=False,
+        d, pacer_case_id, docket_data, report, appellate=False
     )
     return {
         "docket_pk": d.pk,
@@ -1282,7 +1280,7 @@ def fetch_docket(self, fq_pk):
         return None
 
     try:
-        result = fetch_docket_by_pacer_case_id(s, court_id, pacer_case_id, fq,)
+        result = fetch_docket_by_pacer_case_id(s, court_id, pacer_case_id, fq)
     except (requests.RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting pacer_case_id for fq: %s."
         if self.request.retries == self.max_retries:

@@ -67,7 +67,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
             "originating_court_information",
             "idb_data",
         )
-        .prefetch_related("panel", "clusters", "audio_files", "tags",)
+        .prefetch_related("panel", "clusters", "audio_files", "tags")
         .order_by("-id")
     )
 
@@ -100,9 +100,9 @@ class RECAPDocumentViewSet(
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     queryset = (
         RECAPDocument.objects.select_related(
-            "docket_entry", "docket_entry__docket",
+            "docket_entry", "docket_entry__docket"
         )
-        .prefetch_related("tags",)
+        .prefetch_related("tags")
         .order_by("-id")
     )
 
@@ -134,7 +134,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_blocked",
     )
     queryset = OpinionCluster.objects.prefetch_related(
-        "sub_opinions", "panel", "non_participating_judges", "citations",
+        "sub_opinions", "panel", "non_participating_judges", "citations"
     ).order_by("-id")
 
 
@@ -147,8 +147,8 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
     )
     queryset = (
-        Opinion.objects.select_related("cluster", "author",)
-        .prefetch_related("opinions_cited", "joined_by",)
+        Opinion.objects.select_related("cluster", "author")
+        .prefetch_related("opinions_cited", "joined_by")
         .order_by("-id")
     )
 

@@ -28,7 +28,7 @@ def get_from_ia(reporter, volume):
     access_key = settings.IA_ACCESS_KEY
     secret_key = settings.IA_SECRET_KEY
     ia_session = ia.get_session(
-        {"s3": {"access": access_key, "secret": secret_key,}}
+        {"s3": {"access": access_key, "secret": secret_key}}
     )
 
     reporter_key = ".".join(["law.free.cap", reporter])
@@ -57,7 +57,7 @@ def get_from_ia(reporter, volume):
             if "json" not in item.name:
                 continue
 
-            url = "https://archive.org/download/%s/%s" % (ia_key, item.name,)
+            url = "https://archive.org/download/%s/%s" % (ia_key, item.name)
             file_path = os.path.join(
                 settings.MEDIA_ROOT,
                 "harvard_corpus",
