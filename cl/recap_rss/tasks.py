@@ -173,8 +173,8 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         staleness = get_staleness(current_build_date)
         if staleness > staleness_limit:
             logger.warning(
-                "Feed in '%s' has not updated in %s minutes, which is more than "
-                "the limit of %s minutes: %s"
+                "Feed in '%s' has not updated in %s minutes, which is more "
+                "than the limit of %s minutes: %s"
                 % (
                     feed_status.court_id,
                     round(staleness.total_seconds() / 60, 2),
@@ -266,7 +266,7 @@ def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only):
+def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
