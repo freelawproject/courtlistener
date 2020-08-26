@@ -153,7 +153,6 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--skip-until",
-            default=False,
             help="Skip until to process",
             type=int,
         )
