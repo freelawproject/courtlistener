@@ -6,9 +6,7 @@ from juriscraper.pacer import PacerRssFeed
 from cl.lib.model_helpers import make_path
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.search.models import Court
-from cl.search.tasks import add_items_to_solr
 
 
 class RssFeedStatus(models.Model):
@@ -129,6 +127,9 @@ class RssFeedData(models.Model):
         :param index: Whether to save to Solr (note that none will be sent
         when doing medata only since no entries are modified).
         """
+        from cl.recap_rss.tasks import merge_rss_feed_contents
+        from cl.search.tasks import add_items_to_solr
+
         rss_feed = PacerRssFeed(map_cl_to_pacer_id(self.court_id))
         rss_feed._parse_text(self.file_contents)
         response = merge_rss_feed_contents(
