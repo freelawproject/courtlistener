@@ -51,7 +51,7 @@ class UserTest(LiveServerTestCase):
         }
         response = self.client.post(
             "{host}{path}".format(
-                host=self.live_server_url, path=reverse("register"),
+                host=self.live_server_url, path=reverse("register")
             ),
             params,
             follow=True,
@@ -198,7 +198,7 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content,
+            "%s is a blocked email provider" % self.bad_domain, r.content
         )
 
     def test_can_i_change_to_bad_email_address(self):
@@ -207,10 +207,12 @@ class DisposableEmailTest(TestCase):
             self.client.login(username="pandora", password="password")
         )
         r = self.client.post(
-            reverse("view_settings"), {"email": self.bad_email,}, follow=True
+            reverse("view_settings"),
+            {"email": self.bad_email},
+            follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content,
+            "%s is a blocked email provider" % self.bad_domain, r.content
         )
 
 
@@ -226,7 +228,7 @@ class LiveUserTest(BaseSeleniumTest):
         """
         self.browser.get(
             "{host}{path}".format(
-                host=self.live_server_url, path=reverse("password_reset"),
+                host=self.live_server_url, path=reverse("password_reset")
             )
         )
         email_input = self.browser.find_element_by_name("email")
@@ -239,7 +241,7 @@ class LiveUserTest(BaseSeleniumTest):
         self.assertEqual(
             self.browser.current_url,
             "{host}{path}".format(
-                host=self.live_server_url, path=reverse("password_reset_done"),
+                host=self.live_server_url, path=reverse("password_reset_done")
             ),
         )
 

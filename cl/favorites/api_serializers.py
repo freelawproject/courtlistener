@@ -21,7 +21,7 @@ class UserTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
 class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
     docket = serializers.PrimaryKeyRelatedField(
-        queryset=Docket.objects.all(), style={"base_template": "input.html"},
+        queryset=Docket.objects.all(), style={"base_template": "input.html"}
     )
     tag = serializers.PrimaryKeyRelatedField(
         # Should this block other people's from being submitted?

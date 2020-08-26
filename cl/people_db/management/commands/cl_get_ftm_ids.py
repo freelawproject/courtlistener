@@ -64,12 +64,12 @@ def make_dict_of_ftm_eids(use_pickle=True):
             if data["records"] == ["No Records"]:
                 logger.info(
                     "  No records found in court %s and year %s."
-                    % (courtid, year,)
+                    % (courtid, year)
                 )
                 continue
             logger.info(
                 "  Found %s records in court %s and year %s"
-                % (len(data["records"]), courtid, year,)
+                % (len(data["records"]), courtid, year)
             )
 
             for item in data["records"]:

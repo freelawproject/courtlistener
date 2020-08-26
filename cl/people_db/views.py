@@ -167,7 +167,7 @@ def financial_disclosures_for_somebody(request, pk, slug):
     return render(
         request,
         "financial_disclosures_for_somebody.html",
-        {"person": person, "title": title, "private": False,},
+        {"person": person, "title": title, "private": False},
     )
 
 

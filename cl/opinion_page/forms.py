@@ -24,7 +24,7 @@ from cl.search.models import Court, Citation, Docket, Opinion
 class CitationRedirectorForm(forms.Form):
     volume = forms.IntegerField(
         widget=forms.TextInput(
-            attrs={"class": "form-control input-lg", "placeholder": "Volume",}
+            attrs={"class": "form-control input-lg", "placeholder": "Volume"}
         ),
         required=True,
     )
@@ -39,7 +39,7 @@ class CitationRedirectorForm(forms.Form):
     )
     page = forms.IntegerField(
         widget=forms.TextInput(
-            attrs={"class": "form-control input-lg", "placeholder": "Page",}
+            attrs={"class": "form-control input-lg", "placeholder": "Page"}
         ),
         required=True,
     )
@@ -99,7 +99,7 @@ class DocketEntryFilterForm(forms.Form):
 
 class TennWorkersForm(forms.Form):
 
-    court_str = forms.CharField(required=True, widget=forms.HiddenInput(),)
+    court_str = forms.CharField(required=True, widget=forms.HiddenInput())
 
     case_title = forms.CharField(
         label="Case Title",
@@ -153,14 +153,14 @@ class TennWorkersForm(forms.Form):
         queryset=Person.objects.none(),
         required=False,
         label="Second Panelist",
-        widget=forms.Select(attrs={"class": "form-control",}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     third_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Third Panelist",
-        widget=forms.Select(attrs={"class": "form-control",}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     cite_volume = forms.IntegerField(
@@ -172,13 +172,19 @@ class TennWorkersForm(forms.Form):
         ),
     )
 
-    cite_reporter = forms.CharField(label="Cite Reporter", required=True,)
+    cite_reporter = forms.CharField(
+        label="Cite Reporter",
+        required=True,
+    )
 
     cite_page = forms.IntegerField(
         label="Cite Page",
         required=True,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "autocomplete": "off",}
+            attrs={
+                "class": "form-control",
+                "autocomplete": "off",
+            }
         ),
     )
 
@@ -203,7 +209,8 @@ class TennWorkersForm(forms.Form):
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC", "TN WC")], attrs={"class": "form-control"},
+                choices=[("TN WC", "TN WC")],
+                attrs={"class": "form-control"},
             )
             del self.fields["second_judge"]
             del self.fields["third_judge"]
@@ -341,7 +348,7 @@ class TennWorkersForm(forms.Form):
         )
 
         extract_doc_content.delay(
-            opinion.pk, do_ocr=True, citation_jitter=True,
+            opinion.pk, do_ocr=True, citation_jitter=True
         )
 
         logging.info(

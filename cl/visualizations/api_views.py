@@ -55,7 +55,7 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     def perform_create(self, serializer):
         cd = serializer.validated_data
         start, end = reverse_endpoints_if_needed(
-            cd["cluster_start"], cd["cluster_end"],
+            cd["cluster_start"], cd["cluster_end"]
         )
         viz = serializer.save(
             user=self.request.user, cluster_start=start, cluster_end=end

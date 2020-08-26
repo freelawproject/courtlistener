@@ -119,7 +119,7 @@ def add_attorney(atty, p, d):
     :return: None if there's an error, or an Attorney ID if not.
     """
     atty_org_info, atty_info = normalize_attorney_contact(
-        atty["contact"], fallback_name=atty["name"],
+        atty["contact"], fallback_name=atty["name"]
     )
 
     # Try lookup by atty name in the docket.
@@ -130,7 +130,7 @@ def add_attorney(atty, p, d):
     if count == 0:
         # Couldn't find the attorney. Make one.
         a = Attorney.objects.create(
-            name=atty["name"], contact_raw=atty["contact"],
+            name=atty["name"], contact_raw=atty["contact"]
         )
     elif count == 1:
         # Nailed it.
@@ -160,7 +160,7 @@ def add_attorney(atty, p, d):
 
             # Add the attorney to the organization
             AttorneyOrganizationAssociation.objects.get_or_create(
-                attorney=a, attorney_organization=org, docket=d,
+                attorney=a, attorney_organization=org, docket=d
             )
 
         if atty_info:
@@ -509,7 +509,7 @@ def get_or_make_docket_entry(d, docket_entry):
     if docket_entry["document_number"]:
         try:
             de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"],
+                docket=d, entry_number=docket_entry["document_number"]
             )
         except DocketEntry.MultipleObjectsReturned:
             logger.error(
@@ -540,7 +540,7 @@ def get_or_make_docket_entry(d, docket_entry):
         count = des.count()
         if count == 0:
             de = DocketEntry(
-                docket=d, entry_number=docket_entry["document_number"],
+                docket=d, entry_number=docket_entry["document_number"]
             )
             de_created = True
         elif count == 1:
@@ -698,15 +698,15 @@ def get_terminated_entities(d):
         d.parties.prefetch_related(
             Prefetch(
                 "party_types",
-                queryset=PartyType.objects.filter(docket=d,)
-                .exclude(date_terminated=None,)
+                queryset=PartyType.objects.filter(docket=d)
+                .exclude(date_terminated=None)
                 .distinct()
                 .only("pk"),
                 to_attr="party_types_for_d",
             ),
             Prefetch(
                 "attorneys",
-                queryset=Attorney.objects.filter(roles__docket=d,)
+                queryset=Attorney.objects.filter(roles__docket=d)
                 .distinct()
                 .only("pk"),
                 to_attr="attys_in_d",
@@ -714,7 +714,7 @@ def get_terminated_entities(d):
             Prefetch(
                 "attys_in_d__roles",
                 queryset=Role.objects.filter(
-                    docket=d, role__in=[Role.SELF_TERMINATED, Role.TERMINATED],
+                    docket=d, role__in=[Role.SELF_TERMINATED, Role.TERMINATED]
                 )
                 .distinct()
                 .only("pk"),
@@ -1131,7 +1131,7 @@ def add_tags_to_objs(tag_names, objs):
 
 @transaction.atomic
 def merge_pacer_docket_into_cl_docket(
-    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None,
+    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None
 ):
     # Ensure that we set the case ID. This is needed on dockets that have
     # matching docket numbers, but that never got PACER data before. This was

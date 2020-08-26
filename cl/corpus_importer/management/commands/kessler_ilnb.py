@@ -39,8 +39,7 @@ def make_docket_number(year, docket_number):
 
 
 def get_dockets(options):
-    """Download the dockets described in the CSV
-    """
+    """Download the dockets described in the CSV"""
     f = options["file"]
     reader = csv.DictReader(f)
     q = options["queue"]
@@ -96,7 +95,7 @@ def get_petitions(options):
             document_number="1",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
-        .exclude(pacer_doc_id="",)
+        .exclude(pacer_doc_id="")
         .order_by("pk")
         .values_list("pk", flat=True)
         .iterator()
@@ -136,7 +135,7 @@ def get_final_docs(options):
     """Get any documents that contain "final" in their description."""
     des = (
         DocketEntry.objects.filter(
-            tags__name=TAG, description__icontains="final",
+            tags__name=TAG, description__icontains="final"
         )
         .order_by("pk")
         .iterator()
@@ -164,7 +163,7 @@ def get_final_docs(options):
             de.recap_documents.filter(
                 document_type=RECAPDocument.PACER_DOCUMENT,
             )
-            .exclude(pacer_doc_id="",)
+            .exclude(pacer_doc_id="")
             .order_by("pk")
             .values_list("pk", flat=True)
         )

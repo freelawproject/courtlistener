@@ -210,7 +210,7 @@ class Command(VerboseCommand):
         logger.info(
             "Enhancing cluster {id} with data from SCDB ("
             "https://www.courtlistener.com{path}).".format(
-                id=cluster.pk, path=cluster.get_absolute_url(),
+                id=cluster.pk, path=cluster.get_absolute_url()
             )
         )
         attribute_tuples = [
@@ -385,7 +385,7 @@ class Command(VerboseCommand):
                 # have citations.
                 logger.info("Checking by federal citation")
                 clusters = OpinionCluster.objects.filter(
-                    citation=d["usCite"], scdb_id="",
+                    citation=d["usCite"], scdb_id=""
                 )
                 cluster_count = clusters.count()
                 logger.info("%s matches found.", cluster_count)

@@ -85,7 +85,7 @@ class SCOTUSMap(models.Model):
         default=0,
     )
     published = models.BooleanField(
-        help_text="Whether the visualization has been shared.", default=False,
+        help_text="Whether the visualization has been shared.", default=False
     )
     deleted = models.BooleanField(
         help_text="Has a user chosen to delete this visualization?",
@@ -280,14 +280,12 @@ class SCOTUSMap(models.Model):
         return g
 
     def add_clusters(self, g):
-        """Add clusters to the model using an existing nx graph.
-        """
+        """Add clusters to the model using an existing nx graph."""
         self.clusters.add(*g.nodes())
         self.save()
 
     def to_json(self, g):
-        """Make a JSON representation of a NetworkX graph of the data.
-        """
+        """Make a JSON representation of a NetworkX graph of the data."""
         j = {
             "meta": {
                 "donate": "Please consider donating to support more projects "
@@ -315,7 +313,7 @@ class SCOTUSMap(models.Model):
                     "votes_minority": cluster.scdb_votes_minority,
                     "scdb_id": cluster.scdb_id,
                     "sub_opinions": [
-                        {"type": "combined", "opinions_cited": opinions_cited,}
+                        {"type": "combined", "opinions_cited": opinions_cited}
                     ],
                 }
             )
@@ -410,12 +408,14 @@ class Referer(models.Model):
         blank=True,
     )
     display = models.BooleanField(
-        help_text="Should this item be displayed?", default=False,
+        help_text="Should this item be displayed?",
+        default=False,
     )
 
     def __unicode__(self):
         return u"{pk}: Refers to {map}".format(
-            pk=getattr(self, "pk", None), map=self.map,
+            pk=getattr(self, "pk", None),
+            map=self.map,
         )
 
     class Meta:
@@ -448,7 +448,8 @@ class JSONVersion(models.Model):
 
     def __unicode__(self):
         return u"<JSONVersion {pk}> for <{map}>".format(
-            pk=getattr(self, "pk", None), map=self.map,
+            pk=getattr(self, "pk", None),
+            map=self.map,
         )
 
     class Meta:

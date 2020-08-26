@@ -56,7 +56,7 @@ class PodcastTest(IndexedSolrTestCase):
             expected_item_count,
             msg="Did not get {expected} node(s) during search podcast "
             "generation. Instead found: {actual}".format(
-                expected=expected_item_count, actual=node_count,
+                expected=expected_item_count, actual=node_count
             ),
         )
 

@@ -97,13 +97,13 @@ urlpatterns = [
         views.password_change,
         name="password_change",
     ),
-    url(r"^profile/delete/$", views.delete_account, name="delete_account",),
+    url(r"^profile/delete/$", views.delete_account, name="delete_account"),
     url(
         r"^profile/delete/done/$",
         views.delete_profile_done,
         name="delete_profile_done",
     ),
-    url(r"^profile/take-out/$", views.take_out, name="take_out",),
+    url(r"^profile/take-out/$", views.take_out, name="take_out"),
     url(
         r"^profile/take-out/done/$", views.take_out_done, name="take_out_done"
     ),

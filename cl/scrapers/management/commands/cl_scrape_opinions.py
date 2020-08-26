@@ -121,8 +121,7 @@ def make_objects(item, court, sha1_hash, content):
 
 @transaction.atomic
 def save_everything(items, index=False, backscrape=False):
-    """Saves all the sub items and associates them as appropriate.
-    """
+    """Saves all the sub items and associates them as appropriate."""
     docket, cluster = items["docket"], items["cluster"]
     opinion, citations = items["opinion"], items["citations"]
     docket.save()
@@ -135,7 +134,7 @@ def save_everything(items, index=False, backscrape=False):
 
     if cluster.judges:
         candidate_judges = get_candidate_judges(
-            cluster.judges, docket.court.pk, cluster.date_filed,
+            cluster.judges, docket.court.pk, cluster.date_filed
         )
         if len(candidate_judges) == 1:
             opinion.author = candidate_judges[0]
@@ -287,12 +286,12 @@ class Command(VerboseCommand):
                 index=False,
             )
             extract_doc_content.delay(
-                opinion.pk, do_ocr=True, citation_jitter=True,
+                opinion.pk, do_ocr=True, citation_jitter=True
             )
 
             logger.info(
                 "Successfully added doc {pk}: {name}".format(
-                    pk=opinion.pk, name=item["case_names"].encode("utf-8"),
+                    pk=opinion.pk, name=item["case_names"].encode("utf-8")
                 )
             )
 

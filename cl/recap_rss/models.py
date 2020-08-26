@@ -78,7 +78,7 @@ class RssItemCache(models.Model):
         auto_now_add=True,
         db_index=True,
     )
-    hash = models.CharField(max_length=64, unique=True, db_index=True,)
+    hash = models.CharField(max_length=64, unique=True, db_index=True)
 
 
 def make_rss_feed_path(instance, filename):
@@ -137,5 +137,5 @@ class RssFeedData(models.Model):
         )
         if index:
             add_items_to_solr(
-                response.get("rds_for_solr", []), "search.RECAPDocument",
+                response.get("rds_for_solr", []), "search.RECAPDocument"
             )

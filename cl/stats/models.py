@@ -4,8 +4,8 @@ from django.utils.encoding import smart_unicode
 
 
 class Stat(models.Model):
-    name = models.CharField(max_length=50, db_index=True,)
-    date_logged = models.DateField(db_index=True,)
+    name = models.CharField(max_length=50, db_index=True)
+    date_logged = models.DateField(db_index=True)
     count = models.IntegerField()
 
     def __unicode__(self):
@@ -20,10 +20,10 @@ class Stat(models.Model):
 
 class Event(models.Model):
     date_created = models.DateTimeField(
-        help_text="The moment when the event was logged", auto_now_add=True,
+        help_text="The moment when the event was logged", auto_now_add=True
     )
     description = models.CharField(
-        help_text="A human-readable description of the event", max_length=200,
+        help_text="A human-readable description of the event", max_length=200
     )
     user = models.ForeignKey(
         User,

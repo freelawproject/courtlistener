@@ -59,10 +59,10 @@ BOOSTS = {
     },
     # Phrase-based boosts.
     "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3,},
+        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3},
         SEARCH_TYPES.RECAP: recap_boosts_pf,
         SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3,},
+        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3},
         SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
         },
@@ -569,9 +569,7 @@ def add_highlighting(main_params, cd, highlight):
             "court",
         ]
         hlfl = SOLR_PEOPLE_HL_FIELDS
-    main_params.update(
-        {"fl": ",".join(fl), "hl.fl": ",".join(hlfl),}
-    )
+    main_params.update({"fl": ",".join(fl), "hl.fl": ",".join(hlfl)})
     for field in hlfl:
         if field == "text":
             continue
