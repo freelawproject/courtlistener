@@ -8,6 +8,6 @@ emails = {
         " + %s\n\n"
         "You should probably tell the court this is unacceptable.",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }

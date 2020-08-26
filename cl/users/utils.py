@@ -127,7 +127,7 @@ emails = {
         " - %s\n\n"
         "Can't keep 'em all, I suppose.\n\n",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
     "take_out_requested": {
         "subject": "User wants their data. Need to send it to them.",
@@ -138,7 +138,7 @@ emails = {
         " - %s\n\n"
         "Good luck getting this taken care of.",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
     "email_changed_successfully": {
         "subject": "Email changed successfully on CourtListener",
@@ -266,7 +266,7 @@ emails = {
         "Sincerely,\n\n"
         "The CourtListener Bots",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }
 
