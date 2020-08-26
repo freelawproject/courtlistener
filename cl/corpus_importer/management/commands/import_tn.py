@@ -1,6 +1,6 @@
-import itertools
 import json
 import logging
+import os
 from glob import glob
 
 from dateutil import parser
@@ -33,8 +33,8 @@ def make_item(case):
         is_alias_of=None,
         name_first=first_name,
     )
+
     # Four Panelists exist, one retired end of 2019 and the other joined.
-    panelists = case["judge"]
     if case["court"] == "tennworkcompapp":
         exclude = (
             "Marshall"
@@ -45,6 +45,8 @@ def make_item(case):
             positions__court_id=case["court"]
         ).exclude(name_first=exclude)
         panelists = ", ".join([x.name_full for x in panelists_query])
+    else:
+        panelists = case["judge"]
 
     return {
         "source": Docket.DIRECT_INPUT,
@@ -63,40 +65,12 @@ def make_item(case):
     }
 
 
-def add_neutral_citations(filepath):
-    """Add neutral citations to our dataset
-
-    :param tn_corpus: The case data.
-    :type: dict
-    :return: Our case data with neutral citations included.
-    :type: dict
-    """
-    tn_corpus = json.loads(open(filepath, "r").read())
-    results = []
-    for court in ["tennworkcompapp", "tennworkcompcl"]:
-        reporter = "TN WC App." if court == "tennworkcompapp" else "TN WC"
-        tn = [
-            x
-            for x in sorted(
-                tn_corpus, key=lambda x: (x["pub_date"], x["label"])
-            )
-            if x["court"] == court
-        ]
-        for key, group in itertools.groupby(tn, lambda x: x["pub_date"][:4]):
-            count = 1
-            for case in list(group):
-                case["neutral_citation"] = "%s %s %s" % (key, reporter, count)
-                results.append(case)
-                count += 1
-    return results
-
-
-def import_tn_corpus(log, skip_until, dir):
+def import_tn_corpus(log, skip_until, filepath):
     """Import TN Corpus
 
     :param log: Should we view logging info
     :param skip_until: Label ID, if any, to process first
-    :param dir: Location of our import files
+    :param filepath: Location of our overriding data json file
     :return: None
     """
     ready = False if skip_until else True
@@ -105,28 +79,26 @@ def import_tn_corpus(log, skip_until, dir):
         logging.getLogger().setLevel(logging.INFO)
 
     logging.info("Starting import")
-    filepath = "%s/data.json" % dir
-    tn_corpus = add_neutral_citations(filepath)
+    tn_corpus = sorted(json.load(filepath), key=lambda x: x["label"])
     if not ready:
-        case = [x for x in tn_corpus if x["label"] == int(skip_until)][0]
+        case = [x for x in tn_corpus if x["label"] == skip_until][0]
         logging.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
 
-    for case in sorted(tn_corpus, key=lambda x: x["label"]):
-        if case["label"] == int(skip_until):
+    for case in tn_corpus:
+        if case["label"] == skip_until:
             ready = True
         if not ready:
             continue
         logging.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
-        pdf_path = [
-            x
-            for x in glob("%s/%s/*.pdf" % (dir, case["label"]))
-            if "stamped" not in x
-        ][0]
-        pdf_data = open(pdf_path, "r").read()
+        pdf_path = glob(
+            "%s/%s/*.pdf" % (os.path.dirname(filepath.name), case["label"])
+        )[0]
+        with open(pdf_path, "r") as p:
+            pdf_data = p.read()
 
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
@@ -140,8 +112,8 @@ def import_tn_corpus(log, skip_until, dir):
         docket, opinion, cluster, citations, error = make_objects(
             make_item(case),
             Court.objects.get(pk=case["court"]),
-            sha1(force_bytes(pdf_data)),
-            open(pdf_path, "r").read(),
+            sha1_hash,
+            pdf_data,
         )
 
         save_everything(
@@ -167,8 +139,9 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--input-dir",
-            help="The directory containing our data.",
+            "--input-file",
+            type=file,
+            help="The filepath to our preprocessed data file.",
             required=True,
         )
         parser.add_argument(
@@ -178,11 +151,14 @@ class Command(VerboseCommand):
             help="Choose to view info log lines.",
         )
         parser.add_argument(
-            "--skip-until", default=False, help="Skip until to process",
+            "--skip-until",
+            default=False,
+            help="Skip until to process",
+            type=int,
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         import_tn_corpus(
-            options["log"], options["skip_until"], options["input_dir"],
+            options["log"], options["skip_until"], options["input_file"],
         )
