@@ -32,7 +32,7 @@ def create_or_update_row(values):
         # indicator and we should use it.
         {"defendant": values["defendant"]},
     ]
-    existing_rows = FjcIntegratedDatabase.objects.none()
+    existing_rows = FjcIntegratedDatabase.objects.all()
     for fjc_filter in fjc_filters:
         existing_rows = existing_rows.filter(**fjc_filter)
         existing_row_count = existing_rows.count()
