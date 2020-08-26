@@ -490,21 +490,14 @@ class TNCorpusTests(TestCase):
     def tearDown(self):
         Docket.objects.all().delete()
 
-    @mock.patch(
-        "cl.corpus_importer.management.commands.import_tn.add_neutral_citations",
-        side_effect=[
-            json.loads(
-                open(
-                    os.path.join(test_dir, "tn_corpus_test_asset.json"), "r"
-                ).read()
-            )
-        ],
-    )
-    def test_import(self, add_neutral_citations):
+    def test_import(self):
         """Can we import two cases successfully"""
         pre_install_count = OpinionCluster.objects.all().count()
-        dir = os.path.join(self.test_dir, "tenn_test_files")
-        import_tn_corpus(log=True, skip_until=False, dir=dir)
+        filepath = os.path.join(
+            self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
+        )
+        file = open(filepath)
+        import_tn_corpus(log=False, skip_until=False, filepath=file)
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
             pre_install_count + 2,
@@ -512,20 +505,13 @@ class TNCorpusTests(TestCase):
             msg="Did not get two installs",
         )
 
-    @mock.patch(
-        "cl.corpus_importer.management.commands.import_tn.add_neutral_citations",
-        side_effect=[
-            json.loads(
-                open(
-                    os.path.join(test_dir, "tn_corpus_test_asset.json"), "r"
-                ).read()
-            )
-        ],
-    )
-    def test_panel_selction(self, add_neutral_citations):
+    def test_panel_selection(self):
         """Can we choose panelist correctly?"""
-        dir = os.path.join(self.test_dir, "tenn_test_files")
-        import_tn_corpus(log=False, skip_until=False, dir=dir)
+        filepath = os.path.join(
+            self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
+        )
+        file = open(filepath)
+        import_tn_corpus(log=False, skip_until=False, filepath=file)
         oc = OpinionCluster.objects.get(citation="2019 TN WC App. 1")
         self.assertEqual(
             oc.judges,
