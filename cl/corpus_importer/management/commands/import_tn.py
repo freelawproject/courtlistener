@@ -49,7 +49,7 @@ def make_item(case):
         "source": Docket.DIRECT_INPUT,
         "cluster_source": "D",
         "case_names": case["title"],
-        "case_dates": parser.parse(case["pub_date"]),
+        "case_dates": pub_date,
         "precedential_statuses": "Published",
         "docket_numbers": case["docket"],
         "judges": panelists,
