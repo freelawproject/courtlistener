@@ -102,7 +102,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And sees a badge that lets her know it's blocked
@@ -118,7 +118,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And does not see a badge indicating that it's blocked.
@@ -145,7 +145,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is not blocked to search engines
         docket = Docket.objects.get(pk=10)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And does not see a badge that lets her know it's blocked

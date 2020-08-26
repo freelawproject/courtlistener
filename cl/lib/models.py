@@ -41,7 +41,9 @@ class AbstractPDF(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
     )
     sha1 = models.CharField(
         help_text="The ID used for a document in RECAP",
@@ -67,7 +69,9 @@ class AbstractPDF(models.Model):
         blank=True,
     )
     filepath_ia = models.CharField(
-        help_text="The URL of the file in IA", max_length=1000, blank=True,
+        help_text="The URL of the file in IA",
+        max_length=1000,
+        blank=True,
     )
     ia_upload_failure_count = models.SmallIntegerField(
         help_text="Number of times the upload to the Internet Archive failed.",

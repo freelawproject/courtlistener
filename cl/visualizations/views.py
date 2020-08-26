@@ -43,7 +43,7 @@ def render_visualization_page(request, pk, embed):
             referer_url = request.META.get("HTTP_REFERER")
             if referer_url is not None:
                 referer, created = Referer.objects.get_or_create(
-                    url=referer_url, map_id=viz.pk,
+                    url=referer_url, map_id=viz.pk
                 )
                 if created:
                     # Spawn a task to try to get the title of the page.
@@ -67,8 +67,7 @@ def view_embedded_visualization(request, pk):
 
 @never_cache
 def view_visualization(request, pk, slug):
-    """Return the network page.
-    """
+    """Return the network page."""
     return render_visualization_page(request, pk, embed=False)
 
 
@@ -76,14 +75,14 @@ def view_visualization(request, pk, slug):
 @never_cache
 def new_visualization(request):
     demo_viz = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=5,
             clusters__count__lt=15,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:1]
+        .order_by("-date_published", "-date_modified", "-date_created")[:1]
     )
 
     context = {
@@ -172,7 +171,7 @@ def delete_visualization(request):
         return HttpResponse("It worked.")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -187,7 +186,7 @@ def restore_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -201,7 +200,7 @@ def share_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -215,7 +214,7 @@ def privatize_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -224,28 +223,28 @@ def mapper_homepage(request):
         tally_stat("visualization.scotus_homepage_loaded")
 
     visualizations = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:2]
+        .order_by("-date_published", "-date_modified", "-date_created")[:2]
     )
 
     return render(
         request,
         "visualization_home.html",
-        {"visualizations": visualizations, "private": False,},
+        {"visualizations": visualizations, "private": False},
     )
 
 
 @never_cache
 def gallery(request):
     visualizations = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
-        .order_by("-date_published", "-date_modified", "-date_created",)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
+        .order_by("-date_published", "-date_modified", "-date_created")
     )
     paginator = Paginator(visualizations, 5)
     page = request.GET.get("page", 1)
@@ -256,5 +255,7 @@ def gallery(request):
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
     return render(
-        request, "gallery.html", {"results": paged_vizes, "private": False,}
+        request,
+        "gallery.html",
+        {"results": paged_vizes, "private": False},
     )

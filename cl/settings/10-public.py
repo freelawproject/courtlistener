@@ -14,7 +14,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 
 from cl.lib.redis_utils import make_redis_interface
 
-INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..",)
+INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
@@ -311,7 +311,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour",},
+    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Doing a background check service, we told them we didn't want to work
@@ -505,7 +505,7 @@ LOGGING = {
         },
     },
     "handlers": {
-        "null": {"level": "DEBUG", "class": "logging.NullHandler",},
+        "null": {"level": "DEBUG", "class": "logging.NullHandler"},
         "console": {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
@@ -542,7 +542,7 @@ LOGGING = {
             "propagate": False,
         },
         # This is the one that's used practically everywhere in the code.
-        "cl": {"handlers": ["log_file"], "level": "INFO", "propagate": True,},
+        "cl": {"handlers": ["log_file"], "level": "INFO", "propagate": True},
     },
 }
 

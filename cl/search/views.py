@@ -93,7 +93,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
 
 
 def do_search(
-    get_params, rows=20, override_params=None, facet=True, cache_key=None,
+    get_params, rows=20, override_params=None, facet=True, cache_key=None
 ):
     """Do all the difficult solr work.
 
@@ -267,17 +267,17 @@ def get_homepage_stats():
             as_dict=True,
         )["d"],
         "viz_in_last_ten": SCOTUSMap.objects.filter(
-            date_published__gte=ten_days_ago, published=True,
+            date_published__gte=ten_days_ago, published=True
         ).count(),
         "visualizations": SCOTUSMap.objects.filter(
-            published=True, deleted=False,
+            published=True, deleted=False
         )
-        .annotate(Count("clusters"),)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:1],
+        .order_by("-date_published", "-date_modified", "-date_created")[:1],
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
@@ -456,7 +456,7 @@ def advanced(request):
         o_results = do_search(
             request.GET.copy(),
             rows=1,
-            override_params={"type": obj_type,},
+            override_params={"type": obj_type},
             facet=True,
             cache_key="opinion-homepage-results",
         )
@@ -468,7 +468,7 @@ def advanced(request):
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
             courts = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True,
+                pacer_court_id__isnull=False, end_date__isnull=True
             ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT

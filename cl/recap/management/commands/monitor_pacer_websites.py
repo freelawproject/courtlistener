@@ -105,7 +105,7 @@ def iterate_and_log_courts(courts):
             logger.error(
                 "After %s seconds and %s tries, failed to access %s's PACER "
                 "website from our server, but got it via our proxy each time."
-                % ((now() - t1).seconds, try_number, court.pk,)
+                % ((now() - t1).seconds, try_number, court.pk)
             )
 
 

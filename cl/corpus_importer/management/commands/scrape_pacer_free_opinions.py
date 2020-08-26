@@ -42,8 +42,8 @@ def get_next_date_range(court_id, span=7):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         last_completion_log = (
-            PACERFreeDocumentLog.objects.filter(court_id=court_id,)
-            .exclude(status=PACERFreeDocumentLog.SCRAPE_FAILED,)
+            PACERFreeDocumentLog.objects.filter(court_id=court_id)
+            .exclude(status=PACERFreeDocumentLog.SCRAPE_FAILED)
             .latest("date_queried")
         )
     except PACERFreeDocumentLog.DoesNotExist:
@@ -91,13 +91,16 @@ def get_and_save_free_document_reports(options):
     PACERFreeDocumentLog.objects.filter(
         date_started__lt=three_hrs_ago,
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
-    ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED,)
+    ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
     cl_court_ids = (
         Court.federal_courts.district_pacer_courts()
-        .filter(in_use=True, end_date=None,)
-        .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"],)
-        .values_list("pk", flat=True,)
+        .filter(
+            in_use=True,
+            end_date=None,
+        )
+        .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"])
+        .values_list("pk", flat=True)
     )
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
     today = now()
@@ -114,7 +117,7 @@ def get_and_save_free_document_reports(options):
             mark_court_in_progress(pacer_court_id, next_end_d)
             try:
                 status = get_and_save_free_document_report(
-                    pacer_court_id, next_start_d, next_end_d,
+                    pacer_court_id, next_start_d, next_end_d
                 )
             except RequestException:
                 logger.error(
@@ -215,7 +218,7 @@ def do_ocr(options):
     """Do the OCR for any items that need it, then save to the solr index."""
     q = options["queue"]
     rds = (
-        RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED,)
+        RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED)
         .values_list("pk", flat=True)
         .order_by()
     )

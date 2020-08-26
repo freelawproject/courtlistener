@@ -43,22 +43,48 @@ class UserProfile(models.Model):
         verbose_name="the bar memberships held by the user",
         blank=True,
     )
-    stub_account = models.BooleanField(default=False,)
-    employer = models.CharField(
-        help_text="the user's employer", max_length=100, blank=True, null=True,
+    stub_account = models.BooleanField(
+        default=False,
     )
-    address1 = models.CharField(max_length=100, blank=True, null=True,)
-    address2 = models.CharField(max_length=100, blank=True, null=True,)
-    city = models.CharField(max_length=50, blank=True, null=True,)
-    state = models.CharField(max_length=2, blank=True, null=True,)
-    zip_code = models.CharField(max_length=10, blank=True, null=True,)
+    employer = models.CharField(
+        help_text="the user's employer",
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    address1 = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    address2 = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+    city = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+    )
+    state = models.CharField(
+        max_length=2,
+        blank=True,
+        null=True,
+    )
+    zip_code = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+    )
     avatar = models.ImageField(
         help_text="the user's avatar",
         upload_to="avatars/%Y/%m/%d",
         blank=True,
     )
     wants_newsletter = models.BooleanField(
-        help_text="This user wants newsletters", default=False,
+        help_text="This user wants newsletters",
+        default=False,
     )
     unlimited_docket_alerts = models.BooleanField(
         help_text="Should the user get unlimited docket alerts?",
@@ -68,17 +94,21 @@ class UserProfile(models.Model):
         help_text="should the alert should be sent in plaintext",
         default=False,
     )
-    activation_key = models.CharField(max_length=40,)
+    activation_key = models.CharField(
+        max_length=40,
+    )
     key_expires = models.DateTimeField(
         help_text="The time and date when the user's activation_key expires",
         blank=True,
         null=True,
     )
     email_confirmed = models.BooleanField(
-        help_text="The user has confirmed their email address", default=False,
+        help_text="The user has confirmed their email address",
+        default=False,
     )
     notes = models.TextField(
-        help_text="Any notes about the user.", blank=True,
+        help_text="Any notes about the user.",
+        blank=True,
     )
     is_tester = models.BooleanField(
         help_text="The user tests new features before they are finished",
@@ -89,8 +119,8 @@ class UserProfile(models.Model):
     def total_donated_last_year(self):
         one_year_ago = now() - timedelta(days=365)
         total = (
-            self.user.donations.filter(date_created__gte=one_year_ago,)
-            .exclude(status__in=donation_exclusion_codes,)
+            self.user.donations.filter(date_created__gte=one_year_ago)
+            .exclude(status__in=donation_exclusion_codes)
             .aggregate(Sum("amount"))["amount__sum"]
         )
         if total is None:

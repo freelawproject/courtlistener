@@ -92,7 +92,7 @@ def create_stub_account(user_data, profile_data):
 
 
 def convert_to_stub_account(user):
-    """ Set all fields to as blank as possible.
+    """Set all fields to as blank as possible.
 
     :param user: The user to operate on.
     :return: The new user object.

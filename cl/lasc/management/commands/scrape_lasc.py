@@ -46,7 +46,7 @@ def add_or_update_case(options):
         )
     else:
         tasks.add_or_update_case_db.apply_async(
-            kwargs={"case_id": options["case"]}, queue=options["queue"],
+            kwargs={"case_id": options["case"]}, queue=options["queue"]
         )
 
 
@@ -182,10 +182,10 @@ class Command(VerboseCommand):
         today = date.today()
         start = today - timedelta(days=7)
         parser.add_argument(
-            "--start", default=start, type=valid_date, help="Start Date",
+            "--start", default=start, type=valid_date, help="Start Date"
         )
         parser.add_argument(
-            "--end", default=today, type=valid_date, help="End Date",
+            "--end", default=today, type=valid_date, help="End Date"
         )
 
     def handle(self, *args, **options):

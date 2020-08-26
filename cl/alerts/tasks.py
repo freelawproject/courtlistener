@@ -51,7 +51,7 @@ def send_docket_alert(d_pk, since):
     :return: None
     """
     email_addresses = (
-        User.objects.filter(docket_alerts__docket_id=d_pk,)
+        User.objects.filter(docket_alerts__docket_id=d_pk)
         .distinct()
         .values_list("email", flat=True)
     )

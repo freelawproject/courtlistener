@@ -30,8 +30,8 @@ class MagicException(Exception):
 
 class Magic:
     """
-    Magic is a wrapper around the libmagic C library.  
-    
+    Magic is a wrapper around the libmagic C library.
+
     """
 
     def __init__(self, mime=False, magic_file=None, mime_encoding=False):
@@ -41,7 +41,7 @@ class Magic:
         mime - if True, mimetypes are returned instead of textual descriptions
         mime_encoding - if True, codec is returned
         magic_file - use a mime database other than the system default
-        
+
         """
         flags = MAGIC_NONE
         if mime:

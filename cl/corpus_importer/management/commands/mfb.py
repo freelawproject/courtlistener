@@ -24,7 +24,7 @@ def do_bulk_export(options):
             logger.info("Doing item %s with pk %s", i, d_pk)
         throttle.maybe_wait()
         save_ia_docket_to_disk.apply_async(
-            args=(d_pk, options["output_directory"]), queue=q,
+            args=(d_pk, options["output_directory"]), queue=q
         )
 
 

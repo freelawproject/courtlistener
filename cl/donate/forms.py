@@ -42,7 +42,7 @@ class DecimalOrOtherChoiceField(forms.ChoiceField):
 
 
 class ProfileForm(ModelForm):
-    wants_newsletter = forms.BooleanField(required=False,)
+    wants_newsletter = forms.BooleanField(required=False)
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
@@ -112,7 +112,7 @@ class DonationForm(ModelForm):
         initial="monthly",
     )
     amount = DecimalOrOtherChoiceField(
-        widget=forms.RadioSelect, choices=AMOUNTS, initial="50",
+        widget=forms.RadioSelect, choices=AMOUNTS, initial="50"
     )
     placeholder = "Amount (min $%s)" % settings.MIN_DONATION["docket_alerts"]
     amount_other = forms.DecimalField(

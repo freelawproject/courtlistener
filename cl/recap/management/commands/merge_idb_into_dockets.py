@@ -101,7 +101,7 @@ class Command(VerboseCommand, CommandUtils):
                     "%s: Creating new docket for IDB row: %s", i, idb_row
                 )
                 create_new_docket_from_idb.apply_async(
-                    args=(idb_row.pk,), queue=q,
+                    args=(idb_row.pk,), queue=q
                 )
 
             elif count == 1:
@@ -128,7 +128,7 @@ class Command(VerboseCommand, CommandUtils):
         algorithmic selection.
         """
         idb_rows = FjcIntegratedDatabase.objects.filter(
-            dataset_source=CV_2017, docket__isnull=True,
+            dataset_source=CV_2017, docket__isnull=True
         ).order_by("pk")
         for i, idb_row in enumerate(queryset_generator(idb_rows)):
             # Iterate over all items in the IDB and find them in the Docket
@@ -216,7 +216,7 @@ class Command(VerboseCommand, CommandUtils):
         disabled during the first pass. With this method, we update any items
         that are missing their pacer case ID value.
         """
-        ds = Docket.objects.filter(idb_data__isnull=False, pacer_case_id=None,)
+        ds = Docket.objects.filter(idb_data__isnull=False, pacer_case_id=None)
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
         session = PacerSession(

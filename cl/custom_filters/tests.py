@@ -49,9 +49,7 @@ class TestNaturalDuration(TestCase):
             ("90061", "1:01:01:01"),
         )
         for test, result in test_cases:
-            self.assertEqual(
-                naturalduration(test), result,
-            )
+            self.assertEqual(naturalduration(test), result)
 
     def test_input_as_int_or_str(self):
         """Can we take input as either an int or a str?"""
@@ -60,9 +58,7 @@ class TestNaturalDuration(TestCase):
             (62, "1:02"),
         )
         for test, result in test_cases:
-            self.assertEqual(
-                naturalduration(test), result,
-            )
+            self.assertEqual(naturalduration(test), result)
 
     def test_conversion_to_dict(self):
         """Can we get the numbers right when it's a dict?"""
@@ -111,9 +107,7 @@ class TestExtras(TestCase):
     def test_get_full_host(self):
         """Does get_full_host return the right values"""
         c = Context({"request": self.factory.request()})
-        self.assertEqual(
-            get_full_host(c), "http://testserver",
-        )
+        self.assertEqual(get_full_host(c), "http://testserver")
 
         self.assertEqual(
             get_full_host(c, username="billy", password="crystal"),
@@ -178,6 +172,4 @@ class TestExtras(TestCase):
         obj["date_start"] = d
         obj["date_granularity_start"] = GRANULARITY_DAY
 
-        self.assertEqual(
-            granular_date(obj, "date_start"), "Unknown",
-        )
+        self.assertEqual(granular_date(obj, "date_start"), "Unknown")

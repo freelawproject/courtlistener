@@ -24,11 +24,11 @@ urlpatterns = [
     # Redirects
     url(
         r"^privacy/$",
-        RedirectView.as_view(url="/terms/#privacy", permanent=True,),
+        RedirectView.as_view(url="/terms/#privacy", permanent=True),
     ),
     url(
         r"^removal/$",
-        RedirectView.as_view(url="/terms/#removal", permanent=True,),
+        RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
     url(
         r"^report/2010/$",

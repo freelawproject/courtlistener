@@ -86,7 +86,10 @@ class UpdateIndexCommandTest(SolrTestCase):
             self.expected_num_results_opinion,
             msg="Did not get expected number of results.\n"
             "\tGot:\t%s\n\tExpected:\t %s"
-            % (actual_count, self.expected_num_results_opinion,),
+            % (
+                actual_count,
+                self.expected_num_results_opinion,
+            ),
         )
 
         # Check a simple citation query
@@ -98,7 +101,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
             "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count,),
+            % (actual_count, expected_citation_count),
         )
 
         # Next, we delete everything from Solr
@@ -121,7 +124,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             expected_citation_count,
             msg="Did not get the expected number of counts in empty index.\n"
             "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count,),
+            % (actual_count, expected_citation_count),
         )
 
         # Add things back, but do it by ID
@@ -147,7 +150,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
             "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count,),
+            % (actual_count, expected_citation_count),
         )
 
 
@@ -222,7 +225,7 @@ class ModelTest(TestCase):
         """Do chained filters work?"""
         expected_count = 1
         cluster_count = (
-            OpinionCluster.objects.filter(citation="22 U.S. 44",)
+            OpinionCluster.objects.filter(citation="22 U.S. 44")
             .exclude(
                 # Note this doesn't actually exclude anything,
                 # but it helps ensure chaining is working.
@@ -233,8 +236,8 @@ class ModelTest(TestCase):
         self.assertEqual(cluster_count, expected_count)
 
         cluster_count = (
-            OpinionCluster.objects.filter(citation="22 U.S. 44",)
-            .filter(docket__case_name=u"Blah",)
+            OpinionCluster.objects.filter(citation="22 U.S. 44")
+            .filter(docket__case_name=u"Blah")
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
@@ -289,7 +292,7 @@ class IndexingTest(EmptySolrTestCase):
             pacer_case_id="asdf",
             court_id="test",
         )
-        de = DocketEntry.objects.create(docket=d, entry_number=1,)
+        de = DocketEntry.objects.create(docket=d, entry_number=1)
         rd1 = RECAPDocument.objects.create(
             docket_entry=de,
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -332,15 +335,14 @@ class SearchTest(IndexedSolrTestCase):
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "case_name": "honda",}
+            reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
         self.assertIn("Honda", r.content)
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get(
-            reverse("show_results"),
-            {"q": " ", "judge": " ", "case_name": " ",},
+            reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
         )
         self.assertIn("Honda", r.content)
         self.assertNotIn("an error", r.content)
@@ -349,7 +351,7 @@ class SearchTest(IndexedSolrTestCase):
         """Does querying by date work?"""
         response = self.client.get(
             reverse("show_results"),
-            {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01",},
+            {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
         )
         self.assertIn("Honda", response.content)
 
@@ -358,11 +360,11 @@ class SearchTest(IndexedSolrTestCase):
         the wrong facets exclude it?
         """
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "court_test": "on",}
+            reverse("show_results"), {"q": "*", "court_test": "on"}
         )
         self.assertIn("Honda", r.content)
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "stat_Errata": "on",}
+            reverse("show_results"), {"q": "*", "stat_Errata": "on"}
         )
         self.assertNotIn("Honda", r.content)
         self.assertIn("Debbas", r.content)
@@ -384,7 +386,7 @@ class SearchTest(IndexedSolrTestCase):
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "neutral_cite": "22",}
+            reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
         self.assertIn("Honda", r.content)
 
@@ -392,7 +394,7 @@ class SearchTest(IndexedSolrTestCase):
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "filed_after": "1890",}
+            reverse("show_results"), {"q": "*", "filed_after": "1890"}
         )
         self.assertEqual(200, r.status_code)
 
@@ -402,20 +404,20 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"), {"q": "*", "judge": "david"}
         )
         self.assertIn("Honda", r.content)
-        r = self.client.get(reverse("show_results"), {"q": "judge:david",})
+        r = self.client.get(reverse("show_results"), {"q": "judge:david"})
         self.assertIn("Honda", r.content)
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
         r = self.client.get(
-            reverse("show_results"), {"q": 'suitNature:"copyright"',}
+            reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
         self.assertIn("Honda", r.content)
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "cited_lt": 7, "cited_gt": 5,}
+            reverse("show_results"), {"q": "*", "cited_lt": 7, "cited_gt": 5}
         )
         self.assertIn(
             "Honda",
@@ -432,7 +434,7 @@ class SearchTest(IndexedSolrTestCase):
     def test_citation_ordering(self):
         """Can the results be re-ordered by citation count?"""
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "order_by": "citeCount desc",}
+            reverse("show_results"), {"q": "*", "order_by": "citeCount desc"}
         )
         most_cited_name = "case name cluster 3"
         less_cited_name = "Howard v. Honda"
@@ -458,7 +460,7 @@ class SearchTest(IndexedSolrTestCase):
         ordered randomly, but we can at least make sure the query succeeds.
         """
         r = self.client.get(
-            reverse("show_results"), {"q": "*", "order_by": "random_123 desc",}
+            reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
         self.assertNotIn("an error", r.content)
 
@@ -554,7 +556,7 @@ class SearchTest(IndexedSolrTestCase):
     def test_fail_gracefully(self):
         """Do we fail gracefully when an invalid search is created?"""
         response = self.client.get(
-            reverse("show_results"), {"neutral_cite": "-",}
+            reverse("show_results"), {"neutral_cite": "-"}
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(
@@ -611,12 +613,12 @@ class SearchTest(IndexedSolrTestCase):
         """
         r = self.client.get(
             reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "document_number": "1",},
+            {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
         r = self.client.get(
             reverse("show_results"),
-            {"type": SEARCH_TYPES.RECAP, "attachment_number": "1",},
+            {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
@@ -629,7 +631,7 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.OPINION, "q": "supra, at 22"},
         )
         for param in params:
-            r = self.client.get(reverse("show_results"), param,)
+            r = self.client.get(reverse("show_results"), param)
             self.assertEqual(
                 r.status_code,
                 HTTP_200_OK,
@@ -798,7 +800,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "filter applied.\n"
             "Expected: %s\n"
             "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params,),
+            "Params were: %s" % (field_name, expected_count, got, params),
         )
 
     def test_name_field(self):
@@ -877,10 +879,10 @@ class JudgeSearchTest(IndexedSolrTestCase):
 
     def test_schools_filter(self):
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school",
+            {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school"
         )
         self._test_article_count(
-            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school",
+            {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school"
         )
 
     def test_appointer_filter(self):
@@ -1074,7 +1076,7 @@ class PagerankTest(TestCase):
             self.assertTrue(
                 abs(pr_results[key] - value) < 0.0001,
                 msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key],),
+                "%s" % (key, pr_results[key], answers[key]),
             )
 
 
@@ -1461,7 +1463,7 @@ class CaptionTest(TestCase):
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1471,7 +1473,7 @@ class CaptionTest(TestCase):
             page="44",
         )
         self.assertEqual(
-            "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)", cluster.caption,
+            "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)", cluster.caption
         )
 
     def test_scotus_caption(self):
@@ -1480,7 +1482,7 @@ class CaptionTest(TestCase):
         )
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
         Citation.objects.create(
             cluster=cluster,
@@ -1489,15 +1491,13 @@ class CaptionTest(TestCase):
             reporter="U.S.",
             page="44",
         )
-        self.assertEqual(
-            "foo, 22 U.S. 44", cluster.caption,
-        )
+        self.assertEqual("foo, 22 U.S. 44", cluster.caption)
 
     def test_neutral_cites(self):
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
-            case_name="foo", docket=d, date_filed=date(1984, 1, 1),
+            case_name="foo", docket=d, date_filed=date(1984, 1, 1)
         )
         Citation.objects.create(
             cluster=cluster,

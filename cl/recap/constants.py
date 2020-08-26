@@ -11,7 +11,7 @@ APP_OLD = 5
 APP_2017 = 6
 BANKR_2017 = 7
 DATASET_SOURCES = (
-    (CV_OLD, "Civil cases filed and terminated from SY 1970 through SY 1987",),
+    (CV_OLD, "Civil cases filed and terminated from SY 1970 through SY 1987"),
     (
         CV_2017,
         "Civil cases filed, terminated, and pending from SY 1988 "
@@ -60,13 +60,21 @@ IDB_FIELD_DATA = {
         "field": "district",
         "type": Court,
     },
-    "OFFICE": {"sources": [CV_2017, CR_2017], "field": "office", "type": str,},
+    "OFFICE": {
+        "sources": [CV_2017, CR_2017],
+        "field": "office",
+        "type": str,
+    },
     "DOCKET": {
         "sources": [CV_2017, CR_2017],
         "field": "docket_number",
         "type": str,
     },
-    "ORIGIN": {"sources": [CV_2017], "field": "origin", "type": int,},
+    "ORIGIN": {
+        "sources": [CV_2017],
+        "field": "origin",
+        "type": int,
+    },
     "FILEDATE": {
         "sources": [CV_2017, CR_2017],
         "field": "date_filed",
@@ -88,11 +96,31 @@ IDB_FIELD_DATA = {
         "type": int,
     },
     # Civil only
-    "JURIS": {"sources": [CV_2017], "field": "jurisdiction", "type": int,},
-    "NOS": {"sources": [CV_2017], "field": "nature_of_suit", "type": int,},
-    "TITL": {"sources": [CV_2017], "field": "title", "type": str,},
-    "SECTION": {"sources": [CV_2017], "field": "section", "type": str,},
-    "SUBSECTION": {"sources": [CV_2017], "field": "subsection", "type": str,},
+    "JURIS": {
+        "sources": [CV_2017],
+        "field": "jurisdiction",
+        "type": int,
+    },
+    "NOS": {
+        "sources": [CV_2017],
+        "field": "nature_of_suit",
+        "type": int,
+    },
+    "TITL": {
+        "sources": [CV_2017],
+        "field": "title",
+        "type": str,
+    },
+    "SECTION": {
+        "sources": [CV_2017],
+        "field": "section",
+        "type": str,
+    },
+    "SUBSECTION": {
+        "sources": [CV_2017],
+        "field": "subsection",
+        "type": str,
+    },
     "RESIDENC": {
         "sources": [CV_2017],
         "field": "diversity_of_residence",
@@ -114,8 +142,16 @@ IDB_FIELD_DATA = {
         "field": "multidistrict_litigation_docket_number",
         "type": str,
     },
-    "PLT": {"sources": [CV_2017], "field": "plaintiff", "type": str,},
-    "DEF": {"sources": [CV_2017], "field": "defendant", "type": str,},
+    "PLT": {
+        "sources": [CV_2017],
+        "field": "plaintiff",
+        "type": str,
+    },
+    "DEF": {
+        "sources": [CV_2017],
+        "field": "defendant",
+        "type": str,
+    },
     "TRANSOFF": {
         "sources": [CV_2017],
         "field": "transfer_office",
@@ -146,22 +182,42 @@ IDB_FIELD_DATA = {
         "field": "procedural_progress",
         "type": int,
     },
-    "DISP": {"sources": [CV_2017], "field": "disposition", "type": int,},
+    "DISP": {
+        "sources": [CV_2017],
+        "field": "disposition",
+        "type": int,
+    },
     "NOJ": {
         "sources": [CV_2017],
         "field": "nature_of_judgement",
         "type": int,
     },
-    "AMTREC": {"sources": [CV_2017], "field": "amount_received", "type": int,},
-    "JUDGMENT": {"sources": [CV_2017], "field": "judgment", "type": int,},
-    "PROSE": {"sources": [CV_2017], "field": "pro_se", "type": int,},
+    "AMTREC": {
+        "sources": [CV_2017],
+        "field": "amount_received",
+        "type": int,
+    },
+    "JUDGMENT": {
+        "sources": [CV_2017],
+        "field": "judgment",
+        "type": int,
+    },
+    "PROSE": {
+        "sources": [CV_2017],
+        "field": "pro_se",
+        "type": int,
+    },
     # Criminal only
     "D2FOFFCD1": {
         "sources": [CR_2017],
         "field": "nature_of_offense",
         "type": str,
     },
-    "VER": {"sources": [CR_2017], "field": "version", "type": int,},
+    "VER": {
+        "sources": [CR_2017],
+        "field": "version",
+        "type": int,
+    },
     "TRANOFF": {
         "sources": [CR_2017],
         "field": "transfer_office",
