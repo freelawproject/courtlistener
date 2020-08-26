@@ -49,9 +49,9 @@ class Favorite(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        auto_now=True, db_index=True, null=True,
+        auto_now=True, db_index=True, null=True
     )
-    name = models.CharField("a name for the alert", max_length=100,)
+    name = models.CharField("a name for the alert", max_length=100)
     notes = models.TextField(
         "notes about the favorite",
         validators=[MaxLengthValidator(500)],
@@ -75,7 +75,7 @@ class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
     docket = models.ForeignKey(
-        Docket, related_name="docket_tags", on_delete=models.CASCADE,
+        Docket, related_name="docket_tags", on_delete=models.CASCADE
     )
     tag = models.ForeignKey(
         "favorites.UserTag",
@@ -114,11 +114,11 @@ class UserTag(models.Model):
         blank=True,
     )
     name = models.SlugField(
-        help_text="The name of the tag", max_length=50, db_index=True,
+        help_text="The name of the tag", max_length=50, db_index=True
     )
-    title = models.TextField(help_text="A title for the tag", blank=True,)
+    title = models.TextField(help_text="A title for the tag", blank=True)
     description = models.TextField(
-        help_text="The description of the tag in Markdown format", blank=True,
+        help_text="The description of the tag in Markdown format", blank=True
     )
     view_count = models.IntegerField(
         help_text="The number of times the URL for the tag has been seen.",

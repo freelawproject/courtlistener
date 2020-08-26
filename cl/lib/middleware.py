@@ -7,7 +7,7 @@ from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE
 
 
 class MaintenanceModeMiddleware(MiddlewareMixin):
-    """ Provides maintenance mode if requested in settings.
+    """Provides maintenance mode if requested in settings.
 
     This cribs heavily from:
       - https://github.com/fabiocaccamo/django-maintenance-mode

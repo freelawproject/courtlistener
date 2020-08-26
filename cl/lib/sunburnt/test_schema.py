@@ -66,9 +66,12 @@ samples_from_strings = {
 
 
 def check_solr_date_from_date(s, date, canonical_date):
-    assert unicode(solr_date(date)) == s, (
-        "Unequal representations of %r: %r and %r"
-        % (date, unicode(solr_date(date)), s)
+    assert (
+        unicode(solr_date(date)) == s
+    ), "Unequal representations of %r: %r and %r" % (
+        date,
+        unicode(solr_date(date)),
+        s,
     )
     check_solr_date_from_string(s, canonical_date)
 
@@ -114,7 +117,7 @@ class TestReadingSchema(object):
         self.s = SolrSchema(self.schema)
 
     def test_read_schema(self):
-        """ Test that we can read in a schema correctly,
+        """Test that we can read in a schema correctly,
         that we get the right set of fields, the right
         default field, and the right unique key"""
         assert set(self.s.fields.keys()) == {
@@ -126,7 +129,7 @@ class TestReadingSchema(object):
         assert self.s.unique_key == "int_field"
 
     def test_serialize_dict(self):
-        """ Test that each of the fields will serialize the relevant
+        """Test that each of the fields will serialize the relevant
         datatype appropriately."""
         for k, v, v2 in (
             ("int_field", 1, u"1"),

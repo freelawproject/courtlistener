@@ -407,7 +407,7 @@ def extract_id_citation(words, id_index):
 
     # List of literals that could come after an id token
     ID_REFERENCE_TOKEN_LITERALS = set(
-        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶",]
+        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶"]
     )
 
     # Helper function to see whether a token qualifies as a page candidate
@@ -510,7 +510,7 @@ def disambiguate_reporters(citations):
                             ],
                             citation.year,
                         ):
-                            possible_citations.append((citation.reporter, i,))
+                            possible_citations.append((citation.reporter, i))
                     if len(possible_citations) == 1:
                         # We were able to identify only one hit
                         # after filtering by year.
@@ -583,7 +583,7 @@ def disambiguate_reporters(citations):
                         key = REPORTERS[EDITIONS[reporter_key]]
                         cite_year = citation.year
                         if is_date_in_reporter(key[i]["editions"], cite_year):
-                            possible_citations.append((reporter_key, i,))
+                            possible_citations.append((reporter_key, i))
                 if len(possible_citations) == 1:
                     # We were able to identify only one hit after filtering by
                     # year.

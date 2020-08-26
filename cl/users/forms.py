@@ -26,13 +26,13 @@ class ProfileForm(ModelForm):
     state = USStateField(
         widget=forms.Select(
             choices=STATE_CHOICES,
-            attrs={"class": "form-control", "autocomplete": "address-level1",},
+            attrs={"class": "form-control", "autocomplete": "address-level1"},
         ),
         required=False,
     )
     zip_code = USZipCodeField(
         widget=forms.TextInput(
-            attrs={"class": "form-control", "autocomplete": "postal-code",}
+            attrs={"class": "form-control", "autocomplete": "postal-code"}
         ),
         required=False,
     )
@@ -86,7 +86,7 @@ class UserForm(ModelForm):
     email = forms.EmailField(
         required=True,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "autocomplete": "email",}
+            attrs={"class": "form-control", "autocomplete": "email"}
         ),
     )
 
@@ -99,10 +99,10 @@ class UserForm(ModelForm):
         )
         widgets = {
             "first_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "given-name",}
+                attrs={"class": "form-control", "autocomplete": "given-name"}
             ),
             "last_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "family-name",}
+                attrs={"class": "form-control", "autocomplete": "family-name"}
             ),
         }
 
@@ -140,23 +140,21 @@ class UserCreationFormExtended(UserCreationForm):
             field.widget.attrs.update({"class": "form-control"})
 
         self.fields["username"].widget.attrs.update(
-            {"class": "form-control", "autocomplete": "username",}
+            {"class": "form-control", "autocomplete": "username"}
         )
         self.fields["email"].required = True
-        self.fields["email"].widget.attrs.update(
-            {"autocomplete": "email",}
-        )
+        self.fields["email"].widget.attrs.update({"autocomplete": "email"})
         self.fields["password1"].widget.attrs.update(
-            {"autocomplete": "new-password",}
+            {"autocomplete": "new-password"}
         )
         self.fields["password2"].widget.attrs.update(
-            {"autocomplete": "new-password",}
+            {"autocomplete": "new-password"}
         )
         self.fields["first_name"].widget.attrs.update(
-            {"autocomplete": "given-name",}
+            {"autocomplete": "given-name"}
         )
         self.fields["last_name"].widget.attrs.update(
-            {"autocomplete": "family-name",}
+            {"autocomplete": "family-name"}
         )
 
     class Meta:
@@ -220,13 +218,13 @@ class CustomPasswordChangeForm(PasswordChangeForm):
     new_password1 = forms.CharField(
         label="New password",
         widget=forms.PasswordInput(
-            attrs={"class": "form-control", "autocomplete": "new-password",}
+            attrs={"class": "form-control", "autocomplete": "new-password"}
         ),
     )
     new_password2 = forms.CharField(
         label="New password confirmation",
         widget=forms.PasswordInput(
-            attrs={"class": "form-control", "autocomplete": "new-password",}
+            attrs={"class": "form-control", "autocomplete": "new-password"}
         ),
     )
 
@@ -276,5 +274,5 @@ class CustomSetPasswordForm(SetPasswordForm):
             }
         )
         self.fields["new_password2"].widget.attrs.update(
-            {"class": "form-control", "autocomplete": "new-password",}
+            {"class": "form-control", "autocomplete": "new-password"}
         )

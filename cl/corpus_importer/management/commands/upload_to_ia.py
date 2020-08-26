@@ -27,8 +27,8 @@ def upload_pdfs_to_internet_archive(options, do_non_free=False):
             is_available=True,
             filepath_ia="",
         )
-        .exclude(filepath_local="",)
-        .values_list("pk", flat=True,)
+        .exclude(filepath_local="")
+        .values_list("pk", flat=True)
         .order_by()
     )
     if do_non_free:

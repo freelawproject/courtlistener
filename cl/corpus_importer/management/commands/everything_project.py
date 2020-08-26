@@ -58,7 +58,7 @@ def get_fjc_rows():
     ]
     items = FjcIntegratedDatabase.objects.exclude(
         nature_of_suit__in=nos_exclusions,
-    ).filter(date_filed__gte="2014-01-01", dataset_source=CV_2017,)
+    ).filter(date_filed__gte="2014-01-01", dataset_source=CV_2017)
     return items
 
 
@@ -200,10 +200,13 @@ class Command(VerboseCommand):
         elif options["task"] == "price_sample_50":
             price_sample(options, "50")
         elif options["task"] == "2018_only":
+            # Goes through to 2019-09-30
             get_content_by_year(options, 2018)
         elif options["task"] == "2017_only":
+            # Done and billed.
             get_content_by_year(options, 2017)
         elif options["task"] == "2016_only":
+            # Done and billed.
             get_content_by_year(options, 2016)
         else:
             print("Unknown task: %s" % options["task"])

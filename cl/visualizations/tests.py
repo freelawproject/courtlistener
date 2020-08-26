@@ -189,7 +189,7 @@ class TestViews(TestCase):
         self.assertNotIn(b"My Private Visualization", response.context)
 
     def test_view_counts_increment_by_one(self):
-        """ Test the view count for a Visualization increments on page view
+        """Test the view count for a Visualization increments on page view
 
         Ensure that the date_modified does not change.
         """
@@ -204,9 +204,7 @@ class TestViews(TestCase):
 
         viz.refresh_from_db(fields=["view_count", "date_modified"])
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            old_view_count + 1, viz.view_count,
-        )
+        self.assertEqual(old_view_count + 1, viz.view_count)
 
         self.assertEqual(
             old_date_modified,
@@ -234,7 +232,7 @@ class TestVizAjaxCrud(TestCase):
         JSONVersion.objects.all().delete()
 
     def _build_post(self, url, username=None, data=None):
-        """ Helper method to build authenticated AJAX POST
+        """Helper method to build authenticated AJAX POST
         Args:
             url: url pattern to request
             username: username for User to attach

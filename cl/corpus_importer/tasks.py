@@ -153,7 +153,7 @@ def generate_ia_json(d_pk, database="default"):
     attorney_prefetch = Prefetch(
         "parties__attorneys",
         queryset=Attorney.objects.filter(
-            roles__docket_id=d_pk, parties__id__in=party_ids,
+            roles__docket_id=d_pk, parties__id__in=party_ids
         )
         .distinct()
         .prefetch_related(
@@ -403,7 +403,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
             recap_sequence_number = make_recap_sequence_number(
-                {"date_filed": result.date_filed, "recap_sequence_index": 1,}
+                {"date_filed": result.date_filed, "recap_sequence_index": 1}
             )
             de.recap_sequence_number = (
                 de.recap_sequence_number or recap_sequence_number
@@ -587,7 +587,7 @@ def upload_pdf_to_ia(self, rd_pk):
 access_key = settings.IA_ACCESS_KEY
 secret_key = settings.IA_SECRET_KEY
 ia_session = ia.get_session(
-    {"s3": {"access": access_key, "secret": secret_key,}}
+    {"s3": {"access": access_key, "secret": secret_key}}
 )
 
 
@@ -710,7 +710,7 @@ def mark_court_done_on_date(status, court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id,
+            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
         ).latest("date_queried")
     except PACERFreeDocumentLog.DoesNotExist:
         return
@@ -894,7 +894,7 @@ def do_case_query_by_pacer_case_id(
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
-        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id,)
+        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -1028,7 +1028,7 @@ def get_docket_by_pacer_case_id(
     else:
         try:
             d = Docket.objects.get(
-                pacer_case_id=pacer_case_id, court_id=court_id,
+                pacer_case_id=pacer_case_id, court_id=court_id
             )
         except Docket.DoesNotExist:
             d = None
@@ -1128,7 +1128,7 @@ def get_appellate_docket_by_docket_number(
         return None
 
     try:
-        d = Docket.objects.get(docket_number=docket_number, court_id=court_id,)
+        d = Docket.objects.get(docket_number=docket_number, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -1545,7 +1545,7 @@ def get_pacer_doc_by_rd_and_description(
         document_number=rd.document_number,
         pacer_doc_id=att_found["pacer_doc_id"],
         document_type=document_type,
-        defaults={"date_upload": now(),},
+        defaults={"date_upload": now()},
     )
     # Replace the description if we have description data.
     # Else fallback on old.

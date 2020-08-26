@@ -13,11 +13,10 @@ if DEVELOPMENT:
 else:
     ALLOWED_HOSTS = ['127.0.0.1', '.courtlistener.com']
 
-ADMINS = (
-    ('Joe Schmoe', 'joe@courtlistener.com'),
-)
 
-MANAGERS = ADMINS
+MANAGERS = (
+   ('Joe Schmoe', 'joe@courtlistener.com'),
+)
 
 
 DATABASES = {

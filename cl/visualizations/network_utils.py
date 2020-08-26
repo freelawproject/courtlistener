@@ -55,7 +55,7 @@ def set_shortest_path_to_end(good_nodes, node_id, target_id):
         if current_length < previous_length:
             is_shorter = True
         good_nodes[node_id]["shortest_path"] = min(
-            current_length, previous_length,
+            current_length, previous_length
         )
     else:
         good_nodes[node_id] = {

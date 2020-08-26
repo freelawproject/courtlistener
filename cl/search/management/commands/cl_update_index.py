@@ -268,7 +268,7 @@ class Command(VerboseCommand):
                 chunk = []
                 sys.stdout.write(
                     "\rProcessed {}/{} ({:.0%})".format(
-                        processed_count, count, processed_count * 1.0 / count,
+                        processed_count, count, processed_count * 1.0 / count
                     )
                 )
                 self.stdout.flush()

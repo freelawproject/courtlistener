@@ -147,9 +147,9 @@ def view_donations(request):
 @never_cache
 def view_visualizations(request):
     visualizations = (
-        SCOTUSMap.objects.filter(user=request.user, deleted=False,)
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        SCOTUSMap.objects.filter(user=request.user, deleted=False)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -162,7 +162,7 @@ def view_visualizations(request):
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -172,10 +172,10 @@ def view_deleted_visualizations(request):
     thirty_days_ago = now() - timedelta(days=30)
     visualizations = (
         SCOTUSMap.objects.filter(
-            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago,
+            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago
         )
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -189,7 +189,7 @@ def view_deleted_visualizations(request):
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -354,7 +354,7 @@ def register(request):
             try:
                 stub_account = User.objects.filter(
                     profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"),)
+                ).get(email__iexact=request.POST.get("email"))
             except User.DoesNotExist:
                 stub_account = False
 

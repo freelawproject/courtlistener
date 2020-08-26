@@ -62,7 +62,7 @@ urlpatterns = [
         view_visualization,
         name="view_visualization",
     ),
-    url(r"^visualizations/gallery/$", gallery, name="viz_gallery",),
+    url(r"^visualizations/gallery/$", gallery, name="viz_gallery"),
     url(
         r"^sitemap-visualizations\.xml$",
         sitemap,

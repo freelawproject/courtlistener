@@ -29,7 +29,7 @@ class ContactTest(TestCase):
     }
 
     def test_multiple_requests_request(self):
-        """ Is state persisted in the contact form?
+        """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
         behavior when called multiple times. This test makes sure that that

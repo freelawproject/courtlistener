@@ -22,6 +22,7 @@ from cl.recap.mergers import (
     add_docket_entries,
     find_docket_object,
     update_docket_metadata,
+    add_bankruptcy_data_to_docket,
 )
 from cl.recap_rss.models import RssFeedStatus, RssItemCache, RssFeedData
 from cl.recap_rss.utils import emails
@@ -75,6 +76,8 @@ def get_last_build_date(s):
     In this case we considered using lxml & xpath, which was 1000× faster than
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
+
+    :param s: The content of the RSS feed as a string
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
@@ -83,6 +86,11 @@ def get_last_build_date(s):
         return None
     last_build_date_str = m.group(2)
     return parser.parse(last_build_date_str, fuzzy=False)
+
+
+def get_staleness(current_feed_date):
+    """Check how old an RSS feed is and return it as a timedelta"""
+    return now() - current_feed_date
 
 
 def mark_status(status_obj, status_value):
@@ -159,7 +167,25 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             return
 
     current_build_date = get_last_build_date(content)
-    if not current_build_date:
+    if current_build_date:
+        # Check for stale feeds, see: #1390
+        staleness_limit = timedelta(minutes=2 * 60)
+        staleness = get_staleness(current_build_date)
+        if staleness > staleness_limit:
+            logger.warning(
+                "Feed in '%s' has not updated in %s minutes, which is more "
+                "than the limit of %s minutes: %s"
+                % (
+                    feed_status.court_id,
+                    round(staleness.total_seconds() / 60, 2),
+                    staleness_limit.total_seconds() / 60,
+                    rss_feed.url,
+                )
+            )
+
+        feed_status.date_last_build = current_build_date
+        feed_status.save()
+    else:
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
@@ -169,9 +195,6 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.warning(str(exc))
             abort_or_retry(self, feed_status, exc)
             return
-    else:
-        feed_status.date_last_build = current_build_date
-        feed_status.save()
 
     # Only check for early abortion during partial crawls.
     if date_last_built == current_build_date and not feed_status.is_sweep:
@@ -243,19 +266,19 @@ def cache_hash(item_hash):
 
 
 @app.task(bind=True, max_retries=1)
-def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
+def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     """Merge the rss feed contents into CourtListener
 
     :param self: The Celery task
     :param feed_data: The data parameter of a PacerRssFeed object that has
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
-    :param feed_status_pk: The CL ID for the RSS status object.
-    :returns all_rds_created: A list of all the RDs created during the
-    processing.
+    :param metadata_only: Whether to only do metadata and skip docket entries.
+    :returns Dict containing keys:
+      d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
+      rds_for_solr: A list of RECAPDocument PKs for updating in Solr
     """
     start_time = now()
-    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
 
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
@@ -287,10 +310,14 @@ def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
                 d.pacer_case_id = docket["pacer_case_id"]
             try:
                 d.save()
+                add_bankruptcy_data_to_docket(d, docket)
             except IntegrityError as exc:
                 # The docket was created while we looked it up. Retry and it
                 # should associate with the new one instead.
                 raise self.retry(exc=exc)
+            if metadata_only:
+                continue
+
             rds_created, content_updated = add_docket_entries(
                 d, docket["docket_entries"]
             )
@@ -305,7 +332,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, feed_status_pk):
     logger.info(
         "%s: Sending %s new RECAP documents to Solr for indexing and "
         "sending %s dockets for alerts.",
-        feed_status.court_id,
+        court_pk,
         len(all_rds_created),
         len(d_pks_to_alert),
     )

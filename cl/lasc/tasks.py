@@ -135,9 +135,7 @@ def download_pdf(self, pdf_pk):
     )
 
     with transaction.atomic():
-        pdf_document.filepath_s3.save(
-            doc.document_type, ContentFile(pdf_data),
-        )
+        pdf_document.filepath_s3.save(doc.document_type, ContentFile(pdf_data))
 
         doc.is_available = True
         doc.save()
@@ -393,6 +391,4 @@ def save_json(data, content_obj):
     json_file = LASCJSON(content_object=content_obj)
     json_file.sha1 = sha1_of_json_data(data)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
-    json_file.filepath.save(
-        "lasc.json", ContentFile(data),
-    )
+    json_file.filepath.save("lasc.json", ContentFile(data))

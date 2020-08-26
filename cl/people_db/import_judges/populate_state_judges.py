@@ -140,7 +140,7 @@ def make_state_judge(item, testing=False):
             school = get_school(coll)
             if school is not None:
                 college = Education(
-                    person=person, school=school, degree_level="ba",
+                    person=person, school=school, degree_level="ba"
                 )
                 if not testing:
                     college.save()
@@ -155,7 +155,7 @@ def make_state_judge(item, testing=False):
             lschool = get_school(L)
             if lschool is not None:
                 lawschool = Education(
-                    person=person, school=lschool, degree_level="jd",
+                    person=person, school=lschool, degree_level="jd"
                 )
                 if not testing:
                     lawschool.save()

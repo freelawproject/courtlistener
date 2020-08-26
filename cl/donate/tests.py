@@ -19,8 +19,8 @@ from cl.donate.models import Donation, FREQUENCIES, PROVIDERS, MonthlyDonation
 from cl.donate.utils import emails
 
 stripe_test_numbers = {
-    "good": {"visa": "4242424242424242",},
-    "bad": {"cvc_fail": "4000000000000127",},
+    "good": {"visa": "4242424242424242"},
+    "bad": {"cvc_fail": "4000000000000127"},
 }
 
 
@@ -68,24 +68,19 @@ class DonationFormSubmissionTest(TestCase):
 
     def test_paypal_with_other_value_as_anonymous(self):
         """Can a paypal donation go through using the "Other" field?"""
-        self.params.update(
-            {"amount": "other", "amount_other": "5",}
-        )
-        r = self.client.post(reverse("donate"), self.params, follow=True,)
+        self.params.update({"amount": "other", "amount_other": "5"})
+        r = self.client.post(reverse("donate"), self.params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
     def test_paypal_with_regular_value_as_anonymous(self):
         """Can a stripe donation go through using the "Other" field?"""
-        self.params.update(
-            {"amount": "25",}
-        )
-        r = self.client.post(reverse("donate"), self.params, follow=True,)
+        self.params.update({"amount": "25"})
+        r = self.client.post(reverse("donate"), self.params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
 
 def get_stripe_event(fingerprint):
-    """ Get the stripe event so we can post it to the webhook
-    """
+    """Get the stripe event so we can post it to the webhook"""
     # We don't know the event ID, so we have to get the latest ones, then
     # filter...
     events = stripe.Event.all()
@@ -171,7 +166,7 @@ class StripeTest(TestCase):
         callback to our webhook, to make sure it accepts it properly.
         """
         token, r = self.make_a_donation(
-            stripe_test_numbers["good"]["visa"], amount="25",
+            stripe_test_numbers["good"]["visa"], amount="25"
         )
 
         self.assertEqual(
@@ -185,7 +180,7 @@ class StripeTest(TestCase):
         # Create a stripe token (this would normally be done via javascript in
         # the front end when the submit button was pressed)
         token, r = self.make_a_donation(
-            stripe_test_numbers["bad"]["cvc_fail"], amount="25",
+            stripe_test_numbers["bad"]["cvc_fail"], amount="25"
         )
         self.assertIn("Your card's security code is incorrect.", r.content)
         self.assertEventPostsCorrectly(token)

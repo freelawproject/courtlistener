@@ -40,7 +40,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
                     )
             elif not self.user_cache.is_active:
                 raise forms.ValidationError(
-                    self.error_messages["inactive"], code="inactive",
+                    self.error_messages["inactive"], code="inactive"
                 )
             elif not self.user_cache.profile.email_confirmed:
                 raise forms.ValidationError(

@@ -88,7 +88,7 @@ urlpatterns = [
         opinion_sitemap_maker,
         name="opinion_sitemap",
     ),
-    url(r"^sitemap-recap\.xml", recap_sitemap_maker, name="recap_sitemap",),
+    url(r"^sitemap-recap\.xml", recap_sitemap_maker, name="recap_sitemap"),
     # Admin tools
-    url(r"^admin-tools/block-item/$", block_item, name="block_item",),
+    url(r"^admin-tools/block-item/$", block_item, name="block_item"),
 ]

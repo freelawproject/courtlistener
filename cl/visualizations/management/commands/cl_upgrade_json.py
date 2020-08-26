@@ -63,5 +63,5 @@ class Command(VerboseCommand):
 
             else:
                 raise NotImplementedError(
-                    "Cannot upgrade from %s to %s" % (start, end,)
+                    "Cannot upgrade from %s to %s" % (start, end)
                 )

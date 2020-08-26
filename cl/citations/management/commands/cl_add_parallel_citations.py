@@ -76,7 +76,10 @@ class Command(VerboseCommand):
             help="Parse citations for all items",
         )
         parser.add_argument(
-            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id",
+            type=int,
+            nargs="*",
+            help="ids of citing opinions",
         )
 
     def monkey_patch_citation(self):
@@ -157,7 +160,10 @@ class Command(VerboseCommand):
             return
 
         # Remove any node-results pairs with more than than one result.
-        result_sets = filter(lambda (n, r): len(r) > 1, result_sets,)
+        result_sets = filter(
+            lambda (n, r): len(r) > 1,
+            result_sets,
+        )
 
         # For result_sets with more than 0 results, do all the citations have
         # the same ID?
@@ -318,7 +324,7 @@ class Command(VerboseCommand):
                 edge_count = len(self.g.edges())
             sys.stdout.write(
                 "\r  Completed %s of %s. (%s nodes, %s edges)"
-                % (completed, count, node_count, edge_count,)
+                % (completed, count, node_count, edge_count)
             )
             sys.stdout.flush()
 

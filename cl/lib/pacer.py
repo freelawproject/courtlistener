@@ -328,10 +328,10 @@ def normalize_us_state(state):
 def make_address_lookup_key(address_info):
     """Make a key for looking up normalized addresses in the DB
 
-     - Sort the fields alphabetically
-     - Strip anything that's not a character or number
-     - Remove/normalize a variety of words that add little meaning and
-       are often omitted.
+    - Sort the fields alphabetically
+    - Strip anything that's not a character or number
+    - Remove/normalize a variety of words that add little meaning and
+      are often omitted.
     """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {
@@ -366,7 +366,7 @@ def normalize_address_info(address_info):
 
     # Normalize street abbreviations (St --> Street, etc.)
     fixes = OrderedDict(
-        (("Street", "St."), ("Avenue", "Ave."), ("Boulevard", "Blvd."),)
+        (("Street", "St."), ("Avenue", "Ave."), ("Boulevard", "Blvd."))
     )
     for address_part in ["address1", "address2"]:
         a = address_info.get(address_part)
@@ -488,7 +488,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     }
     try:
         address_info, address_type = usaddress.tag(
-            u", ".join(address_lines), tag_mapping=mapping,
+            u", ".join(address_lines), tag_mapping=mapping
         )
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we

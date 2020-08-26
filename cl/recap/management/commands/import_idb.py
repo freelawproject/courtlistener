@@ -31,7 +31,9 @@ class Command(VerboseCommand, CommandUtils):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--input-file", help="The IDB file to import", required=True,
+            "--input-file",
+            help="The IDB file to import",
+            required=True,
         )
         parser.add_argument(
             "--filetype",

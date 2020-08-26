@@ -39,7 +39,7 @@ class Command(VerboseCommand):
             name__startswith="bulk_data", date_logged__gte=about_a_year_ago
         ).aggregate(Sum("count"))["count__sum"]
         self.alerts_sent_count = Stat.objects.filter(
-            name="alerts.sent", date_logged__gte=about_a_year_ago,
+            name="alerts.sent", date_logged__gte=about_a_year_ago
         ).aggregate(Sum("count"))["count__sum"]
 
         self.users = User.objects.filter(
@@ -65,7 +65,7 @@ class Command(VerboseCommand):
         txt = txt_template.render(context)
         html = html_template.render(context)
         msg = EmailMultiAlternatives(
-            email_subject, txt, email_sender, [user.email],
+            email_subject, txt, email_sender, [user.email]
         )
         msg.attach_alternative(html, "text/html")
         msg.send(fail_silently=False)

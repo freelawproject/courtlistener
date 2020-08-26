@@ -101,7 +101,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_all_courts(self):
         r = self.client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "all",})
+            reverse("coverage_data", kwargs={"version": "3", "court": "all"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -109,7 +109,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_specific_court(self):
         r = self.client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "ca1",})
+            reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -234,7 +234,7 @@ class ApiEventCreationTestCase(TestCase):
         # Set the attributes needed in the absence of middleware
         request.user = self.user
         request.resolver_match = ResolverMatch(
-            view, {"version": "v3"}, "audio-list",
+            view, {"version": "v3"}, "audio-list"
         )
 
         view(request)
@@ -885,9 +885,7 @@ class BulkJsonHistoryTest(TestCase):
 
     def test_load_the_file(self):
         data = self.history.load_json_file()
-        self.assertEqual(
-            {}, data,
-        )
+        self.assertEqual({}, data)
 
     def test_load_date_when_none(self):
         d = self.history.get_last_good_date()
