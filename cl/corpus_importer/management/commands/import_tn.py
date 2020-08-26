@@ -37,11 +37,7 @@ def make_item(case):
     # Four Panelists exist, one retired end of 2019 and the other joined.
     pub_date_year = parser.parse(case["pub_date"]).date().year
     if case["court"] == "tennworkcompapp":
-        exclude = (
-            "Marshall"
-            if pub_date_year == 2020
-            else "Pele"
-        )
+        exclude = "Marshall" if pub_date_year == 2020 else "Pele"
         panelists_query = Person.objects.filter(
             positions__court_id=case["court"]
         ).exclude(name_first=exclude)
@@ -153,9 +149,7 @@ class Command(VerboseCommand):
             help="Choose to view info log lines.",
         )
         parser.add_argument(
-            "--skip-until",
-            help="Skip until to process",
-            type=int,
+            "--skip-until", help="Skip until to process", type=int,
         )
 
     def handle(self, *args, **options):
