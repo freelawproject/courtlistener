@@ -85,8 +85,10 @@ def import_tn_corpus(log, skip_until, filepath):
         logging.info(
             "Skipping until case %s labeled: %s", case["title"], case["label"]
         )
-    courts = {"tennworkcompcl": Court.objects.get(pk="tennworkcompcl"),
-              "tennworkcompapp": Court.objects.get(pk="tennworkcompapp")}
+    courts = {
+        "tennworkcompcl": Court.objects.get(pk="tennworkcompcl"),
+        "tennworkcompapp": Court.objects.get(pk="tennworkcompapp"),
+    }
 
     for case in tn_corpus:
         if case["label"] == skip_until:
@@ -112,10 +114,7 @@ def import_tn_corpus(log, skip_until, filepath):
             )
 
         docket, opinion, cluster, citations, error = make_objects(
-            make_item(case),
-            courts[case['court']],
-            sha1_hash,
-            pdf_data,
+            make_item(case), courts[case["court"]], sha1_hash, pdf_data,
         )
 
         save_everything(
