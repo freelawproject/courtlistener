@@ -496,8 +496,8 @@ class TNCorpusTests(TestCase):
         filepath = os.path.join(
             self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
         )
-        file = open(filepath)
-        import_tn_corpus(log=False, skip_until=False, filepath=file)
+        with open(filepath) as file:
+            import_tn_corpus(log=False, skip_until=False, filepath=file)
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
             pre_install_count + 2,
@@ -510,8 +510,8 @@ class TNCorpusTests(TestCase):
         filepath = os.path.join(
             self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
         )
-        file = open(filepath)
-        import_tn_corpus(log=False, skip_until=False, filepath=file)
+        with open(filepath) as file:
+            import_tn_corpus(log=False, skip_until=False, filepath=file)
         oc = OpinionCluster.objects.get(citation="2019 TN WC App. 1")
         self.assertEqual(
             oc.judges,
