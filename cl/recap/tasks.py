@@ -917,7 +917,7 @@ def create_new_docket_from_idb(idb_pk):
     """
     idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
     case_name = idb_row.plaintiff + " v. " + idb_row.defendant
-    d = Docket.objects.create(
+    d = Docket(
         source=Docket.IDB,
         court=idb_row.district,
         idb_data=idb_row,
