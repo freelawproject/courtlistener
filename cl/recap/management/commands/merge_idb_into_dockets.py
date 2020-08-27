@@ -167,9 +167,13 @@ class Command(VerboseCommand, CommandUtils):
 
             d = do_heuristic_match(idb_row, ds)
             if d is not None:
-                merge_docket_with_idb(d.pk, idb_row.pk)
+                merge_docket_with_idb.apply_async(
+                    args=(d.pk, idb_row.pk), queue=q
+                )
             else:
-                create_new_docket_from_idb(idb_row.pk)
+                create_new_docket_from_idb.apply_async(
+                    args=(idb_row.pk,), queue=q
+                )
 
     @staticmethod
     def update_any_missing_pacer_case_ids(options):
