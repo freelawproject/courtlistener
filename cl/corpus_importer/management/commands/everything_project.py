@@ -28,6 +28,7 @@ from cl.recap.constants import (
     PATENT,
     SOCIAL_SECURITY,
     CV_2017,
+    CV_2020,
 )
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.tasks import add_or_update_recap_docket
@@ -38,27 +39,30 @@ PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 TAG = "xITWtdtYjRbPeHQMftyS"
 TAG_SAMPLE = "QAKfjXAcxfjINeFsbtAI"
 
+NOS_EXCLUSIONS = [
+    CIVIL_RIGHTS_OTHER,
+    CIVIL_RIGHTS_VOTING,
+    CIVIL_RIGHTS_JOBS,
+    CIVIL_RIGHTS_ACCOMMODATIONS,
+    CIVIL_RIGHTS_WELFARE,
+    CIVIL_RIGHTS_ADA_EMPLOYMENT,
+    CIVIL_RIGHTS_ADA_OTHER,
+    PRISONER_PETITIONS_VACATE_SENTENCE,
+    PRISONER_PETITIONS_HABEAS_CORPUS,
+    PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
+    PRISONER_CIVIL_RIGHTS,
+    PRISONER_PRISON_CONDITION,
+    PATENT,
+    SOCIAL_SECURITY,
+]
+
 
 def get_fjc_rows():
-    nos_exclusions = [
-        CIVIL_RIGHTS_OTHER,
-        CIVIL_RIGHTS_VOTING,
-        CIVIL_RIGHTS_JOBS,
-        CIVIL_RIGHTS_ACCOMMODATIONS,
-        CIVIL_RIGHTS_WELFARE,
-        CIVIL_RIGHTS_ADA_EMPLOYMENT,
-        CIVIL_RIGHTS_ADA_OTHER,
-        PRISONER_PETITIONS_VACATE_SENTENCE,
-        PRISONER_PETITIONS_HABEAS_CORPUS,
-        PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
-        PRISONER_CIVIL_RIGHTS,
-        PRISONER_PRISON_CONDITION,
-        PATENT,
-        SOCIAL_SECURITY,
-    ]
     items = FjcIntegratedDatabase.objects.exclude(
-        nature_of_suit__in=nos_exclusions,
-    ).filter(date_filed__gte="2014-01-01", dataset_source=CV_2017)
+        nature_of_suit__in=NOS_EXCLUSIONS,
+    ).filter(
+        date_filed__gte="2014-01-01", dataset_source__in=[CV_2017, CV_2020]
+    )
     return items
 
 
