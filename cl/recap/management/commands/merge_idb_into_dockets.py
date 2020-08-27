@@ -11,7 +11,6 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
-from cl.lib.db_tools import queryset_generator
 from cl.lib.string_diff import find_best_match
 from cl.recap.constants import CV_2017
 from cl.recap.models import FjcIntegratedDatabase
@@ -104,21 +103,23 @@ class Command(VerboseCommand, CommandUtils):
 
     def handle(self, *args, **options):
         logger.info("Using PACER username: %s" % PACER_USERNAME)
-        if options["task"] == "first_pass":
-            self.do_first_pass(options)
-        elif options["task"] == "second_pass":
-            self.do_second_pass(options)
+        if options["task"] == "merge_and_create":
+            self.join_fjc_with_dockets(options)
         elif options["task"] == "update_case_ids":
             self.update_any_missing_pacer_case_ids(options)
 
     @staticmethod
-    def do_first_pass(options):
+    def join_fjc_with_dockets(options):
         idb_rows = FjcIntegratedDatabase.objects.filter(
             dataset_source=CV_2017,
         ).order_by("pk")
+        if options["court_id"]:
+            idb_rows = idb_rows.filter(district_id=options["court_id"])
+
+        logger.info("%s items will be merged or created.", idb_rows.count())
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
-        for i, idb_row in enumerate(queryset_generator(idb_rows)):
+        for i, idb_row in enumerate(idb_rows.iterator()):
             # Iterate over all items in the IDB and find them in the Docket
             # table. If they're not there, create a new item.
             if i < options["offset"]:
@@ -175,7 +176,7 @@ class Command(VerboseCommand, CommandUtils):
             username=PACER_USERNAME, password=PACER_PASSWORD
         )
         session.login()
-        for i, d in enumerate(queryset_generator(ds)):
+        for i, d in enumerate(ds.iterator()):
             if i < options["offset"]:
                 continue
             if i >= options["limit"] > 0:
