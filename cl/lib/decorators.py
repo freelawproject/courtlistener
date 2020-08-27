@@ -129,7 +129,7 @@ def track_in_matomo(original_func=None, timeout=0.5, check_bots=True):
                     },
                 )
             except RequestException:
-                logger.info(
+                logger.debug(
                     "Matomo tracking request had an error (likely "
                     "timeout?) out for URL: %s" % url
                 )
