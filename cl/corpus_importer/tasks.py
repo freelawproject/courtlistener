@@ -69,7 +69,7 @@ from cl.lib.recap_utils import (
     get_bucket_name,
     get_docket_filename,
 )
-from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
+from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD, CV_2020
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
 from cl.recap.mergers import (
     add_claims_to_docket,
@@ -756,7 +756,7 @@ def make_fjc_idb_lookup_params(item):
             params["docket_number_letters"] = "md"
         else:
             params["docket_number_letters"] = "cr"
-    elif item.dataset_source in [CV_2017, CV_OLD]:
+    elif item.dataset_source in [CV_2017, CV_2020, CV_OLD]:
         params["docket_number_letters"] = "cv"
     return params
 
@@ -977,6 +977,70 @@ def filter_docket_by_tags(self, data, tags, court_id):
         self.request.chain = None
         return None
     return data
+
+
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(
+    bind=True,
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+def make_docket_by_iquery(
+    self, court_id, pacer_case_id, cookies, tag_names=None
+):
+    """
+    Using the iquery endpoint, create or update a docket
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param cookies: Cookies for a logged-in PACER session
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :return: None if failed, else the ID of the created/updated docket
+    """
+    s = PacerSession(cookies=cookies)
+    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    try:
+        report.query(pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+
+    logging_id = "%s.%s" % (court_id, pacer_case_id)
+    if not report.data:
+        logger.info("No valid data found in iquery page for %s", logging_id)
+        return
+
+    d, count = find_docket_object(
+        court_id, str(pacer_case_id), report.data["docket_number"]
+    )
+    if count > 1:
+        d = d.earliest("date_created")
+
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = update_docket_metadata(d, report.data)
+    try:
+        d.save()
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warn(msg)
+            return
+        logger.info(msg=" Retrying.")
+        raise self.retry(exc=exc)
+
+    add_tags_to_objs(tag_names, [d])
+    logger.info("Created/updated docket: %s" % d)
+    return d.pk
 
 
 # Retry 10 times. First one after 1m, then again every 5 minutes.
