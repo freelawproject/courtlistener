@@ -46,8 +46,9 @@ def add_all_nysd_to_cl(options):
 
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
         throttle.maybe_wait()
-        make_docket_by_iquery.delay(
-            "nysd", pacer_case_id, session.cookies, [TAG]
+        make_docket_by_iquery.apply_async(
+            args=("nysd", pacer_case_id, session.cookies, [TAG]),
+            queue=q,
         )
 
 
@@ -89,8 +90,8 @@ Checks:
             "--limit",
             type=int,
             default=0,
-            help="Stop when you reach this pacer_case_id. Default is to do all "
-            "of them.",
+            help="Stop when you reach this pacer_case_id. Default is to do "
+            "all of them.",
         )
         parser.add_argument(
             "--task",
