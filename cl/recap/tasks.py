@@ -953,7 +953,13 @@ def merge_docket_with_idb(d_pk, idb_pk):
     d.jurisdiction_type = (
         d.jurisdiction_type or idb_row.get_jurisdiction_display()
     )
-    d.save()
+    try:
+        d.save()
+    except IntegrityError:
+        # Happens when the IDB row is already associated with a docket. Remove
+        # the other association and try again.
+        Docket.objects.get(idb_data_id=idb_pk).update(idb_data=None)
+        d.save()
 
 
 @app.task
