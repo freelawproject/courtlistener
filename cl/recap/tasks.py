@@ -929,7 +929,14 @@ def create_new_docket_from_idb(idb_pk):
         nature_of_suit=idb_row.get_nature_of_suit_display(),
         jurisdiction_type=idb_row.get_jurisdiction_display() or "",
     )
-    d.save()
+    try:
+        d.save()
+    except IntegrityError:
+        # Happens when the IDB row is already associated with a docket. Remove
+        # the other association and try again.
+        Docket.objects.get(idb_data_id=idb_pk).update(idb_data=None)
+        d.save()
+
     logger.info("Created docket %s for IDB row: %s", d.pk, idb_row)
     return d.pk
 
