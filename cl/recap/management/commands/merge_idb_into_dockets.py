@@ -12,7 +12,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.lib.string_diff import find_best_match
-from cl.recap.constants import CV_2017
+from cl.recap.constants import CV_2017, CV_2020
 from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import (
     merge_docket_with_idb,
@@ -100,6 +100,14 @@ class Command(VerboseCommand, CommandUtils):
             required=True,
             help="What task are we doing at this point?",
         )
+        parser.add_argument(
+            "--court-id",
+            type=str,
+            required=False,
+            default="",
+            help="Provide a CL court ID to focus this on a particular "
+            "jurisdiction",
+        )
 
     def handle(self, *args, **options):
         logger.info("Using PACER username: %s" % PACER_USERNAME)
@@ -111,7 +119,7 @@ class Command(VerboseCommand, CommandUtils):
     @staticmethod
     def join_fjc_with_dockets(options):
         idb_rows = FjcIntegratedDatabase.objects.filter(
-            dataset_source=CV_2017,
+            dataset_source__in=[CV_2017, CV_2020],
         ).order_by("pk")
         if options["court_id"]:
             idb_rows = idb_rows.filter(district_id=options["court_id"])
