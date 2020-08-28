@@ -75,11 +75,12 @@ def get_dockets(options):
     buchwald_id = 450
     ds = (
         Docket.objects.filter(
-            court_id="nysd", assigned_to_id=buchwald_id, tag__name=NYSD_TAG
+            court_id="nysd", assigned_to_id=buchwald_id, tags__name=NYSD_TAG
         )
         .exclude(idb_data__nature_of_suit__in=NOS_EXCLUSIONS)
         .exclude(idb_data__isnull=True)
     )
+    logger.info("Got %s dockets to download", ds.count())
     for i, d in enumerate(ds):
         if i < options["skip_until"]:
             continue
