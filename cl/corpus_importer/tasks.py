@@ -27,7 +27,7 @@ from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
-from juriscraper.lib.exceptions import ParsingException
+from juriscraper.lib.exceptions import ParsingException, PacerLoginException
 from juriscraper.lib.string_utils import harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
@@ -40,13 +40,7 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
     ClaimsRegister,
 )
-from requests.exceptions import (
-    ChunkedEncodingError,
-    HTTPError,
-    ConnectionError,
-    ReadTimeout,
-    ConnectTimeout,
-)
+from requests.exceptions import HTTPError, RequestException
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
@@ -66,24 +60,25 @@ from cl.lib.pacer import (
     map_cl_to_pacer_id,
     get_first_missing_de_date,
 )
-from cl.lib.pacer_session import get_pacer_cookie_from_cache
+from cl.lib.pacer_session import (
+    get_pacer_cookie_from_cache,
+    get_or_cache_pacer_cookies,
+)
 from cl.lib.recap_utils import (
     get_document_filename,
     get_bucket_name,
     get_docket_filename,
 )
-from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
+from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD, CV_2020
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
 from cl.recap.mergers import (
-    find_docket_object,
-    update_docket_metadata,
-    update_docket_appellate_metadata,
-    make_recap_sequence_number,
-    add_docket_entries,
-    add_parties_and_attorneys,
-    process_orphan_documents,
     add_claims_to_docket,
     add_bankruptcy_data_to_docket,
+    add_tags_to_objs,
+    find_docket_object,
+    make_recap_sequence_number,
+    merge_pacer_docket_into_cl_docket,
+    update_docket_metadata,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
@@ -158,7 +153,7 @@ def generate_ia_json(d_pk, database="default"):
     attorney_prefetch = Prefetch(
         "parties__attorneys",
         queryset=Attorney.objects.filter(
-            roles__docket_id=d_pk, parties__id__in=party_ids,
+            roles__docket_id=d_pk, parties__id__in=party_ids
         )
         .distinct()
         .prefetch_related(
@@ -275,47 +270,48 @@ def download_recap_item(self, url, filename, clobber=False):
 
 
 @app.task(bind=True, max_retries=2, soft_time_limit=240)
-def get_and_save_free_document_report(self, court_id, start, end, cookies):
+def get_and_save_free_document_report(self, court_id, start, end):
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
     :return: None
     """
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
     s = PacerSession(
         cookies=cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     report = FreeOpinionReport(court_id, s)
+    msg = None
     try:
         report.query(start, end, sort="case_number")
-    except (
-        ConnectionError,
-        ChunkedEncodingError,
-        ReadTimeoutError,
-        ReadTimeout,
-        ConnectTimeout,
-    ) as exc:
-        logger.warning(
-            "Unable to get free document report results from %s "
-            "(%s to %s). Trying again." % (court_id, start, end)
+    except TypeError as exc:
+        msg = (
+            "TypeError getting free document report results, likely due "
+            "to failure to get Nonce."
         )
-        if self.request.retries == self.max_retries:
-            return PACERFreeDocumentLog.SCRAPE_FAILED
-        raise self.retry(exc=exc, countdown=5)
+    except (RequestException, ReadTimeoutError) as exc:
+        msg = "Unable to get free document report results at %s (%s to %s)."
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs at %s (%s to %s)."
+    except ParsingException as exc:
+        msg = "Didn't get nonce at %s (%s to %s)."
     except SoftTimeLimitExceeded as exc:
-        logger.warning(
-            "Soft time limit exceeded at %s. %s retries remain.",
-            court_id,
-            (self.max_retries - self.request.retries),
-        )
+        msg = "Soft time limit exceeded at %s (%s to %s)."
+
+    if msg is not None:
         if self.request.retries == self.max_retries:
+            logger.error(msg, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
+        logger.info(msg + " Retrying.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -348,7 +344,13 @@ def get_and_save_free_document_report(self, court_id, start, end, cookies):
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def process_free_opinion_result(self, row_pk, cnt):
     """Process a single result from the free opinion report"""
-    result = PACERFreeDocumentRow.objects.get(pk=row_pk)
+    try:
+        result = PACERFreeDocumentRow.objects.get(pk=row_pk)
+    except PACERFreeDocumentRow.DoesNotExist:
+        logger.warning("Unable to find PACERFreeDocumentRow: %s" % row_pk)
+        self.request.chain = None
+        return
+
     result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
     result.case_name_short = cnt.make_case_name_short(result.case_name)
@@ -372,17 +374,26 @@ def process_free_opinion_result(self, row_pk, cnt):
                 self.request.chain = None
                 return
             d.blocked, d.date_blocked = get_blocked_status(d)
-            mark_ia_upload_needed(d)
+            mark_ia_upload_needed(d, save_docket=False)
             d.save()
 
-            de, de_created = DocketEntry.objects.update_or_create(
-                docket=d,
-                entry_number=result.document_number,
-                defaults={
-                    "date_filed": result.date_filed,
-                    "description": result.description,
-                },
-            )
+            try:
+                de, _ = DocketEntry.objects.update_or_create(
+                    docket=d,
+                    entry_number=result.document_number,
+                    defaults={
+                        "date_filed": result.date_filed,
+                        "description": result.description,
+                    },
+                )
+            except DocketEntry.MultipleObjectsReturned:
+                # This shouldn't happen, but sometimes it does. Handle it.
+                de = DocketEntry.objects.filter(
+                    docket=d, entry_number=result.document_number
+                ).earliest("pk")
+                de.date_filed = result.date_filed
+                de.description = result.description
+
             # Update the psn if we have a new value
             de.pacer_sequence_number = (
                 result.pacer_seq_no or de.pacer_sequence_number
@@ -392,7 +403,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
             recap_sequence_number = make_recap_sequence_number(
-                {"date_filed": result.date_filed, "recap_sequence_index": 1,}
+                {"date_filed": result.date_filed, "recap_sequence_index": 1}
             )
             de.recap_sequence_number = (
                 de.recap_sequence_number or recap_sequence_number
@@ -440,10 +451,7 @@ def process_free_opinion_result(self, row_pk, cnt):
         return
 
     if not rd_created and rd.is_available:
-        # The item already exists and is available. Fantastic, mark it as free,
-        # and call it a day.
-        rd.is_free_on_pacer = True
-        rd.save()
+        # The item already exists and is available. Fantastic. Call it a day.
         result.delete()
         self.request.chain = None
         return
@@ -467,7 +475,7 @@ def process_free_opinion_result(self, row_pk, cnt):
     interval_step=5,
     ignore_result=True,
 )
-def get_and_process_pdf(self, data, cookies, row_pk):
+def get_and_process_free_pdf(self, data, row_pk):
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param data: The returned results from the previous task, takes the form
@@ -475,18 +483,38 @@ def get_and_process_pdf(self, data, cookies, row_pk):
         {'result': <PACERFreeDocumentRow> object,
          'rd_pk': rd.pk,
          'pacer_court_id': result.court_id}
-
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
     :param row_pk: The PACERFreeDocumentRow operate on
     """
     if data is None:
         return
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
-    r = download_pacer_pdf_by_rd(
-        rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
     )
+    try:
+        r = download_pacer_pdf_by_rd(
+            rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
+        )
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs."
+        if self.request.retries == self.max_retries:
+            logger.warning(msg)
+            self.request.chain = None
+            return
+        logger.info(msg + " Retrying.")
+        raise self.retry(exc=exc)
+    except (ReadTimeoutError, requests.RequestException) as exc:
+        msg = "Request exception getting free PDF"
+        if self.request.retries == self.max_retries:
+            logger.warning(msg)
+            self.request.chain = None
+            return
+        logger.info(msg + " Retrying.")
+        raise self.retry(exc=exc)
+
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
         self,
@@ -559,7 +587,7 @@ def upload_pdf_to_ia(self, rd_pk):
 access_key = settings.IA_ACCESS_KEY
 secret_key = settings.IA_SECRET_KEY
 ia_session = ia.get_session(
-    {"s3": {"access": access_key, "secret": secret_key,}}
+    {"s3": {"access": access_key, "secret": secret_key}}
 )
 
 
@@ -682,7 +710,7 @@ def mark_court_done_on_date(status, court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id,
+            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
         ).latest("date_queried")
     except PACERFreeDocumentLog.DoesNotExist:
         return
@@ -697,7 +725,10 @@ def mark_court_done_on_date(status, court_id, d):
 
 @app.task(ignore_result=True)
 def delete_pacer_row(data, pk):
-    PACERFreeDocumentRow.objects.get(pk=pk).delete()
+    try:
+        PACERFreeDocumentRow.objects.get(pk=pk).delete()
+    except PACERFreeDocumentRow.DoesNotExist:
+        pass
     return [data["rd_pk"]]
 
 
@@ -725,7 +756,7 @@ def make_fjc_idb_lookup_params(item):
             params["docket_number_letters"] = "md"
         else:
             params["docket_number_letters"] = "cr"
-    elif item.dataset_source in [CV_2017, CV_OLD]:
+    elif item.dataset_source in [CV_2017, CV_2020, CV_OLD]:
         params["docket_number_letters"] = "cv"
     return params
 
@@ -796,18 +827,26 @@ def get_pacer_case_id_and_title(
         cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
+    msg = None
     try:
         report.query(docket_number)
-    except requests.RequestException as exc:
-        logger.warning(
-            "RequestException while running possible case number "
-            "query. Trying again if retries not exceeded: %s.%s",
-            court_id,
-            docket_number,
+    except (requests.RequestException, ReadTimeoutError) as exc:
+        msg = (
+            "Network error while running possible case number query on: "
+            "%s.%s"
         )
+    except PacerLoginException as exc:
+        msg = (
+            "PacerLoginException while running possible case number query on: "
+            "%s.%s"
+        )
+
+    if msg:
         if self.request.retries == self.max_retries:
+            logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
+        logger.info(msg + " Retrying.", court_id, docket_number)
         raise self.retry(exc=exc)
 
     try:
@@ -855,7 +894,7 @@ def do_case_query_by_pacer_case_id(
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
-        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id,)
+        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -884,12 +923,7 @@ def do_case_query_by_pacer_case_id(
     update_docket_metadata(d, docket_data)
     d.save()
 
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
+    add_tags_to_objs(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
@@ -953,12 +987,75 @@ def filter_docket_by_tags(self, data, tags, court_id):
     interval_step=5 * 60,
     ignore_result=True,
 )
+def make_docket_by_iquery(
+    self, court_id, pacer_case_id, cookies, tag_names=None
+):
+    """
+    Using the iquery endpoint, create or update a docket
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param cookies: Cookies for a logged-in PACER session
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :return: None if failed, else the ID of the created/updated docket
+    """
+    s = PacerSession(cookies=cookies)
+    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    try:
+        report.query(pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+
+    logging_id = "%s.%s" % (court_id, pacer_case_id)
+    if not report.data:
+        logger.info("No valid data found in iquery page for %s", logging_id)
+        return
+
+    d, count = find_docket_object(
+        court_id, str(pacer_case_id), report.data["docket_number"]
+    )
+    if count > 1:
+        d = d.earliest("date_created")
+
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = update_docket_metadata(d, report.data)
+    try:
+        d.save()
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warn(msg)
+            return
+        logger.info(msg=" Retrying.")
+        raise self.retry(exc=exc)
+
+    add_tags_to_objs(tag_names, [d])
+    logger.info("Created/updated docket: %s" % d)
+    return d.pk
+
+
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(
+    bind=True,
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
 def get_docket_by_pacer_case_id(
     self,
     data,
     court_id,
     cookies=None,
-    user_pk=None,
     docket_pk=None,
     tag_names=None,
     **kwargs
@@ -975,9 +1072,6 @@ def get_docket_by_pacer_case_id(
     :param court_id: A courtlistener court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
-    :param user_pk: The PK of a user making the request. This can be provided
-    instead of the cookies parameter. If so, this will get the user's cookies
-    from redis instead of passing them in as an argument.
     :param docket_pk: The PK of the docket to update. Can also be provided in
     the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
@@ -985,26 +1079,20 @@ def get_docket_by_pacer_case_id(
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     :return: A dict indicating if we need to update Solr.
     """
-    if not cookies:
-        # Get cookies from Redis if not provided
-        cookies = get_pacer_cookie_from_cache(user_pk)
-    s = PacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
         return
 
+    # Attempt a light docket look up, we'll do better after fetching more data
     pacer_case_id = data.get("pacer_case_id")
-    report = DocketReport(map_cl_to_pacer_id(court_id), s)
-
+    docket_pk = docket_pk or data.get("docket_pk")
     if docket_pk:
         d = Docket.objects.get(pk=docket_pk)
-    elif data.get("docket_pk") is not None:
-        d = Docket.objects.get(pk=data["docket_pk"])
     else:
         try:
             d = Docket.objects.get(
-                pacer_case_id=pacer_case_id, court_id=court_id,
+                pacer_case_id=pacer_case_id, court_id=court_id
             )
         except Docket.DoesNotExist:
             d = None
@@ -1017,20 +1105,17 @@ def get_docket_by_pacer_case_id(
 
     logging_id = "%s.%s" % (court_id, pacer_case_id)
     logger.info("Querying docket report %s", logging_id)
+    s = PacerSession(cookies=cookies)
+    report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id, **kwargs)
-    except ConnectionError as exc:
-        logger.warning(
-            "Ran into ConnectionError while getting docket "
-            "for %s. Retrying.",
-            logging_id,
-        )
+    except (RequestException, ReadTimeoutError) as exc:
+        msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(
-                "Max retries exceeded for %s. Aborting chain.", logging_id
-            )
+            logger.error(msg + " Aborting chain.", logging_id)
             self.request.chain = None
             return None
+        logger.info(msg + " Retrying.", logging_id)
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1040,7 +1125,6 @@ def get_docket_by_pacer_case_id(
         self.request.chain = None
         return
 
-    # Merge the contents into CL.
     if d is None:
         d, count = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
@@ -1048,37 +1132,14 @@ def get_docket_by_pacer_case_id(
         if count > 1:
             d = d.earliest("date_created")
 
-    # Ensure that we set the case ID. This is needed on dockets that have
-    # matching docket numbers, but that never got PACER data before. This was
-    # previously rare, but since we added the FJC data to the dockets table,
-    # this is now quite common.
-    d.pacer_case_id = pacer_case_id
-
-    d.add_recap_source()
-    update_docket_metadata(d, docket_data)
-    d.save()
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
-
-    # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(
-        content_object=d, upload_type=UPLOAD_TYPE.DOCKET
+    rds_created, content_updated = merge_pacer_docket_into_cl_docket(
+        d,
+        pacer_case_id,
+        docket_data,
+        report,
+        appellate=False,
+        tag_names=tag_names,
     )
-    pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
-        ContentFile(report.response.text),
-    )
-
-    rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
-    )
-    add_parties_and_attorneys(d, docket_data["parties"])
-    process_orphan_documents(rds_created, d.court_id, d.date_filed)
-    logger.info("Created/updated docket: %s" % d)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -1131,7 +1192,7 @@ def get_appellate_docket_by_docket_number(
         return None
 
     try:
-        d = Docket.objects.get(docket_number=docket_number, court_id=court_id,)
+        d = Docket.objects.get(docket_number=docket_number, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -1142,38 +1203,14 @@ def get_appellate_docket_by_docket_number(
         if count > 1:
             d = d.earliest("date_created")
 
-    d.add_recap_source()
-    update_docket_metadata(d, docket_data)
-    d, og_info = update_docket_appellate_metadata(d, docket_data)
-    if not d.pacer_case_id:
-        d.pacer_case_id = docket_number
-
-    if og_info is not None:
-        og_info.save()
-        d.originating_court_information = og_info
-    d.save()
-    tags = []
-    if tag_names is not None:
-        for tag_name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=tag_name)
-            tag.tag_object(d)
-            tags.append(tag)
-
-    # Save the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(
-        content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
+    rds_created, content_updated = merge_pacer_docket_into_cl_docket(
+        d,
+        docket_number,
+        docket_data,
+        report,
+        appellate=True,
+        tag_names=tag_names,
     )
-    pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
-        ContentFile(report.response.text),
-    )
-
-    rds_created, content_updated = add_docket_entries(
-        d, docket_data["docket_entries"], tags=tags
-    )
-    add_parties_and_attorneys(d, docket_data["parties"])
-    process_orphan_documents(rds_created, d.court_id, d.date_filed)
-    logger.info("Created/updated docket: %s" % d)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -1260,21 +1297,20 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
         report.query(d.pacer_case_id, d.docket_number)
-    except ConnectionError as exc:
-        logger.warning(
-            "Ran into ConnectionError while getting claims "
-            "report for %s. Retrying.",
-            logging_id,
-        )
+    except (RequestException, ReadTimeoutError) as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
             logger.error(
-                "Max retries completed for %s. Unable to get "
-                "claims data. Aborting task, but allowing next task "
-                "to run.",
+                "Max retries completed for %s. Unable to get claims data. "
+                "Aborting task, but allowing next task to run.",
                 logging_id,
             )
             return data
+        logger.info(
+            "Ran into networking error while getting claims report for %s. "
+            "Retrying.",
+            logging_id,
+        )
         raise self.retry(exc)
     claims_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1367,13 +1403,12 @@ def download_pacer_pdf_by_rd(
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
-            logger.warning(
-                "Ran into HTTPError while getting PDF: %s. Retrying.",
-                exc.response.status_code,
-            )
+            msg = "Ran into HTTPError while getting PDF: %s."
             if self.request.retries == self.max_retries:
+                logger.error(msg, exc.response.status_code)
                 self.request.chain = None
                 return
+            logger.info(msg + " Retrying.", exc.response.status_code)
             raise self.retry(exc)
         else:
             logger.error(
@@ -1434,6 +1469,7 @@ def update_rd_metadata(
     rd.filepath_local.save(file_name, cf, save=False)
     rd.file_size = rd.filepath_local.size
     rd.is_available = True  # We've got the PDF.
+    rd.date_upload = rd.date_upload or now()
 
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
@@ -1444,10 +1480,7 @@ def update_rd_metadata(
     rd.save()
 
     # Make sure we mark the docket as needing upload
-    changed = mark_ia_upload_needed(rd.docket_entry.docket)
-    if changed:
-        rd.docket_entry.docket.save()
-
+    mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
     return True, "Saved item successfully"
 
 
@@ -1565,7 +1598,7 @@ def get_pacer_doc_by_rd_and_description(
             return
 
     if not att_found.get("pacer_doc_id"):
-        logger.warn("No pacer_doc_id for document (is it sealed?)")
+        logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
         return
 
@@ -1576,7 +1609,7 @@ def get_pacer_doc_by_rd_and_description(
         document_number=rd.document_number,
         pacer_doc_id=att_found["pacer_doc_id"],
         document_type=document_type,
-        defaults={"date_upload": now(),},
+        defaults={"date_upload": now()},
     )
     # Replace the description if we have description data.
     # Else fallback on old.
@@ -1641,41 +1674,29 @@ def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
             )
         else:
             report.query(d.pacer_case_id, rd.document_number)
-    except (
-        ConnectTimeout,
-        ConnectionError,
-        ReadTimeout,
-        ReadTimeoutError,
-        ChunkedEncodingError,
-    ) as exc:
-        logger.warning("Unable to get PDF for %s" % rd)
+    except (RequestException, ReadTimeoutError) as exc:
+        msg = "Unable to get PDF for %s"
         if last_try:
+            logger.error(msg, rd)
             return
-        else:
-            raise self.retry(exc=exc)
+        logger.info(msg + " Retrying.", rd)
+        raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.response.status_code in [
+        status_code = exc.response.status_code
+        if status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
+            msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(
-                    "Ran into repeated HTTPErrors. No more retries. "
-                    "Aborting."
-                )
+                logger.error(msg + " Aborting.", status_code)
                 return
-            else:
-                logger.warning(
-                    "Ran into HTTPError: %s. Retrying."
-                    % exc.response.status_code
-                )
-                raise self.retry(exc)
+
+            logger.info(msg + " Retrying", status_code)
+            raise self.retry(exc)
         else:
-            msg = (
-                "Ran into unknown HTTPError. %s. Aborting."
-                % exc.response.status_code
-            )
-            logger.error(msg)
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, status_code)
             return
     try:
         pacer_doc_id = report.data

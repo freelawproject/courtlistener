@@ -6,19 +6,17 @@ from celery.canvas import chain
 from django.conf import settings
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer.http import PacerSession
 from requests import RequestException
 
 from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     get_and_save_free_document_report,
     process_free_opinion_result,
-    get_and_process_pdf,
+    get_and_process_free_pdf,
     delete_pacer_row,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
@@ -44,12 +42,12 @@ def get_next_date_range(court_id, span=7):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         last_completion_log = (
-            PACERFreeDocumentLog.objects.filter(court_id=court_id,)
-            .exclude(status=PACERFreeDocumentLog.SCRAPE_FAILED,)
+            PACERFreeDocumentLog.objects.filter(court_id=court_id)
+            .exclude(status=PACERFreeDocumentLog.SCRAPE_FAILED)
             .latest("date_queried")
         )
     except PACERFreeDocumentLog.DoesNotExist:
-        logger.warn("FAILED ON: %s" % court_id)
+        logger.warning("FAILED ON: %s" % court_id)
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
@@ -93,27 +91,18 @@ def get_and_save_free_document_reports(options):
     PACERFreeDocumentLog.objects.filter(
         date_started__lt=three_hrs_ago,
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
-    ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED,)
+    ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
     cl_court_ids = (
-        Court.objects.filter(
-            jurisdiction__in=[
-                Court.FEDERAL_DISTRICT,
-                Court.FEDERAL_BANKRUPTCY,
-            ],
+        Court.federal_courts.district_pacer_courts()
+        .filter(
             in_use=True,
             end_date=None,
         )
-        .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"],)
-        .values_list("pk", flat=True,)
+        .exclude(pk__in=["casb", "gub", "innb", "miwb", "ohsb", "prb"])
+        .values_list("pk", flat=True)
     )
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
-
-    pacer_session = PacerSession(
-        username=PACER_USERNAME, password=PACER_PASSWORD
-    )
-    pacer_session.login()
-
     today = now()
     for pacer_court_id in pacer_court_ids:
         while True:
@@ -128,10 +117,7 @@ def get_and_save_free_document_reports(options):
             mark_court_in_progress(pacer_court_id, next_end_d)
             try:
                 status = get_and_save_free_document_report(
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
-                    pacer_session.cookies,
+                    pacer_court_id, next_start_d, next_end_d
                 )
             except RequestException:
                 logger.error(
@@ -210,16 +196,11 @@ def get_pdfs(options):
     logger.info("%s %s items from PACER." % (task_name, count))
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
-    for row in queryset_generator(rows):
+    for row in rows.iterator():
         throttle.maybe_wait()
-        if completed % 30000 == 0:
-            pacer_session = PacerSession(
-                username=PACER_USERNAME, password=PACER_PASSWORD
-            )
-            pacer_session.login()
         c = chain(
             process_free_opinion_result.si(row.pk, cnt).set(queue=q),
-            get_and_process_pdf.s(pacer_session.cookies, row.pk).set(queue=q),
+            get_and_process_free_pdf.s(row.pk).set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
         if index:
@@ -237,7 +218,7 @@ def do_ocr(options):
     """Do the OCR for any items that need it, then save to the solr index."""
     q = options["queue"]
     rds = (
-        RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED,)
+        RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED)
         .values_list("pk", flat=True)
         .order_by()
     )

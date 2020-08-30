@@ -37,7 +37,7 @@ def do_bulk_export(options):
         logger.info("Skipping to dockets with PK greater than %s", offset)
     d_pks = (
         Docket.objects.filter(
-            court__jurisdiction=Court.FEDERAL_BANKRUPTCY, pk__gt=offset,
+            court__jurisdiction=Court.FEDERAL_BANKRUPTCY, pk__gt=offset
         )
         .order_by("pk")
         .values_list("pk", flat=True)
@@ -48,7 +48,7 @@ def do_bulk_export(options):
         logger.info("Doing item %s with pk %s", i, d_pk)
         throttle.maybe_wait()
         save_ia_docket_to_disk.apply_async(
-            args=(d_pk, options["output_directory"]), queue=q,
+            args=(d_pk, options["output_directory"]), queue=q
         )
 
 
@@ -104,9 +104,11 @@ def idb_row_transform(row):
     :return row: A transformed version of the row
     """
     # Convert the court field from theirs to something bearable
-    row["court"] = Court.objects.get(
-        fjc_court_id=row["DISTRICT"], jurisdiction=Court.FEDERAL_BANKRUPTCY
-    ).pk
+    row["court"] = (
+        Court.federal_courts.bankruptcy_courts()
+        .get(fjc_court_id=row["DISTRICT"])
+        .pk
+    )
 
     # Set the case name to None. Alas, we don't get it, but we probably don't
     # need it either.
@@ -167,9 +169,7 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
         logger.info("Using PACER username: %s" % PACER_USERNAME)
         if options["task"] == "fdd_export":
-            get_data(
-                options, tcil_row_transform, [TAG],
-            )
+            get_data(options, tcil_row_transform, [TAG])
         elif options["task"] == "idb_sample":
             get_data(options, idb_row_transform, [TAG_IDB_SAMPLE])
         elif options["task"] == "bulk_export":

@@ -3,7 +3,9 @@ import re
 from collections import OrderedDict
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.forms import DateField, ChoiceField
+from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
@@ -23,6 +25,8 @@ OPINION_ORDER_BY_CHOICES = (
     ("citeCount asc", "Least Cited First"),
     ("dateArgued desc", "Newest First"),
     ("dateArgued asc", "Oldest First"),
+    ("entry_date_filed desc", "Newest Document First"),
+    ("entry_date_filed asc", "Oldest Document First"),
     ("name_reverse asc", "Name"),
     ("dob desc,name_reverse asc", "Most Recently Born"),
     ("dob asc,name_reverse asc", "Least Recently Born"),
@@ -31,8 +35,7 @@ OPINION_ORDER_BY_CHOICES = (
 
 
 def _clean_form(get_params, cd, courts):
-    """Returns cleaned up values as a Form object.
-    """
+    """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
 
@@ -80,7 +83,7 @@ class SearchForm(forms.Form):
         ),
     )
     type.as_str_types = []
-    q = forms.CharField(required=False, label="Query",)
+    q = forms.CharField(required=False, label="Query")
     q.as_str_types = SEARCH_TYPES.ALL_TYPES
     court = forms.CharField(required=False, widget=forms.HiddenInput())
     court.as_str_types = []
@@ -150,7 +153,7 @@ class SearchForm(forms.Form):
         label_suffix="",
         required=False,
         widget=forms.CheckboxInput(
-            attrs={"class": "external-input form-control left",}
+            attrs={"class": "external-input form-control left"}
         ),
     )
     available_only.as_str_types = [SEARCH_TYPES.RECAP]
@@ -551,7 +554,12 @@ class SearchForm(forms.Form):
         return q
 
     def clean_order_by(self):
-        """Sets the default order_by value if one isn't provided by the user."""
+        """Sets the default order_by value if one isn't provided by the
+        user.
+        """
+        if not self.cleaned_data.get("type"):
+            raise ValidationError("Invalid value for type field")
+
         if (
             self.cleaned_data["type"] == SEARCH_TYPES.OPINION
             or not self.cleaned_data["type"]
@@ -648,8 +656,13 @@ class SearchForm(forms.Form):
         if all courts are being queried.
         :returns A dictionary of the data
         """
+        # The search type is usually provided by cleaned data, but can be
+        # missing when the form is invalid (and lacks it). If so, just give up.
+        try:
+            search_type = self.data["type"]
+        except MultiValueDictKeyError:
+            return {}
         display_dict = OrderedDict({"Courts": court_count_human})
-        search_type = self.data["type"]
         for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue

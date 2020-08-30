@@ -1,3 +1,4 @@
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
@@ -64,7 +65,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     queryset = (
-        RECAPDocument.objects.filter(is_available=True,)
+        RECAPDocument.objects.filter(is_available=True)
         .only(
             "pk",
             "filepath_local",
@@ -88,6 +89,14 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         if suffix:
             name += " " + suffix
         return name
+
+    def list(self, request, *args, **kwargs):
+        if not [p.startswith("pacer_doc_id") for p in request.GET.keys()]:
+            # Not having this parameter causes bad performance. Abort.
+            raise ValidationError("pacer_doc_id is a required filter.")
+        return super(PacerDocIdLookupViewSet, self).list(
+            request, *args, **kwargs
+        )
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):

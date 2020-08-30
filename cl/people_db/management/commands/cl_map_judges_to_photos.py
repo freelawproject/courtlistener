@@ -38,7 +38,7 @@ class Command(VerboseCommand):
 
         slug_name_dob = "{slug}-{date}.jpeg".format(
             slug=slug_name.rsplit(".")[0],
-            date=granular_date(person, "date_dob", iso=True,).lower(),
+            date=granular_date(person, "date_dob", iso=True).lower(),
         )
         return slug_name, slug_name_dob
 
@@ -73,7 +73,7 @@ class Command(VerboseCommand):
         multi = 0
         for path, people in judge_map.items():
             if len(people) == 0:
-                logger.warn("Did not find a judge for %s" % path)
+                logger.warning("Did not find a judge for %s" % path)
                 missed += 1
             if len(people) == 1:
                 person = people[0]
@@ -83,14 +83,11 @@ class Command(VerboseCommand):
                     person.has_photo = True
                     person.save()
             if len(people) > 1:
-                logger.warn("Found more than one match for %s:" % path)
+                logger.warning("Found more than one match for %s:" % path)
                 for person in people:
-                    logger.warn(
+                    logger.warning(
                         "Found: %s - %s"
-                        % (
-                            person,
-                            granular_date(person, "date_dob", iso=True,),
-                        )
+                        % (person, granular_date(person, "date_dob", iso=True))
                     )
                 multi += 1
 

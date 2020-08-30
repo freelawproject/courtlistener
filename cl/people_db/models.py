@@ -90,6 +90,12 @@ class Person(models.Model):
         auto_now=True,
         db_index=True,
     )
+    date_completed = models.DateTimeField(
+        help_text="Whenever an editor last decided that a profile was "
+        "complete in some sense.",
+        blank=True,
+        null=True,
+    )
     fjc_id = models.IntegerField(
         help_text="The ID of a judge as assigned by the Federal Judicial "
         "Center.",
@@ -111,7 +117,8 @@ class Person(models.Model):
         max_length=158,  # len(self.name_full)
     )
     name_first = models.CharField(
-        help_text="The first name of this person.", max_length=50,
+        help_text="The first name of this person.",
+        max_length=50,
     )
     name_middle = models.CharField(
         help_text="The middle name or names of this person",
@@ -119,7 +126,9 @@ class Person(models.Model):
         blank=True,
     )
     name_last = models.CharField(
-        help_text="The last name of this person", max_length=50, db_index=True,
+        help_text="The last name of this person",
+        max_length=50,
+        db_index=True,
     )
     name_suffix = models.CharField(
         help_text="Any suffixes that this person's name may have",
@@ -128,16 +137,24 @@ class Person(models.Model):
         blank=True,
     )
     date_dob = models.DateField(
-        help_text="The date of birth for the person", null=True, blank=True,
+        help_text="The date of birth for the person",
+        null=True,
+        blank=True,
     )
     date_granularity_dob = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_dod = models.DateField(
-        help_text="The date of death for the person", null=True, blank=True,
+        help_text="The date of death for the person",
+        null=True,
+        blank=True,
     )
     date_granularity_dod = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     dob_city = models.CharField(
         help_text="The city where the person was born.",
@@ -145,13 +162,29 @@ class Person(models.Model):
         blank=True,
     )
     dob_state = local_models.USStateField(
-        help_text="The state where the person was born.", blank=True,
+        help_text="The state where the person was born.",
+        blank=True,
+    )
+    dob_country = models.CharField(
+        help_text="The country where the person was born.",
+        blank=True,
+        default="United States",
+        max_length=50,
     )
     dod_city = models.CharField(
-        help_text="The city where the person died.", max_length=50, blank=True,
+        help_text="The city where the person died.",
+        max_length=50,
+        blank=True,
     )
     dod_state = local_models.USStateField(
-        help_text="The state where the person died.", blank=True,
+        help_text="The state where the person died.",
+        blank=True,
+    )
+    dod_country = models.CharField(
+        help_text="The country where the person died.",
+        blank=True,
+        default="United States",
+        max_length=50,
     )
     gender = models.CharField(
         help_text="The person's gender",
@@ -304,24 +337,35 @@ class Person(models.Model):
                 "date_nominated": solr_list(positions, "date_nominated"),
                 "date_elected": solr_list(positions, "date_elected"),
                 "date_recess_appointment": solr_list(
-                    positions, "date_recess_appointment",
+                    positions,
+                    "date_recess_appointment",
                 ),
                 "date_referred_to_judicial_committee": solr_list(
-                    positions, "date_referred_to_judicial_committee",
+                    positions,
+                    "date_referred_to_judicial_committee",
                 ),
                 "date_judicial_committee_action": solr_list(
-                    positions, "date_judicial_committee_action",
+                    positions,
+                    "date_judicial_committee_action",
                 ),
                 "date_hearing": solr_list(positions, "date_hearing"),
                 "date_confirmation": solr_list(positions, "date_confirmation"),
                 "date_start": solr_list(positions, "date_start"),
                 "date_granularity_start": solr_list(
-                    positions, "date_granularity_start",
+                    positions,
+                    "date_granularity_start",
                 ),
-                "date_retirement": solr_list(positions, "date_retirement",),
-                "date_termination": solr_list(positions, "date_termination",),
+                "date_retirement": solr_list(
+                    positions,
+                    "date_retirement",
+                ),
+                "date_termination": solr_list(
+                    positions,
+                    "date_termination",
+                ),
                 "date_granularity_termination": solr_list(
-                    positions, "date_granularity_termination",
+                    positions,
+                    "date_granularity_termination",
                 ),
                 "judicial_committee_action": [
                     p.get_judicial_committee_action_display()
@@ -412,90 +456,181 @@ class School(models.Model):
 class Position(models.Model):
     """A role held by a person, and the details about it."""
 
+    JUDGE = "jud"
+    # Acting
+    ACTING_JUDGE = "act-jud"
+    ACTING_PRESIDING_JUDGE = "act-pres-jud"
+    # Associate
+    ASSOCIATE_JUDGE = "ass-jud"
+    ASSOCIATE_CHIEF_JUDGE = "ass-c-jud"
+    ASSOCIATE_PRESIDING_JUDGE = "ass-pres-jud"
+    JUSTICE = "jus"
+    # Chief
+    CHIEF_JUDGE = "c-jud"
+    CHIEF_JUSTICE = "c-jus"
+    CHIEF_SPECIAL_MASTER = "c-spec-m"
+    PRESIDING_JUDGE = "pres-jud"
+    PRESIDING_JUSTICE = "pres-jus"
+    # Commissioner
+    COMMISSIONER = "com"
+    DEPUTY_COMMISSIONER = "com-dep"
+    # Pro Tem
+    JUDGE_PRO_TEM = "jud-pt"
+    JUSTICE_PRO_TEM = "jus-pt"
+    # Referee
+    JUDGE_TRIAL_REFEREE = "ref-jud-tr"
+    OFFICIAL_REFEREE = "ref-off"
+    STATE_TRIAL_REFEREE = "ref-state-trial"
+    # Retired
+    ACTIVE_RETIRED_JUSTICE = "ret-act-jus"
+    RETIRED_ASSOCIATE_JUDGE = "ret-ass-jud"
+    RETIRED_CHIEF_JUDGE = "ret-c-jud"
+    RETIRED_JUSTICE = "ret-jus"
+    SENIOR_JUDGE = "ret-senior-jud"
+    # Magistrate
+    MAGISTRATE = "mag"
+    CHIEF_MAGISTRATE = "c-mag"
+    PRESIDING_MAGISTRATE = "pres-mag"
+    MAGISTRATE_PRO_TEM = "mag-pt"
+    MAGISTRATE_RECALLED = "mag-rc"
+    MAGISTRATE_PART_TIME = "mag-part-time"
+    # Special
+    SPECIAL_CHAIRMAN = "spec-chair"
+    SPECIAL_JUDGE = "spec-jud"
+    SPECIAL_MASTER = "spec-m"
+    SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES = "spec-scjcbc"
+    # Other
+    CHAIRMAN = "chair"
+    CHANCELLOR = "chan"
+    PRESIDENT = "presi-jud"
+    RESERVE_JUDGE = "res-jud"
+    TRIAL_JUDGE = "trial-jud"
+    VICE_CHANCELLOR = "vice-chan"
+    VICE_CHIEF_JUDGE = "vice-cj"
+    # Attorney General
+    ATTORNEY_GENERAL = "att-gen"
+    ASSISTANT_ATTORNEY_GENERAL = "att-gen-ass"
+    SPECIAL_ASSISTANT_ATTORNEY_GENERAL = "att-gen-ass-spec"
+    SENIOR_COUNSEL = "sen-counsel"
+    DEPUTY_SOLICITOR_GENERAL = "dep-sol-gen"
+    # More roles
+    USA_PRESIDENT = "pres"
+    GOVERNOR = "gov"
+    CLERK = "clerk"
+    CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
+    STAFF_ATTORNEY = "staff-atty"
+    PROFESSOR = "prof"
+    PRACTITIONER = "Practitioner"
+    PROSECUTOR = "Prosecutor"
+    PUBLIC_DEFENDER = "Public Defender"
+    LEGISLATOR = "legis"
+
     POSITION_TYPES = (
         (
             "Judge",
             (
                 # Acting
-                ("act-jud", "Acting Judge"),
-                ("act-pres-jud", "Acting Presiding Judge"),
-                # Associate
-                ("ass-jud", "Associate Judge"),
-                ("ass-c-jud", "Associate Chief Judge"),
-                ("ass-pres-jud", "Associate Presiding Judge"),
-                ("jud", "Judge"),
-                ("jus", "Justice"),
-                # Chief
-                ("c-jud", "Chief Judge"),
-                ("c-jus", "Chief Justice"),
-                ("c-mag", "Chief Magistrate"),
-                ("c-spec-m", "Chief Special Master"),
-                ("pres-jud", "Presiding Judge"),
-                ("pres-jus", "Presiding Justice"),
-                ("pres-mag", "Presiding Magistrate"),
-                # Commissioner
-                ("com", "Commissioner"),
-                ("com-dep", "Deputy Commissioner"),
-                # Pro Tem
-                ("jud-pt", "Judge Pro Tem"),
-                ("jus-pt", "Justice Pro Tem"),
-                ("mag-pt", "Magistrate Pro Tem"),
-                # Referee
-                ("ref-jud-tr", "Judge Trial Referee"),
-                ("ref-off", "Official Referee"),
-                ("ref-state-trial", "State Trial Referee"),
-                # Retired
-                ("ret-act-jus", "Active Retired Justice"),
-                ("ret-ass-jud", "Retired Associate Judge"),
-                ("ret-c-jud", "Retired Chief Judge"),
-                ("ret-jus", "Retired Justice"),
-                ("ret-senior-jud", "Senior Judge"),
-                # Special
-                ("spec-chair", "Special Chairman"),
-                ("spec-jud", "Special Judge"),
-                ("spec-m", "Special Master"),
+                (ACTING_JUDGE, "Acting Judge"),
                 (
-                    "spec-scjcbc",
+                    ACTING_PRESIDING_JUDGE,
+                    "Acting Presiding Judge",
+                ),
+                # Associate
+                (ASSOCIATE_JUDGE, "Associate Judge"),
+                (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
+                (ASSOCIATE_PRESIDING_JUDGE, "Associate Presiding Judge"),
+                (JUDGE, "Judge"),
+                (JUSTICE, "Justice"),
+                # Chief
+                (CHIEF_JUDGE, "Chief Judge"),
+                (CHIEF_JUSTICE, "Chief Justice"),
+                (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
+                (PRESIDING_JUDGE, "Presiding Judge"),
+                (PRESIDING_JUSTICE, "Presiding Justice"),
+                # Commissioner
+                (COMMISSIONER, "Commissioner"),
+                (DEPUTY_COMMISSIONER, "Deputy Commissioner"),
+                # Pro Tem
+                (JUDGE_PRO_TEM, "Judge Pro Tem"),
+                (JUSTICE_PRO_TEM, "Justice Pro Tem"),
+                # Referee
+                (JUDGE_TRIAL_REFEREE, "Judge Trial Referee"),
+                (OFFICIAL_REFEREE, "Official Referee"),
+                (STATE_TRIAL_REFEREE, "State Trial Referee"),
+                # Retired
+                (ACTIVE_RETIRED_JUSTICE, "Active Retired Justice"),
+                (RETIRED_ASSOCIATE_JUDGE, "Retired Associate Judge"),
+                (RETIRED_CHIEF_JUDGE, "Retired Chief Judge"),
+                (RETIRED_JUSTICE, "Retired Justice"),
+                (SENIOR_JUDGE, "Senior Judge"),
+                # Magistrate
+                (MAGISTRATE, "Magistrate"),
+                (CHIEF_MAGISTRATE, "Chief Magistrate"),
+                (PRESIDING_MAGISTRATE, "Presiding Magistrate"),
+                (MAGISTRATE_PRO_TEM, "Magistrate Pro Tem"),
+                (MAGISTRATE_RECALLED, "Magistrate (Recalled)"),
+                (MAGISTRATE_PART_TIME, "Magistrate (Part-Time)"),
+                # Special
+                (SPECIAL_CHAIRMAN, "Special Chairman"),
+                (SPECIAL_JUDGE, "Special Judge"),
+                (SPECIAL_MASTER, "Special Master"),
+                (
+                    SPECIAL_SUPERIOR_COURT_JUDGE_FOR_COMPLEX_BUSINESS_CASES,
                     "Special Superior Court Judge for Complex Business "
                     "Cases",
                 ),
                 # Other
-                ("chair", "Chairman"),
-                ("chan", "Chancellor"),
-                ("mag", "Magistrate"),
-                ("presi-jud", "President"),
-                ("res-jud", "Reserve Judge"),
-                ("trial-jud", "Trial Judge"),
-                ("vice-chan", "Vice Chancellor"),
-                ("vice-cj", "Vice Chief Judge"),
+                (CHAIRMAN, "Chairman"),
+                (CHANCELLOR, "Chancellor"),
+                (PRESIDENT, "President"),
+                (RESERVE_JUDGE, "Reserve Judge"),
+                (TRIAL_JUDGE, "Trial Judge"),
+                (VICE_CHANCELLOR, "Vice Chancellor"),
+                (VICE_CHIEF_JUDGE, "Vice Chief Judge"),
             ),
         ),
         # Sometimes attorney generals write opinions too
         (
             "Attorney General",
             (
-                ("att-gen", "Attorney General"),
-                ("att-gen-ass", "Assistant Attorney General"),
-                ("att-gen-ass-spec", "Special Assistant Attorney General"),
-                ("sen-counsel", "Senior Counsel"),
-                ("dep-sol-gen", "Deputy Solicitor General"),
+                (ATTORNEY_GENERAL, "Attorney General"),
+                (ASSISTANT_ATTORNEY_GENERAL, "Assistant Attorney General"),
+                (
+                    SPECIAL_ASSISTANT_ATTORNEY_GENERAL,
+                    "Special Assistant Attorney General",
+                ),
+                (SENIOR_COUNSEL, "Senior Counsel"),
+                (DEPUTY_SOLICITOR_GENERAL, "Deputy Solicitor General"),
             ),
         ),
         (
             "Appointing Authority",
-            (("pres", "President of the United States"), ("gov", "Governor"),),
+            (
+                (USA_PRESIDENT, "President of the United States"),
+                (GOVERNOR, "Governor"),
+            ),
         ),
         (
             "Clerkships",
-            (("clerk", "Clerk"), ("staff-atty", "Staff Attorney"),),
+            (
+                (CLERK, "Clerk"),
+                (CLERK_CHIEF_DEPUTY, "Chief Deputy Clerk"),
+                (STAFF_ATTORNEY, "Staff Attorney"),
+            ),
         ),
-        ("prof", "Professor"),
-        ("prac", "Practitioner"),
-        ("pros", "Prosecutor"),
-        ("pub_def", "Public Defender"),
-        ("legis", "Legislator"),
+        (PROFESSOR, "Professor"),
+        (PRACTITIONER, "Practitioner"),
+        (PROSECUTOR, "Prosecutor"),
+        (PUBLIC_DEFENDER, "Public Defender"),
+        (LEGISLATOR, "Legislator"),
     )
     POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
+    PRIVATE = 1
+    PUBLIC = 2
+    SECTORS = (
+        (PRIVATE, "Private sector"),
+        (PUBLIC, "Public sector"),
+    )
     NOMINATION_PROCESSES = (
         ("fed_senate", "U.S. Senate"),
         ("state_senate", "State Senate"),
@@ -547,8 +682,8 @@ class Position(models.Model):
         ("termed_out", "Term Limit Reached"),
     )
     position_type = models.CharField(
-        help_text="If this is a judicial position, this indicates the role the "
-        "person had. This field may be blank if job_title is "
+        help_text="If this is a judicial position, this indicates the role "
+        "the person had. This field may be blank if job_title is "
         "complete instead.",
         choices=POSITION_TYPES,
         max_length=20,
@@ -560,6 +695,13 @@ class Position(models.Model):
         "be entered here.",
         max_length=100,
         blank=True,
+    )
+    sector = models.SmallIntegerField(
+        help_text="Whether the job was private or public sector.",
+        choices=SECTORS,
+        default=None,
+        blank=True,
+        null=True,
     )
     person = models.ForeignKey(
         Person,
@@ -702,10 +844,15 @@ class Position(models.Model):
         db_index=True,
     )
     date_start = models.DateField(
-        help_text="The date the position starts active duty.", db_index=True,
+        help_text="The date the position starts active duty.",
+        blank=True,
+        null=True,
+        db_index=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_termination = models.DateField(
         help_text="The last date of their employment. The compliment to "
@@ -721,7 +868,9 @@ class Position(models.Model):
         blank=True,
     )
     date_granularity_termination = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_retirement = models.DateField(
         help_text="The date when they become a senior judge by going into "
@@ -852,7 +1001,7 @@ class Position(models.Model):
             if self.court:
                 s += self.court.full_name
             elif self.school:
-                s += self.school
+                s += self.school.name
             elif self.organization_name:
                 s += self.organization_name
 
@@ -934,7 +1083,8 @@ class RetentionEvent(models.Model):
         max_length=10,
     )
     date_retention = models.DateField(
-        help_text="The date of retention", db_index=True,
+        help_text="The date of retention",
+        db_index=True,
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
@@ -1033,7 +1183,9 @@ class Education(models.Model):
         blank=True,
     )
     degree_year = models.PositiveSmallIntegerField(
-        help_text="The year the degree was awarded.", null=True, blank=True,
+        help_text="The year the degree was awarded.",
+        null=True,
+        blank=True,
     )
 
     def __unicode__(self):
@@ -1063,7 +1215,11 @@ class Race(models.Model):
         ("p", "Native Hawaiian or Other Pacific Islander"),
         ("h", "Hispanic/Latino"),
     )
-    race = models.CharField(choices=RACES, max_length=5, unique=True,)
+    race = models.CharField(
+        choices=RACES,
+        max_length=5,
+        unique=True,
+    )
 
     def __unicode__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
@@ -1123,13 +1279,19 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_end = models.DateField(
-        help_text="The date the affiliation ended.", null=True, blank=True,
+        help_text="The date the affiliation ended.",
+        null=True,
+        blank=True,
     )
     date_granularity_end = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
 
     def save(self, *args, **kwargs):
@@ -1166,7 +1328,9 @@ class Source(models.Model):
         blank=True,
     )
     date_accessed = models.DateField(
-        help_text="The date the data was gathered.", blank=True, null=True,
+        help_text="The date the data was gathered.",
+        blank=True,
+        null=True,
     )
     notes = models.TextField(
         help_text="Any additional notes about the data's provenance, in "
@@ -1279,10 +1443,14 @@ class PartyType(models.Model):
     """
 
     docket = models.ForeignKey(
-        "search.Docket", related_name="party_types", on_delete=models.CASCADE,
+        "search.Docket",
+        related_name="party_types",
+        on_delete=models.CASCADE,
     )
     party = models.ForeignKey(
-        "Party", related_name="party_types", on_delete=models.CASCADE,
+        "Party",
+        related_name="party_types",
+        on_delete=models.CASCADE,
     )
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
@@ -1296,7 +1464,9 @@ class PartyType(models.Model):
         blank=True,
     )
     extra_info = models.TextField(
-        help_text="Additional info from PACER", db_index=True, blank=True,
+        help_text="Additional info from PACER",
+        db_index=True,
+        blank=True,
     )
     highest_offense_level_opening = models.TextField(
         help_text="In a criminal case, the highest offense level at the "
@@ -1379,7 +1549,8 @@ class CriminalComplaint(models.Model):
         "Reentry of Deported Alien'",
     )
     disposition = models.TextField(
-        help_text="The disposition of the criminal complaint.", blank=True,
+        help_text="The disposition of the criminal complaint.",
+        blank=True,
     )
 
 
@@ -1400,9 +1571,18 @@ class Party(models.Model):
         through="Role",
         related_name="parties",
     )
-    name = models.TextField(help_text="The name of the party.", db_index=True,)
+    name = models.TextField(
+        help_text="The name of the party.",
+        db_index=True,
+    )
     extra_info = models.TextField(
-        help_text="Additional info from PACER", db_index=True,
+        # See: 7d4c916a34207c3c55b58cc385425a9fc7021004
+        help_text="Prior to March, 2018, this field briefly held additional "
+        "info from PACER about particular parties. That was a modelling "
+        "mistake and the information has been moved to the "
+        "PartyType.extra_info field instead. This field will be removed in "
+        "October, 2020.",
+        db_index=True,
     )
 
     class Meta:
@@ -1439,10 +1619,14 @@ class Role(models.Model):
         (UNKNOWN, "Unknown"),
     )
     party = models.ForeignKey(
-        Party, related_name="roles", on_delete=models.CASCADE,
+        Party,
+        related_name="roles",
+        on_delete=models.CASCADE,
     )
     attorney = models.ForeignKey(
-        "Attorney", related_name="roles", on_delete=models.CASCADE,
+        "Attorney",
+        related_name="roles",
+        on_delete=models.CASCADE,
     )
     docket = models.ForeignKey(
         "search.Docket",
@@ -1505,10 +1689,12 @@ class Attorney(models.Model):
         through="AttorneyOrganizationAssociation",
     )
     name = models.TextField(
-        help_text="The name of the attorney.", db_index=True,
+        help_text="The name of the attorney.",
+        db_index=True,
     )
     contact_raw = models.TextField(
-        help_text="The raw contents of the contact field", db_index=True,
+        help_text="The raw contents of the contact field",
+        db_index=True,
     )
     phone = local_models.PhoneNumberField(
         help_text="The phone number of the attorney.",
@@ -1516,7 +1702,9 @@ class Attorney(models.Model):
     fax = local_models.PhoneNumberField(
         help_text="The fax number of the attorney.",
     )
-    email = models.EmailField(help_text="The email address of the attorney.",)
+    email = models.EmailField(
+        help_text="The email address of the attorney.",
+    )
 
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1580,16 +1768,20 @@ class AttorneyOrganization(models.Model):
         unique=True,
     )
     name = models.TextField(
-        help_text="The name of the organization.", db_index=True,
+        help_text="The name of the organization.",
+        db_index=True,
     )
     address1 = models.TextField(
-        help_text="The normalized address1 of the organization", db_index=True,
+        help_text="The normalized address1 of the organization",
+        db_index=True,
     )
     address2 = models.TextField(
-        help_text="The normalized address2 of the organization", db_index=True,
+        help_text="The normalized address2 of the organization",
+        db_index=True,
     )
     city = models.TextField(
-        help_text="The normalized city of the organization", db_index=True,
+        help_text="The normalized city of the organization",
+        db_index=True,
     )
     state = local_models.USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "

@@ -7,6 +7,7 @@ from cl.alerts.views import (
     edit_alert_redirect,
     enable_alert,
     toggle_docket_alert,
+    new_docket_alert,
 )
 
 urlpatterns = [
@@ -30,4 +31,5 @@ urlpatterns = [
         toggle_docket_alert,
         name="toggle_docket_alert",
     ),
+    url(r"^alert/docket/new/$", new_docket_alert, name="new_docket_alert"),
 ]

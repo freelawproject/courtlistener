@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.mail import send_mail
+from django.db import connections
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_text
@@ -25,11 +26,13 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
 from rest_framework_filters.backends import DjangoFilterBackend
 
+from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
+BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
     "gte",
@@ -306,7 +309,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
         # Adjust if user has special privileges.
         override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
-            request.user.username, None,
+            request.user.username, None
         )
         if override_rate is not None:
             self.num_requests, self.duration = self.parse_rate(override_rate)
@@ -474,7 +477,7 @@ def invert_user_logs(start, end, add_usernames=True):
     pipe = r.pipeline()
 
     dates = [
-        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end,)
+        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
     ]
     for d in dates:
         pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
@@ -558,6 +561,49 @@ def get_avg_ms_for_endpoint(endpoint, d):
     results = pipe.execute()
 
     return results[0] / results[1]
+
+
+def get_replication_statuses():
+    """Return the replication status information for all publishers
+
+    The easiest way to detect a problem in a replication set up is to monitor
+    the size of the publisher's change lag. That is, how many changes are on
+    the publisher that haven't been sent to the subscriber? This function will
+    query all DBs set up in the config file and send their replication status
+    information.
+
+    :return: The status of all configured publications
+    :rtype: A dict of server aliases point to lists of query results dicts:
+
+    {"replica": [{
+            slot_name: 'coupa',
+            lsn_distance: 33239
+        }, {
+            slot_name: 'maverick',
+            lsn_distance: 393478,
+        }],
+        "default": [{
+            slot_name: 'replica',
+            lsn_distance: 490348
+        }],
+    }
+    """
+    statuses = {}
+    query = """
+        SELECT
+            slot_name,
+            confirmed_flush_lsn,
+            pg_current_wal_lsn(),
+            (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
+        FROM pg_replication_slots;
+    """
+    for alias in connections:
+        with connections[alias].cursor() as cursor:
+            cursor.execute(query)
+            rows = fetchall_as_dict(cursor)
+            if rows:
+                statuses[alias] = rows
+    return statuses
 
 
 emails = {

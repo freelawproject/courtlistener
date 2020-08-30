@@ -143,7 +143,7 @@ def do_many(
     random order.
     :param status_interval: How often a status update will be given.
     :param newcases: If true, skip court-years that already have data.
-    :param skipdupes: If true, skip duplicates.    
+    :param skipdupes: If true, skip duplicates.
     :param skip_newcases: If true, skip cases imported under newcases.
     :param avoid_nocites: If true, skip cases from dates after any case with no cite.
     :param courtdates: If true, skip cases with dates before court established.

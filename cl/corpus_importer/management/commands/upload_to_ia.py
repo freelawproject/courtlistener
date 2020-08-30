@@ -1,8 +1,6 @@
 import argparse
-import os
 import time
 
-from django.conf import settings
 from django.db.models import Q
 from django.utils.timezone import now
 
@@ -14,9 +12,6 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import make_redis_interface
 from cl.search.models import RECAPDocument, Docket
-
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 def upload_non_free_pdfs_to_internet_archive(options):
@@ -32,8 +27,8 @@ def upload_pdfs_to_internet_archive(options, do_non_free=False):
             is_available=True,
             filepath_ia="",
         )
-        .exclude(filepath_local="",)
-        .values_list("pk", flat=True,)
+        .exclude(filepath_local="")
+        .values_list("pk", flat=True)
         .order_by()
     )
     if do_non_free:

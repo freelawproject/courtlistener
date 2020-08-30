@@ -52,7 +52,7 @@ services:
               --events
               --pool=prefork
               --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
-              --queues=batch1,batch2
+              --queues=batch1,batch2,iauploads
               --hostname=prefork@%h
               --prefetch-multiplier=5
 

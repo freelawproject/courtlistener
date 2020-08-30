@@ -1,5 +1,5 @@
 import logging
-import re
+from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
@@ -73,9 +73,55 @@ def view_alerts(request):
 @never_cache
 def view_favorites(request):
     favorites = request.user.favorites.all().order_by("pk")
-    favorite_forms = []
+    favorite_forms = OrderedDict()
+    favorite_forms["Dockets"] = []
+    favorite_forms["RECAP Documents"] = []
+    favorite_forms["Opinions"] = []
+    favorite_forms["Oral Arguments"] = []
     for favorite in favorites:
-        favorite_forms.append(FavoriteForm(instance=favorite))
+        if favorite.cluster_id:
+            key = "Opinions"
+        elif favorite.audio_id:
+            key = "Oral Arguments"
+        elif favorite.recap_doc_id:
+            key = "RECAP Documents"
+        elif favorite.docket_id:
+            key = "Dockets"
+        favorite_forms[key].append(FavoriteForm(instance=favorite))
+    docket_search_url = (
+        "/?type=r&q=xxx AND docket_id:("
+        + " OR ".join(
+            [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
+        )
+        + ")"
+    )
+    oral_search_url = (
+        "/?type=oa&q=xxx AND id:("
+        + " OR ".join(
+            [
+                str(a.instance.audio_id.pk)
+                for a in favorite_forms["Oral Arguments"]
+            ]
+        )
+        + ")"
+    )
+    recap_search_url = (
+        "/?type=r&q=xxx AND docket_entry_id:("
+        + " OR ".join(
+            [
+                str(a.instance.recap_doc_id.pk)
+                for a in favorite_forms["RECAP Documents"]
+            ]
+        )
+        + ")"
+    )
+    opinion_search_url = (
+        "/?q=xxx AND cluster_id:("
+        + " OR ".join(
+            [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
+        )
+        + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
+    )
     return render(
         request,
         "profile/favorites.html",
@@ -83,6 +129,10 @@ def view_favorites(request):
             "private": True,
             "favorite_forms": favorite_forms,
             "blank_favorite_form": FavoriteForm(),
+            "docket_search_url": docket_search_url,
+            "oral_search_url": oral_search_url,
+            "recap_search_url": recap_search_url,
+            "opinion_search_url": opinion_search_url,
         },
     )
 
@@ -97,9 +147,9 @@ def view_donations(request):
 @never_cache
 def view_visualizations(request):
     visualizations = (
-        SCOTUSMap.objects.filter(user=request.user, deleted=False,)
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        SCOTUSMap.objects.filter(user=request.user, deleted=False)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -112,7 +162,7 @@ def view_visualizations(request):
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -122,10 +172,10 @@ def view_deleted_visualizations(request):
     thirty_days_ago = now() - timedelta(days=30)
     visualizations = (
         SCOTUSMap.objects.filter(
-            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago,
+            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago
         )
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -139,7 +189,7 @@ def view_deleted_visualizations(request):
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -149,7 +199,12 @@ def view_api(request):
     return render(request, "profile/api.html", {"private": True})
 
 
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    # Contains password info
+    "user_cd",
+    # Contains activation key
+    "email",
+)
 @login_required
 @never_cache
 def view_settings(request):
@@ -174,7 +229,8 @@ def view_settings(request):
             # resubscribe it when they confirm it later).
             update_mailchimp.delay(old_email, "unsubscribed")
 
-            # Send the email.
+            # Send an email to the new and old addresses. New for verification;
+            # old for notification of the change.
             email = emails["email_changed_successfully"]
             send_mail(
                 email["subject"],
@@ -182,7 +238,13 @@ def view_settings(request):
                 email["from"],
                 [new_email],
             )
-
+            email = emails["notify_old_address"]
+            send_mail(
+                email["subject"],
+                email["body"] % (user.username, old_email, new_email),
+                email["from"],
+                [old_email],
+            )
             msg = message_dict["email_changed_successfully"]
             messages.add_message(request, msg["level"], msg["message"])
             logout(request)
@@ -276,7 +338,12 @@ def take_out_done(request):
 
 
 @sensitive_post_parameters("password1", "password2")
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    # Contains password info
+    "cd",
+    # Contains activation key
+    "email",
+)
 @check_honeypot(field_name="skip_me_if_alive")
 @never_cache
 def register(request):
@@ -287,7 +354,7 @@ def register(request):
             try:
                 stub_account = User.objects.filter(
                     profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"),)
+                ).get(email__iexact=request.POST.get("email"))
             except User.DoesNotExist:
                 stub_account = False
 
@@ -386,6 +453,7 @@ def register_success(request):
     )
 
 
+@sensitive_variables("activation_key")
 @never_cache
 def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
@@ -437,7 +505,11 @@ def confirm_email(request, activation_key):
     )
 
 
-@sensitive_variables("salt", "activation_key", "email_body")
+@sensitive_variables(
+    "activation_key",
+    # Contains activation key
+    "email",
+)
 @check_honeypot(field_name="skip_me_if_alive")
 def request_email_confirmation(request):
     """Send an email confirmation email"""

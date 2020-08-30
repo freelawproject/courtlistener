@@ -101,7 +101,7 @@
     {% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
-    {% if search_form.type.value == SEARCH_TYPES.RECAP %}active{% else %}{{ block.super }}{% endif %}
+    {% if search_form.type.value == SEARCH_TYPES.RECAP or search_form.type.value == SEARCH_TYPES.DOCKETS %}active{% else %}{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-oa %}
     {% if search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}active{% else %}{{ block.super }}{% endif %}
@@ -128,7 +128,7 @@
 {% with type=search_form.type.value %}
     <div id="search-results" class="col-lg-7 col-sm-9 search-page">
       {% include "includes/messages.html" %}
-      {% if type != 'p' %}
+      {% if type != SEARCH_TYPES.PEOPLE %}
         {% if query_citation or alert_form.errors or request.GET.edit_alert  %}
           <div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}" role="alert">
             <div class="row">
@@ -175,7 +175,7 @@
 
       <div class="row">
             <div class="col-sm-12">
-              {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+              {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
                 {% include "includes/alert_modal.html" %}
               {% endif %}
               <form action="/"
@@ -191,7 +191,7 @@
                                    id="id_q"
                                    autocomplete="off"
                                    type="text">
-                            {% if search_form.type.value == 'o' or search_form.type.value == 'oa' %}
+                            {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
                               {% if not error and get_string %}
                                 <span class="input-group-addon input-group-addon-blended">
                                   <i class="fa fa-bell-o fa-lg gray pointer"
@@ -220,7 +220,7 @@
             <div class="row">
                 <div class="col-sm-12">
                     {% if not request.COOKIES.recap_install_plea %}
-                      {% if type == 'r' or type_override == 'r' %}
+                      {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
                         {# Show the RECAP install plea. #}
                         <div class="alert alert-info alert-dismissible recap_install_plea"
                              role="alert">
@@ -235,7 +235,7 @@
                     {% endif %}
 
                     <h2 id="result-count" class="bottom">
-                        {% if type == 'o' %}
+                        {% if type == SEARCH_TYPES.OPINION %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
                           {% if cited_cluster %}
                             <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
@@ -243,22 +243,22 @@
                           {% if related_cluster %}
                             <span class="gray alt">related to</span> {{ related_cluster.caption|safe|v_wrapper }}
                           {% endif %}
-                        {% elif type == 'r' %}
+                        {% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             {% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
                             {{ count|intcomma }} Case{{ count|pluralize }} <span class="gray">&mdash;</span>
                             {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                             {% endwith %}
-                        {% elif type == 'oa' %}
+                        {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
                             {{ results.paginator.count|intcomma }} Oral Argument{{ results.paginator.count|pluralize }}
-                        {% elif type == 'p' %}
+                        {% elif type == SEARCH_TYPES.PEOPLE %}
                             {{ results.paginator.count|intcomma }} Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
-                        {% if type == 'o' or type == 'r' %}
+                        {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
                             <a href="/feed/search/?{{ get_string }}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>
                             </a>
-                        {% elif type == 'oa' %}
+                        {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
                             <a href="/podcast/search/?{{ get_string }}">
                                 <i class="gray fa fa-podcast"
                                    title="Subscribe to a podcast of these results"></i>

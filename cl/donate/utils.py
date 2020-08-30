@@ -102,34 +102,23 @@ emails = {
         "from": settings.DEFAULT_FROM_EMAIL,
     },
     "user_bad_subscription": {
-        "subject": "We have disabled your monthly contributions to Free Law "
-        "Project",
-        "body": "Dear %s\n\n"
-        "We attempted to process your recurring donation to Free Law "
-        "Project this morning, but we had an issue processing your "
-        "card. It has failed three times now, and as a result, we "
-        "have disabled your monthly contributions.\n\n"
-        "You were donating $%0.2f each month. If you still want to "
-        "contribute to Free Law Project, the easiest way to fix this "
-        "is to just set up a new monthly contribution, here:\n\n"
-        "    https://www.courtlistener.com%s\n\n"
-        "Thank you as always for your continued support, and if you "
-        "have any questions or need any help, do not hesitate to "
-        "reach out to us.\n\n"
-        "Thanks again,\n\n"
-        "Michael Lissner and Brian Carver\n"
-        "Founders of Free Law Project\n"
+        "subject": "Your monthly donation to Free Law Project has failed",
+        "body": "Dear %s,\n\n"
+        "We just attempted to process your recurring donation to Free Law "
+        "Project, host of CourtListener and RECAP, but we had an issue "
+        "processing your card. As a result, unfortunately, we have disabled "
+        "this monthly contribution.\n\n"
+        "You were donating $%0.2f each month. The easiest way to fix this is "
+        "to set up a new monthly contribution, here\n\n:"
+        "    https://www.courtlistener.com%s?amount_other=%0.2f\n\n"
+        "Would you mind setting that up again so that your donations and "
+        "other services keep working properly?\n\n"
+        "Sorry for the hassle. Hopefully this isn't too much trouble to fix, "
+        "and thank you for supporting Free Law Project!\n\n"
+        "Thanks again,\n\n\n"
+        "Free Law Project\n"
         "https://free.law/contact/",
         "from": settings.DEFAULT_FROM_EMAIL,
-    },
-    "admin_bad_subscription": {
-        "subject": "Something went wrong with a donor's subscription",
-        "body": "Something went wrong while processing the monthly donation "
-        "with ID %s. It had a message of:\n\n"
-        "     %s\n\n"
-        "An admin should look into this before it gets disabled.",
-        "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
     },
     "admin_donation_report": {
         "subject": "$%s were donated by monthly donors today",
@@ -138,7 +127,7 @@ emails = {
         "(Note that some of these charges still can fail to go "
         "through.)",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }
 
@@ -189,10 +178,11 @@ def send_failed_subscription_email(m_donation):
 
     m_donation: The MonthlyDonation object that failed.
     """
-    email = emails["disabled_subscription"]
+    email = emails["user_bad_subscription"]
     body = email["body"] % (
-        m_donation.user.first_name,
+        m_donation.donor.first_name,
         m_donation.monthly_donation_amount,
         reverse("donate"),
+        m_donation.monthly_donation_amount,
     )
-    send_mail(email["subject"], body, email["from"], [m_donation.user.email])
+    send_mail(email["subject"], body, email["from"], [m_donation.donor.email])

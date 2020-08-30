@@ -275,7 +275,7 @@ def get_dockets(options, items, tags, sample_size=0):
 
 def get_attachment_pages(options, tag):
     rd_pks = RECAPDocument.objects.filter(
-        tags__name=tag, docket_entry__description__icontains="attachment",
+        tags__name=tag, docket_entry__description__icontains="attachment"
     ).values_list("pk", flat=True)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     session.login()

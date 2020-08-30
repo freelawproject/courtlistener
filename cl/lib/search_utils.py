@@ -11,6 +11,7 @@ from django.http import QueryDict
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
+from cl.citations.models import Citation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
@@ -29,15 +30,18 @@ from cl.search.models import (
     DOCUMENT_STATUSES,
 )
 
+recap_boosts_qf = {
+    "text": 1,
+    "caseName": 4,
+    "docketNumber": 3,
+    "description": 2,
+}
+recap_boosts_pf = {"text": 3, "caseName": 3, "description": 3}
 BOOSTS = {
     "qf": {
         SEARCH_TYPES.OPINION: {"text": 1, "caseName": 4, "docketNumber": 2},
-        SEARCH_TYPES.RECAP: {
-            "text": 1,
-            "caseName": 4,
-            "docketNumber": 3,
-            "description": 2,
-        },
+        SEARCH_TYPES.RECAP: recap_boosts_qf,
+        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1,
             "caseName": 4,
@@ -55,9 +59,10 @@ BOOSTS = {
     },
     # Phrase-based boosts.
     "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3,},
-        SEARCH_TYPES.RECAP: {"text": 3, "caseName": 3, "description": 3},
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3,},
+        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3},
+        SEARCH_TYPES.RECAP: recap_boosts_pf,
+        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
+        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3},
         SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
         },
@@ -70,7 +75,7 @@ def get_solr_interface(cd):
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
         si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    elif search_type == SEARCH_TYPES.RECAP:
+    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
     elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
         si = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
@@ -109,6 +114,8 @@ def get_query_citation(cd):
     citations = get_citations(
         cd["q"], html=False, do_post_citation=False, do_defendant=False
     )
+
+    citations = [c for c in citations if isinstance(c, Citation)]
 
     matches = None
     if len(citations) == 1:
@@ -422,6 +429,7 @@ def add_boosts(main_params, cd):
     if cd["type"] in [
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.ORAL_ARGUMENT,
     ]:
         # Give a boost on the case_name field if it's obviously a case_name
@@ -444,6 +452,7 @@ def add_boosts(main_params, cd):
     if cd["type"] in [
         SEARCH_TYPES.OPINION,
         SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.ORAL_ARGUMENT,
     ]:
         main_params["pf"] = make_boost_string(BOOSTS["pf"][cd["type"]])
@@ -509,7 +518,7 @@ def add_highlighting(main_params, cd, highlight):
             "status",
         ]
         hlfl = SOLR_OPINION_HL_FIELDS
-    elif cd["type"] == SEARCH_TYPES.RECAP:
+    elif cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         fl = [
             "absolute_url",
             "assigned_to_id",
@@ -560,9 +569,7 @@ def add_highlighting(main_params, cd, highlight):
             "court",
         ]
         hlfl = SOLR_PEOPLE_HL_FIELDS
-    main_params.update(
-        {"fl": ",".join(fl), "hl.fl": ",".join(hlfl),}
-    )
+    main_params.update({"fl": ",".join(fl), "hl.fl": ",".join(hlfl)})
     for field in hlfl:
         if field == "text":
             continue
@@ -596,7 +603,7 @@ def add_filter_queries(main_params, cd):
         cite_count_query = make_cite_count_query(cd)
         main_fq.append(cite_count_query)
 
-    elif cd["type"] == SEARCH_TYPES.RECAP:
+    elif cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         if cd["case_name"]:
             main_fq.append(make_fq(cd, "caseName", "case_name"))
         if cd["description"]:
@@ -713,16 +720,23 @@ def add_grouping(main_params, cd, group):
         else:
             main_params["fq"] = group_fq
 
-    elif cd["type"] == SEARCH_TYPES.RECAP and group is True:
+    elif (
+        cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        and group is True
+    ):
         docket_query = re.match("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
             group_sort = "score desc"
+        if cd["type"] == SEARCH_TYPES.RECAP:
+            group_limit = 5 if not docket_query else 500
+        elif cd["type"] == SEARCH_TYPES.DOCKETS:
+            group_limit = 1 if not docket_query else 500
         group_params = {
             "group": "true",
             "group.ngroups": "true",
-            "group.limit": 5 if not docket_query else 500,
+            "group.limit": group_limit,
             "group.field": "docket_id",
             "group.sort": group_sort,
         }
@@ -774,9 +788,56 @@ def print_params(params):
         # print results_si.execute()
 
 
+def cleanup_main_query(query_string):
+    """Enhance the query string with some simple fixes
+
+     - Make any numerical queries into phrases (except dates)
+     - Add hyphens to district docket numbers that lack them
+     - Ignore tokens inside phrases
+     - Handle query punctuation correctly by mostly ignoring it
+
+    :param query_string: The query string from the form
+    :return The enhanced query string
+    """
+    inside_a_phrase = False
+    cleaned_items = []
+    for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
+        if not item:
+            continue
+
+        if item.startswith('"') or item.endswith('"'):
+            # Start or end of a phrase; flip whether we're inside a phrase
+            inside_a_phrase = not inside_a_phrase
+            cleaned_items.append(item)
+            continue
+
+        if inside_a_phrase:
+            # Don't do anything if we're already in a phrase query
+            cleaned_items.append(item)
+            continue
+
+        not_numeric = not item[0].isdigit()
+        is_date_str = re.match(
+            "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
+        )
+        if any([not_numeric, is_date_str]):
+            cleaned_items.append(item)
+            continue
+
+        m = re.match(r"(\d{2})(cv|cr|mj|po)(\d{1,5})", item)
+        if m:
+            # It's a docket number missing hyphens, e.g. 19cv38374
+            item = "-".join(m.groups())
+
+        # Some sort of number, probably a docket number.
+        # Wrap in quotes to do a phrase search
+        cleaned_items.append('"' + item + '"')
+    return "".join(cleaned_items)
+
+
 def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
     main_params = {
-        "q": cd["q"] or "*",
+        "q": cleanup_main_query(cd["q"] or "*"),
         "sort": cd.get("order_by", order_by),
         "caller": "build_main_query",
     }
@@ -839,7 +900,7 @@ def build_alert_estimation_query(cd, day_count):
     triggered.
     """
     params = {
-        "q": cd["q"] or "*",
+        "q": cleanup_main_query(cd["q"] or "*"),
         "rows": 0,
         "caller": "alert_estimator",
     }
@@ -947,16 +1008,6 @@ def get_citing_clusters_with_cache(cluster, is_bot):
     return citing_clusters
 
 
-def is_related_beta_user(request):
-    """Check whether current user is allowed for related opinions beta test"""
-    if request.user.is_authenticated and (
-        request.user.is_superuser or request.user.profile.is_tester
-    ):
-        return True
-    else:
-        return False
-
-
 def get_related_clusters_with_cache(cluster, request):
     """Use Solr to get related opinions with Solr-MoreLikeThis query
 
@@ -969,7 +1020,7 @@ def get_related_clusters_with_cache(cluster, request):
     available_statuses = dict(DOCUMENT_STATUSES).values()
     url_search_params = {"stat_" + v: "on" for v in available_statuses}
 
-    if is_bot(request) or not is_related_beta_user(request):
+    if is_bot(request):
         # If it is a bot or is not beta tester, return empty results
         return [], [], url_search_params
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.9 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.11 &ndash; CourtListener.com{% endblock %}
 {% block description %}
   REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
   <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.9</h1>
+    <h1 id="about">REST API &ndash; v3.11</h1>
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -338,7 +338,7 @@
     </p>
     <p>These numbers are counted by using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code> HTTP headers, which can create problems for users that are behind a gateway that uses <a href="http://en.wikipedia.org/wiki/Network_address_translation">Network Address Translation (NAT)</a>. For more information about how this works, <a href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read the documentation on the Django REST Framework website</a>, but in general, the simplest solution is usually to log in. Note that using the browsable HTML API counts towards these thresholds since it's technically just another mediatype of the API.
     </p>
-    <p>If you find that you are hitting a throttle while using token authentication, check if it is resolved by browsing the API while logged into your browser. If so, this indicates that the token authentication in your code is not working properly and you are being throttled as an anonymous user.
+    <p>If you find that you are hitting a throttle while using token authentication, check if it is resolved by browsing the API while logged into your browser. If so, this indicates that the token authentication in your code is not working properly and you are being throttled as an anonymous user. You can also see your recent API requests by looking in your <a href="{% url "view_api" %}#usage">profile</a>, but remember that will show stats for the browsable API as well.
     </p>
     <p>If after checking the above you need your rate limit increased, <a href="{% url "contact" %}">please get in touch</a> so we can discuss your use case.
     </p>
@@ -435,10 +435,11 @@
 
 
     <h3 id="upgrades">Upgrades and Fixes</h3>
-    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are very welcome. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
+    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
     </p>
-    <p>Getting this kind support is one of the most rewarding things possible and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
+    <p>Getting this kind support is one of the most rewarding things possible for an organization like ours and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
     </p>
+    <p>(Upgrades requiring downtime are scheduled according to our maintenance schedule as described in the sidebar below.)</p>
 
 
     <h2 id="endpoints">Endpoints</h2>
@@ -612,14 +613,15 @@
       <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. Currently supported parameters are:
         <ul>
           <li><code>o</code> &mdash; Opinions</li>
-          <li><code>r</code> &mdash; The RECAP Archive (this endpoint in beta)</li>
+          <li><code>r</code> &mdash; Document-oriented results from the RECAP Archive</li>
+          <li><code>d</code> &mdash; Docket-oriented results from the RECAP Archive</li>
           <li><code>p</code> &mdash; Judges</li>
           <li><code>oa</code> &mdash; Oral Arguments</li>
         </ul>
       </li>
       <li>As in the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
       </li>
-      <li>The RECAP <code>type</code> returns a flat list of results, unlike as is done in the front end. This is to simplify the backend and to aid in performance of API requests. We hope to add nested results to a future version of the API.
+      <li>The <code>r</code> <code>type</code> returns a flat list of document results from the RECAP Archive, unlike as is done in the front end, where the results are nested. This is to simplify the backend and to aid in performance of API requests. The <code>d</code> <code>type</code> returns a flat list of docket results from the RECAP Archive.
       </li>
     </ul>
     <p>Some fields warrant more details:
@@ -659,25 +661,25 @@
     </p>
     <p>The endpoints for RECAP are:</p>
     <ul>
-      <li><code>{% url "processingqueue-list" version="v3" %}</code>: This endpoint can be used to upload items and to check on the progress of an upload.</li>
-      <li><code>{% url "fast-recapdocument-list" version="v3" %}</code>: This endpoint can be used to check if documents are in RECAP</li>
-      <li><code>{% url "pacerfetchqueue-list" version="v3" %}</code>: Use this endpoint to ask our server to fetch an item from PACER on your behalf.</li>
+      <li><p><code>{% url "processingqueue-list" version="v3" %}</code> &mdash; This endpoint is used to upload items and to check on the progress of an upload.</p></li>
+      <li><p><code>{% url "fast-recapdocument-list" version="v3" %}</code> &mdash; This endpoint is used to check if documents are in RECAP.</p></li>
+      <li><p><code>{% url "pacerfetchqueue-list" version="v3" %}</code> &mdash; Use this endpoint to ask our server to fetch an item from PACER on your behalf.</p></li>
     </ul>
     <h4 id="processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</h4>
-    <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using POST requests and multipart form data.
+    <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
     </p>
     <p>The following parameters apply to all uploads:</p>
     <ul>
       <li>
-        <p><code>upload_type</code> <em>(required)</em>: Accepted values for this parameter are: <code>1</code> for (district court) dockets, <code>2</code> for (district court) attachment pages, <code>3</code> for PDFs, <code>4</code> for docket history reports (as of yet unimplemented), <code>5</code> for appellate dockets, and <code>6</code> for appeallate attachment pages.
+        <p><code>upload_type</code> <em>(required)</em> &mdash; This field accepts integers representing objects in PACER. Send an HTTP <code>OPTIONS</code> request to this API to learn the possible values for this field. As a simple example, <code>1</code> represents HTML dockets, <code>3</code> represents PDFs, etc.
         </p>
       </li>
       <li>
-        <p><code>filepath_local</code> <em>(required)</em>: Use this field to upload the binary data you are submitting, whether it's an HTML docket or attachment menu or a PDF file.
+        <p><code>filepath_local</code> <em>(required)</em> &mdash; Use this field to upload the binary data you are submitting, whether it HTML of a docket or attachment menu or a PDF file.
         </p>
       </li>
       <li>
-        <p><code>court</code> <em>(required)</em>: The CourtListener court id, <a href="{% url "court_index" %}">as described here</a>. Note that these are almost all identical to the subdomains of the PACER websites with the exception of the following values:
+        <p><code>court</code> <em>(required)</em> &mdash; The CourtListener court id, <a href="{% url "court_index" %}">as described here</a>. These are almost all identical to the subdomains of the PACER websites with the exception of the following values that vary due to historical reasons:
         </p>
         <pre>
 PACER_TO_CL_IDS = {
@@ -688,47 +690,44 @@ PACER_TO_CL_IDS = {
 };</pre>
       </li>
       <li>
-        <p><code>debug</code> <em>(optional)</em>: While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
+        <p><code>debug</code> <em>(optional)</em> &mdash; While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
         </p>
       </li>
     </ul>
     <p>The following four upload types are supported:</p>
     <ul>
       <li>
-        <p><code>Dockets</code>: Uploading a docket should be fairly easy. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
+        <p><code>District/Bankruptcy Dockets</code> (1), <code>Appellate Dockets</code> (5), <code>Docket History Reports</code> (4), and <code>Claims Registries</code> (9) &mdash; Uploading these types of objects should be fairly easy. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
         </p>
       </li>
       <li>
-        <p><code>Docket history reports</code>: Upload these similar to how you upload Dockets.
+        <p><code>PDFs</code> (3) &mdash; To upload PDFs, you must include the <code>pacer_doc_id</code> and <code>document_number</code> fields. If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. Because some cases share documents, the <code>pacer_case_id</code> field should also be provided, though it's not a required field if it's unknown.
+        </p>
+        <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times in the hopes that the docket gets processed in the meantime. If, after retrying several times, the a docket cannot be found, your upload will be marked as an orphan document. Later, if the docket is found, your PDF will be automatically associated with it, but until then it's not visible to users or any API.
         </p>
       </li>
       <li>
-        <p><code>PDFs</code>: To upload PDFs, you must inlucde the <code>pacer_doc_id</code> and <code>document_number</code> fields. If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. If at all possible, the <code>pacer_case_id</code> field should also be provided.
-        </p>
-        <p>Document uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the item you uploaded, your upload will be requeued and retried several times in the hopes that the docket was processed in the meantime. If, after retrying several times, the a docket cannot be found, your upload will be discarded as an orphan document. It is thus good practice to ensure that you upload a docket before you upload any documents from that docket.
+        <p><code>Document Zips</code> (10) &mdash; From the attachment page in district court PACER websites, there is a link to get all the documents for a particular docket entry as a zip. Such zips can be uploaded using the same parameters as PDFs, using the <code>upload_type</code> of <code>10</code>.
         </p>
       </li>
       <li>
-        <p><code>Attachment Menus</code>: These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.
+        <p><code>Attachment Menus</code> (2) &mdash; These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.
         </p>
       </li>
-    </ul>
-    <p>The following upload types are works in progress:</p>
-    <ul>
-      <li><code>APPELLATE_DOCKET</code></li>
-      <li><code>APPELLATE_ATTACHMENT_PAGE</code></li>
     </ul>
     <p>When you complete your upload, you will create a <code>Processing Queue</code> object in the CourtListener database. This object will be returned in the HTTP response to your upload so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
     </p>
     <ul>
-      <li><code>status</code>: When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.
+      <li><code>status</code> &mdash; When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.
       </li>
-      <li><code>error_message</code>: This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred.
+      <li><code>error_message</code> &mdash; This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred.
       </li>
-      <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code>: After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.
+      <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code> &mdash; After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.
       </li>
       <li><code>date_created</code> and <code>date_modified</code></li>
     </ul>
+
+    <h5>An Example</h5>
     <p>Pulling this all together, a docket upload might look like:</p>
     <pre class=scrollable">curl -v \
     --form upload_type=1 \
@@ -736,7 +735,8 @@ PACER_TO_CL_IDS = {
     --form court=dcd \
     --form pacer_case_id=&lt;some-value&gt; \
     --form debug=true \
-    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'</pre>
+    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'
+    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
     <p>And once you've completed your upload, you would have a <code>Processing Queue</code> object that you could monitor for completeness. Once its <code>status</code> field indicated that it was processed successfully, it would have  a link to the docket that was created or updated.
     </p>
     <h4 id="recap-query">{% url "fast-recapdocument-list" version="v3" %}</h4>
@@ -758,8 +758,8 @@ PACER_TO_CL_IDS = {
     </p>
     <p><strong>To purchase a PDF:</strong></p>
     <ol>
-      <li>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</li>
-      <li>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</li>
+      <li><p>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</p></li>
+      <li><p>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</p></li>
     </ol>
     <p>An example of downloading a PDF by <code>recap_document</code> ID might be:
     </p>
@@ -779,10 +779,17 @@ PACER_TO_CL_IDS = {
 
     <p><strong>Fetching dockets</strong> is done similarly:</p>
     <ol>
-      <li>Provide the <code>request_type</code> of <code>1</code> for dockets.</li>
-      <li>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair.</li>
-      Note that this is the CourtListener court ID, not the PACER court ID (they're usually the same, but not always).
-      <li>Set any options you need for the docket purchase itself (place an <code>OPTIONS</code> request to this API for details on the available fields).</li>
+      <li><p>Provide the <code>request_type</code> of <code>1</code> for dockets.</p></li>
+      <li>
+        <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair:</p>
+        <ul>
+          <li><p><code>pacer_case_id</code> is the internal ID in the PACER system.</p></li>
+          <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
+          <li><p><code>court</code> is the CourtListener court ID, <em>not</em> the PACER court ID (see the mapping above under <code>PACER_TO_CL_IDS</code>).</p>
+          </li>
+        </ul>
+      </li>
+      <li><p>Set any options you need for the docket purchase itself (place an HTTP <code>OPTIONS</code> request to this API for details on the available fields).</p></li>
     </ol>
     <p>For example, this request identifies a case by docket number and court:</p>
     <pre class="scrollable">curl -X POST \
@@ -793,7 +800,7 @@ PACER_TO_CL_IDS = {
   --data 'court=okwd' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   {% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}</pre>
-    <p>This one gets it by docket number and court, including parties and counsel:</p>
+    <p>This is the same, but includes parties and counsel:</p>
     <pre class="scrollable">curl -X POST \
   --data 'request_type=1' \
   --data 'pacer_username=xxx' \
@@ -841,6 +848,31 @@ PACER_TO_CL_IDS = {
     </p>
     <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
     </p>
+
+
+    <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
+      <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
+    <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
+    </p>
+    <p>
+
+    </p>
+      To create a new visualization, POST a title, a starting cluster ID and an ending cluster ID to <strong>{% url "scotusmap-list" version="v3" %}</strong>:</p>
+    <pre class="scrollable">curl -X POST \
+  --data 'cluster_start=/api/rest/v3/clusters/105659/' \
+  --data 'cluster_end=/api/rest/v3/clusters/111891/' \
+  --data 'title=A map from Trop to Salerno' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "scotusmap-list" version="v3" %}</pre>
+    <p>Note that the <code>cluster_start</code> and <code>cluster_end</code> parameters use URLs instead of IDs. This is in keeping with our API, which uses hyperlinks as identifiers.</p>
+    <p>Once <code>POST</code>ed, a visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
+    <p>Changing data for an existing item can be done via <code>PATCH</code> requests. For example, to make an item <code>published</code> (so it's publicly viewable), you can do:</p>
+    <pre class="scrollable">curl -X PATCH \
+  --data 'published=True' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  {% get_full_host %}{% url "scotusmap-detail" version="v3" pk="1" %}</pre>
+    <p>Similar commands can be used to update other non-readonly fields if desired.</p>
+    <p>Visualizations can be marked as deleted by flipping the <code>deleted</code> field to <code>True</code>, or can be deleted forthright via a <code>DELETE</code> request.</p>
 
     <h2>Footnotes</h2>
     <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.
@@ -920,7 +952,9 @@ PACER_TO_CL_IDS = {
 
     <div class="sidebar-section">
       <h3><span>Maintenance Schedule</span></h3>
-      <p>We regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. If you need to do bulk crawling of our API, please be mindful of this schedule.
+      <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
+      </p>
+      <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
       </p>
     </div>
 

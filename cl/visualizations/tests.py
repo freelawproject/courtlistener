@@ -4,9 +4,20 @@ Unit tests for Visualizations
 from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
 from django.urls import reverse
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+)
+from rest_framework.test import APITestCase
+
+from cl.tests.utils import make_client
 from cl.visualizations.forms import VizForm
 from cl.visualizations.models import SCOTUSMap, JSONVersion
-from cl.visualizations import utils, views
+from cl.visualizations import views
+from cl.visualizations.network_utils import reverse_endpoints_if_needed
 from cl.users.models import UserProfile
 from cl.search.models import OpinionCluster
 
@@ -25,7 +36,7 @@ class TestVizUtils(TestCase):
         end = OpinionCluster.objects.get(
             case_name="Town of Greece v. Galloway"
         )
-        new_start, new_end = utils.reverse_endpoints_if_needed(start, end)
+        new_start, new_end = reverse_endpoints_if_needed(start, end)
         self.assertEqual(new_start, start)
         self.assertEqual(new_end, end)
 
@@ -38,7 +49,7 @@ class TestVizUtils(TestCase):
             case_name="Town of Greece v. Galloway"
         )
         real_start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
-        reversed_start, reversed_end = utils.reverse_endpoints_if_needed(
+        reversed_start, reversed_end = reverse_endpoints_if_needed(
             real_end, real_start
         )
         self.assertEqual(real_start, reversed_start)
@@ -110,6 +121,10 @@ class TestViews(TestCase):
             user=self.user, email_confirmed=True
         )
 
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
+
     def test_new_visualization_view_provides_form(self):
         """ Test a GET to the Visualization view provides a VizForm """
         self.assertTrue(
@@ -174,7 +189,7 @@ class TestViews(TestCase):
         self.assertNotIn(b"My Private Visualization", response.context)
 
     def test_view_counts_increment_by_one(self):
-        """ Test the view count for a Visualization increments on page view
+        """Test the view count for a Visualization increments on page view
 
         Ensure that the date_modified does not change.
         """
@@ -189,9 +204,7 @@ class TestViews(TestCase):
 
         viz.refresh_from_db(fields=["view_count", "date_modified"])
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            old_view_count + 1, viz.view_count,
-        )
+        self.assertEqual(old_view_count + 1, viz.view_count)
 
         self.assertEqual(
             old_date_modified,
@@ -214,8 +227,12 @@ class TestVizAjaxCrud(TestCase):
         self.deleted_viz = SCOTUSMap.objects.get(pk=3)
         self.factory = RequestFactory()
 
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
+
     def _build_post(self, url, username=None, data=None):
-        """ Helper method to build authenticated AJAX POST
+        """Helper method to build authenticated AJAX POST
         Args:
             url: url pattern to request
             username: username for User to attach
@@ -305,3 +322,167 @@ class TestVizAjaxCrud(TestCase):
 
         self.assertTrue(viz.published)
         self.assertIsNotNone(viz.date_published)
+
+
+class APIVisualizationTestCase(APITestCase):
+    """Check that visualizations are created properly through the API."""
+
+    fixtures = [
+        "api_scotus_map_data.json",
+        "user_with_recap_api_access.json",
+        "authtest_data.json",
+    ]
+
+    def setUp(self):
+        self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
+        self.client = make_client(6)
+        self.rando_client = make_client(1001)
+
+    def tearDown(self):
+        SCOTUSMap.objects.all().delete()
+        JSONVersion.objects.all().delete()
+
+    def make_good_visualization(self, title):
+        data = {
+            "title": title,
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        }
+        response = self.client.post(self.path, data, format="json")
+        return response
+
+    def test_no_title_visualization_post(self):
+        data = {
+            "title": "",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        }
+        response = self.client.post(self.path, data, format="json")
+        res = response.json()
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(res["title"][0], "This field may not be blank.")
+
+    def test_no_cluster_start_visualization_post(self):
+        data = {
+            "title": "My Invalid Visualization - No Cluster Start Provided",
+            "cluster_start": "",
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        }
+        response = self.client.post(self.path, data, format="json")
+        res = response.json()
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            res["cluster_start"][0], "This field may not be null."
+        )
+
+    def test_no_cluster_end_visualization_post(self):
+        data = {
+            "title": "My Invalid Visualization - No Cluster End Provided",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+            "cluster_end": "",
+        }
+        response = self.client.post(self.path, data, format="json")
+        res = response.json()
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(res["cluster_end"][0], "This field may not be null.")
+
+    def test_invalid_cluster_start_visualization_post(self):
+        data = {
+            "title": "My Invalid Visualization - No Cluster Exists",
+            "cluster_start": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 999}
+            ),
+            "cluster_end": reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        }
+        response = self.client.post(self.path, data, format="json")
+        res = response.json()
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            res["cluster_start"][0],
+            "Invalid hyperlink - Object does not exist.",
+        )
+
+    def test_valid_visualization_post(self):
+        title = "My Valid Visualization"
+        response = self.make_good_visualization(title)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        res = response.json()
+        self.assertEqual(res["title"], title)
+
+        # cluster_start and cluster_end are reversed
+        self.assertEqual(
+            res["cluster_start"],
+            "http://testserver%s"
+            % reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+            ),
+        )
+        self.assertEqual(
+            res["cluster_end"],
+            "http://testserver%s"
+            % reverse(
+                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+            ),
+        )
+
+    def test_visualization_permissions(self):
+        """Are some non-owners rejected from editing visualizations?"""
+        response = self.make_good_visualization("Some title")
+
+        # Try to edit it as the current user; should work
+        j = response.json()
+        path = j["resource_uri"]
+        response = self.client.patch(path, {"published": True}, format="json")
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # Try to edit it as a different user; should fail
+        response = self.rando_client.patch(
+            path, {"published": True}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
+
+    def test_json_data_permissions(self):
+        """Are non-owners rejected from editing JSON data?"""
+        response = self.make_good_visualization("some title")
+
+        # Try to edit the JSON as current user; should work
+        j = response.json()
+        vis_path = j["resource_uri"]
+        json_path = j["json_versions"][0]["resource_uri"]
+        response = self.client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # Try to edit the JSON as different user, while private; should fail;
+        # user shouldn't know it exists.
+        response = self.rando_client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+        # Try to edit the JSON as different user, while public; should fail
+        # Make it public
+        response = self.client.patch(
+            vis_path, {"published": True}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # Try to patch it as a random user
+        response = self.rando_client.patch(
+            json_path, {"json_data": "immaterial"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)

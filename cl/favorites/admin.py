@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.favorites.models import Favorite
+from cl.favorites.models import Favorite, UserTag, DocketTag
 
 
 class FavoriteInline(admin.TabularInline):
@@ -29,3 +29,7 @@ class FavoriteAdmin(admin.ModelAdmin):
         "docket_id",
         "recap_doc_id",
     )
+
+
+admin.site.register(UserTag)
+admin.site.register(DocketTag)

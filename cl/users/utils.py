@@ -92,7 +92,7 @@ def create_stub_account(user_data, profile_data):
 
 
 def convert_to_stub_account(user):
-    """ Set all fields to as blank as possible.
+    """Set all fields to as blank as possible.
 
     :param user: The user to operate on.
     :return: The new user object.
@@ -127,7 +127,7 @@ emails = {
         " - %s\n\n"
         "Can't keep 'em all, I suppose.\n\n",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
     "take_out_requested": {
         "subject": "User wants their data. Need to send it to them.",
@@ -138,7 +138,7 @@ emails = {
         " - %s\n\n"
         "Good luck getting this taken care of.",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
     "email_changed_successfully": {
         "subject": "Email changed successfully on CourtListener",
@@ -146,12 +146,28 @@ emails = {
         "You have successfully changed your email address at "
         "CourtListener. Please confirm this change by clicking the "
         "following link within five days:\n\n"
-        "https://www.courtlistener.com/email/confirm/%s\n\n"
+        "  https://www.courtlistener.com/email/confirm/%s\n\n"
         "Thanks for using our site,\n\n"
-        "The CourtListener team\n\n"
+        "The Free Law Project Team\n\n"
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
+        "from": settings.DEFAULT_FROM_EMAIL,
+    },
+    "notify_old_address": {
+        "subject": "This email address is no longer in use on CourtListener",
+        "body": "Hello %s,\n\n"
+        "A moment ago somebody, hopefully you, changed the email address on "
+        "your CourtListener account. Previously, it used:\n\n"
+        "    %s\n\n"
+        "But now it is set to:\n\n"
+        "    %s\n\n"
+        "If you made this change, no action is needed. If you did not make "
+        "this change, please get in touch with us as soon as possible by "
+        "sending a message to:\n\n"
+        "    security@free.law\n\n"
+        "Thanks for using our site,\n\n"
+        "The Free Law Project Team\n\n",
         "from": settings.DEFAULT_FROM_EMAIL,
     },
     "confirm_your_new_account": {
@@ -165,10 +181,10 @@ emails = {
         "We're always adding features and listening to your requests. "
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
-        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject or https://twitter.com/courtlistener\n"
+        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
         " - Check our blog for the latest news and updates: https://free.law/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
-        "The CourtListener Team\n\n"
+        "The Free Law Project Team\n\n"
         "-------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
@@ -184,7 +200,7 @@ emails = {
         "https://www.courtlistener.com/email/confirm/%s\n\n"
         "If this was not you, you can disregard this email.\n\n"
         "Thanks for using our site,\n"
-        "The CourtListener Team\n\n"
+        "The Free Law Project Team\n\n"
         "-------\n"
         "For questions or comments, please visit our contact page, "
         "https://www.courtlistener.com/contact/\n"
@@ -202,12 +218,13 @@ emails = {
         u"instructions to this address. If this was you, "
         u"we regret to inform you that we do not have an account with "
         u"this email address. This sometimes happens when people "
-        u"have have typos in their email address when they sign up.\n\n"
+        u"have have typos in their email address when they sign up or "
+        u"change their email address.\n\n"
         u""
         u"If you think that may have happened to you, the solution is "
         u"to simply create a new account using your email address:\n\n"
         u""
-        u" - https://www.courtlistener.com%s\n\n"
+        u"    https://www.courtlistener.com%s\n\n"
         u""
         u"That usually will fix the problem.\n\n"
         u""
@@ -215,7 +232,7 @@ emails = {
         u""
         u"Thanks for using our site,\n\n"
         u""
-        u"The CourtListener Team\n\n"
+        u"The Free Law Project Team\n\n"
         u"-------\n"
         u"For questions or comments, please visit our contact page, "
         u"https://www.courtlistener.com/contact/\n"
@@ -234,7 +251,7 @@ emails = {
         "will stop receiving alerts, and will eventually be deleted "
         "from our system.\n\n"
         "Thanks for using our site,\n\n"
-        "The CourtListener team\n\n\n"
+        "The Free Law Project Team\n\n\n"
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
@@ -249,7 +266,7 @@ emails = {
         "Sincerely,\n\n"
         "The CourtListener Bots",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }
 

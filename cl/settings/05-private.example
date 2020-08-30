@@ -13,11 +13,10 @@ if DEVELOPMENT:
 else:
     ALLOWED_HOSTS = ['127.0.0.1', '.courtlistener.com']
 
-ADMINS = (
-    ('Joe Schmoe', 'joe@courtlistener.com'),
-)
 
-MANAGERS = ADMINS
+MANAGERS = (
+   ('Joe Schmoe', 'joe@courtlistener.com'),
+)
 
 
 DATABASES = {
@@ -26,11 +25,12 @@ DATABASES = {
         'NAME': 'courtlistener',
         'USER': 'postgres',  # Use 'django' in prod
         'PASSWORD': 'postgres',
+        'HOST': 'cl-postgresql',
         'CONN_MAX_AGE': 600,
     }
 }
 API_READ_DATABASES = ['replica']
-
+MAX_REPLICATION_LAG = 1e+8  # 100MB
 
 SOLR_HOST = 'http://cl-solr:8983'
 SOLR_RECAP_HOST = SOLR_HOST
@@ -84,6 +84,9 @@ IA_OA_COLLECTIONS = ['uscourtsoralargumentsdev']
 MAILCHIMP_SECRET = ''
 MAILCHIMP_API_KEY = ''
 
+# Matomo token (used for reporting API)
+MATOMO_TOKEN = ''
+
 # PACER
 PACER_USERNAME = ''
 PACER_PASSWORD = ''
@@ -109,6 +112,8 @@ FUNDRAISING_MODE = False
 
 AWS_ACCESS_KEY_ID = ''
 AWS_SECRET_ACCESS_KEY = ''
+
+AWS_LAMBDA_PROXY_URL = 'https://xxx.execute-api.us-west-2.amazonaws.com/v1/get'
 
 # Development credentials available upon request
 

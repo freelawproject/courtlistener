@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}PostgreSQL Replication Statuses – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+
+{% block content %}
+<div class="hidden-xs col-sm-2 col-md-3"></div>
+<div class="col-xs-12 col-sm-8 col-md-6">
+  <h1>PostgreSQL Logical Replication&nbsp;Status</h1>
+  {% if not statuses %}
+    <h3>No replication statuses found.</h3>
+    <p>Are any publishers configured in <code>settings.DATABASES</code>?</p>
+  {% else %}
+    {% for server_name, rows in statuses.items %}
+      <h3>Database: <code>{{ server_name }}</code></h3>
+      {% for row in rows %}
+        <p>Slot {{ forloop.counter }}: <code>lsn_distance</code>: <code>{{ row.lsn_distance|intcomma }} bytes</code></p>
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

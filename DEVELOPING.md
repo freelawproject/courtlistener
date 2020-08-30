@@ -103,7 +103,7 @@ You can see most of the logs via docker when you start it. CourtListener also ke
 
     docker exec -it cl-django tail -f /var/log/courtlistener/django.log
     
-The one nice thing about that log is that it contains SQL queries, which can be important for performance tuning. Otherwise the docker logs will be all you need.
+But usually you won't need to look at these logs.
 
 
 ## How Settings Work in CourtListener
@@ -114,7 +114,7 @@ Thus, `10-public.py` contains default settings for CourtListener and Celery. To 
 
 Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them. 
 
-You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth reading through.
+You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth skimming through. Please don't rename this file; copy it instead. If you rename it, sooner or later you'll accidentally commit the missing file into a PR.
 
 Files that are read later (with higher numbered file names) have access to the 
 context of files that are read earlier. For example, if `01-some-name.py` 

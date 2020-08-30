@@ -7,16 +7,16 @@ from django.core.serializers import base, python
 
 def load_migration_fixture(apps, schema_editor, fixture, app_label):
     """Load a fixture during a migration.
-    
-    This is a rather un-fun utility to load a fixture during a migration. It 
-    works by monkey patching the normal fixture code with code that can load 
+
+    This is a rather un-fun utility to load a fixture during a migration. It
+    works by monkey patching the normal fixture code with code that can load
     fixtures at a certain point in a migration, ie, not using the current state
-    of the models. 
-    
+    of the models.
+
     For more information, see this answer:
-    
+
     https://stackoverflow.com/a/39743581/64911
-        
+
     :param apps: Apps at the state of the migration.
     :param schema_editor: The schema at the time of the migration.
     :param fixture: A path to the fixture to be loaded.

@@ -1,0 +1,39 @@
+[
+  {
+    "court": "tennworkcompapp",
+    "success": true,
+    "title": "Diaz, Ruben v. Create and Construct, LLC",
+    "docket": "2019-06-0263",
+    "pdf_url": "https://trace.tennessee.edu/cgi/viewcontent.cgi?article=2455&amp;context=utk_workerscomp&amp;unstamped=1",
+    "label": 1449,
+    "has_pdf": true,
+    "state": "published",
+    "xml_path": "/utk_workerscomp/1449/metadata.xml",
+    "coverage_url": "https://trace.tennessee.edu/utk_workerscomp/1449",
+    "judge": "Marshall L. Davidson, III",
+    "pdfs": [
+      "/utk_workerscomp/1449/Diaz_v._Create_and_Construct__LLC_Appeals_Board_Opinion.pdf"
+    ],
+    "pub_date": "2019-09-13T00:00:00-07:00",
+    "neutral_citation": "2019 TN WC App. 1"
+
+  },
+  {
+    "court": "tennworkcompcl",
+    "success": true,
+    "title": "Calderon-Fuentes, Leonardo v. CEVA Logistics U.S. Holdings",
+    "pub_date": "2019-10-2",
+    "pdf_url": "http://trace.tennessee.edu/cgi/viewcontent.cgi?article=2455&amp;context=utk_workerscomp&amp;unstamped=1",
+    "label": 1450,
+    "has_pdf": true,
+    "xml_path": null,
+    "coverage_url": "https://trace.tennessee.edu/utk_workerscomp/1450",
+    "judge": "Kenneth M. Switzer",
+    "pdfs": [
+      "/utk_workerscomp/1450/Calderon_Fuentes_EHO.pdf",
+      "/utk_workerscomp/1450/stamped.pdf"
+    ],
+    "docket": "2018-06-1735",
+    "neutral_citation": "2019 TN WC 1"
+  }
+]

@@ -2,9 +2,7 @@ from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
-from django.conf import settings
-from django.core.cache import cache
-from django.core.cache import caches
+from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
@@ -14,8 +12,9 @@ from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import never_cache, cache_page
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.vary import vary_on_cookie
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -29,8 +28,8 @@ from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
-from cl.lib import sunburnt
-from cl.lib.bot_detector import is_bot, is_og_bot
+from cl.lib.auth import group_required
+from cl.lib.bot_detector import is_bot
 from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
@@ -39,7 +38,12 @@ from cl.lib.search_utils import (
     get_related_clusters_with_cache,
 )
 from cl.lib.string_utils import trunc
-from cl.opinion_page.forms import CitationRedirectorForm, DocketEntryFilterForm
+from cl.lib.view_utils import increment_view_count
+from cl.opinion_page.forms import (
+    CitationRedirectorForm,
+    DocketEntryFilterForm,
+    TennWorkersForm,
+)
 from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
@@ -83,6 +87,38 @@ def court_homepage(request, pk):
     return render(request, "court.html", render_dict)
 
 
+@group_required("tenn_work_uploaders")
+def court_publish_page(request, pk):
+    """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
+
+    :param request: A GET or POST request for the page
+    :param pk: The CL Court ID for each court
+    :return:
+    """
+
+    if pk not in ["tennworkcompcl", "tennworkcompapp"]:
+        raise Http404("Court pages only implemented for Tennessee so far.")
+    form = TennWorkersForm(pk=pk)
+    if request.method == "POST":
+        form = TennWorkersForm(request.POST, request.FILES, pk=pk)
+        if form.is_valid():
+            cluster = form.save()
+            goto = reverse("view_case", args=[cluster.pk, cluster.slug])
+            messages.info(
+                request, "Document uploaded successfully.", extra_tags=goto
+            )
+            return HttpResponseRedirect(
+                reverse("court_publish_page", kwargs={"pk": pk})
+            )
+        else:
+            messages.info(
+                request, "Error submitting form, please review below."
+            )
+    return render(
+        request, "publish.html", {"form": form, "private": True, "pk": pk}
+    )
+
+
 def redirect_docket_recap(request, court, pacer_case_id):
     docket = get_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
@@ -92,9 +128,7 @@ def redirect_docket_recap(request, court, pacer_case_id):
     )
 
 
-def core_docket_data(request, pk):
-    """Gather the core data for a docket, party, or IDB page."""
-    docket = get_object_or_404(Docket, pk=pk)
+def make_docket_title(docket):
     title = ", ".join(
         [
             s
@@ -102,9 +136,25 @@ def core_docket_data(request, pk):
                 trunc(best_case_name(docket), 100, ellipsis="..."),
                 docket.docket_number,
             ]
-            if s.strip()
+            if s and s.strip()
         ]
     )
+    return title
+
+
+def user_has_alert(user, docket):
+    has_alert = False
+    if user.is_authenticated:
+        has_alert = DocketAlert.objects.filter(
+            docket=docket, user=user
+        ).exists()
+    return has_alert
+
+
+def core_docket_data(request, pk):
+    """Gather the core data for a docket, party, or IDB page."""
+    docket = get_object_or_404(Docket, pk=pk)
+    title = make_docket_title(docket)
 
     try:
         fave = Favorite.objects.get(docket_id=docket.pk, user=request.user)
@@ -119,11 +169,7 @@ def core_docket_data(request, pk):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    has_alert = False
-    if request.user.is_authenticated:
-        has_alert = DocketAlert.objects.filter(
-            docket=docket, user=request.user
-        ).exists()
+    has_alert = user_has_alert(request.user, docket)
 
     return (
         docket,
@@ -138,15 +184,12 @@ def core_docket_data(request, pk):
     )
 
 
+@cache_page(60)
+@vary_on_cookie
 @ratelimit_if_not_whitelisted
 def view_docket(request, pk, slug):
     docket, context = core_docket_data(request, pk)
-    if not is_bot(request):
-        with suppress_autotime(docket, ["date_modified"]):
-            cached_count = docket.view_count
-            docket.view_count = F("view_count") + 1
-            docket.save()
-            docket.view_count = cached_count + 1
+    increment_view_count(docket, request)
 
     de_list = docket.docket_entries.all().prefetch_related("recap_documents")
     form = DocketEntryFilterForm(request.GET)
@@ -232,7 +275,7 @@ def view_parties(request, docket_id, slug):
         )
 
     context.update(
-        {"parties": parties, "docket_entries": docket.docket_entries.exists(),}
+        {"parties": parties, "docket_entries": docket.docket_entries.exists()}
     )
     return render(request, "docket_parties.html", context)
 
@@ -290,16 +333,17 @@ def view_recap_document(
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
-    item = get_object_or_404(
-        RECAPDocument,
-        docket_entry__docket__id=docket_id,
-        document_number=doc_num,
-        attachment_number=att_num,
-    )
+    try:
+        item = RECAPDocument.objects.filter(
+            docket_entry__docket__id=docket_id,
+            document_number=doc_num,
+            attachment_number=att_num,
+        ).order_by("pk")[0]
+    except IndexError:
+        raise Http404("No RECAPDocument matches the given query.")
+
     title = make_rd_title(item)
-    if is_og_bot(request):
-        make_thumb_if_needed(item)
-        item.refresh_from_db()
+    item = make_thumb_if_needed(request, item)
     try:
         fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
@@ -452,7 +496,7 @@ def reporter_or_volume_handler(request, reporter, volume=None):
     if not root_reporter:
         return throw_404(
             request,
-            {"no_reporters": True, "reporter": reporter, "private": True,},
+            {"no_reporters": True, "reporter": reporter, "private": True},
         )
 
     volume_names = [r["name"] for r in REPORTERS[root_reporter]]
@@ -678,5 +722,5 @@ def block_item(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )

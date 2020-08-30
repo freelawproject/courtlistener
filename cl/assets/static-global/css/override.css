@@ -434,6 +434,11 @@ mark {
 }
 
 .serif{ font-family: "Warnock Pro","Palatino","Book Antiqua",Georgia,serif; }
+.serif-text{
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+}
 .meta-data-header{ font-weight: bold; }
 .meta-data-value{ margin-right: 2em; }
 
@@ -483,7 +488,7 @@ body {
 }
 
 /* New case view styling, including citations */
-#default-text pre, .citation {
+#default-text pre, .plaintext .citation {
   background-color: transparent;
   margin: 0;
   padding: 0;
@@ -515,6 +520,7 @@ div.shown ul {
 }
 
 #authorities ul,
+#docket-list ul,
 #cited-by ul,
 #visualizations ul,
 #recommendations ul,
@@ -534,6 +540,17 @@ div.shown ul {
   padding: 3px 0 2px 0;
   border-bottom: 1pt solid #DDD;
 }
+#docket-list > ul > li {
+  /* Use > b/c we don't want rule applying to drop downs */
+  list-style-type: none;
+  padding: 3px 0 5px 0;
+}
+
+.bullet-tail:after{
+  content: " \2022";
+  padding: 0.5em;
+}
+.bullet-tail:last-child:after { content: none; }
 
 .citation-name {
   font-size: 1.2em;
@@ -997,6 +1014,35 @@ body.embed .caseHoverText {
 #notes.markdown img {
   /* disable highlight border on images without height/width */
   border: 0;
+}
+
+.tag {
+  display: inline-block;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #c8d7f2 transparent #c8d7f2 #c8d7f2;
+  border-radius: .25em 0 0 .25em;
+  padding: 0.1em 0.6em 0.1em 0.3em;
+  margin-right: 0.8em;
+  background-color: #e5ecf9;
+  line-height: 1.2em;
+}
+.tag:after {
+  content: "\25CF";
+  position: absolute;
+  display: inline-block;
+  height: 1.2em;
+  width: 1.17em;
+  transform: rotate(45deg);
+  color: white;
+  text-indent: 0.3em;
+  text-shadow: 0 0 1px #333;
+  line-height: 1em;
+  background-color: #e5ecf9;
+  border-radius: 0.33em 0.33em 0.33em 1em;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #c8d7f2 #c8d7f2 transparent transparent;
 }
 
 /* Highlights images that need height/width */

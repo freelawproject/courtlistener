@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load markdown_deux_tags %}
+{% load humanize %}
+{% load extras %}
+
+
+{% block title %}Tag: &quot;{{ tag.name }}&quot; by {{ tag.user.username }}, {{  tag.view_count|intcomma }} view{{ tag.view_count|pluralize }} – CourtListener.com{% endblock %}
+{% block og_title %}Tag: &quot;{{ tag.name }}&quot; by {{ tag.user.username }}, {{  tag.view_count|intcomma }} view{{ tag.view_count|pluralize }} – CourtListener.com{% endblock %}
+{% block description %}{{ tag.user.username }} created tag &quot;{{ tag.name }}&quot; containing {{ total_tag_count|intcomma }} items. Tags allow you to create public and private collections of items you wish to track.
+{% endblock %}
+{% block og_description %}{{ tag.user.username }} created tag &quot;{{ tag.name }}&quot; containing {{ total_tag_count|intcomma }} items. Tags allow you to create public and private collections of items you wish to track.
+{% endblock %}
+{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-tag-300x300.png{% endblock %}
+
+
+{% block footer-scripts %}
+  {% if request.user.is_authenticated %}
+    <script defer type="text/javascript"
+            src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+  {% endif %}
+  <script type="text/javascript">
+    // Set this variable for the docket alerts script to find
+    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
+  </script>
+  <script defer type="text/javascript"
+          src="{{ STATIC_URL }}js/docket_alerts.js?v=20200428"></script>
+{% endblock %}
+
+
+{% block sidebar %}{% endblock %}
+{% block content %}
+  <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+  <div class="col-xs-12 col-md-10 col-lg-8">
+    {% if tag.user == user %}
+      <div class="float-right v-offset-above-1">
+        <a href="" class="btn btn-primary btn-lg"><i class="fa fa-pencil"></i>&nbsp;Edit</a>
+      </div>
+    {% endif %}
+    <h1 class="clearfix"><span class="tag">{{ tag.name }}</span> {% if tag.title %}<small>{{ tag.title }}</small>{% endif %}</h1>
+    <p>Created by <span class="alt">{{ tag.user }}</span> on <span class="alt">{{ tag.date_created|date }}</span> with <span class="alt">{{ tag.view_count|intcomma }} view{{ tag.view_count|pluralize }}</span></p>
+
+    {% if tag.description %}
+      <div class="v-offset-above-3">
+        <h3>Description</h3>
+        {{ tag.description|markdown }}
+      </div>
+    {% endif %}
+
+    {% for docket in tag.dockets.all %}
+      {% if forloop.first %}
+        <h3 class="v-offset-above-3"><i class="fa-list fa grey" title="Dockets"></i> {{ tag.dockets.all.count|intcomma }} Tagged Docket{{ tag.dockets.all.count|pluralize }}</h3>
+        <div id="docket-list">
+          <ul>
+      {% endif %}
+            {% include "includes/docket_li.html" %}
+      {% if forloop.last %}
+          </ul>
+        </div>
+      {% endif %}
+    {% empty %}
+      <h3 class="v-offset-above-3">Nothing tagged yet</h3>
+    {% endfor %}
+  </div>
+  <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+{% endblock %}
+

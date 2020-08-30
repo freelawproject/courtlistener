@@ -1,6 +1,5 @@
 # coding=utf-8
 from __future__ import print_function
-
 import json
 import shutil
 from datetime import timedelta, date
@@ -8,6 +7,7 @@ from datetime import timedelta, date
 from django.conf import settings
 from django.contrib.auth.models import User, Permission
 from django.core import mail
+from django.core.cache import cache
 from django.core.management import call_command
 from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
@@ -72,19 +72,19 @@ class BasicAPIPageTest(TestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_coverage_api_via_url(self):
-        # Should hit something like:
-        #  https://www.courtlistener.com/api/rest/v2/coverage/ca1/
         r = self.client.get("/api/rest/v2/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     def test_api_info_page_displays_latest_rest_docs_by_default(self):
-        response = self.client.get("/api/rest-info/")
+        response = self.client.get(reverse("rest_docs"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "rest-docs-vlatest.html")
 
     def test_api_info_page_can_display_different_versions_of_rest_docs(self):
         for version in ["v1", "v2"]:
-            response = self.client.get("/api/rest-info/%s/" % (version,))
+            response = self.client.get(
+                reverse("rest_docs", kwargs={"version": version})
+            )
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, "rest-docs-%s.html" % (version,))
             header = "REST API &ndash; %s" % (version.upper(),)
@@ -101,7 +101,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_all_courts(self):
         r = self.client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "all",})
+            reverse("coverage_data", kwargs={"version": "3", "court": "all"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -109,7 +109,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     def test_coverage_data_specific_court(self):
         r = self.client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "ca1",})
+            reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -144,6 +144,9 @@ class ApiQueryCountTests(TransactionTestCase):
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
+
+    def tearDown(self):
+        cache.clear()
 
     def test_audio_api_query_counts(self):
         with self.assertNumQueries(4):
@@ -180,14 +183,21 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_recap_upload_api_query_counts(self):
+    def test_recap_api_query_counts(self):
         with self.assertNumQueries(3):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
 
         with self.assertNumQueries(5):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
-            self.client.get(path)
+            self.client.get(path, {"pacer_doc_id": "17711118263"})
+
+    def test_recap_api_required_filter(self):
+        path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
+        r = self.client.get(path, {"pacer_doc_id": "17711118263"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
+        r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
+        self.assertEqual(HTTP_200_OK, r.status_code)
 
 
 class ApiEventCreationTestCase(TestCase):
@@ -224,7 +234,7 @@ class ApiEventCreationTestCase(TestCase):
         # Set the attributes needed in the absence of middleware
         request.user = self.user
         request.resolver_match = ResolverMatch(
-            view, {"version": "v3"}, "audio-list",
+            view, {"version": "v3"}, "audio-list"
         )
 
         view(request)
@@ -875,9 +885,7 @@ class BulkJsonHistoryTest(TestCase):
 
     def test_load_the_file(self):
         data = self.history.load_json_file()
-        self.assertEqual(
-            {}, data,
-        )
+        self.assertEqual({}, data)
 
     def test_load_date_when_none(self):
         d = self.history.get_last_good_date()

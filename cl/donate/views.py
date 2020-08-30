@@ -26,6 +26,7 @@ from cl.donate.stripe_helpers import (
     create_stripe_customer,
 )
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
+from cl.lib.ratelimiter import ratelimiter_unsafe_methods
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
@@ -232,7 +233,7 @@ def process_donation_forms(
                 payment_type,
             )
         except PaymentFailureException as e:
-            logger.critical("Payment failed. Message was: %s", e.message)
+            logger.info("Payment failed. Message was: %s", e.message)
             context["message"] = e.message
             response = {"status": "Failed"}
 
@@ -266,6 +267,7 @@ def process_donation_forms(
     return render(request, template_name, context)
 
 
+@ratelimiter_unsafe_methods
 def donate(request):
     context = make_payment_page_context(request)
     context["private"] = False
@@ -278,6 +280,7 @@ def donate(request):
     )
 
 
+@ratelimiter_unsafe_methods
 def cc_payment(request):
     context = make_payment_page_context(request)
     context["private"] = True
@@ -290,6 +293,7 @@ def cc_payment(request):
     )
 
 
+@ratelimiter_unsafe_methods
 def badge_signup(request):
     context = make_payment_page_context(request)
     context["private"] = True
@@ -317,10 +321,14 @@ def payment_complete(request, template_name):
             return render(
                 request,
                 "donate_complete.html",
-                {"error": error, "private": True,},
+                {"error": error, "private": True},
             )
 
-    return render(request, template_name, {"error": error, "private": True,})
+    return render(
+        request,
+        template_name,
+        {"error": error, "private": True},
+    )
 
 
 def toggle_monthly_donation(request):
@@ -348,9 +356,7 @@ def make_check_donation(request):
     """A page for admins to use to input check donations manually."""
     if request.method == "POST":
         data = request.POST.copy()
-        data.update(
-            {"payment_provider": PROVIDERS.CHECK, "amount": "other",}
-        )
+        data.update({"payment_provider": PROVIDERS.CHECK, "amount": "other"})
         donation_form = DonationForm(data)
         # Get the user, if we can. Else, set up the form to create a new user.
         try:

@@ -133,4 +133,4 @@ class RealTimeQueue(models.Model):
         choices=SEARCH_TYPES.NAMES,
         db_index=True,
     )
-    item_pk = models.IntegerField(help_text="the pk of the item",)
+    item_pk = models.IntegerField(help_text="the pk of the item")

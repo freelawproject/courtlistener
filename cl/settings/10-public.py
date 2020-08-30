@@ -3,10 +3,18 @@ import os
 import re
 import sys
 
+import sentry_sdk
 from django.contrib.messages import constants as message_constants
+from django.http import UnreadablePostError
 from judge_pics import judge_root
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.logging import ignore_logger
 
-INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..",)
+from cl.lib.redis_utils import make_redis_interface
+
+INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
@@ -228,11 +236,12 @@ CACHES = {
     "default": {
         "BACKEND": "redis_cache.RedisCache",
         "LOCATION": "%s:%s" % (REDIS_HOST, REDIS_PORT),
-        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"],},
+        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
     },
     "db_cache": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "django_cache",
+        "OPTIONS": {"MAX_ENTRIES": 2.5e5},
     },
 }
 # This sets Redis as the session backend. This is often advised against, but we
@@ -302,7 +311,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour",},
+    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Doing a background check service, we told them we didn't want to work
@@ -406,6 +415,7 @@ MARKDOWN_DEUX_STYLES = {
 ##########
 
 MATOMO_URL = "http://192.168.0.243/piwik.php"
+MATOMO_REPORT_URL = "http://192.168.0.243/"
 MATOMO_FRONTEND_BASE_URL = "//matomo.courtlistener.com/"
 MATOMO_SITE_ID = "1"
 
@@ -413,7 +423,7 @@ MATOMO_SITE_ID = "1"
 # SCDB #
 ########
 # SCOTUS cases after this date aren't expected to have SCDB data.
-SCDB_LATEST_CASE = datetime.datetime(2017, 6, 26)
+SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 
 
 ######################
@@ -443,10 +453,47 @@ else:
 ########################
 # Logging Machinations #
 ########################
-# From: http://stackoverflow.com/questions/1598823/elegant-setup-of-python-logging-in-django
+if not DEVELOPMENT:
+    # IA's library logs a lot of errors, which get sent to sentry unnecessarily
+    ignore_logger("internetarchive.session")
+    ignore_logger("internetarchive.item")
+    sentry_sdk.init(
+        dsn="https://18f5941395e249f48e746dd7c6de84b1@o399720.ingest.sentry.io/5257254",
+        integrations=[
+            CeleryIntegration(),
+            DjangoIntegration(),
+            RedisIntegration(),
+        ],
+    )
+
+
+def skip_unreadable_post(record):
+    if record.exc_info:
+        exc_value = record.exc_info[1]
+        if isinstance(exc_value, UnreadablePostError):
+            cache_key = "settings.unreadable_post_error"
+            r = make_redis_interface("CACHE")
+            if r.get(cache_key) is not None:
+                # We've seen this recently; let it through; hitting it a lot
+                # might mean something.
+                return True
+            else:
+                # Haven't seen this recently; cache it with a minute expiry,
+                # and don't let it through.
+                r.set(cache_key, "True", ex=60)
+                return False
+    return True
+
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "skip_unreadable_posts": {
+            "()": "django.utils.log.CallbackFilter",
+            "callback": skip_unreadable_post,
+        },
+    },
     "formatters": {
         "verbose": {
             "format": '%(levelname)s %(asctime)s (%(pathname)s %(funcName)s): "%(message)s"'
@@ -457,11 +504,8 @@ LOGGING = {
             "format": "[%(server_time)s] %(message)s",
         },
     },
-    "filters": {
-        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}
-    },
     "handlers": {
-        "null": {"level": "DEBUG", "class": "logging.NullHandler",},
+        "null": {"level": "DEBUG", "class": "logging.NullHandler"},
         "console": {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
@@ -473,29 +517,21 @@ LOGGING = {
             "filename": "/var/log/courtlistener/django.log",
             "maxBytes": "16777216",  # 16 megabytes
             "formatter": "verbose",
-        },
-        "mail_admins": {
-            "level": "ERROR",
-            "filters": ["require_debug_false"],
-            "class": "django.utils.log.AdminEmailHandler",
-            "include_html": True,
+            "filters": ["skip_unreadable_posts"],
         },
         "django.server": {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "django.server",
+            "filters": ["skip_unreadable_posts"],
         },
+        "mail_admins": {"class": "logging.NullHandler"},
     },
     "loggers": {
-        "django": {
-            "handlers": ["mail_admins"],
-            "level": "ERROR",
-            "propagate": True,
-        },
         # Disable SuspiciousOperation.DisallowedHost exception ("Invalid
-        # HTTP_HOST" header messages.) This appears to be caused by clients that
-        # don't support SNI, and which are browsing to other domains on the
-        # server. The most relevant bad client is the googlebot.
+        # HTTP_HOST" header messages.) This appears to be caused by clients
+        # that don't support SNI, and which are browsing to other domains on
+        # the server. The most relevant bad client is the googlebot.
         "django.security.DisallowedHost": {
             "handlers": ["null"],
             "propagate": False,
@@ -506,13 +542,13 @@ LOGGING = {
             "propagate": False,
         },
         # This is the one that's used practically everywhere in the code.
-        "cl": {"handlers": ["log_file"], "level": "INFO", "propagate": True,},
+        "cl": {"handlers": ["log_file"], "level": "INFO", "propagate": True},
     },
 }
 
 if DEVELOPMENT:
     LOGGING["loggers"]["django.db.backends"] = {
-        "handlers": ["log_file"],
+        "handlers": ["console"],
         "level": "DEBUG",
         "propagate": False,
     }

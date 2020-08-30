@@ -215,18 +215,19 @@ def process_docket_data(d, filepath, report_type):
         add_claims_to_docket,
     )
 
+    court_id = map_cl_to_pacer_id(d.court_id)
     if report_type == UPLOAD_TYPE.DOCKET:
-        report = DocketReport(map_cl_to_pacer_id(d.court_id))
+        report = DocketReport(court_id)
     elif report_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
-        report = DocketHistoryReport(map_cl_to_pacer_id(d.court_id))
+        report = DocketHistoryReport(court_id)
     elif report_type == UPLOAD_TYPE.APPELLATE_DOCKET:
-        report = AppellateDocketReport(map_cl_to_pacer_id(d.court_id))
+        report = AppellateDocketReport(court_id)
     elif report_type == UPLOAD_TYPE.IA_XML_FILE:
-        report = InternetArchive()
+        report = InternetArchive(court_id)
     elif report_type == UPLOAD_TYPE.CASE_REPORT_PAGE:
-        report = CaseQuery(map_cl_to_pacer_id(d.court_id))
+        report = CaseQuery(court_id)
     elif report_type == UPLOAD_TYPE.CLAIMS_REGISTER:
-        report = ClaimsRegister(map_cl_to_pacer_id(d.court_id))
+        report = ClaimsRegister(court_id)
     else:
         raise NotImplementedError(
             "The report type with id '%s' is not yet "
@@ -327,10 +328,10 @@ def normalize_us_state(state):
 def make_address_lookup_key(address_info):
     """Make a key for looking up normalized addresses in the DB
 
-     - Sort the fields alphabetically
-     - Strip anything that's not a character or number
-     - Remove/normalize a variety of words that add little meaning and
-       are often omitted.
+    - Sort the fields alphabetically
+    - Strip anything that's not a character or number
+    - Remove/normalize a variety of words that add little meaning and
+      are often omitted.
     """
     sorted_info = OrderedDict(sorted(address_info.items()))
     fixes = {
@@ -365,7 +366,7 @@ def normalize_address_info(address_info):
 
     # Normalize street abbreviations (St --> Street, etc.)
     fixes = OrderedDict(
-        (("Street", "St."), ("Avenue", "Ave."), ("Boulevard", "Blvd."),)
+        (("Street", "St."), ("Avenue", "Ave."), ("Boulevard", "Blvd."))
     )
     for address_part in ["address1", "address2"]:
         a = address_info.get(address_part)
@@ -487,12 +488,12 @@ def normalize_attorney_contact(c, fallback_name=""):
     }
     try:
         address_info, address_type = usaddress.tag(
-            u", ".join(address_lines), tag_mapping=mapping,
+            u", ".join(address_lines), tag_mapping=mapping
         )
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we
         # catch the UnicodeEncodeError. Oy.
-        logger.warn(
+        logger.warning(
             "Unable to parse address (RepeatedLabelError): %s"
             % ", ".join(c.split("\n"))
         )
@@ -502,7 +503,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     address_info.pop("NotAddress", None)
 
     if any([address_type == "Ambiguous", "CountryName" in address_info]):
-        logger.warn(
+        logger.warning(
             "Unable to parse address (Ambiguous address type): %s"
             % ", ".join(c.split("\n"))
         )

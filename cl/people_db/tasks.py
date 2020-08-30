@@ -3,6 +3,7 @@ import subprocess
 from django.core.files.base import ContentFile
 
 from cl.celery import app
+from cl.lib.bot_detector import is_og_bot
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
 from cl.search.models import RECAPDocument
@@ -76,11 +77,16 @@ def make_recap_document_thumbnail_from_pdf(pk):
     )
 
 
-def make_thumb_if_needed(rd):
-    """Check if a thumbnail exists. If it does, do not make another. If it
-    does not, make it.
+def make_thumb_if_needed(request, rd):
+    """Make a thumbnail for a RECAP Document, if needed
+
+    If a thumbnail is needed, can be made and should be made, make one.
+
+    :param request: The request sent to the server
+    :param rd: A RECAPDocument object
     """
-    if rd.thumbnail_status == THUMBNAIL_STATUSES.COMPLETE:
-        return
-    else:
+    needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
+    if all([needs_thumb, rd.has_valid_pdf, is_og_bot(request)]):
         make_recap_document_thumbnail_from_pdf(rd.pk)
+        rd.refresh_from_db()
+    return rd

@@ -44,7 +44,7 @@ class IncrementingFileSystemStorage(FileSystemStorage):
 
 class UUIDFileSystemStorage(FileSystemStorage):
     """Implements a simple UUID file system storage.
-    
+
     Useful when you don't care what the name of the file is, but you want it to
     be unique. Keeps the path from upload_to param and the extension of the
     original file.

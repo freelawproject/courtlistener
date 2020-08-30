@@ -1,0 +1,7 @@
+{% load text_filters %}{% for docket in dockets %}{{ docket|best_case_name|safe|wordwrap:80 }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}
+{{ docket.court }}
+Terminated: {{ docket.date_terminated|date:"M j, Y" }}{% if docket.date_last_filing %}
+Last Entry: {{ docket.date_last_filing|date:"M j, Y" }}{% endif %}
+https://www.courtlistener.com{{ docket.get_absolute_url }}
+
+{% endfor %}

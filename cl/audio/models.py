@@ -19,9 +19,7 @@ from cl.search.models import Docket, SOURCES
 
 
 class Audio(models.Model):
-    """A class representing oral arguments and their associated metadata
-
-    """
+    """A class representing oral arguments and their associated metadata"""
 
     STT_NEEDED = 0
     STT_COMPLETE = 1
@@ -52,7 +50,8 @@ class Audio(models.Model):
         blank=True,
     )
     case_name = models.TextField(
-        help_text="The full name of the case", blank=True,
+        help_text="The full name of the case",
+        blank=True,
     )
     case_name_full = models.TextField(
         help_text="The full name of the case", blank=True
@@ -111,7 +110,9 @@ class Audio(models.Model):
         db_index=True,
     )
     filepath_ia = models.CharField(
-        help_text="The URL of the file in IA", max_length=1000, blank=True,
+        help_text="The URL of the file in IA",
+        max_length=1000,
+        blank=True,
     )
     ia_upload_failure_count = models.SmallIntegerField(
         help_text="Number of times the upload to the Internet Archive failed.",
@@ -119,10 +120,12 @@ class Audio(models.Model):
         blank=True,
     )
     duration = models.SmallIntegerField(
-        help_text="the length of the item, in seconds", null=True,
+        help_text="the length of the item, in seconds",
+        null=True,
     )
     processing_complete = models.BooleanField(
-        help_text="Is audio for this item done processing?", default=False,
+        help_text="Is audio for this item done processing?",
+        default=False,
     )
     date_blocked = models.DateField(
         help_text="The date that this opinion was blocked from indexing by "

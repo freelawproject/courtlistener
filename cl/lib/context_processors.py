@@ -33,16 +33,17 @@ info_tips = (
     % reverse("donate"),
     'We host and maintain <a href="https://free.law/2020/03/10/announcing-a-new-open-database-of-court-information-ids-and-parsers/">a massive database of court identifiers and information</a> we call the Court-DB',
     # Non-profit and fundraising
-    'Free Law Project is a 501(c)(3) non-profit that relies on your support to operate. Please <a href="%s?referrer=tip">donate</a> to support this site</a>.'
+    'Free Law Project is a 501(c)(3) non-profit that relies on your support to operate. Please <a href="%s?referrer=tip">donate</a> to support this site</a>. <i class="fa fa-heart red"></i>'
     % reverse("donate"),
-    'CourtListener gets more than two million visits per year, but has a lean staff of only a few developers. Please <a href="%s?referrer=tip">donate</a> to support this site.'
+    'CourtListener gets more than two million visits per year, but has a lean staff of only a few developers. Please <a href="%s?referrer=tip">donate</a> to support this site. <i class="fa fa-heart red"></i>'
     % reverse("donate"),
-    'CourtListener is supported by <a href="%s?referrer=tip">user donations</a> and small grants. More donations result in less time spent seeking grants and more time adding features.'
+    'CourtListener is supported by <a href="%s?referrer=tip">user donations</a> and small grants. More donations result in less time spent seeking grants and more time adding features. <i class="fa fa-heart red"></i>'
     % reverse("donate"),
-    'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="%s?referrer=tip">your donations</a>.'
+    'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="%s?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>'
     % reverse("donate"),
-    'Using <a href="https://smile.amazon.com/ch/46-3342480">smile.amazon.com</a>, you can donate 0.5% of every purchase you make on Amazon to Free Law Project, the non-profit that sponsors CourtListener.',
+    'Using <a href="https://smile.amazon.com/ch/46-3342480">smile.amazon.com</a>, you can donate 0.5% of every purchase you make on Amazon to Free Law Project, the non-profit that sponsors CourtListener. <i class="fa fa-heart red"></i>',
     'Free Law Project, the non-profit behind CourtListener, provides <a href="https://free.law/data-consulting/">data consulting and client services</a> for those that need help with our data.',
+    'If you have a Github account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
     # Recognition
     'Free Law Project\'s founders were <a href="https://free.law/2014/07/14/free-law-project-co-founders-named-to-fastcase-50-for-2014/">selected as FastCase 50 winners in 2014</a>.',
     'Oral Arguments were <a href="https://free.law/2014/12/04/free-law-project-recognized-in-two-of-top-ten-legal-hacks-of-2014-by-dc-legal-hackers/">selected as a Top Ten Legal Hack of 2014</a>.',

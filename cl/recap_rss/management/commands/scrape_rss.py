@@ -13,7 +13,7 @@ from cl.recap_rss.tasks import (
     check_if_feed_changed,
     merge_rss_feed_contents,
     mark_status_successful,
-    trim_rss_cache,
+    trim_rss_data,
 )
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
@@ -69,18 +69,14 @@ class Command(VerboseCommand):
                 except IOError:
                     print(
                         "Another instance of this program is running with "
-                        "for this combination of courts. Only one instance "
+                        "this combination of courts. Only one instance "
                         "can crawl these courts at a time: '%s'" % court_str
                     )
                     sys.exit(1)
 
         # Loop over the PACER sites that have RSS feeds and see if they're
         # ready to do.
-        courts = Court.objects.filter(
-            jurisdiction__in=[
-                Court.FEDERAL_BANKRUPTCY,
-                Court.FEDERAL_DISTRICT,
-            ],
+        courts = Court.federal_courts.district_pacer_courts().filter(
             pacer_has_rss_feed=True,
         )
         if options["courts"] != ["all"]:
@@ -124,7 +120,8 @@ class Command(VerboseCommand):
                         # Processed too recently. Try next court.
                         continue
 
-                # Give a court some time to complete during non-sweep crawls
+                # Don't crawl a court if it says it's been in progress just a
+                # little while. It's probably queued and on the way.
                 processing_cutoff = now() - timedelta(
                     seconds=self.RSS_MAX_PROCESSING_DURATION
                 )
@@ -151,7 +148,7 @@ class Command(VerboseCommand):
                     check_if_feed_changed.s(
                         court.pk, new_status.pk, feed_status.date_last_build
                     ),
-                    merge_rss_feed_contents.s(court.pk, new_status.pk),
+                    merge_rss_feed_contents.s(court.pk),
                     send_docket_alerts.s(),
                     # Update recap *documents*, not *dockets*. Updating dockets
                     # requires much more work, and we don't expect to get much
@@ -167,9 +164,11 @@ class Command(VerboseCommand):
                 seconds=self.DELAY_BETWEEN_CACHE_TRIMS
             )
             if last_trim_date is None or trim_cutoff_date > last_trim_date:
-                trim_rss_cache.delay()
+                trim_rss_data.delay()
                 last_trim_date = now()
 
             # Wait, then attempt the courts again if iterations not exceeded.
             iterations_completed += 1
-            time.sleep(self.DELAY_BETWEEN_ITERATIONS)
+            remaining_iterations = options["iterations"] - iterations_completed
+            if remaining_iterations > 0:
+                time.sleep(self.DELAY_BETWEEN_ITERATIONS)

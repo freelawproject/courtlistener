@@ -70,7 +70,7 @@ class solr_date(object):
         return repr(self._dt_obj)
 
     def __unicode__(self):
-        """ Serialize a datetime object in the format required
+        """Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
         if hasattr(self._dt_obj, "isoformat"):

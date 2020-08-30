@@ -5,6 +5,7 @@ from cl.opinion_page.views import (
     block_item,
     cluster_visualizations,
     court_homepage,
+    court_publish_page,
     view_opinion,
     citation_redirector,
     redirect_docket_recap,
@@ -18,6 +19,11 @@ from cl.opinion_page.views import (
 urlpatterns = [
     # Court pages
     url(r"^court/(?P<pk>[^/]*)/$", court_homepage, name="court_homepage"),
+    url(
+        r"^court/(?P<pk>[^/]*)/new-opinion/$",
+        court_publish_page,
+        name="court_publish_page",
+    ),
     # Opinion pages
     url(
         r"^opinion/(?P<pk>\d*)/(?P<slug>[^/]*)/authorities/$",
@@ -62,12 +68,12 @@ urlpatterns = [
         name="view_recap_attachment",
     ),
     url(
-        r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,4})/(?P<page>.*)/)?$",
+        r"^c/(?:(?P<reporter>.*)/(?P<volume>\d{1,10})/(?P<page>.*)/)?$",
         citation_redirector,
         name="citation_redirector",
     ),
     url(
-        r"^c/(?P<reporter>.*)/(?P<volume>\d{1,4})/$",
+        r"^c/(?P<reporter>.*)/(?P<volume>\d{1,10})/$",
         citation_redirector,
         name="citation_redirector",
     ),
@@ -82,7 +88,7 @@ urlpatterns = [
         opinion_sitemap_maker,
         name="opinion_sitemap",
     ),
-    url(r"^sitemap-recap\.xml", recap_sitemap_maker, name="recap_sitemap",),
+    url(r"^sitemap-recap\.xml", recap_sitemap_maker, name="recap_sitemap"),
     # Admin tools
-    url(r"^admin-tools/block-item/$", block_item, name="block_item",),
+    url(r"^admin-tools/block-item/$", block_item, name="block_item"),
 ]

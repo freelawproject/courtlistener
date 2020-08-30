@@ -1,0 +1,161 @@
+[
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": "2015-08-15",
+      "court": "scotus",
+      "date_reargued": "2015-08-16",
+      "case_name_full": "case name full docket 1",
+      "date_argued": "2015-08-16",
+      "date_modified": "2015-08-15T13:55:03.669Z",
+      "case_name": "case name docket 1",
+      "date_created": "2015-08-15T13:55:03.669Z",
+      "case_name_short": "case name short docket 1",
+      "docket_number": "docket number 1 005",
+      "slug": "case-name",
+      "pacer_case_id": "666666",
+      "blocked": false,
+      "source": 0
+    },
+    "model": "search.docket",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "date_reargument_denied": "2015-08-15",
+      "court": "scotus",
+      "date_reargued": "2015-08-15",
+      "case_name_full": "case name full docket 2",
+      "date_argued": "2015-08-15",
+      "date_modified": "2015-08-15T13:55:03.669Z",
+      "case_name": "case name docket 2",
+      "date_created": "2015-08-15T13:55:03.669Z",
+      "case_name_short": "case name short docket 2",
+      "docket_number": "docket number 2",
+      "slug": "case-name",
+      "source": 0,
+      "blocked": false
+    },
+    "model": "search.docket",
+    "pk": 2
+  },
+
+
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "Paul Debbas v. Franklin",
+      "case_name_short": "Debbas",
+      "blocked": false,
+      "syllabus": "some rando syllabus",
+      "date_filed": "2015-08-15",
+      "procedural_history": "some rando history",
+      "source": "C",
+      "panel": [],
+      "judges": "",
+      "case_name": "Debbas v. Franklin",
+      "attorneys": "a bunch of crooks!",
+      "slug": "case-name-cluster",
+      "posture": "",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "precedential_status": "Errata",
+      "citation_count": 4,
+      "scdb_id": "",
+      "scdb_votes_minority": null,
+      "scdb_votes_majority": null,
+      "nature_of_suit": "",
+      "non_participating_judges": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "docket": 1
+    },
+    "model": "search.opinioncluster",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_blocked": null,
+      "case_name_full": "Harvey Howard v. Antonin Honda",
+      "case_name_short": "Howard",
+      "blocked": false,
+      "syllabus": "some rando syllabus",
+      "date_filed": "1795-06-09",
+      "procedural_history": "some rando history",
+      "source": "C",
+      "panel": [],
+      "judges": "David",
+      "case_name": "Howard v. Honda",
+      "attorneys": "a bunch of crooks!",
+      "slug": "case-name-cluster",
+      "posture": "",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "precedential_status": "Published",
+      "citation_count": 6,
+      "scdb_id": "",
+      "scdb_votes_minority": 3,
+      "scdb_votes_majority": 6,
+      "nature_of_suit": "copyright",
+      "non_participating_judges": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "docket": 2
+    },
+    "model": "search.opinioncluster",
+    "pk": 2
+  },
+
+
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": null,
+      "plain_text": "my plain text secret word for queries",
+      "html": "",
+      "download_url": null,
+      "cluster": 1,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_doc.doc",
+      "html_columbia": "",
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": "",
+      "per_curiam": false,
+      "type": "020lead"
+    },
+    "model": "search.opinion",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "sha1": "asdfasdfasdfasdfasdfasddf",
+      "date_modified": "2015-08-15T14:10:56.801Z",
+      "extracted_by_ocr": false,
+      "author": null,
+      "plain_text": "my plain text secret word for queries",
+      "html": "",
+      "download_url": null,
+      "cluster": 2,
+      "html_with_citations": "",
+      "local_path": "test/search/opinion_pdf_image_based.pdf",
+      "html_columbia": "",
+      "joined_by": [],
+      "date_created": "2015-08-15T14:10:56.801Z",
+      "html_lawbox": "",
+      "per_curiam": false,
+      "type": "010combined"
+    },
+    "model": "search.opinion",
+    "pk": 2
+  },
+
+
+  {
+    "fields": {
+      "cited_opinion": 2,
+      "citing_opinion": 1
+    },
+    "model": "search.opinionscited",
+    "pk": 1
+  }
+]

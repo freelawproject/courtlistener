@@ -102,7 +102,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And sees a badge that lets her know it's blocked
@@ -118,7 +118,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And does not see a badge indicating that it's blocked.
@@ -126,11 +126,13 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
             ".content .btn.btn-danger"
         )
         expected_btn_count = 1
+        actual_btn_count = len(btns)
         self.assertEqual(
-            len(btns),
+            actual_btn_count,
             expected_btn_count,
-            msg="Found button indicating the item is blocked, but user should "
-            "not have this access.",
+            msg="Found %s button(s), but expected %s. Does the user have "
+            "access to the blocked button they shouldn't or maybe the "
+            "page crashed?" % (actual_btn_count, expected_btn_count),
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -143,7 +145,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         # Pulls up a page for a Docket that is not blocked to search engines
         docket = Docket.objects.get(pk=10)
         self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url(),)
+            "%s%s" % (self.live_server_url, docket.get_absolute_url())
         )
 
         # And does not see a badge that lets her know it's blocked

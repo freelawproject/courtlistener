@@ -1,4 +1,5 @@
 from django.conf import settings
+from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -9,12 +10,21 @@ from cl.search.models import SEARCH_TYPES
 def get_object_list(request, cd, paginator):
     """Perform the Solr work"""
     # Set the offset value
-    page_number = int(request.GET.get(paginator.page_query_param, 1))
+    try:
+        page_number = int(request.GET.get(paginator.page_query_param, 1))
+    except ValueError:
+        raise ParseError(
+            "Invalid page number: %s"
+            % request.GET.get(paginator.page_query_param)
+        )
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
+    group = False
+    if cd["type"] == SEARCH_TYPES.DOCKETS:
+        group = True
     main_query = search_utils.build_main_query(
-        cd, highlight="text", facet=False, group=False
+        cd, highlight="text", facet=False, group=group
     )
     main_query["caller"] = "api_search"
     if cd["type"] == SEARCH_TYPES.RECAP:
@@ -35,15 +45,13 @@ class SolrList(object):
         self.type = type
         self._item_cache = []
         if self.type == SEARCH_TYPES.OPINION:
-            self.conn = ExtraSolrInterface(
-                settings.SOLR_OPINION_URL, mode="r",
-            )
+            self.conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         elif self.type == SEARCH_TYPES.ORAL_ARGUMENT:
-            self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r",)
-        elif self.type == SEARCH_TYPES.RECAP:
-            self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r",)
+            self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+        elif self.type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+            self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
         elif self.type == SEARCH_TYPES.PEOPLE:
-            self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r",)
+            self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
         self._length = length
 
     def __len__(self):

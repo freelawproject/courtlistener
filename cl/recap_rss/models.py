@@ -1,5 +1,11 @@
-from django.db import models
+import bz2
 
+from django.db import models
+from juriscraper.pacer import PacerRssFeed
+
+from cl.lib.model_helpers import make_path
+from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.storage import UUIDFileSystemStorage
 from cl.search.models import Court
 
 
@@ -72,4 +78,64 @@ class RssItemCache(models.Model):
         auto_now_add=True,
         db_index=True,
     )
-    hash = models.CharField(max_length=64, unique=True, db_index=True,)
+    hash = models.CharField(max_length=64, unique=True, db_index=True)
+
+
+def make_rss_feed_path(instance, filename):
+    return make_path("pacer-rss-feeds", filename)
+
+
+class RssFeedData(models.Model):
+    """Store all old RSS data to disk for future analysis."""
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    court = models.ForeignKey(
+        Court,
+        help_text="The court where the RSS feed was found",
+        on_delete=models.CASCADE,
+        related_name="rss_feed_data",
+    )
+    filepath = models.FileField(
+        help_text="The path of the file in the local storage area.",
+        upload_to=make_rss_feed_path,
+        storage=UUIDFileSystemStorage(),
+        max_length=150,
+    )
+
+    @property
+    def file_contents(self):
+        with open(self.filepath.path, "rb") as f:
+            return bz2.decompress(f.read()).decode("utf-8")
+
+    def print_file_contents(self):
+        print(self.file_contents)
+
+    def reprocess_item(self, metadata_only=False, index=True):
+        """Reprocess the RSS feed
+
+        :param metadata_only: If True, only do the metadata, not the docket
+        entries.
+        :param index: Whether to save to Solr (note that none will be sent
+        when doing medata only since no entries are modified).
+        """
+        from cl.recap_rss.tasks import merge_rss_feed_contents
+        from cl.search.tasks import add_items_to_solr
+
+        rss_feed = PacerRssFeed(map_cl_to_pacer_id(self.court_id))
+        rss_feed._parse_text(self.file_contents)
+        response = merge_rss_feed_contents(
+            rss_feed.data, self.court_id, metadata_only
+        )
+        if index:
+            add_items_to_solr(
+                response.get("rds_for_solr", []), "search.RECAPDocument"
+            )

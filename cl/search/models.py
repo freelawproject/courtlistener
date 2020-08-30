@@ -61,6 +61,7 @@ SOURCES = (
     ("ZL", "columbia merged with lawbox"),
     ("U", "Harvard, Library Innovation Lab Case Law Access Project"),
     ("CU", "court website merged with Harvard"),
+    ("D", "direct court input"),
 )
 
 
@@ -103,7 +104,7 @@ class OriginatingCourtInformation(models.Model):
         db_index=True,
     )
     docket_number = models.TextField(
-        help_text="The docket number in the lower court.", blank=True,
+        help_text="The docket number in the lower court.", blank=True
     )
     assigned_to = models.ForeignKey(
         "people_db.Person",
@@ -133,7 +134,7 @@ class OriginatingCourtInformation(models.Model):
         blank=True,
     )
     court_reporter = models.TextField(
-        help_text="The court reporter responsible for the case.", blank=True,
+        help_text="The court reporter responsible for the case.", blank=True
     )
     date_disposed = models.DateField(
         help_text="The date the case was disposed at the lower court.",
@@ -188,6 +189,8 @@ class Docket(models.Model):
     # source, you can add it to the previous one, and have a combined value.
     # For example, if you start with a RECAP docket (1), then add scraped
     # content (2), you can arrive at a combined docket (3) because 1 + 2 = 3.
+    # Put another way, this is a bitmask. We should eventually re-do it as a
+    # bitfield using, e.g. https://github.com/disqus/django-bitfield
     DEFAULT = 0
     RECAP = 1
     SCRAPER = 2
@@ -205,7 +208,8 @@ class Docket(models.Model):
     COLUMBIA_AND_SCRAPER_AND_IDB = 14
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
     HARVARD = 16
-    SCRAPER_AND_HARVARD = 17
+    SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
+    DIRECT_INPUT = 32
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -228,6 +232,7 @@ class Docket(models.Model):
         ),
         (HARVARD, "Harvard"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
+        (DIRECT_INPUT, "Direct court input"),
     )
     RECAP_SOURCES = [
         RECAP,
@@ -251,7 +256,7 @@ class Docket(models.Model):
     ]
 
     source = models.SmallIntegerField(
-        help_text="contains the source of the Docket.", choices=SOURCE_CHOICES,
+        help_text="contains the source of the Docket.", choices=SOURCE_CHOICES
     )
     court = models.ForeignKey(
         "Court",
@@ -417,15 +422,15 @@ class Docket(models.Model):
         db_index=True,
     )
     date_filed = models.DateField(
-        help_text="The date the case was filed.", blank=True, null=True,
+        help_text="The date the case was filed.", blank=True, null=True
     )
     date_terminated = models.DateField(
-        help_text="The date the case was terminated.", blank=True, null=True,
+        help_text="The date the case was terminated.", blank=True, null=True
     )
     date_last_filing = models.DateField(
         help_text=(
             "The date the case was last updated in the docket, as shown "
-            "in PACER's Docket History report."
+            "in PACER's Docket History report or iquery page."
         ),
         blank=True,
         null=True,
@@ -436,10 +441,10 @@ class Docket(models.Model):
         blank=True,
     )
     case_name = models.TextField(
-        help_text="The standard name of the case", blank=True,
+        help_text="The standard name of the case", blank=True
     )
     case_name_full = models.TextField(
-        help_text="The full name of the case", blank=True,
+        help_text="The full name of the case", blank=True
     )
     slug = models.SlugField(
         help_text="URL that the document should map to (the slug)",
@@ -492,7 +497,7 @@ class Docket(models.Model):
         blank=True,
     )
     jury_demand = models.CharField(
-        help_text="The compensation demand.", max_length=500, blank=True,
+        help_text="The compensation demand.", max_length=500, blank=True
     )
     jurisdiction_type = models.CharField(
         help_text=(
@@ -568,7 +573,7 @@ class Docket(models.Model):
         db_index=True,
     )
     view_count = models.IntegerField(
-        help_text="The number of times the docket has been seen.", default=0,
+        help_text="The number of times the docket has been seen.", default=0
     )
     date_blocked = models.DateField(
         help_text=(
@@ -672,7 +677,7 @@ class Docket(models.Model):
                 u"caseNum=%s&"
                 u"incOrigDkt=Y&"
                 u"incDktEntries=Y"
-            ) % (court_id, self.pacer_case_id,)
+            ) % (court_id, self.pacer_case_id)
         else:
             return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
                 court_id,
@@ -778,7 +783,7 @@ class Docket(models.Model):
                     out["firm"].add(f.name)
 
         # Do RECAPDocument and Docket Entries in a nested loop
-        for de in self.docket_entries.all():
+        for de in self.docket_entries.all().iterator():
             # Docket Entry
             de_out = {
                 "description": de.description,
@@ -835,7 +840,7 @@ class Docket(models.Model):
                 # Ensure that loops to bleed into each other
                 out_copy = out.copy()
                 out_copy.update(rd_out)
-                out_copy.update(rd_out)
+                out_copy.update(de_out)
 
                 search_list.append(normalize_search_dicts(out_copy))
 
@@ -1022,9 +1027,7 @@ class AbstractPacerDocument(models.Model):
 
 
 class RECAPDocument(AbstractPacerDocument, AbstractPDF):
-    """
-        The model for Docket Documents and Attachments.
-    """
+    """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
@@ -1141,6 +1144,18 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
                 )
 
     @property
+    def has_valid_pdf(self):
+        return all(
+            [
+                self.is_available,
+                (
+                    self.filepath_local
+                    and os.path.isfile(self.filepath_local.path)
+                ),
+            ]
+        )
+
+    @property
     def needs_extraction(self):
         """Does the item need extraction and does it have all the right
         fields? Items needing OCR still need extraction.
@@ -1148,10 +1163,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         return all(
             [
                 self.ocr_status is None or self.ocr_status == self.OCR_NEEDED,
-                self.is_available is True,
-                # Has a value in filepath field, which points to a file.
-                self.filepath_local
-                and os.path.isfile(self.filepath_local.path),
+                self.has_valid_pdf,
             ]
         )
 
@@ -1326,9 +1338,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         out = docket_metadata or self.get_docket_metadata()
 
         # IDs
-        out.update(
-            {"id": self.pk, "docket_entry_id": self.docket_entry.pk,}
-        )
+        out.update({"id": self.pk, "docket_entry_id": self.docket_entry.pk})
 
         # RECAPDocument
         out.update(
@@ -1380,7 +1390,7 @@ class BankruptcyInformation(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_converted = models.DateTimeField(
         help_text=(
@@ -1391,7 +1401,7 @@ class BankruptcyInformation(models.Model):
         null=True,
     )
     date_last_to_file_claims = models.DateTimeField(
-        help_text="The last date for filing claims.", blank=True, null=True,
+        help_text="The last date for filing claims.", blank=True, null=True
     )
     date_last_to_file_govt = models.DateTimeField(
         help_text="The last date for the government to file claims.",
@@ -1399,7 +1409,7 @@ class BankruptcyInformation(models.Model):
         null=True,
     )
     date_debtor_dismissed = models.DateTimeField(
-        help_text="The date the debtor was dismissed.", blank=True, null=True,
+        help_text="The date the debtor was dismissed.", blank=True, null=True
     )
     chapter = models.CharField(
         help_text="The chapter the bankruptcy is currently filed under.",
@@ -1407,7 +1417,7 @@ class BankruptcyInformation(models.Model):
         blank=True,
     )
     trustee_str = models.TextField(
-        help_text="The name of the trustee handling the case.", blank=True,
+        help_text="The name of the trustee handling the case.", blank=True
     )
 
     class Meta:
@@ -1436,7 +1446,7 @@ class Claim(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_claim_modified = models.DateTimeField(
         help_text="Date the claim was last modified to our knowledge.",
@@ -1459,7 +1469,7 @@ class Claim(models.Model):
         null=True,
     )
     date_last_amendment_filed = models.DateTimeField(
-        help_text="Date the last amendment was filed.", blank=True, null=True,
+        help_text="Date the last amendment was filed.", blank=True, null=True
     )
     claim_number = models.CharField(
         help_text="The number of the claim.",
@@ -1483,7 +1493,7 @@ class Claim(models.Model):
         blank=True,
     )
     status = models.CharField(
-        help_text="The status of the claim.", max_length=1000, blank=True,
+        help_text="The status of the claim.", max_length=1000, blank=True
     )
     entered_by = models.CharField(
         help_text="The person that entered the claim.",
@@ -1553,7 +1563,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
         on_delete=models.CASCADE,
     )
     date_filed = models.DateField(
-        help_text="The created date of the claim.", null=True, blank=True,
+        help_text="The created date of the claim.", null=True, blank=True
     )
     claim_document_type = models.IntegerField(
         help_text=(
@@ -1597,6 +1607,58 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
 
     class Meta:
         verbose_name_plural = "Claim History Entries"
+
+
+class FederalCourtsQuerySet(models.QuerySet):
+    def all(self):
+        return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
+
+    def all_pacer_courts(self):
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                    Court.FEDERAL_APPELLATE,
+                ]
+            )
+            | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
+
+    def district_pacer_courts(self):
+        return self.filter(
+            Q(
+                jurisdiction__in=[
+                    Court.FEDERAL_DISTRICT,
+                    Court.FEDERAL_BANKRUPTCY,
+                ]
+            )
+            | Q(pk__in=["cit", "jpml", "uscfc"]),
+            end_date__isnull=True,
+        )
+
+    def appellate_pacer_courts(self):
+        return self.filter(
+            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
+            # Court of Appeals for Veterans Claims uses appellate PACER
+            Q(pk__in=["cavc"]),
+            end_date__isnull=True,
+        ).exclude(pk="scotus")
+
+    def bankruptcy_pacer_courts(self):
+        return self.filter(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
+        )
+
+    def district_courts(self):
+        return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
+
+    def bankruptcy_courts(self):
+        return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
+
+    def appellate_courts(self):
+        return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
 
 class Court(models.Model):
@@ -1656,6 +1718,8 @@ class Court(models.Model):
         max_length=15,  # Changes here will require updates in urls.py
         primary_key=True,
     )
+
+    # Pacer fields
     pacer_court_id = models.PositiveSmallIntegerField(
         help_text=(
             "The numeric ID for the court in PACER. "
@@ -1672,6 +1736,18 @@ class Court(models.Model):
         ),
         blank=True,
     )
+    pacer_rss_entry_types = models.TextField(
+        help_text="The types of entries provided by the court's RSS feed.",
+        blank=True,
+    )
+    date_last_pacer_contact = models.DateTimeField(
+        help_text="The last time the PACER website for the court was "
+        "successfully contacted",
+        blank=True,
+        null=True,
+    )
+
+    # Other stuff
     fjc_court_id = models.CharField(
         help_text="The ID used by FJC in the Integrated Database",
         max_length=3,
@@ -1718,10 +1794,10 @@ class Court(models.Model):
         blank=True,
     )
     short_name = models.CharField(
-        help_text="a short name of the court", max_length=100, blank=False,
+        help_text="a short name of the court", max_length=100, blank=False
     )
     full_name = models.CharField(
-        help_text="the full name of the court", max_length=200, blank=False,
+        help_text="the full name of the court", max_length=200, blank=False
     )
     url = models.URLField(
         help_text="the homepage for each court or the closest thing thereto",
@@ -1749,6 +1825,9 @@ class Court(models.Model):
         "raw)",
         blank=True,
     )
+
+    objects = models.Manager()
+    federal_courts = FederalCourtsQuerySet.as_manager()
 
     def __unicode__(self):
         return u"{name}".format(name=self.full_name)
@@ -1945,7 +2024,7 @@ class OpinionCluster(models.Model):
         blank=True,
     )
     posture = models.TextField(
-        help_text="The procedural posture of the case.", blank=True,
+        help_text="The procedural posture of the case.", blank=True
     )
     syllabus = models.TextField(
         help_text=(
@@ -2094,25 +2173,27 @@ class OpinionCluster(models.Model):
         caption = best_case_name(self)
         citations = sorted(self.citations.all(), key=sort_cites)
         if not citations:
-            caption += ", %s" % self.docket.docket_number
+            if self.docket.docket_number:
+                caption += u", %s" % self.docket.docket_number
         else:
             if citations[0].type == Citation.NEUTRAL:
-                caption += ", %s" % citations[0]
+                caption += u", %s" % citations[0]
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
             elif (
-                citations[0].type == Citation.WEST
+                len(citations) >= 2
+                and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
             ):
-                caption += ", %s, %s" % (citations[0], citations[1])
+                caption += u", %s, %s" % (citations[0], citations[1])
             else:
-                caption += ", %s" % citations[0]
+                caption += u", %s" % citations[0]
 
-        if self.docket.court_id != "scotus":
+        if self.docket.court_id != u"scotus":
             court = re.sub(u" ", u"&nbsp;", self.docket.court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
             year = self.date_filed.isoformat().split("-")[0]
-            caption += "&nbsp;({court}&nbsp;{year})".format(
+            caption += u"&nbsp;({court}&nbsp;{year})".format(
                 court=court, year=year
             )
         return caption
@@ -2171,7 +2252,7 @@ class OpinionCluster(models.Model):
         authorities_with_data = list(self.authorities)
         for authority in authorities_with_data:
             authority.citation_depth = get_citation_depth_between_clusters(
-                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk,
+                citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
             )
 
         authorities_with_data.sort(
@@ -2360,7 +2441,7 @@ class Citation(models.Model):
         related_name="citations",
         on_delete=models.CASCADE,
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter",)
+    volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -2377,7 +2458,7 @@ class Citation(models.Model):
         ),
     )
     type = models.SmallIntegerField(
-        help_text="The type of citation that this is.", choices=CITATION_TYPES,
+        help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
     def __unicode__(self):
@@ -2531,7 +2612,7 @@ class Opinion(models.Model):
         auto_now=True,
         db_index=True,
     )
-    type = models.CharField(max_length=20, choices=OPINION_TYPES,)
+    type = models.CharField(max_length=20, choices=OPINION_TYPES)
     sha1 = models.CharField(
         help_text=(
             "unique ID for the document, as generated via SHA1 of the "
@@ -2583,10 +2664,10 @@ class Opinion(models.Model):
         help_text="HTML of Lawbox documents", blank=True
     )
     html_columbia = models.TextField(
-        help_text="HTML of Columbia archive", blank=True,
+        help_text="HTML of Columbia archive", blank=True
     )
     xml_harvard = models.TextField(
-        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True,
+        help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
     html_with_citations = models.TextField(
         help_text=(
@@ -2609,7 +2690,7 @@ class Opinion(models.Model):
     def __unicode__(self):
         try:
             return u"{pk} - {cn}".format(
-                pk=getattr(self, "pk", None), cn=self.cluster.case_name,
+                pk=getattr(self, "pk", None), cn=self.cluster.case_name
             )
         except AttributeError:
             return u"Orphan opinion with ID: %s" % self.pk
@@ -2734,10 +2815,10 @@ class Opinion(models.Model):
 
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
-        Opinion, related_name="cited_opinions", on_delete=models.CASCADE,
+        Opinion, related_name="cited_opinions", on_delete=models.CASCADE
     )
     cited_opinion = models.ForeignKey(
-        Opinion, related_name="citing_opinions", on_delete=models.CASCADE,
+        Opinion, related_name="citing_opinions", on_delete=models.CASCADE
     )
     depth = models.IntegerField(
         help_text="The number of times the cited opinion was cited "
@@ -2868,11 +2949,13 @@ class Tag(models.Model):
 class SEARCH_TYPES:
     OPINION = "o"
     RECAP = "r"
+    DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     NAMES = (
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
+        (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
     )

@@ -3,6 +3,7 @@ import traceback
 from datetime import date, datetime, timedelta
 from urllib import quote
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -63,10 +64,13 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
         if paged_results is not None:
             return paged_results
 
-    page = int(get_params.get("page", 1))
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
     check_pagination_depth(page)
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         rows = 10
 
     paginator = Paginator(results, rows)
@@ -89,7 +93,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
 
 
 def do_search(
-    get_params, rows=20, override_params=None, facet=True, cache_key=None,
+    get_params, rows=20, override_params=None, facet=True, cache_key=None
 ):
     """Do all the difficult solr work.
 
@@ -111,6 +115,7 @@ def do_search(
     query_citation = None
     error = False
     paged_results = None
+    cited_cluster = None
     courts = Court.objects.filter(in_use=True)
     related_cluster_pks = None
 
@@ -158,6 +163,11 @@ def do_search(
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )
+            cited_cluster = add_depth_counts(
+                # Also returns cited cluster if found
+                search_data=cd,
+                search_results=paged_results,
+            )
         except (NotImplementedError, RequestException, SolrError) as e:
             error = True
             logger.warning(
@@ -169,10 +179,18 @@ def do_search(
 
         # A couple special variables for particular search types
         search_form = _clean_form(get_params, cd, courts)
-        if cd["type"] in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
+        if cd["type"] in [
+            SEARCH_TYPES.OPINION,
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        ]:
             query_citation = get_query_citation(cd)
 
-        if cd["type"] == SEARCH_TYPES.RECAP:
+        if cd["type"] in [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.PEOPLE,
+        ]:
             panels = Court.FEDERAL_BANKRUPTCY_PANEL
             courts = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True
@@ -185,9 +203,6 @@ def do_search(
     )
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
-    cited_cluster = add_depth_counts(  # Also returns cited cluster if found
-        search_data=cd, search_results=paged_results,
-    )
     related_cluster = (
         OpinionCluster.objects.get(sub_opinions__pk__in=related_cluster_pks)
         if related_cluster_pks
@@ -210,6 +225,7 @@ def do_search(
     }
 
 
+@cache_memoize(5 * 60)
 def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
@@ -251,17 +267,17 @@ def get_homepage_stats():
             as_dict=True,
         )["d"],
         "viz_in_last_ten": SCOTUSMap.objects.filter(
-            date_published__gte=ten_days_ago, published=True,
+            date_published__gte=ten_days_ago, published=True
         ).count(),
         "visualizations": SCOTUSMap.objects.filter(
-            published=True, deleted=False,
+            published=True, deleted=False
         )
-        .annotate(Count("clusters"),)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:1],
+        .order_by("-date_published", "-date_modified", "-date_created")[:1],
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
@@ -440,7 +456,7 @@ def advanced(request):
         o_results = do_search(
             request.GET.copy(),
             rows=1,
-            override_params={"type": obj_type,},
+            override_params={"type": obj_type},
             facet=True,
             cache_key="opinion-homepage-results",
         )
@@ -452,8 +468,8 @@ def advanced(request):
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
             courts = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True,
-            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL,)
+                pacer_court_id__isnull=False, end_date__isnull=True
+            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):

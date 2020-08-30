@@ -1,11 +1,9 @@
-import time
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
-from django.db.models import F, Count
+from django.db.models import Count
 from django.http import (
     HttpResponseRedirect,
     HttpResponse,
@@ -18,31 +16,18 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import suppress_autotime
+from cl.lib.view_utils import increment_view_count
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizForm, VizEditForm
-from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
+from cl.visualizations.models import SCOTUSMap, Referer
 from cl.visualizations.tasks import get_title
-from cl.visualizations.utils import (
-    reverse_endpoints_if_needed,
-    TooManyNodes,
-    message_dict,
-)
+from cl.visualizations.utils import message_dict, build_visualization
+from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 
 def render_visualization_page(request, pk, embed):
     viz = get_object_or_404(SCOTUSMap, pk=pk)
-
-    if not is_bot(request):
-        cached_value = viz.view_count
-
-        with suppress_autotime(viz, ["date_modified"]):
-            viz.view_count = F("view_count") + 1
-            viz.save()
-
-        # To get the new value, you either need to get the item from the DB a
-        # second time, or just manipulate it manually....
-        viz.view_count = cached_value + 1
+    increment_view_count(viz, request)
 
     status = None
     if viz.deleted:
@@ -58,7 +43,7 @@ def render_visualization_page(request, pk, embed):
             referer_url = request.META.get("HTTP_REFERER")
             if referer_url is not None:
                 referer, created = Referer.objects.get_or_create(
-                    url=referer_url, map_id=viz.pk,
+                    url=referer_url, map_id=viz.pk
                 )
                 if created:
                     # Spawn a task to try to get the title of the page.
@@ -67,7 +52,7 @@ def render_visualization_page(request, pk, embed):
     else:
         template = "visualization.html"
     return render(
-        request, template, {"viz": viz, "private": True}, status=status
+        request, template, {"viz": viz, "private": False}, status=status
     )
 
 
@@ -82,8 +67,7 @@ def view_embedded_visualization(request, pk):
 
 @never_cache
 def view_visualization(request, pk, slug):
-    """Return the network page.
-    """
+    """Return the network page."""
     return render_visualization_page(request, pk, embed=False)
 
 
@@ -91,14 +75,14 @@ def view_visualization(request, pk, slug):
 @never_cache
 def new_visualization(request):
     demo_viz = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=5,
             clusters__count__lt=15,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:1]
+        .order_by("-date_published", "-date_modified", "-date_created")[:1]
     )
 
     context = {
@@ -123,48 +107,19 @@ def new_visualization(request):
                 title=cd["title"],
                 notes=cd["notes"],
             )
-
-            build_kwargs = {
-                "parent_authority": end,
-                "visited_nodes": {},
-                "good_nodes": {},
-                "max_hops": 3,
-            }
-            t1 = time.time()
-            try:
-                g = viz.build_nx_digraph(**build_kwargs)
-            except TooManyNodes:
-                try:
-                    # Try with fewer hops.
-                    build_kwargs["max_hops"] = 2
-                    g = viz.build_nx_digraph(**build_kwargs)
-                    msg = message_dict["fewer_hops_delivered"]
-                    messages.add_message(request, msg["level"], msg["message"])
-                except TooManyNodes:
-                    # Still too many hops. Abort.
-                    tally_stat("visualization.too_many_nodes_failure")
-                    msg = message_dict["too_many_nodes"]
-                    messages.add_message(request, msg["level"], msg["message"])
-                    return render(request, "new_visualization.html", context)
-
-            if len(g.edges()) == 0:
-                tally_stat("visualization.too_few_nodes_failure")
-                msg = message_dict["too_few_nodes"]
+            status, viz = build_visualization(viz)
+            if status == "too_many_nodes":
+                msg = message_dict[status]
+                messages.add_message(request, msg["level"], msg["message"])
+                return render(request, "new_visualization.html", context)
+            elif status == "too_few_nodes":
+                msg = message_dict[status]
                 messages.add_message(request, msg["level"], msg["message"])
                 return render(
                     request,
                     "new_visualization.html",
                     {"form": form, "private": True},
                 )
-
-            t2 = time.time()
-            viz.generation_time = t2 - t1
-
-            viz.save()
-            viz.add_clusters(g)
-            j = viz.to_json(g)
-            jv = JSONVersion(map=viz, json_data=j)
-            jv.save()
 
             return HttpResponseRedirect(
                 reverse(
@@ -216,7 +171,7 @@ def delete_visualization(request):
         return HttpResponse("It worked.")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -231,7 +186,7 @@ def restore_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -245,7 +200,7 @@ def share_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -259,7 +214,7 @@ def privatize_visualization(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )
 
 
@@ -268,28 +223,28 @@ def mapper_homepage(request):
         tally_stat("visualization.scotus_homepage_loaded")
 
     visualizations = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
         .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-        .order_by("-date_published", "-date_modified", "-date_created",)[:2]
+        .order_by("-date_published", "-date_modified", "-date_created")[:2]
     )
 
     return render(
         request,
         "visualization_home.html",
-        {"visualizations": visualizations, "private": False,},
+        {"visualizations": visualizations, "private": False},
     )
 
 
 @never_cache
 def gallery(request):
     visualizations = (
-        SCOTUSMap.objects.filter(published=True, deleted=False,)
-        .annotate(Count("clusters"),)
-        .order_by("-date_published", "-date_modified", "-date_created",)
+        SCOTUSMap.objects.filter(published=True, deleted=False)
+        .annotate(Count("clusters"))
+        .order_by("-date_published", "-date_modified", "-date_created")
     )
     paginator = Paginator(visualizations, 5)
     page = request.GET.get("page", 1)
@@ -300,5 +255,7 @@ def gallery(request):
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
     return render(
-        request, "gallery.html", {"results": paged_vizes, "private": False,}
+        request,
+        "gallery.html",
+        {"results": paged_vizes, "private": False},
     )

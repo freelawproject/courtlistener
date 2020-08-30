@@ -6,6 +6,7 @@ from datetime import date
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -27,6 +28,7 @@ from cl.search.models import OpinionCluster
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
+cnt = CaseNameTweaker()
 
 
 def make_citation(cite_str, cluster, cite_type):
@@ -41,12 +43,119 @@ def make_citation(cite_str, cluster, cite_type):
     )
 
 
+@transaction.atomic
+def make_objects(item, court, sha1_hash, content):
+    """Takes the meta data from the scraper and associates it with objects.
+
+    Returns the created objects.
+    """
+    blocked = item["blocked_statuses"]
+    if blocked:
+        date_blocked = date.today()
+    else:
+        date_blocked = None
+
+    case_name_short = item.get("case_name_shorts") or cnt.make_case_name_short(
+        item["case_names"]
+    )
+
+    docket = Docket(
+        docket_number=item.get("docket_numbers", ""),
+        case_name=item["case_names"],
+        case_name_short=case_name_short,
+        court=court,
+        blocked=blocked,
+        date_blocked=date_blocked,
+        source=item.get("source") or Docket.SCRAPER,
+    )
+
+    west_cite_str = item.get("west_citations", "")
+    state_cite_str = item.get("west_state_citations", "")
+    neutral_cite_str = item.get("neutral_citations", "")
+    cluster = OpinionCluster(
+        judges=item.get("judges", ""),
+        date_filed=item["case_dates"],
+        date_filed_is_approximate=item["date_filed_is_approximate"],
+        case_name=item["case_names"],
+        case_name_short=case_name_short,
+        source=item.get("cluster_source") or "C",
+        precedential_status=item["precedential_statuses"],
+        nature_of_suit=item.get("nature_of_suit", ""),
+        blocked=blocked,
+        date_blocked=date_blocked,
+        syllabus=item.get("summaries", ""),
+    )
+    citations = []
+    cite_types = [
+        (west_cite_str, Citation.WEST),
+        (state_cite_str, Citation.STATE),
+        (neutral_cite_str, Citation.NEUTRAL),
+    ]
+    for cite_str, cite_type in cite_types:
+        if cite_str:
+            citations.append(make_citation(cite_str, cluster, cite_type))
+    opinion = Opinion(
+        type=Opinion.COMBINED,
+        sha1=sha1_hash,
+        download_url=item["download_urls"],
+    )
+
+    error = False
+    try:
+        cf = ContentFile(content)
+        extension = get_extension(content)
+        file_name = trunc(item["case_names"].lower(), 75) + extension
+        opinion.file_with_date = cluster.date_filed
+        opinion.local_path.save(file_name, cf, save=False)
+    except:
+        msg = "Unable to save binary to disk. Deleted " "item: %s.\n %s" % (
+            item["case_names"],
+            traceback.format_exc(),
+        )
+        logger.critical(msg.encode("utf-8"))
+        ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
+        error = True
+
+    return docket, opinion, cluster, citations, error
+
+
+@transaction.atomic
+def save_everything(items, index=False, backscrape=False):
+    """Saves all the sub items and associates them as appropriate."""
+    docket, cluster = items["docket"], items["cluster"]
+    opinion, citations = items["opinion"], items["citations"]
+    docket.save()
+    cluster.docket = docket
+    cluster.save(index=False)  # Index only when the opinion is associated.
+
+    for citation in citations:
+        citation.cluster_id = cluster.pk
+        citation.save()
+
+    if cluster.judges:
+        candidate_judges = get_candidate_judges(
+            cluster.judges, docket.court.pk, cluster.date_filed
+        )
+        if len(candidate_judges) == 1:
+            opinion.author = candidate_judges[0]
+
+        if len(candidate_judges) > 1:
+            for candidate in candidate_judges:
+                cluster.panel.add(candidate)
+
+    opinion.cluster = cluster
+    opinion.save(index=index)
+    if not backscrape:
+        RealTimeQueue.objects.create(
+            item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
+        )
+
+
 class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
-        self.cnt = CaseNameTweaker()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -92,110 +201,6 @@ class Command(VerboseCommand):
             help="Disable duplicate aborting.",
         )
 
-    def make_objects(self, item, court, sha1_hash, content):
-        """Takes the meta data from the scraper and associates it with objects.
-
-        Returns the created objects.
-        """
-        blocked = item["blocked_statuses"]
-        if blocked:
-            date_blocked = date.today()
-        else:
-            date_blocked = None
-
-        case_name_short = item.get(
-            "case_name_shorts"
-        ) or self.cnt.make_case_name_short(item["case_names"])
-        docket = Docket(
-            docket_number=item.get("docket_numbers", ""),
-            case_name=item["case_names"],
-            case_name_short=case_name_short,
-            court=court,
-            blocked=blocked,
-            date_blocked=date_blocked,
-            source=Docket.SCRAPER,
-        )
-
-        west_cite_str = item.get("west_citations", "")
-        state_cite_str = item.get("west_state_citations", "")
-        neutral_cite_str = item.get("neutral_citations", "")
-        cluster = OpinionCluster(
-            judges=item.get("judges", ""),
-            date_filed=item["case_dates"],
-            date_filed_is_approximate=item["date_filed_is_approximate"],
-            case_name=item["case_names"],
-            case_name_short=case_name_short,
-            source="C",
-            precedential_status=item["precedential_statuses"],
-            nature_of_suit=item.get("nature_of_suit", ""),
-            blocked=blocked,
-            date_blocked=date_blocked,
-            syllabus=item.get("summaries", ""),
-        )
-        citations = []
-        cite_types = [
-            (west_cite_str, Citation.WEST),
-            (state_cite_str, Citation.STATE),
-            (neutral_cite_str, Citation.NEUTRAL),
-        ]
-        for cite_str, cite_type in cite_types:
-            if cite_str:
-                citations.append(make_citation(cite_str, cluster, cite_type))
-        opinion = Opinion(
-            type=Opinion.COMBINED,
-            sha1=sha1_hash,
-            download_url=item["download_urls"],
-        )
-
-        error = False
-        try:
-            cf = ContentFile(content)
-            extension = get_extension(content)
-            file_name = trunc(item["case_names"].lower(), 75) + extension
-            opinion.file_with_date = cluster.date_filed
-            opinion.local_path.save(file_name, cf, save=False)
-        except:
-            msg = (
-                "Unable to save binary to disk. Deleted "
-                "item: %s.\n %s" % (item["case_names"], traceback.format_exc())
-            )
-            logger.critical(msg.encode("utf-8"))
-            ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
-            error = True
-
-        return docket, opinion, cluster, citations, error
-
-    def save_everything(self, items, index=False, backscrape=False):
-        """Saves all the sub items and associates them as appropriate.
-        """
-        docket, cluster = items["docket"], items["cluster"]
-        opinion, citations = items["opinion"], items["citations"]
-        docket.save()
-        cluster.docket = docket
-        cluster.save(index=False)  # Index only when the opinion is associated.
-
-        for citation in citations:
-            citation.cluster_id = cluster.pk
-            citation.save()
-
-        if cluster.judges:
-            candidate_judges = get_candidate_judges(
-                cluster.judges, docket.court.pk, cluster.date_filed,
-            )
-            if len(candidate_judges) == 1:
-                opinion.author = candidate_judges[0]
-
-            if len(candidate_judges) > 1:
-                for candidate in candidate_judges:
-                    cluster.panel.add(candidate)
-
-        opinion.cluster = cluster
-        opinion.save(index=index)
-        if not backscrape:
-            RealTimeQueue.objects.create(
-                item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
-            )
-
     def scrape_court(self, site, full_crawl=False):
         download_error = False
         # Get the court object early for logging
@@ -217,7 +222,7 @@ class Command(VerboseCommand):
                 method=site.method,
             )
             if msg:
-                logger.warn(msg)
+                logger.warning(msg)
                 ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 
@@ -263,7 +268,7 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
-            docket, opinion, cluster, citations, error = self.make_objects(
+            docket, opinion, cluster, citations, error = make_objects(
                 item, court, sha1_hash, content
             )
 
@@ -271,7 +276,7 @@ class Command(VerboseCommand):
                 download_error = True
                 continue
 
-            self.save_everything(
+            save_everything(
                 items={
                     "docket": docket,
                     "opinion": opinion,
@@ -281,12 +286,12 @@ class Command(VerboseCommand):
                 index=False,
             )
             extract_doc_content.delay(
-                opinion.pk, do_ocr=True, citation_jitter=True,
+                opinion.pk, do_ocr=True, citation_jitter=True
             )
 
             logger.info(
                 "Successfully added doc {pk}: {name}".format(
-                    pk=opinion.pk, name=item["case_names"].encode("utf-8"),
+                    pk=opinion.pk, name=item["case_names"].encode("utf-8")
                 )
             )
 

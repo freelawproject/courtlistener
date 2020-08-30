@@ -36,24 +36,24 @@ TAG_NAME_OPINIONS = TAG_NAME + "-opinions"
 """
 This file contains some of the work product of our collaboration with GSU. The
 process we went through for this project was:
-   
+
  - They provided a spreadsheet with case names, jurisdictions, and dates.
-  
+
  - We took that spreadsheet and looked up anything we could in our IDB DB.
- 
+
  - That didn't always work, so we provided a spreadsheet of missing values
    back to GSU.
-   
+
  - Students then completed the missing values, which we merged back into our
    spreadsheet.
-   
+
  - From there, we used the new spreadsheet to look up the new and old values
    and download them.
-   
+
  - Once the docket is downloaded, we get the docket entries matching the dates
-   on the spreadsheet. 
-   
-All of this process is summarized in an email dated 2018-04-17. 
+   on the spreadsheet.
+
+All of this process is summarized in an email dated 2018-04-17.
 """
 
 
@@ -91,10 +91,10 @@ def lookup_row(row):
     try:
         plaintiff, defendant = row["Case Name"].lower().split(" v. ", 1)
     except IndexError:
-        logger.warn("Unable to find ' v. ' in case name.")
+        logger.warning("Unable to find ' v. ' in case name.")
         return
     except ValueError:
-        logger.warn("Got multiple ' v. ' in the case name.")
+        logger.warning("Got multiple ' v. ' in the case name.")
         return
     opinion_date = datetime.strptime(row["Date"], "%m/%d/%Y")
     orig_query = (
@@ -169,7 +169,7 @@ def lookup_row(row):
         results = orig_query.filter(*args, **kwargs)
         count = results.count()
         if count == 0:
-            logger.warn(
+            logger.warning(
                 "Unable to find result (args: %s, kwargs: %s). "
                 "Broadening if possible." % (args, kwargs)
             )
@@ -186,7 +186,7 @@ def lookup_row(row):
             )
             return results[0]
         else:
-            logger.warn(
+            logger.warning(
                 "Got too many results. Cannot identify correct case "
                 "(args: %s, kwargs: %s)." % (args, kwargs)
             )
@@ -268,9 +268,8 @@ def download_dockets(options):
             else:
                 # No docket number; move on.
                 continue
-            court = Court.objects.get(
+            court = Court.federal_courts.district_courts().get(
                 fjc_court_id=row["AO ID"].rjust(2, "0"),
-                jurisdiction=Court.FEDERAL_DISTRICT,
             )
             chain(
                 get_pacer_case_id_and_title.s(
@@ -388,20 +387,19 @@ def download_documents(options):
         )
 
         if not docket_number:
-            logger.warn("No docket number found for row: %s", i)
+            logger.warning("No docket number found for row: %s", i)
             continue
-        court = Court.objects.get(
+        court = Court.federal_courts.district_courts().get(
             fjc_court_id=row["AO ID"].rjust(2, "0"),
-            jurisdiction=Court.FEDERAL_DISTRICT,
         )
 
         try:
             d = Docket.objects.get(docket_number=docket_number, court=court)
         except Docket.MultipleObjectsReturned:
-            logger.warn("Multiple objects returned for row: %s", i)
+            logger.warning("Multiple objects returned for row: %s", i)
             continue
         except Docket.DoesNotExist:
-            logger.warn("Could not find docket for row: %s", i)
+            logger.warning("Could not find docket for row: %s", i)
             continue
 
         # Got the docket, now get the documents from it, tag & OCR them.
@@ -409,7 +407,7 @@ def download_documents(options):
         des = d.docket_entries.filter(date_filed=document_date)
         count = des.count()
         if count == 0:
-            logger.warn("No docket entries found for row: %s", i)
+            logger.warning("No docket entries found for row: %s", i)
             continue
         elif des.count() == 1:
             good_des = [des[0]]
@@ -424,7 +422,7 @@ def download_documents(options):
             )
             for rd in rds:
                 if not rd.pacer_doc_id:
-                    logger.warn(
+                    logger.warning(
                         "Unable to get pacer_doc_id for item with "
                         "rd_pk: %s. Restricted document?",
                         rd.pk,

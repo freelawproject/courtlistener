@@ -91,17 +91,25 @@ def process_stripe_callback(request):
         ):
             charge = event["data"]["object"]
 
-            if charge["application"] == settings.XERO_APPLICATION_ID:
+            if charge.get("application") == settings.XERO_APPLICATION_ID:
                 handle_xero_payment(charge)
 
             # Sometimes stripe can process a transaction and call our callback
             # faster than we can even save things to our own DB. If that
-            # happens wait a second up to five times until it works.
-            retry_count = 5
+            # happens wait a bit until it works.
+            retry_count = 10
             d = None
             while retry_count > 0:
                 try:
-                    d = Donation.objects.get(payment_id=charge["id"])
+                    if event["type"] in [
+                        "charge.dispute.created",
+                        "charge.dispute.funds_withdrawn",
+                    ]:
+                        # I don't know why stripe doesn't use the "id" field on
+                        # disputes like they do everything else.
+                        d = Donation.objects.get(payment_id=charge["charge"])
+                    else:
+                        d = Donation.objects.get(payment_id=charge["id"])
                 except Donation.DoesNotExist:
                     time.sleep(1)
                     retry_count -= 1
@@ -144,20 +152,28 @@ def process_stripe_callback(request):
                 ).replace(tzinfo=utc)
                 d.status = Donation.CAPTURED
             elif event["type"].endswith("dispute.created"):
-                logger.critical(
-                    "Somebody has created a dispute in "
-                    "Stripe: %s" % charge["id"]
+                logger.info(
+                    "Somebody has created a dispute in " "Stripe: %s",
+                    charge["id"],
                 )
+                d.status = Donation.DISPUTED
             elif event["type"].endswith("dispute.updated"):
-                logger.critical(
-                    "The Stripe dispute on charge %s has been "
-                    "updated." % charge["id"]
+                logger.info(
+                    "The Stripe dispute on charge %s has been updated.",
+                    charge["id"],
+                )
+            elif event["type"].endswith("dispute.funds_withdrawn"):
+                logger.info(
+                    "Funds for the stripe dispute on charge %s have been "
+                    "withdrawn",
+                    charge["charge"],
                 )
             elif event["type"].endswith("dispute.closed"):
-                logger.critical(
-                    "The Stripe dispute on charge %s has been "
-                    "closed." % charge["id"]
+                logger.info(
+                    "The Stripe dispute on charge %s has been " "closed.",
+                    charge["charge"],
                 )
+                d.status = Donation.DISPUTE_CLOSED
             d.save()
         return HttpResponse("<h1>200: OK</h1>")
     else:
@@ -204,7 +220,7 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
             "redirect": stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.warn("Stripe was unable to process the payment: %s" % e)
+        logger.info("Stripe was unable to process the payment: %s" % e)
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]
@@ -222,7 +238,7 @@ def create_stripe_customer(source, email):
     try:
         return stripe.Customer.create(source=source, email=email)
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.warn("Stripe was unable to create the customer: %s" % e)
+        logger.warning("Stripe was unable to create the customer: %s" % e)
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]

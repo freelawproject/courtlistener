@@ -131,7 +131,7 @@ class Command(VerboseCommand):
                 values_differ = True
 
             if values_differ:
-                logger.warn(
+                logger.warning(
                     "WARNING: Didn't set '{attr}' attribute on obj {obj_id} "
                     "because it already had a value, but the new value "
                     "('{new}') differs from current value ('{current}')".format(
@@ -165,6 +165,8 @@ class Command(VerboseCommand):
             "lexisCite": ("U.S. LEXIS", Citation.LEXIS),
         }
         for scdb_field, reporter_info in fields.items():
+            if not scdb_info[scdb_field]:
+                continue
             try:
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
@@ -174,13 +176,14 @@ class Command(VerboseCommand):
                     disambiguate=False,
                 )[0]
             except IndexError:
-                logger.warn(
+                logger.warning(
                     "Unable to parse citation for: %s", scdb_info[scdb_field]
                 )
             else:
-                cite = cluster.citations.filter(reporter=reporter_info[0])
-                if cite:
+                cites = cluster.citations.filter(reporter=reporter_info[0])
+                if cites.count() == 1:
                     # Update the existing citation.
+                    cite = cites[0]
                     cite.volume = citation_obj.volume
                     cite.reporter = citation_obj.reporter
                     cite.page = citation_obj.page
@@ -207,7 +210,7 @@ class Command(VerboseCommand):
         logger.info(
             "Enhancing cluster {id} with data from SCDB ("
             "https://www.courtlistener.com{path}).".format(
-                id=cluster.pk, path=cluster.get_absolute_url(),
+                id=cluster.pk, path=cluster.get_absolute_url()
             )
         )
         attribute_tuples = [
@@ -366,29 +369,31 @@ class Command(VerboseCommand):
             if i < start_row:
                 continue
             logger.info(
-                "\nRow is: %s. ID is: %s (%s)"
-                % (i, d["caseId"], d["caseName"])
+                "\nRow is: %s. ID is: %s (%s)", i, d["caseId"], d["caseName"]
             )
 
             clusters = OpinionCluster.objects.none()
-            if len(clusters) == 0:
+            cluster_count = clusters.count()
+            if cluster_count == 0:
                 logger.info("Checking scdb_id for SCDB field 'caseID'...")
                 clusters = OpinionCluster.objects.filter(scdb_id=d["caseId"])
-                logger.info("%s matches found." % clusters.count())
-            if d["usCite"].strip() and clusters.count() == 0:
+                cluster_count = clusters.count()
+                logger.info("%s matches found.", cluster_count)
+            if d["usCite"].strip() and cluster_count == 0:
                 # None found by scdb_id. Try by citation number. Only do these
                 # lookups if there is a usCite value, as newer cases don't yet
                 # have citations.
                 logger.info("Checking by federal citation")
                 clusters = OpinionCluster.objects.filter(
-                    citation=d["usCite"], scdb_id="",
+                    citation=d["usCite"], scdb_id=""
                 )
-                logger.info("%s matches found." % clusters.count())
+                cluster_count = clusters.count()
+                logger.info("%s matches found.", cluster_count)
 
             # At this point, we need to start getting more experimental b/c
             # the easy ways to find items did not work. Items matched here
             # are ones that lack citations.
-            if clusters.count() == 0:
+            if cluster_count == 0:
                 # try by date and then winnow by docket number
                 logger.info("Checking by date...")
                 clusters = OpinionCluster.objects.filter(
@@ -398,32 +403,39 @@ class Command(VerboseCommand):
                     docket__court_id="scotus",
                     scdb_id="",
                 )
-                logger.info("%s matches found." % clusters.count())
+                cluster_count = clusters.count()
+                if cluster_count == 1:
+                    # Winnow these by name too. Date isn't enough.
+                    clusters = self.winnow_by_case_name(clusters, d)
+                    cluster_count = clusters.count()
+                logger.info("%s matches found.", cluster_count)
 
-            if clusters.count() > 1:
+            if cluster_count > 1:
                 if d["docket"]:
                     logger.info("Winnowing by docket number...")
                     clusters = self.winnow_by_docket_number(clusters, d)
-                    logger.info("%s matches found." % clusters.count())
+                    cluster_count = clusters.count()
+                    logger.info("%s matches found.", cluster_count)
                 else:
                     logger.info(
                         "Cannot winnow by docket number -- there isn't one."
                     )
 
-            if clusters.count() > 1:
+            if cluster_count > 1:
                 logger.info("Winnowing by case name...")
                 clusters = self.winnow_by_case_name(clusters, d)
-                logger.info("%s matches found." % clusters.count())
+                cluster_count = clusters.count()
+                logger.info("%s matches found.", cluster_count)
 
             # Searching complete, run actions.
-            if clusters.count() == 0:
+            if cluster_count == 0:
                 logger.info("No items found.")
                 cluster = action_zero(d)
-            elif clusters.count() == 1:
+            elif cluster_count == 1:
                 logger.info("Exactly one match found.")
                 cluster = clusters[0]
             else:
-                logger.info("%s items found:" % clusters.count())
+                logger.info("%s items found:", cluster_count)
                 cluster = action_many(clusters, d)
 
             if cluster is not None:

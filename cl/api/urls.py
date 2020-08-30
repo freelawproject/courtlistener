@@ -4,9 +4,11 @@ from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
 from cl.api import views
 from cl.audio import api_views as audio_views
+from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
 from cl.search import api_views as search_views
+from cl.visualizations import api_views as viz_views
 
 router = DefaultRouter()
 # Search & Audio
@@ -66,10 +68,24 @@ router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
 )
 
+# Tags
+router.register(r"tags", favorite_views.UserTagViewSet, base_name="UserTag")
+router.register(
+    r"docket-tags", favorite_views.DocketTagViewSet, base_name="DocketTag"
+)
+
+# Visualizations
+router.register(
+    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion"
+)
+router.register(
+    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap"
+)
+
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(title=API_TITLE)
 swagger_schema_view = get_schema_view(
-    title=API_TITLE, renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer],
+    title=API_TITLE, renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer]
 )
 
 
@@ -93,6 +109,11 @@ urlpatterns = [
     url(r"^api/bulk-info/$", views.bulk_data_index, name="bulk_data_index"),
     url(
         r"^api/replication/$", views.replication_docs, name="replication_docs"
+    ),
+    url(
+        r"^api/replication/status/$",
+        views.replication_status,
+        name="replication_status",
     ),
     url(
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",

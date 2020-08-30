@@ -20,9 +20,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         default=serializers.CurrentUserDefault(),
     )
     court = serializers.PrimaryKeyRelatedField(
-        queryset=Court.objects.filter(
-            jurisdiction__in=Court.FEDERAL_JURISDICTIONS
-        ),
+        queryset=Court.federal_courts.all(),
         html_cutoff=500,  # Show all values in HTML view.
     )
     docket = serializers.HyperlinkedRelatedField(
@@ -95,15 +93,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
         ]:
             # These are district court dockets. Is the court valid?
-            district_court_ids = Court.objects.filter(
-                Q(
-                    jurisdiction__in=[
-                        Court.FEDERAL_DISTRICT,
-                        Court.FEDERAL_BANKRUPTCY,
-                    ]
+            district_court_ids = (
+                Court.federal_courts.district_pacer_courts().values_list(
+                    "pk", flat=True
                 )
-                | Q(pk__in=["cit", "jpml", "uscfc"]),
-            ).values_list("pk", flat=True)
+            )
             if attrs["court"].pk not in district_court_ids:
                 raise ValidationError(
                     "%s is not a district or bankruptcy court ID. Did you "
@@ -113,9 +107,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
         if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
             # Only allowed on bankruptcy courts
-            district_court_ids = Court.objects.filter(
-                jurisdiction=Court.FEDERAL_BANKRUPTCY
-            ).values_list("pk", flat=True)
+            district_court_ids = (
+                Court.federal_courts.bankruptcy_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
             if attrs["court"].pk not in district_court_ids:
                 raise ValidationError(
                     "%s is not a bankruptcy court ID. Only bankruptcy cases "
@@ -124,12 +120,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
         if attrs["upload_type"] == UPLOAD_TYPE.APPELLATE_DOCKET:
             # Appellate court dockets. Is the court valid?
-            appellate_court_ids = Court.objects.filter(
-                Q(jurisdiction__in=[Court.FEDERAL_APPELLATE])
-                |
-                # Court of Appeals for Veterans Claims uses appellate PACER
-                Q(pk__in=["cavc"]),
-            ).values_list("pk", flat=True)
+            appellate_court_ids = (
+                Court.federal_courts.appellate_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
             if attrs["court"].pk not in appellate_court_ids:
                 raise ValidationError(
                     "%s is not an appellate court ID. Did you mean to use the "
@@ -158,19 +153,17 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
 
 class PacerFetchQueueSerializer(serializers.ModelSerializer):
-    user = serializers.HiddenField(default=serializers.CurrentUserDefault(),)
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     court = serializers.PrimaryKeyRelatedField(
-        queryset=Court.objects.filter(
-            jurisdiction__in=Court.FEDERAL_JURISDICTIONS
-        ),
+        queryset=Court.federal_courts.all(),
         html_cutoff=500,  # Show all values in HTML view.
         required=False,
     )
     docket = serializers.PrimaryKeyRelatedField(
-        queryset=Docket.objects.all(), required=False,
+        queryset=Docket.objects.all(), required=False
     )
     recap_document = serializers.PrimaryKeyRelatedField(
-        queryset=RECAPDocument.objects.all(), required=False,
+        queryset=RECAPDocument.objects.all(), required=False
     )
     pacer_username = serializers.CharField(write_only=True)
     pacer_password = serializers.CharField(write_only=True)
@@ -188,15 +181,11 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Is it a good court value?
-        district_court_ids = Court.objects.filter(
-            Q(
-                jurisdiction__in=[
-                    Court.FEDERAL_DISTRICT,
-                    Court.FEDERAL_BANKRUPTCY,
-                ]
+        district_court_ids = (
+            Court.federal_courts.district_pacer_courts().values_list(
+                "pk", flat=True
             )
-            | Q(pk__in=["cit", "jpml", "uscfc"]),
-        ).values_list("pk", flat=True)
+        )
         if attrs.get("court") and attrs["court"].pk not in district_court_ids:
             raise ValidationError("Invalid court id: %s" % attrs["court"].pk)
 

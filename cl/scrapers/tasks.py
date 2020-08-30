@@ -2,19 +2,21 @@
 from __future__ import print_function
 
 import os
+import logging
 import random
 import subprocess
 import traceback
 import uuid
 from tempfile import NamedTemporaryFile
 
-from django.apps import apps
-from cl.lib.juriscraper_utils import get_scraper_object_by_name
 import eyed3
+import requests
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
+from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import IntegrityError
 from django.utils.encoding import (
     smart_text,
     DjangoUnicodeDecodeError,
@@ -31,19 +33,29 @@ from cl.audio.utils import get_audio_binary
 from cl.celery import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.mojibake import fix_mojibake
+from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
+from cl.recap.mergers import (
+    update_docket_metadata,
+    add_bankruptcy_data_to_docket,
+)
 from cl.scrapers.models import ErrorLog
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import Opinion, RECAPDocument, Docket
+from cl.search.tasks import add_items_to_solr
+from juriscraper.pacer import PacerSession, CaseQuery
 
 DEVNULL = open("/dev/null", "w")
 
+logger = logging.getLogger(__name__)
+
 
 def get_clean_body_content(content):
-    """Parse out the body from an html string, clean it up, and send it along.
-    """
+    """Parse out the body from an html string, clean it up, and send it along."""
     cleaner = Cleaner(
         style=True, remove_tags=["a", "body", "font", "noscript", "img"]
     )
@@ -120,7 +132,7 @@ def make_pdftotext_process(path):
 
 
 def extract_from_pdf(path, opinion, do_ocr=False):
-    """ Extract text from pdfs.
+    """Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
     assumption it's an image-based PDF. Once that is complete, we check for the
@@ -190,7 +202,7 @@ def extract_from_wpd(path, opinion):
 def convert_file_to_txt(path):
     tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
     p = subprocess.Popen(
-        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     return p.communicate()[0].decode("utf-8")
 
@@ -241,6 +253,8 @@ def update_document_from_text(opinion):
     """
     court = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court)
+    if site is None:
+        return
     metadata_dict = site.extract_from_text(opinion.plain_text)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model("search.%s" % model_name)
@@ -516,7 +530,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
             os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
         ) as f:
             audio_file.tag.images.set(
-                3, f.read(), "image/png", u"Seal for %s" % court.short_name,
+                3, f.read(), "image/png", u"Seal for %s" % court.short_name
             )
         flp_image_frames.remove(3)
 
@@ -597,3 +611,44 @@ def process_audio_file(pk):
     af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True
     af.save()
+
+
+@app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
+def update_docket_info_iquery(self, d_pk):
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    d = Docket.objects.get(pk=d_pk)
+    report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
+    try:
+        report.query(d.pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+    if not report.data:
+        return
+
+    d = update_docket_metadata(d, report.data)
+    try:
+        d.save()
+        add_bankruptcy_data_to_docket(d, report.data)
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warn(msg)
+            return
+        logger.info(msg=" Retrying.")
+        raise self.retry(exc=exc)
+    add_items_to_solr([d.pk], "search.Docket")

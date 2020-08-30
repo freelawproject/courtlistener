@@ -4,7 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.views.generic import RedirectView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
-from cl.lib.ratelimiter import ratelimiter_auth
+from cl.lib.ratelimiter import ratelimiter_unsafe_methods
 from cl.users import views
 from cl.users.forms import (
     CustomPasswordResetForm,
@@ -16,7 +16,7 @@ urlpatterns = [
     # Sign in/out and password pages
     url(
         r"^sign-in/$",
-        auth_views.login,
+        ratelimiter_unsafe_methods(auth_views.login),
         {
             "template_name": "register/login.html",
             "authentication_form": ConfirmedEmailAuthenticationForm,
@@ -34,13 +34,16 @@ urlpatterns = [
     ),
     url(
         r"^reset-password/$",
-        ratelimiter_auth(auth_views.password_reset),
-        {
-            "template_name": "register/password_reset_form.html",
-            "email_template_name": "register/password_reset_email.html",
-            "extra_context": {"private": False},
-            "password_reset_form": CustomPasswordResetForm,
-        },
+        ratelimiter_unsafe_methods(
+            auth_views.PasswordResetView.as_view(
+                **{
+                    "template_name": "register/password_reset_form.html",
+                    "email_template_name": "register/password_reset_email.html",
+                    "extra_context": {"private": False},
+                    "form_class": CustomPasswordResetForm,
+                }
+            )
+        ),
         name="password_reset",
     ),
     url(
@@ -94,17 +97,21 @@ urlpatterns = [
         views.password_change,
         name="password_change",
     ),
-    url(r"^profile/delete/$", views.delete_account, name="delete_account",),
+    url(r"^profile/delete/$", views.delete_account, name="delete_account"),
     url(
         r"^profile/delete/done/$",
         views.delete_profile_done,
         name="delete_profile_done",
     ),
-    url(r"^profile/take-out/$", views.take_out, name="take_out",),
+    url(r"^profile/take-out/$", views.take_out, name="take_out"),
     url(
         r"^profile/take-out/done/$", views.take_out_done, name="take_out_done"
     ),
-    url(r"^register/$", ratelimiter_auth(views.register), name="register",),
+    url(
+        r"^register/$",
+        ratelimiter_unsafe_methods(views.register),
+        name="register",
+    ),
     url(
         r"^register/success/$",
         views.register_success,
@@ -118,7 +125,7 @@ urlpatterns = [
     ),
     url(
         r"^email-confirmation/request/$",
-        ratelimiter_auth(views.request_email_confirmation),
+        ratelimiter_unsafe_methods(views.request_email_confirmation),
         name="email_confirmation_request",
     ),
     url(

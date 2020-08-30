@@ -159,7 +159,7 @@ class FullCitation(Citation):
         return r"%d(\s+)%s(\s+)%s(\s?)" % (
             self.volume,
             re.escape(self.reporter_found),
-            self.page,
+            re.escape(self.page),
         )
 
     # TODO: Update css for no-link citations
@@ -223,7 +223,7 @@ class ShortformCitation(Citation):
             re.escape(self.antecedent_guess),
             self.volume,
             re.escape(self.reporter_found),
-            self.page,
+            re.escape(self.page),
         )
 
     def as_html(self):
@@ -244,7 +244,7 @@ class ShortformCitation(Citation):
             data_attr = ""
         return (
             u'<span class="%s"%s><span class="antecedent_guess">%s</span>\\g<1>%s</span>'
-            % (span_class, data_attr, self.antecedent_guess, inner_html,)
+            % (span_class, data_attr, self.antecedent_guess, inner_html)
         )
 
 
@@ -283,7 +283,7 @@ class SupraCitation(Citation):
             s = r"%s(\s+)supra" % re.escape(self.antecedent_guess)
 
         if self.page:
-            s += r",(\s+)at(\s+)%s" % self.page
+            s += r",(\s+)at(\s+)%s" % re.escape(self.page)
 
         return s + r"(\s?)"
 
@@ -338,11 +338,14 @@ class IdCitation(Citation):
     Example: "... foo bar," id., at 240
     """
 
-    def __init__(self, id_token=None, after_tokens=None):
+    def __init__(self, id_token=None, after_tokens=None, should_linkify=False):
         super(IdCitation, self).__init__(None, None, None)
 
         self.id_token = id_token
         self.after_tokens = after_tokens
+
+        # Whether the "after tokens" should be included in the generated link
+        self.should_linkify = should_linkify
 
     def __repr__(self):
         print_string = "%s %s" % (self.id_token, self.after_tokens)
@@ -357,8 +360,9 @@ class IdCitation(Citation):
         # Whitespace regex explanation:
         #  \s matches any whitespace character
         #  </?\w+> matches any HTML tag
+        #  , matches a comma
         #  The whole thing matches greedily, saved into a single group
-        whitespace_regex = r"((?:\s|</?\w+>)*)"
+        whitespace_regex = r"((?:\s|</?\w+>|,)*)"
 
         # Start with a matching group for any whitespace
         template = whitespace_regex
@@ -384,7 +388,7 @@ class IdCitation(Citation):
         # The group numbers of each backreference (g<NUMBER>) must be
         #   dynamically generated because total number of "after tokens" varies
         # Produces something like this:
-        # "\\g<1>after_token_1\\g<2>after_token_2\\g<3>after_token_3" ...
+        # "\\g<2>after_token_1\\g<3>after_token_2\\g<4>after_token_3" ...
         template = u"\\g<%s>%s"
         after_token_html = "".join(
             [
@@ -403,9 +407,18 @@ class IdCitation(Citation):
         span_class = "citation"
         after_token_html = self.generate_after_token_html()
         if self.match_url:
-            id_string = (
-                u'<a href="%s"><span class="id_token">%s</span>%s</a>'
-                % (self.match_url, self.id_token, after_token_html,)
+            if self.should_linkify:
+                id_string_template = (
+                    u'<a href="%s"><span class="id_token">%s</span>%s</a>'
+                )
+            else:
+                id_string_template = (
+                    u'<a href="%s"><span class="id_token">%s</span></a>%s'
+                )
+            id_string = id_string_template % (
+                self.match_url,
+                self.id_token,
+                after_token_html,
             )
             data_attr = u' data-id="%s"' % self.match_id
         else:
@@ -419,34 +432,6 @@ class IdCitation(Citation):
             span_class,
             data_attr,
             id_string,
-        )
-
-
-class IbidCitation(IdCitation):
-    """Convenience class which represents an 'ibid' citation, a special case
-    of an 'id' citation that doesn't have any attached page. Overrides the
-    as_html() method in order to only linkify the 'ibid' token itself, and
-    not any after tokens.
-
-    Example: "... foo bar," ibid.
-    """
-
-    def as_html(self):
-        span_class = "citation"
-        after_token_html = self.generate_after_token_html()
-        if self.match_url:
-            ibid_token = (
-                u'<a href="%s"><span class="ibid_token">%s</span></a>'
-                % (self.match_url, self.id_token,)
-            )
-            data_attr = u' data-id="%s"' % self.match_id
-        else:
-            ibid_token = u"%s" % self.id_token
-            span_class += " no-link"
-            data_attr = ""
-        return (
-            u'<span class="%s"%s>\\g<1><span class="ibid_token">%s</span>%s</span>'
-            % (span_class, data_attr, ibid_token, after_token_html,)
         )
 
 

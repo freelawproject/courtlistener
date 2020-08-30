@@ -41,7 +41,9 @@ class AbstractPDF(models.Model):
         db_index=True,
     )
     date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True,
+        help_text="Timestamp of last update.",
+        auto_now=True,
+        db_index=True,
     )
     sha1 = models.CharField(
         help_text="The ID used for a document in RECAP",
@@ -67,7 +69,9 @@ class AbstractPDF(models.Model):
         blank=True,
     )
     filepath_ia = models.CharField(
-        help_text="The URL of the file in IA", max_length=1000, blank=True,
+        help_text="The URL of the file in IA",
+        max_length=1000,
+        blank=True,
     )
     ia_upload_failure_count = models.SmallIntegerField(
         help_text="Number of times the upload to the Internet Archive failed.",
@@ -139,3 +143,28 @@ class AbstractJSON(AbstractFile):
 
     class Meta:
         abstract = True
+
+
+class Note(models.Model):
+    """An polymorphic field that can be used to add notes to most objects"""
+
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_entered = models.DateTimeField(
+        help_text="The datetime when the note was entered",
+        verbose_name="Note Creation Date",
+    )
+    notes = models.TextField(
+        help_text="Any notes you wish to keep about this item",
+    )
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey()

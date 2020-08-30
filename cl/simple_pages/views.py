@@ -23,6 +23,7 @@ from cl.custom_filters.decorators import check_honeypot
 from cl.lib import magic
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_matomo
+from cl.lib.ratelimiter import ratelimiter_slow
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
@@ -78,10 +79,16 @@ def help_home(request):
 
 
 def alert_help(request):
-    no_feeds = Court.objects.filter(
-        jurisdiction__in=[Court.FEDERAL_BANKRUPTCY, Court.FEDERAL_DISTRICT,],
+    no_feeds = Court.federal_courts.district_pacer_courts().filter(
         pacer_has_rss_feed=False,
-        end_date=None,
+    )
+    partial_feeds = (
+        Court.federal_courts.district_pacer_courts()
+        .filter(pacer_has_rss_feed=True)
+        .exclude(pacer_rss_entry_types="all")
+    )
+    full_feeds = Court.federal_courts.district_pacer_courts().filter(
+        pacer_has_rss_feed=True, pacer_rss_entry_types="all"
     )
     cache_key = "alert-help-stats"
     data = cache.get(cache_key)
@@ -98,6 +105,8 @@ def alert_help(request):
         cache.set(cache_key, data, one_day)
     context = {
         "no_feeds": no_feeds,
+        "partial_feeds": partial_feeds,
+        "full_feeds": full_feeds,
         "private": False,
     }
     context.update(data)
@@ -122,7 +131,7 @@ def build_court_dicts(courts):
     court_dicts = [{"pk": "all", "short_name": u"All Courts"}]
     court_dicts.extend(
         [
-            {"pk": court.pk, "short_name": court.full_name,}
+            {"pk": court.pk, "short_name": court.full_name}
             #'notes': court.notes}
             for court in courts
         ]
@@ -206,7 +215,7 @@ def podcasts(request):
         "podcasts.html",
         {
             "oral_argument_courts": Court.objects.filter(
-                in_use=True, has_oral_argument_scraper=True,
+                in_use=True, has_oral_argument_scraper=True
             ),
             "count": Audio.objects.all().count(),
             "private": False,
@@ -218,6 +227,7 @@ def contribute(request):
     return render(request, "contribute.html", {"private": False})
 
 
+@ratelimiter_slow
 @check_honeypot(field_name="skip_me_if_alive")
 def contact(
     request,
@@ -365,7 +375,7 @@ def ratelimited(request, exception):
     )
 
 
-@track_in_matomo
+@track_in_matomo(timeout=0.01)
 def serve_static_file(request, file_path=""):
     """Sends a static file to a user.
 

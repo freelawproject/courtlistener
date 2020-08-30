@@ -3,9 +3,11 @@ import logging
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
+from django.template import TemplateDoesNotExist
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
+from cl.api.utils import get_replication_statuses
 from cl.lib import sunburnt
 from cl.lib.search_utils import (
     build_coverage_query,
@@ -62,13 +64,11 @@ def rest_docs(request, version):
     """Show the correct version of the rest docs"""
     courts = make_court_variable()
     court_count = len(courts)
-    if version is None:
-        version = "vlatest"
-    return render(
-        request,
-        "rest-docs-%s.html" % version,
-        {"court_count": court_count, "courts": courts, "private": False},
-    )
+    context = {"court_count": court_count, "courts": courts, "private": False}
+    try:
+        return render(request, "rest-docs-%s.html" % version, context)
+    except TemplateDoesNotExist:
+        return render(request, "rest-docs-vlatest.html", context)
 
 
 def api_index(request):
@@ -81,7 +81,16 @@ def api_index(request):
 
 
 def replication_docs(request):
-    return render(request, "replication.html", {"private": False,})
+    return render(request, "replication.html", {"private": False})
+
+
+def replication_status(request):
+    statuses = get_replication_statuses()
+    return render(
+        request,
+        "replication_status.html",
+        {"private": True, "statuses": statuses},
+    )
 
 
 def bulk_data_index(request):

@@ -289,11 +289,12 @@ class PacerFetchQueue(models.Model):
         on_delete=models.CASCADE,
         null=True,
     )
+
     # PDF and attachment pages use this
     recap_document = models.ForeignKey(
         RECAPDocument,
-        help_text="The ID of the RECAP Document or attachment page in the "
-        "CourtListener databae that you wish to fetch or update.",
+        help_text="The ID of the RECAP Document in the CourtListener databae "
+        "that you wish to fetch or update.",
         related_name="pacer_fetch_queue_items",
         on_delete=models.CASCADE,
         null=True,
@@ -683,7 +684,9 @@ class FjcIntegratedDatabase(models.Model):
     # Via email from FJC, title and section fields are alternative for "cause"
     # field.
     title = models.TextField(
-        help_text="No description provided by FJC.", blank=True, db_index=True,
+        help_text="No description provided by FJC.",
+        blank=True,
+        db_index=True,
     )
     section = models.CharField(
         help_text="No description provided by FJC.",

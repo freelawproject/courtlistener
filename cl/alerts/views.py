@@ -3,9 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.http import HttpResponseNotAllowed, HttpResponse
 from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
+from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from cl.alerts.models import Alert, DocketAlert
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.opinion_page.views import make_docket_title, user_has_alert
+from cl.search.models import Docket
 
 
 @login_required
@@ -67,7 +70,7 @@ def disable_alert(request, secret_key):
     return render(
         request,
         "disable_alert.html",
-        {"alert": alert, "prev_rate": prev_rate, "private": True,},
+        {"alert": alert, "prev_rate": prev_rate, "private": True},
     )
 
 
@@ -87,7 +90,7 @@ def enable_alert(request, secret_key):
     return render(
         request,
         "enable_alert.html",
-        {"alert": alert, "failed": failed, "private": True,},
+        {"alert": alert, "failed": failed, "private": True},
     )
 
 
@@ -109,3 +112,52 @@ def toggle_docket_alert(request):
         return HttpResponseNotAllowed(
             permitted_methods={"POST"}, content="Not an ajax POST request."
         )
+
+
+def new_docket_alert(request):
+    """Allow users to create docket alerts based on case and court ID"""
+    pacer_case_id = request.GET.get("pacer_case_id")
+    court_id = request.GET.get("court_id")
+    if not pacer_case_id or not court_id:
+        return render(
+            request,
+            "docket_alert_new.html",
+            {
+                "docket": None,
+                "title": "400: Invalid request creating docket alert",
+                "private": True,
+            },
+            status=HTTP_400_BAD_REQUEST,
+        )
+    try:
+        docket = Docket.objects.get(
+            pacer_case_id=pacer_case_id, court_id=court_id
+        )
+    except Docket.DoesNotExist:
+        return render(
+            request,
+            "docket_alert_new.html",
+            {
+                "docket": None,
+                "title": "New Docket Alert for Unknown Case",
+                "private": True,
+            },
+            status=HTTP_404_NOT_FOUND,
+        )
+    except Docket.MultipleObjectsReturned as exc:
+        docket = Docket.objects.filter(
+            pacer_case_id=pacer_case_id, court_id=court_id
+        ).earliest("date_created")
+
+    title = "New Docket Alert for %s" % make_docket_title(docket)
+    has_alert = user_has_alert(request.user, docket)
+    return render(
+        request,
+        "docket_alert_new.html",
+        {
+            "title": title,
+            "has_alert": has_alert,
+            "docket": docket,
+            "private": True,
+        },
+    )

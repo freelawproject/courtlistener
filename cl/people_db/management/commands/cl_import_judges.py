@@ -14,12 +14,15 @@ from cl.people_db.import_judges.populate_fjc_judges import (
     make_federal_judge,
     add_positions_from_row,
     update_bankruptcy_and_magistrate,
+    make_mag_bk_judge,
 )
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
+
+from django.core.exceptions import ValidationError
 
 
 class Command(VerboseCommand):
@@ -254,7 +257,7 @@ class Command(VerboseCommand):
                     date_start = date_recess_appointment
                 if pd.isnull(date_start):
                     # if still no start date, skip
-                    continue
+                    date_start = None
                 positions = Position.objects.filter(
                     person=p,
                     date_start=date_start,
@@ -300,6 +303,51 @@ class Command(VerboseCommand):
                         position.save()
                         add_items_to_solr.delay([p.pk], "people_db.Person")
 
+    def process_mag_bk_entries(self, df):
+
+        bad_record = []
+
+        textfields = [
+            "CL_ID",
+            "NAME_FIRST",
+            "NAME_MIDDLE",
+            "NAME_LAST",
+            "NAME_SUFFIX",
+            "GENDER",
+            "POSITION",
+            "COURT",
+            "START_DATE",
+            "START_DATE_GRANULARITY",
+            "END_DATE",
+            "END_DATE_GRANULARITY",
+        ]
+
+        for x in textfields:
+            df[x] = df[x].replace(np.nan, "", regex=True)
+        for i, row in df.iterrows():
+            if i < self.options["offset"]:
+                continue
+            if i >= self.options["limit"] > 0:
+                break
+            try:
+                make_mag_bk_judge(dict(row), testing=self.debug)
+            except ValidationError as e:
+                bad_record.append(e[0])
+
+        for b in bad_record:
+            print(b)
+
+    def import_mag_bk_judges(self, infile=None):
+
+        if infile is None:
+            self.ensure_input_file()
+            infile = self.options["input_file"]
+        df = pd.read_csv(infile)
+        has_date = df["START_DATE_GRANULARITY"].notnull()
+        df = df[has_date]
+        df = df.replace(r"^\s+$", np.nan, regex=True)
+        self.process_mag_bk_entries(df)
+
     VALID_ACTIONS = {
         "import-all": import_all,
         "import-fjc-judges": import_fjc_judges,
@@ -310,4 +358,5 @@ class Command(VerboseCommand):
         "assign-judges-to-oral-arguments": assign_judges_to_oral_arguments,
         "assign-bankruptcy-fjc": assign_bankruptcy_fjc,
         "fix-fjc-positions": fix_fjc_positions,
+        "import-mag-bk-judges": import_mag_bk_judges,
     }

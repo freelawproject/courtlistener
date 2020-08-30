@@ -1,6 +1,6 @@
 from django.db import models
 
-from cl.search.models import Court
+from cl.search.models import Court, Docket
 
 
 class UrlHash(models.Model):
@@ -16,7 +16,7 @@ class UrlHash(models.Model):
         primary_key=True,
     )
     sha1 = models.CharField(
-        "a SHA1 corresponding to the item", max_length=40, editable=False,
+        "a SHA1 corresponding to the item", max_length=40, editable=False
     )
 
     def __unicode__(self):
@@ -37,7 +37,7 @@ class ErrorLog(models.Model):
         on_delete=models.CASCADE,
     )
     log_time = models.DateTimeField(
-        "the exact date and time of the error", auto_now_add=True,
+        "the exact date and time of the error", auto_now_add=True
     )
     log_level = models.CharField(
         "the loglevel of the error encountered", max_length=15, editable=False
@@ -80,25 +80,68 @@ class PACERFreeDocumentLog(models.Model):
         db_index=True,
     )
     date_queried = models.DateField(
-        help_text="The date that was queried.", db_index=True,
+        help_text="The date that was queried.", db_index=True
     )
     status = models.SmallIntegerField(
-        help_text="The status of the scrape.", choices=SCRAPE_STATUSES,
+        help_text="The status of the scrape.", choices=SCRAPE_STATUSES
     )
 
 
 class PACERFreeDocumentRow(models.Model):
     """Rows from the Free Opinion report table converted to rows in the DB."""
 
-    court_id = models.CharField(max_length=15,)
-    pacer_case_id = models.CharField(max_length=100,)
-    docket_number = models.CharField(max_length=5000,)
+    court_id = models.CharField(max_length=15)
+    pacer_case_id = models.CharField(max_length=100)
+    docket_number = models.CharField(max_length=5000)
     case_name = models.TextField()
     date_filed = models.DateField()
-    pacer_doc_id = models.CharField(max_length=32,)
-    pacer_seq_no = models.IntegerField(null=True, blank=True,)
-    document_number = models.CharField(max_length=32,)
+    pacer_doc_id = models.CharField(max_length=32)
+    pacer_seq_no = models.IntegerField(null=True, blank=True)
+    document_number = models.CharField(max_length=32)
     description = models.TextField()
     nature_of_suit = models.TextField()
-    cause = models.CharField(max_length=2000,)
+    cause = models.CharField(max_length=2000)
     error_msg = models.TextField()
+
+
+class PACERMobilePageData(models.Model):
+    """Status information about crawling the PACER Mobile UI for a docket"""
+
+    docket = models.OneToOneField(
+        Docket,
+        help_text="The docket we are tracking.",
+        on_delete=models.CASCADE,
+        related_name="mobile_crawl_statuses",
+    )
+    date_created = models.DateTimeField(
+        help_text="The time when this item was created",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+    date_last_mobile_crawl = models.DateTimeField(
+        help_text="When the Mobile UI was last crawled",
+        db_index=True,
+        null=True,
+    )
+    count_last_mobile_crawl = models.IntegerField(
+        help_text="The number of items found during the last crawl",
+        null=True,
+    )
+    count_last_rss_crawl = models.IntegerField(
+        help_text="The number of items added from RSS that had a date after "
+        "date_last_mobile_crawl",
+        default=0,
+    )
+
+    def __unicode__(self):
+        return u"<%s: Docket %s crawled at %s with %s results>" % (
+            self.pk,
+            self.docket_id,
+            self.date_last_mobile_crawl,
+            self.count_last_mobile_crawl,
+        )

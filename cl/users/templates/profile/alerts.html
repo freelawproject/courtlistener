@@ -47,11 +47,11 @@
             <tr>
               <td>
                 <p class="bottom">
-                  {% if alert.type == 'o' %}
+                  {% if alert.type == SEARCH_TYPES.OPINION %}
                     Opinion
-                  {% elif alert.type == 'oa' %}
+                  {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
                     Oral Argument
-                  {% elif alert.type == 'r' %}
+                  {% elif alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
                     RECAP
                   {% endif %}
                 </p>
@@ -62,15 +62,15 @@
                 </p>
               </td>
               <td>{{ alert.get_rate_display }}</td>
-              <td>{{ alert.date_last_hit|date:"D, n/j/Y"|default:"Never" }}</td>
+              <td>{{ alert.date_last_hit|date:"M j, Y"|default:"Never" }}</td>
               <td class="right">
-                {% if alert.type == 'o' or alert.type == 'r' %}
+                {% if alert.type == SEARCH_TYPES.OPINION or alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
                   <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
                      title="Atom feed for this alert"
                      class="btn btn-primary btn-xs">
                     <i class="fa fa-rss"></i>&nbsp;Subscribe
                   </a>
-                {% elif alert.type == 'oa' %}
+                {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
                   <a
                     href="{% url "search_podcast" "search" %}?{{ alert.query }}"
                     title="Podcast for this alert"

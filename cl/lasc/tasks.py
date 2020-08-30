@@ -135,9 +135,7 @@ def download_pdf(self, pdf_pk):
     )
 
     with transaction.atomic():
-        pdf_document.filepath_s3.save(
-            doc.document_type, ContentFile(pdf_data),
-        )
+        pdf_document.filepath_s3.save(doc.document_type, ContentFile(pdf_data))
 
         doc.is_available = True
         doc.save()
@@ -231,7 +229,7 @@ def add_or_update_case_db(self, case_id):
         else:
             logger.info("LASC case is already up to date: %s", case_id)
     else:
-        logger.warn(
+        logger.warning(
             "Issue adding or updating lasc case with ID '%s' - Too "
             "many cases in system with that ID (%s cases)",
             case_id,
@@ -326,7 +324,7 @@ def add_case_from_filepath(filepath):
     if ds.count() == 0:
         add_case(case_id, case_data, original_data)
     elif ds.count() == 1:
-        logger.warn(
+        logger.warning(
             "LASC case on file system at '%s' is already in the database ",
             filepath,
         )
@@ -393,6 +391,4 @@ def save_json(data, content_obj):
     json_file = LASCJSON(content_object=content_obj)
     json_file.sha1 = sha1_of_json_data(data)
     json_file.upload_type = UPLOAD_TYPE.DOCKET
-    json_file.filepath.save(
-        "lasc.json", ContentFile(data),
-    )
+    json_file.filepath.save("lasc.json", ContentFile(data))

@@ -40,8 +40,7 @@ class LASCJSON(AbstractJSON):
 
 
 class LASCPDF(AbstractPDF):
-    """Use the content framework to associate PDFs with our dockets
-    """
+    """Use the content framework to associate PDFs with our dockets"""
 
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
@@ -65,7 +64,9 @@ class LASCPDF(AbstractPDF):
         db_index=True,
     )
     document_id = models.CharField(
-        help_text="Internal Document Id", max_length=40, db_index=True,
+        help_text="Internal Document Id",
+        max_length=40,
+        db_index=True,
     )
 
     class Meta:
@@ -181,7 +182,9 @@ class Docket(models.Model):
         db_index=True,
     )
     date_filed = models.DateField(
-        help_text="The date the case was filed", null=True, blank=True,
+        help_text="The date the case was filed",
+        null=True,
+        blank=True,
     )
     date_disposition = models.DateField(
         help_text="The date the case was disposed by the court",
@@ -209,28 +212,40 @@ class Docket(models.Model):
         help_text="Disposition type", blank=True
     )
     disposition_type_code = models.CharField(
-        help_text="Disposition type code", max_length=10, blank=True,
+        help_text="Disposition type code",
+        max_length=10,
+        blank=True,
     )
     case_type_str = models.TextField(
-        help_text="Case type description", blank=True,
+        help_text="Case type description",
+        blank=True,
     )
     case_type_code = models.CharField(
-        help_text="Case type code", max_length=10, blank=True,
+        help_text="Case type code",
+        max_length=10,
+        blank=True,
     )
-    case_name = models.TextField(help_text="The name of the case", blank=True,)
+    case_name = models.TextField(
+        help_text="The name of the case",
+        blank=True,
+    )
     judge_code = models.CharField(
         help_text="Internal judge code assigned to the case",
         max_length=10,
         blank=True,
     )
     judge_name = models.TextField(
-        help_text="The judge that the case was assigned to", blank=True,
+        help_text="The judge that the case was assigned to",
+        blank=True,
     )
     courthouse_name = models.TextField(
-        help_text="The courthouse name", blank=True,
+        help_text="The courthouse name",
+        blank=True,
     )
     date_status = models.DateTimeField(
-        help_text="Date status was updated", null=True, blank=True,
+        help_text="Date status was updated",
+        null=True,
+        blank=True,
     )
     status_code = models.CharField(
         help_text="Court status code associated with current status",
@@ -238,7 +253,8 @@ class Docket(models.Model):
         blank=True,
     )
     status_str = models.TextField(
-        help_text="The status of the case", blank=True,
+        help_text="The status of the case",
+        blank=True,
     )
 
     objects = CaseIDQuerySet.as_manager()
@@ -260,7 +276,9 @@ class QueuedPDF(models.Model):
     """PDFs we have yet to download."""
 
     docket = models.ForeignKey(
-        Docket, related_name="queued_pdfs", on_delete=models.CASCADE,
+        Docket,
+        related_name="queued_pdfs",
+        on_delete=models.CASCADE,
     )
 
     date_created = models.DateTimeField(
@@ -280,7 +298,9 @@ class QueuedPDF(models.Model):
         db_index=True,
     )
     document_id = models.CharField(
-        help_text="Internal Document Id", max_length=40, db_index=True,
+        help_text="Internal Document Id",
+        max_length=40,
+        db_index=True,
     )
 
     @property
@@ -332,7 +352,9 @@ class DocumentImage(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="document_images", on_delete=models.CASCADE,
+        Docket,
+        related_name="document_images",
+        on_delete=models.CASCADE,
     )
     pdf_document = GenericRelation(
         LASCPDF,
@@ -369,7 +391,9 @@ class DocumentImage(models.Model):
         max_length=30,
     )
     page_count = models.IntegerField(
-        help_text="Page count for this document", blank=True, null=True,
+        help_text="Page count for this document",
+        blank=True,
+        null=True,
     )
     document_type = models.TextField(
         help_text="Type of document. Typically blank; still exploring "
@@ -389,7 +413,8 @@ class DocumentImage(models.Model):
         blank=True,
     )
     app_id = models.TextField(
-        help_text="ID for filing application, if any.", blank=True,
+        help_text="ID for filing application, if any.",
+        blank=True,
     )
     odyssey_id = models.TextField(
         help_text="Typically null; likely a vendor-provided code. Still "
@@ -401,10 +426,13 @@ class DocumentImage(models.Model):
         "download this item?",
     )
     security_level = models.CharField(
-        help_text="Document security level", max_length=10, blank=True,
+        help_text="Document security level",
+        max_length=10,
+        blank=True,
     )
     description = models.TextField(
-        help_text="Document description", blank=True,
+        help_text="Document description",
+        blank=True,
     )
     volume = models.TextField(
         help_text="Document volume. Still exploring possible meanings in LASC "
@@ -455,7 +483,9 @@ class DocumentFiled(models.Model):
     # "Document": "Answer"]
     """
     docket = models.ForeignKey(
-        Docket, related_name="documents_filed", on_delete=models.CASCADE,
+        Docket,
+        related_name="documents_filed",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -467,16 +497,20 @@ class DocumentFiled(models.Model):
         auto_now=True,
         db_index=True,
     )
-    date_filed = models.DateTimeField(help_text="Date a document was filed",)
+    date_filed = models.DateTimeField(
+        help_text="Date a document was filed",
+    )
     memo = models.TextField(
-        help_text="Memo describing document filed", blank=True,
+        help_text="Memo describing document filed",
+        blank=True,
     )
     document_type = models.TextField(
         help_text="Document type, whether it's an Answer, a Complaint, etc.",
         blank=True,
     )
     party_str = models.TextField(
-        help_text="Filing party for the document", blank=True,
+        help_text="Filing party for the document",
+        blank=True,
     )
 
     class Meta:
@@ -506,7 +540,9 @@ class Action(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="actions", on_delete=models.CASCADE,
+        Docket,
+        related_name="actions",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -522,10 +558,12 @@ class Action(models.Model):
         help_text="Date of the action entry",
     )
     description = models.TextField(
-        help_text="Short description of the document", blank=True,
+        help_text="Short description of the document",
+        blank=True,
     )
     additional_information = models.TextField(
-        help_text="Additional information stored as HTML", blank=True,
+        help_text="Additional information stored as HTML",
+        blank=True,
     )
 
     class Meta:
@@ -551,7 +589,9 @@ class CrossReference(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="cross_references", on_delete=models.CASCADE,
+        Docket,
+        related_name="cross_references",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -564,13 +604,17 @@ class CrossReference(models.Model):
         db_index=True,
     )
     date_cross_reference = models.DateTimeField(
-        help_text="Cross reference date", null=True, blank=True,
+        help_text="Cross reference date",
+        null=True,
+        blank=True,
     )
     cross_reference_docket_number = models.TextField(
-        help_text="Cross reference docket number", blank=True,
+        help_text="Cross reference docket number",
+        blank=True,
     )
     cross_reference_type = models.TextField(
-        help_text="A description of the type of cross reference", blank=True,
+        help_text="A description of the type of cross reference",
+        blank=True,
     )
 
     def __unicode__(self):
@@ -605,7 +649,9 @@ class Party(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="parties", on_delete=models.CASCADE,
+        Docket,
+        related_name="parties",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -617,22 +663,33 @@ class Party(models.Model):
         auto_now=True,
         db_index=True,
     )
-    attorney_name = models.TextField(help_text="Attorney name", blank=True,)
-    attorney_firm = models.TextField(help_text="Attorney firm", blank=True,)
+    attorney_name = models.TextField(
+        help_text="Attorney name",
+        blank=True,
+    )
+    attorney_firm = models.TextField(
+        help_text="Attorney firm",
+        blank=True,
+    )
     entity_number = models.TextField(
-        help_text="Order entity/party joined cases system", blank=True,
+        help_text="Order entity/party joined cases system",
+        blank=True,
     )
     party_name = models.TextField(
-        help_text="Full name of the party", blank=True,
+        help_text="Full name of the party",
+        blank=True,
     )
     party_flag = models.TextField(
-        help_text="Court code representing party", blank=True,
+        help_text="Court code representing party",
+        blank=True,
     )
     party_type_code = models.TextField(
-        help_text="Court code representing party position", blank=True,
+        help_text="Court code representing party position",
+        blank=True,
     )
     party_description = models.TextField(
-        help_text="Description of the party", blank=True,
+        help_text="Description of the party",
+        blank=True,
     )
 
     class Meta:
@@ -684,7 +741,9 @@ class Proceeding(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="proceedings", on_delete=models.CASCADE,
+        Docket,
+        related_name="proceedings",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -710,29 +769,40 @@ class Proceeding(models.Model):
         help_text="Date of the past proceeding",
     )
     proceeding_time = models.TextField(
-        help_text="Time of the past proceeding in HH:MM string", blank=True,
+        help_text="Time of the past proceeding in HH:MM string",
+        blank=True,
     )
     am_pm = models.TextField(
-        help_text="Was the proceeding in the AM or PM", blank=True,
+        help_text="Was the proceeding in the AM or PM",
+        blank=True,
     )
-    memo = models.TextField(help_text="Memo about the proceeding", blank=True,)
+    memo = models.TextField(
+        help_text="Memo about the proceeding",
+        blank=True,
+    )
     courthouse_name = models.TextField(
-        help_text="Courthouse name for the proceeding", blank=True,
+        help_text="Courthouse name for the proceeding",
+        blank=True,
     )
     address = models.TextField(
-        help_text="Address of the proceeding", blank=True,
+        help_text="Address of the proceeding",
+        blank=True,
     )
     proceeding_room = models.TextField(
-        help_text="The court room of the proceeding", blank=True,
+        help_text="The court room of the proceeding",
+        blank=True,
     )
     result = models.TextField(
-        help_text="Result of the proceeding", blank=True,
+        help_text="Result of the proceeding",
+        blank=True,
     )
     judge_name = models.TextField(
-        help_text="Judge in the proceeding", blank=True,
+        help_text="Judge in the proceeding",
+        blank=True,
     )
     event = models.TextField(
-        help_text='Event that occurred. E.g. "Jury Trial"', blank=True,
+        help_text='Event that occurred. E.g. "Jury Trial"',
+        blank=True,
     )
 
     objects = models.Manager()
@@ -758,7 +828,9 @@ class TentativeRuling(models.Model):
     """
 
     docket = models.ForeignKey(
-        Docket, related_name="tentative_rulings", on_delete=models.CASCADE,
+        Docket,
+        related_name="tentative_rulings",
+        on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
@@ -781,10 +853,12 @@ class TentativeRuling(models.Model):
         blank=True,
     )
     department = models.TextField(
-        help_text="Internal court code for department", blank=True,
+        help_text="Internal court code for department",
+        blank=True,
     )
     ruling = models.TextField(
-        help_text="The court ruling as HTML", blank=True,
+        help_text="The court ruling as HTML",
+        blank=True,
     )
 
     def __unicode__(self):

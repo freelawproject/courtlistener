@@ -67,26 +67,5 @@
     </div>
 {% else %}
     {# user is not authenticated #}
-    <div id="modal-logged-out"
-         class="modal hidden-print"
-         role="dialog"
-         aria-hidden="true"
-         tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-              <div class="modal-body">
-                <button type="button" class="close" data-dismiss="modal"
-                        aria-label="Close"><span
-                  aria-hidden="true">&times;</span></button>
-                <h2 class="text-center">Please Sign In or&nbsp;Register</h2>
-                <p class="v-offset-above-2">
-                  <a href="{% url "sign-in" %}?next={{ request.path }}?{{ get_string|urlencode }}"
-                   class="btn btn-primary btn-block btn-lg">Sign In</a>
-                  <a href="{% url "register" %}?next={{ request.path|urlencode }}?{{  get_string|urlencode }}"
-                     class="btn btn-default btn-block btn-lg">Register</a>
-                </p>
-              </div>
-            </div>
-        </div>
-    </div>
+    {% include "includes/logged_out_modal.html" %}
 {% endif %}

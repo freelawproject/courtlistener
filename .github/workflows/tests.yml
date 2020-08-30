@@ -1,6 +1,10 @@
 name: docker build and test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master, ]
+  pull_request:
+    branches: [master]
 
 jobs:
   build:
@@ -35,13 +39,15 @@ jobs:
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose up -d
-      - name: List docker statuses
-        run: docker ps -a
-      - name: Show the logs
+      - name: List docker images
+        run: docker image ls -a --no-trunc
+      - name: List docker container statuses
+        run: docker ps -a --no-trunc
+      - name: Show the docker startup logs
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
       - name: Run the tests!
-        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl
+        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2
       - name: cp selenium results from docker to host
         if: failure()
         run: |

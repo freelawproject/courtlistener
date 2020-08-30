@@ -1,16 +1,20 @@
+# coding=utf-8
 # Code for merging PACER content into the DB
 import logging
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.pacer import AttachmentPage
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
+from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.import_lib import get_candidate_judges
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import (
@@ -18,6 +22,7 @@ from cl.lib.pacer import (
     map_pacer_to_cl_id,
     normalize_attorney_contact,
     normalize_attorney_role,
+    map_cl_to_pacer_id,
 )
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
@@ -31,7 +36,12 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
-from cl.recap.models import ProcessingQueue, UPLOAD_TYPE, PROCESSING_STATUS
+from cl.recap.models import (
+    ProcessingQueue,
+    UPLOAD_TYPE,
+    PROCESSING_STATUS,
+    PacerHtmlFiles,
+)
 from cl.search.models import (
     BankruptcyInformation,
     Claim,
@@ -43,6 +53,7 @@ from cl.search.models import (
     Tag,
     Docket,
 )
+from cl.search.tasks import add_items_to_solr
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +119,7 @@ def add_attorney(atty, p, d):
     :return: None if there's an error, or an Attorney ID if not.
     """
     atty_org_info, atty_info = normalize_attorney_contact(
-        atty["contact"], fallback_name=atty["name"],
+        atty["contact"], fallback_name=atty["name"]
     )
 
     # Try lookup by atty name in the docket.
@@ -119,7 +130,7 @@ def add_attorney(atty, p, d):
     if count == 0:
         # Couldn't find the attorney. Make one.
         a = Attorney.objects.create(
-            name=atty["name"], contact_raw=atty["contact"],
+            name=atty["name"], contact_raw=atty["contact"]
         )
     elif count == 1:
         # Nailed it.
@@ -149,7 +160,7 @@ def add_attorney(atty, p, d):
 
             # Add the attorney to the organization
             AttorneyOrganizationAssociation.objects.get_or_create(
-                attorney=a, attorney_organization=org, docket=d,
+                attorney=a, attorney_organization=org, docket=d
             )
 
         if atty_info:
@@ -221,9 +232,9 @@ def update_docket_metadata(d, docket_data):
     or district) results.
     """
     d = update_case_names(d, docket_data["case_name"])
-    mark_ia_upload_needed(d)
+    mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
-    d.date_filed = docket_data["date_filed"] or d.date_filed
+    d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (
         docket_data.get("date_last_filing") or d.date_last_filing
     )
@@ -238,7 +249,7 @@ def update_docket_metadata(d, docket_data):
     judges = get_candidate_judges(
         docket_data.get("assigned_to_str"),
         d.court_id,
-        docket_data["date_filed"],
+        docket_data.get("date_filed"),
     )
     if judges is not None and len(judges) == 1:
         d.assigned_to = judges[0]
@@ -246,7 +257,7 @@ def update_docket_metadata(d, docket_data):
     judges = get_candidate_judges(
         docket_data.get("referred_to_str"),
         d.court_id,
-        docket_data["date_filed"],
+        docket_data.get("date_filed"),
     )
     if judges is not None and len(judges) == 1:
         d.referred_to = judges[0]
@@ -498,7 +509,7 @@ def get_or_make_docket_entry(d, docket_entry):
     if docket_entry["document_number"]:
         try:
             de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"],
+                docket=d, entry_number=docket_entry["document_number"]
             )
         except DocketEntry.MultipleObjectsReturned:
             logger.error(
@@ -529,7 +540,7 @@ def get_or_make_docket_entry(d, docket_entry):
         count = des.count()
         if count == 0:
             de = DocketEntry(
-                docket=d, entry_number=docket_entry["document_number"],
+                docket=d, entry_number=docket_entry["document_number"]
             )
             de_created = True
         elif count == 1:
@@ -573,7 +584,15 @@ def add_docket_entries(d, docket_entries, tags=None):
             de, de_created = response[0], response[1]
 
         de.description = docket_entry["description"] or de.description
-        de.date_filed = docket_entry["date_filed"] or de.date_filed
+        date_filed = docket_entry["date_filed"]
+        if isinstance(date_filed, datetime):
+            # For now we do dumb date conversion. This simply returns a date
+            # object with the same year, month, and day, ignoring time and
+            # timezones. Once the DB is upgraded to support timezones, we can
+            # do better.
+            date_filed = date_filed.date()
+
+        de.date_filed = date_filed or de.date_filed
         de.pacer_sequence_number = (
             docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
         )
@@ -621,7 +640,7 @@ def add_docket_entries(d, docket_entries, tags=None):
                 continue
             rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
-            logger.error(
+            logger.info(
                 "Multiple recap documents found for document entry number'%s' "
                 "while processing '%s'" % (docket_entry["document_number"], d)
             )
@@ -679,15 +698,15 @@ def get_terminated_entities(d):
         d.parties.prefetch_related(
             Prefetch(
                 "party_types",
-                queryset=PartyType.objects.filter(docket=d,)
-                .exclude(date_terminated=None,)
+                queryset=PartyType.objects.filter(docket=d)
+                .exclude(date_terminated=None)
                 .distinct()
                 .only("pk"),
                 to_attr="party_types_for_d",
             ),
             Prefetch(
                 "attorneys",
-                queryset=Attorney.objects.filter(roles__docket=d,)
+                queryset=Attorney.objects.filter(roles__docket=d)
                 .distinct()
                 .only("pk"),
                 to_attr="attys_in_d",
@@ -695,7 +714,7 @@ def get_terminated_entities(d):
             Prefetch(
                 "attys_in_d__roles",
                 queryset=Role.objects.filter(
-                    docket=d, role__in=[Role.SELF_TERMINATED, Role.TERMINATED],
+                    docket=d, role__in=[Role.SELF_TERMINATED, Role.TERMINATED]
                 )
                 .distinct()
                 .only("pk"),
@@ -840,6 +859,12 @@ def add_parties_and_attorneys(d, parties):
     :return: None
 
     """
+    if not parties:
+        # Exit early if no parties. Some dockets don't have any due to user
+        # preference, and if we don't bail early, we risk deleting everything
+        # we have.
+        return
+
     normalize_attorney_roles(parties)
 
     updated_parties = set()
@@ -927,33 +952,31 @@ def add_parties_and_attorneys(d, parties):
 
 
 @transaction.atomic
-def add_bankruptcy_data_to_docket(d, claims_data):
-    """Add bankruptcy data to the docket from the claims data."""
+def add_bankruptcy_data_to_docket(d, metadata):
+    """Add bankruptcy data to the docket from the claims data, RSS feeds, or
+    another location.
+    """
     try:
         bankr_data = d.bankruptcy_information
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    bankr_data.date_converted = (
-        claims_data.get("date_converted") or bankr_data.date_converted
-    )
-    bankr_data.date_last_to_file_claims = (
-        claims_data.get("date_last_to_file_claims")
-        or bankr_data.date_last_to_file_claims
-    )
-    bankr_data.date_last_to_file_govt = (
-        claims_data.get("date_last_to_file_govt")
-        or bankr_data.date_last_to_file_govt
-    )
-    bankr_data.date_debtor_dismissed = (
-        claims_data.get("date_debtor_dismissed")
-        or bankr_data.date_debtor_dismissed
-    )
-    bankr_data.chapter = claims_data.get("chapter") or bankr_data.chapter
-    bankr_data.trustee_str = (
-        claims_data.get("trustee_str") or bankr_data.trustee_str
-    )
-    bankr_data.save()
+    fields = [
+        "date_converted",
+        "date_last_to_file_claims",
+        "date_last_to_file_govt",
+        "date_debtor_dismissed",
+        "chapter",
+        "trustee_str",
+    ]
+    do_save = False
+    for field in fields:
+        if metadata.get(field):
+            do_save = True
+            setattr(bankr_data, field, metadata[field])
+
+    if do_save:
+        bankr_data.save()
 
 
 def add_claim_history_entry(new_history, claim):
@@ -1071,17 +1094,196 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
         )
         db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
-
-        # Add tags to claim
-        tags = []
-        if tag_names is not None:
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name)
-                tag.tag_object(db_claim)
-                tags.append(tag)
-
+        add_tags_to_objs(tag_names, [db_claim])
         for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
+
+
+def get_data_from_att_report(text, court_id):
+    att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
+    att_page._parse_text(text)
+    att_data = att_page.data
+    return att_data
+
+
+def add_tags_to_objs(tag_names, objs):
+    """Add tags by name to objects
+
+    :param tag_names: A list of tag name strings
+    :type tag_names: list
+    :param objs: A list of objects in need of tags
+    :type objs: list
+    :return: [] if no tag names, else a list of the tags created/found
+    """
+    if tag_names is None:
+        return []
+
+    tags = []
+    for tag_name in tag_names:
+        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tags.append(tag)
+
+    for tag in tags:
+        for obj in objs:
+            tag.tag_object(obj)
+    return tags
+
+
+@transaction.atomic
+def merge_pacer_docket_into_cl_docket(
+    d, pacer_case_id, docket_data, report, appellate=False, tag_names=None
+):
+    # Ensure that we set the case ID. This is needed on dockets that have
+    # matching docket numbers, but that never got PACER data before. This was
+    # previously rare, but since we added the FJC data to the dockets table,
+    # this is now quite common.
+    if not d.pacer_case_id:
+        d.pacer_case_id = pacer_case_id
+
+    d.add_recap_source()
+    update_docket_metadata(d, docket_data)
+    d.save()
+
+    if appellate:
+        d, og_info = update_docket_appellate_metadata(d, docket_data)
+        if og_info is not None:
+            og_info.save()
+            d.originating_court_information = og_info
+
+    tags = add_tags_to_objs(tag_names, [d])
+
+    # Add the HTML to the docket in case we need it someday.
+    upload_type = (
+        UPLOAD_TYPE.APPELLATE_DOCKET if appellate else UPLOAD_TYPE.DOCKET
+    )
+    pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
+    pacer_file.filepath.save(
+        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(report.response.text),
+    )
+
+    rds_created, content_updated = add_docket_entries(
+        d, docket_data["docket_entries"], tags=tags
+    )
+    add_parties_and_attorneys(d, docket_data["parties"])
+    process_orphan_documents(rds_created, d.court_id, d.date_filed)
+    logger.info("Created/updated docket: %s" % d)
+    return rds_created, content_updated
+
+
+@transaction.atomic
+def merge_attachment_page_data(
+    court,
+    pacer_case_id,
+    pacer_doc_id,
+    document_number,
+    text,
+    attachment_dicts,
+    debug=False,
+):
+    """Merge attachment page data into the docket
+
+    :param court: The court object we're working with
+    :param pacer_case_id: A PACER case ID
+    :param pacer_doc_id: A PACER document ID
+    :param document_number: The docket entry number
+    :param text: The text of the attachment page
+    :param attachment_dicts: A list of Juriscraper-parsed dicts for each
+    attachment.
+    :param debug: Whether to do saves during this process.
+    :return: A list of RECAPDocuments modified or created during the process,
+    and the DocketEntry object associated with the RECAPDocuments
+    :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
+    """
+    try:
+        params = {
+            "pacer_doc_id": pacer_doc_id,
+            "docket_entry__docket__court": court,
+        }
+        if pacer_case_id:
+            params["docket_entry__docket__pacer_case_id"] = pacer_case_id
+        main_rd = RECAPDocument.objects.get(**params)
+    except RECAPDocument.MultipleObjectsReturned as exc:
+        # Unclear how to proceed and we don't want to associate this data with
+        # the wrong case. We must punt.
+        raise exc
+    except RECAPDocument.DoesNotExist as exc:
+        # Can't find the docket to associate with the attachment metadata
+        # It may be possible to go look for orphaned documents at this stage
+        # and to then add them here, as we do when adding dockets. This need is
+        # particularly acute for those that get free look emails and then go to
+        # the attachment page.
+        raise exc
+
+    # We got the right item. Update/create all the attachments for
+    # the docket entry.
+    de = main_rd.docket_entry
+    if document_number is None:
+        # Bankruptcy attachment page. Use the document number from the Main doc
+        document_number = main_rd.document_number
+
+    if debug:
+        return [], de
+
+    # Save the old HTML to the docket entry.
+    pacer_file = PacerHtmlFiles(
+        content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
+    )
+    pacer_file.filepath.save(
+        "attachment_page.html",  # Irrelevant b/c UUIDFileSystemStorage
+        ContentFile(text),
+    )
+
+    # Create/update the attachment items.
+    rds_created = []
+    rds_affected = []
+    for attachment in attachment_dicts:
+        sanity_checks = [
+            attachment["attachment_number"],
+            # Missing on sealed items.
+            attachment.get("pacer_doc_id", False),
+            # Missing on some restricted docs (see Juriscraper)
+            attachment["page_count"] is not None,
+            attachment["description"],
+        ]
+        if not all(sanity_checks):
+            continue
+
+        rd, created = RECAPDocument.objects.update_or_create(
+            docket_entry=de,
+            document_number=document_number,
+            attachment_number=attachment["attachment_number"],
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        if created:
+            rds_created.append(rd)
+        rds_affected.append(rd)
+
+        for field in ["description", "pacer_doc_id"]:
+            if attachment[field]:
+                setattr(rd, field, attachment[field])
+
+        # Only set page_count and file_size if they're blank, in case
+        # we got the real value by measuring.
+        if rd.page_count is None:
+            rd.page_count = attachment["page_count"]
+        if rd.file_size is None and attachment["file_size_str"]:
+            try:
+                rd.file_size = convert_size_to_bytes(
+                    attachment["file_size_str"]
+                )
+            except ValueError:
+                pass
+        rd.save()
+
+        # Do *not* do this async — that can cause race conditions.
+        add_items_to_solr([rd.pk], "search.RECAPDocument")
+
+    mark_ia_upload_needed(de.docket, save_docket=True)
+    process_orphan_documents(
+        rds_created, court.pk, main_rd.docket_entry.docket.date_filed
+    )
+    return rds_affected, de
 
 
 def process_orphan_documents(rds_created, court_id, docket_date):

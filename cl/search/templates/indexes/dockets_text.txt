@@ -24,7 +24,6 @@
     {{ docket.date_terminated|date:"j F Y" }}
     {{ docket.docket_number }}
     {{ docket.nature_of_suit }}
-    {{ docket.case }}
     {{ docket.jury_demand }}
 {% endwith %}
 
@@ -47,4 +46,13 @@
     {% if referred_to %}
         {{ referred_to.name_full }}
     {% endif %}
+{% endwith %}
+
+
+{# bankruptcy info: Skip the dates, but add the chapter and trustee #}
+{% with bankr_info=item.docket_entry.docket.bankruptcy_information %}
+    {% if bankr_info.chapter %}
+        Chapter: {{ bankr_info.chapter }}
+    {% endif %}
+    {{ bankr_info.trustee_str }}
 {% endwith %}

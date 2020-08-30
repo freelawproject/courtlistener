@@ -1,4 +1,6 @@
 # coding=utf-8
+import bz2
+import errno
 import json
 import logging
 import re
@@ -6,6 +8,8 @@ from datetime import timedelta
 
 import requests
 from dateutil import parser
+from django.core.files.base import ContentFile
+from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -18,10 +22,52 @@ from cl.recap.mergers import (
     add_docket_entries,
     find_docket_object,
     update_docket_metadata,
+    add_bankruptcy_data_to_docket,
 )
-from cl.recap_rss.models import RssFeedStatus, RssItemCache
+from cl.recap_rss.models import RssFeedStatus, RssItemCache, RssFeedData
+from cl.recap_rss.utils import emails
+from cl.search.models import Court
 
 logger = logging.getLogger(__name__)
+
+
+def update_entry_types(court_pk, description):
+    """Check the entry types of a feed. If changed update our record and
+    send an email.
+
+    :param court_pk: The CL identifier for the court
+    :param description: The <description> nodes in the feed
+    :return: None
+    """
+    description = description.lower()
+    if description == "public filings in the last 24 hours":
+        # nyed: https://ecf.nyed.uscourts.gov/cgi-bin/readyDockets.pl
+        new_entry_types = "all"
+    elif description == "all docket entries.":
+        # ared: https://ecf.ared.uscourts.gov/cgi-bin/rss_outside4.pl
+        new_entry_types = "all"
+    else:
+        m = re.search(r"entries of type: (.+)", description)
+        if not m:
+            logger.error(
+                "Unable to parse PACER RSS description: %s" % description
+            )
+            return
+        new_entry_types = m.group(1)
+
+    court = Court.objects.get(pk=court_pk)
+    if court.pacer_rss_entry_types != new_entry_types:
+        # PACER CHANGED AN RSS FEED.
+        email = emails["changed_rss_feed"]
+        send_mail(
+            email["subject"] % court,
+            email["body"]
+            % (court, court.pacer_rss_entry_types, new_entry_types),
+            email["from"],
+            email["to"],
+        )
+        court.pacer_rss_entry_types = new_entry_types
+        court.save()
 
 
 def get_last_build_date(s):
@@ -30,6 +76,8 @@ def get_last_build_date(s):
     In this case we considered using lxml & xpath, which was 1000× faster than
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
+
+    :param s: The content of the RSS feed as a string
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = r"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
@@ -38,6 +86,26 @@ def get_last_build_date(s):
         return None
     last_build_date_str = m.group(2)
     return parser.parse(last_build_date_str, fuzzy=False)
+
+
+def alert_on_staleness(current_build_date, court_id, url):
+    """Send an alert email if a feed goes stale.
+
+    :param current_build_date: When the feed was updated
+    :param court_id: The CL ID of the court
+    :param url: The URL for the feed
+    """
+    staleness_limit = timedelta(minutes=2 * 60)
+    staleness = now() - current_build_date
+    if staleness > staleness_limit:
+        email = emails["stale_feed"]
+        send_mail(
+            email["subject"] % court_id,
+            email["body"]
+            % (court_id, round(staleness.total_seconds() / 60, 2), url),
+            email["from"],
+            email["to"],
+        )
 
 
 def mark_status(status_obj, status_value):
@@ -100,20 +168,27 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         )
         abort_or_retry(self, feed_status, exc)
         return
-    else:
-        if not rss_feed.response.content:
-            try:
-                raise Exception(
-                    "Empty RSS document returned by PACER: %s"
-                    % feed_status.court_id
-                )
-            except Exception as exc:
-                logger.warning(str(exc))
-                abort_or_retry(self, feed_status, exc)
-                return
 
-    current_build_date = get_last_build_date(rss_feed.response.content)
-    if not current_build_date:
+    content = rss_feed.response.content
+    if not content:
+        try:
+            raise Exception(
+                "Empty RSS document returned by PACER: %s"
+                % feed_status.court_id
+            )
+        except Exception as exc:
+            logger.warning(str(exc))
+            abort_or_retry(self, feed_status, exc)
+            return
+
+    current_build_date = get_last_build_date(content)
+    if current_build_date:
+        alert_on_staleness(
+            current_build_date, feed_status.court_id, rss_feed.url
+        )
+        feed_status.date_last_build = current_build_date
+        feed_status.save()
+    else:
         try:
             raise Exception(
                 "No last build date in RSS document returned by "
@@ -125,30 +200,41 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             return
 
     # Only check for early abortion during partial crawls.
-    if not feed_status.is_sweep:
-        # Get the last time this feed was pulled successfully
-        if date_last_built == current_build_date:
-            logger.info(
-                "%s: Feed has not changed since %s. Aborting."
-                % (feed_status.court_id, date_last_built)
-            )
-            # Abort. Nothing has changed here.
-            self.request.chain = None
-            mark_status(feed_status, RssFeedStatus.UNCHANGED)
-            return
+    if date_last_built == current_build_date and not feed_status.is_sweep:
+        logger.info(
+            "%s: Feed has not changed since %s. Aborting.",
+            feed_status.court_id,
+            date_last_built,
+        )
+        # Abort. Nothing has changed here.
+        self.request.chain = None
+        mark_status(feed_status, RssFeedStatus.UNCHANGED)
+        return
 
     logger.info(
         "%s: Feed changed or doing a sweep. Moving on to the merge."
         % feed_status.court_id
     )
-    feed_status.date_last_build = current_build_date
-    feed_status.save()
-
     rss_feed.parse()
     logger.info(
         "%s: Got %s results to merge."
         % (feed_status.court_id, len(rss_feed.data))
     )
+
+    # Update RSS entry types in Court table
+    update_entry_types(court_pk, rss_feed.feed.feed.description)
+
+    # Save the feed to the DB
+    feed_data = RssFeedData(court_id=court_pk)
+    try:
+        feed_data.filepath.save(
+            "rss.xml.bz2", ContentFile(bz2.compress(content))
+        )
+    except OSError as exc:
+        if exc.errno == errno.EIO:
+            abort_or_retry(self, feed_status, exc)
+        else:
+            raise exc
 
     return rss_feed.data
 
@@ -182,19 +268,20 @@ def cache_hash(item_hash):
         return True
 
 
-@app.task
-def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
+@app.task(bind=True, max_retries=1)
+def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     """Merge the rss feed contents into CourtListener
 
+    :param self: The Celery task
     :param feed_data: The data parameter of a PacerRssFeed object that has
     already queried the feed and been parsed.
     :param court_pk: The CourtListener court ID.
-    :param feed_status_pk: The CL ID for the RSS status object.
-    :returns all_rds_created: A list of all the RDs created during the
-    processing.
+    :param metadata_only: Whether to only do metadata and skip docket entries.
+    :returns Dict containing keys:
+      d_pks_to_alert: A list of (docket, alert_time) tuples for sending alerts
+      rds_for_solr: A list of RECAPDocument PKs for updating in Solr
     """
     start_time = now()
-    feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
 
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
@@ -224,7 +311,16 @@ def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
             update_docket_metadata(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
-            d.save()
+            try:
+                d.save()
+                add_bankruptcy_data_to_docket(d, docket)
+            except IntegrityError as exc:
+                # The docket was created while we looked it up. Retry and it
+                # should associate with the new one instead.
+                raise self.retry(exc=exc)
+            if metadata_only:
+                continue
+
             rds_created, content_updated = add_docket_entries(
                 d, docket["docket_entries"]
             )
@@ -239,7 +335,7 @@ def merge_rss_feed_contents(feed_data, court_pk, feed_status_pk):
     logger.info(
         "%s: Sending %s new RECAP documents to Solr for indexing and "
         "sending %s dockets for alerts.",
-        feed_status.court_id,
+        court_pk,
         len(all_rds_created),
         len(d_pks_to_alert),
     )
@@ -254,20 +350,18 @@ def mark_status_successful(feed_status_pk):
 
 
 @app.task
-def trim_rss_cache(days=2):
-    """Remove any entries in the RSS cache older than `days` days.
+def trim_rss_data(cache_days=2, status_days=14):
+    """Trim the various tracking objects used during RSS parsing
 
-    :returns The number removed.
+    :param cache_days: RssItemCache objects older than this number of days will
+    be deleted
+    :param status_days: RssFeedStatus objects older than this number of days
+    will be deleted.
     """
-    logger.info("Trimming RSS item cache.")
-    result = RssItemCache.objects.filter(
-        date_created__lt=now() - timedelta(days=days)
+    logger.info("Trimming RSS tracking items.")
+    RssItemCache.objects.filter(
+        date_created__lt=now() - timedelta(days=cache_days)
     ).delete()
-    if result is None:
-        return 0
-
-    # Deletions return a tuple of the total count and the individual item count
-    # if there is a cascade. We just want the total.
-    num_deleted = result[0]
-    logger.info("Trimmed %s items from the RSS cache." % num_deleted)
-    return num_deleted
+    RssFeedStatus.objects.filter(
+        date_created__lt=now() - timedelta(days=status_days)
+    ).delete()

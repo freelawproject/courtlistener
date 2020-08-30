@@ -38,7 +38,7 @@ extended_iso_re = re.compile("^" + extended_iso + "$", re.X)
 
 
 def datetime_from_w3_datestring(s):
-    """ We need to extend ISO syntax (as permitted by the standard) to allow
+    """We need to extend ISO syntax (as permitted by the standard) to allow
     for dates before 0AD and after 9999AD. This is how to parse such a string"""
     m = extended_iso_re.match(s)
     if not m:

@@ -14,7 +14,6 @@ from cl.citations.models import (
     Citation,
     FullCitation,
     IdCitation,
-    IbidCitation,
     SupraCitation,
     ShortformCitation,
     NonopinionCitation,
@@ -236,7 +235,7 @@ def parse_page(page):
 
     if page.isdigit():
         # First, check whether the page is a simple digit. Most will be.
-        return int(page)
+        return str(page)
     else:
         # Otherwise, check whether the "page" is really one of the following:
         # (ordered in descending order of likelihood)
@@ -244,14 +243,16 @@ def parse_page(page):
         # 2) A roman numeral. E.g., "250 Neb. xxiv (1996)"
         # 3) A special Connecticut or Illinois number. E.g., "13301-M"
         # 4) A page with a weird suffix. E.g., "559 N.W.2d 826|N.D."
+        # 5) A page with a ¶ symbol, star, and/or colon. E.g., "¶ 119:12-14"
         match = (
-            re.match(r"\d{1,6}-\d{1,6}", page)  # Page range
+            re.match(r"\d{1,6}-\d{1,6}", page)  # Simple page range
             or isroman(page)  # Roman numeral
             or re.match(r"\d{1,6}[-]?[a-zA-Z]{1,6}", page)  # CT/IL page
             or re.match(r"\d{1,6}", page)  # Weird suffix
+            or re.match(r"[*\u00b6\ ]*[0-9:\-]+", page)  # ¶, star, colon
         )
         if match:
-            return match.group(0)
+            return str(match.group(0))
         else:
             return None
 
@@ -396,6 +397,46 @@ def extract_supra_citation(words, supra_index):
     return SupraCitation(antecedent_guess, page=page, volume=volume)
 
 
+def extract_id_citation(words, id_index):
+    """Given a list of words and the index of an id token, gather the
+    immediately succeeding tokens to construct and return an IdCitation
+    object.
+    """
+    # Keep track of whether a page is detected or not
+    has_page = False
+
+    # List of literals that could come after an id token
+    ID_REFERENCE_TOKEN_LITERALS = set(
+        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶"]
+    )
+
+    # Helper function to see whether a token qualifies as a page candidate
+    def is_page_candidate(token):
+        return token in ID_REFERENCE_TOKEN_LITERALS or parse_page(token)
+
+    # Check if the post-id token is indeed a page candidate
+    if is_page_candidate(words[id_index + 1]):
+        # If it is, set the scan_index appropriately
+        scan_index = id_index + 2
+        has_page = True
+
+        # Also, keep trying to scan for more pages
+        while is_page_candidate(words[scan_index]):
+            scan_index += 1
+
+    # If it is not, simply set a naive anchor for the end of the scan_index
+    else:
+        has_page = False
+        scan_index = id_index + 4
+
+    # Only linkify the after tokens if a page is found
+    return IdCitation(
+        id_token=words[id_index],
+        after_tokens=words[id_index + 1 : scan_index],
+        should_linkify=has_page,
+    )
+
+
 def is_date_in_reporter(editions, year):
     """Checks whether a year falls within the range of 1 to n editions of a
     reporter
@@ -469,7 +510,7 @@ def disambiguate_reporters(citations):
                             ],
                             citation.year,
                         ):
-                            possible_citations.append((citation.reporter, i,))
+                            possible_citations.append((citation.reporter, i))
                     if len(possible_citations) == 1:
                         # We were able to identify only one hit
                         # after filtering by year.
@@ -542,7 +583,7 @@ def disambiguate_reporters(citations):
                         key = REPORTERS[EDITIONS[reporter_key]]
                         cite_year = citation.year
                         if is_date_in_reporter(key[i]["editions"], cite_year):
-                            possible_citations.append((reporter_key, i,))
+                            possible_citations.append((reporter_key, i))
                 if len(possible_citations) == 1:
                     # We were able to identify only one hit after filtering by
                     # year.
@@ -555,6 +596,47 @@ def disambiguate_reporters(citations):
                     continue
 
     return unambiguous_citations
+
+
+def remove_address_citations(citations):
+    """Some addresses look like citations, but they're not. Remove them.
+
+    An example might be 111 S.W. 23st St.
+
+    :param citations: A list of citations. These should generally be
+    disambiguated, but it's not essential.
+    :returns A list of citations with addresses removed.
+    """
+    coordinate_reporters = ("N.E.", "S.E.", "S.W.", "N.W.")
+    good_citations = []
+    for citation in citations:
+        if not isinstance(citation, FullCitation):
+            good_citations.append(citation)
+            continue
+
+        if not isinstance(citation.page, basestring):
+            good_citations.append(citation)
+            continue
+
+        page = citation.page.lower()
+        is_ordinal_page = (
+            page.endswith("st")
+            or page.endswith("nd")
+            or page.endswith("rd")
+            or page.endswith("th")
+        )
+        is_coordinate_reporter = (
+            # Assuming disambiguation was used, check the canonical_reporter
+            citation.canonical_reporter in coordinate_reporters
+            # If disambiguation wasn't used, check the reporter attr
+            or citation.reporter in coordinate_reporters
+        )
+        if is_ordinal_page and is_coordinate_reporter:
+            # It's an address. Skip it.
+            continue
+
+        good_citations.append(citation)
+    return good_citations
 
 
 def get_citations(
@@ -592,22 +674,14 @@ def get_citations(
                     # Neither a full nor short form citation
                     continue
 
-        # CASE 2: Citation token is an "Id." reference.
+        # CASE 2: Citation token is an "Id." or "Ibid." reference.
         # In this case, the citation is simply to the immediately previous
         # document, but for safety we won't make that resolution until the
         # previous citation has been successfully matched to an opinion.
-        elif citation_token.lower() in {"id.", "id.,"}:
-            citation = IdCitation(
-                id_token=citation_token, after_tokens=words[i + 1 : i + 3]
-            )
+        elif citation_token.lower() in {"id.", "id.,", "ibid."}:
+            citation = extract_id_citation(words, i)
 
-        # CASE 3: Citation token is an "Ibid." reference. Same logic as above.
-        elif citation_token.lower() == "ibid.":
-            citation = IbidCitation(
-                id_token=citation_token, after_tokens=words[i + 1 : i + 4]
-            )
-
-        # CASE 4: Citation token is a "supra" reference.
+        # CASE 3: Citation token is a "supra" reference.
         # In this case, we're not sure yet what the citation's antecedent is.
         # It could be any of the previous citations above. Thus, like an Id.
         # citation, we won't be able to resolve this reference until the
@@ -615,14 +689,14 @@ def get_citations(
         elif strip_punct(citation_token.lower()) == "supra":
             citation = extract_supra_citation(words, i)
 
-        # CASE 5: Citation token is a section marker.
+        # CASE 4: Citation token is a section marker.
         # In this case, it's likely that this is a reference to a non-
         # opinion document. So we record this marker in order to keep
         # an accurate list of the possible antecedents for id citations.
         elif u"§" in citation_token:
             citation = NonopinionCitation(match_token=citation_token)
 
-        # CASE 6: The token is not a citation.
+        # CASE 5: The token is not a citation.
         else:
             continue
 
@@ -631,6 +705,8 @@ def get_citations(
     # Disambiguate each citation's reporter
     if disambiguate:
         citations = disambiguate_reporters(citations)
+
+    citations = remove_address_citations(citations)
 
     # Set each citation's court property to "scotus" by default
     for citation in citations:

@@ -1,15 +1,19 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 from django.http import (
     HttpResponse,
     HttpResponseServerError,
     HttpResponseNotAllowed,
+    Http404,
 )
+from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite
+from cl.favorites.models import Favorite, UserTag
+from cl.lib.view_utils import increment_view_count
 
 
 def get_favorite(request):
@@ -66,7 +70,11 @@ def save_or_update_favorite(request):
         if f.is_valid():
             new_fave = f.save(commit=False)
             new_fave.user = request.user
-            new_fave.save()
+            try:
+                new_fave.save()
+            except IntegrityError:
+                # User already has this favorite.
+                return HttpResponse("It worked")
         else:
             # Validation errors fail silently. Probably could be better.
             return HttpResponseServerError("Failure. Form invalid")
@@ -110,3 +118,21 @@ def delete_favorite(request):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request."
         )
+
+
+def view_tag(request, username, tag_name):
+    tag = get_object_or_404(UserTag, name=tag_name, user__username=username)
+    increment_view_count(tag, request)
+
+    if tag.published is False and tag.user != request.user:
+        # They don't even get to see if it exists.
+        raise Http404("This tag does not exist")
+
+    # Calculate the total tag count (as we add more types of taggables, add
+    # them here).
+    total_tag_count = tag.dockets.all().count()
+    return render(
+        request,
+        "tag.html",
+        {"tag": tag, "total_tag_count": total_tag_count, "private": False},
+    )

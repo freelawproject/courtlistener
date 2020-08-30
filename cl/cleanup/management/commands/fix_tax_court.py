@@ -215,8 +215,8 @@ def find_missing_or_incorrect_citations(options):
     logger.info("%s clusters found", ocs.count())
 
     for oc in ocs:
-        logger.warn(
-            "Reference url: https://www.courtlistener.com/opinion/%s/x", oc.id,
+        logger.warning(
+            "Reference url: https://www.courtlistener.com/opinion/%s/x", oc.id
         )
         cites = oc.citations.all()
 
@@ -224,7 +224,7 @@ def find_missing_or_incorrect_citations(options):
 
         if cites.count() > 0:
             if should_fix:
-                logger.warn("Deleting cites in cluster %s", oc.id)
+                logger.warning("Deleting cites in cluster %s", oc.id)
                 cites.delete()
 
         ops = oc.sub_opinions.all()
@@ -239,7 +239,7 @@ def find_missing_or_incorrect_citations(options):
                     "Found citation in plain text as %s", found_cite_str
                 )
                 if should_fix:
-                    logger.warn("Creating citation: %s", found_cite_str)
+                    logger.warning("Creating citation: %s", found_cite_str)
                     Citation.objects.create(
                         volume=found_cite.volume,
                         reporter=found_cite.reporter,
@@ -251,19 +251,19 @@ def find_missing_or_incorrect_citations(options):
                     if cites.count() > 0:
                         for cite in cites:
                             if str(cite) != found_cite_str:
-                                logger.warn(
+                                logger.warning(
                                     "Have (%s), Expect (%s)",
                                     cite,
                                     found_cite_str,
                                 )
                     else:
-                        logger.warn("Add %s to db", found_cite_str)
+                        logger.warning("Add %s to db", found_cite_str)
 
             else:
                 if cites.count() > 0:
                     for cite in cites:
-                        logger.warn("Have (%s), Expect None", cite)
-                        logger.warn("%s should be removed", cite)
+                        logger.warning("Have (%s), Expect None", cite)
+                        logger.warning("%s should be removed", cite)
                 else:
                     logger.info("No citation in db or text: %s", oc.id)
 
@@ -287,7 +287,7 @@ def find_missing_or_incorrect_docket_numbers(options):
         ops = oc.sub_opinions.all()
         assert ops.count() == 1
         for op in ops:
-            logger.warn(
+            logger.warning(
                 "Reference url: https://www.courtlistener.com/opinion/%s/x",
                 oc.id,
             )
@@ -307,17 +307,17 @@ def find_missing_or_incorrect_docket_numbers(options):
                 continue
             else:
                 if dockets_in_db == "":
-                    logger.warn(
+                    logger.warning(
                         "Docket No(s). found for the first time: %s",
                         found_dockets,
                     )
                 elif found_dockets == "":
-                    logger.warn(
+                    logger.warning(
                         "Docket No(s). not found in text but Docket No(s). %s in db",
                         dockets_in_db,
                     )
                 else:
-                    logger.warn(
+                    logger.warning(
                         "Dockets in db (%s) != (%s) docket parsed from text",
                         dockets_in_db,
                         found_dockets,

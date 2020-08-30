@@ -7,7 +7,8 @@ from requests.exceptions import HTTPError, MissingSchema, TooManyRedirects
 
 from cl.celery import app
 from cl.visualizations.models import Referer
-from cl.visualizations.utils import emails, new_title_for_viz
+from cl.visualizations.utils import emails
+from cl.visualizations.network_utils import new_title_for_viz
 
 
 def blacklisted_url(url):
@@ -76,7 +77,7 @@ def get_title(self, referer_id):
 
     if title:
         referer.page_title = trunc(
-            title, referer._meta.get_field("page_title").max_length,
+            title, referer._meta.get_field("page_title").max_length
         )
         referer.save()
 
