@@ -1,11 +1,13 @@
+import random
 from collections import defaultdict, OrderedDict
 from itertools import groupby
 from urllib import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db.models import F, Prefetch
+from django.db.models import Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
@@ -21,7 +23,6 @@ from reporters_db import (
     REPORTERS,
     VARIATIONS_ONLY,
 )
-
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_300_MULTIPLE_CHOICES
 
 from cl.alerts.models import DocketAlert
@@ -30,7 +31,7 @@ from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import suppress_autotime, choices_to_csv
+from cl.lib.model_helpers import choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
@@ -52,7 +53,6 @@ from cl.search.models import (
     Docket,
     OpinionCluster,
     RECAPDocument,
-    DOCUMENT_STATUSES,
 )
 from cl.search.views import do_search
 
@@ -369,6 +369,49 @@ def view_recap_document(
     )
 
 
+def get_related_feedback_form(request, pk):
+    """If a recommendations was clicked, return seed details for feedback form.
+
+    Clicks on "related opinions" are tracked with cookies. We check here if
+    these cookies exists, are valid, no "close" was clicked before and no other
+    feedback was submitted. Also, the feedback form is only shown to a random
+    subset of users (5% by default, see settings.RELATED_FEEDBACK_RATIO).
+    """
+    if is_bot(request):
+        return False
+
+    # Click cookies must exists and random test must be true
+    if (
+        request.COOKIES.has_key("clickFromRelated%s_id" % pk)
+        and request.COOKIES.has_key("clickFromRelated%s_title" % pk)
+        and random.random() < settings.RELATED_FEEDBACK_RATIO
+    ):
+
+        try:
+            seed_id = int(request.COOKIES.get("clickFromRelated%s_id" % pk))
+            seed_title = request.COOKIES.get("clickFromRelated%s_title" % pk)
+
+            # Valid seed, not closed and no feedback yet
+            if (
+                seed_id > 0
+                and not request.COOKIES.has_key("feedbackRelatedCloseAll")
+                and not request.COOKIES.has_key(
+                    "feedbackRelated_%s_%s" % (seed_id, pk)
+                )
+            ):
+
+                return {
+                    "seed_id": seed_id,
+                    "seed_title": seed_title,
+                    "target_id": pk,
+                }
+
+        except ValueError:
+            pass
+
+    return False
+
+
 @never_cache
 @ratelimit_if_not_whitelisted
 def view_opinion(request, pk, _):
@@ -438,6 +481,7 @@ def view_opinion(request, pk, _):
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": "&" + urlencode(related_search_params),
+            "related_feedback_form": get_related_feedback_form(request, pk),
         },
     )
 

@@ -1,0 +1,30 @@
+{% if related_feedback_form %}
+  <script type="text/javascript">
+  function submitRelatedFeedback(button, seedId, targetId, feedback) {
+    feedback = String(feedback);
+
+    // Send to Matomo
+    var _paq = window._paq || [];
+    _paq.push(['trackEvent', 'feedbackRelated', 'feedbackRelated_' + seedId + '_' + targetId, feedback]);
+
+    // Set cookie for 1 year
+    document.cookie = 'feedbackRelated_' + seedId + '_' + targetId + '=' + feedback + ';path=/;max-age=31536000';
+
+    if(feedback === 'close') {
+        document.cookie = 'feedbackRelatedCloseAll' + '=1;path=/;max-age=2678400'; // 1 month
+    }
+
+    $(button).parent().fadeOut();
+  }
+  </script>
+
+  <div class="alert alert-info alert-dismissible" role="alert">
+    <button type="button" class="close" onclick="closeRelatedFeedback(this, {{ related_feedback_form.seed_id }}, {{ related_feedback_form.target_id }}, 'close');" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+
+      Was this case a good recommendation for <u>{{ related_feedback_form.seed_title|safe|truncatewords:10 }}</u>?
+
+      <button class="btn btn-xs btn-default" onclick="submitRelatedFeedback(this, {{ related_feedback_form.seed_id }}, {{ related_feedback_form.target_id }}, 1);"><i class="fa fa-thumbs-up"></i> Yes</button>&nbsp;
+      <button class="btn btn-xs btn-default" onclick="submitRelatedFeedback(this, {{ related_feedback_form.seed_id }}, {{ related_feedback_form.target_id }}, 0);"><i class="fa fa-thumbs-down"></i> No</button>
+  </div>
+
+{% endif %}

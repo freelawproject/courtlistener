@@ -26,9 +26,15 @@
 
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/related_feedback.js"></script>
     <script type="text/javascript">
-    $(document).ready(function () {
-      insertFeedbackForm({{ cluster.pk }}, {{ related_feedback_ratio }});
-    });
+      function clickRelated(algorithm, seedId, targetId, rank, seedTitle) {
+        // Click cookies
+        document.cookie = 'clickFromRelated' + targetId + '_id=' + seedId + ';path=/;max-age=60';
+        document.cookie = 'clickFromRelated' + targetId + '_title=' + seedTitle + ';path=/;max-age=60';
+
+        // Send to Matomo
+        var _paq = window._paq || [];
+        _paq.push(['trackEvent', 'clickRelated', 'clickRelated_' + algorithm + '_seed_' + seedId, targetId, rank]);
+      }
     </script>
 {% endblock %}
 
@@ -194,6 +200,8 @@
 
 {% block content %}
     <article class="col-sm-9">
+        {% include 'includes/related_feedback_form.html' %}
+
         {% with opinion_count=cluster.sub_opinions.all.count %}
             <i id="favorites-star"
                class="{% if favorite_form.instance.cluster_id %}gold fa-star{% else %}gray fa-star-o bold{% endif %} pointer fa inline"
