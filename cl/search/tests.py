@@ -86,10 +86,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             self.expected_num_results_opinion,
             msg="Did not get expected number of results.\n"
             "\tGot:\t%s\n\tExpected:\t %s"
-            % (
-                actual_count,
-                self.expected_num_results_opinion,
-            ),
+            % (actual_count, self.expected_num_results_opinion,),
         )
 
         # Check a simple citation query
@@ -727,8 +724,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
                 "clickRelated('mlt', %i, %i," % (seed_pk, expected_first_pk)
             )
             < r.content.index(
-                "clickRelated('mlt', %i, %i,"
-                % (seed_pk, expected_second_pk)
+                "clickRelated('mlt', %i, %i," % (seed_pk, expected_second_pk)
             ),
             msg="Related opinions are in wrong order.",
         )
