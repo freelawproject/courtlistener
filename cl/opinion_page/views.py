@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db.models import Prefetch
+from django.db.models import F, Prefetch
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
@@ -31,7 +31,7 @@ from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import choices_to_csv
+from cl.lib.model_helpers import suppress_autotime, choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
@@ -53,6 +53,7 @@ from cl.search.models import (
     Docket,
     OpinionCluster,
     RECAPDocument,
+    DOCUMENT_STATUSES,
 )
 from cl.search.views import do_search
 
@@ -375,7 +376,7 @@ def get_related_feedback_form(request, pk):
     Clicks on "related opinions" are tracked with cookies. We check here if
     these cookies exists, are valid, no "close" was clicked before and no other
     feedback was submitted. Also, the feedback form is only shown to a random
-    subset of users (5% by default, see settings.RELATED_FEEDBACK_RATIO).
+    subset of users (10% by default, see settings.RELATED_FEEDBACK_RATIO).
     """
     if is_bot(request):
         return False
