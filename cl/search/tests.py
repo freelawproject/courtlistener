@@ -699,7 +699,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
         # Test if related opinion exist
         self.assertGreater(
             r.content.index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+                "clickRelated('mlt', %i, %i," % (seed_pk, expected_first_pk)
             ),
             0,
             msg="Related opinion not found.",
@@ -724,10 +724,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
         # Test for click tracking order
         self.assertTrue(
             r.content.index(
-                "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
+                "clickRelated('mlt', %i, %i," % (seed_pk, expected_first_pk)
             )
             < r.content.index(
-                "'clickRelated_mlt_seed%i', %i,"
+                "clickRelated('mlt', %i, %i,"
                 % (seed_pk, expected_second_pk)
             ),
             msg="Related opinions are in wrong order.",
