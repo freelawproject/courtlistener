@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
-from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
     DocketHistoryReport,
@@ -37,6 +37,7 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename
+from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
@@ -907,15 +908,14 @@ def process_recap_appellate_attachment(self, pk):
 
 
 @app.task
-def create_new_docket_from_idb(idb_pk):
+def create_new_docket_from_idb(idb_row):
     """Create a new docket for the IDB item found. Populate it with all
     applicable fields.
 
-    :param idb_pk: An FjcIntegratedDatabase object pk with which to create a
+    :param idb_row: An FjcIntegratedDatabase object with which to create a
     Docket.
     :return Docket: The created Docket object.
     """
-    idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
     case_name = idb_row.plaintiff + " v. " + idb_row.defendant
     d = Docket(
         source=Docket.IDB,
@@ -934,7 +934,7 @@ def create_new_docket_from_idb(idb_pk):
     except IntegrityError:
         # Happens when the IDB row is already associated with a docket. Remove
         # the other association and try again.
-        Docket.objects.filter(idb_data_id=idb_pk).update(idb_data=None)
+        Docket.objects.filter(idb_data=idb_row).update(idb_data=None)
         d.save()
 
     logger.info("Created docket %s for IDB row: %s", d.pk, idb_row)
@@ -942,16 +942,14 @@ def create_new_docket_from_idb(idb_pk):
 
 
 @app.task
-def merge_docket_with_idb(d_pk, idb_pk):
+def merge_docket_with_idb(d, idb_row):
     """Merge an existing docket with an idb_row.
 
-    :param d_pk: A Docket object pk to update.
-    :param idb_pk: A FjcIntegratedDatabase object pk to use as a source for
+    :param d: A Docket object pk to update.
+    :param idb_row: A FjcIntegratedDatabase object to use as a source for
     updates.
     :return None
     """
-    d = Docket.objects.get(pk=d_pk)
-    idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
     d.add_idb_source()
     d.idb_data = idb_row
     d.date_filed = d.date_filed or idb_row.date_filed
@@ -965,8 +963,93 @@ def merge_docket_with_idb(d_pk, idb_pk):
     except IntegrityError:
         # Happens when the IDB row is already associated with a docket. Remove
         # the other association and try again.
-        Docket.objects.filter(idb_data_id=idb_pk).update(idb_data=None)
+        Docket.objects.filter(idb_data=idb_row).update(idb_data=None)
         d.save()
+
+
+def do_heuristic_match(idb_row, ds):
+    """Use cosine similarity of case names from the IDB to try to find a match
+    out of several possibilities in the DB.
+
+    :param idb_row: The FJC IDB row to match against
+    :param ds: A list of Dockets that might match
+    :returns: The best-matching Docket in ds if possible, else None
+    """
+    case_names = []
+    for d in ds:
+        case_name = harmonize(d.case_name)
+        parts = case_name.lower().split(" v. ")
+        if len(parts) == 1:
+            case_names.append(case_name)
+        elif len(parts) == 2:
+            plaintiff, defendant = parts[0], parts[1]
+            case_names.append("%s v. %s" % (plaintiff[0:30], defendant[0:30]))
+        elif len(parts) > 2:
+            case_names.append(case_name)
+    idb_case_name = harmonize(
+        "%s v. %s" % (idb_row.plaintiff, idb_row.defendant)
+    )
+    results = find_best_match(case_names, idb_case_name, case_sensitive=False)
+    if results["ratio"] > 0.65:
+        logger.info(
+            "Found good match by case name for %s: %s",
+            idb_case_name,
+            results["match_str"],
+        )
+        d = ds[results["match_index"]]
+    else:
+        logger.info(
+            "No good match after office and case name filtering. Creating "
+            "new item: %s",
+            idb_row,
+        )
+        d = None
+    return d
+
+
+@app.task
+def create_or_merge_from_idb_chunk(idb_chunk):
+    """Take a chunk of IDB rows and either merge them into the Docket table or
+    create new items for them in the docket table.
+
+    :param idb_chunk: A list of FjcIntegratedDatabase PKs
+    :type idb_chunk: list
+    :return: None
+    :rtype: None
+    """
+    for idb_pk in idb_chunk:
+        idb_row = FjcIntegratedDatabase.objects.get(pk=idb_pk)
+        ds = (
+            Docket.objects.filter(
+                docket_number_core=idb_row.docket_number,
+                court=idb_row.district,
+            )
+            .exclude(docket_number__icontains="cr")
+            .exclude(case_name__icontains="sealed")
+            .exclude(case_name__icontains="suppressed")
+            .exclude(case_name__icontains="search warrant")
+        )
+        count = ds.count()
+        if count == 0:
+            msg = "Creating new docket for IDB row: %s"
+            logger.info(msg, idb_row)
+            create_new_docket_from_idb(idb_row)
+            continue
+        elif count == 1:
+            d = ds[0]
+            msg = "Merging Docket %s with IDB row: %s"
+            logger.info(msg, d, idb_row)
+            merge_docket_with_idb(d, idb_row)
+            continue
+
+        msg = "Unable to merge. Got %s dockets for row: %s"
+        logger.info(msg, count, idb_row)
+
+        d = do_heuristic_match(idb_row, ds)
+        if d is not None:
+            merge_docket_with_idb(d, idb_row)
+        else:
+            create_new_docket_from_idb(idb_row)
 
 
 @app.task
