@@ -4,6 +4,7 @@ import errno
 import json
 import logging
 import re
+from calendar import SUNDAY, SATURDAY
 from datetime import timedelta
 
 import requests
@@ -13,11 +14,13 @@ from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
+from pytz import timezone
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.mergers import (
     add_docket_entries,
     find_docket_object,
@@ -89,14 +92,23 @@ def get_last_build_date(s):
 
 
 def alert_on_staleness(current_build_date, court_id, url):
-    """Send an alert email if a feed goes stale.
+    """Send an alert email if a feed goes stale on a weekday, according to its
+    timezone.
 
     :param current_build_date: When the feed was updated
     :param court_id: The CL ID of the court
     :param url: The URL for the feed
     """
+    _now = now()
+    court_tz = timezone(COURT_TIMEZONES.get(court_id, "US/Pacific"))
+    court_now = _now.astimezone(court_tz)
+    if court_now.weekday() in [SATURDAY, SUNDAY]:
+        # Maintenance is frequently done on weekends, causing staleness. Don't
+        # send alerts on weekends.
+        return
+
     staleness_limit = timedelta(minutes=2 * 60)
-    staleness = now() - current_build_date
+    staleness = _now - current_build_date
     if staleness > staleness_limit:
         email = emails["stale_feed"]
         send_mail(
