@@ -91,18 +91,18 @@ class Command(VerboseCommand, CommandUtils):
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
         chunk_size = 25
-        i = -1
-        for idb_chunk in chunks(idb_rows.iterator(), chunk_size):
+        for i, idb_chunk in enumerate(chunks(idb_rows.iterator(), chunk_size)):
             # Iterate over all items in the IDB and find them in the Docket
             # table. If they're not there, create a new item.
-            i += 1
+            # Consume the chunk so the iterator works properly
+            idb_chunk = list(idb_chunk)
             if i < options["offset"]:
                 continue
             if i >= options["limit"] > 0:
                 break
             throttle.maybe_wait()
-            msg = "%s: Merging/creating new docket for IDB chunk"
-            logger.info(msg, i)
+            msg = "%s: Merging/creating new dockets for IDB chunk of %s items"
+            logger.info(msg, i, chunk_size)
             create_or_merge_from_idb_chunk.apply_async(
                 args=(idb_chunk,), queue=q
             )
