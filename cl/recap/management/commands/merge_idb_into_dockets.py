@@ -91,9 +91,11 @@ class Command(VerboseCommand, CommandUtils):
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
         chunk_size = 25
-        for i, idb_chunk in enumerate(chunks(idb_rows.iterator(), chunk_size)):
+        i = -1
+        for idb_chunk in chunks(idb_rows.iterator(), chunk_size):
             # Iterate over all items in the IDB and find them in the Docket
             # table. If they're not there, create a new item.
+            i += 1
             if i < options["offset"]:
                 continue
             if i >= options["limit"] > 0:

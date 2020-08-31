@@ -59,10 +59,19 @@ def mkdir_p(path):
             raise
 
 
-def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
+def chunks(iterable, chunk_size):
+    """Like the chunks function, but the iterable can be a generator.
+
+    Note that this cannot be used with enumerate because it needs the items to
+    be consumed for it to know it needs to create the next chunk.
+
+    :param iterable: Any iterable
+    :param chunk_size: The number of items to put in each chunk
+    :return: Yields lists of chunksize number of items from iterable
+    """
+    iterator = iter(iterable)
+    for first in iterator:
+        yield chain([first], islice(iterator, chunk_size - 1))
 
 
 def previous_and_next(some_iterable):
