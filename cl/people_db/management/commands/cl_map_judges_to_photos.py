@@ -1,6 +1,7 @@
 import os
 
 from django.utils.text import slugify
+from django.utils.timezone import now
 from judge_pics import judge_root
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -66,7 +67,7 @@ class Command(VerboseCommand):
 
         # After iterating, set all people to not have photos.
         if not self.debug:
-            people.update(has_photo=False)
+            people.update(date_modified=now(), has_photo=False)
 
         found = 0
         missed = 0

@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import requests
 from django.conf import settings
+from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.sunburnt import SolrInterface
@@ -97,7 +98,9 @@ def clear_old_values(do_it, debug):
     if not do_it or debug:
         return
     logger.info("Clearing out all old values in FTM fields.")
-    Person.objects.all().update(ftm_eid="", ftm_total_received=None)
+    Person.objects.all().update(
+        date_modified=now(), ftm_eid="", ftm_total_received=None
+    )
 
 
 def print_stats(match_stats, candidate_eid_lists):
