@@ -62,12 +62,12 @@ def mkdir_p(path):
 def chunks(iterable, chunk_size):
     """Like the chunks function, but the iterable can be a generator.
 
-    Note that this cannot be used with enumerate because it needs the items to
-    be consumed for it to know it needs to create the next chunk.
+    Note that the chunks must be *consumed* for it to work properly. Usually
+    that means converting them to a list in your loop.
 
     :param iterable: Any iterable
     :param chunk_size: The number of items to put in each chunk
-    :return: Yields lists of chunksize number of items from iterable
+    :return: Yields iterators of chunksize number of items from iterable
     """
     iterator = iter(iterable)
     for first in iterator:
