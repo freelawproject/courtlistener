@@ -5,6 +5,7 @@ from datetime import date
 
 from dateutil import parser
 from django.core.management import CommandError
+from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.recap.constants import (
@@ -41,7 +42,7 @@ def create_or_update_row(values):
             logger.info("Added row: %s", fjc_row)
             break
         elif existing_row_count == 1:
-            existing_rows.update(**values)
+            existing_rows.update(date_modified=now(), **values)
             fjc_row = existing_rows[0]
             logger.info("Updated row: %s" % fjc_row)
             break

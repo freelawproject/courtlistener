@@ -248,6 +248,10 @@ def update_document_from_text(opinion):
     Use functions from Juriscraper to pull metadata out of opinion
     text. Currently only implemented in Tax, but functional in all
     scrapers via AbstractSite object.
+
+    Note that this updates the values but does not save them. Saving is left to
+    the calling function.
+
     :param opinion: Opinion object
     :return: None
     """

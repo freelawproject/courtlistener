@@ -934,7 +934,9 @@ def create_new_docket_from_idb(idb_row):
     except IntegrityError:
         # Happens when the IDB row is already associated with a docket. Remove
         # the other association and try again.
-        Docket.objects.filter(idb_data=idb_row).update(idb_data=None)
+        Docket.objects.filter(idb_data=idb_row).update(
+            date_modified=now(), idb_data=None
+        )
         d.save()
 
     logger.info("Created docket %s for IDB row: %s", d.pk, idb_row)
@@ -963,7 +965,9 @@ def merge_docket_with_idb(d, idb_row):
     except IntegrityError:
         # Happens when the IDB row is already associated with a docket. Remove
         # the other association and try again.
-        Docket.objects.filter(idb_data=idb_row).update(idb_data=None)
+        Docket.objects.filter(idb_data=idb_row).update(
+            date_modified=now(), idb_data=None
+        )
         d.save()
 
 

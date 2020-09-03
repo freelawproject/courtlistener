@@ -293,7 +293,9 @@ def delete_account(request):
             request.user.alerts.all().delete()
             request.user.docket_alerts.all().delete()
             request.user.favorites.all().delete()
-            request.user.scotus_maps.all().update(deleted=True)
+            request.user.scotus_maps.all().update(
+                date_modified=now(), deleted=True
+            )
             convert_to_stub_account(request.user)
             logout(request)
             update_mailchimp.delay(request.user.email, "unsubscribed")
