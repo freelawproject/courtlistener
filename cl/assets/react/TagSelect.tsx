@@ -122,9 +122,6 @@ const TagSelect: React.FC = () => {
         rowVirtualizer.scrollToIndex(highlightedIndex);
       }
     },
-    onInputValueChange: ({ inputValue }) => {
-      setTextVal(inputValue || '');
-    },
   });
 
   return (
@@ -164,7 +161,10 @@ const TagSelect: React.FC = () => {
           className="list-group-item"
         >
           <input
-            {...getInputProps({ onBlur: (e: React.FocusEvent) => setValidationError(null) })}
+            {...getInputProps({
+              onBlur: (e: React.FocusEvent) => setValidationError(null),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTextVal(e.target.value),
+            })}
             className={`form-control ${validationError && 'is-invalid'}`}
             placeholder="Search for a tag"
           />
