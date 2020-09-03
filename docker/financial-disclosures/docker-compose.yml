@@ -1,0 +1,14 @@
+version: '3.5'
+
+services:
+  disclosure-extractor:
+    build: .
+    image: freelawproject/disclosure-extractor
+    container_name: "cl-disclosure-extractor"
+    expose:
+      - "5001"
+    networks:
+      - cl_net_overlay
+networks:
+  cl_net_overlay:
+    external: true
