@@ -14,8 +14,8 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite, UserTag
 from cl.lib.http import is_ajax
+from cl.favorites.models import Favorite, UserTag, DocketTag
 from cl.lib.view_utils import increment_view_count
 
 
@@ -133,11 +133,16 @@ def view_tag(request, username, tag_name):
 
     # Calculate the total tag count (as we add more types of taggables, add
     # them here).
-    total_tag_count = tag.dockets.all().count()
+    total_tag_count = len(tag.dockets.all())
+    enhanced_dockets = tag.dockets.all()
+    for docket in enhanced_dockets:
+        docket.association_id = DocketTag.objects.get(
+            docket=docket, tag=tag
+        ).pk
     return render(
         request,
         "tag.html",
-        {"tag": tag, "total_tag_count": total_tag_count, "private": False},
+        {"tag": tag, "dockets": enhanced_dockets, "total_tag_count": total_tag_count, "private": False},
     )
 
 
