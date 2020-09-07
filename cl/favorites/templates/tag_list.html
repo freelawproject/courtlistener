@@ -45,6 +45,9 @@
         {% if is_page_owner %}
           <td>{{ tag.published|yesno|capfirst }}</td>
           <td><a href="" class="btn btn-primary btn-sm inline"><i class="fa fa-pencil"></i>&nbsp;Edit</a></td>
+          <td><button title="Delete Tag" class="btn btn-danger btn-xs inline delete-tag-button" data-id={{ tag.id }}>
+            <i class="fa fa-times"></i>
+          </button></td>
          {% endif %}
       </tr>
       {% if forloop.last %}
@@ -59,5 +62,6 @@
         <h3>{{ requested_user }} has not shared any tags.</h3>
       {% endif %}
     {% endfor %}
-  </div>
+      </div>  
+  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag-utils.js?v=20200722"></script>
 {% endblock %}
