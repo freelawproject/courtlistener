@@ -20,6 +20,9 @@
     {% if tag.user == user %}
       <div class="float-right v-offset-above-1">
         <a href="" class="btn btn-primary btn-lg"><i class="fa fa-pencil"></i>&nbsp;Edit</a>
+        <button title="Delete Tag" class="btn btn-danger btn-lg inline delete-tag-button" data-id={{ tag.id }}>
+          <i class="fa fa-times"></i>
+        </button>
       </div>
     {% endif %}
     <h1 class="clearfix"><span class="tag">{{ tag.name }}</span> {% if tag.title %}<small>{{ tag.title }}</small>{% endif %}</h1>
@@ -32,7 +35,7 @@
       </div>
     {% endif %}
 
-    {% for docket in tag.dockets.all %}
+    {% for docket in dockets %}
       {% if forloop.first %}
         <h3 class="v-offset-above-3"><i class="fa-list fa grey" title="Dockets"></i> {{ tag.dockets.all.count|intcomma }} Tagged Docket{{ tag.dockets.all.count|pluralize }}</h3>
         <div id="docket-list">
@@ -48,5 +51,6 @@
     {% endfor %}
   </div>
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag-utils.js?v=20200722"></script>
 {% endblock %}
 
