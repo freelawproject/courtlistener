@@ -10,7 +10,7 @@
     </button>
     <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
       {% if tag.user == user %}
-        <li><a href="">Untag this item</a></li>
+        <li><a href="" data-id="{{ docket.association_id }}">Untag this item</a></li>
       {% endif %}
       <li role="separator" class="divider"></li>
       {% if entry_count %}
