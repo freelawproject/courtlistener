@@ -99,7 +99,7 @@ class TestDBTools(TestCase):
 
         print("Testing a good values query...", end="")
         self.assertEqual(
-            sum(1 for _ in queryset_generator(UrlHash.objects.values())), 2,
+            sum(1 for _ in queryset_generator(UrlHash.objects.values())), 2
         )
         print("✓")
 
@@ -112,9 +112,7 @@ class TestDBTools(TestCase):
         )
         expected_count = 2
         results = queryset_generator(UrlHash.objects.all(), chunksize=1)
-        self.assertEqual(
-            expected_count, sum(1 for _ in results),
-        )
+        self.assertEqual(expected_count, sum(1 for _ in results))
         print("✓")
 
 
@@ -177,10 +175,10 @@ class TestStringUtils(TestCase):
             ("Term XXX-XX-XXXX Term", True),
         )
         self.assertEqual(
-            anonymize("Term 11-1111111 Term"), ("Term XX-XXXXXXX Term", True),
+            anonymize("Term 11-1111111 Term"), ("Term XX-XXXXXXX Term", True)
         )
         self.assertEqual(
-            anonymize("Term A11111111 Term"), ("Term AXXXXXXXX Term", True),
+            anonymize("Term A11111111 Term"), ("Term AXXXXXXXX Term", True)
         )
 
         # Multiple matches
@@ -224,7 +222,7 @@ class TestModelHelpers(TestCase):
             date_filed=datetime.date(2015, 12, 14),
         )
         self.opinion = Opinion(
-            cluster=self.opinioncluster, type="Lead Opinion",
+            cluster=self.opinioncluster, type="Lead Opinion"
         )
 
     def test_make_upload_path_works_with_opinions(self):
@@ -319,7 +317,7 @@ class TestMaintenanceMiddleware(TestCase):
             r.status_code,
             HTTP_503_SERVICE_UNAVAILABLE,
             "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE,),
+            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
         )
 
     def test_staff_can_get_through(self):
@@ -452,10 +450,10 @@ class TestPACERPartyParsing(TestCase):
 
     def test_state_normalization(self):
         pairs = [
-            {"q": "CA", "a": "CA",},
-            {"q": "ca", "a": "CA",},
-            {"q": "California", "a": "CA",},
-            {"q": "california", "a": "CA",},
+            {"q": "CA", "a": "CA"},
+            {"q": "ca", "a": "CA"},
+            {"q": "California", "a": "CA"},
+            {"q": "california", "a": "CA"},
         ]
         for pair in pairs:
             print(
@@ -508,7 +506,11 @@ class TestPACERPartyParsing(TestCase):
                         "zip_code": u"23218-2188",
                         "lookup_key": u"pobox2188richmondsandsandersonva232182188",
                     },
-                    {"phone": u"(804) 648-1636", "fax": u"", "email": u"",},
+                    {
+                        "phone": u"(804) 648-1636",
+                        "fax": u"",
+                        "email": u"",
+                    },
                 ),
             },
             {
@@ -526,7 +528,11 @@ class TestPACERPartyParsing(TestCase):
                         "zip_code": u"23218-2188",
                         "lookup_key": u"pobox2188richmondsandsandersonva232182188",
                     },
-                    {"phone": u"(804) 648-1636", "fax": u"", "email": u"",},
+                    {
+                        "phone": u"(804) 648-1636",
+                        "fax": u"",
+                        "email": u"",
+                    },
                 ),
             },
             {
@@ -568,7 +574,11 @@ class TestPACERPartyParsing(TestCase):
                         "zip_code": u"43215",
                         "lookup_key": u"211elivingstonavecolumbusoh43215",
                     },
-                    {"phone": u"(614) 228-3727", "email": u"", "fax": u"",},
+                    {
+                        "phone": u"(614) 228-3727",
+                        "email": u"",
+                        "fax": u"",
+                    },
                 ),
             },
             {
@@ -663,7 +673,11 @@ class TestPACERPartyParsing(TestCase):
                         "zip_code": u"70130",
                         "lookup_key": u"400poydrasstsuite1200neworleansduncansevinllcla70130",
                     },
-                    {"phone": u"", "fax": u"", "email": u"",},
+                    {
+                        "phone": u"",
+                        "fax": u"",
+                        "email": u"",
+                    },
                 ),
             },
             {
@@ -720,7 +734,11 @@ class TestPACERPartyParsing(TestCase):
                         "zip_code": u"",
                         "lookup_key": u"pob69barrownsbdepartmentoflawak",
                     },
-                    {"phone": u"", "fax": u"", "email": u"",},
+                    {
+                        "phone": u"",
+                        "fax": u"",
+                        "email": u"",
+                    },
                 ),
             },
             {
@@ -772,7 +790,7 @@ class TestPACERPartyParsing(TestCase):
         )
         self.assertEqual(
             make_address_lookup_key(
-                {"name": "Offices of Lissner AND Strook & Levin, LLP",}
+                {"name": "Offices of Lissner AND Strook & Levin, LLP"}
             ),
             "officeoflissnerstrooklevin",
         )

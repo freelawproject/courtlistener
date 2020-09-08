@@ -55,8 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_clean_body_content(content):
-    """Parse out the body from an html string, clean it up, and send it along.
-    """
+    """Parse out the body from an html string, clean it up, and send it along."""
     cleaner = Cleaner(
         style=True, remove_tags=["a", "body", "font", "noscript", "img"]
     )
@@ -133,7 +132,7 @@ def make_pdftotext_process(path):
 
 
 def extract_from_pdf(path, opinion, do_ocr=False):
-    """ Extract text from pdfs.
+    """Extract text from pdfs.
 
     Here, we use pdftotext. If that fails, try to use tesseract under the
     assumption it's an image-based PDF. Once that is complete, we check for the
@@ -203,7 +202,7 @@ def extract_from_wpd(path, opinion):
 def convert_file_to_txt(path):
     tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
     p = subprocess.Popen(
-        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     return p.communicate()[0].decode("utf-8")
 
@@ -249,6 +248,10 @@ def update_document_from_text(opinion):
     Use functions from Juriscraper to pull metadata out of opinion
     text. Currently only implemented in Tax, but functional in all
     scrapers via AbstractSite object.
+
+    Note that this updates the values but does not save them. Saving is left to
+    the calling function.
+
     :param opinion: Opinion object
     :return: None
     """
@@ -531,7 +534,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
             os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
         ) as f:
             audio_file.tag.images.set(
-                3, f.read(), "image/png", u"Seal for %s" % court.short_name,
+                3, f.read(), "image/png", u"Seal for %s" % court.short_name
             )
         flp_image_frames.remove(3)
 

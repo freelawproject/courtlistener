@@ -14,7 +14,7 @@ from cl.search.models import Court
 
 @retry(requests.RequestException, tries=2, backoff=1)
 def check_and_log_url(session, url, timeout=10):
-    """Check if a URL is accessible by sending it a HEAD request
+    """Check if a URL is accessible by sending it a GET request
 
     :param session: A requests.Session object
     :param url: The URL to check
@@ -105,7 +105,7 @@ def iterate_and_log_courts(courts):
             logger.error(
                 "After %s seconds and %s tries, failed to access %s's PACER "
                 "website from our server, but got it via our proxy each time."
-                % ((now() - t1).seconds, try_number, court.pk,)
+                % ((now() - t1).seconds, try_number, court.pk)
             )
 
 

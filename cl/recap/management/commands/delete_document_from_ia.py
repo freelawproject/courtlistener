@@ -30,7 +30,7 @@ class Command(VerboseCommand):
             "%s/%s" % (self.IA_STORAGE_URL, bucket_path),
             headers={
                 "Authorization": "LOW %s:%s"
-                % (settings.IA_ACCESS_KEY, settings.IA_SECRET_KEY,),
+                % (settings.IA_ACCESS_KEY, settings.IA_SECRET_KEY),
                 "x-archive-cascade-delete": "1",
             },
         )

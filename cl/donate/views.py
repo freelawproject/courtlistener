@@ -321,10 +321,14 @@ def payment_complete(request, template_name):
             return render(
                 request,
                 "donate_complete.html",
-                {"error": error, "private": True,},
+                {"error": error, "private": True},
             )
 
-    return render(request, template_name, {"error": error, "private": True,})
+    return render(
+        request,
+        template_name,
+        {"error": error, "private": True},
+    )
 
 
 def toggle_monthly_donation(request):
@@ -352,9 +356,7 @@ def make_check_donation(request):
     """A page for admins to use to input check donations manually."""
     if request.method == "POST":
         data = request.POST.copy()
-        data.update(
-            {"payment_provider": PROVIDERS.CHECK, "amount": "other",}
-        )
+        data.update({"payment_provider": PROVIDERS.CHECK, "amount": "other"})
         donation_form = DonationForm(data)
         # Get the user, if we can. Else, set up the form to create a new user.
         try:

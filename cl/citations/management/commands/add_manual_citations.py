@@ -7,14 +7,13 @@ from cl.search.tasks import add_items_to_solr
 
 def load_csv(csv_location):
     data = pd.read_csv(
-        csv_location, delimiter=",", dtype={"citing": int, "cited": int,}
+        csv_location, delimiter=",", dtype={"citing": int, "cited": int}
     )
     return data, len(data.index)
 
 
 def process_citations(data, debug):
-    """Walk through the citations and add them one at a time.
-    """
+    """Walk through the citations and add them one at a time."""
     updated_ids = set()
     for index, item in data.iterrows():
         logger.info(

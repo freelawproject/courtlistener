@@ -17,8 +17,8 @@ def get_pacer_doc_ids(options):
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
     row_pks = (
-        RECAPDocument.objects.filter(pacer_doc_id=None,)
-        .exclude(document_number=None,)
+        RECAPDocument.objects.filter(pacer_doc_id=None)
+        .exclude(document_number=None)
         .exclude(docket_entry__docket__pacer_case_id=None)
         .exclude(
             docket_entry__docket__court__jurisdiction__in=Court.BANKRUPTCY_JURISDICTIONS,
@@ -43,7 +43,7 @@ def get_pacer_doc_ids(options):
                 % (completed, row_pk)
             )
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
-            args=(row_pk, session.cookies), queue=q,
+            args=(row_pk, session.cookies), queue=q
         )
         completed += 1
 

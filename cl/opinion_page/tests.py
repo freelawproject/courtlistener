@@ -65,12 +65,12 @@ class CitationRedirectorTest(TestCase):
 
         # Are we redirected to the correct place when we use GET or POST?
         r = self.client.get(
-            reverse("citation_redirector", kwargs=self.citation), follow=True,
+            reverse("citation_redirector", kwargs=self.citation), follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
         r = self.client.post(
-            reverse("citation_redirector"), self.citation, follow=True,
+            reverse("citation_redirector"), self.citation, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
@@ -113,7 +113,7 @@ class CitationRedirectorTest(TestCase):
 
     def test_volume_page(self):
         r = self.client.get(
-            reverse("citation_redirector", kwargs={"reporter": "F.2d",})
+            reverse("citation_redirector", kwargs={"reporter": "F.2d"})
         )
         self.assertStatus(r, HTTP_200_OK)
 
@@ -121,7 +121,7 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse(
                 "citation_redirector",
-                kwargs={"reporter": "F.2d", "volume": "56",},
+                kwargs={"reporter": "F.2d", "volume": "56"},
             )
         )
         self.assertStatus(r, HTTP_200_OK)
@@ -142,7 +142,7 @@ class ViewRecapDocketTest(TestCase):
         r = self.client.get(
             reverse(
                 "redirect_docket_recap",
-                kwargs={"court": "test", "pacer_case_id": "666666",},
+                kwargs={"court": "test", "pacer_case_id": "666666"},
             ),
             follow=True,
         )

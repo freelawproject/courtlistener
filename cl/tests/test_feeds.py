@@ -42,7 +42,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         def patched_path(self, name):
             """ Patching Path method to use MEDIA_ROOT properly """
-            return "%s%s" % (settings.MEDIA_ROOT, name,)
+            return "%s%s" % (settings.MEDIA_ROOT, name)
 
         IncrementingFileSystemStorage.path = patched_path
         super(FeedsFunctionalTest, cls).setUpClass()
@@ -72,7 +72,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         Does the feeds page show all the proper links for each jurisdiction?
         """
-        courts = Court.objects.filter(in_use=True, has_opinion_scraper=True,)
+        courts = Court.objects.filter(in_use=True, has_opinion_scraper=True)
         self.browser.get(
             "%s%s" % (self.live_server_url, reverse("feeds_info"))
         )
@@ -83,7 +83,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             print "Testing link to %s..." % court.full_name,
             self.assertEqual(
                 link.get_attribute("href"),
-                "%s/feed/court/%s/" % (self.live_server_url, court.pk,),
+                "%s/feed/court/%s/" % (self.live_server_url, court.pk),
             )
             link.click()
             print "clicked...",

@@ -9,7 +9,10 @@ from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 from cl.citations.models import Citation
-from cl.citations.utils import is_balanced_html
+from cl.citations.utils import (
+    is_balanced_html,
+    remove_duplicate_citations_by_regex,
+)
 
 # This is the distance two reporter abbreviations can be from each other if they
 # are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
@@ -74,26 +77,26 @@ def get_document_citations(opinion):
 
 
 def create_cited_html(opinion, citations):
+    citations = [
+        citation for citation in citations if isinstance(citation, Citation)
+    ]
+    citations = remove_duplicate_citations_by_regex(citations)
     if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
         new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
         for citation in citations:
-            if isinstance(citation, Citation):
-                citation_regex = citation.as_regex()
-                match = re.search(citation_regex, new_html)
+            citation_regex = citation.as_regex()
+            match = re.search(citation_regex, new_html)
 
-                # Only perform the string replacement if we're sure that the
-                # matched HTML is not unbalanced. (If it is, when we inject
-                # our own HTML, the DOM can get messed up.)
-                if match and is_balanced_html(match.group()):
-                    new_html = re.sub(
-                        citation_regex, citation.as_html(), new_html
-                    )
+            # Only perform the string replacement if we're sure that the
+            # matched HTML is not unbalanced. (If it is, when we inject
+            # our own HTML, the DOM can get messed up.)
+            if match and is_balanced_html(match.group()):
+                new_html = re.sub(citation_regex, citation.as_html(), new_html)
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            if isinstance(citation, Citation):
-                repl = u'</pre>%s<pre class="inline">' % citation.as_html()
-                inner_html = re.sub(citation.as_regex(), repl, inner_html)
+            repl = u'</pre>%s<pre class="inline">' % citation.as_html()
+            inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = u'<pre class="inline">%s</pre>' % inner_html
     return new_html.encode("utf-8")
 

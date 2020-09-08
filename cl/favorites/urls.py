@@ -13,7 +13,7 @@ urlpatterns = [
         save_or_update_favorite,
         name="save_or_update_favorite",
     ),
-    url(r"^favorite/delete/$", delete_favorite, name="delete_favorite",),
+    url(r"^favorite/delete/$", delete_favorite, name="delete_favorite"),
     # Tag pages
     url(
         r"^tags/(?P<username>[^/]*)/(?P<tag_name>[^/]*)/",

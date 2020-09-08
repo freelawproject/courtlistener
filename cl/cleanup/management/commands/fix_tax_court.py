@@ -216,7 +216,7 @@ def find_missing_or_incorrect_citations(options):
 
     for oc in ocs:
         logger.warning(
-            "Reference url: https://www.courtlistener.com/opinion/%s/x", oc.id,
+            "Reference url: https://www.courtlistener.com/opinion/%s/x", oc.id
         )
         cites = oc.citations.all()
 

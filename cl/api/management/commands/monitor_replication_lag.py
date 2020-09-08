@@ -32,5 +32,5 @@ class Command(VerboseCommand):
                 subject=subject,
                 message=template.render({"bad_slots": bad_slots}),
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[admin[1] for admin in settings.ADMINS],
+                recipient_list=[admin[1] for admin in settings.MANAGERS],
             )

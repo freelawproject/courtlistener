@@ -89,14 +89,14 @@ def view_favorites(request):
             key = "Dockets"
         favorite_forms[key].append(FavoriteForm(instance=favorite))
     docket_search_url = (
-        "/?type=r&q=docket_id:("
+        "/?type=r&q=xxx AND docket_id:("
         + " OR ".join(
             [str(a.instance.docket_id.pk) for a in favorite_forms["Dockets"]]
         )
         + ")"
     )
     oral_search_url = (
-        "/?type=oa&q=id:("
+        "/?type=oa&q=xxx AND id:("
         + " OR ".join(
             [
                 str(a.instance.audio_id.pk)
@@ -106,7 +106,7 @@ def view_favorites(request):
         + ")"
     )
     recap_search_url = (
-        "/?type=r&q=docket_entry_id:("
+        "/?type=r&q=xxx AND docket_entry_id:("
         + " OR ".join(
             [
                 str(a.instance.recap_doc_id.pk)
@@ -116,7 +116,7 @@ def view_favorites(request):
         + ")"
     )
     opinion_search_url = (
-        "/?q=cluster_id:("
+        "/?q=xxx AND cluster_id:("
         + " OR ".join(
             [str(a.instance.cluster_id.pk) for a in favorite_forms["Opinions"]]
         )
@@ -147,9 +147,9 @@ def view_donations(request):
 @never_cache
 def view_visualizations(request):
     visualizations = (
-        SCOTUSMap.objects.filter(user=request.user, deleted=False,)
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        SCOTUSMap.objects.filter(user=request.user, deleted=False)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -162,7 +162,7 @@ def view_visualizations(request):
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -172,10 +172,10 @@ def view_deleted_visualizations(request):
     thirty_days_ago = now() - timedelta(days=30)
     visualizations = (
         SCOTUSMap.objects.filter(
-            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago,
+            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago
         )
-        .annotate(Count("clusters"),)
-        .order_by("-date_created",)
+        .annotate(Count("clusters"))
+        .order_by("-date_created")
     )
     paginator = Paginator(visualizations, 20, orphans=2)
     page = request.GET.get("page", 1)
@@ -189,7 +189,7 @@ def view_deleted_visualizations(request):
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "private": True,},
+        {"results": paged_vizes, "private": True},
     )
 
 
@@ -293,7 +293,9 @@ def delete_account(request):
             request.user.alerts.all().delete()
             request.user.docket_alerts.all().delete()
             request.user.favorites.all().delete()
-            request.user.scotus_maps.all().update(deleted=True)
+            request.user.scotus_maps.all().update(
+                date_modified=now(), deleted=True
+            )
             convert_to_stub_account(request.user)
             logout(request)
             update_mailchimp.delay(request.user.email, "unsubscribed")
@@ -354,7 +356,7 @@ def register(request):
             try:
                 stub_account = User.objects.filter(
                     profile__stub_account=True,
-                ).get(email__iexact=request.POST.get("email"),)
+                ).get(email__iexact=request.POST.get("email"))
             except User.DoesNotExist:
                 stub_account = False
 

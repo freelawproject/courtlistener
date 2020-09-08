@@ -55,7 +55,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
-def track_in_matomo(func, timeout=0.5, check_bots=True):
+def track_in_matomo(original_func=None, timeout=0.5, check_bots=True):
     """A decorator to track a request in Matomo.
 
     This decorator is needed on static assets that we want to track because
@@ -70,10 +70,15 @@ def track_in_matomo(func, timeout=0.5, check_bots=True):
     properly. If people have a CourtListener referer, we ignore them under the
     assumption that they got tracked client-side.
 
-    :param func: The function that we're wrapping.
+    For the design pattern, see: https://stackoverflow.com/a/24617244/64911
+
+    :param original_func: The function that we're wrapping.
     :param timeout: The amount of time the Matomo tracking request has to
     respond. If it does not respond in this amount of time, we time out and
-    move on.
+    move on. Note that timing out can be OK! It only means that we didn't wait
+    for the response, not that the tracking didn't happen. It's not crazy to
+    set this value to a tiny fraction of a second and just ignore responses
+    from matomo.
     :param check_bots: Whether to check bots before hitting Matomo. Matomo
     itself has robust bot detection, so we can rely on that in general, but
     it's generally better to do some basic blocking here too to avoid even
@@ -82,51 +87,56 @@ def track_in_matomo(func, timeout=0.5, check_bots=True):
     :returns the result of the wrapped function
     """
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        t1 = time.time()
-        result = func(*args, **kwargs)  # Run the view
-        t2 = time.time()
+    def _decorate(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            t1 = time.time()
+            result = f(*args, **kwargs)  # Run the view
+            t2 = time.time()
 
-        if settings.DEVELOPMENT:
-            # Disable tracking during development.
+            if settings.DEVELOPMENT:
+                # Disable tracking during development.
+                return result
+
+            request = args[0]  # Request is always first arg.
+            if check_bots and is_bot(request):
+                return result
+
+            url = request.build_absolute_uri()
+            referer = request.META.get("HTTP_REFERER", "")
+            url_domain = tldextract.extract(url)
+            ref_domain = tldextract.extract(referer)
+            if url_domain == ref_domain:
+                # Referer domain is same as current. Don't count b/c it'll be
+                # caught by client-side Matomo tracker already.
+                return result
+
+            try:
+                # See: https://developer.matomo.org/api-reference/tracking-api
+                requests.get(
+                    settings.MATOMO_URL,
+                    timeout=timeout,
+                    params={
+                        "idsite": settings.MATOMO_SITE_ID,
+                        "rec": 1,  # Required but unexplained in docs.
+                        "url": url,
+                        "download": url,
+                        "apiv": 1,
+                        "urlref": referer,
+                        "ua": request.META.get("HTTP_USER_AGENT", ""),
+                        "gt_ms": int((t2 - t1) * 1000),  # Milliseconds
+                        "send_image": 0,
+                    },
+                )
+            except RequestException:
+                logger.debug(
+                    "Matomo tracking request had an error (likely "
+                    "timeout?) out for URL: %s" % url
+                )
             return result
 
-        request = args[0]  # Request is always first arg.
-        if check_bots and is_bot(request):
-            return result
+        return wrapper
 
-        url = request.build_absolute_uri()
-        referer = request.META.get("HTTP_REFERER", "")
-        url_domain = tldextract.extract(url)
-        ref_domain = tldextract.extract(referer)
-        if url_domain == ref_domain:
-            # Referer domain is same as current. Don't count b/c it'll be
-            # caught by client-side Matomo tracker already.
-            return result
-
-        try:
-            # See: https://developer.matomo.org/api-reference/tracking-api
-            requests.get(
-                settings.MATOMO_URL,
-                timeout=timeout,
-                params={
-                    "idsite": settings.MATOMO_SITE_ID,
-                    "rec": 1,  # Required but unexplained in docs.
-                    "url": url,
-                    "download": url,
-                    "apiv": 1,
-                    "urlref": referer,
-                    "ua": request.META.get("HTTP_USER_AGENT", ""),
-                    "gt_ms": int((t2 - t1) * 1000),  # Milliseconds
-                    "send_image": 0,
-                },
-            )
-        except RequestException:
-            logger.info(
-                "Matomo tracking request had an error (likely "
-                "timeout?) out for URL: %s" % url
-            )
-        return result
-
-    return wrapper
+    if original_func:
+        return _decorate(original_func)
+    return _decorate

@@ -6,8 +6,8 @@ from django.shortcuts import render
 
 def honeypot_equals(val):
     """
-        Default verifier used if HONEYPOT_VERIFIER is not specified.
-        Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
+    Default verifier used if HONEYPOT_VERIFIER is not specified.
+    Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
     """
     expected = getattr(settings, "HONEYPOT_VALUE", "")
     if callable(expected):
@@ -17,10 +17,10 @@ def honeypot_equals(val):
 
 def verify_honeypot_value(request, field_name):
     """
-        Verify that request.POST[field_name] is a valid honeypot.
+    Verify that request.POST[field_name] is a valid honeypot.
 
-        Ensures that the field exists and passes verification according to
-        HONEYPOT_VERIFIER.
+    Ensures that the field exists and passes verification according to
+    HONEYPOT_VERIFIER.
     """
     verifier = getattr(settings, "HONEYPOT_VERIFIER", honeypot_equals)
     if request.method == "POST":
@@ -36,10 +36,10 @@ def verify_honeypot_value(request, field_name):
 
 def check_honeypot(func=None, field_name=None):
     """
-        Check request.POST for valid honeypot field.
+    Check request.POST for valid honeypot field.
 
-        Takes an optional field_name that defaults to HONEYPOT_FIELD_NAME if
-        not specified.
+    Takes an optional field_name that defaults to HONEYPOT_FIELD_NAME if
+    not specified.
     """
     # hack to reverse arguments if called with str param
     if isinstance(func, basestring):

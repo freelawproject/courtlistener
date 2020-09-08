@@ -126,7 +126,7 @@ def write_json_to_disk(
         # Create a directory for every jurisdiction, if they don't already
         # exist. This does not clobber.
         for court in courts:
-            mkdir_p(join(bulk_dir, obj_type_str, court.pk,))
+            mkdir_p(join(bulk_dir, obj_type_str, court.pk))
     else:
         # Make a directory for the object type.
         mkdir_p(join(bulk_dir, obj_type_str))

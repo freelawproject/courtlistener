@@ -45,7 +45,7 @@ def make_path(root, filename):
     """
     d = now()
     return os.path.join(
-        root, "%s" % d.year, "%02d" % d.month, "%02d" % d.day, filename,
+        root, "%s" % d.year, "%02d" % d.month, "%02d" % d.day, filename
     )
 
 
@@ -55,7 +55,7 @@ def make_lasc_path(instance, filename):
     Start with the `root` node, and use the current date as the subdirectories.
     """
     return os.path.join(
-        "lasc-data", "%s" % instance.sha1[0:2], "%s.json" % instance.sha1[2:],
+        "lasc-data", "%s" % instance.sha1[0:2], "%s.json" % instance.sha1[2:]
     )
 
 
@@ -236,8 +236,8 @@ def validate_has_full_name(instance):
 
 def validate_nomination_fields_ok(instance):
     """Validate a few things:
-     - date_nominated and date_elected cannot both have values
-     - if nominated, then date_elected not complete and vice versa.
+    - date_nominated and date_elected cannot both have values
+    - if nominated, then date_elected not complete and vice versa.
     """
     if instance.date_nominated and instance.date_elected:
         raise ValidationError(
@@ -263,9 +263,9 @@ def validate_nomination_fields_ok(instance):
 def validate_supervisor(instance):
     """Ensure that the supervisor field makes sense.
 
-     - Supervisors can only be judges.
-     - Supervisor field can only be completed when the position is that of a
-       clerk.
+    - Supervisors can only be judges.
+    - Supervisor field can only be completed when the position is that of a
+      clerk.
     """
     sup = instance.supervisor
     if sup:
@@ -282,7 +282,7 @@ def validate_supervisor(instance):
         raise ValidationError(
             "You have configured a supervisor for this field ('%s'), but it "
             "the position_type is not a clerkship. Instead it's: '%s'"
-            % (sup.name_full, instance.position_type,)
+            % (sup.name_full, instance.position_type)
         )
 
 
@@ -297,7 +297,7 @@ def validate_all_or_none(instance, fields):
     if not any([all_complete, none_complete]):
         raise ValidationError(
             "%s of the following fields are complete, but either all of them need to be, or none of them need to be: %s"
-            % (completed_fields, ", ".join(fields),)
+            % (completed_fields, ", ".join(fields))
         )
 
 

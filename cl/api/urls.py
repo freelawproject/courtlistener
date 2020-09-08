@@ -69,25 +69,23 @@ router.register(
 )
 
 # Tags
+router.register(r"tags", favorite_views.UserTagViewSet, base_name="UserTag")
 router.register(
-    r"tags", favorite_views.UserTagViewSet, base_name="UserTag",
-)
-router.register(
-    r"docket-tags", favorite_views.DocketTagViewSet, base_name="DocketTag",
+    r"docket-tags", favorite_views.DocketTagViewSet, base_name="DocketTag"
 )
 
 # Visualizations
 router.register(
-    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion",
+    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion"
 )
 router.register(
-    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap",
+    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap"
 )
 
 API_TITLE = "CourtListener Legal Data API"
 core_api_schema_view = get_schema_view(title=API_TITLE)
 swagger_schema_view = get_schema_view(
-    title=API_TITLE, renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer],
+    title=API_TITLE, renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer]
 )
 
 

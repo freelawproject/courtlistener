@@ -50,7 +50,7 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
     else:
         # Mark dockets as updated if needed
         if model == Docket:
-            items.update(date_last_index=now())
+            items.update(date_modified=now(), date_last_index=now())
 
 
 @app.task(ignore_resutls=True)

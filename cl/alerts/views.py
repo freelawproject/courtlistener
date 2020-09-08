@@ -70,7 +70,7 @@ def disable_alert(request, secret_key):
     return render(
         request,
         "disable_alert.html",
-        {"alert": alert, "prev_rate": prev_rate, "private": True,},
+        {"alert": alert, "prev_rate": prev_rate, "private": True},
     )
 
 
@@ -90,7 +90,7 @@ def enable_alert(request, secret_key):
     return render(
         request,
         "enable_alert.html",
-        {"alert": alert, "failed": failed, "private": True,},
+        {"alert": alert, "failed": failed, "private": True},
     )
 
 
