@@ -29,10 +29,10 @@
       extra_args='--upgrade --no-cache-dir'
     tags:
       - dependencies
-  - name: update seals
-    become: yes
-    become_user: "{{ web_user }}"
-    command: "{{ virtualenv_root }}/bin/update-seals"
+#  - name: update seals
+#    become: yes
+#    become_user: "{{ web_user }}"
+#    command: "{{ virtualenv_root }}/bin/update-seals"
 
 - hosts: web
   tasks:

@@ -67,7 +67,7 @@ pytz
 redis~=3.2.0
 requests==2.20.0
 scorched==0.11.0
-seal_rookery
+# seal_rookery
 selenium~=3.0
 sentry-sdk~=0.0
 simplejson
