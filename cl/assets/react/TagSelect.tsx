@@ -99,9 +99,9 @@ const TagSelect: React.FC = () => {
       if (!selectedItem) return;
       const isCreateItemOption = selectedItem.name.startsWith('Create Tag:');
       if (isCreateItemOption) {
-        const validInput = textVal.match(/^[a-z-]*$/);
+        const validInput = textVal.match(/^[a-z0-9-]*$/);
         if (!validInput) {
-          return setValidationError("Only lowercase letters and '-' allowed");
+          return setValidationError("Only lowercase letters, numbers, and '-' allowed");
         }
         return addNewTag({ name: selectedItem.name.replace('Create Tag: ', '') });
       }
