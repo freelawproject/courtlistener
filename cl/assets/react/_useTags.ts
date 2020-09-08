@@ -149,7 +149,7 @@ export const useTags = ({ docket, enabled }: UseTagsProps) => {
       return [
         {
           id: '-10',
-          name: `Create Option: ${textVal}`,
+          name: `Create Tag: ${textVal}`,
           dockets: [],
         },
         ...filtered,
