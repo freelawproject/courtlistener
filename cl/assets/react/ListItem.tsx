@@ -9,7 +9,7 @@ interface ListItemProps {
 }
 
 export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelected }) => {
-  const isCreateItem = name.startsWith('Create Option: ');
+  const isCreateItem = name.startsWith('Create Tag: ');
 
   return (
     <a className="list-group-item" style={isCreateItem ? { cursor: 'default' } : {}}>

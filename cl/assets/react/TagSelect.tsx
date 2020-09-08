@@ -97,13 +97,13 @@ const TagSelect: React.FC = () => {
     },
     onSelectedItemChange: ({ selectedItem }) => {
       if (!selectedItem) return;
-      const isCreateItemOption = selectedItem.name.startsWith('Create Option:');
+      const isCreateItemOption = selectedItem.name.startsWith('Create Tag:');
       if (isCreateItemOption) {
         const validInput = textVal.match(/^[a-z-]*$/);
         if (!validInput) {
           return setValidationError("Only lowercase letters and '-' allowed");
         }
-        return addNewTag({ name: selectedItem.name.replace('Create Option: ', '') });
+        return addNewTag({ name: selectedItem.name.replace('Create Tag: ', '') });
       }
       const isAlreadySelected = !associations
         ? false
@@ -166,7 +166,7 @@ const TagSelect: React.FC = () => {
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTextVal(e.target.value),
             })}
             className={`form-control ${validationError && 'is-invalid'}`}
-            placeholder="Search for a tag"
+            placeholder="Search tags…"
           />
           {validationError && (
             <div style={{ padding: '1px' }} className="invalid-feedback">
@@ -232,7 +232,7 @@ const TagSelect: React.FC = () => {
         </div>
         <a style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item" href={editUrl}>
           <i className="fa fa-pencil" style={{ marginRight: '1em' }} />
-          Edit Labels
+          Edit Tags
         </a>
       </div>
     </div>
