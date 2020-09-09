@@ -6,7 +6,7 @@ from cl.api.api_permissions import IsOwner
 from cl.api.utils import LoggingMixin
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import UserTagSerializer, DocketTagSerializer
-from cl.favorites.filters import UserTagFilter
+from cl.favorites.filters import UserTagFilter, DocketTagFilter
 from cl.favorites.models import UserTag, DocketTag
 
 
@@ -29,6 +29,7 @@ class UserTagViewSet(LoggingMixin, ModelViewSet):
 class DocketTagViewSet(LoggingMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner]
     serializer_class = DocketTagSerializer
+    filter_class = DocketTagFilter
 
     def get_queryset(self):
         return DocketTag.objects.filter(

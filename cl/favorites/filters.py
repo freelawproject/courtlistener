@@ -5,7 +5,7 @@ from cl.api.utils import (
     BOOLEAN_LOOKUPS,
     BASIC_TEXT_LOOKUPS,
 )
-from cl.favorites.models import UserTag
+from cl.favorites.models import UserTag, DocketTag
 
 
 class UserTagFilter(FilterSet):
@@ -16,4 +16,14 @@ class UserTagFilter(FilterSet):
             "user": ["exact"],
             "name": BASIC_TEXT_LOOKUPS,
             "published": BOOLEAN_LOOKUPS,
+        }
+
+
+class DocketTagFilter(FilterSet):
+    class Meta:
+        model = DocketTag
+        fields = {
+            "id": ["exact"],
+            "docket": ["exact"],
+            "tag": ["exact"],
         }
