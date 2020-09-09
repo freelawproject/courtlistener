@@ -1,8 +1,8 @@
 # Run using `docker-compose up`
 version: "3.7"
 volumes:
-  judicial_pictures:
-  seals_rookery:
+  cl-judge-pics:
+  cl-seal-rookery:
 
 networks:
     cl_net_overlay:
@@ -62,22 +62,22 @@ services:
 
     cl-django:
         container_name: cl-django
-        build: ../django/
+        image: freelawproject/courtlistener-django:latest
         depends_on:
             - cl-postgresql
             - cl-redis
             - cl-celery
             - cl-solr
             - cl-selenium
-            - judicial_pictures
-            - seals_rookery
+            - cl-judge-pics
+            - cl-seal-rookery
         ports:
             - "8000:8000"
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-            - judicial_pictures:/usr/local/lib/python2.7/site-packages/judge_pics
-            - seals_rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
+            - cl-judge-pics:${PYTHONPATH}/judge_pics
+            - cl-seal-rookery:${PYTHONPATH}/seal_rookery
         networks:
             - cl_net_overlay
         command: >
@@ -96,15 +96,10 @@ services:
         networks:
             - cl_net_overlay
 
-    judicial_pictures:
-        build: ../judge-pics/
-        container_name: "judicial_pictures"
-        volumes:
-          - judicial_pictures:/usr/local/lib/python2.7/site-packages/judge_pics
+    cl-judge-pics:
+        image: freelawproject/judge-pics
+        container_name: "cl-judge-pics"
 
-    seals_rookery:
-        build: ../seals/
-        container_name: "seals_rookery"
-        volumes:
-          - seals_rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
-
+    cl-seal-rookery:
+        image: freelawproject/seal-rookery
+        container_name: "cl-seal-rookery"
