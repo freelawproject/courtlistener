@@ -59,3 +59,13 @@ def is_balanced_html(text):
         return True
     except etree.XMLSyntaxError:
         return False
+
+
+def remove_duplicate_citations_by_regex(citations):
+    """Given a list of Citation objects, remove duplicates according to each
+    citation's generated regex. Because each citation's regex matches every
+    instance of that citation in an opinion, we do not need to redundantly
+    match multiple citations with the same regexes."""
+    return {
+        hash(citation.as_regex()): citation for citation in citations
+    }.values()

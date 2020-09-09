@@ -8,6 +8,17 @@ emails = {
         " + %s\n\n"
         "You should probably tell the court this is unacceptable.",
         "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.ADMINS],
+        "to": [a[1] for a in settings.MANAGERS],
+    },
+    "stale_feed": {
+        "subject": "PACER feed gone stale at: %s",
+        "body": "Dear admin:\n\n"
+        "%s's RSS feed has not had updates for %s minutes. You can see their "
+        "feed here:\n\n"
+        "  %s\n\n"
+        "You should probably tell the court this is an issue. Maybe their "
+        "CM/ECF administrator, IT staff, or director of operations?",
+        "from": settings.DEFAULT_FROM_EMAIL,
+        "to": [a[1] for a in settings.MANAGERS],
     },
 }

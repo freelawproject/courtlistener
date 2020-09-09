@@ -148,7 +148,7 @@ class Command(VerboseCommand):
                     check_if_feed_changed.s(
                         court.pk, new_status.pk, feed_status.date_last_build
                     ),
-                    merge_rss_feed_contents.s(court.pk, new_status.pk),
+                    merge_rss_feed_contents.s(court.pk),
                     send_docket_alerts.s(),
                     # Update recap *documents*, not *dockets*. Updating dockets
                     # requires much more work, and we don't expect to get much

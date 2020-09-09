@@ -41,15 +41,15 @@ def normalize_variation(string):
 
 def tokenize(text):
     """Tokenize text using regular expressions in the following steps:
-        - Split the text by the occurrences of patterns which match a federal
-          reporter, including the reporter strings as part of the resulting
-          list.
-        - Perform simple tokenization (whitespace split) on each of the
-          non-reporter strings in the list.
+     - Split the text by the occurrences of patterns which match a federal
+       reporter, including the reporter strings as part of the resulting
+       list.
+     - Perform simple tokenization (whitespace split) on each of the
+       non-reporter strings in the list.
 
-       Example:
-       >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
-       ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
+    Example:
+    >>>tokenize('See Roe v. Wade, 410 U. S. 113 (1973)')
+    ['See', 'Roe', 'v.', 'Wade,', '410', 'U. S.', '113', '(1973)']
     """
     # if the text looks likes the corner-case 'digit-REPORTER-digit', splitting
     # by spaces doesn't work

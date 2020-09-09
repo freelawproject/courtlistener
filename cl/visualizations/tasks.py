@@ -77,7 +77,7 @@ def get_title(self, referer_id):
 
     if title:
         referer.page_title = trunc(
-            title, referer._meta.get_field("page_title").max_length,
+            title, referer._meta.get_field("page_title").max_length
         )
         referer.save()
 

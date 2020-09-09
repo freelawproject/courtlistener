@@ -25,7 +25,7 @@ from cl.search.models import (
 
 class CourtFilter(FilterSet):
     dockets = filters.RelatedFilter(
-        "cl.search.filters.DocketFilter", queryset=Docket.objects.all(),
+        "cl.search.filters.DocketFilter", queryset=Docket.objects.all()
     )
     jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
 
@@ -63,18 +63,18 @@ class DocketFilter(FilterSet):
         queryset=DocketEntry.objects.all(),
     )
     audio_files = filters.RelatedFilter(
-        "cl.audio.filters.AudioFilter", queryset=Audio.objects.all(),
+        "cl.audio.filters.AudioFilter", queryset=Audio.objects.all()
     )
     assigned_to = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     referred_to = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     parties = filters.RelatedFilter(
-        "cl.people_db.filters.PartyFilter", queryset=Party.objects.all(),
+        "cl.people_db.filters.PartyFilter", queryset=Party.objects.all()
     )
-    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all(),)
+    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all())
 
     class Meta:
         model = Docket
@@ -108,10 +108,10 @@ class OpinionFilter(FilterSet):
         queryset=OpinionCluster.objects.all(),
     )
     author = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     joined_by = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     type = filters.MultipleChoiceFilter(choices=Opinion.OPINION_TYPES)
 
@@ -139,21 +139,19 @@ class CitationFilter(FilterSet):
 
 
 class OpinionClusterFilter(FilterSet):
-    docket = filters.RelatedFilter(
-        DocketFilter, queryset=Docket.objects.all(),
-    )
+    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     panel = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     non_participating_judges = filters.RelatedFilter(
-        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all(),
+        "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     sub_opinions = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all(),
+        OpinionFilter, queryset=Opinion.objects.all()
     )
     source = filters.MultipleChoiceFilter(choices=SOURCES)
     citations = filters.RelatedFilter(
-        CitationFilter, queryset=Citation.objects.all(),
+        CitationFilter, queryset=Citation.objects.all()
     )
 
     class Meta:
@@ -176,10 +174,10 @@ class OpinionClusterFilter(FilterSet):
 
 class OpinionsCitedFilter(FilterSet):
     citing_opinion = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all(),
+        OpinionFilter, queryset=Opinion.objects.all()
     )
     cited_opinion = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all(),
+        OpinionFilter, queryset=Opinion.objects.all()
     )
 
     class Meta:
@@ -190,14 +188,12 @@ class OpinionsCitedFilter(FilterSet):
 
 
 class DocketEntryFilter(FilterSet):
-    docket = filters.RelatedFilter(
-        DocketFilter, queryset=Docket.objects.all(),
-    )
+    docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     recap_documents = filters.RelatedFilter(
         "cl.search.filters.RECAPDocumentFilter",
         queryset=RECAPDocument.objects.all(),
     )
-    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all(),)
+    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all())
 
     class Meta:
         model = DocketEntry
@@ -212,9 +208,9 @@ class DocketEntryFilter(FilterSet):
 
 class RECAPDocumentFilter(FilterSet):
     docket_entry = filters.RelatedFilter(
-        DocketEntryFilter, queryset=DocketEntry.objects.all(),
+        DocketEntryFilter, queryset=DocketEntry.objects.all()
     )
-    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all(),)
+    tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all())
 
     class Meta:
         model = RECAPDocument

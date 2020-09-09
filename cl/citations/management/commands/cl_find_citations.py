@@ -18,7 +18,10 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--doc-id", type=int, nargs="*", help="ids of citing opinions",
+            "--doc-id",
+            type=int,
+            nargs="*",
+            help="ids of citing opinions",
         )
         parser.add_argument(
             "--start-id",
@@ -167,7 +170,8 @@ class Command(VerboseCommand):
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
                 find_citations_for_opinion_by_pks.apply_async(
-                    args=(chunk, index_during_subtask), queue=queue_name,
+                    args=(chunk, index_during_subtask),
+                    queue=queue_name,
                 )
                 chunk = []
 

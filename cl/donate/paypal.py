@@ -26,7 +26,7 @@ def get_paypal_access_token():
     r = requests.post(
         "%s/v1/oauth2/token" % settings.PAYPAL_ENDPOINT,
         headers={"Accept": "application/json", "Accept-Language": "en_US"},
-        auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_KEY,),
+        auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_KEY),
         data={"grant_type": "client_credentials"},
     )
     if r.status_code == HTTP_200_OK:
@@ -94,7 +94,7 @@ def process_paypal_payment(cd_donation_form):
     cancel_url = "https://www.courtlistener.com%s" % reverse("paypal_cancel")
     data = {
         "intent": "sale",
-        "redirect_urls": {"return_url": return_url, "cancel_url": cancel_url,},
+        "redirect_urls": {"return_url": return_url, "cancel_url": cancel_url},
         "payer": {"payment_method": "paypal"},
         "transactions": [
             {
@@ -155,5 +155,5 @@ def donate_paypal_cancel(request):
     return render(
         request,
         "donate_complete.html",
-        {"error": "User Cancelled", "private": False,},
+        {"error": "User Cancelled", "private": False},
     )

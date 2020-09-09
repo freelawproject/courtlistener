@@ -7,7 +7,7 @@ from cl.search.models import OpinionCluster
 
 
 class JSONVersionSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId,
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
     class Meta:
         model = JSONVersion
@@ -15,7 +15,7 @@ class JSONVersionSerializer(
 
 
 class VisualizationSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId,
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     title = serializers.CharField(max_length=200)

@@ -275,7 +275,7 @@ def view_parties(request, docket_id, slug):
         )
 
     context.update(
-        {"parties": parties, "docket_entries": docket.docket_entries.exists(),}
+        {"parties": parties, "docket_entries": docket.docket_entries.exists()}
     )
     return render(request, "docket_parties.html", context)
 
@@ -495,7 +495,7 @@ def reporter_or_volume_handler(request, reporter, volume=None):
     if not root_reporter:
         return throw_404(
             request,
-            {"no_reporters": True, "reporter": reporter, "private": True,},
+            {"no_reporters": True, "reporter": reporter, "private": True},
         )
 
     volume_names = [r["name"] for r in REPORTERS[root_reporter]]
@@ -721,5 +721,5 @@ def block_item(request):
         return HttpResponse("It worked")
     else:
         return HttpResponseNotAllowed(
-            permitted_methods=["POST"], content="Not an ajax request",
+            permitted_methods=["POST"], content="Not an ajax request"
         )

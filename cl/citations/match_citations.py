@@ -31,8 +31,7 @@ def build_date_range(start_year, end_year):
 
 
 def make_name_param(defendant, plaintiff=None):
-    """Remove punctuation and return cleaned string plus its length in tokens.
-    """
+    """Remove punctuation and return cleaned string plus its length in tokens."""
     token_list = defendant.split()
     if plaintiff:
         token_list.extend(plaintiff.split())

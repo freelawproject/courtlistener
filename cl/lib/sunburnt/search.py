@@ -583,8 +583,7 @@ class BaseSearch(object):
     __len__ = count
 
     def __getitem__(self, k):
-        """Return a single result or slice of results from the query.
-        """
+        """Return a single result or slice of results from the query."""
         # are we already paginated? if so, we'll apply this getitem to the
         # paginated result - else we'll apply it to the whole.
         offset = 0 if self.paginator.start is None else self.paginator.start

@@ -71,8 +71,8 @@ class Command(VerboseCommand):
             orig_atty_id = role["attorney_id"]
             atty = Attorney.objects.get(pk=orig_atty_id)
             dockets = (
-                Docket.objects.filter(role__attorney=atty,)
-                .order_by("date_created",)
+                Docket.objects.filter(role__attorney=atty)
+                .order_by("date_created")
                 .distinct()
             )
             logger.info(

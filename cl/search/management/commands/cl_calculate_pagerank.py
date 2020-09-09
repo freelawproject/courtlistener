@@ -18,7 +18,7 @@ def make_and_populate_nx_graph():
         directed=True,
         edges=list(
             OpinionsCited.objects.values_list(
-                "citing_opinion", "cited_opinion",
+                "citing_opinion", "cited_opinion"
             )
         ),
     )
@@ -57,7 +57,7 @@ def make_sorted_pr_file(pr_results, result_file_path):
     # without the temp_extension value.
     os.system(
         "sort -n %s%s > %s"
-        % (result_file_path, temp_extension, result_file_path,)
+        % (result_file_path, temp_extension, result_file_path)
     )
     os.remove(result_file_path + temp_extension)
 

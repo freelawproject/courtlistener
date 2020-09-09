@@ -51,6 +51,8 @@ class Donation(models.Model):
     FAILED = 6
     RECLAIMED_REFUNDED = 7
     CAPTURED = 8
+    DISPUTED = 9
+    DISPUTE_CLOSED = 10
     PAYMENT_STATUSES = (
         (AWAITING_PAYMENT, "Awaiting Payment"),
         (UNKNOWN_ERROR, "Unknown Error"),
@@ -62,6 +64,8 @@ class Donation(models.Model):
         (FAILED, "Failed"),
         (RECLAIMED_REFUNDED, "Reclaimed/Refunded"),
         (CAPTURED, "Captured"),
+        (DISPUTED, "Disputed"),
+        (DISPUTE_CLOSED, "Dispute closed"),
     )
     donor = models.ForeignKey(
         User,
@@ -69,11 +73,12 @@ class Donation(models.Model):
         related_name="donations",
         on_delete=models.CASCADE,
     )
-    date_modified = models.DateTimeField(auto_now=True, db_index=True,)
+    date_modified = models.DateTimeField(auto_now=True, db_index=True)
     date_created = models.DateTimeField(auto_now_add=True, db_index=True)
-    clearing_date = models.DateTimeField(null=True, blank=True,)
+    clearing_date = models.DateTimeField(null=True, blank=True)
     send_annual_reminder = models.BooleanField(
-        "Send me a reminder to donate again in one year", default=False,
+        "Send me a reminder to donate again in one year",
+        default=False,
     )
     min_docket_donation = settings.MIN_DONATION["docket_alerts"]
     min_donation_error = (
@@ -88,7 +93,7 @@ class Donation(models.Model):
         ],
     )
     payment_provider = models.CharField(
-        max_length=50, choices=PROVIDERS.NAMES, default=None,
+        max_length=50, choices=PROVIDERS.NAMES, default=None
     )
     payment_id = models.CharField(
         help_text="Internal ID used during a transaction (used by PayPal and "
@@ -101,8 +106,8 @@ class Donation(models.Model):
         null=True,
         blank=True,
     )
-    status = models.SmallIntegerField(choices=PAYMENT_STATUSES,)
-    referrer = models.TextField("GET or HTTP referrer", blank=True,)
+    status = models.SmallIntegerField(choices=PAYMENT_STATUSES)
+    referrer = models.TextField("GET or HTTP referrer", blank=True)
 
     def __unicode__(self):
         return u"%s: $%s, %s" % (
@@ -124,16 +129,14 @@ class MonthlyDonation(models.Model):
         related_name="monthly_donations",
         on_delete=models.CASCADE,
     )
-    date_modified = models.DateTimeField(auto_now=True, db_index=True,)
+    date_modified = models.DateTimeField(auto_now=True, db_index=True)
     date_created = models.DateTimeField(auto_now_add=True, db_index=True)
     enabled = models.BooleanField(
-        help_text="Is this monthly donation enabled?", default=True,
+        help_text="Is this monthly donation enabled?", default=True
     )
-    payment_provider = models.CharField(
-        max_length=50, choices=PROVIDERS.NAMES,
-    )
+    payment_provider = models.CharField(max_length=50, choices=PROVIDERS.NAMES)
     monthly_donation_amount = models.DecimalField(
-        max_digits=10, decimal_places=2,
+        max_digits=10, decimal_places=2
     )
     monthly_donation_day = models.SmallIntegerField(
         help_text="The day of the month that the monthly donation should be "

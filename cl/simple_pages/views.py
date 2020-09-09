@@ -131,7 +131,7 @@ def build_court_dicts(courts):
     court_dicts = [{"pk": "all", "short_name": u"All Courts"}]
     court_dicts.extend(
         [
-            {"pk": court.pk, "short_name": court.full_name,}
+            {"pk": court.pk, "short_name": court.full_name}
             #'notes': court.notes}
             for court in courts
         ]
@@ -215,7 +215,7 @@ def podcasts(request):
         "podcasts.html",
         {
             "oral_argument_courts": Court.objects.filter(
-                in_use=True, has_oral_argument_scraper=True,
+                in_use=True, has_oral_argument_scraper=True
             ),
             "count": Audio.objects.all().count(),
             "private": False,
@@ -375,7 +375,7 @@ def ratelimited(request, exception):
     )
 
 
-@track_in_matomo
+@track_in_matomo(timeout=0.01)
 def serve_static_file(request, file_path=""):
     """Sends a static file to a user.
 

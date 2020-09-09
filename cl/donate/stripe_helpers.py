@@ -91,7 +91,7 @@ def process_stripe_callback(request):
         ):
             charge = event["data"]["object"]
 
-            if charge["application"] == settings.XERO_APPLICATION_ID:
+            if charge.get("application") == settings.XERO_APPLICATION_ID:
                 handle_xero_payment(charge)
 
             # Sometimes stripe can process a transaction and call our callback
@@ -101,7 +101,15 @@ def process_stripe_callback(request):
             d = None
             while retry_count > 0:
                 try:
-                    d = Donation.objects.get(payment_id=charge["id"])
+                    if event["type"] in [
+                        "charge.dispute.created",
+                        "charge.dispute.funds_withdrawn",
+                    ]:
+                        # I don't know why stripe doesn't use the "id" field on
+                        # disputes like they do everything else.
+                        d = Donation.objects.get(payment_id=charge["charge"])
+                    else:
+                        d = Donation.objects.get(payment_id=charge["id"])
                 except Donation.DoesNotExist:
                     time.sleep(1)
                     retry_count -= 1
@@ -144,20 +152,28 @@ def process_stripe_callback(request):
                 ).replace(tzinfo=utc)
                 d.status = Donation.CAPTURED
             elif event["type"].endswith("dispute.created"):
-                logger.critical(
-                    "Somebody has created a dispute in "
-                    "Stripe: %s" % charge["id"]
+                logger.info(
+                    "Somebody has created a dispute in " "Stripe: %s",
+                    charge["id"],
                 )
+                d.status = Donation.DISPUTED
             elif event["type"].endswith("dispute.updated"):
-                logger.critical(
-                    "The Stripe dispute on charge %s has been "
-                    "updated." % charge["id"]
+                logger.info(
+                    "The Stripe dispute on charge %s has been updated.",
+                    charge["id"],
+                )
+            elif event["type"].endswith("dispute.funds_withdrawn"):
+                logger.info(
+                    "Funds for the stripe dispute on charge %s have been "
+                    "withdrawn",
+                    charge["charge"],
                 )
             elif event["type"].endswith("dispute.closed"):
-                logger.critical(
-                    "The Stripe dispute on charge %s has been "
-                    "closed." % charge["id"]
+                logger.info(
+                    "The Stripe dispute on charge %s has been " "closed.",
+                    charge["charge"],
                 )
+                d.status = Donation.DISPUTE_CLOSED
             d.save()
         return HttpResponse("<h1>200: OK</h1>")
     else:

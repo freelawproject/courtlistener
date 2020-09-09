@@ -19,7 +19,7 @@ from cl.search.tasks import add_or_update_recap_docket
 
 def get_docket_and_claims(docket_number, court, case_name, cookies, tags, q):
     """Get the docket report, claims history report, and save it all to the DB
-     and Solr
+    and Solr
     """
     chain(
         get_pacer_case_id_and_title.s(
@@ -40,7 +40,7 @@ def get_docket_and_claims(docket_number, court, case_name, cookies, tags, q):
                 "show_list_of_member_cases": False,
             }
         ).set(queue=q),
-        get_bankr_claims_registry.s(cookies=cookies, tag_names=tags,).set(
+        get_bankr_claims_registry.s(cookies=cookies, tag_names=tags).set(
             queue=q
         ),
         add_or_update_recap_docket.s().set(queue=q),

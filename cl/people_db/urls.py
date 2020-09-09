@@ -36,5 +36,5 @@ urlpatterns = [
         name="financial_disclosures_home",
     ),
     # Sitemap
-    url(r"^sitemap-people\.xml", people_sitemap_maker, name="people_sitemap",),
+    url(r"^sitemap-people\.xml", people_sitemap_maker, name="people_sitemap"),
 ]

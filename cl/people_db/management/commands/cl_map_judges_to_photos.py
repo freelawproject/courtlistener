@@ -1,6 +1,7 @@
 import os
 
 from django.utils.text import slugify
+from django.utils.timezone import now
 from judge_pics import judge_root
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -38,7 +39,7 @@ class Command(VerboseCommand):
 
         slug_name_dob = "{slug}-{date}.jpeg".format(
             slug=slug_name.rsplit(".")[0],
-            date=granular_date(person, "date_dob", iso=True,).lower(),
+            date=granular_date(person, "date_dob", iso=True).lower(),
         )
         return slug_name, slug_name_dob
 
@@ -66,7 +67,7 @@ class Command(VerboseCommand):
 
         # After iterating, set all people to not have photos.
         if not self.debug:
-            people.update(has_photo=False)
+            people.update(date_modified=now(), has_photo=False)
 
         found = 0
         missed = 0
@@ -87,10 +88,7 @@ class Command(VerboseCommand):
                 for person in people:
                     logger.warning(
                         "Found: %s - %s"
-                        % (
-                            person,
-                            granular_date(person, "date_dob", iso=True,),
-                        )
+                        % (person, granular_date(person, "date_dob", iso=True))
                     )
                 multi += 1
 

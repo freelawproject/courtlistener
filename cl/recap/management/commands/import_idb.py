@@ -5,21 +5,57 @@ from datetime import date
 
 from dateutil import parser
 from django.core.management import CommandError
+from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
 from cl.recap.constants import (
     DATASET_SOURCES,
-    CV_OLD,
     CV_2017,
-    CR_OLD,
+    CV_2020,
     CR_2017,
-    APP_2017,
-    APP_OLD,
     BANKR_2017,
     IDB_FIELD_DATA,
 )
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
+
+
+def create_or_update_row(values):
+    fjc_filters = [
+        {
+            "district": values["district"],
+            "docket_number": values["docket_number"],
+            "origin": values["origin"],
+            "date_filed": values["date_filed"],
+        },
+        # Match on defendant (that'll work better on criminal cases). It can
+        # change over time, but if we find a match that's a very strong
+        # indicator and we should use it.
+        {"defendant": values["defendant"]},
+    ]
+    existing_rows = FjcIntegratedDatabase.objects.all()
+    for fjc_filter in fjc_filters:
+        existing_rows = existing_rows.filter(**fjc_filter)
+        existing_row_count = existing_rows.count()
+        if existing_row_count == 0:
+            fjc_row = FjcIntegratedDatabase.objects.create(**values)
+            logger.info("Added row: %s", fjc_row)
+            break
+        elif existing_row_count == 1:
+            existing_rows.update(date_modified=now(), **values)
+            fjc_row = existing_rows[0]
+            logger.info("Updated row: %s" % fjc_row)
+            break
+    else:
+        # Didn't hit a break b/c too many matches.
+        logger.warn(
+            "Got %s results when looking up row by filters: %s",
+            existing_row_count,
+            fjc_filter,
+        )
+        fjc_row = None
+
+    return fjc_row
 
 
 class Command(VerboseCommand, CommandUtils):
@@ -31,7 +67,9 @@ class Command(VerboseCommand, CommandUtils):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--input-file", help="The IDB file to import", required=True,
+            "--input-file",
+            help="The IDB file to import",
+            required=True,
         )
         parser.add_argument(
             "--filetype",
@@ -150,8 +188,6 @@ class Command(VerboseCommand, CommandUtils):
             options["input_file"], mode="r", encoding="cp1252", newline="\r\n"
         )
         col_headers = f.next().strip().split("\t")
-        batch_size = 1000
-        batch = []
         for i, line in enumerate(f):
             sys.stdout.write("\rDoing line: %s" % i)
             sys.stdout.flush()
@@ -167,28 +203,13 @@ class Command(VerboseCommand, CommandUtils):
             self.normalize_booleans(row)
             self.normalize_dates(row)
             self.normalize_ints(row)
-            if options["filetype"] in [
-                CV_OLD,
-                CR_OLD,
-                APP_OLD,
-                BANKR_2017,
-                APP_2017,
-            ]:
-                raise NotImplementedError(
-                    "This file type not yet implemented."
+            if options["filetype"] not in [CV_2017, CV_2020, CR_2017]:
+                raise NotImplementedError("This file type not implemented.")
+            else:
+                values = self.convert_to_cl_data_model(
+                    row, options["filetype"]
                 )
-            elif options["filetype"] == CV_2017:
-                batch.append(self.create_row_obj(row, CV_2017))
-            elif options["filetype"] == CR_2017:
-                batch.append(self.create_row_obj(row, CR_2017))
-
-            if len(batch) == batch_size:
-                logger.info("Saving %s items to the DB.", batch_size)
-                FjcIntegratedDatabase.objects.bulk_create(batch)
-                batch = []
-
-        # Do any trailing items as well.
-        FjcIntegratedDatabase.objects.bulk_create(batch)
+            create_or_update_row(values)
 
         f.close()
 
@@ -269,14 +290,13 @@ class Command(VerboseCommand, CommandUtils):
                     "Court object" % row["DISTRICT"]
                 )
 
-    def create_row_obj(self, row, source):
-        # Just create an obj, so we can do a bulk_update. This is much faster
-        # than doing an insert for every item.
-        values = {}
+    def convert_to_cl_data_model(self, row, source):
+        """Convert the CSV dict with it's headers to our data model"""
+        values = {"dataset_source": source}
         for k, v in row.items():
             if k in self.field_mappings:
                 values[self.field_mappings[k]] = v
-        return FjcIntegratedDatabase(dataset_source=source, **values)
+        return values
 
     def build_field_data(self):
         """Build up fields for the selected filetype."""

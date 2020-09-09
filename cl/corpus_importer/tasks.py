@@ -69,7 +69,7 @@ from cl.lib.recap_utils import (
     get_bucket_name,
     get_docket_filename,
 )
-from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD
+from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD, CV_2020
 from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
 from cl.recap.mergers import (
     add_claims_to_docket,
@@ -153,7 +153,7 @@ def generate_ia_json(d_pk, database="default"):
     attorney_prefetch = Prefetch(
         "parties__attorneys",
         queryset=Attorney.objects.filter(
-            roles__docket_id=d_pk, parties__id__in=party_ids,
+            roles__docket_id=d_pk, parties__id__in=party_ids
         )
         .distinct()
         .prefetch_related(
@@ -293,6 +293,11 @@ def get_and_save_free_document_report(self, court_id, start, end):
     msg = None
     try:
         report.query(start, end, sort="case_number")
+    except TypeError as exc:
+        msg = (
+            "TypeError getting free document report results, likely due "
+            "to failure to get Nonce."
+        )
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Unable to get free document report results at %s (%s to %s)."
     except PacerLoginException as exc:
@@ -398,7 +403,7 @@ def process_free_opinion_result(self, row_pk, cnt):
             # by a docket or other source, it tends to be better. Prefer an
             # existing rsn if we have it.
             recap_sequence_number = make_recap_sequence_number(
-                {"date_filed": result.date_filed, "recap_sequence_index": 1,}
+                {"date_filed": result.date_filed, "recap_sequence_index": 1}
             )
             de.recap_sequence_number = (
                 de.recap_sequence_number or recap_sequence_number
@@ -582,7 +587,7 @@ def upload_pdf_to_ia(self, rd_pk):
 access_key = settings.IA_ACCESS_KEY
 secret_key = settings.IA_SECRET_KEY
 ia_session = ia.get_session(
-    {"s3": {"access": access_key, "secret": secret_key,}}
+    {"s3": {"access": access_key, "secret": secret_key}}
 )
 
 
@@ -705,7 +710,7 @@ def mark_court_done_on_date(status, court_id, d):
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id,
+            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
         ).latest("date_queried")
     except PACERFreeDocumentLog.DoesNotExist:
         return
@@ -751,7 +756,7 @@ def make_fjc_idb_lookup_params(item):
             params["docket_number_letters"] = "md"
         else:
             params["docket_number_letters"] = "cr"
-    elif item.dataset_source in [CV_2017, CV_OLD]:
+    elif item.dataset_source in [CV_2017, CV_2020, CV_OLD]:
         params["docket_number_letters"] = "cv"
     return params
 
@@ -889,7 +894,7 @@ def do_case_query_by_pacer_case_id(
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
     try:
-        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id,)
+        d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -982,6 +987,70 @@ def filter_docket_by_tags(self, data, tags, court_id):
     interval_step=5 * 60,
     ignore_result=True,
 )
+def make_docket_by_iquery(
+    self, court_id, pacer_case_id, cookies, tag_names=None
+):
+    """
+    Using the iquery endpoint, create or update a docket
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param cookies: Cookies for a logged-in PACER session
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :return: None if failed, else the ID of the created/updated docket
+    """
+    s = PacerSession(cookies=cookies)
+    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    try:
+        report.query(pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return
+        raise self.retry(exc=exc)
+
+    logging_id = "%s.%s" % (court_id, pacer_case_id)
+    if not report.data:
+        logger.info("No valid data found in iquery page for %s", logging_id)
+        return
+
+    d, count = find_docket_object(
+        court_id, str(pacer_case_id), report.data["docket_number"]
+    )
+    if count > 1:
+        d = d.earliest("date_created")
+
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = update_docket_metadata(d, report.data)
+    try:
+        d.save()
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warn(msg)
+            return
+        logger.info(msg=" Retrying.")
+        raise self.retry(exc=exc)
+
+    add_tags_to_objs(tag_names, [d])
+    logger.info("Created/updated docket: %s" % d)
+    return d.pk
+
+
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(
+    bind=True,
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
 def get_docket_by_pacer_case_id(
     self,
     data,
@@ -1023,7 +1092,7 @@ def get_docket_by_pacer_case_id(
     else:
         try:
             d = Docket.objects.get(
-                pacer_case_id=pacer_case_id, court_id=court_id,
+                pacer_case_id=pacer_case_id, court_id=court_id
             )
         except Docket.DoesNotExist:
             d = None
@@ -1123,7 +1192,7 @@ def get_appellate_docket_by_docket_number(
         return None
 
     try:
-        d = Docket.objects.get(docket_number=docket_number, court_id=court_id,)
+        d = Docket.objects.get(docket_number=docket_number, court_id=court_id)
     except Docket.DoesNotExist:
         d = None
     except Docket.MultipleObjectsReturned:
@@ -1540,7 +1609,7 @@ def get_pacer_doc_by_rd_and_description(
         document_number=rd.document_number,
         pacer_doc_id=att_found["pacer_doc_id"],
         document_type=document_type,
-        defaults={"date_upload": now(),},
+        defaults={"date_upload": now()},
     )
     # Replace the description if we have description data.
     # Else fallback on old.
