@@ -127,10 +127,22 @@ const TagSelect: React.FC = () => {
   return (
     <div style={{ paddingRight: '3px', position: 'relative' }}>
       <button
-        {...getToggleButtonProps()}
-        disabled={!isAuthenticated && docket !== undefined}
+        {...getToggleButtonProps({
+          onClick: (event) => {
+            if (!isAuthenticated) {
+              // Anonymous user
+              event.nativeEvent.preventDownshiftDefault = true;
+              // event.preventDefault();
+            }
+          },
+          onKeyDown: (event) => {
+            if (!isAuthenticated) {
+              event.nativeEvent.preventDownShiftDefault = true;
+            }
+          },
+        })}
         aria-label="toggle tag menu"
-        className="btn btn-primary"
+        className={!isAuthenticated ? 'btn btn-primary logged-out-modal-trigger' : 'btn btn-primary'}
       >
         Tags <span className="caret"></span>
       </button>
