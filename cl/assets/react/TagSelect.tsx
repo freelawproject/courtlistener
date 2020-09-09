@@ -124,20 +124,24 @@ const TagSelect: React.FC = () => {
     },
   });
 
+  // manually type nativeEvent as any
+  // https://github.com/downshift-js/downshift/issues/734
+  const disableDownshiftMenuToggle = ({ nativeEvent }: { nativeEvent: any }) =>
+    (nativeEvent.preventDownshiftDefault = true);
+
   return (
     <div style={{ paddingRight: '3px', position: 'relative' }}>
       <button
         {...getToggleButtonProps({
           onClick: (event) => {
+            // Anonymous user
             if (!isAuthenticated) {
-              // Anonymous user
-              event.nativeEvent.preventDownshiftDefault = true;
-              // event.preventDefault();
+              disableDownshiftMenuToggle(event);
             }
           },
           onKeyDown: (event) => {
             if (!isAuthenticated) {
-              event.nativeEvent.preventDownShiftDefault = true;
+              disableDownshiftMenuToggle(event);
             }
           },
         })}
