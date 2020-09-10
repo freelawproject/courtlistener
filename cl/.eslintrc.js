@@ -12,7 +12,16 @@ module.exports = {
     'plugin:prettier/recommended',
   ],
   rules: {
-    'prettier/prettier': 'error',
+    'prettier/prettier': 'warn',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
+    indent: ['error', 2],
+    'linebreak-style': ['error', 'unix'],
+    semi: ['error', 'always'],
+    'max-len': [
+      'warn',
+      {
+        code: 80,
+      },
+    ],
   },
 };
