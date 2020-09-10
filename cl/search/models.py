@@ -658,12 +658,32 @@ class Docket(models.Model):
             self.source = self.source + self.IDB
 
     @property
-    def pacer_url(self):
-        if not self.pacer_case_id:
-            return None
+    def pacer_court_id(self):
+        if hasattr(self, "_pacer_court_id"):
+            return self._pacer_court_id
+
         from cl.lib.pacer import map_cl_to_pacer_id
 
-        court_id = map_cl_to_pacer_id(self.court.pk)
+        pacer_court_id = map_cl_to_pacer_id(self.court.pk)
+        self._pacer_court_id = pacer_court_id
+        return pacer_court_id
+
+    def pacer_district_url(self, path):
+        if not self.pacer_case_id or (
+            self.court.jurisdiction == Court.FEDERAL_APPELLATE
+        ):
+            return None
+        return u"https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
+            self.pacer_court_id,
+            path,
+            self.pacer_case_id,
+        )
+
+    @property
+    def pacer_docket_url(self):
+        if not self.pacer_case_id:
+            return None
+
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
             if self.court.pk in ["ca5", "ca7", "ca11"]:
                 path = "/cmecf/servlet/TransportRoom?"
@@ -677,12 +697,57 @@ class Docket(models.Model):
                 u"caseNum=%s&"
                 u"incOrigDkt=Y&"
                 u"incDktEntries=Y"
-            ) % (court_id, self.pacer_case_id)
+            ) % (self.pacer_court_id, self.pacer_case_id)
         else:
-            return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
-                court_id,
-                self.pacer_case_id,
-            )
+            return self.pacer_district_url(u"DktRpt.pl")
+
+    @property
+    def pacer_alias_url(self):
+        return self.pacer_district_url("qryAlias.pl")
+
+    @property
+    def pacer_associated_cases_url(self):
+        return self.pacer_district_url("qryAscCases.pl")
+
+    @property
+    def pacer_attorney_url(self):
+        return self.pacer_district_url("qryAttorneys.pl")
+
+    @property
+    def pacer_case_file_location_url(self):
+        return self.pacer_district_url("QryRMSLocation.pl")
+
+    @property
+    def pacer_summary_url(self):
+        return self.pacer_district_url("qrySummary.pl")
+
+    @property
+    def pacer_deadlines_and_hearings_url(self):
+        return self.pacer_district_url("SchedQry.pl")
+
+    @property
+    def pacer_filers_url(self):
+        return self.pacer_district_url("FilerQry.pl")
+
+    @property
+    def pacer_history_and_documents_url(self):
+        return self.pacer_district_url("HistDocQry.pl")
+
+    @property
+    def pacer_party_url(self):
+        return self.pacer_district_url("qryParties.pl")
+
+    @property
+    def pacer_related_transactions_url(self):
+        return self.pacer_district_url("RelTransactQry.pl")
+
+    @property
+    def pacer_status_url(self):
+        return self.pacer_district_url("StatusQry.pl")
+
+    @property
+    def pacer_view_doc_url(self):
+        return self.pacer_district_url("qryDocument.pl")
 
     @property
     def prefetched_parties(self):

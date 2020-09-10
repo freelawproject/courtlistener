@@ -1,0 +1,29 @@
+{% if docket.pacer_docket_url %}
+  <div class="btn-group">
+    <a href="{{ docket.pacer_docket_url }}"
+       class="btn btn-primary"
+       target="_blank"
+       rel="nofollow"><i class="fa fa-external-link"></i> View on PACER</a>
+    {% if docket.court.jurisdiction != docket.court.FEDERAL_APPELLATE %}
+      <a class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <span class="caret"></span>
+        <span class="sr-only">Toggle Dropdown</span>
+      </a>
+      <ul class="dropdown-menu">
+        <li><a href="{{ docket.pacer_alias_url }}" target="_blank"><i class="fa fa-external-link"></i> Alias Report</a></li>
+        <li><a href="{{ docket.pacer_associated_cases_url }}" target="_blank"><i class="fa fa-external-link"></i> Associated Cases</a></li>
+        <li><a href="{{ docket.pacer_attorney_url }}" target="_blank"><i class="fa fa-external-link"></i> Attorney Report</a></li>
+        <li><a href="{{ docket.pacer_case_file_location_url }}" target="_blank"><i class="fa fa-external-link"></i> Case File Location Report</a></li>
+        <li><a href="{{ docket.pacer_summary_url }}" target="_blank"><i class="fa fa-external-link"></i> Case Summary Report</a></li>
+        <li><a href="{{ docket.pacer_deadlines_and_hearings_url }}" target="_blank"><i class="fa fa-external-link"></i>  Deadlines/Hearings</a></li>
+        <li><a href="{{ docket.pacer_docket_url }}" target="_blank"><i class="fa fa-external-link"></i> Docket Report</a></li>
+        <li><a href="{{ docket.pacer_filers_url }}" target="_blank"><i class="fa fa-external-link"></i> Filers Report</a></li>
+        <li><a href="{{ docket.pacer_history_and_documents_url }}" target="_blank"><i class="fa fa-external-link"></i> History/Documents</a></li>
+        <li><a href="{{ docket.pacer_party_url }}" target="_blank"><i class="fa fa-external-link"></i> Party Report</a></li>
+        <li><a href="{{ docket.pacer_related_transactions_url }}" target="_blank"><i class="fa fa-external-link"></i> Related Transactions</a></li>
+        <li><a href="{{ docket.pacer_status_url }}" target="_blank"><i class="fa fa-external-link"></i> Status Report</a></li>
+        <li><a href="{{ docket.pacer_view_doc_url }}" target="_blank"><i class="fa fa-external-link"></i> Purchase a Document</a></li>
+      </ul>
+    {% endif %}
+  </div>
+{% endif %}

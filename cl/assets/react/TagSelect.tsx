@@ -146,9 +146,10 @@ const TagSelect: React.FC = () => {
           },
         })}
         aria-label="toggle tag menu"
-        className={!isAuthenticated ? 'btn btn-primary logged-out-modal-trigger' : 'btn btn-primary'}
+        className={!isAuthenticated ? 'btn btn-success logged-out-modal-trigger' : 'btn btn-success'}
       >
-        Tags <span className="caret"></span>
+        <i className="fa fa-tags" />
+        &nbsp;Tags <span className="caret" />
       </button>
 
       <div

@@ -71,36 +71,25 @@
 
     <h2>{{ docket.court }}</h2>
 
-    {% if docket.pacer_url or docket_entries %}
+    {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
-        {% if docket.pacer_url %}
-          <div class="left">
-            <p><a href="{{ docket.pacer_url }}"
-               class="btn btn-primary"
-               target="_blank"
-               rel="nofollow"><i class="fa fa-external-link"></i> View on PACER</a>&nbsp;</p>
-          </div>
-        {% endif %}
         {% if docket_entries %}
-          <div class="left">
-            <p><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-               class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
-          </div>
+          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+             class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
         {% endif %}
-        <div class="left">
-          {% include "includes/tag_button.html" %}
-        </div>
-        <div class="left">
+        {% include "includes/tag_button.html" %}
+        <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}
-          <a href="{% url "alert_help" %}#recap-alerts"
-             class="btn btn-link btn-close"
-             data-toggle="tooltip"
-             data-placement="right"
-             title="Learn about docket alerts"><i
-                  class="fa fa-question-circle fa-lg gray"></i></a>
+          <a class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </a>
+          <ul class="dropdown-menu">
+            <li><a href="{% url "alert_help" %}#recap-alerts">Learn More</a></li>
+          </ul>
         </div>
+        {% include "includes/pacer_links_dropdown.html" %}
       </div>
-      <div class="clearfix"></div>
     {% endif %}
 
     {% if docket.source in docket.RECAP_SOURCES %}
