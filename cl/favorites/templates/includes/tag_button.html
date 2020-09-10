@@ -1,3 +1,8 @@
 {% load render_bundle from webpack_loader %}
-<div class="btn-group" id="react-root" data-authenticated="{% if user.is_authenticated %}true{% endif %}" data-edit-url="{% url "tag_list" request.user %}"></div>
+<div class="btn-group"
+     id="react-root"
+     data-authenticated="{% if user.is_authenticated %}{{ user.get_username }}{% endif %}"
+     data-edit-url="{% url "tag_list" request.user %}"
+></div>
+
 {% render_bundle 'main' %} {% render_bundle 'vendor' %}

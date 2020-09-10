@@ -6,9 +6,10 @@ interface ListItemProps {
   dockets?: number[];
   assocId?: number;
   isSelected: boolean;
+  user: string | boolean | undefined;
 }
 
-export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelected }) => {
+export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelected, user }) => {
   const isCreateItem = name.startsWith('Create Tag: ');
 
   return (
@@ -28,6 +29,13 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
             data-tagid={id}
           />
           <label className="form-check-label">{name}</label>
+          <span className="float-right gray">
+            <i
+              className="fa fa-external-link cursor"
+              onClick={() => (window.location.href = `/tags/${user}/${name}/`)}
+              title="View this tag"
+            />
+          </span>
         </div>
       )}
     </a>

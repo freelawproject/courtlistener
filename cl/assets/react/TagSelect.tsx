@@ -9,7 +9,7 @@ function getDataFromReactRoot() {
   const div = document.querySelector('div#react-root');
   if (div && div instanceof HTMLElement) {
     return {
-      isAuthenticated: div.dataset.authenticated === 'true',
+      isAuthenticated: div.dataset.authenticated || false,
       editUrl: div.dataset.editUrl,
     };
   } else {

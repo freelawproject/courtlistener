@@ -5,7 +5,7 @@ import { ApiResult, Tag, Association } from './_types';
 
 interface UseTagsProps {
   docket: number;
-  enabled?: boolean;
+  enabled?: boolean | undefined | string;
 }
 
 export const useTags = ({ docket, enabled }: UseTagsProps) => {
@@ -55,7 +55,7 @@ export const useTags = ({ docket, enabled }: UseTagsProps) => {
     'tags',
     getTags,
     {
-      enabled: enabled,
+      enabled: !!enabled,
       // if the lastPage has a next key, extract the page number
       getFetchMore: (lastPage, allPages) => {
         const nextPage = (lastPage as ApiResult<Tag>).next;
