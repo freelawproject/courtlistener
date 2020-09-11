@@ -13,9 +13,11 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
   const isCreateItem = name.startsWith('Create Tag: ');
 
   return (
-    <a className="list-group-item" style={isCreateItem ? { cursor: 'default' } : {}}>
+    <a className="list-group-item cursor">
       {isCreateItem ? (
-        <p>{name}</p>
+        <p>
+          <strong>{name}</strong>
+        </p>
       ) : (
         <div className="form-check form-check-inline">
           <input
