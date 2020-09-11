@@ -8,8 +8,19 @@ import { Association } from './_types';
 function getDataFromReactRoot() {
   const div = document.querySelector('div#react-root');
   if (div && div instanceof HTMLElement) {
+    const authStr = div.dataset.authenticated;
+    let userId, isAuthenticated;
+    if (!authStr) {
+      userId = undefined;
+      isAuthenticated = false;
+    } else {
+      const strParts = authStr.split(':', 2);
+      userId = parseInt(strParts[0], 10);
+      isAuthenticated = strParts[1];
+    }
     return {
-      isAuthenticated: div.dataset.authenticated || false,
+      userId: userId,
+      isAuthenticated: isAuthenticated,
       editUrl: div.dataset.editUrl,
     };
   } else {
@@ -30,7 +41,7 @@ function getDocketIdFromH1Tag() {
 const TagSelect: React.FC = () => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
 
-  const { isAuthenticated, editUrl } = getDataFromReactRoot();
+  const { userId, isAuthenticated, editUrl } = getDataFromReactRoot();
 
   const docket = getDocketIdFromH1Tag();
 
@@ -43,7 +54,7 @@ const TagSelect: React.FC = () => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket: docket as number, enabled: !!docket && isAuthenticated });
+  } = useTags({ docket: docket as number, enabled: !!docket && isAuthenticated, userId: userId });
 
   const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({

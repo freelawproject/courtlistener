@@ -8,11 +8,11 @@ interface UseTagsProps {
   enabled?: boolean | undefined | string;
 }
 
-export const useTags = ({ docket, enabled }: UseTagsProps) => {
+export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
   const [textVal, setTextVal] = React.useState<string>('');
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?page=${page}`),
+    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
     []
   );
 
