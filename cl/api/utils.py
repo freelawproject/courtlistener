@@ -358,6 +358,10 @@ class RECAPUploaders(DjangoModelPermissions):
     }
 
 
+class MediumPagination(PageNumberPagination):
+    page_size = 50
+
+
 class BigPagination(PageNumberPagination):
     page_size = 300
 
