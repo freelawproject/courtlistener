@@ -41,13 +41,15 @@ def get_milestone_range(start, end):
     return out
 
 
-def tally_stat(name, inc=1, date_logged=now()):
+def tally_stat(name, inc=1, date_logged=None):
     """Tally an event's occurrence to the database.
 
     Will assume the following overridable values:
        - the event happened today.
        - the event happened once.
     """
+    if date_logged is None:
+        date_logged = now()
     stat, created = Stat.objects.get_or_create(
         name=name, date_logged=date_logged, defaults={"count": inc}
     )
