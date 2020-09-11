@@ -94,16 +94,16 @@ const TagSelect: React.FC = () => {
     stateReducer: (state, actionAndChanges) => {
       const { changes, type } = actionAndChanges;
       switch (type) {
-        case useCombobox.stateChangeTypes.InputKeyDownEnter:
-        case useCombobox.stateChangeTypes.ItemClick:
-          return {
-            ...changes,
-            isOpen: true, // keep menu open after selection.
-            highlightedIndex: state.highlightedIndex,
-            inputValue: '',
-          };
-        default:
-          return changes;
+      case useCombobox.stateChangeTypes.InputKeyDownEnter:
+      case useCombobox.stateChangeTypes.ItemClick:
+        return {
+          ...changes,
+          isOpen: true, // keep menu open after selection.
+          highlightedIndex: state.highlightedIndex,
+          inputValue: '',
+        };
+      default:
+        return changes;
       }
     },
     onSelectedItemChange: ({ selectedItem }) => {
@@ -249,6 +249,7 @@ const TagSelect: React.FC = () => {
                         <ListItem
                           isSelected={!!associations.find((a) => a.tag === tag.id)}
                           key={virtualRow.index}
+                          user={isAuthenticated}
                           {...tag}
                         />
                       )}

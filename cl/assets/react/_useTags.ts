@@ -6,6 +6,7 @@ import { ApiResult, Tag, Association } from './_types';
 interface UseTagsProps {
   docket: number;
   enabled?: boolean | undefined | string;
+  userId: number | undefined;
 }
 
 export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
@@ -115,8 +116,8 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     const flatTags = !tags
       ? []
       : Object.entries(tags)
-          .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
-          .flat(1);
+        .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
+        .flat(1);
 
     // rebuild tagData with the assocId
     const enhancedTags = flatTags.map((tag: Tag) => {
