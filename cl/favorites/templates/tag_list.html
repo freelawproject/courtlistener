@@ -1,12 +1,19 @@
 {% extends "base.html" %}
 {% load extras %}
 {% load text_filters %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Tags for: {{ requested_user }} – CourtListener.com{% endblock %}
 {% block og_title %}Tags for: {{ requested_user }} – CourtListener.com{% endblock %}
 {% block description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
 {% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-tag-300x300.png{% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag-utils.js?v=20200722"></script>
+  {% render_bundle 'main' %} {% render_bundle 'vendor' %}
+{% endblock %}
+
 
 
 {% block sidebar %}{% endblock %}
@@ -27,9 +34,9 @@
               <th>Name</th>
               <th>Title</th>
               <th>Created</th>
-              <th colspan="2">Views</th>
+              <th>Views</th>
               {% if is_page_owner %}
-                <th>Published</th>
+                <th colspan="2">Published</th>
               {% endif %}
             </tr>
             </thead>
@@ -44,10 +51,14 @@
         <td>{{ tag.view_count }}</td>
         {% if is_page_owner %}
           <td>{{ tag.published|yesno|capfirst }}</td>
-          <td><a href="" class="btn btn-primary btn-sm inline"><i class="fa fa-pencil"></i>&nbsp;Edit</a></td>
-          <td><button title="Delete Tag" class="btn btn-danger btn-xs inline delete-tag-button" data-id={{ tag.id }}>
-            <i class="fa fa-times"></i>
-          </button></td>
+          <td class="text-right">
+            <a href="" class="btn btn-primary btn-sm inline">
+              <i class="fa fa-pencil"></i>&nbsp;Edit
+            </a>&nbsp;
+            <a title="Delete Tag" class="btn btn-danger btn-sm inline delete-tag-button" data-id={{ tag.id }}>
+              <i class="fa fa-times"></i> Delete
+            </a>
+          </td>
          {% endif %}
       </tr>
       {% if forloop.last %}
@@ -62,6 +73,6 @@
         <h3>{{ requested_user }} has not shared any tags.</h3>
       {% endif %}
     {% endfor %}
-      </div>  
-  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag-utils.js?v=20200722"></script>
+  <div id="react-root"></div>
+  </div>
 {% endblock %}
