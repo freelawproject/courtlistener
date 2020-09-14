@@ -2,6 +2,7 @@
 {% load text_filters %}
 {% load humanize %}
 {% load tz %}
+{% load render_bundle from webpack_loader %}
 
 
 {% block sidebar %}{% endblock %}
@@ -32,6 +33,7 @@
     src="{{ STATIC_URL }}js/docket_alerts.js?v=20200428"></script>
 
   {% include "includes/date_picker.html" %}
+  {% render_bundle 'main' %} {% render_bundle 'vendor' %}
 {% endblock %}
 
 {% block nav %}
@@ -77,7 +79,11 @@
           <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
              class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
         {% endif %}
-        {% include "includes/tag_button.html" %}
+        <div class="btn-group"
+             id="react-root"
+             data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
+             data-edit-url="{% url "tag_list" request.user %}"
+        ></div>
         <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}
           <a class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
