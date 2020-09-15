@@ -1,5 +1,7 @@
+import os
 import subprocess
 
+import requests
 from django.core.files.base import ContentFile
 
 from cl.celery_init import app
@@ -22,37 +24,24 @@ def make_png_thumbnail_for_instance(
     :param max_dimension: The longest you want any edge to be
     """
     item = InstanceClass.objects.get(pk=pk)
-    command = [
-        "pdftoppm",
-        "-jpeg",
-        getattr(item, file_attr).path,
-        # Start and end on the first page
-        "-f",
-        "1",
-        "-l",
-        "1",
-        # Set the max dimension (generally the height). Alas, we can't just
-        # set the width, so this is our only hope.
-        "-scale-to",
-        str(max_dimension),
-    ]
+    filepath = getattr(item, file_attr).path
+    with open(filepath, "rb") as file:
+        f = file.read()
 
-    # Note that pdftoppm adds things like -01.png to the end of whatever
-    # filename you give it, which makes using a temp file difficult. But,
-    # if you don't give it an output file, it'll send the result to stdout,
-    # so that's why we are capturing it here.
-    p = subprocess.Popen(
-        command, close_fds=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    content, success = requests.post(
+        "http://cl-binary-transformers-and-extractors:80/make_png_thumbnail",
+        files={"file": (os.path.basename(filepath), f)},
+        params={"max_dimensions": max_dimension},
     )
-    stdout, stderr = p.communicate()
-    if p.returncode != 0:
+
+    if not success:
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()
         return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(stdout))
+    item.thumbnail.save(filename, ContentFile(content))
 
     return item.pk
 

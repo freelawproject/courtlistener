@@ -466,43 +466,17 @@ class AudioFileTaskTest(TestCase):
 
 class WeirdBinariesTest(TestCase):
     fixtures = ["test_court.json"]
-    base_url = "http://cl-binary-transformers-and-extractors:80"
 
     def setUp(self):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
     def test_sanity(self):
         """Can we start container and check sanity test?"""
-        response = requests.get(self.base_url).json()
+        response = requests.get(
+            "http://cl-binary-transformers-and-extractors:80"
+        ).json()
         self.assertTrue(response["success"], msg="Failed sanity test.")
         print(response)
-
-    def send_file_to_bte(self, filepath, do_ocr=False):
-        """Send file to extract doc content
-
-        :param filepath:
-        :param do_ocr:
-        :return:
-        """
-        with open(filepath, "rb") as file:
-            f = file.read()
-        return requests.post(
-            "%s/extract_doc_content" % self.base_url,
-            files={"file": (os.path.basename(filepath), f)},
-            params={"do_ocr": do_ocr},
-        )
-
-    def test_ingest_opinions(self):
-        """Can we successfully ingest opinions at a high level?"""
-        site = test_opinion_scraper.Site()
-        site.method = "LOCAL"
-        parsed_site = site.parse()
-        cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
-        opinions = Opinion.objects.all()
-        for opinion in opinions:
-            filepath = os.path.join(self.path, opinion.local_path.path)
-            response = send_file_to_bte(filepath, do_ocr=True)
-            print(response.content)
 
     def test_content_extraction(self):
         """Do all of the supported mimetypes get extracted to text
@@ -510,13 +484,13 @@ class WeirdBinariesTest(TestCase):
         test_strings = [
             "intelligence",
             "supreme",
-            "",
+            "",  # this needs a fix
             "indiana",
             "indiana",
             "fidelity",
             "supreme",
             "tax court",
-            "reagan"
+            "reagan",
         ]
         opinions = iglob(os.path.join(self.path, "*"))
         for filepath, test_string in zip(opinions, test_strings):
