@@ -54,6 +54,23 @@ DEVNULL = open("/dev/null", "w")
 logger = logging.getLogger(__name__)
 
 
+def send_file_to_bte(filepath, do_ocr=False):
+    """Send file to extract doc content
+
+    :param filepath:
+    :param do_ocr:
+    :return:
+    """
+    with open(filepath, "rb") as file:
+        f = file.read()
+    return requests.post(
+        "http://cl-binary-transformers-and-extractors:80/extract_doc_content",
+        files={"file": (os.path.basename(filepath), f)},
+        params={"do_ocr": do_ocr},
+    )
+
+
+
 def get_clean_body_content(content):
     """Parse out the body from an html string, clean it up, and send it along."""
     cleaner = Cleaner(

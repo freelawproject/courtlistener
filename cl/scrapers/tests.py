@@ -1,7 +1,9 @@
 # coding=utf-8
 import os
 from datetime import timedelta
+from glob import iglob
 
+import requests
 from django.conf import settings
 from django.test import TestCase, override_settings
 from django.utils.timezone import now
@@ -19,6 +21,7 @@ from cl.scrapers.tasks import (
     extract_from_txt,
     extract_doc_content,
     process_audio_file,
+    send_file_to_bte,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
@@ -459,3 +462,68 @@ class AudioFileTaskTest(TestCase):
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
         )
+
+
+class WeirdBinariesTest(TestCase):
+    fixtures = ["test_court.json"]
+    base_url = "http://cl-binary-transformers-and-extractors:80"
+
+    def setUp(self):
+        self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
+
+    def test_sanity(self):
+        """Can we start container and check sanity test?"""
+        response = requests.get(self.base_url).json()
+        self.assertTrue(response["success"], msg="Failed sanity test.")
+        print(response)
+
+    def send_file_to_bte(self, filepath, do_ocr=False):
+        """Send file to extract doc content
+
+        :param filepath:
+        :param do_ocr:
+        :return:
+        """
+        with open(filepath, "rb") as file:
+            f = file.read()
+        return requests.post(
+            "%s/extract_doc_content" % self.base_url,
+            files={"file": (os.path.basename(filepath), f)},
+            params={"do_ocr": do_ocr},
+        )
+
+    def test_ingest_opinions(self):
+        """Can we successfully ingest opinions at a high level?"""
+        site = test_opinion_scraper.Site()
+        site.method = "LOCAL"
+        parsed_site = site.parse()
+        cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
+        opinions = Opinion.objects.all()
+        for opinion in opinions:
+            filepath = os.path.join(self.path, opinion.local_path.path)
+            response = send_file_to_bte(filepath, do_ocr=True)
+            print(response.content)
+
+    def test_content_extraction(self):
+        """Do all of the supported mimetypes get extracted to text
+        successfully, including OCR?"""
+        test_strings = [
+            "intelligence",
+            "supreme",
+            "",
+            "indiana",
+            "indiana",
+            "fidelity",
+            "supreme",
+            "tax court",
+            "reagan"
+        ]
+        opinions = iglob(os.path.join(self.path, "*"))
+        for filepath, test_string in zip(opinions, test_strings):
+            response = send_file_to_bte(filepath, do_ocr=True)
+            self.assertIn(
+                test_string,
+                response.content.lower(),
+                msg="Failed html or wpd",
+            )
+            print(u"Successful parsing of %s √" % filepath)
