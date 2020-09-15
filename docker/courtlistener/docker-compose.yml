@@ -65,6 +65,7 @@ services:
             - cl-celery
             - cl-solr
             - cl-selenium
+            - cl-binary-transformers-and-extractors
         ports:
             - "8000:8000"
         volumes:
@@ -85,5 +86,15 @@ services:
             - 5900:5900  # VNC server
         volumes:
             - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
+        networks:
+            - cl_net_overlay
+
+    cl-binary-transformers-and-extractors:
+        image: freelawproject/binary-transformers-and-extractors:latest
+        container_name: "cl-binary-transformers-and-extractors"
+        expose:
+            - "5011"
+        ports:
+            - "5011:80"
         networks:
             - cl_net_overlay
