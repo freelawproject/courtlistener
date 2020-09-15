@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 import requests
 from django.core.files.base import ContentFile
