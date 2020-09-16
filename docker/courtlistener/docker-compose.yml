@@ -48,14 +48,20 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:latest
+        build: ../task-server
+#        image: freelawproject/task-server:latest
         depends_on:
             - cl-postgresql
             - cl-redis
+            - cl-binary-transformers-and-extractors
+            - cl-judge-pics
+            - cl-seal-rookery
         volumes:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
+            - cl-judge-pics:/usr/local/lib/python2.7/site-packages/judge_pics
+            - cl-seal-rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
         networks:
             - cl_net_overlay
 
@@ -77,8 +83,8 @@ services:
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-            - cl-judge-pics:${PYTHONPATH}/judge_pics
-            - cl-seal-rookery:${PYTHONPATH}/seal_rookery
+            - cl-judge-pics:/usr/local/lib/python2.7/site-packages/judge_pics
+            - cl-seal-rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
         networks:
             - cl_net_overlay
         command: >
