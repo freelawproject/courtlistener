@@ -26,7 +26,7 @@ const App = () => {
   return (
     <BrowserRouter>
       <Switch>
-        <Route path="/dockets">
+        <Route path="/docket">
           <TagSelect {...user} />
         </Route>
         <Route path="/tags">
