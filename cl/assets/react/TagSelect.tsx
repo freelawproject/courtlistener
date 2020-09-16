@@ -3,7 +3,7 @@ import { useVirtual } from 'react-virtual';
 import { useCombobox } from 'downshift';
 import { ListItem } from './ListItem';
 import { useTags } from './_useTags';
-import { Association } from './_types';
+import { Association, UserState } from './_types';
 
 function getDataFromReactRoot() {
   const div = document.querySelector('div#react-root');
@@ -31,10 +31,8 @@ function getDocketIdFromH1Tag() {
   }
 }
 
-const TagSelect: React.FC = () => {
+const TagSelect: React.FC<UserState> = ({ id, name, editUrl }) => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
-
-  const { userId, userName, editUrl } = getDataFromReactRoot();
 
   const docket = getDocketIdFromH1Tag();
 
@@ -47,7 +45,7 @@ const TagSelect: React.FC = () => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket: docket as number, enabled: !!docket && userName, userId: userId });
+  } = useTags({ docket: docket as number, enabled: !!docket && name, userId: id });
 
   const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({
@@ -87,16 +85,16 @@ const TagSelect: React.FC = () => {
     stateReducer: (state, actionAndChanges) => {
       const { changes, type } = actionAndChanges;
       switch (type) {
-      case useCombobox.stateChangeTypes.InputKeyDownEnter:
-      case useCombobox.stateChangeTypes.ItemClick:
-        return {
-          ...changes,
-          isOpen: true, // keep menu open after selection.
-          highlightedIndex: state.highlightedIndex,
-          inputValue: '',
-        };
-      default:
-        return changes;
+        case useCombobox.stateChangeTypes.InputKeyDownEnter:
+        case useCombobox.stateChangeTypes.ItemClick:
+          return {
+            ...changes,
+            isOpen: true, // keep menu open after selection.
+            highlightedIndex: state.highlightedIndex,
+            inputValue: '',
+          };
+        default:
+          return changes;
       }
     },
     onSelectedItemChange: ({ selectedItem }) => {

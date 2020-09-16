@@ -19,6 +19,12 @@
 {% block sidebar %}{% endblock %}
 {% block content %}
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+  <div 
+    class="col-xs-12"
+    id="react-root"
+    data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
+    data-edit-url="{% url "tag_list" request.user %}"
+  ></div>
   <div class="col-xs-12 col-md-10 col-lg-8">
     {% if is_page_owner %}
       <h1><i class="fa fa-tags gray"></i>&nbsp;Your tags</h1>
@@ -73,6 +79,4 @@
         <h3>{{ requested_user }} has not shared any tags.</h3>
       {% endif %}
     {% endfor %}
-  <div id="react-root"></div>
-  </div>
 {% endblock %}
