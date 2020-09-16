@@ -503,7 +503,7 @@ class WeirdBinariesTest(TestCase):
             if ".pdf" in filepath:
                 content = response["content"]
             else:
-                content = response['content'][0]
+                content = response["content"][0]
             self.assertIn(
                 test_string,
                 content.lower(),
