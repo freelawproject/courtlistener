@@ -18,10 +18,12 @@ from cl.scrapers.management.commands import (
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
-    extract_from_txt,
+    # extract_from_txt,
     extract_doc_content,
     process_audio_file,
-    send_file_to_bte,
+    # send_file_to_bte,
+    send_file_to_convert_audio,
+    process_doc,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
@@ -119,9 +121,12 @@ class IngestionTest(IndexedSolrTestCase):
             "search",
             "txt_file_with_no_encoding.txt",
         )
-        content, err = extract_from_txt(path)
+        response = process_doc(path)
+        content = response["content"][0]
+        success = response["content"][1]
+
         self.assertFalse(
-            err, "Error reported while extracting text from %s" % path
+            success, "Error reported while extracting text from %s" % path
         )
         self.assertIn(
             "¶  1.  DOOLEY, J.   Plaintiffs",
@@ -484,7 +489,7 @@ class WeirdBinariesTest(TestCase):
         test_strings = [
             "intelligence",
             "supreme",
-            "",  # this needs a fix
+            "dooley",
             "indiana",
             "indiana",
             "fidelity",
@@ -494,10 +499,14 @@ class WeirdBinariesTest(TestCase):
         ]
         opinions = iglob(os.path.join(self.path, "*"))
         for filepath, test_string in zip(opinions, test_strings):
-            response = send_file_to_bte(filepath, do_ocr=True)
+            response = process_doc(filepath, do_ocr=True)
+            if ".pdf" in filepath:
+                content = response["content"]
+            else:
+                content = response['content'][0]
             self.assertIn(
                 test_string,
-                response.content.lower(),
+                content.lower(),
                 msg="Failed html or wpd",
             )
             print(u"Successful parsing of %s √" % filepath)
