@@ -53,7 +53,7 @@ def make_pdftotext_process(path):
     ).json()
 
 
-def get_page_count(path):
+def get_page_count(path, extension=None):
     """Helper method to call get_page_count.
 
     :param path: Location of file
@@ -64,7 +64,7 @@ def get_page_count(path):
     return requests.post(
         "http://cl-binary-transformers-and-extractors:80/get_page_count",
         files={"file": (os.path.basename(path), f)},
-    ).json()
+    ).json()["pg_count"]
 
 
 def process_doc(path, do_ocr=False):
@@ -154,7 +154,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     content = response["content"]
     success = response["success"]
     # Do page count, if possible
-    opinion.page_count = get_page_count(path)["pg_count"]
+    opinion.page_count = get_page_count(path)
 
     # Do blocked status
     if extension in ["html", "wpd"]:
