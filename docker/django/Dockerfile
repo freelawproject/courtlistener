@@ -27,6 +27,9 @@ ENV PYTHONUNBUFFERED=1 \
     VENV_PATH="/opt/pysetup/.venv"
 
 
+# Use lots of layers. Bigger image, but faster builds. Slow stuff is up here at
+# the top.
+RUN apt-get update
 # prepend poetry and venv to path
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
