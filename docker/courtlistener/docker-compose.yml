@@ -52,6 +52,7 @@ services:
         depends_on:
             - cl-postgresql
             - cl-redis
+            - cl-binary-transformers-and-extractors
             - cl-judge-pics
             - cl-seal-rookery
         volumes:
