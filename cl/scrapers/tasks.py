@@ -59,6 +59,8 @@ def get_page_count(path, extension=None):
     """Helper method to call get_page_count.
 
     :param path: Location of file
+    :param extension: File extension
+    :type: str
     :return: dictionary containing page count.
     """
     with open(path, "rb") as file:
