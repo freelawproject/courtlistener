@@ -467,9 +467,7 @@ class AudioFileTaskTest(TestCase):
         )
 
 
-class WeirdBinariesTest(TestCase):
-    fixtures = ["test_court.json"]
-
+class BinaryTransformerExtractionTest(TestCase):
     def setUp(self):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
@@ -485,23 +483,24 @@ class WeirdBinariesTest(TestCase):
         """Do all of the supported mimetypes get extracted to text
         successfully, including OCR?"""
         test_strings = [
-            "intelligence",
             "supreme",
-            "dooley",
             "indiana",
-            "indiana",
-            "fidelity",
-            "supreme",
-            "tax court",
             "reagan",
+            "intelligence",
+            "october",
+            "tax court",
+            "fidelity",
+            "indiana",
+            "vermont",
         ]
-        opinions = iglob(os.path.join(self.path, "*"))
+        opinions = sorted(iglob(os.path.join(self.path, "*")))
         for filepath, test_string in zip(opinions, test_strings):
             response = process_doc(filepath, do_ocr=True)
             content = response["content"]
             self.assertIn(
                 test_string,
                 content.lower(),
-                msg="Failed html or wpd %s and %s" % (filepath, test_string),
+                msg="Failed document %s with word %s"
+                % (filepath, test_string),
             )
             print(u"Successful parsing of %s √" % filepath)
