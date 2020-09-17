@@ -455,7 +455,7 @@ class BinaryTransformerExtractionTest(TestCase):
         response = requests.get(
             "http://cl-binary-transformers-and-extractors:80"
         ).json()
-        self.assertTrue(response["err"], msg="Failed heartbeat test.")
+        self.assertTrue(response["success"], msg="Failed heartbeat test.")
         print(response)
 
     def test_content_extraction(self):
