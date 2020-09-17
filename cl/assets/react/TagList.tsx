@@ -10,7 +10,8 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const [page, setPage] = React.useState(1);
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
+    async (key: string, page = 1) =>
+      await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}&page_size=50&order_by=name`),
     []
   );
   const { isLoading, isError, error, resolvedData, latestData, isFetching } = usePaginatedQuery(
