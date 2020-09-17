@@ -66,8 +66,7 @@ services:
 
     cl-django:
         container_name: cl-django
-#        build: ../django
-        image: freelawproject/courtlistener-django:latest
+        image: freelawproject/courtlistener-django:bte_beta
         depends_on:
             - cl-postgresql
             - cl-redis
