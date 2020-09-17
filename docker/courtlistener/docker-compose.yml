@@ -48,7 +48,7 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:latest
+        image: freelawproject/task-server:bte_beta
         depends_on:
             - cl-postgresql
             - cl-redis
