@@ -59,8 +59,8 @@ services:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
-            - cl-judge-pics:/usr/local/lib/python2.7/site-packages/judge_pics
-            - cl-seal-rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
+            - cl-judge-pics:${JUDGE_PICS_PATH}
+            - cl-seal-rookery:${SEAL_ROOKERY_PATH}
         networks:
             - cl_net_overlay
 
@@ -81,8 +81,8 @@ services:
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-            - cl-judge-pics:/usr/local/lib/python2.7/site-packages/judge_pics
-            - cl-seal-rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
+            - cl-judge-pics:${JUDGE_PICS_PATH}
+            - cl-seal-rookery:${SEAL_ROOKERY_PATH}
         networks:
             - cl_net_overlay
         command: >
@@ -112,13 +112,13 @@ services:
             - cl_net_overlay
 
     cl-judge-pics:
-        image: freelawproject/judge-pics
+        image: freelawproject/judge-pics:latest
         container_name: "cl-judge-pics"
         volumes:
-          - cl-judge-pics:/usr/local/lib/python2.7/site-packages/judge_pics
+          - cl-judge-pics:${JUDGE_PICS_PATH}
 
     cl-seal-rookery:
-        image: freelawproject/seal-rookery
+        image: freelawproject/seal-rookery:latest
         container_name: "cl-seal-rookery"
         volumes:
-          - cl-seal-rookery:/usr/local/lib/python2.7/site-packages/seal_rookery
+          - cl-seal-rookery:${SEAL_ROOKERY_PATH}
