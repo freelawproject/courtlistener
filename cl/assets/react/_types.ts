@@ -21,7 +21,8 @@ export interface ApiResult<T> {
 }
 
 export interface UserState {
-  id?: number;
-  name?: string;
+  userId?: number;
+  userName?: string;
   editUrl?: string;
+  isPageOwner?: boolean;
 }

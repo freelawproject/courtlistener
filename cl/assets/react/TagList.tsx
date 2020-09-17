@@ -6,11 +6,11 @@ import { appFetch } from './_fetch';
 import { UserState } from './_types';
 import { userInfo } from 'os';
 
-const TagList: React.FC<UserState> = ({ id, name }) => {
+const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const [page, setPage] = React.useState(1);
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${id}&page=${page}`),
+    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
     []
   );
   const { isLoading, isError, error, resolvedData, latestData, isFetching } = usePaginatedQuery(
@@ -18,11 +18,11 @@ const TagList: React.FC<UserState> = ({ id, name }) => {
     getTags
   );
 
-  const isPageOwner = true;
   return (
     <>
       <h1>
-        <i className="fa fa-tags gray"></i>&nbsp;{isPageOwner ? 'Your tags' : name}
+        {console.log(isPageOwner)}
+        <i className="fa fa-tags gray"></i>&nbsp;{isPageOwner ? 'Your tags' : 'Public tags for ' + userName}
       </h1>
       <div className="table-responsive">
         {isLoading ? (
@@ -32,7 +32,7 @@ const TagList: React.FC<UserState> = ({ id, name }) => {
         ) : (
           // `resolvedData` will either resolve to the latest page's data
           // or if fetching a new page, the last successful page's data
-          <TagListInner data={resolvedData.results} userName={name} isPageOwner={isPageOwner} />
+          <TagListInner data={resolvedData.results} userName={userName} isPageOwner={isPageOwner} />
         )}
       </div>
       <span>Current Page: {page}</span>

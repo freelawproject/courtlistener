@@ -11,9 +11,10 @@ function getDataFromReactRoot() {
     if (!authStr) return {};
     const strParts = authStr.split(':', 2);
     return {
-      id: parseInt(strParts[0], 10),
-      name: strParts[1],
+      userId: parseInt(strParts[0], 10),
+      userName: strParts[1],
       editUrl: div.dataset.editUrl,
+      isPageOwner: div.dataset.isPageOwner != '',
     };
   } else {
     console.error('Unable to fetch credentials from server. Tags disabled.');

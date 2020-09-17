@@ -83,6 +83,7 @@
              id="react-root"
              data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
              data-edit-url="{% url "tag_list" request.user %}"
+             data-is-page-owner=""
         ></div>
         <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}

@@ -31,7 +31,7 @@ function getDocketIdFromH1Tag() {
   }
 }
 
-const TagSelect: React.FC<UserState> = ({ id, name, editUrl }) => {
+const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl }) => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
 
   const docket = getDocketIdFromH1Tag();
@@ -45,7 +45,7 @@ const TagSelect: React.FC<UserState> = ({ id, name, editUrl }) => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket: docket as number, enabled: !!docket && name, userId: id });
+  } = useTags({ docket: docket as number, enabled: !!docket && userName, userId: userId });
 
   const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({

@@ -19,64 +19,13 @@
 {% block sidebar %}{% endblock %}
 {% block content %}
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
-  <div 
-    class="col-xs-12"
-    id="react-root"
-    data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
-    data-edit-url="{% url "tag_list" request.user %}"
-  ></div>
   <div class="col-xs-12 col-md-10 col-lg-8">
-    {% if is_page_owner %}
-      <h1><i class="fa fa-tags gray"></i>&nbsp;Your tags</h1>
-    {% else %}
-      <h1><i class="fa fa-tags gray"></i>&nbsp;Tags for {{ requested_user }}</h1>
-    {% endif %}
-    {% for tag in tags %}
-      {% if forloop.first %}
-        <div class="table-responsive">
-          <table class="table settings-table tablesorter-bootstrap">
-            <thead>
-            <tr>
-              <th>Name</th>
-              <th>Title</th>
-              <th>Created</th>
-              <th>Views</th>
-              {% if is_page_owner %}
-                <th colspan="2">Published</th>
-              {% endif %}
-            </tr>
-            </thead>
-            <tbody>
-      {% endif %}
-
-      {# Normal row #}
-      <tr>
-        <td><a href="{% url "view_tag" requested_user tag.name %}" class="black-link"><span class="tag">{{ tag.name }}</span></a></td>
-        <td>{{ tag.title|default:"(none)" }}</td>
-        <td>{{ tag.date_created|date:"M j, Y"|nbsp }}</td>
-        <td>{{ tag.view_count }}</td>
-        {% if is_page_owner %}
-          <td>{{ tag.published|yesno|capfirst }}</td>
-          <td class="text-right">
-            <a href="" class="btn btn-primary btn-sm inline">
-              <i class="fa fa-pencil"></i>&nbsp;Edit
-            </a>&nbsp;
-            <a title="Delete Tag" class="btn btn-danger btn-sm inline delete-tag-button" data-id={{ tag.id }}>
-              <i class="fa fa-times"></i> Delete
-            </a>
-          </td>
-         {% endif %}
-      </tr>
-      {% if forloop.last %}
-            </tbody>
-          </table>
-        </div>
-      {% endif %}
-    {% empty %}
-      {% if is_page_owner %}
-        <h3>You do not have any tags.</h3>
-      {% else %}
-        <h3>{{ requested_user }} has not shared any tags.</h3>
-      {% endif %}
-    {% endfor %}
+    <div
+      class="col-xs-12"
+      id="react-root"
+      data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
+      data-edit-url="{% url "tag_list" request.user %}"
+      data-is-page-owner="{% if is_page_owner %}{{ is_page_owner }}{% endif %}"
+    ></div>
+  </div>
 {% endblock %}
