@@ -18,10 +18,8 @@ from cl.scrapers.management.commands import (
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
-    # extract_from_txt,
     extract_doc_content,
     process_audio_file,
-    # send_file_to_bte,
     send_file_to_convert_audio,
     process_doc,
 )
@@ -105,8 +103,8 @@ class ExtractionTest(TestCase):
             "txt_file_with_no_encoding.txt",
         )
         response = process_doc(path)
-        content = response["content"][0]
-        success = response["content"][1]
+        content = response["content"]
+        success = response["err"]
 
         self.assertFalse(
             success, "Error reported while extracting text from %s" % path
@@ -454,12 +452,12 @@ class WeirdBinariesTest(TestCase):
     def setUp(self):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
-    def test_sanity(self):
+    def heartbeat(self):
         """Can we start container and check sanity test?"""
         response = requests.get(
             "http://cl-binary-transformers-and-extractors:80"
         ).json()
-        self.assertTrue(response["success"], msg="Failed sanity test.")
+        self.assertTrue(response["err"], msg="Failed heartbeat test.")
         print(response)
 
     def test_content_extraction(self):
@@ -479,10 +477,7 @@ class WeirdBinariesTest(TestCase):
         opinions = iglob(os.path.join(self.path, "*"))
         for filepath, test_string in zip(opinions, test_strings):
             response = process_doc(filepath, do_ocr=True)
-            if ".pdf" in filepath:
-                content = response["content"]
-            else:
-                content = response["content"][0]
+            content = response["content"]
             self.assertIn(
                 test_string,
                 content.lower(),

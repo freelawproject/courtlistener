@@ -51,6 +51,7 @@ def make_pdftotext_process(path):
         "http://cl-binary-transformers-and-extractors:80/make_pdftotext_process",
         files={"file": (os.path.basename(path), f)},
     ).json()
+    # Add timeouts
 
 
 def get_page_count(path, extension=None):
@@ -154,7 +155,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     extension = path.split(".")[-1]
     response = process_doc(path, do_ocr=do_ocr)
     content = response["content"]
-    success = response["success"]
+    success = response["err"]
     # Do page count, if possible
     opinion.page_count = get_page_count(path)
 
@@ -223,7 +224,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
                 # probably an image PDF. Send it to OCR.
                 response = process_doc(path, do_ocr=True)
                 content = response["content"]
-                success = response["success"]
+                success = response["err"]
                 if success:
                     rd.ocr_status = RECAPDocument.OCR_COMPLETE
                 elif content == u"" or not success:
