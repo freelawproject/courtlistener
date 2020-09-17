@@ -15,6 +15,7 @@ from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils.timezone import now
 from eyed3 import id3
+from requests import Timeout
 from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
@@ -41,21 +42,6 @@ from juriscraper.pacer import PacerSession, CaseQuery
 logger = logging.getLogger(__name__)
 
 
-def make_pdftotext_process(path):
-    """Helper function to call make_pdftotext_process method
-
-    :param path:
-    :return:
-    """
-    with open(path, "rb") as file:
-        f = file.read()
-    return requests.post(
-        "http://cl-binary-transformers-and-extractors:80/make_pdftotext_process",
-        files={"file": (os.path.basename(path), f)},
-    ).json()
-    # Add timeouts
-
-
 def get_page_count(path, extension=None):
     """Helper method to call get_page_count.
 
@@ -66,10 +52,19 @@ def get_page_count(path, extension=None):
     """
     with open(path, "rb") as file:
         f = file.read()
-    return requests.post(
-        "http://cl-binary-transformers-and-extractors:80/get_page_count",
-        files={"file": (os.path.basename(path), f)},
-    ).json()["pg_count"]
+    try:
+        return requests.post(
+            "http://cl-binary-transformers-and-extractors:80/get_page_count",
+            files={"file": (os.path.basename(path), f)},
+            timeout=300,
+        ).json()["pg_count"]
+    except Timeout:
+        return {
+            "err": Timeout,
+            "msg": "Timeout error occurred; Page count failed.",
+        }
+    except:
+        return {"err": "An unknown error occured."}
 
 
 def process_doc(path, do_ocr=False):
@@ -81,11 +76,20 @@ def process_doc(path, do_ocr=False):
     """
     with open(path, "rb") as file:
         f = file.read()
-    return requests.post(
-        "http://cl-binary-transformers-and-extractors:80/extract_doc_content",
-        files={"file": (os.path.basename(path), f)},
-        params={"do_ocr": do_ocr},
-    ).json()
+    try:
+        return requests.post(
+            "http://cl-binary-transformers-and-extractors:80/extract_doc_content",
+            files={"file": (os.path.basename(path), f)},
+            params={"do_ocr": do_ocr},
+            timeout=3600,
+        ).json()
+    except Timeout:
+        return {
+            "err": Timeout,
+            "msg": "Timeout error occurred; Failed conversion",
+        }
+    except:
+        return {"err": "An unknown error occured."}
 
 
 def send_file_to_convert_audio(filepath):
@@ -96,10 +100,19 @@ def send_file_to_convert_audio(filepath):
     """
     with open(filepath, "rb") as file:
         f = file.read()
-    return requests.post(
-        "http://cl-binary-transformers-and-extractors:80/convert_audio_file",
-        files={"file": (os.path.basename(filepath), f)},
-    )
+    try:
+        return requests.post(
+            "http://cl-binary-transformers-and-extractors:80/convert_audio_file",
+            files={"file": (os.path.basename(filepath), f)},
+            timeout=3600,
+        )
+    except Timeout:
+        return {
+            "err": Timeout,
+            "msg": "Timeout error occurred; Failed conversion",
+        }
+    except:
+        return {"err": "An unknown error occured."}
 
 
 def update_document_from_text(opinion):
@@ -217,26 +230,19 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
-        path = rd.filepath_local.path
-        response = make_pdftotext_process(path)
-        content = response["content"]
 
-        if needs_ocr(content):
-            if not skip_ocr:
-                # probably an image PDF. Send it to OCR.
-                response = process_doc(path, do_ocr=True)
-                content = response["content"]
-                success = response["err"]
-                if success:
-                    rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                elif content == "" or not success:
-                    content = "Unable to extract document content."
-                    rd.ocr_status = RECAPDocument.OCR_FAILED
-            else:
-                content = ""
-                rd.ocr_status = RECAPDocument.OCR_NEEDED
+        path = rd.filepath_local.path
+        response = process_doc(path, do_ocr=True)
+        content = response["content"]
+        err = response["err"]
+
+        if err == Timeout:
+            content = u"Unable to extract document content."
+            rd.ocr_status = RECAPDocument.OCR_FAILED
+        elif len(content.strip()) == 0:
+            rd.ocr_status = RECAPDocument.OCR_NEEDED
         else:
-            rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
