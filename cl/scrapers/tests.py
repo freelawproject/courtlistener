@@ -473,7 +473,7 @@ class WeirdBinariesTest(TestCase):
     def setUp(self):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
-    def heartbeat(self):
+    def test_heartbeat(self):
         """Can we start container and check sanity test?"""
         response = requests.get(
             "http://cl-binary-transformers-and-extractors:80"
@@ -502,6 +502,6 @@ class WeirdBinariesTest(TestCase):
             self.assertIn(
                 test_string,
                 content.lower(),
-                msg="Failed html or wpd",
+                msg="Failed html or wpd %s and %s" % (filepath, test_string),
             )
             print(u"Successful parsing of %s √" % filepath)
