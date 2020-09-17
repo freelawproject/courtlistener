@@ -22,8 +22,8 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   return (
     <>
       <h1>
-        {console.log(isPageOwner)}
-        <i className="fa fa-tags gray"></i>&nbsp;{isPageOwner ? 'Your tags' : 'Public tags for ' + userName}
+        <i className="fa fa-tags gray" />
+        &nbsp;{isPageOwner ? 'Your tags' : 'Public tags for ' + userName}
       </h1>
       <div className="table-responsive">
         {isLoading ? (
@@ -36,26 +36,56 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
           <TagListInner data={resolvedData.results} userName={userName} isPageOwner={isPageOwner} />
         )}
       </div>
-      <span>Current Page: {page}</span>
-      <button onClick={() => setPage((old) => Math.max(old - 1, 0))} disabled={page === 1}>
-        Previous Page
-      </button>{' '}
-      <button
-        onClick={() =>
-          // Here, we use `latestData` so the Next Page
-          // button isn't relying on potentially old data
-          setPage((old) => (!latestData || !latestData.next ? old : old + 1))
-        }
-        disabled={!latestData || !latestData.next}
-      >
-        Next Page
-      </button>
-      {
-        // Since the last page's data potentially sticks around between page requests,
-        // we can use `isFetching` to show a background loading
-        // indicator since our `status === 'loading'` state won't be triggered
-        isFetching ? <span> Loading...</span> : null
-      }{' '}
+      {page === 1 && latestData && !latestData.next ? null : (
+        <div className="well v-offset-above-3 hidden-print">
+          <div className="row">
+            <div className="col-xs-2 col-sm-3">
+              {page > 1 ? (
+                <div className="text-left">
+                  <a onClick={() => setPage((old) => Math.max(old - 1, 0))} className="btn btn-default" rel="prev">
+                    <i className="fa fa-caret-left no-underline" />
+                    &nbsp;
+                    <span className="hidden-xs hidden-sm">Previous</span>
+                    <span className="hidden-xs hidden-md hidden-lg">Prev.</span>
+                  </a>
+                </div>
+              ) : null}
+            </div>
+            <div className="col-xs-8 col-sm-6">
+              <div className="text-center large">
+                <span className="hidden-xs">
+                  {isFetching ? (
+                    <>
+                      <i className="fa fa-spinner fa-pulse gray" />
+                      &nbsp;Loading...
+                    </>
+                  ) : (
+                    'Page ' + page
+                  )}
+                </span>
+              </div>
+            </div>
+            <div className="col-xs-2 col-sm-3">
+              {latestData && latestData.next ? (
+                <div className="text-right">
+                  <a
+                    onClick={() =>
+                      // Here, we use `latestData` so the Next Page
+                      // button isn't relying on potentially old data
+                      setPage((old) => (!latestData || !latestData.next ? old : old + 1))
+                    }
+                    rel="next"
+                    className="btn btn-default"
+                  >
+                    <span className="hidden-xs">Next</span>&nbsp;
+                    <i className="fa fa-caret-right no-underline" />
+                  </a>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
