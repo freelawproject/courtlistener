@@ -81,7 +81,8 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.docker_helpers import get_page_count
 from cl.search.models import (
     DocketEntry,
     RECAPDocument,
@@ -1474,7 +1475,7 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")
+    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")['pg_count']
 
     # Save and extract, skipping OCR.
     rd.save()

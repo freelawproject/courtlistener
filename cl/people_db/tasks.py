@@ -7,6 +7,7 @@ from cl.celery import app
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
+from cl.scrapers.docker_helpers import generate_thumbnail
 from cl.search.models import RECAPDocument
 
 
@@ -24,23 +25,17 @@ def make_png_thumbnail_for_instance(
     """
     item = InstanceClass.objects.get(pk=pk)
     filepath = getattr(item, file_attr).path
-    with open(filepath, "rb") as file:
-        f = file.read()
 
-    content, success = requests.post(
-        "http://cl-binary-transformers-and-extractors:80/make_png_thumbnail",
-        files={"file": (os.path.basename(filepath), f)},
-        params={"max_dimensions": max_dimension},
-    )
-
-    if not success:
+    response = generate_thumbnail(filepath)
+    err = response.headers['err']
+    if err:
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()
         return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(content))
+    item.thumbnail.save(filename, ContentFile(response.content))
 
     return item.pk
 

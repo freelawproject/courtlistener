@@ -61,7 +61,8 @@ from cl.recap.models import (
     REQUEST_TYPE,
     UPLOAD_TYPE,
 )
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.docker_helpers import get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
@@ -306,7 +307,7 @@ def process_recap_pdf(self, pk):
 
             # Do page count and extraction
             extension = rd.filepath_local.path.split(".")[-1]
-            rd.page_count = get_page_count(rd.filepath_local.path, extension)
+            rd.page_count = get_page_count(rd.filepath_local.path, extension)['pg_count']
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None

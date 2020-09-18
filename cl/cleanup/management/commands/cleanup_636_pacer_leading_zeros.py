@@ -11,7 +11,8 @@ from cl.lib.recap_utils import (
     get_local_document_url_from_path,
 )
 from cl.search.models import RECAPDocument, Docket
-from cl.scrapers.tasks import get_page_count, extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.docker_helpers import get_page_count
 
 
 class CleanupPacerXMLParser(PacerXMLParser):
@@ -89,7 +90,7 @@ class CleanupPacerXMLParser(PacerXMLParser):
                 extension = rd.filepath_local.path.split(".")[-1]
                 rd.page_count = get_page_count(
                     rd.filepath_local.path, extension
-                )
+                )['pg_count']
         else:
             logger.info("    Item not available in RECAP. Punting.")
             return None
