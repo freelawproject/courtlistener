@@ -27,7 +27,7 @@ def make_png_thumbnail_for_instance(
     filepath = getattr(item, file_attr).path
 
     response = generate_thumbnail(filepath)
-    err = response.headers['err']
+    err = response.headers["err"]
     if err:
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()

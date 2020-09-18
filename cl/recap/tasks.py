@@ -307,7 +307,9 @@ def process_recap_pdf(self, pk):
 
             # Do page count and extraction
             extension = rd.filepath_local.path.split(".")[-1]
-            rd.page_count = get_page_count(rd.filepath_local.path, extension)['pg_count']
+            rd.page_count = get_page_count(rd.filepath_local.path, extension)[
+                "pg_count"
+            ]
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
