@@ -11,6 +11,7 @@ from django.utils.timezone import now
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.docker_helpers import document_extract
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
     cl_scrape_opinions,
@@ -472,9 +473,8 @@ class BinaryTransformerExtractionTest(TestCase):
 
     def test_heartbeat(self):
         """Can we start container and check sanity test?"""
-        response = requests.get(
-            "http://cl-binary-transformers-and-extractors:80"
-        ).json()
+        base_url = "http://cl-binary-transformers-and-extractors:80"
+        response = requests.get(url=base_url, timeout=60).json()
         self.assertTrue(response["success"], msg="Failed heartbeat test.")
         print(response)
 
@@ -494,7 +494,7 @@ class BinaryTransformerExtractionTest(TestCase):
         ]
         opinions = sorted(iglob(os.path.join(self.path, "*")))
         for filepath, test_string in zip(opinions, test_strings):
-            response = process_doc(filepath, do_ocr=True)
+            response = document_extract(filepath, do_ocr=True)
             content = response["content"]
             self.assertIn(
                 test_string,
