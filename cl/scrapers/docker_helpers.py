@@ -74,7 +74,7 @@ def generate_thumbnail(path):
         return {"err": "Unknown error occurred"}
 
 
-def get_page_count(path, ext):
+def get_page_count(path, ext=None):
     """Get page count from document
 
     Sends file to binary-transformers-and-extractors and returns a json
@@ -92,7 +92,7 @@ def get_page_count(path, ext):
             url=service,
             files={"file": (os.path.basename(path), f)},
             timeout=300,
-        )
+        ).json()
     except Timeout:
         return {"err": Timeout}
     except:
