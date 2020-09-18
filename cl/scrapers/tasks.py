@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-from cl.scrapers.docker_helpers import get_page_count, document_extract, \
-    convert_audio
+from cl.scrapers.docker_helpers import (
+    get_page_count,
+    document_extract,
+    convert_audio,
+)
 import os
 import logging
 import random
@@ -98,7 +101,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     content = response["content"]
     success = response["err"]
     # Do page count, if possible
-    opinion.page_count = get_page_count(path)['pg_count']
+    opinion.page_count = get_page_count(path)["pg_count"]
 
     # Do blocked status
     if extension in ["html", "wpd"]:

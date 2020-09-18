@@ -1475,7 +1475,7 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")['pg_count']
+    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")["pg_count"]
 
     # Save and extract, skipping OCR.
     rd.save()

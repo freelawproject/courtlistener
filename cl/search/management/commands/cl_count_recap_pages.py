@@ -23,7 +23,7 @@ class Command(VerboseCommand):
                 cnt["no_file"] += 1
             else:
                 extension = path.split(".")[-1]
-                count = get_page_count(path, extension)['pg_count']
+                count = get_page_count(path, extension)["pg_count"]
                 rd.page_count = count
                 rd.save(do_extraction=False, index=False)
                 cnt["successes"] += 1
