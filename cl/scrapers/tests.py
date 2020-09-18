@@ -21,7 +21,6 @@ from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
     extract_doc_content,
     process_audio_file,
-    process_doc,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
@@ -119,7 +118,7 @@ class IngestionTest(IndexedSolrTestCase):
             "search",
             "txt_file_with_no_encoding.txt",
         )
-        response = process_doc(path)
+        response = document_extract(path)
         content = response["content"]
         success = response["err"]
 
