@@ -275,11 +275,10 @@ def process_audio_file(pk):
     tmp_path = os.path.join("/tmp", "audio_" + uuid.uuid4().hex + ".mp3")
     response = convert_audio(af.local_path_original_file.path)
 
-    file = response["content"]
     err = response["err"]
     if not err == Timeout:
         with open(tmp_path, "w") as mp3:
-            mp3.write(file.content)
+            mp3.write(response["content"])
         set_mp3_meta_data(af, tmp_path)
         try:
             with open(tmp_path, "r") as mp3:
