@@ -2,9 +2,9 @@ import React from 'react';
 import { usePaginatedQuery } from 'react-query';
 import { useTags } from './_useTags';
 import TagListInner from './TagListInner';
+import TagEditModal from './TagModal';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
-import { userInfo } from 'os';
 
 const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const [page, setPage] = React.useState(1);
@@ -86,6 +86,7 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
           </div>
         </div>
       )}
+      <TagEditModal />
     </>
   );
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Modal: React.FC = () => {
+const TagEditModal: React.FC = () => {
   return (
     <div className="modal hidden-print" role="dialog" id="modal-edit-delete">
       <div className="modal-dialog modal-sm" role="document">
@@ -10,4 +10,4 @@ const Modal: React.FC = () => {
   );
 };
 
-export default Modal;
+export default TagEditModal;

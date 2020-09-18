@@ -31,18 +31,20 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
                   </a>
                 </td>
                 <td>{tag.title || '(none)'}</td>
-                <td>{format(parseISO(tag.date_created) || new Date(), 'MMM d, yyyy')}</td>
+                <td>{format(parseISO(tag.date_created), 'MMM d, yyyy')}</td>
                 <td>{tag.view_count}</td>
                 {isPageOwner && (
                   <>
                     <td>{tag.published ? 'Yes' : 'No'}</td>
                     <td className="text-right">
-                      <a href="" className="btn btn-primary btn-sm inline">
-                        <i className="fa fa-pencil"></i>&nbsp;Edit
-                      </a>
-                      &nbsp;
-                      <a title="Delete Tag" className="btn btn-danger btn-sm inline delete-tag-button" data-id={tag.id}>
-                        <i className="fa fa-times"></i> Delete
+                      <a
+                        className="btn btn-primary btn-sm inline"
+                        data-id={tag.id}
+                        data-toggle="modal"
+                        data-target="#modal-edit-delete"
+                      >
+                        <i className="fa fa-pencil" />
+                        &nbsp;Edit / Delete
                       </a>
                     </td>
                   </>
