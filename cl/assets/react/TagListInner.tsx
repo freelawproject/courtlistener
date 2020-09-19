@@ -6,9 +6,10 @@ interface TagListInnerProps {
   data: Tag[];
   userName: string;
   isPageOwner: boolean;
+  onEditTagClick: () => void;
 }
 
-const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName }) => {
+const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName, onEditTagClick }) => {
   return (
     <div className="table-responsive">
       <table className="table settings-table tablesorter-bootstrap">
@@ -40,8 +41,8 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
                       <a
                         className="btn btn-primary btn-sm inline"
                         data-id={tag.id}
-                        data-toggle="modal"
-                        data-target="#modal-edit-delete"
+                        // XXX THIS IS REALLY NOT GOING TO WORK...
+                        onClick={() => onEditTagClick(tag)}
                       >
                         <i className="fa fa-pencil" />
                         &nbsp;Edit / Delete

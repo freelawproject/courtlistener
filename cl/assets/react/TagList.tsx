@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Button, Modal } from 'react-bootstrap';
 import { usePaginatedQuery } from 'react-query';
 import { useTags } from './_useTags';
 import TagListInner from './TagListInner';
@@ -19,6 +20,21 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
     getTags
   );
 
+  // Modal methods
+  const [show, setShow] = useState(false);
+
+  const handleClose = () => {
+    // Clear the inputs, hide the modal
+    setShow(false);
+  };
+
+  // XXX HOW TO GET THE TAG HERE FROM THE TagListInner component?
+  const handleShow = (e, tag) => {
+    // Get the item, populate the inputs, show the modal
+    console.log(`Tag ID is: ${tag.id}`);
+    setShow(true);
+  };
+
   return (
     <>
       <h1>
@@ -33,9 +49,16 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
         ) : (
           // `resolvedData` will either resolve to the latest page's data
           // or if fetching a new page, the last successful page's data
-          <TagListInner data={resolvedData.results} userName={userName} isPageOwner={isPageOwner} />
+          <TagListInner
+            data={resolvedData.results}
+            userName={userName}
+            isPageOwner={isPageOwner}
+            onEditTagClick={handleShow}
+          />
         )}
       </div>
+
+      {/*Pagination*/}
       {page === 1 && latestData && !latestData.next ? null : (
         <div className="well v-offset-above-3 hidden-print">
           <div className="row">
@@ -86,7 +109,15 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
           </div>
         </div>
       )}
-      <TagEditModal />
+      <Modal show={show} onHide={handleClose} animation={false}>
+        <Modal.Header closeButton>
+          <Modal.Title componentClass="h2">Edit Tag</Modal.Title>
+        </Modal.Header>
+        <Modal.Body></Modal.Body>
+        <Modal.Footer>
+          <Button onClick={handleClose}>Close</Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
