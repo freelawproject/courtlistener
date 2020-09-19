@@ -580,3 +580,9 @@ if DEVELOPMENT:
     AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
 
 CLOUDFRONT_DOMAIN = ""
+
+####################################
+# Binary Transformers & Extractors #
+####################################
+
+BTE_URL = "http://cl-binary-transformers-and-extractors:80"
