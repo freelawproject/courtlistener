@@ -20,7 +20,7 @@ def document_extract(path, do_ocr=False):
             url=service,
             files={"file": (os.path.basename(path), f)},
             params={"do_ocr": do_ocr},
-            timeout=3600,
+            timeout=60 * 60,
         ).json()
     except Timeout:
         return {"err": Timeout}
@@ -41,7 +41,7 @@ def convert_audio(path):
         response = requests.post(
             url=service,
             files={"file": (os.path.basename(path), f)},
-            timeout=3600,
+            timeout=60 * 60,
         )
         return {"content": response.content, "err": response.headers["err"]}
     except Timeout:
@@ -63,7 +63,7 @@ def generate_thumbnail(path):
         response = requests.post(
             url=service,
             files={"file": (os.path.basename(path), f)},
-            timeout=300,
+            timeout=60,
         )
         return {"content": response.content, "err": response.headers["err"]}
     except Timeout:
@@ -89,7 +89,7 @@ def get_page_count(path, ext=None):
         return requests.post(
             url=service,
             files={"file": (os.path.basename(path), f)},
-            timeout=300,
+            timeout=60,
         ).json()
     except Timeout:
         return {"err": Timeout}
