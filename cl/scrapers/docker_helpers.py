@@ -1,9 +1,8 @@
 import os
 
 import requests
+from django.conf import settings
 from requests import Timeout
-
-base_url = "http://cl-binary-transformers-and-extractors:80"
 
 
 def document_extract(path, do_ocr=False):
@@ -13,8 +12,7 @@ def document_extract(path, do_ocr=False):
     :param do_ocr:
     :return:
     """
-    service = "%s/%s" % (base_url, "extract_doc_content")
-    do_ocr = do_ocr
+    service = "%s/%s" % (settings.BTE_URL, "extract_doc_content")
     with open(path, "rb") as file:
         f = file.read()
     try:
@@ -36,7 +34,7 @@ def convert_audio(path):
     :param path:
     :return:
     """
-    service = "%s/%s" % (base_url, "convert_audio_file")
+    service = "%s/%s" % (settings.BTE_URL, "convert_audio_file")
     with open(path, "rb") as file:
         f = file.read()
     try:
@@ -58,7 +56,7 @@ def generate_thumbnail(path):
     :param path:
     :return:
     """
-    service = "%s/%s" % (base_url, "make_png_thumbnail")
+    service = "%s/%s" % (settings.BTE_URL, "make_png_thumbnail")
     with open(path, "rb") as file:
         f = file.read()
     try:
@@ -84,7 +82,7 @@ def get_page_count(path, ext=None):
     :param ext: File extension
     :return: {"pg_count: "", "err": ""}
     """
-    service = "%s/%s" % (base_url, "get_page_count")
+    service = "%s/%s" % (settings.BTE_URL, "get_page_count")
     with open(path, "rb") as file:
         f = file.read()
     try:

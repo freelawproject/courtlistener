@@ -451,8 +451,7 @@ class BinaryTransformerExtractionTest(TestCase):
 
     def test_heartbeat(self):
         """Can we start container and check sanity test?"""
-        base_url = "http://cl-binary-transformers-and-extractors:80"
-        response = requests.get(url=base_url, timeout=60).json()
+        response = requests.get(url=settings.BTE_URL, timeout=1).json()
         self.assertTrue(response["success"], msg="Failed heartbeat test.")
         print(response)
 
