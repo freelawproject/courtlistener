@@ -59,17 +59,11 @@ def generate_thumbnail(path):
     service = "%s/%s" % (settings.BTE_URL, "make_png_thumbnail")
     with open(path, "rb") as file:
         f = file.read()
-    try:
-        response = requests.post(
-            url=service,
-            files={"file": (os.path.basename(path), f)},
-            timeout=60,
-        )
-        return {"content": response.content, "err": response.headers["err"]}
-    except Timeout:
-        return {"err": Timeout}
-    except:
-        return {"err": "Unknown error occurred"}
+    return requests.post(
+        url=service,
+        files={"file": (os.path.basename(path), f)},
+        timeout=60,
+    ).content
 
 
 def get_page_count(path):

@@ -1,10 +1,9 @@
-import os
-
-import requests
 from django.core.files.base import ContentFile
+from requests import Timeout
 
 from cl.celery_init import app
 from cl.lib.bot_detector import is_og_bot
+from cl.lib.command_utils import logger
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
 from cl.scrapers.docker_helpers import generate_thumbnail
@@ -26,16 +25,25 @@ def make_png_thumbnail_for_instance(
     item = InstanceClass.objects.get(pk=pk)
     filepath = getattr(item, file_attr).path
 
-    response = generate_thumbnail(filepath)
-    err = response.headers["err"]
-    if err:
+    try:
+        thumbnail = generate_thumbnail(filepath)
+    except Timeout:
+        logger.error("Thumnail generation failed via timeout.")
+        item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
+        item.save()
+        return item.pk
+    except Exception as e:
+        logger.error(
+            "Catch all exception occurred during thumbnail generation.  See %s"
+            % str(e)
+        )
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()
         return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(response.content))
+    item.thumbnail.save(filename, ContentFile(thumbnail))
 
     return item.pk
 
