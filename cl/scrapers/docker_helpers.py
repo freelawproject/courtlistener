@@ -72,7 +72,7 @@ def generate_thumbnail(path):
         return {"err": "Unknown error occurred"}
 
 
-def get_page_count(path, ext=None):
+def get_page_count(path):
     """Get page count from document
 
     Sends file to binary-transformers-and-extractors and returns a json
