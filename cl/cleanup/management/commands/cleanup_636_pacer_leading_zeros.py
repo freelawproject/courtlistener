@@ -87,10 +87,9 @@ class CleanupPacerXMLParser(PacerXMLParser):
 
             if rd.page_count is None:
                 logger.info("    Getting page count.")
-                extension = rd.filepath_local.path.split(".")[-1]
-                rd.page_count = get_page_count(
-                    rd.filepath_local.path, extension
-                )["pg_count"]
+                rd.page_count = get_page_count(rd.filepath_local.path)[
+                    "pg_count"
+                ]
         else:
             logger.info("    Item not available in RECAP. Punting.")
             return None
