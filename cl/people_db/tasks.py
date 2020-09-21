@@ -26,9 +26,9 @@ def make_png_thumbnail_for_instance(
     filepath = getattr(item, file_attr).path
 
     try:
-        thumbnail = generate_thumbnail(filepath)
+        thumbnail_resp = generate_thumbnail(filepath)
     except Timeout:
-        logger.error("Thumnail generation failed via timeout.")
+        logger.error("Thumbnail generation failed via timeout.")
         item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
         item.save()
         return item.pk
@@ -43,7 +43,7 @@ def make_png_thumbnail_for_instance(
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(thumbnail))
+    item.thumbnail.save(filename, ContentFile(thumbnail_resp.content))
 
     return item.pk
 

@@ -63,7 +63,7 @@ def generate_thumbnail(path):
         url=service,
         files={"file": (os.path.basename(path), f)},
         timeout=60,
-    ).content
+    )
 
 
 def get_page_count(path):
