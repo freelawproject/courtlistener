@@ -79,7 +79,6 @@ def get_page_count(path):
     object containing the pg count
 
     :param path: path of the document
-    :param ext: File extension
     :return: {"pg_count: "", "err": ""}
     """
     service = "%s/%s" % (settings.BTE_URL, "get_page_count")
