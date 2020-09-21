@@ -180,7 +180,7 @@
       {% with limit=results.object_list.params|get:"group.limit" %}
       {% with remaining=result.doclist.numFound|sub:limit %}
       {% if remaining > 0 %}
-      <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}{{ request.GET.q }} AND {% endif %}docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
+      <a href="{% url "show_results" %}?type={{ type }}&amp;q={% if request.GET.q %}({{ request.GET.q }}) AND {% endif %}docket_id:{{ doc0.docket_id }}" class="btn-default btn">View {{ remaining }} Additional Result{{ remaining|pluralize }} for
           this Case</a>
       {% endif %}
       {% endwith %}
