@@ -724,7 +724,7 @@ def add_grouping(main_params, cd, group):
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         and group is True
     ):
-        docket_query = re.match("docket_id:\d+", cd["q"])
+        docket_query = re.search("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
