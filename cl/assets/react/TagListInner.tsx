@@ -27,7 +27,7 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
             return (
               <tr key={tag.id}>
                 <td>
-                  <a href={`/api/rest/v3/tags/${userName}/${tag.name}`} className="black-link">
+                  <a href={`/tags/${userName}/${tag.name}/`} className="black-link">
                     <span className="tag">{tag.name}</span>
                   </a>
                 </td>
