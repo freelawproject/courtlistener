@@ -187,7 +187,9 @@ def do_search(
             query_citation = get_query_citation(cd)
 
         if cd["type"] in [
-            SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS, SEARCH_TYPES.PEOPLE,
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.PEOPLE,
         ]:
             # Exclude BAP courts from RECAP, Dockets, and People
             panel_courts = Court.FEDERAL_BANKRUPTCY_PANEL
@@ -195,7 +197,8 @@ def do_search(
         elif cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
             # Only use courts with pacer_court_id and no end date in RECAP
             courts = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True,
+                pacer_court_id__isnull=False,
+                end_date__isnull=True,
             )
     else:
         error = True
