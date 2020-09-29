@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.docker_helpers import document_extract
+from cl.scrapers.transformer_extractor_utils import document_extract
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
     cl_scrape_opinions,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-from cl.scrapers.docker_helpers import (
+from cl.scrapers.transformer_extractor_utils import (
     get_page_count,
     document_extract,
     convert_audio,

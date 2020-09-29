@@ -6,7 +6,7 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.command_utils import logger
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
-from cl.scrapers.docker_helpers import generate_thumbnail
+from cl.scrapers.transformer_extractor_utils import generate_thumbnail
 from cl.search.models import RECAPDocument
 
 

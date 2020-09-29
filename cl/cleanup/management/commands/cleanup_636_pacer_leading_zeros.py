@@ -12,7 +12,7 @@ from cl.lib.recap_utils import (
 )
 from cl.search.models import RECAPDocument, Docket
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.scrapers.docker_helpers import get_page_count
+from cl.scrapers.transformer_extractor_utils import get_page_count
 
 
 class CleanupPacerXMLParser(PacerXMLParser):
