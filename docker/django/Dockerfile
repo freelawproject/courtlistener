@@ -4,7 +4,6 @@ WORKDIR /usr/src/app
 
 # Use lots of layers. Bigger image, but faster builds. Slow stuff is up here at
 # the top.
-RUN apt-get update
 
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements-dev.txt && \
