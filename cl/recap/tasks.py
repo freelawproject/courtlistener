@@ -62,7 +62,7 @@ from cl.recap.models import (
     UPLOAD_TYPE,
 )
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.scrapers.docker_helpers import get_page_count
+from cl.scrapers.transformer_extractor_utils import get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
 
