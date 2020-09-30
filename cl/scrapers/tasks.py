@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+
+from ast import literal_eval
+
 from cl.scrapers.transformer_extractor_utils import (
     get_page_count,
     document_extract,
@@ -275,10 +278,10 @@ def process_audio_file(pk):
     tmp_path = os.path.join("/tmp", "audio_" + uuid.uuid4().hex + ".mp3")
     response = convert_audio(af.local_path_original_file.path)
 
-    err = response["err"]
+    err = int(response["error_code"])
     if not err == Timeout:
         with open(tmp_path, "w") as mp3:
-            mp3.write(response["content"])
+            mp3.write(literal_eval(response["content"]))
         set_mp3_meta_data(af, tmp_path)
         try:
             with open(tmp_path, "r") as mp3:

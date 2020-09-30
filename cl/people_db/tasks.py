@@ -1,3 +1,5 @@
+from ast import literal_eval
+
 from django.core.files.base import ContentFile
 from requests import Timeout
 
@@ -42,7 +44,9 @@ def make_png_thumbnail_for_instance(
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(thumbnail_resp.content))
+    item.thumbnail.save(
+        filename, ContentFile(literal_eval(thumbnail_resp["content"]))
+    )
 
     return item.pk
 
