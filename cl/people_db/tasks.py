@@ -29,17 +29,16 @@ def make_png_thumbnail_for_instance(
         thumbnail_resp = generate_thumbnail(filepath)
     except Timeout:
         logger.error("Thumbnail generation failed via timeout.")
-        item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        item.save()
-        return item.pk
     except Exception as e:
         logger.error(
             "Catch all exception occurred during thumbnail generation.  See %s"
             % str(e)
         )
-        item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        item.save()
-        return item.pk
+    finally:
+        if "thumbnail_resp" not in locals():
+            item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
+            item.save()
+            return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
