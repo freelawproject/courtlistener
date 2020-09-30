@@ -455,28 +455,11 @@ class BinaryTransformerExtractionTest(TestCase):
         self.assertTrue(response["success"], msg="Failed heartbeat test.")
         print(response)
 
-    def test_content_extraction(self):
-        """Do all of the supported mimetypes get extracted to text
-        successfully, including OCR?"""
-        test_strings = [
-            "supreme",
-            "indiana",
-            "reagan",
-            "intelligence",
-            "october",
-            "tax court",
-            "fidelity",
-            "indiana",
-            "vermont",
-        ]
+    def test_document_extractor(self):
         opinions = sorted(iglob(os.path.join(self.path, "*")))
-        for filepath, test_string in zip(opinions, test_strings):
-            response = document_extract(filepath, do_ocr=True)
-            content = response["content"]
-            self.assertIn(
-                test_string,
-                content.lower(),
-                msg="Failed document %s with word %s"
-                % (filepath, test_string),
+        for opinion in opinions:
+            response = document_extract(opinion, do_ocr=True)
+            self.assertFalse(
+                int(response["error_code"]), msg="Document failed extraction"
             )
-            print(u"Successful parsing of %s √" % filepath)
+            print("Successful response for %s" % os.path.basename(opinion))
