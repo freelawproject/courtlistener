@@ -48,8 +48,8 @@ def convert_audio(path=None, file_content=None):
         url=service,
         files={"file": ("some.wav", file_content)},
         timeout=60 * 60,
-    )
-    return {"content": response.content, "err": response.headers["err"]}
+    ).json()
+    return response
 
 
 def generate_thumbnail(path=None, file_content=None):
@@ -69,7 +69,7 @@ def generate_thumbnail(path=None, file_content=None):
         url=service,
         files={"file": ("some.pdf", file_content)},
         timeout=60,
-    )
+    ).json()
 
 
 def get_page_count(path=None, file_content=None):
