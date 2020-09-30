@@ -103,10 +103,10 @@ class ExtractionTest(TestCase):
         )
         response = document_extract(path)
         content = response["content"]
-        success = response["err"]
 
         self.assertFalse(
-            success, "Error reported while extracting text from %s" % path
+            int(response["error_code"]),
+            "Error reported while extracting text from %s" % path,
         )
         self.assertIn(
             u"¶  1.  DOOLEY, J.   Plaintiffs",
