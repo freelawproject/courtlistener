@@ -1,3 +1,5 @@
+import os
+
 import requests
 from django.conf import settings
 
@@ -17,9 +19,13 @@ def document_extract(path=None, file_content=None, do_ocr=False):
     elif file_content is None:
         return {"err": "File not supplied"}
 
+    if path is not None:
+        file_name = os.path.basename(path)
+    else:
+        file_name = os.path.basename(file_content.name)
     return requests.post(
         url=service,
-        files={"file": ("some.pdf", file_content)},
+        files={"file": (file_name, file_content)},
         params={"do_ocr": do_ocr},
         timeout=60 * 60,
     ).json()
@@ -137,7 +143,7 @@ def make_pdf_from_single_image(aws_path=None, file_content=None):
 
 
 def make_pdf_from_multiple_images(aws_path=None, file_content=None):
-    """ Pass aws path to BTE to generate PDF from many tiffs
+    """Pass aws path to BTE to generate PDF from many tiffs
 
     :return: pdf file
     """
