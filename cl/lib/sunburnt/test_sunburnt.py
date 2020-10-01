@@ -159,7 +159,7 @@ conn = SolrInterface(
 pagination_slice_tests = (
     (
         (None, None),
-        range(0, 10),
+        list(range(0, 10)),
         (
             slice(None, None, None),
             slice(0, 10, None),
@@ -192,7 +192,7 @@ pagination_slice_tests = (
     ### and now with pre-paginated queries:
     (
         (2, 6),
-        range(2, 8),
+        list(range(2, 8)),
         (
             slice(None, None, None),
             slice(0, 6, None),
@@ -240,7 +240,7 @@ def test_slice_pagination():
 pagination_index_tests = (
     (
         (None, None),
-        range(0, 10),
+        list(range(0, 10)),
         (
             (0, None),
             (5, None),
@@ -256,7 +256,7 @@ pagination_index_tests = (
     ),
     (
         (2, 6),
-        range(2, 8),
+        list(range(2, 8)),
         (
             (0, None),
             (3, None),

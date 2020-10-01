@@ -1017,7 +1017,7 @@ def get_related_clusters_with_cache(cluster, request):
     """
 
     # By default all statuses are included
-    available_statuses = dict(DOCUMENT_STATUSES).values()
+    available_statuses = list(dict(DOCUMENT_STATUSES).values())
     url_search_params = {"stat_" + v: "on" for v in available_statuses}
 
     if is_bot(request):
