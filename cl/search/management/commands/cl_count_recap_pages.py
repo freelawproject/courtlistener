@@ -11,7 +11,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        raw_input(
+        input(
             "This is a very primitive script that has serious performance "
             "issues with large datasets. Press any key to proceed anyway. "
             "Otherwise, press CTRL+C to exit."
