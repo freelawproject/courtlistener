@@ -38,8 +38,8 @@ def fixer(simulate=False, verbose=False):
         )
 
         if verbose:
-            print "Fixing document %s: %s" % (doc.pk, doc)
-            print "        New for %s: %s\n" % (doc.pk, new_case_name)
+            print("Fixing document %s: %s" % (doc.pk, doc))
+            print("        New for %s: %s\n" % (doc.pk, new_case_name))
 
         if not simulate:
             doc.case_name = new_case_name
@@ -71,9 +71,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return fixer(simulate, verbose)
 

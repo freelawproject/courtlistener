@@ -299,8 +299,8 @@ def check_query_data(method, args, kwargs, output):
         assert p == output, "Unequal: %r, %r" % (p, output)
     except AssertionError:
         if debug:
-            print p
-            print output
+            print(p)
+            print(output)
             import pdb
 
             pdb.set_trace()
@@ -742,8 +742,8 @@ def check_complex_boolean_query(solr_search, query, output):
         assert p == output
     except AssertionError:
         if debug:
-            print p
-            print output
+            print(p)
+            print(output)
             import pdb
 
             pdb.set_trace()
@@ -756,8 +756,8 @@ def check_complex_boolean_query(solr_search, query, output):
         assert p == q
     except AssertionError:
         if debug:
-            print p
-            print q
+            print(p)
+            print(q)
             import pdb
 
             pdb.set_trace()

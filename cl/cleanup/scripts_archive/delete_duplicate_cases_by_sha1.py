@@ -1962,14 +1962,14 @@ def fixer_orig(simulate=False, verbose=False):
     delete_count = 0
     for sha in bad_shas:
         docs = Document.objects.filter(sha1=sha).order_by("time_retrieved")
-        print "Deleting %s docs with sha1 of: %s" % (len(docs) - 1, sha)
+        print("Deleting %s docs with sha1 of: %s" % (len(docs) - 1, sha))
         for doc in docs[1:]:
-            print "  --> Document %s has been deleted." % doc.pk
+            print("  --> Document %s has been deleted." % doc.pk)
             # Delete all but the first doc.
             if not simulate:
                 delete_count += 1
                 doc.delete()
-    print "%s items deleted, holy cow." % delete_count
+    print("%s items deleted, holy cow." % delete_count)
 
 
 def fixer(simulate=False, verbose=False):
@@ -1978,7 +1978,7 @@ def fixer(simulate=False, verbose=False):
     with open("ids_to_delete.txt", "r") as ids:
         for id in ids:
             id = int(id.strip())
-            print "Deleting %s from index." % id
+            print("Deleting %s from index." % id)
             if not simulate:
                 delete_items.delay([id], settings.SOLR_OPINION_URL)
 
@@ -2008,9 +2008,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return fixer(simulate, verbose)
 

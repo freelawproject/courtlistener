@@ -24,7 +24,7 @@ for line in f:
         # it's a header for a volume, parse out the volume number
         volume = mg_vol.group(0).strip()
         if DEBUG:
-            print "****\nVolume: " + volume + "\n****"
+            print("****\nVolume: " + volume + "\n****")
 
     mg_pg_case = re.match(page_and_case, line)
     mg_date = re.match(date_regex, line)
@@ -32,12 +32,12 @@ for line in f:
         # Next: page numbers
         page = mg_pg_case.group(1).strip()
         if DEBUG:
-            print "Page: " + page
+            print("Page: " + page)
 
         # Next: Case name
         case = mg_pg_case.group(2).strip()
         if DEBUG:
-            print "Case: " + case
+            print("Case: " + case)
 
         # Next: Date
         case_date = mg_date.group(1).strip().strip("[]#*.").strip()
@@ -61,7 +61,7 @@ for line in f:
             month = re.match(month_regex, case_date).group(1)
             day = re.match(day_regex, case_date).group(1)
             if DEBUG:
-                print "Date: " + case_date
+                print("Date: " + case_date)
             case_date = str(
                 date(
                     *time.strptime(

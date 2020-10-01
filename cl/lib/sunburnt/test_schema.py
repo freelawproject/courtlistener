@@ -321,8 +321,8 @@ def check_update_serialization(s, obj, xml_string):
         try:
             assert p == xml_string
         except AssertionError:
-            print p
-            print xml_string
+            print(p)
+            print(xml_string)
             import pdb
 
             pdb.set_trace()
@@ -422,8 +422,8 @@ def check_delete_queries(s, queries, xml_string):
         try:
             assert p == xml_string
         except AssertionError:
-            print p
-            print xml_string
+            print(p)
+            print(xml_string)
             import pdb
 
             pdb.set_trace()

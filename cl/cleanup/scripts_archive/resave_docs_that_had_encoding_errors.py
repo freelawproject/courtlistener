@@ -24,10 +24,10 @@ pdf/2012/12/11/norman_douglas_diamond_and_zaida_gole"""
 paths = paths.split("\n")
 
 for path in paths:
-    print "Path is now: %s" % path
+    print("Path is now: %s" % path)
     docs = Document.objects.filter(local_path__startswith=path)
 
-    print "%s docs found." % len(docs)
+    print("%s docs found." % len(docs))
 
     if live:
         for doc in docs:

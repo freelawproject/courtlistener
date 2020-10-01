@@ -334,7 +334,7 @@ class CiteTest(TestCase):
         )
         # fmt: on
         for q, a in test_pairs:
-            print "Testing citation extraction for %s..." % q,
+            print("Testing citation extraction for %s..." % q, end=" ")
             cites_found = get_citations(q)
             self.assertEqual(
                 cites_found,
@@ -346,7 +346,7 @@ class CiteTest(TestCase):
                     ",\n".join([str(cite.__dict__) for cite in a]),
                 ),
             )
-            print "✓"
+            print("✓")
 
     def test_find_tc_citations(self):
         """Can we parse tax court citations properly?"""
@@ -402,7 +402,7 @@ class CiteTest(TestCase):
         )
         # fmt: on
         for q, a in test_pairs:
-            print "Testing citation extraction for %s..." % q,
+            print("Testing citation extraction for %s..." % q, end=" ")
             cites_found = get_citations(q)
             self.assertEqual(
                 cites_found,
@@ -414,7 +414,7 @@ class CiteTest(TestCase):
                     ",\n".join([str(cite.__dict__) for cite in a]),
                 ),
             )
-            print "✓"
+            print("✓")
 
     def test_date_in_editions(self):
         test_pairs = [
@@ -517,7 +517,7 @@ class CiteTest(TestCase):
         ]
         # fmt: on
         for pair in test_pairs:
-            print "Testing disambiguation for %s..." % pair[0],
+            print("Testing disambiguation for %s..." % pair[0], end=" ")
             citations = get_citations(pair[0], html=False)
             self.assertEqual(
                 citations,
@@ -529,7 +529,7 @@ class CiteTest(TestCase):
                     [cite.__dict__ for cite in pair[1]],
                 ),
             )
-            print "✓"
+            print("✓")
 
     def test_make_html_from_plain_text(self):
         """Can we convert the plain text of an opinion into HTML?"""
@@ -644,7 +644,7 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print "Testing plain text to html conversion for %s..." % s,
+            print("Testing plain text to html conversion for %s..." % s, end=" ")
             opinion = Opinion(plain_text=s)
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
@@ -653,7 +653,7 @@ class CiteTest(TestCase):
                 expected_html,
                 msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
             )
-            print "✓"
+            print("✓")
 
     def test_make_html_from_html(self):
         """Can we convert the HTML of an opinion into modified HTML?"""
@@ -690,7 +690,7 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print "Testing html to html conversion for %s..." % s,
+            print("Testing html to html conversion for %s..." % s, end=" ")
             opinion = Opinion(html=s)
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
@@ -699,7 +699,7 @@ class CiteTest(TestCase):
                 expected_html,
                 msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
             )
-            print "✓"
+            print("✓")
 
     def test_make_html_from_matched_citation_objects(self):
         """Can we render matched citation objects as HTML?"""
@@ -740,7 +740,7 @@ class CiteTest(TestCase):
 
         # fmt: on
         for plain_text, citation, expected_html in test_triples:
-            print "Testing object to HTML rendering for %s..." % plain_text,
+            print("Testing object to HTML rendering for %s..." % plain_text, end=" ")
             citation.match_url = "MATCH_URL"
             citation.match_id = "MATCH_ID"
             opinion = Opinion(plain_text=plain_text)
@@ -750,7 +750,7 @@ class CiteTest(TestCase):
                 expected_html,
                 msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
             )
-            print "✓"
+            print("✓")
 
 
 class MatchingTest(IndexedSolrTestCase):
@@ -983,7 +983,7 @@ class MatchingTest(IndexedSolrTestCase):
 
         # fmt: on
         for citations, expected_matches in test_pairs:
-            print "Testing citation matching for %s..." % citations
+            print("Testing citation matching for %s..." % citations)
 
             # The citing opinion does not matter for this test
             citing_opinion = Opinion.objects.get(pk=1)
@@ -995,7 +995,7 @@ class MatchingTest(IndexedSolrTestCase):
                 msg="\n%s\n\n    !=\n\n%s"
                 % (citation_matches, expected_matches),
             )
-            print "✓"
+            print("✓")
 
     def test_citation_matching_issue621(self):
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
@@ -1060,14 +1060,14 @@ class UpdateTest(IndexedSolrTestCase):
         ]
 
         for cited, depth in test_pairs:
-            print "Testing OpinionsCited creation for %s..." % cited,
+            print("Testing OpinionsCited creation for %s..." % cited, end=" ")
             self.assertEqual(
                 OpinionsCited.objects.get(
                     citing_opinion=citing, cited_opinion=cited
                 ).depth,
                 depth,
             )
-            print "✓"
+            print("✓")
 
 
 class CitationFeedTest(IndexedSolrTestCase):
@@ -1191,7 +1191,7 @@ class ParallelCitationTest(SimpleTestCase):
             ("1 U.S. 1 too many words, then 22 U.S. 33, 13 WL 33223", 1, 2),
         )
         for q, citation_group_count, expected_num_parallel_citations in tests:
-            print "Testing parallel citation identification for: %s..." % q,
+            print("Testing parallel citation identification for: %s..." % q, end=" ")
             citations = get_citations(q)
             citation_groups = identify_parallel_citations(citations)
             computed_num_citation_groups = len(citation_groups)
@@ -1216,7 +1216,7 @@ class ParallelCitationTest(SimpleTestCase):
                     expected_num_parallel_citations,
                 ),
             )
-            print "✓"
+            print("✓")
 
     def test_making_edge_list(self):
         """Can we make networkx-friendly edge lists?"""
