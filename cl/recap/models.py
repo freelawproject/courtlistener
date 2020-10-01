@@ -180,7 +180,7 @@ class ProcessingQueue(models.Model):
         on_delete=models.CASCADE,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.upload_type in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
@@ -365,7 +365,7 @@ class PacerFetchQueue(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "PacerFetchQueue: %s (%s)" % (
             self.pk,
             self.get_request_type_display(),
@@ -851,7 +851,7 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
 
     class Meta:

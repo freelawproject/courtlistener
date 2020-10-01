@@ -25,7 +25,7 @@ class RefererAdmin(admin.ModelAdmin):
     raw_id_fields = ("map",)
     list_filter = ("display",)
     list_display = (
-        "__unicode__",
+        "__str__",
         "display",
         "date_created",
         "date_modified",
@@ -59,7 +59,7 @@ class SCOTUSMapAdmin(admin.ModelAdmin):
         "generation_time",
     )
     list_display = (
-        "__unicode__",
+        "__str__",
         "user_id",
         "date_created",
         "date_modified",

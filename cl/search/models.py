@@ -170,7 +170,7 @@ class OriginatingCourtInformation(models.Model):
         null=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "<OriginatingCourtInformation: %s>" % self.pk
 
     def get_absolute_url(self):
@@ -603,7 +603,7 @@ class Docket(models.Model):
             ),
         )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.case_name:
             return smart_unicode("%s: %s" % (self.pk, self.case_name))
         else:
@@ -966,7 +966,7 @@ class DocketEntry(models.Model):
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "<DocketEntry:%s ---> %s >" % (
             self.pk,
             trunc(self.description, 50, ellipsis="..."),
@@ -1076,7 +1076,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
             self.pk,
             self.docket_entry.docket.docket_number,
@@ -1423,7 +1423,7 @@ class BankruptcyInformation(models.Model):
     class Meta:
         verbose_name_plural = "Bankruptcy Information"
 
-    def __unicode__(self):
+    def __str__(self):
         return "Bankruptcy Info for docket %s" % self.docket_id
 
 
@@ -1541,7 +1541,7 @@ class Claim(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "Claim #%s on docket %s with pk %s" % (
             self.claim_number,
             self.docket_id,
@@ -1829,7 +1829,7 @@ class Court(models.Model):
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
-    def __unicode__(self):
+    def __str__(self):
         return "{name}".format(name=self.full_name)
 
     @property
@@ -2265,7 +2265,7 @@ class OpinionCluster(models.Model):
             published=True, deleted=False
         ).order_by("-view_count")
 
-    def __unicode__(self):
+    def __str__(self):
         if self.case_name:
             return "%s: %s" % (self.pk, self.case_name)
         else:
@@ -2461,7 +2461,7 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
-    def __unicode__(self):
+    def __str__(self):
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
 
@@ -2687,7 +2687,7 @@ class Opinion(models.Model):
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
-    def __unicode__(self):
+    def __str__(self):
         try:
             return "{pk} - {cn}".format(
                 pk=getattr(self, "pk", None), cn=self.cluster.case_name
@@ -2834,7 +2834,7 @@ class OpinionsCited(models.Model):
     # treatment: positive, negative, etc.
     #
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s ⤜--cites⟶  %s" % (
             self.citing_opinion.id,
             self.cited_opinion.id,
@@ -2866,7 +2866,7 @@ class Tag(models.Model):
         unique=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s" % (self.pk, self.name)
 
     def tag_object(self, thing):
@@ -2940,7 +2940,7 @@ class Tag(models.Model):
 #         max_length=1,
 #         choices=REVIEW_STANDARDS,
 #     )
-#     def __unicode__(self):
+#     def __str__(self):
 #         return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
 #                                         self.upper_court.id)
 #

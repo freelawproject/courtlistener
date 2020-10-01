@@ -215,7 +215,7 @@ class Person(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s" % (self.pk, self.name_full)
 
     class Meta:
@@ -429,7 +429,7 @@ class School(models.Model):
         db_index=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.is_alias_of:
             return "%s: %s (alias: %s)" % (
                 self.pk,
@@ -934,7 +934,7 @@ class Position(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s at %s" % (
             self.pk,
             self.person.name_full,
@@ -1188,7 +1188,7 @@ class Education(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Degree in %s from %s in the year %s" % (
             self.pk,
             self.degree_detail,
@@ -1221,7 +1221,7 @@ class Race(models.Model):
         unique=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
         return "{race}".format(race=self.race)
 
@@ -1482,7 +1482,7 @@ class PartyType(models.Model):
     class Meta:
         unique_together = ("docket", "party", "name")
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Party %s is %s in Docket %s" % (
             self.pk,
             self.party_id,
@@ -1589,7 +1589,7 @@ class Party(models.Model):
         verbose_name_plural = "Parties"
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s" % (self.pk, self.name)
 
 
@@ -1661,7 +1661,7 @@ class Role(models.Model):
             "date_action",
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Attorney %s is %s for Party %s in docket %s" % (
             self.pk,
             self.attorney_id,
@@ -1709,7 +1709,7 @@ class Attorney(models.Model):
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s" % (self.pk, self.name)
 
 
@@ -1742,7 +1742,7 @@ class AttorneyOrganizationAssociation(models.Model):
     class Meta:
         unique_together = ("attorney", "attorney_organization", "docket")
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Atty %s worked on docket %s while at org %s" % (
             self.pk,
             self.attorney_id,
@@ -1804,7 +1804,7 @@ class AttorneyOrganization(models.Model):
             "zip_code",
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s, %s, %s, %s, %s, %s" % (
             self.pk,
             self.name,

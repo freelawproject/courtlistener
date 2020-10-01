@@ -29,7 +29,7 @@ class WildcardString(SolrString):
         self.chars = self.get_wildcards(s)
 
     class SpecialChar(object):
-        def __unicode__(self):
+        def __str__(self):
             return str(self.char)
 
     class Asterisk(SpecialChar):

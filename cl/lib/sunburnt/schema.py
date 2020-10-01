@@ -69,7 +69,7 @@ class solr_date(object):
     def __repr__(self):
         return repr(self._dt_obj)
 
-    def __unicode__(self):
+    def __str__(self):
         """Serialize a datetime object in the format required
         by Solr. See http://wiki.apache.org/solr/IndexingDates
         """
@@ -120,7 +120,7 @@ def solr_point_factory(dimension):
         def __repr__(self):
             return "solr_point(%s)" % str(self)
 
-        def __unicode__(self):
+        def __str__(self):
             return ",".join(str(p) for p in self.point)
 
     return solr_point

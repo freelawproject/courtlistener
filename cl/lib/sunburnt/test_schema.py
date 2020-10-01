@@ -226,7 +226,7 @@ class StringWrapper(object):
     def __init__(self, s):
         self.s = s
 
-    def __unicode__(self):
+    def __str__(self):
         return self.s
 
 
