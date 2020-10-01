@@ -34,7 +34,7 @@ def cleaner(simulate=False, verbose=False):
             # Only do each case once, since the index isn't updated until
             # later, and I may run this script many times.
             print(doc.download_url)
-            casename = raw_input("Case name: ")
+            casename = input("Case name: ")
             doc.citation.caseNameFull = casename
             doc.citation.caseNameShort = trunc(casename, 100)
             doc.citation.slug = trunc(slugify(casename), 50)

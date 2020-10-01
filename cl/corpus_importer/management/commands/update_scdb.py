@@ -330,7 +330,7 @@ class Command(VerboseCommand):
             self.skipped_count += 1
             return clusters[0]
         else:
-            choice = raw_input(
+            choice = input(
                 "Which item should we update? [0-%s] " % (len(clusters) - 1)
             )
 

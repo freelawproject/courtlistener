@@ -156,7 +156,7 @@ def cleaner(simulate=False, verbose=False):
 
             elif (diff >= LOW_THRESHOLD) and (diff <= HIGH_THRESHOLD):
                 # Ask the user if the change should be made.
-                same = raw_input(
+                same = input(
                     str(results[0]) + "   ==   " + csv_case_name + " ?: "
                 )
                 if same == "y":

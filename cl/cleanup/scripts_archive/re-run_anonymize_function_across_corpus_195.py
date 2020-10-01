@@ -30,7 +30,7 @@ def cleaner(simulate=False, verbose=False):
             if modified:
                 print("Fixing text in document: %s" % doc.pk)
                 print("Line reads: %s" % line)
-                fix = raw_input("Fix the line? [Y/n]: ") or "y"
+                fix = input("Fix the line? [Y/n]: ") or "y"
                 if fix.lower() == "y":
                     clean_lines.append(clean_line)
                     any_mods.append(modified)
