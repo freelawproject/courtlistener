@@ -54,13 +54,11 @@ services:
             - cl-redis
             - cl-binary-transformers-and-extractors
             - cl-judge-pics
-            - cl-seal-rookery
         volumes:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
             - cl-judge-pics:${JUDGE_PICS_PATH}
-            - cl-seal-rookery:${SEAL_ROOKERY_PATH}
         networks:
             - cl_net_overlay
 
@@ -75,14 +73,12 @@ services:
             - cl-selenium
             - cl-binary-transformers-and-extractors
             - cl-judge-pics
-            - cl-seal-rookery
         ports:
             - "8000:8000"
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - cl-judge-pics:${JUDGE_PICS_PATH}
-            - cl-seal-rookery:${SEAL_ROOKERY_PATH}
         networks:
             - cl_net_overlay
         command: >
@@ -104,12 +100,16 @@ services:
     cl-binary-transformers-and-extractors:
         image: freelawproject/binary-transformers-and-extractors:latest
         container_name: "cl-binary-transformers-and-extractors"
+        depends_on:
+          - cl-seal-rookery
         expose:
             - "5011"
         ports:
             - "5011:80"
         networks:
             - cl_net_overlay
+        volumes:
+            - cl-seal-rookery:${SEAL_ROOKERY3_PATH}
 
     cl-judge-pics:
         image: freelawproject/judge-pics:latest
