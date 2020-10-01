@@ -1,5 +1,5 @@
 import logging
-from urlparse import urljoin
+from urllib.parse import urljoin
 
 import requests
 from django.conf import settings

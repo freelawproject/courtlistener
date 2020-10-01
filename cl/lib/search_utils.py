@@ -1,8 +1,7 @@
 import re
 from datetime import date
 from datetime import timedelta
-from urllib import urlencode
-from urlparse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.cache import cache

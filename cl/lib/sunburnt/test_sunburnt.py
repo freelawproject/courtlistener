@@ -1,11 +1,6 @@
-from __future__ import absolute_import
+from io import StringIO
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
-import cgi, datetime, urlparse
+import cgi, datetime, urllib.parse
 
 from lxml.builder import E
 from lxml.etree import tostring
@@ -116,8 +111,8 @@ class MockConnection(object):
 
     def request(self, uri, method="GET", body=None, headers=None):
 
-        u = urlparse.urlparse(uri)
-        params = urlparse.parse_qs(u.query)
+        u = urllib.parse.urlparse(uri)
+        params = urllib.parse.parse_qs(u.query)
 
         self.tracking_dict.update(
             url=uri,
