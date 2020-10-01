@@ -175,10 +175,10 @@ def add_post_citation(citation, words):
     # either the end of the words list or to FORWARD_SEEK tokens from where you
     # started.
     fwd_sk = citation.reporter_index + FORWARD_SEEK
-    for start in xrange(citation.reporter_index + 2, min(fwd_sk, len(words))):
+    for start in range(citation.reporter_index + 2, min(fwd_sk, len(words))):
         if words[start].startswith("("):
             # Get the year by looking for a token that ends in a paren.
-            for end in xrange(start, start + FORWARD_SEEK):
+            for end in range(start, start + FORWARD_SEEK):
                 try:
                     has_ending_paren = words[end].find(")") > -1
                 except IndexError:
@@ -211,7 +211,7 @@ def add_defendant(citation, words):
     """
     start_index = None
     back_seek = citation.reporter_index - BACKWARD_SEEK
-    for index in xrange(citation.reporter_index - 1, max(back_seek, 0), -1):
+    for index in range(citation.reporter_index - 1, max(back_seek, 0), -1):
         word = words[index]
         if word == ",":
             # Skip it
@@ -651,7 +651,7 @@ def get_citations(
     words = reporter_tokenizer.tokenize(text)
     citations = []
 
-    for i in xrange(0, len(words) - 1):
+    for i in range(0, len(words) - 1):
         citation_token = words[i]
 
         # CASE 1: Citation token is a reporter (e.g., "U. S.").
