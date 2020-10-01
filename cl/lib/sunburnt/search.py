@@ -4,6 +4,7 @@ import collections
 import copy
 import operator
 import re
+from functools import reduce
 
 from .schema import (
     SolrError,
