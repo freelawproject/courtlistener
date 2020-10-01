@@ -661,7 +661,7 @@ class SolrUpdate(object):
         ]
 
     def doc(self, doc):
-        missing_fields = self.schema.missing_fields(doc.keys())
+        missing_fields = self.schema.missing_fields(list(doc.keys()))
         if missing_fields:
             raise SolrError(
                 "These required fields are unspecified:\n %s" % missing_fields
@@ -806,7 +806,7 @@ class SolrResponse(object):
             (n.name, n) for n in more_like_these_results
         )
         if len(self.more_like_these) == 1:
-            self.more_like_this = self.more_like_these.values()[0]
+            self.more_like_this = list(self.more_like_these.values())[0]
         else:
             self.more_like_this = None
 
@@ -867,7 +867,7 @@ def object_to_dict(o, schema):
             d[name] = a
     # and now try for dynamicFields:
     try:
-        names = o.__dict__.keys()
+        names = list(o.__dict__.keys())
     except AttributeError:
         names = []
     for name in names:
@@ -877,7 +877,7 @@ def object_to_dict(o, schema):
             if a is not None:
                 d[name] = a
     try:
-        names = o.__class__.__dict__.keys()
+        names = list(o.__class__.__dict__.keys())
     except AttributeError:
         names = []
     for name in names:

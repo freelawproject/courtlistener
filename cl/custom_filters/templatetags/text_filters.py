@@ -21,9 +21,9 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
     :param separator: The separator between the items. Typically a comma.
     :returns s: A string with the items in the list joined together.
     """
-    items = map(force_text, items)
+    items = list(map(force_text, items))
     if autoescape:
-        items = map(conditional_escape, items)
+        items = list(map(conditional_escape, items))
 
     num_items = len(items)
     if num_items == 0:

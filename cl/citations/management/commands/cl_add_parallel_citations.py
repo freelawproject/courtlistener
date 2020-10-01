@@ -160,10 +160,10 @@ class Command(VerboseCommand):
             return
 
         # Remove any node-results pairs with more than than one result.
-        result_sets = filter(
-            lambda (n, r): len(r) > 1,
+        result_sets = list(filter(
+            lambda n, r: len(r) > 1,
             result_sets,
-        )
+        ))
 
         # For result_sets with more than 0 results, do all the citations have
         # the same ID?
