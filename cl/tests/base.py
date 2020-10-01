@@ -180,7 +180,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     def extract_result_count_from_serp(self):
         results = self.browser.find_element_by_id("result-count").text.strip()
         try:
-            count = long(results.split(" ")[0].replace(",", ""))
+            count = int(results.split(" ")[0].replace(",", ""))
         except (IndexError, ValueError):
             self.fail("Cannot extract result count from SERP.")
         return count
