@@ -118,7 +118,7 @@ class QueuedCase(models.Model):
             ["https://media.lacourt.org/api/AzureApi", self.internal_case_id]
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.internal_case_id
 
     class Meta:
@@ -268,7 +268,7 @@ class Docket(models.Model):
             [self.docket_number, self.district, self.division_code]
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.case_id
 
 
@@ -313,7 +313,7 @@ class QueuedPDF(models.Model):
             ]
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s" % self.document_id
 
     class Meta:
@@ -458,7 +458,7 @@ class DocumentImage(models.Model):
         path_template = "ViewDocument/%s/%s"
         return base_url + path_template % (self.docket.case_id, self.doc_id)
 
-    def __unicode__(self):
+    def __str__(self):
         return "Scanned PDF  %s for %s" % (
             self.doc_id,
             self.docket.docket_number,
@@ -516,7 +516,7 @@ class DocumentFiled(models.Model):
     class Meta:
         verbose_name_plural = "Documents Filed"
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s for %s" % (self.document_type, self.docket.docket_number)
 
 
@@ -570,7 +570,7 @@ class Action(models.Model):
         verbose_name = "Action Entry"
         verbose_name_plural = "Action Entries"
 
-    def __unicode__(self):
+    def __str__(self):
         return "Action for %s" % self.docket.docket_number
 
 
@@ -617,7 +617,7 @@ class CrossReference(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s for %s" % (
             self.cross_reference_type,
             self.docket.docket_number,
@@ -695,7 +695,7 @@ class Party(models.Model):
     class Meta:
         verbose_name_plural = "Parties"
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s for %s" % (self.party_name, self.docket.docket_number)
 
 
@@ -809,7 +809,7 @@ class Proceeding(models.Model):
     past_objects = PastProceedingManager()
     future_objects = FutureProceedingManager()
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s for %s" % (self.event, self.docket.docket_number)
 
 
@@ -861,7 +861,7 @@ class TentativeRuling(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "Tentative ruling for %s" % self.docket.docket_number
 
     class Meta:

@@ -322,7 +322,7 @@ class SCOTUSMap(models.Model):
 
         return json.dumps(j, indent=2)
 
-    def __unicode__(self):
+    def __str__(self):
         return "{pk}: {title}".format(
             pk=getattr(self, "pk", None), title=self.title
         )
@@ -412,7 +412,7 @@ class Referer(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "{pk}: Refers to {map}".format(
             pk=getattr(self, "pk", None),
             map=self.map,
@@ -446,7 +446,7 @@ class JSONVersion(models.Model):
         help_text="The JSON data for a particular version of the visualization.",
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "<JSONVersion {pk}> for <{map}>".format(
             pk=getattr(self, "pk", None),
             map=self.map,

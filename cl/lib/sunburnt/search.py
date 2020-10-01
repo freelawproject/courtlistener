@@ -195,7 +195,7 @@ class LuceneQuery(object):
         self.normalized = True
         return self, mutated
 
-    def __unicode__(self, level=0, op=None):
+    def __str__(self, level=0, op=None):
         if not self.normalized:
             self, _ = self.normalize()
         if self.boosts:
@@ -208,7 +208,7 @@ class LuceneQuery(object):
             ]
             newself = newself | (newself & reduce(operator.or_, boost_queries))
             newself, _ = newself.normalize()
-            return newself.__unicode__(level=level)
+            return newself.__str__(level=level)
         else:
             u = [
                 s
@@ -222,9 +222,9 @@ class LuceneQuery(object):
             for q in self.subqueries:
                 op_ = "OR" if self._or else "AND"
                 if self.child_needs_parens(q):
-                    u.append("(%s)" % q.__unicode__(level=level + 1, op=op_))
+                    u.append("(%s)" % q.__str__(level=level + 1, op=op_))
                 else:
-                    u.append("%s" % q.__unicode__(level=level + 1, op=op_))
+                    u.append("%s" % q.__str__(level=level + 1, op=op_))
             if self._and:
                 return " AND ".join(u)
             elif self._or:
@@ -261,7 +261,7 @@ class LuceneQuery(object):
         q.add(args, kwargs)
         return q
 
-    def __nonzero__(self):
+    def __bool__(self):
         return (
             bool(self.terms)
             or bool(self.phrases)

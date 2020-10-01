@@ -51,7 +51,7 @@ class OpinionAdmin(admin.ModelAdmin):
 class CitationAdmin(admin.ModelAdmin):
     raw_id_fields = ("cluster",)
     list_display = (
-        "__unicode__",
+        "__str__",
         "type",
     )
     list_filter = ("type",)

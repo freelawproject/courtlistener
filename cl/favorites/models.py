@@ -67,7 +67,7 @@ class Favorite(models.Model):
             ("recap_doc_id", "user"),
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "Favorite %s" % self.id
 
 
@@ -131,7 +131,7 @@ class UserTag(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s by user %s" % (self.pk, self.name, self.user_id)
 
     class Meta:
