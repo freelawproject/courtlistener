@@ -1,7 +1,7 @@
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(compile(open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"))
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings

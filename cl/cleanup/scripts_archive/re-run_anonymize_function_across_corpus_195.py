@@ -2,7 +2,7 @@ import os
 import sys
 from django.utils.timezone import now
 
-execfile("/etc/courtlistener")
+exec(compile(open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"))
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
