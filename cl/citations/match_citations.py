@@ -68,7 +68,7 @@ def case_name_query(conn, params, citation, citing_doc):
     results = []
     # Use Solr minimum match search, starting with requiring all words to match,
     # and decreasing by one word each time until a match is found
-    for num_words in xrange(length, 0, -1):
+    for num_words in range(length, 0, -1):
         params["mm"] = num_words
         new_results = conn.raw_query(**params).execute()
         if len(new_results) >= 1:
