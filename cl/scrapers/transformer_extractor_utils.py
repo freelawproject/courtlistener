@@ -1,7 +1,10 @@
+import json
 import os
+from tempfile import NamedTemporaryFile
 
 import requests
 from django.conf import settings
+from django.core import serializers
 
 
 def document_extract(path=None, file_content=None, do_ocr=False):
@@ -31,25 +34,49 @@ def document_extract(path=None, file_content=None, do_ocr=False):
     ).json()
 
 
-def convert_audio(path=None, file_content=None):
-    """Convert audio file to MP3
+def serialize_audio_object(af):
+    """
+
+    :param af: Audio File Object
+    :return: Convert audio w/ metadata
+    """
+    af_dict = json.loads(serializers.serialize("json", [af]))[0]["fields"]
+    docket_dict = json.loads(serializers.serialize("json", [af.docket]))[0][
+        "fields"
+    ]
+    court_dict = json.loads(serializers.serialize("json", [af.docket.court]))[
+        0
+    ]["fields"]
+    af_dict["docket"] = docket_dict
+    af_dict["docket"]["court"] = court_dict
+    with NamedTemporaryFile(suffix=".json") as tmp:
+        with open(tmp.name, "w") as json_data:
+            json.dump(af_dict, json_data)
+        with open(tmp.name, "rb") as file:
+            af = file.read()
+    return af
+
+
+def convert_and_clean_audio(af):
+    """Convert audio file to MP3 and add metadata
 
     :param path:
     :return:
     """
-    service = "%s/%s" % (settings.BTE_URL, "convert_audio_file")
-    if path is not None:
-        with open(path, "rb") as file:
-            file_content = file.read()
-    elif file_content is None:
-        return {"err": "File not supplied"}
+    service = "%s/%s/%s" % (settings.BTE_URL, "convert", "audio")
+    audio_json = serialize_audio_object(af)
+    with open(af.local_path_original_file.path, "rb") as wma_file:
+        wav = wma_file.read()
 
-    response = requests.post(
+    files = {
+        "file": ("the_audio.wav", wav),
+        "af": ("the_json.json", audio_json),
+    }
+    return requests.post(
         url=service,
-        files={"file": ("some.wav", file_content)},
+        files=files,
         timeout=60 * 60,
-    ).json()
-    return response
+    )
 
 
 def generate_thumbnail(path=None, file_content=None):
