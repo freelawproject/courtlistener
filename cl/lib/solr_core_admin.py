@@ -71,7 +71,7 @@ def get_term_frequency(
             for result in content_as_json["fields"]["text"]["topTerms"]:
                 # Top terms is a list of alternating terms and counts. Their
                 # types are different, so we'll use that.
-                if isinstance(result, basestring):
+                if isinstance(result, str):
                     top_terms.append(result)
             return top_terms
     elif result_type == "dict":
@@ -82,7 +82,7 @@ def get_term_frequency(
             for result in content_as_json["fields"]["text"]["topTerms"]:
                 # We set aside the term until we reach its count, then we add
                 # them as a k,v pair
-                if isinstance(result, basestring):
+                if isinstance(result, str):
                     key = result
                 else:
                     top_terms[key] = result

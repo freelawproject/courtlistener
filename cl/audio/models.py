@@ -141,13 +141,13 @@ class Audio(models.Model):
         default=False,
     )
     stt_status = models.SmallIntegerField(
-        u"Speech to text status",
+        "Speech to text status",
         help_text="The status of the Speech to Text for this item?",
         choices=STT_STATUSES,
         default=STT_NEEDED,
     )
     stt_google_response = models.TextField(
-        u"Speech to text Google response",
+        "Speech to text Google response",
         help_text="The JSON response object returned by Google Speech.",
         blank=True,
     )
@@ -173,7 +173,7 @@ class Audio(models.Model):
         verbose_name_plural = "Audio Files"
 
     def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.case_name)
+        return "%s: %s" % (self.pk, self.case_name)
 
     def get_absolute_url(self):
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
@@ -245,7 +245,7 @@ class Audio(models.Model):
                 "duration": self.duration,
                 "source": self.source,
                 "download_url": self.download_url,
-                "local_path": unicode(getattr(self, "local_path_mp3", None)),
+                "local_path": str(getattr(self, "local_path_mp3", None)),
             }
         )
         try:

@@ -393,10 +393,10 @@ class UploadPublication(TestCase):
             court_id="tennworkcompcl",
             pacer_case_id=None,
             docket_number="1234123",
-            case_name=u"One v. Two",
+            case_name="One v. Two",
         )
         oc = OpinionCluster.objects.create(
-            case_name=u"One v. Two",
+            case_name="One v. Two",
             docket=d,
             date_filed=datetime.date(2010, 1, 1),
         )
@@ -418,5 +418,5 @@ class UploadPublication(TestCase):
             form2.save()
 
         self.assertIn(
-            u"Document already in database", form2.errors["pdf_upload"][0]
+            "Document already in database", form2.errors["pdf_upload"][0]
         )

@@ -20,7 +20,7 @@ class UrlHash(models.Model):
     )
 
     def __unicode__(self):
-        return u"{pk}".format(pk=self.pk)
+        return "{pk}".format(pk=self.pk)
 
     class Meta:
         verbose_name_plural = "URL Hashes"
@@ -47,7 +47,7 @@ class ErrorLog(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s - %s@%s %s" % (
+        return "%s - %s@%s %s" % (
             self.log_time,
             self.log_level,
             self.court.pk,
@@ -139,7 +139,7 @@ class PACERMobilePageData(models.Model):
     )
 
     def __unicode__(self):
-        return u"<%s: Docket %s crawled at %s with %s results>" % (
+        return "<%s: Docket %s crawled at %s with %s results>" % (
             self.pk,
             self.docket_id,
             self.date_last_mobile_crawl,

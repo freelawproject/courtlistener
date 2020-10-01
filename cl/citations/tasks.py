@@ -95,9 +95,9 @@ def create_cited_html(opinion, citations):
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            repl = u'</pre>%s<pre class="inline">' % citation.as_html()
+            repl = '</pre>%s<pre class="inline">' % citation.as_html()
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
-        new_html = u'<pre class="inline">%s</pre>' % inner_html
+        new_html = '<pre class="inline">%s</pre>' % inner_html
     return new_html.encode("utf-8")
 
 

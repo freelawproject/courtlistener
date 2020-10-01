@@ -159,10 +159,10 @@ class ModelTest(TestCase):
 
     def setUp(self):
         self.docket = Docket.objects.create(
-            case_name=u"Blah", court_id="test", source=Docket.DEFAULT
+            case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name=u"Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -182,7 +182,7 @@ class ModelTest(TestCase):
     def test_save_old_opinion(self):
         """Can we save opinions older than 1900?"""
         docket = Docket(
-            case_name=u"Blah", court_id="test", source=Docket.DEFAULT
+            case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
         self.oc.date_filed = date(1899, 1, 1)
@@ -237,7 +237,7 @@ class ModelTest(TestCase):
 
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .filter(docket__case_name=u"Blah")
+            .filter(docket__case_name="Blah")
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
@@ -422,13 +422,13 @@ class SearchTest(IndexedSolrTestCase):
         self.assertIn(
             "Honda",
             r.content,
-            msg=u"Did not get case back when filtering by citation count.",
+            msg="Did not get case back when filtering by citation count.",
         )
         r = self.client.get("/", {"q": "*", "cited_lt": 100, "cited_gt": 80})
         self.assertIn(
             "had no results",
             r.content,
-            msg=u"Got case back when filtering by crazy citation count.",
+            msg="Got case back when filtering by crazy citation count.",
         )
 
     def test_citation_ordering(self):
@@ -1233,12 +1233,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             ".meta-data-header"
         )
         headers = [
-            u"Filed:",
-            u"Precedential Status:",
-            u"Citations:",
-            u"Docket Number:",
-            u"Author:",
-            u"Nature of suit:",
+            "Filed:",
+            "Precedential Status:",
+            "Citations:",
+            "Docket Number:",
+            "Author:",
+            "Nature of suit:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])
@@ -1309,7 +1309,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She notices only Precedential results are being displayed
         prec = self.browser.find_element_by_id("id_stat_Precedential")
         non_prec = self.browser.find_element_by_id("id_stat_Non-Precedential")
-        self.assertEqual(prec.get_attribute("checked"), u"true")
+        self.assertEqual(prec.get_attribute("checked"), "true")
         self.assertIsNone(non_prec.get_attribute("checked"))
         prec_count = self.browser.find_element_by_css_selector(
             'label[for="id_stat_Precedential"]'
@@ -1334,7 +1334,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She didn't change the query, so the search box should still look
         # the same (which is blank)
         self.assertEqual(
-            self.browser.find_element_by_id("id_q").get_attribute("value"), u""
+            self.browser.find_element_by_id("id_q").get_attribute("value"), ""
         )
 
         # And now she notices her result set increases thanks to adding in
@@ -1432,7 +1432,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         profile_dropdown = self.browser.find_elements_by_css_selector(
             "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
         dropdown_menu = self.browser.find_element_by_css_selector(
             "ul.dropdown-menu"

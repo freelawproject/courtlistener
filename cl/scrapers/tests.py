@@ -104,7 +104,7 @@ class ExtractionTest(TestCase):
             err, "Error reported while extracting text from %s" % path
         )
         self.assertIn(
-            u"¶  1.  DOOLEY, J.   Plaintiffs",
+            "¶  1.  DOOLEY, J.   Plaintiffs",
             content,
             "Issue extracting/encoding text from file at: %s" % path,
         )

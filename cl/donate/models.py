@@ -110,7 +110,7 @@ class Donation(models.Model):
     referrer = models.TextField("GET or HTTP referrer", blank=True)
 
     def __unicode__(self):
-        return u"%s: $%s, %s" % (
+        return "%s: $%s, %s" % (
             self.get_payment_provider_display(),
             self.amount,
             self.get_status_display(),
@@ -154,7 +154,7 @@ class MonthlyDonation(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s: $%s by %s" % (
+        return "%s: $%s by %s" % (
             self.pk,
             self.monthly_donation_amount,
             self.get_payment_provider_display(),

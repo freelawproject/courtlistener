@@ -95,7 +95,7 @@ class Command(VerboseCommand):
         return ok: Whether the item was set successfully
         """
         current_value = getattr(obj, attribute)
-        if current_value is not None and isinstance(current_value, basestring):
+        if current_value is not None and isinstance(current_value, str):
             current_value = current_value.strip()
 
         does_not_currently_have_a_value = not current_value
@@ -117,8 +117,8 @@ class Command(VerboseCommand):
             # Report if there's a difference -- that might spell trouble.
             values_differ = False
             if (
-                isinstance(current_value, basestring)
-                and isinstance(new_value, basestring)
+                isinstance(current_value, str)
+                and isinstance(new_value, str)
                 and "".join(current_value.split())
                 != "".join(new_value.split())
             ):

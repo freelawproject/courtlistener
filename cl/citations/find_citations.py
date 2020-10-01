@@ -127,7 +127,7 @@ def get_court_by_paren(paren_string, citation):
         court_str = strip_punct(paren_string[:year_index])
 
     court_code = None
-    if court_str == u"":
+    if court_str == "":
         court_code = None
     else:
         # Map the string to a court, if possible.
@@ -191,14 +191,14 @@ def add_post_citation(citation, words):
                     else:
                         citation.year = get_year(words[end])
                     citation.court = get_court_by_paren(
-                        u" ".join(words[start : end + 1]), citation
+                        " ".join(words[start : end + 1]), citation
                     )
                     break
 
             if start > citation.reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
-                citation.extra = u" ".join(
+                citation.extra = " ".join(
                     words[citation.reporter_index + 2 : start]
                 )
             break
@@ -225,7 +225,7 @@ def add_defendant(citation, words):
             # String citation
             break
     if start_index:
-        citation.defendant = u" ".join(
+        citation.defendant = " ".join(
             words[start_index : citation.reporter_index - 1]
         )
 
@@ -407,7 +407,7 @@ def extract_id_citation(words, id_index):
 
     # List of literals that could come after an id token
     ID_REFERENCE_TOKEN_LITERALS = set(
-        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶"]
+        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", "¶", "¶¶"]
     )
 
     # Helper function to see whether a token qualifies as a page candidate
@@ -614,7 +614,7 @@ def remove_address_citations(citations):
             good_citations.append(citation)
             continue
 
-        if not isinstance(citation.page, basestring):
+        if not isinstance(citation.page, str):
             good_citations.append(citation)
             continue
 
@@ -693,7 +693,7 @@ def get_citations(
         # In this case, it's likely that this is a reference to a non-
         # opinion document. So we record this marker in order to keep
         # an accurate list of the possible antecedents for id citations.
-        elif u"§" in citation_token:
+        elif "§" in citation_token:
             citation = NonopinionCitation(match_token=citation_token)
 
         # CASE 5: The token is not a citation.

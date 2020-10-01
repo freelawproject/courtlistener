@@ -4,7 +4,7 @@ BASE_DOWNLOAD_URL = "https://www.archive.org/download"
 
 
 def get_bucket_name(court, pacer_case_id):
-    bucketlist = ["gov", "uscourts", court, unicode(pacer_case_id)]
+    bucketlist = ["gov", "uscourts", court, str(pacer_case_id)]
     if settings.DEBUG is True:
         bucketlist.insert(0, "dev")
     return ".".join(bucketlist)
@@ -66,8 +66,8 @@ def get_docket_filename(court, pacer_case_id, ext):
         [
             "gov",
             "uscourts",
-            unicode(court),
-            unicode(pacer_case_id),
+            str(court),
+            str(pacer_case_id),
             "docket.%s" % ext,
         ]
     )
@@ -80,10 +80,10 @@ def get_document_filename(
         [
             "gov",
             "uscourts",
-            unicode(court),
-            unicode(pacer_case_id),
-            unicode(document_number),
-            unicode(attachment_number or 0),
+            str(court),
+            str(pacer_case_id),
+            str(document_number),
+            str(attachment_number or 0),
             "pdf",
         ]
     )

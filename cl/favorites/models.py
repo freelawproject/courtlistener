@@ -68,7 +68,7 @@ class Favorite(models.Model):
         )
 
     def __unicode__(self):
-        return u"Favorite %s" % self.id
+        return "Favorite %s" % self.id
 
 
 class DocketTag(models.Model):
@@ -132,7 +132,7 @@ class UserTag(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s: %s by user %s" % (self.pk, self.name, self.user_id)
+        return "%s: %s by user %s" % (self.pk, self.name, self.user_id)
 
     class Meta:
         unique_together = (("user", "name"),)

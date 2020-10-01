@@ -56,9 +56,9 @@ class CitationTaxCleanup(TestCase):
             with open(path) as f:
                 data = json.loads(f.read())
             for case in data:
-                answer = re.sub(u"–", "-", case["answer"])
-                answer = re.sub(u"—", "-", answer)
-                answer = re.sub(u"–", "-", answer)
+                answer = re.sub("–", "-", case["answer"])
+                answer = re.sub("—", "-", answer)
+                answer = re.sub("–", "-", answer)
                 print (answer)
                 self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
                 print ("Success ✓")
@@ -351,7 +351,7 @@ with Virginia Historic Tax Credit Fund""",
                 "2003 T.C. Summary Opinion 150",
             ),
             (
-                u"""
+                """
                    MICHAEL KEITH SHENK, PETITIONER v. COMMISSIONER
                                                     OF INTERNAL REVENUE, RESPONDENT
 
