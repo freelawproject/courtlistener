@@ -117,8 +117,7 @@ class Person(models.Model):
         max_length=158,  # len(self.name_full)
     )
     name_first = models.CharField(
-        help_text="The first name of this person.",
-        max_length=50,
+        help_text="The first name of this person.", max_length=50,
     )
     name_middle = models.CharField(
         help_text="The middle name or names of this person",
@@ -126,9 +125,7 @@ class Person(models.Model):
         blank=True,
     )
     name_last = models.CharField(
-        help_text="The last name of this person",
-        max_length=50,
-        db_index=True,
+        help_text="The last name of this person", max_length=50, db_index=True,
     )
     name_suffix = models.CharField(
         help_text="Any suffixes that this person's name may have",
@@ -137,24 +134,16 @@ class Person(models.Model):
         blank=True,
     )
     date_dob = models.DateField(
-        help_text="The date of birth for the person",
-        null=True,
-        blank=True,
+        help_text="The date of birth for the person", null=True, blank=True,
     )
     date_granularity_dob = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     date_dod = models.DateField(
-        help_text="The date of death for the person",
-        null=True,
-        blank=True,
+        help_text="The date of death for the person", null=True, blank=True,
     )
     date_granularity_dod = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     dob_city = models.CharField(
         help_text="The city where the person was born.",
@@ -162,8 +151,7 @@ class Person(models.Model):
         blank=True,
     )
     dob_state = local_models.USStateField(
-        help_text="The state where the person was born.",
-        blank=True,
+        help_text="The state where the person was born.", blank=True,
     )
     dob_country = models.CharField(
         help_text="The country where the person was born.",
@@ -172,13 +160,10 @@ class Person(models.Model):
         max_length=50,
     )
     dod_city = models.CharField(
-        help_text="The city where the person died.",
-        max_length=50,
-        blank=True,
+        help_text="The city where the person died.", max_length=50, blank=True,
     )
     dod_state = local_models.USStateField(
-        help_text="The state where the person died.",
-        blank=True,
+        help_text="The state where the person died.", blank=True,
     )
     dod_country = models.CharField(
         help_text="The country where the person died.",
@@ -337,35 +322,24 @@ class Person(models.Model):
                 "date_nominated": solr_list(positions, "date_nominated"),
                 "date_elected": solr_list(positions, "date_elected"),
                 "date_recess_appointment": solr_list(
-                    positions,
-                    "date_recess_appointment",
+                    positions, "date_recess_appointment",
                 ),
                 "date_referred_to_judicial_committee": solr_list(
-                    positions,
-                    "date_referred_to_judicial_committee",
+                    positions, "date_referred_to_judicial_committee",
                 ),
                 "date_judicial_committee_action": solr_list(
-                    positions,
-                    "date_judicial_committee_action",
+                    positions, "date_judicial_committee_action",
                 ),
                 "date_hearing": solr_list(positions, "date_hearing"),
                 "date_confirmation": solr_list(positions, "date_confirmation"),
                 "date_start": solr_list(positions, "date_start"),
                 "date_granularity_start": solr_list(
-                    positions,
-                    "date_granularity_start",
+                    positions, "date_granularity_start",
                 ),
-                "date_retirement": solr_list(
-                    positions,
-                    "date_retirement",
-                ),
-                "date_termination": solr_list(
-                    positions,
-                    "date_termination",
-                ),
+                "date_retirement": solr_list(positions, "date_retirement",),
+                "date_termination": solr_list(positions, "date_termination",),
                 "date_granularity_termination": solr_list(
-                    positions,
-                    "date_granularity_termination",
+                    positions, "date_granularity_termination",
                 ),
                 "judicial_committee_action": [
                     p.get_judicial_committee_action_display()
@@ -531,10 +505,7 @@ class Position(models.Model):
             (
                 # Acting
                 (ACTING_JUDGE, "Acting Judge"),
-                (
-                    ACTING_PRESIDING_JUDGE,
-                    "Acting Presiding Judge",
-                ),
+                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge",),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
@@ -850,9 +821,7 @@ class Position(models.Model):
         db_index=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     date_termination = models.DateField(
         help_text="The last date of their employment. The compliment to "
@@ -868,9 +837,7 @@ class Position(models.Model):
         blank=True,
     )
     date_granularity_termination = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     date_retirement = models.DateField(
         help_text="The date when they become a senior judge by going into "
@@ -1083,8 +1050,7 @@ class RetentionEvent(models.Model):
         max_length=10,
     )
     date_retention = models.DateField(
-        help_text="The date of retention",
-        db_index=True,
+        help_text="The date of retention", db_index=True,
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
@@ -1183,9 +1149,7 @@ class Education(models.Model):
         blank=True,
     )
     degree_year = models.PositiveSmallIntegerField(
-        help_text="The year the degree was awarded.",
-        null=True,
-        blank=True,
+        help_text="The year the degree was awarded.", null=True, blank=True,
     )
 
     def __unicode__(self):
@@ -1215,11 +1179,7 @@ class Race(models.Model):
         ("p", "Native Hawaiian or Other Pacific Islander"),
         ("h", "Hispanic/Latino"),
     )
-    race = models.CharField(
-        choices=RACES,
-        max_length=5,
-        unique=True,
-    )
+    race = models.CharField(choices=RACES, max_length=5, unique=True,)
 
     def __unicode__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
@@ -1279,19 +1239,13 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
     date_end = models.DateField(
-        help_text="The date the affiliation ended.",
-        null=True,
-        blank=True,
+        help_text="The date the affiliation ended.", null=True, blank=True,
     )
     date_granularity_end = models.CharField(
-        choices=DATE_GRANULARITIES,
-        max_length=15,
-        blank=True,
+        choices=DATE_GRANULARITIES, max_length=15, blank=True,
     )
 
     def save(self, *args, **kwargs):
@@ -1328,9 +1282,7 @@ class Source(models.Model):
         blank=True,
     )
     date_accessed = models.DateField(
-        help_text="The date the data was gathered.",
-        blank=True,
-        null=True,
+        help_text="The date the data was gathered.", blank=True, null=True,
     )
     notes = models.TextField(
         help_text="Any additional notes about the data's provenance, in "
@@ -1443,14 +1395,10 @@ class PartyType(models.Model):
     """
 
     docket = models.ForeignKey(
-        "search.Docket",
-        related_name="party_types",
-        on_delete=models.CASCADE,
+        "search.Docket", related_name="party_types", on_delete=models.CASCADE,
     )
     party = models.ForeignKey(
-        "Party",
-        related_name="party_types",
-        on_delete=models.CASCADE,
+        "Party", related_name="party_types", on_delete=models.CASCADE,
     )
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
@@ -1464,9 +1412,7 @@ class PartyType(models.Model):
         blank=True,
     )
     extra_info = models.TextField(
-        help_text="Additional info from PACER",
-        db_index=True,
-        blank=True,
+        help_text="Additional info from PACER", db_index=True, blank=True,
     )
     highest_offense_level_opening = models.TextField(
         help_text="In a criminal case, the highest offense level at the "
@@ -1549,8 +1495,7 @@ class CriminalComplaint(models.Model):
         "Reentry of Deported Alien'",
     )
     disposition = models.TextField(
-        help_text="The disposition of the criminal complaint.",
-        blank=True,
+        help_text="The disposition of the criminal complaint.", blank=True,
     )
 
 
@@ -1571,10 +1516,7 @@ class Party(models.Model):
         through="Role",
         related_name="parties",
     )
-    name = models.TextField(
-        help_text="The name of the party.",
-        db_index=True,
-    )
+    name = models.TextField(help_text="The name of the party.", db_index=True,)
     extra_info = models.TextField(
         # See: 7d4c916a34207c3c55b58cc385425a9fc7021004
         help_text="Prior to March, 2018, this field briefly held additional "
@@ -1619,14 +1561,10 @@ class Role(models.Model):
         (UNKNOWN, "Unknown"),
     )
     party = models.ForeignKey(
-        Party,
-        related_name="roles",
-        on_delete=models.CASCADE,
+        Party, related_name="roles", on_delete=models.CASCADE,
     )
     attorney = models.ForeignKey(
-        "Attorney",
-        related_name="roles",
-        on_delete=models.CASCADE,
+        "Attorney", related_name="roles", on_delete=models.CASCADE,
     )
     docket = models.ForeignKey(
         "search.Docket",
@@ -1689,12 +1627,10 @@ class Attorney(models.Model):
         through="AttorneyOrganizationAssociation",
     )
     name = models.TextField(
-        help_text="The name of the attorney.",
-        db_index=True,
+        help_text="The name of the attorney.", db_index=True,
     )
     contact_raw = models.TextField(
-        help_text="The raw contents of the contact field",
-        db_index=True,
+        help_text="The raw contents of the contact field", db_index=True,
     )
     phone = local_models.PhoneNumberField(
         help_text="The phone number of the attorney.",
@@ -1702,9 +1638,7 @@ class Attorney(models.Model):
     fax = local_models.PhoneNumberField(
         help_text="The fax number of the attorney.",
     )
-    email = models.EmailField(
-        help_text="The email address of the attorney.",
-    )
+    email = models.EmailField(help_text="The email address of the attorney.",)
 
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1768,20 +1702,16 @@ class AttorneyOrganization(models.Model):
         unique=True,
     )
     name = models.TextField(
-        help_text="The name of the organization.",
-        db_index=True,
+        help_text="The name of the organization.", db_index=True,
     )
     address1 = models.TextField(
-        help_text="The normalized address1 of the organization",
-        db_index=True,
+        help_text="The normalized address1 of the organization", db_index=True,
     )
     address2 = models.TextField(
-        help_text="The normalized address2 of the organization",
-        db_index=True,
+        help_text="The normalized address2 of the organization", db_index=True,
     )
     city = models.TextField(
-        help_text="The normalized city of the organization",
-        db_index=True,
+        help_text="The normalized city of the organization", db_index=True,
     )
     state = local_models.USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "
@@ -1814,3 +1744,556 @@ class AttorneyOrganization(models.Model):
             self.state,
             self.zip_code,
         )
+
+
+class Individual(models.Model):
+    """
+    Individual making a campaign contribution.
+    """
+
+    committees = models.ManyToManyField(Committee)
+    name = models.CharField(
+        help_text="Individual contributor name", db_index=True,
+    )
+    city = models.CharField(
+        help_text="City where individual contributor lives", blank=True,
+    )
+    state = models.CharField(
+        help_text="State where individual contributor lives",
+    )
+    zip_code = models.CharField(
+        help_text="Zip code for individual contributor", blank=True,
+    )
+    employer = models.CharField(
+        help_text="Employer of individual contributor", blank=True,
+    )
+    occupation = models.CharField(
+        help_text="Occupation of individual contributor", blank=True,
+    )
+
+
+class Contribution(models.Model):
+    """
+    Details about campaign contribution.
+    """
+
+    TRANSACTION_CHOICES = (
+        ("10", "Contribution to Independent Expenditure"),
+        (
+            "10J",
+            "Memo - Recipient committee's percentage of nonfederal "
+            "receipt from a person (individual, partnership, limited "
+            "liability company, corporation, labor organization, or any "
+            "other organization or group of persons)",
+        ),
+        ("11", "Native American Tribe contribution"),
+        (
+            "11J",
+            "Memo - Recipient committee's percentage of contribution "
+            "from Native American Tribe given to joint fundraising "
+            "committee",
+        ),
+        ("12", "Nonfederal other receipt - Levin Account (Line 2)"),
+        ("13", "Inaugural donation accepted"),
+        (
+            "15",
+            "Contribution to political committees (other than Super PACs "
+            "and Hybrid PACs) from an individual, partnership or limited "
+            "liability company",
+        ),
+        ("15C", "Contribution from candidate"),
+        (
+            "15E",
+            "Earmarked contributions to political committees (other than "
+            "Super PACs and Hybrid PACs) from an individual, partnership "
+            "or limited liability company",
+        ),
+        ("15F", "Loans forgiven by candidate"),
+        (
+            "15I",
+            "Earmarked contribution from an individual, partnership or "
+            "limited liability company received by intermediary committee "
+            "and passed on in the form of contributor's check "
+            "(intermediary in)",
+        ),
+        (
+            "15J",
+            "Memo - Recipient committee's percentage of contribution "
+            "from an individual, partnership or limited liability company "
+            "given to joint fundraising committee",
+        ),
+        (
+            "15T",
+            "Earmarked contribution from an individual, partnership or "
+            "limited liability company received by intermediary "
+            "committee and entered into intermediary's treasury "
+            "(intermediary treasury in)",
+        ),
+        ("15Z", "In-kind contribution received from registered filer"),
+        ("16C", "Loan received from the candidate"),
+        ("16F", "Loan received from bank"),
+        ("16G", "Loan from individual"),
+        ("16H", "Loan from registered filers"),
+        ("16J", "Loan repayment from individual"),
+        ("16K", "Loan repayment from from registered filer"),
+        ("16L", "Loan repayment received from unregistered entity"),
+        ("16R", "Loan received from registered filers"),
+        ("16U", "Loan received from unregistered entity"),
+        ("17R", "Contribution refund received from registered entity"),
+        ("17U", "Refund/Rebate/Return received from unregistered entity"),
+        ("17Y", "Refund/Rebate/Return from individual or corporation"),
+        ("17Z", "Refund/Rebate/Return from candidate or committee"),
+        ("18G", "Transfer in from affiliated committee"),
+        ("18H", "Honorarium received"),
+        (
+            "18J",
+            "Memo - Recipient committee's percentage of contribution "
+            "from a registered committee given to joint fundraising "
+            "committee",
+        ),
+        ("18K", "Contribution received from registered filer"),
+        ("18L", "Bundled contribution"),
+        ("18U", "Contribution received from unregistered committee"),
+        ("19", "Electioneering communication donation received"),
+        (
+            "19J",
+            "Memo - Recipient committee's percentage of Electioneering "
+            "Communication donation given to joint fundraising committee",
+        ),
+        (
+            "20",
+            'Nonfederal disbursement - nonfederal party "soft money" '
+            "accounts (1991-2002)",
+        ),
+        (
+            "20A",
+            "Nonfederal disbursement - Levin Account (Line 4A) Voter "
+            "Registration",
+        ),
+        (
+            "20B",
+            "Nonfederal Disbursement - Levin Account (Line 4B) Voter "
+            "Identification",
+        ),
+        ("20C", "Loan repayment made to candidate"),
+        (
+            "20D",
+            "Nonfederal disbursement - Levin Account (Line 4D) Generic "
+            "Campaign",
+        ),
+        ("20F", "Loan repayment made to banks"),
+        ("20G", "Loan repayment made to individual"),
+        ("20R", "Loan repayment made to registered filer"),
+        (
+            "20V",
+            "Nonfederal disbursement - Levin Account (Line 4C) Get Out "
+            "The Vote",
+        ),
+        ("20Y", "Nonfederal refund"),
+        ("21Y", "Native American Tribe refund"),
+        ("22G", "Loan to individual"),
+        ("22H", "Loan to candidate or committee"),
+        ("22J", "Loan repayment to individual"),
+        ("22K", "Loan repayment to candidate or committee"),
+        ("22L", "Loan repayment to bank"),
+        ("22R", "Contribution refund to unregistered entity"),
+        ("22U", "Loan repaid to unregistered entity"),
+        ("22X", "Loan made to unregistered entity"),
+        (
+            "22Y",
+            "Contribution refund to an individual, partnership or limited "
+            "liability company",
+        ),
+        ("22Z", "Contribution refund to candidate or committee"),
+        ("23Y", "Inaugural donation refund"),
+        ("24A", "Independent expenditure opposing election of candidate"),
+        ("24C", "Coordinated party expenditure"),
+        ("24E", "Independent expenditure advocating election of candidate"),
+        ("24F", "Communication cost for candidate (only for Form 7 filer)"),
+        ("24G", "Transfer out to affiliated committee"),
+        ("24H", "Honorarium to candidate"),
+        (
+            "24I",
+            "Earmarked contributor's check passed on by intermediary "
+            "committee to intended recipient (intermediary out)",
+        ),
+        ("24K", "Contribution made to nonaffiliated committee"),
+        (
+            "24N",
+            "Communication cost against candidate (only for Form 7 filer)",
+        ),
+        (
+            "24P",
+            "Contribution made to possible federal candidate including "
+            "in-kind contributions",
+        ),
+        ("24R", "Election recount disbursement"),
+        (
+            "24T",
+            "Earmarked contribution passed to intended recipient from "
+            "intermediary's treasury (treasury out)",
+        ),
+        ("24U", "Contribution made to unregistered entity"),
+        ("24Z", "In-kind contribution made to registered filer"),
+        ("28L", "Refund of bundled contribution"),
+        ("29", "Electioneering Communication disbursement or obligation"),
+        (
+            "30",
+            "Convention Account receipt from an individual, partnership or "
+            "limited liability company",
+        ),
+        ("30T", "Convention Account receipt from Native American Tribe"),
+        ("30K", "Convention Account receipt from registered filer"),
+        ("30G", "Convention Account - transfer in from affiliated committee"),
+        (
+            "30J",
+            "Convention Account - Memo - Recipient committee's "
+            "percentage of contributions from an individual, partnership "
+            "or limited liability company given to joint fundraising "
+            "committee",
+        ),
+        (
+            "30F",
+            "Convention Account - Memo - Recipient committee's "
+            "percentage of contributions from a registered committee "
+            "given to joint fundraising committee",
+        ),
+        (
+            "31",
+            "Headquarters Account receipt from an individual, partnership "
+            "or limited liability company",
+        ),
+        (
+            "32",
+            "Recount Account receipt from an individual, partnership or "
+            "limited liability company",
+        ),
+        ("15C", "Contribution from candidate"),
+        (
+            "15E",
+            "Earmarked contributions to political committees (other than "
+            "Super PACs and Hybrid PACs) from an individual, partnership "
+            "or limited liability company",
+        ),
+        (
+            "15T",
+            "Earmarked contribution from an individual, partnership or "
+            "limited liability company received by intermediary committee "
+            "and entered into intermediary's treasury (intermediary "
+            "treasury in)",
+        ),
+        ("20Y", "Nonfederal refund"),
+        (
+            "22Y",
+            "Contribution refund to an individual, partnership or limited "
+            "liability company",
+        ),
+        (
+            "24I",
+            "Earmarked contributor's check passed on by intermediary "
+            "committee to intended recipient (intermediary out)",
+        ),
+        (
+            "24T",
+            "Earmarked contribution passed to intended recipient from "
+            "intermediary's treasury (treasury out)",
+        ),
+    )
+
+    AMENDMENT_CHOICES = (
+        ("N", "New report"),
+        ("A", "Amendment to a previous report"),
+        ("T", "Termination report"),
+    )
+
+    REPORT_TYPE_CHOICES = (
+        (
+            "12C",
+            "For states using conventions to select candidates. Report "
+            "covers through 20 days before the convention",
+        ),
+        (
+            "12G",
+            "Report covers through 20 days before the general election - "
+            "due 12 days before the election",
+        ),
+        (
+            "12P",
+            "Report covers through 20 days before the primary- due 12 "
+            "days before the election",
+        ),
+        (
+            "12R",
+            "Report covers through 20 days before the run-off- due 12 "
+            "days before the election",
+        ),
+        (
+            "12S",
+            "Report covers through 20 days before the special election - "
+            "due 12 days before the election",
+        ),
+        (
+            "30D",
+            "Report covers from 19 days before the election through 20 "
+            "days after - due 30 days after the election",
+        ),
+        (
+            "30G",
+            "Report covers from 19 days before the election through 20 "
+            "days after. - due 30 days after the election",
+        ),
+        (
+            "30P",
+            "Report covers from 19 days before the election through 20 "
+            "days after. - due 30 days after the election",
+        ),
+        (
+            "30R",
+            "Report covers from 19 days before the election through 20 "
+            "days after. - due 30 days after the election",
+        ),
+        (
+            "30S",
+            "Report covers from 19 days before the election through 20 "
+            "days after. - due 30 days after the election",
+        ),
+        (
+            "60D",
+            "Report filed by national party convention and host "
+            "committees disclosing their convention expenses, due 60 days "
+            "after the convention",
+        ),
+        (
+            "ADJ",
+            "Adjustment of a comprehensive amendment - coverage is "
+            "variable",
+        ),
+        (
+            "CA",
+            "Amendment modifying information from two or more original "
+            "reports - coverage is variable",
+        ),
+        ("M10", "Covers September - due October 20"),
+        ("M11", "Covers October - due November 20"),
+        ("M12", "Covers November - due December 20"),
+        ("M2", "Covers January - due February 20"),
+        ("M3", "Covers February - due March 20"),
+        ("M4", "Covers March - due April 20"),
+        ("M5", "Covers April - due May 20"),
+        ("M6", "Covers May - due June 20"),
+        ("M7", "Covers June - due July 20"),
+        ("M8", "Covers July - due August 20"),
+        ("M9", "Covers August - due September 20"),
+        (
+            "MY",
+            "Covers January 1 through June 30 - due July 31 Permissible "
+            "in non-election years for PACs and party committees normally "
+            "filing Quarterly reports. (Note that since 2003 campaign "
+            "committees must file quarterly in all years.)",
+        ),
+        ("Q1", "Covers January 1 through March 31 - due April 15"),
+        ("Q2", "Covers April 1 through June 30 - due July 15"),
+        ("Q3", "Covers July 1 through September 30 - due October 15"),
+        (
+            "TER",
+            "Final report submitted by a committee - coverage is variable",
+        ),
+        (
+            "YE",
+            "Covers from the end of the last quarterly or mid-year report "
+            "through December 31 - due January 31",
+        ),
+        ("90S", "Post inaugural supplement", " "),
+        (
+            "90D",
+            "Filing of Presidential inaugural committee - due 90 days "
+            "after the Inauguration",
+        ),
+        (
+            "48H",
+            "Report of specific contribution of $1,000 or more made to "
+            "a campaign within 20 days of an election. Alternatively, "
+            "once a PAC or party or other person has made independent "
+            "expenditures exceeding $10,000 in a race these and future "
+            "independent expenditures must be reported. Due within 48 "
+            "hours of receiving the contribution or public distribution "
+            "of the independent expenditure. 48 hour timing for "
+            "independent expenditures applies prior to 20 days before "
+            "the election.",
+        ),
+        (
+            "24H",
+            "Within 20 days of an election once a PAC or party or other "
+            "person has made independent expenditures exceeding $1,000 "
+            "in a race these and future independent expenditures must be "
+            "reported. Due within 24 hours of the public distribution of "
+            "the independent expenditure.",
+        ),
+    )
+
+    contributor = models.ForeignKey(Individual)
+    valid = models.BooleanField(
+        help_text="Is the record valid?", null=True, blank=True,
+    )
+    dt_transaction = models.DateField(
+        help_text="Transaction date", blank=True,
+    )
+    transaction_amt = models.IntegerField(help_text="Transaction amount",)
+    sub_id = models.CharField(
+        help_text="Unique FEC record number of the contribution",
+        db_index=True,
+    )
+    transaction_id = models.CharField(
+        help_text="FEC identifier for the contribution.  Only valid for "
+        "electronic filings.",
+        blank=True,
+    )
+    image_num = models.CharField(help_text="FEC image number", db_index=True,)
+    transaction_pgi = models.CharField(
+        help_text="Primary or general election and it's ID/year",
+    )
+    year = models.IntegerField(help_text="Year",)
+    transaction_type = models.CharField(
+        help_text="Transaction type", choices=TRANSACTION_CHOICES,
+    )
+    amend_indicator = models.CharField(
+        help_text="Amendment indicator", choices=AMENDMENT_CHOICES,
+    )
+    report_type = models.CharField(
+        help_text="Report type", choices=REPORT_TYPE_CHOICES,
+    )
+    memo_cd = models.CharField(
+        help_text="Memo code.  X indicates that the amount is NOT to be "
+        "included in the itemization total. ",
+        blank=True,
+    )
+    memo_text = models.CharField(
+        help_text="Memo text. A description of the activity. Memo Text is "
+        "available on itemized amounts on Schedules A and B. "
+        "These transactions are included in the itemization total. ",
+        blank=True,
+    )
+    file_num = models.CharField(help_text="Unique report id", blank=True,)
+
+
+class Committee(models.Model):
+    """
+    Details about committee receiving campaign contribution.
+    """
+
+    COMMITTEE_CHOICES = (
+        ("C", "Communication cost"),
+        (
+            "D",
+            "Delegate committees are organized for the purpose of "
+            "influencing the selection of delegates to Presidential "
+            "nominating conventions. The term includes a group of "
+            "delegates, a group of individuals seeking to become "
+            "delegates, and a group of individuals supporting delegates.",
+        ),
+        ("E", "Groups (other than PACs) making electioneering communications"),
+        (
+            "H",
+            "Campaign committees for candidates for the U.S. House of "
+            "Representatives",
+        ),
+        (
+            "I",
+            "Individuals or groups (other than PACs) making independent "
+            "expenditures over $250 in a year must disclose those "
+            "expenditures",
+        ),
+        (
+            "N",
+            "PAC - unqualified : PACs that have not yet been in existence "
+            "for six months and received contributions from 50 people "
+            "and made contributions to five federal candidates. These "
+            "committees have lower limits for their contributions to "
+            "candidates.",
+        ),
+        ("O", "Independent expenditure-only (Super PACs)"),
+        ("P", "Campaign committee for candidate for U.S. President"),
+        (
+            "Q",
+            "PAC - qualified : PACs that have been in existence for six "
+            "months and received contributions from 50 people and made "
+            "contributions to five federal candidates",
+        ),
+        ("S", "Campaign committee for candidate for Senate"),
+        ("U", "Single-candidate independent expenditure"),
+        (
+            "V",
+            "PAC with non-contribution account - nonqualified  : "
+            "Political committees with non-contribution accounts",
+        ),
+        (
+            "W",
+            "PAC with non-contribution account - qaualified : Political "
+            "committees with non-contribution accounts",
+        ),
+        (
+            "X",
+            "Party - nonqualified : Party committees that have not yet "
+            "been in existence for six months and received contributions "
+            "from 50 people, unless they are affiliated with another "
+            "party committee that has met these requirements.",
+        ),
+        (
+            "Y",
+            "Party - qualified : Party committees that have existed for "
+            "at least six months and received contributions from 50 "
+            "people or are affiliated with another party committee that "
+            "meets these requirements.",
+        ),
+        (
+            "Z",
+            "National party nonfederal accounts. Not permitted after "
+            "enactment of Bipartisan Campaign Reform Act of 2002. ",
+        ),
+    )
+
+    COMMITTEE_DESIGNATION_CHOICES = (
+        ("A", "Authorized by a candidate"),
+        ("B", "Lobbyist / Registrant PAC"),
+        ("D", "Leadership PAC"),
+        ("J", "Joint fundraiser"),
+        ("P", "Principal campaign committee of a candidate"),
+        ("U", "Unauthorized"),
+    )
+
+    ORG_TYPE_CHOICES = (
+        ("C", "Corporation"),
+        ("L", "Labor organization"),
+        ("M", "Membership organization"),
+        ("T", "Trade association"),
+        ("V", "Cooperative"),
+        ("W", "Corporation without capital stock"),
+    )
+
+    committee_id = models.CharField(
+        help_text="Unique ID for committee", db_index=True,
+    )
+    committee_name = models.CharField(help_text="Committee name", blank=True,)
+    committee_party = models.CharField(
+        help_text="Political party affiliation", blank=True,
+    )
+    candidate_id = models.CharField(
+        help_text="Unique ID for candidate supported by committee", blank=True,
+    )
+    connected_org_name = models.CharField(
+        help_text="Connected organization name", blank=True,
+    )
+    file_num = models.CharField(help_text="Unique report ID",)
+    committee_type = models.CharField(
+        help_text="Committee type", choices=COMMITTEE_CHOICES, blank=True,
+    )
+    committee_designation = models.CharField(
+        help_text="Committee designation",
+        choices=COMMITTEE_DESIGNATION_CHOICES,
+        blank=True,
+    )
+    org_type = models.CharField(
+        help_text="Interest group category",
+        choices=ORG_TYPE_CHOICES,
+        blank=True,
+    )
