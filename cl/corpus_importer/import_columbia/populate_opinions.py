@@ -13,7 +13,7 @@ from cl.lib import sunburnt
 from cl.lib.import_lib import find_person
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
-from convert_columbia_html import convert_columbia_html
+from .convert_columbia_html import convert_columbia_html
 
 # only make a solr connection onece
 SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")

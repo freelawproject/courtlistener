@@ -16,8 +16,8 @@ from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
-from parse_judges import find_judge_names
-from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
+from .parse_judges import find_judge_names
+from .regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()
