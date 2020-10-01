@@ -102,7 +102,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             "%s%s" % (self.live_server_url, reverse("all_jurisdictions_feed"))
         )
         self.assertEqual(
-            u"CourtListener.com: All Opinions (High Volume)", f.feed.title
+            "CourtListener.com: All Opinions (High Volume)", f.feed.title
         )
         # Per https://pythonhosted.org/feedparser/bozo.html
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
@@ -117,7 +117,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         )
         f = feedparser.parse(url)
         self.assertEqual(
-            u"CourtListener.com: All opinions for the Testing Supreme Court",
+            "CourtListener.com: All opinions for the Testing Supreme Court",
             f.feed.title,
         )
         # Per https://pythonhosted.org/feedparser/bozo.html

@@ -37,7 +37,7 @@ def make_name_param(defendant, plaintiff=None):
         token_list.extend(plaintiff.split())
         # Strip out punctuation, which Solr doesn't like
     query_words = [strip_punct(t) for t in token_list]
-    return u" ".join(query_words), len(query_words)
+    return " ".join(query_words), len(query_words)
 
 
 def reverse_match(conn, results, citing_doc):

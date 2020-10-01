@@ -332,7 +332,7 @@ mlt_query_tests = (
     ((None, None, None), ({"mlt.fl": ["text_field"]}, "GET", ""), None),
     (("Content", "not-an-encoding", None), (), LookupError),
     (
-        (u"Content", None, None),
+        ("Content", None, None),
         ({"stream.body": ["Content"], "mlt.fl": ["text_field"]}, "GET", ""),
         None,
     ),

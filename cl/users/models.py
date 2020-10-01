@@ -158,7 +158,7 @@ class UserProfile(models.Model):
         return data[self.user.pk]
 
     def __unicode__(self):
-        return u"{name}".format(name=self.user.username)
+        return "{name}".format(name=self.user.username)
 
     class Meta:
         verbose_name = "user profile"

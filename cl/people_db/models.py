@@ -216,7 +216,7 @@ class Person(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name_full)
+        return "%s: %s" % (self.pk, self.name_full)
 
     class Meta:
         verbose_name_plural = "people"
@@ -237,7 +237,7 @@ class Person(models.Model):
 
     @property
     def name_full(self):
-        return u" ".join(
+        return " ".join(
             [
                 v
                 for v in [
@@ -252,7 +252,7 @@ class Person(models.Model):
 
     @property
     def name_full_reverse(self):
-        return u"{name_last}, {name_first} {name_middle}, {suffix}".format(
+        return "{name_last}, {name_first} {name_middle}, {suffix}".format(
             suffix=self.get_name_suffix_display(), **self.__dict__
         ).strip(", ")
 
@@ -431,13 +431,13 @@ class School(models.Model):
 
     def __unicode__(self):
         if self.is_alias_of:
-            return u"%s: %s (alias: %s)" % (
+            return "%s: %s (alias: %s)" % (
                 self.pk,
                 self.name,
                 self.is_alias_of.name,
             )
         else:
-            return u"%s: %s" % (self.pk, self.name)
+            return "%s: %s" % (self.pk, self.name)
 
     @property
     def is_alias(self):
@@ -935,7 +935,7 @@ class Position(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s: %s at %s" % (
+        return "%s: %s at %s" % (
             self.pk,
             self.person.name_full,
             self.court_id,
@@ -1189,7 +1189,7 @@ class Education(models.Model):
     )
 
     def __unicode__(self):
-        return u"%s: Degree in %s from %s in the year %s" % (
+        return "%s: Degree in %s from %s in the year %s" % (
             self.pk,
             self.degree_detail,
             self.school.name,
@@ -1223,7 +1223,7 @@ class Race(models.Model):
 
     def __unicode__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
-        return u"{race}".format(race=self.race)
+        return "{race}".format(race=self.race)
 
 
 class PoliticalAffiliation(models.Model):
@@ -1483,7 +1483,7 @@ class PartyType(models.Model):
         unique_together = ("docket", "party", "name")
 
     def __unicode__(self):
-        return u"%s: Party %s is %s in Docket %s" % (
+        return "%s: Party %s is %s in Docket %s" % (
             self.pk,
             self.party_id,
             self.name,
@@ -1590,7 +1590,7 @@ class Party(models.Model):
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name)
+        return "%s: %s" % (self.pk, self.name)
 
 
 class Role(models.Model):
@@ -1662,7 +1662,7 @@ class Role(models.Model):
         )
 
     def __unicode__(self):
-        return u"%s: Attorney %s is %s for Party %s in docket %s" % (
+        return "%s: Attorney %s is %s for Party %s in docket %s" % (
             self.pk,
             self.attorney_id,
             self.get_role_display(),
@@ -1710,7 +1710,7 @@ class Attorney(models.Model):
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name)
+        return "%s: %s" % (self.pk, self.name)
 
 
 class AttorneyOrganizationAssociation(models.Model):
@@ -1743,7 +1743,7 @@ class AttorneyOrganizationAssociation(models.Model):
         unique_together = ("attorney", "attorney_organization", "docket")
 
     def __unicode__(self):
-        return u"%s: Atty %s worked on docket %s while at org %s" % (
+        return "%s: Atty %s worked on docket %s while at org %s" % (
             self.pk,
             self.attorney_id,
             self.docket_id,

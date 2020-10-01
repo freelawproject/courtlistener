@@ -149,7 +149,7 @@ def extract_from_pdf(path, opinion, do_ocr=False):
             content = "Unable to extract document content."
     elif "e" not in content:
         # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(unicode(content, "utf-8", errors="ignore"))
+        content = fix_mojibake(str(content, "utf-8", errors="ignore"))
 
     return content, err
 
@@ -384,11 +384,11 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
                 success, content = extract_by_ocr(path)
                 if success:
                     rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                elif content == u"" or not success:
-                    content = u"Unable to extract document content."
+                elif content == "" or not success:
+                    content = "Unable to extract document content."
                     rd.ocr_status = RECAPDocument.OCR_FAILED
             else:
-                content = u""
+                content = ""
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
         else:
             rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
@@ -449,8 +449,8 @@ def cleanup_ocr_text(txt):
     :return: Txt output, cleaned up.
     """
     simple_replacements = (
-        (u"Fi|ed", u"Filed"),
-        (u" Il ", u" II "),
+        ("Fi|ed", "Filed"),
+        (" Il ", " II "),
     )
     for replacement in simple_replacements:
         txt = txt.replace(replacement[0], replacement[1])
@@ -461,8 +461,8 @@ def cleanup_ocr_text(txt):
 def extract_by_ocr(path):
     """Extract the contents of a PDF using OCR."""
     fail_msg = (
-        u"Unable to extract the content from this file. Please try "
-        u"reading the original."
+        "Unable to extract the content from this file. Please try "
+        "reading the original."
     )
     with NamedTemporaryFile(prefix="ocr_", suffix=".tiff") as tmp:
         out, err, returncode = rasterize_pdf(path, tmp.name)
@@ -494,21 +494,21 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     )
     audio_file.initTag()
     audio_file.tag.title = best_case_name(audio_obj)
-    audio_file.tag.album = u"{court}, {year}".format(
+    audio_file.tag.album = "{court}, {year}".format(
         court=court.full_name, year=audio_obj.docket.date_argued.year
     )
     audio_file.tag.artist = court.full_name
     audio_file.tag.artist_url = court.url
     audio_file.tag.audio_source_url = audio_obj.download_url
     audio_file.tag.comments.set(
-        u"Argued: {date_argued}. Docket number: {docket_number}".format(
+        "Argued: {date_argued}. Docket number: {docket_number}".format(
             date_argued=audio_obj.docket.date_argued.strftime("%Y-%m-%d"),
             docket_number=audio_obj.docket.docket_number,
         )
     )
-    audio_file.tag.genre = u"Speech"
-    audio_file.tag.publisher = u"Free Law Project"
-    audio_file.tag.publisher_url = u"https://free.law"
+    audio_file.tag.genre = "Speech"
+    audio_file.tag.publisher = "Free Law Project"
+    audio_file.tag.publisher_url = "https://free.law"
     audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime(
         "%Y-%m-%d"
     )
@@ -534,7 +534,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
             os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
         ) as f:
             audio_file.tag.images.set(
-                3, f.read(), "image/png", u"Seal for %s" % court.short_name
+                3, f.read(), "image/png", "Seal for %s" % court.short_name
             )
         flp_image_frames.remove(3)
 
@@ -554,7 +554,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
                 frame,
                 f.read(),
                 "image/png",
-                u"Created for the public domain by Free Law Project",
+                "Created for the public domain by Free Law Project",
             )
 
     audio_file.tag.save()

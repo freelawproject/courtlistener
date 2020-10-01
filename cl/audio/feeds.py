@@ -16,13 +16,13 @@ class JurisdictionPodcast(JurisdictionFeed):
     )
     subtitle = description
     summary = description
-    iTunes_name = u"Free Law Project"
-    iTunes_email = u"feeds@courtlistener.com"
+    iTunes_name = "Free Law Project"
+    iTunes_email = "feeds@courtlistener.com"
     iTunes_image_url = (
-        u"https://www.courtlistener.com/static/png/producer-2000x2000.png"
+        "https://www.courtlistener.com/static/png/producer-2000x2000.png"
     )
-    iTunes_explicit = u"no"
-    item_enclosure_mime_type = u"audio/mpeg"
+    iTunes_explicit = "no"
+    item_enclosure_mime_type = "audio/mpeg"
 
     def title(self, obj):
         return "Oral Arguments for the %s" % obj.full_name
@@ -44,15 +44,15 @@ class JurisdictionPodcast(JurisdictionFeed):
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
-            "iTunes_name": u"Free Law Project",
-            "iTunes_email": u"feeds@courtlistener.com",
-            "iTunes_explicit": u"no",
+            "iTunes_name": "Free Law Project",
+            "iTunes_email": "feeds@courtlistener.com",
+            "iTunes_explicit": "no",
         }
         if hasattr(obj, "pk"):
-            path = u"/static/png/producer-%s-2000x2000.png" % obj.pk
+            path = "/static/png/producer-%s-2000x2000.png" % obj.pk
         else:
             # Not a jurisdiction API -- A search API.
-            path = u"/static/png/producer-2000x2000.png"
+            path = "/static/png/producer-2000x2000.png"
         extra_args["iTunes_image_url"] = (
             "https://www.courtlistener.com%s" % path
         )
@@ -63,7 +63,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         return {
             "author": get_item(item)["court"],
             "duration": str(item["duration"]),
-            "explicit": u"no",
+            "explicit": "no",
         }
 
     def item_enclosure_url(self, item):

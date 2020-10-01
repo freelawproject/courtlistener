@@ -323,7 +323,7 @@ class SCOTUSMap(models.Model):
         return json.dumps(j, indent=2)
 
     def __unicode__(self):
-        return u"{pk}: {title}".format(
+        return "{pk}: {title}".format(
             pk=getattr(self, "pk", None), title=self.title
         )
 
@@ -345,9 +345,9 @@ class SCOTUSMap(models.Model):
                 obj.case_name,
                 obj.case_name_full,
             ]
-            return next((_ for _ in case_name_preference if _), u"Unknown")
+            return next((_ for _ in case_name_preference if _), "Unknown")
 
-        return u"{start} ({start_year}) to {end} ({end_year})".format(
+        return "{start} ({start_year}) to {end} ({end_year})".format(
             start=get_best_case_name(self.cluster_start),
             start_year=self.cluster_start.date_filed.year,
             end=get_best_case_name(self.cluster_end),
@@ -358,7 +358,7 @@ class SCOTUSMap(models.Model):
         # Note that the title needs to be made first, so that the slug can be
         # generated from it.
         if not self.title:
-            self.title = trunc(self.make_title(), 200, ellipsis=u"…")
+            self.title = trunc(self.make_title(), 200, ellipsis="…")
 
         if self.published is True and self.date_published is None:
             # First time shared.
@@ -413,7 +413,7 @@ class Referer(models.Model):
     )
 
     def __unicode__(self):
-        return u"{pk}: Refers to {map}".format(
+        return "{pk}: Refers to {map}".format(
             pk=getattr(self, "pk", None),
             map=self.map,
         )
@@ -447,7 +447,7 @@ class JSONVersion(models.Model):
     )
 
     def __unicode__(self):
-        return u"<JSONVersion {pk}> for <{map}>".format(
+        return "<JSONVersion {pk}> for <{map}>".format(
             pk=getattr(self, "pk", None),
             map=self.map,
         )

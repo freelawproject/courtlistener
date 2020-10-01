@@ -636,7 +636,7 @@ class SearchForm(forms.Form):
 
         # 4. Strip any whitespace, otherwise it crashes Solr.
         for k, v in cleaned_data.items():
-            if isinstance(v, basestring):
+            if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
         return cleaned_data

@@ -67,10 +67,10 @@ samples_from_strings = {
 
 def check_solr_date_from_date(s, date, canonical_date):
     assert (
-        unicode(solr_date(date)) == s
+        str(solr_date(date)) == s
     ), "Unequal representations of %r: %r and %r" % (
         date,
-        unicode(solr_date(date)),
+        str(solr_date(date)),
         s,
     )
     check_solr_date_from_string(s, canonical_date)
@@ -132,10 +132,10 @@ class TestReadingSchema(object):
         """Test that each of the fields will serialize the relevant
         datatype appropriately."""
         for k, v, v2 in (
-            ("int_field", 1, u"1"),
-            ("text_field", "text", u"text"),
-            ("text_field", u"text", u"text"),
-            ("boolean_field", True, u"true"),
+            ("int_field", 1, "1"),
+            ("text_field", "text", "text"),
+            ("text_field", "text", "text"),
+            ("boolean_field", True, "true"),
         ):
             assert self.s.field_from_user_data(k, v).to_solr() == v2
 

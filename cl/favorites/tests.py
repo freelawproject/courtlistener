@@ -211,7 +211,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         profile_dropdown = self.browser.find_elements_by_css_selector(
             "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
         dropdown_menu = self.browser.find_element_by_css_selector(
             "ul.dropdown-menu"
@@ -263,7 +263,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         profile_dropdown = self.browser.find_elements_by_css_selector(
             "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
         dropdown_menu = self.browser.find_element_by_css_selector(
             "ul.dropdown-menu"

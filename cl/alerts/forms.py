@@ -21,8 +21,8 @@ class CreateAlertForm(ModelForm):
             # Somebody is trying to hack past the JS/HTML block on the front
             # end. Don't let them create the alert until they've donated.
             raise ValidationError(
-                u"You must donate more than $10 per year to create Real Time "
-                u"alerts."
+                "You must donate more than $10 per year to create Real Time "
+                "alerts."
             )
         else:
             return rate

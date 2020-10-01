@@ -297,7 +297,7 @@ def judges_exist(text, judges):
     """
     matched = []
     for judge in judges:
-        if isinstance(judge, basestring):
+        if isinstance(judge, str):
             if re.search(r"\b%s\b" % judge, text):
                 matched.append(judge)
             continue

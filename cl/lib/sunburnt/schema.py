@@ -33,7 +33,7 @@ class solr_date(object):
     def __init__(self, v):
         if isinstance(v, solr_date):
             self._dt_obj = v._dt_obj
-        elif isinstance(v, basestring):
+        elif isinstance(v, str):
             try:
                 self._dt_obj = datetime_from_w3_datestring(v)
             except ValueError as e:
@@ -78,8 +78,8 @@ class solr_date(object):
         strtime = self._dt_obj.strftime("%Y-%m-%dT%H:%M:%S")
         microsecond = self.microsecond
         if microsecond:
-            return u"%s.%06dZ" % (strtime, microsecond)
-        return u"%sZ" % (strtime,)
+            return "%s.%06dZ" % (strtime, microsecond)
+        return "%sZ" % (strtime,)
 
     def __cmp__(self, other):
         try:
@@ -104,7 +104,7 @@ def solr_point_factory(dimension):
         def __init__(self, *args):
             if dimension > 1 and len(args) == 1:
                 v = args[0]
-                if isinstance(v, basestring):
+                if isinstance(v, str):
                     v_arr = v.split(",")
                 else:
                     try:
@@ -118,7 +118,7 @@ def solr_point_factory(dimension):
             self.point = tuple(float(v) for v in v_arr)
 
         def __repr__(self):
-            return "solr_point(%s)" % unicode(self)
+            return "solr_point(%s)" % str(self)
 
         def __unicode__(self):
             return ",".join(str(p) for p in self.point)
@@ -174,7 +174,7 @@ class SolrField(object):
         return self.normalize(value)
 
     def to_solr(self, value):
-        return unicode(value)
+        return str(value)
 
     def to_query(self, value):
         return RawString(self.to_solr(value)).escape_for_lqs_term()
@@ -188,14 +188,14 @@ class SolrUnicodeField(SolrField):
         if isinstance(value, SolrString):
             return value
         else:
-            return WildcardString(unicode(value))
+            return WildcardString(str(value))
 
     def to_query(self, value):
         return value.escape_for_lqs_term()
 
     def from_solr(self, value):
         try:
-            return unicode(value)
+            return str(value)
         except UnicodeError:
             raise SolrError(
                 "%s could not be coerced to unicode (field %s)"
@@ -205,10 +205,10 @@ class SolrUnicodeField(SolrField):
 
 class SolrBooleanField(SolrField):
     def to_solr(self, value):
-        return u"true" if value else u"false"
+        return "true" if value else "false"
 
     def normalize(self, value):
-        if isinstance(value, basestring):
+        if isinstance(value, str):
             if value.lower() == "true":
                 return True
             elif value.lower() == "false":
@@ -232,7 +232,7 @@ class SolrBinaryField(SolrField):
             )
 
     def to_solr(self, value):
-        return unicode(value.encode("base64"))
+        return str(value.encode("base64"))
 
     def from_solr(self, value):
         return value.decode("base64")
@@ -326,7 +326,7 @@ class SolrPointField(SolrField):
         self.value_class = solr_point_factory(self.dimension)
 
     def to_solr(self, v):
-        return unicode(self.value_class(v))
+        return str(self.value_class(v))
 
     def normalize(self, v):
         return self.value_class(v).point
@@ -565,7 +565,7 @@ class SolrSchema(object):
         ]
 
     def check_fields(self, field_names, required_atts=None):
-        if isinstance(field_names, basestring):
+        if isinstance(field_names, str):
             field_names = [field_names]
         if required_atts is None:
             required_atts = {}
@@ -726,7 +726,7 @@ class SolrDelete(object):
         # Is this a dictionary, or an document object, or a thing
         # that can be cast to a uniqueKey? (which could also be an
         # arbitrary object.
-        if isinstance(doc, (basestring, int, long, float)):
+        if isinstance(doc, (str, int, long, float)):
             # It's obviously not a document object, just coerce to appropriate type
             doc_id = doc
         elif hasattr(doc, "items"):
@@ -754,7 +754,7 @@ class SolrDelete(object):
     def delete_queries(self, queries):
         if not hasattr(queries, "__iter__"):
             queries = [queries]
-        return [self.QUERY(unicode(query)) for query in queries]
+        return [self.QUERY(str(query)) for query in queries]
 
     def __str__(self):
         return lxml.etree.tostring(self.xml, encoding="utf-8")

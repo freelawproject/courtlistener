@@ -45,7 +45,7 @@ class LuceneQuery(object):
 
     def options(self):
         opts = {}
-        s = unicode(self)
+        s = str(self)
         if s:
             opts[self.option_flag] = s
         return opts
@@ -89,20 +89,20 @@ class LuceneQuery(object):
                 field = self.schema.default_field
             if name:
                 s += [
-                    u"%s:%s" % (name, value.to_query()) for value in value_set
+                    "%s:%s" % (name, value.to_query()) for value in value_set
                 ]
             else:
                 s += [value.to_query() for value in value_set]
-        return u" AND ".join(sorted(s))
+        return " AND ".join(sorted(s))
 
     range_query_templates = {
-        "any": u"[* TO *]",
-        "lt": u"{* TO %s}",
-        "lte": u"[* TO %s]",
-        "gt": u"{%s TO *}",
-        "gte": u"[%s TO *]",
-        "rangeexc": u"{%s TO %s}",
-        "range": u"[%s TO %s]",
+        "any": "[* TO *]",
+        "lt": "{* TO %s}",
+        "lte": "[* TO %s]",
+        "gt": "{%s TO *}",
+        "gte": "[%s TO *]",
+        "rangeexc": "{%s TO %s}",
+        "range": "[%s TO %s]",
     }
 
     def serialize_range_queries(self):
@@ -112,8 +112,8 @@ class LuceneQuery(object):
                 value.to_query()
                 for value in sorted(values, key=lambda x: getattr(x, "value"))
             )
-            s.append(u"%s:%s" % (name, range_s))
-        return u" AND ".join(s)
+            s.append("%s:%s" % (name, range_s))
+        return " AND ".join(s)
 
     def child_needs_parens(self, child):
         if len(child) == 1:
@@ -220,24 +220,24 @@ class LuceneQuery(object):
                 if s
             ]
             for q in self.subqueries:
-                op_ = u"OR" if self._or else u"AND"
+                op_ = "OR" if self._or else "AND"
                 if self.child_needs_parens(q):
-                    u.append(u"(%s)" % q.__unicode__(level=level + 1, op=op_))
+                    u.append("(%s)" % q.__unicode__(level=level + 1, op=op_))
                 else:
-                    u.append(u"%s" % q.__unicode__(level=level + 1, op=op_))
+                    u.append("%s" % q.__unicode__(level=level + 1, op=op_))
             if self._and:
-                return u" AND ".join(u)
+                return " AND ".join(u)
             elif self._or:
-                return u" OR ".join(u)
+                return " OR ".join(u)
             elif self._not:
                 assert len(u) == 1
                 if level == 0 or (level == 1 and op == "AND"):
-                    return u"NOT %s" % u[0]
+                    return "NOT %s" % u[0]
                 else:
-                    return u"(*:* AND NOT %s)" % u[0]
+                    return "(*:* AND NOT %s)" % u[0]
             elif self._pow is not False:
                 assert len(u) == 1
-                return u"%s^%s" % (u[0], self._pow)
+                return "%s^%s" % (u[0], self._pow)
             else:
                 raise ValueError
 
@@ -421,8 +421,8 @@ class BaseSearch(object):
     result_constructor = dict
 
     def _init_common_modules(self):
-        self.query_obj = LuceneQuery(self.schema, u"q")
-        self.filter_obj = LuceneQuery(self.schema, u"fq")
+        self.query_obj = LuceneQuery(self.schema, "q")
+        self.filter_obj = LuceneQuery(self.schema, "fq")
         self.paginator = PaginateOptions(self.schema)
         self.highlighter = HighlightOptions(self.schema)
         self.faceter = FacetOptions(self.schema)
@@ -741,7 +741,7 @@ class MltSolrSearch(BaseSearch):
             if content is not None:
                 if content_charset is None:
                     content_charset = "utf-8"
-                if isinstance(content, unicode):
+                if isinstance(content, str):
                     content = content.encode("utf-8")
                 elif (
                     content_charset.lower().replace("-", "_")
@@ -823,7 +823,7 @@ class Options(object):
     def update(self, fields=None, **kwargs):
         if fields:
             self.schema.check_fields(fields)
-            if isinstance(fields, basestring):
+            if isinstance(fields, str):
                 fields = [fields]
             for field in set(fields) - set(self.fields):
                 self.fields[field] = {}
@@ -879,7 +879,7 @@ class Options(object):
 class FacetOptions(Options):
     option_name = "facet"
     opts = {
-        "prefix": unicode,
+        "prefix": str,
         "sort": [True, False, "count", "index"],
         "limit": int,
         "offset": lambda self, x: int(x) >= 0
@@ -918,14 +918,14 @@ class HighlightOptions(Options):
         else self.invalid_value(),
         "maxAlternateFieldLength": int,
         "formatter": ["simple"],
-        "simple.pre": unicode,
-        "simple.post": unicode,
-        "fragmenter": unicode,
+        "simple.pre": str,
+        "simple.post": str,
+        "fragmenter": str,
         "useFastVectorHighlighter": bool,  # available as of Solr 3.1
         "usePhraseHighlighter": bool,
         "highlightMultiTerm": bool,
         "regex.slop": float,
-        "regex.pattern": unicode,
+        "regex.pattern": str,
         "regex.maxAnalyzedChars": int,
     }
 
@@ -970,7 +970,7 @@ class MoreLikeThisOptions(Options):
         if fields is None:
             fields = [self.schema.default_field_name]
         self.schema.check_fields(fields)
-        if isinstance(fields, basestring):
+        if isinstance(fields, str):
             fields = [fields]
         self.fields.update(fields)
 
@@ -1130,7 +1130,7 @@ class FieldLimitOptions(Options):
     def update(self, fields=None, score=False, all_fields=False):
         if fields is None:
             fields = []
-        if isinstance(fields, basestring):
+        if isinstance(fields, str):
             fields = [fields]
         self.schema.check_fields(fields, {"stored": True})
         self.fields.update(fields)
@@ -1164,7 +1164,7 @@ class FacetQueryOptions(Options):
     def options(self):
         if self.queries:
             return {
-                "facet.query": [unicode(q) for q in self.queries],
+                "facet.query": [str(q) for q in self.queries],
                 "facet": True,
             }
         else:
@@ -1174,16 +1174,16 @@ class FacetQueryOptions(Options):
 def params_from_dict(**kwargs):
     utf8_params = []
     for k, vs in kwargs.items():
-        if isinstance(k, unicode):
+        if isinstance(k, str):
             k = k.encode("utf-8")
         # We allow for multivalued options with lists.
         if not hasattr(vs, "__iter__"):
             vs = [vs]
         for v in vs:
             if isinstance(v, bool):
-                v = u"true" if v else u"false"
+                v = "true" if v else "false"
             else:
-                v = unicode(v)
+                v = str(v)
             v = v.encode("utf-8")
             utf8_params.append((k, v))
     return sorted(utf8_params)
