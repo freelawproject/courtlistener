@@ -27,10 +27,10 @@ def db_corrector(simulate, verbose):
     docs = queryset_generator(Document.objects.filter(source="R"))
     for doc in docs:
         if verbose:
-            print "Assigning %s to west_cite on doc %s" % (
+            print("Assigning %s to west_cite on doc %s" % (
                 doc.citation.docket_number,
                 doc.pk,
-            )
+            ))
         doc.citation.west_cite = doc.citation.docket_number
 
         # Gather the docket number
@@ -41,12 +41,12 @@ def db_corrector(simulate, verbose):
             doc.citation.docket_number = docket
         except IndexError:
             if verbose:
-                print "Failed to get docket number from text."
+                print("Failed to get docket number from text.")
             doc.citation.docket_number = None
         if not simulate:
             doc.citation.save()
 
-    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***"
+    print("***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***")
 
 
 def main():
@@ -74,11 +74,11 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
-    print "***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***"
+    print("***DATA LOSS WARNING - DO NOT RUN THIS SCRIPT TWICE***")
 
     return db_corrector(simulate, verbose)
 

@@ -46,8 +46,8 @@ def cleaner(simulate=False, verbose=False):
         fixed = link_fixer(original_link)
         doc.download_url = fixed
         if verbose:
-            print "Changing: " + original_link
-            print "      to: " + fixed
+            print("Changing: " + original_link)
+            print("      to: " + fixed)
         if not simulate:
             doc.save()
 
@@ -77,9 +77,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

@@ -16,14 +16,14 @@ def fixer(simulate=False, verbose=False):
 
     for alert in alerts:
         if verbose:
-            print "Fixing alert %s" % alert
-            print "  Old query: %s" % alert.query
+            print("Fixing alert %s" % alert)
+            print("  Old query: %s" % alert.query)
         q = alert.query
         q_parts = q.split("&")
         q_parts = [q for q in q_parts if not q.startswith("court_")]
         alert.query = "&".join(q_parts)
         if verbose:
-            print "  New query: %s" % alert.query
+            print("  New query: %s" % alert.query)
         if not simulate:
             alert.save()
 
@@ -53,9 +53,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return fixer(simulate, verbose)
 

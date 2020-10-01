@@ -51,9 +51,9 @@ class Command(VerboseCommand):
         if options["notify"]:
             self.notify_unconfirmed_accounts()
         if options["simulate"]:
-            print "**************************************"
-            print "* NO EMAILS SENT OR ACCOUNTS DELETED *"
-            print "**************************************"
+            print("**************************************")
+            print("* NO EMAILS SENT OR ACCOUNTS DELETED *")
+            print("**************************************")
 
     def delete_old_accounts(self):
         """Find accounts older than roughly two months that have not been
@@ -68,7 +68,7 @@ class Command(VerboseCommand):
 
         for up in unconfirmed_ups:
             if self.options["verbose"]:
-                print "User %s deleted" % up.user.username
+                print("User %s deleted" % up.user.username)
             if not self.options["simulate"]:
                 # Gather their foreign keys, delete those
                 up.user.alerts.all().delete()
@@ -106,7 +106,7 @@ class Command(VerboseCommand):
 
         for up in unconfirmed_ups:
             if self.options["verbose"]:
-                print "User %s will be notified" % up.user
+                print("User %s will be notified" % up.user)
 
             if not self.options["simulate"]:
                 # Build and save a new activation key for the account.

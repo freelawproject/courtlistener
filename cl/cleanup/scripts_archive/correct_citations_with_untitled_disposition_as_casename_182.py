@@ -26,14 +26,14 @@ def cleaner(simulate=False, verbose=False):
         "-date_filed"
     )
     if verbose:
-        print "%s results found." % (docs.count())
+        print("%s results found." % (docs.count()))
 
     # Must slice here, or else only get top 20 results
     for doc in docs[0 : docs.count()]:
         if doc.citation.caseNameFull.lower() == "unpublished disposition":
             # Only do each case once, since the index isn't updated until
             # later, and I may run this script many times.
-            print doc.download_url
+            print(doc.download_url)
             casename = raw_input("Case name: ")
             doc.citation.caseNameFull = casename
             doc.citation.caseNameShort = trunc(casename, 100)
@@ -42,7 +42,7 @@ def cleaner(simulate=False, verbose=False):
             if not simulate:
                 doc.citation.save()
                 doc.save()
-            print ""
+            print("")
 
 
 def main():
@@ -70,9 +70,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

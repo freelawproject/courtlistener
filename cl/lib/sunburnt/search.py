@@ -52,32 +52,32 @@ class LuceneQuery(object):
 
     def serialize_debug(self, indent=0):
         indentspace = indent * " "
-        print "%s%s (%s)" % (
+        print("%s%s (%s)" % (
             indentspace,
             repr(self),
             "Normalized" if self.normalized else "Not normalized",
-        )
-        print "%s%s" % (indentspace, "{")
-        for term in self.terms.items():
-            print "%s%s" % (indentspace, term)
+        ))
+        print("%s%s" % (indentspace, "{"))
+        for term in list(self.terms.items()):
+            print("%s%s" % (indentspace, term))
         for phrase in self.phrases.items():
-            print "%s%s" % (indentspace, phrase)
+            print("%s%s" % (indentspace, phrase))
         for range in self.ranges:
-            print "%s%s" % (indentspace, range)
+            print("%s%s" % (indentspace, range))
         if self.subqueries:
             if self._and:
-                print "%sAND:" % indentspace
+                print("%sAND:" % indentspace)
             elif self._or:
-                print "%sOR:" % indentspace
+                print("%sOR:" % indentspace)
             elif self._not:
-                print "%sNOT:" % indentspace
+                print("%sNOT:" % indentspace)
             elif self._pow is not False:
-                print "%sPOW %s:" % (indentspace, self._pow)
+                print("%sPOW %s:" % (indentspace, self._pow))
             else:
                 raise ValueError
             for subquery in self.subqueries:
                 subquery.serialize_debug(indent + 2)
-        print "%s%s" % (indentspace, "}")
+        print("%s%s" % (indentspace, "}"))
 
     # Below, we sort all our value_sets - this is for predictability when testing.
     def serialize_term_queries(self, terms):

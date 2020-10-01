@@ -17,7 +17,7 @@ def fixer(simulate=False, verbose=False):
 
     for citation in citations:
         if verbose:
-            print "Fixing %s" % citation
+            print("Fixing %s" % citation)
         citation.slug = trunc(slugify(citation.case_name), 50)
         if not simulate:
             citation.save()
@@ -48,9 +48,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return fixer(simulate, verbose)
 
