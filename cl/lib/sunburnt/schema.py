@@ -268,7 +268,7 @@ class SolrIntField(SolrNumericalField):
 
 
 class SolrLongField(SolrNumericalField):
-    base_type = long
+    base_type = int
     min = -(2 ** 63)
     max = 2 ** 63 - 1
 
@@ -726,7 +726,7 @@ class SolrDelete(object):
         # Is this a dictionary, or an document object, or a thing
         # that can be cast to a uniqueKey? (which could also be an
         # arbitrary object.
-        if isinstance(doc, (str, int, long, float)):
+        if isinstance(doc, (str, int, float)):
             # It's obviously not a document object, just coerce to appropriate type
             doc_id = doc
         elif hasattr(doc, "items"):
@@ -916,7 +916,7 @@ def value_from_node(node):
     elif node.tag in ("short", "int"):
         value = int(node.text)
     elif node.tag == "long":
-        value = long(node.text)
+        value = int(node.text)
     elif node.tag == "bool":
         value = True if node.text == "true" else False
     elif node.tag in ("float", "double"):
