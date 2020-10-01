@@ -1,7 +1,7 @@
 import collections
 import errno
 import os
-from itertools import tee, islice, chain, izip
+from itertools import tee, islice, chain
 
 
 class _UNSPECIFIED(object):
@@ -85,7 +85,7 @@ def previous_and_next(some_iterable):
     prevs, items, nexts = tee(some_iterable, 3)
     prevs = chain([None], prevs)
     nexts = chain(islice(nexts, 1, None), [None])
-    return izip(prevs, items, nexts)
+    return zip(prevs, items, nexts)
 
 
 def is_iter(item):

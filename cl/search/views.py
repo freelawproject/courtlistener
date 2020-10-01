@@ -1,7 +1,7 @@
 import logging
 import traceback
 from datetime import date, datetime, timedelta
-from urllib import quote
+from urllib.parse import quote
 
 from cache_memoize import cache_memoize
 from django.conf import settings

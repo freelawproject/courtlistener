@@ -1,10 +1,4 @@
-from __future__ import absolute_import
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
+from io import StringIO
 import datetime
 
 from lxml.builder import E

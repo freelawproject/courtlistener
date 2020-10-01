@@ -1,5 +1,5 @@
 # coding=utf-8
-import StringIO
+import io
 import os
 import time
 from datetime import date
@@ -189,7 +189,7 @@ class ModelTest(TestCase):
         self.oc.save()
 
         try:
-            cf = ContentFile(StringIO.StringIO("blah").read())
+            cf = ContentFile(io.StringIO("blah").read())
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save(index=False)

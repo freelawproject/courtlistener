@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 
 from django.utils.html import strip_tags
 

@@ -1,5 +1,5 @@
 import re
-from httplib import ResponseNotReady
+from http.client import ResponseNotReady
 from collections import Counter
 
 from django.db.models import F
