@@ -27,12 +27,15 @@ def assign_authors_to_opinions(jurisdictions=None, testing=False):
 
     for cluster in clusters:
         i += 1
-        print("(%s/%s): Processing: %s, %s" % (
-            i,
-            total,
-            cluster.pk,
-            cluster.date_filed,
-        ))
+        print(
+            "(%s/%s): Processing: %s, %s"
+            % (
+                i,
+                total,
+                cluster.pk,
+                cluster.date_filed,
+            )
+        )
 
         judge_str = unidecode(cluster.judges)
         print("  Judge string: %s" % judge_str)

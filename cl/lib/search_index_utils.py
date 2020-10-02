@@ -23,7 +23,9 @@ class InvalidDocumentError(Exception):
 
 
 # Used to nuke null and control characters.
-null_map = dict.fromkeys(list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32)))
+null_map = dict.fromkeys(
+    list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
+)
 
 
 def normalize_search_dicts(d):

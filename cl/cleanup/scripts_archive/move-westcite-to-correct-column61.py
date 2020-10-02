@@ -1,7 +1,11 @@
 import os
 import sys
 
-exec(compile(open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"))
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -27,10 +31,13 @@ def db_corrector(simulate, verbose):
     docs = queryset_generator(Document.objects.filter(source="R"))
     for doc in docs:
         if verbose:
-            print("Assigning %s to west_cite on doc %s" % (
-                doc.citation.docket_number,
-                doc.pk,
-            ))
+            print(
+                "Assigning %s to west_cite on doc %s"
+                % (
+                    doc.citation.docket_number,
+                    doc.pk,
+                )
+            )
         doc.citation.west_cite = doc.citation.docket_number
 
         # Gather the docket number
