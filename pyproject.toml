@@ -1,5 +1,5 @@
 [tool.poetry]
-authors = ["Mike Lissner <mike@free.law>"] 
+authors = ["Mike Lissner <mike@free.law>"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Natural Language :: English",
@@ -9,20 +9,21 @@ classifiers = [
   "Programming Language :: Python :: 3.8",
   "Intended Audience :: Developers",
   "Intended Audience :: Legal Industry",
-] 
-description = "A free and powerful system for awareness and research of the American judicial system." 
-documentation = "https://github.com/freelawproject/courtlistener/wiki" 
-homepage = "https://www.courtlistener.com/" 
-keywords = ["legal", "courts", "databases", "judiciary", "laws"] # Max: 5 
+]
+description = "A free and powerful system for awareness and research of the American judicial system."
+documentation = "https://github.com/freelawproject/courtlistener/wiki"
+homepage = "https://www.courtlistener.com/"
+include = ["manage.py"]
+keywords = ["legal", "courts", "databases", "judiciary", "laws"] # Max: 5
 license = "AGPL-3.0" # Should be spdx ID: https://spdx.org/licenses/
-maintainers = ["Mike Lissner <mike@free.law>"] 
-name = "cl" 
-readme = "README.md" 
+maintainers = ["Mike Lissner <mike@free.law>"]
+name = "cl"
+readme = "README.md"
 repository = "https://github.com/freelawproject/courtlistener" 
-version = "0.14.24" 
+version = "0.14.24"
 
 [tool.poetry.scripts]
-cl-manage = "manage"
+cl-manage = "manage:main"
 
 [tool.poetry.dependencies]
 ansible = "*"
@@ -86,9 +87,11 @@ python-dateutil = "^2.8.1"
 python-igraph = "*"
 python-mimeparse = "^0.1.4"
 pytz = "*"
+pyyaml = "^5.3.1"
 redis = "==3.2.*,>=3.2.0"
 requests = "^2.20.0"
 scorched = "^0.11.0"
+selenium = "^3.141.0"
 sentry-sdk = "==0.*,>=0.0.0"
 simplejson = "*"
 six = "*"
@@ -98,7 +101,6 @@ timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
 usaddress = "*"
-selenium = "^3.141.0"
 
 reporters-db = {version = "^2.0.5", optional = true}
 seal-rookery = {git = "https://github.com/freelawproject/seal-rookery", branch = "master"}
