@@ -44,7 +44,7 @@ class CitationTaxCleanup(TestCase):
                 data = json.loads(f.read())
             cite = find_tax_court_citation(data["html"])
             self.assertFalse(cite)
-            print ("Success ✓")
+            print("Success ✓")
 
     @mock.patch(
         "cl.cleanup.management.commands.fix_tax_court.get_tax_docket_numbers",
@@ -59,9 +59,9 @@ class CitationTaxCleanup(TestCase):
                 answer = re.sub("–", "-", case["answer"])
                 answer = re.sub("—", "-", answer)
                 answer = re.sub("–", "-", answer)
-                print (answer)
+                print(answer)
                 self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
-                print ("Success ✓")
+                print("Success ✓")
 
 
 class CleanupTest(TestCase):

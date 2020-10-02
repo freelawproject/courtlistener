@@ -1,5 +1,3 @@
-
-
 from cl.lib.decorators import retry
 import io
 from itertools import islice

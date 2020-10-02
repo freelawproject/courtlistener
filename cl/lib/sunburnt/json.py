@@ -1,5 +1,3 @@
-
-
 import json, math
 
 from .schema import SolrResponse, SolrResult

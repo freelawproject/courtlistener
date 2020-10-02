@@ -1,5 +1,3 @@
-
-
 from .strings import RawString
 from .sunburnt import SolrError, SolrInterface
 

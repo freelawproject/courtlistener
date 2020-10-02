@@ -1,6 +1,3 @@
-
-
-
 class SolrString(str):
     # The behaviour below is only really relevant for String fields rather
     # than Text fields - most queryparsers will strip these characters out

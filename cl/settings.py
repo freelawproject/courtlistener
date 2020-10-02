@@ -14,6 +14,10 @@ conf_files = glob.glob(
 )
 conf_files.sort()
 for f in conf_files:
-    exec(compile(open(os.path.abspath(f), "rb").read(), os.path.abspath(f), "exec"))
+    exec(
+        compile(
+            open(os.path.abspath(f), "rb").read(), os.path.abspath(f), "exec"
+        )
+    )
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))

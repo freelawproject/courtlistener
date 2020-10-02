@@ -1,7 +1,11 @@
 import os
 import sys
 
-exec(compile(open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"))
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
@@ -52,16 +56,20 @@ def update_date(doc, simulate):
         date_filed = doc.date_filed
     else:
         # break from this function.
-        print("\n***No date_filed value for doc: " + str(
-            doc.pk
-        ) + ". Punting.***\n")
+        print(
+            "\n***No date_filed value for doc: "
+            + str(doc.pk)
+            + ". Punting.***\n"
+        )
         return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
-        print("\n***No local_path value for doc: " + str(
-            doc.pk
-        ) + ". Punting.***\n")
+        print(
+            "\n***No local_path value for doc: "
+            + str(doc.pk)
+            + ". Punting.***\n"
+        )
         return 2
     root = settings.MEDIA_ROOT
 
@@ -106,9 +114,13 @@ def update_date(doc, simulate):
 
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
-        print("***Created new hard link to " + new + " for doc: " + str(
-            doc.pk
-        ) + " ***")
+        print(
+            "***Created new hard link to "
+            + new
+            + " for doc: "
+            + str(doc.pk)
+            + " ***"
+        )
     else:
         print("Same. Not updating link for " + str(doc.pk))
 

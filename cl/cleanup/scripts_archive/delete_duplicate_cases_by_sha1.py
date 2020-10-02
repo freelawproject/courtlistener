@@ -2,7 +2,11 @@ import os
 import sys
 from django.conf import settings
 
-exec(compile(open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"))
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 

@@ -1,5 +1,3 @@
-
-
 import datetime, math, re, warnings
 
 try:

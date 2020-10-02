@@ -657,7 +657,9 @@ def get_citations(
         # CASE 1: Citation token is a reporter (e.g., "U. S.").
         # In this case, first try extracting it as a standard, full citation,
         # and if that fails try extracting it as a short form citation.
-        if citation_token in list(EDITIONS.keys()) + list(VARIATIONS_ONLY.keys()):
+        if citation_token in list(EDITIONS.keys()) + list(
+            VARIATIONS_ONLY.keys()
+        ):
             citation = extract_full_citation(words, i)
             if citation:
                 # CASE 1A: Standard citation found, try to add additional data

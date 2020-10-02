@@ -293,8 +293,7 @@ class SupraCitation(Citation):
         )
         if self.volume:
             inner_html += (
-                '\\g<1><span class="volume">%d</span>\\g<2>supra'
-                % self.volume
+                '\\g<1><span class="volume">%d</span>\\g<2>supra' % self.volume
             )
             if self.page:
                 inner_html += (

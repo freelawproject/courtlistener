@@ -644,7 +644,9 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print("Testing plain text to html conversion for %s..." % s, end=" ")
+            print(
+                "Testing plain text to html conversion for %s..." % s, end=" "
+            )
             opinion = Opinion(plain_text=s)
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
@@ -740,7 +742,10 @@ class CiteTest(TestCase):
 
         # fmt: on
         for plain_text, citation, expected_html in test_triples:
-            print("Testing object to HTML rendering for %s..." % plain_text, end=" ")
+            print(
+                "Testing object to HTML rendering for %s..." % plain_text,
+                end=" ",
+            )
             citation.match_url = "MATCH_URL"
             citation.match_id = "MATCH_ID"
             opinion = Opinion(plain_text=plain_text)
@@ -1191,7 +1196,10 @@ class ParallelCitationTest(SimpleTestCase):
             ("1 U.S. 1 too many words, then 22 U.S. 33, 13 WL 33223", 1, 2),
         )
         for q, citation_group_count, expected_num_parallel_citations in tests:
-            print("Testing parallel citation identification for: %s..." % q, end=" ")
+            print(
+                "Testing parallel citation identification for: %s..." % q,
+                end=" ",
+            )
             citations = get_citations(q)
             citation_groups = identify_parallel_citations(citations)
             computed_num_citation_groups = len(citation_groups)

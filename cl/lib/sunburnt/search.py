@@ -1,5 +1,3 @@
-
-
 import collections
 import copy
 import operator
@@ -53,11 +51,14 @@ class LuceneQuery(object):
 
     def serialize_debug(self, indent=0):
         indentspace = indent * " "
-        print("%s%s (%s)" % (
-            indentspace,
-            repr(self),
-            "Normalized" if self.normalized else "Not normalized",
-        ))
+        print(
+            "%s%s (%s)"
+            % (
+                indentspace,
+                repr(self),
+                "Normalized" if self.normalized else "Not normalized",
+            )
+        )
         print("%s%s" % (indentspace, "{"))
         for term in list(self.terms.items()):
             print("%s%s" % (indentspace, term))
