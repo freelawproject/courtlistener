@@ -27,7 +27,11 @@ Spec/features:
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -107,10 +111,13 @@ def cleaner(simulate=False, verbose=False):
 
         if results.count() == 0:
             # No hits for the doc. Log and punt it.
-            print "Results: %d. Line number %d. Line contents: %s" % (
-                results.count(),
-                line_num,
-                line.strip(),
+            print(
+                "Results: %d. Line number %d. Line contents: %s"
+                % (
+                    results.count(),
+                    line_num,
+                    line.strip(),
+                )
             )
             punt_file.write(
                 "Results: %d. Line number %d. Line contents %s\n"
@@ -134,13 +141,16 @@ def cleaner(simulate=False, verbose=False):
 
                 # Log as appropriate
                 if verbose:
-                    print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % (
-                        results.count(),
-                        line_num,
-                        diff,
-                        results[0].pk,
-                        results[0],
-                        line.strip(),
+                    print(
+                        "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s"
+                        % (
+                            results.count(),
+                            line_num,
+                            diff,
+                            results[0].pk,
+                            results[0],
+                            line.strip(),
+                        )
                     )
                 updated_file.write(
                     "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n"
@@ -156,7 +166,7 @@ def cleaner(simulate=False, verbose=False):
 
             elif (diff >= LOW_THRESHOLD) and (diff <= HIGH_THRESHOLD):
                 # Ask the user if the change should be made.
-                same = raw_input(
+                same = input(
                     str(results[0]) + "   ==   " + csv_case_name + " ?: "
                 )
                 if same == "y":
@@ -172,13 +182,16 @@ def cleaner(simulate=False, verbose=False):
 
                     # Log as appropriate
                     if verbose:
-                        print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % (
-                            results.count(),
-                            line_num,
-                            diff,
-                            results[0].pk,
-                            results[0],
-                            line.strip(),
+                        print(
+                            "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s"
+                            % (
+                                results.count(),
+                                line_num,
+                                diff,
+                                results[0].pk,
+                                results[0],
+                                line.strip(),
+                            )
                         )
                     updated_file.write(
                         "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n"
@@ -194,13 +207,16 @@ def cleaner(simulate=False, verbose=False):
                 else:
                     # Human says punt; therefore punt.
                     if verbose:
-                        print "Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s" % (
-                            results.count(),
-                            line_num,
-                            diff,
-                            results[0].pk,
-                            results[0],
-                            line.strip(),
+                        print(
+                            "Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s"
+                            % (
+                                results.count(),
+                                line_num,
+                                diff,
+                                results[0].pk,
+                                results[0],
+                                line.strip(),
+                            )
                         )
                     punt_file.write(
                         "Results: %d. Line number %d punted by human. Diff_ratio: %f found on %d: %s; Line contents: %s\n"
@@ -217,13 +233,16 @@ def cleaner(simulate=False, verbose=False):
             else:
                 # Below the threshold. Punt!
                 if verbose:
-                    print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % (
-                        results.count(),
-                        line_num,
-                        diff,
-                        results[0].pk,
-                        results[0],
-                        line.strip(),
+                    print(
+                        "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s"
+                        % (
+                            results.count(),
+                            line_num,
+                            diff,
+                            results[0].pk,
+                            results[0],
+                            line.strip(),
+                        )
                     )
                 punt_file.write(
                     "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n"
@@ -262,13 +281,16 @@ def cleaner(simulate=False, verbose=False):
 
                 # Log as appropriate
                 if verbose:
-                    print "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s" % (
-                        results.count(),
-                        line_num,
-                        max_ratio,
-                        results[i].pk,
-                        results[i],
-                        line.strip(),
+                    print(
+                        "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s"
+                        % (
+                            results.count(),
+                            line_num,
+                            max_ratio,
+                            results[i].pk,
+                            results[i],
+                            line.strip(),
+                        )
                     )
                 updated_file.write(
                     "Results: %d. Line number: %d. Diff_ratio: %f; Doc updated: %d: %s. Line contents: %s\n"
@@ -285,13 +307,16 @@ def cleaner(simulate=False, verbose=False):
             else:
                 # Below the threshold. Punt!
                 if verbose:
-                    print "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s" % (
-                        results.count(),
-                        line_num,
-                        max_ratio,
-                        results[i].pk,
-                        results[i],
-                        line.strip(),
+                    print(
+                        "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s"
+                        % (
+                            results.count(),
+                            line_num,
+                            max_ratio,
+                            results[i].pk,
+                            results[i],
+                            line.strip(),
+                        )
                     )
                 punt_file.write(
                     "Results: %d. Line number %d below threshold. Diff_ratio: %f found on %d: %s; Line contents: %s\n"
@@ -334,9 +359,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

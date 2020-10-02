@@ -1,7 +1,11 @@
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -46,8 +50,8 @@ def cleaner(simulate=False, verbose=False):
         fixed = link_fixer(original_link)
         doc.download_url = fixed
         if verbose:
-            print "Changing: " + original_link
-            print "      to: " + fixed
+            print("Changing: " + original_link)
+            print("      to: " + fixed)
         if not simulate:
             doc.save()
 
@@ -77,9 +81,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

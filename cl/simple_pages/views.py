@@ -128,7 +128,7 @@ def markdown_help(request):
 def build_court_dicts(courts):
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
-    court_dicts = [{"pk": "all", "short_name": u"All Courts"}]
+    court_dicts = [{"pk": "all", "short_name": "All Courts"}]
     court_dicts.extend(
         [
             {"pk": court.pk, "short_name": court.full_name}
@@ -255,39 +255,39 @@ def contact(
             # begins with three digits, assume it's spam; fake success.
             if re.match("\d{3}", cd["phone_number"]):
                 logger.info("Detected spam message. Not sending email.")
-                return HttpResponseRedirect(reverse(u"contact_thanks"))
+                return HttpResponseRedirect(reverse("contact_thanks"))
 
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
-                subject=u"[CourtListener] Contact: "
-                u"{phone_number}".format(**cd),
-                body=u"Subject: {phone_number}\n"
-                u"From: {name} ({email})\n"
-                u"\n\n{message}\n\n"
-                u"Browser: {browser}".format(
-                    browser=request.META.get(u"HTTP_USER_AGENT", u"Unknown"),
+                subject="[CourtListener] Contact: "
+                "{phone_number}".format(**cd),
+                body="Subject: {phone_number}\n"
+                "From: {name} ({email})\n"
+                "\n\n{message}\n\n"
+                "Browser: {browser}".format(
+                    browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
                     **cd
                 ),
                 to=["info@free.law"],
-                reply_to=[cd.get(u"email", default_from) or default_from],
+                reply_to=[cd.get("email", default_from) or default_from],
             ).send()
-            return HttpResponseRedirect(reverse(u"contact_thanks"))
+            return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
         try:
-            initial[u"email"] = request.user.email
-            initial[u"name"] = request.user.get_full_name()
+            initial["email"] = request.user.email
+            initial["name"] = request.user.get_full_name()
             form = ContactForm(initial=initial)
         except AttributeError:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 
-    template_data.update({u"form": form, u"private": False})
+    template_data.update({"form": form, "private": False})
     return render(request, template_path, template_data)
 
 
 def contact_thanks(request):
-    return render(request, u"contact_thanks.html", {u"private": True})
+    return render(request, "contact_thanks.html", {"private": True})
 
 
 def advanced_search(request):
@@ -299,7 +299,7 @@ def old_terms(request, v):
         request,
         "terms/%s.html" % v,
         {
-            "title": u"Archived Terms of Service and Policies, v%s – CourtListener.com"
+            "title": "Archived Terms of Service and Policies, v%s – CourtListener.com"
             % v,
             "private": True,
         },
@@ -311,7 +311,7 @@ def latest_terms(request):
         request,
         "terms/latest.html",
         {
-            "title": u"Terms of Service and Policies – CourtListener.com",
+            "title": "Terms of Service and Policies – CourtListener.com",
             "private": False,
         },
     )

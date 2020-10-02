@@ -19,8 +19,8 @@ class UrlHash(models.Model):
         "a SHA1 corresponding to the item", max_length=40, editable=False
     )
 
-    def __unicode__(self):
-        return u"{pk}".format(pk=self.pk)
+    def __str__(self):
+        return "{pk}".format(pk=self.pk)
 
     class Meta:
         verbose_name_plural = "URL Hashes"
@@ -46,8 +46,8 @@ class ErrorLog(models.Model):
         "the message produced in the log", blank=True, editable=False
     )
 
-    def __unicode__(self):
-        return u"%s - %s@%s %s" % (
+    def __str__(self):
+        return "%s - %s@%s %s" % (
             self.log_time,
             self.log_level,
             self.court.pk,
@@ -138,8 +138,8 @@ class PACERMobilePageData(models.Model):
         default=0,
     )
 
-    def __unicode__(self):
-        return u"<%s: Docket %s crawled at %s with %s results>" % (
+    def __str__(self):
+        return "<%s: Docket %s crawled at %s with %s results>" % (
             self.pk,
             self.docket_id,
             self.date_last_mobile_crawl,

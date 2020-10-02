@@ -1,7 +1,11 @@
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
@@ -29,13 +33,13 @@ def cleaner(simulate=False, verbose=False):
             if (caseNameShortOrig != caseNameShort) or (
                 caseNameFullOrig != caseNameFull
             ):
-                print "Document: %s" % doc.pk
+                print("Document: %s" % doc.pk)
             if caseNameShortOrig != caseNameShort:
-                print "Short name, replacing: '%s'" % caseNameShortOrig
-                print "                 with: '%s'" % caseNameShort
+                print("Short name, replacing: '%s'" % caseNameShortOrig)
+                print("                 with: '%s'" % caseNameShort)
             if caseNameFullOrig != caseNameFull:
-                print " Full name, replacing: '%s'" % caseNameFullOrig
-                print "                 with: '%s'\n" % caseNameFull
+                print(" Full name, replacing: '%s'" % caseNameFullOrig)
+                print("                 with: '%s'\n" % caseNameFull)
         if not simulate:
             doc.citation.save()
 
@@ -65,9 +69,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

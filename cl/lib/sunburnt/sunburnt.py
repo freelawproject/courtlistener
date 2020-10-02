@@ -1,14 +1,12 @@
-from __future__ import absolute_import
-
 from cl.lib.decorators import retry
-import cStringIO as StringIO
+import io
 from itertools import islice
 import logging
 import socket
 import time
-import urllib
-import urlparse
-import urllib2
+import urllib.request
+import urllib.parse
+import urllib.error
 
 from .schema import SolrSchema, SolrError
 from .search import (
@@ -134,13 +132,13 @@ class SolrConnection(object):
         if extra_params:
             return "%s?%s" % (
                 self.update_url,
-                urllib.urlencode(sorted(extra_params.items())),
+                urllib.parse.urlencode(sorted(extra_params.items())),
             )
         else:
             return self.update_url
 
     def select(self, params):
-        qs = urllib.urlencode(params)
+        qs = urllib.parse.urlencode(params)
         url = "%s?%s" % (self.select_url, qs)
         if len(url) > self.max_length_get_url:
             # warnings.warn("Long query URL encountered - POSTing instead of GETting. This query will not be cached at the HTTP layer")
@@ -161,14 +159,14 @@ class SolrConnection(object):
         """Perform a MoreLikeThis query using the content specified
         There may be no content if stream.url is specified in the params.
         """
-        qs = urllib.urlencode(params)
+        qs = urllib.parse.urlencode(params)
         base_url = "%s?%s" % (self.mlt_url, qs)
         if content is None:
             kwargs = {"uri": base_url, "method": "GET"}
         else:
             get_url = "%s&stream.body=%s" % (
                 base_url,
-                urllib.quote_plus(content),
+                urllib.parse.quote_plus(content),
             )
             if len(get_url) <= self.max_length_get_url:
                 kwargs = {"uri": get_url, "method": "GET"}
@@ -209,20 +207,20 @@ class SolrInterface(object):
             self.readable = False
         self.init_schema()
 
-    @retry((urllib2.URLError, socket.error), 5, 3)
+    @retry((urllib.error.URLError, socket.error), 5, 3)
     def init_schema(self):
         if self.schemadoc:
             schemadoc = self.schemadoc
         else:
             r, c = self.conn.request(
-                urlparse.urljoin(self.conn.url, self.remote_schema_file)
+                urllib.parse.urljoin(self.conn.url, self.remote_schema_file)
             )
             if r.status != 200:
                 raise EnvironmentError(
                     "Couldn't retrieve schema document from server - received status code %s\n%s"
                     % (r.status, c)
                 )
-            schemadoc = StringIO.StringIO(c)
+            schemadoc = io.StringIO(c)
             # for line in schemadoc:
             #    print line
         self.schema = SolrSchema(schemadoc)

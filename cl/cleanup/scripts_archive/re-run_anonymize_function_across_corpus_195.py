@@ -2,7 +2,11 @@ import os
 import sys
 from django.utils.timezone import now
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -28,9 +32,9 @@ def cleaner(simulate=False, verbose=False):
         for line in text.split("\n"):
             clean_line, modified = anonymize(line)
             if modified:
-                print "Fixing text in document: %s" % doc.pk
-                print "Line reads: %s" % line
-                fix = raw_input("Fix the line? [Y/n]: ") or "y"
+                print("Fixing text in document: %s" % doc.pk)
+                print("Line reads: %s" % line)
+                fix = input("Fix the line? [Y/n]: ") or "y"
                 if fix.lower() == "y":
                     clean_lines.append(clean_line)
                     any_mods.append(modified)
@@ -71,9 +75,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return cleaner(simulate, verbose)
 

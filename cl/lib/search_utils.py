@@ -1,8 +1,7 @@
 import re
 from datetime import date
 from datetime import timedelta
-from urllib import urlencode
-from urlparse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.cache import cache
@@ -379,8 +378,8 @@ def make_date_query(query_field, before, after):
 
 def make_cite_count_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
-    start = cd.get("cited_gt") or u"*"
-    end = cd.get("cited_lt") or u"*"
+    start = cd.get("cited_gt") or "*"
+    end = cd.get("cited_lt") or "*"
     if start == "*" and end == "*":
         return ""
     else:
@@ -724,7 +723,7 @@ def add_grouping(main_params, cd, group):
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         and group is True
     ):
-        docket_query = re.match("docket_id:\d+", cd["q"])
+        docket_query = re.search("docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
@@ -1017,7 +1016,7 @@ def get_related_clusters_with_cache(cluster, request):
     """
 
     # By default all statuses are included
-    available_statuses = dict(DOCUMENT_STATUSES).values()
+    available_statuses = list(dict(DOCUMENT_STATUSES).values())
     url_search_params = {"stat_" + v: "on" for v in available_statuses}
 
     if is_bot(request):

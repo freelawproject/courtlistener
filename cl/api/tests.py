@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function
+
 import json
 import shutil
 from datetime import timedelta, date
@@ -913,7 +913,7 @@ class BulkDataTest(TestCase):
 
     def setUp(self):
         docket = Docket(
-            case_name=u"foo",
+            case_name="foo",
             court=Court.objects.get(pk="test"),
             source=Docket.DEFAULT,
         )
@@ -921,7 +921,7 @@ class BulkDataTest(TestCase):
         # Must be more than a year old for all tests to be runnable.
         last_month = now().date() - timedelta(days=400)
         self.doc_cluster = OpinionCluster(
-            case_name=u"foo", docket=docket, date_filed=last_month
+            case_name="foo", docket=docket, date_filed=last_month
         )
         self.doc_cluster.save(index=False)
         opinion = Opinion(cluster=self.doc_cluster, type="Lead Opinion")

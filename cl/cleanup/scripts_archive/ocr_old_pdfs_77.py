@@ -1,7 +1,11 @@
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -21,7 +25,7 @@ def fixer(simulate=False, verbose=False):
     )
     for doc in docs:
         if verbose:
-            print "Fixing document number %s: %s" % (doc.pk, doc)
+            print("Fixing document number %s: %s" % (doc.pk, doc))
 
         if not simulate:
             # Extract the contents asynchronously.
@@ -53,9 +57,9 @@ def main():
     simulate = options.simulate
 
     if simulate:
-        print "*******************************************"
-        print "* SIMULATE MODE - NO CHANGES WILL BE MADE *"
-        print "*******************************************"
+        print("*******************************************")
+        print("* SIMULATE MODE - NO CHANGES WILL BE MADE *")
+        print("*******************************************")
 
     return fixer(simulate, verbose)
 

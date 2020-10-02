@@ -80,19 +80,19 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         for court in courts:
             link = self.browser.find_element_by_link_text(court.full_name)
-            print "Testing link to %s..." % court.full_name,
+            print("Testing link to %s..." % court.full_name, end=" ")
             self.assertEqual(
                 link.get_attribute("href"),
                 "%s/feed/court/%s/" % (self.live_server_url, court.pk),
             )
             link.click()
-            print "clicked...",
+            print("clicked...", end=" ")
             self.assertIn(
                 'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
                 self.browser.page_source,
             )
             self.browser.back()
-            print "✓"
+            print("✓")
 
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
         """
@@ -102,7 +102,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             "%s%s" % (self.live_server_url, reverse("all_jurisdictions_feed"))
         )
         self.assertEqual(
-            u"CourtListener.com: All Opinions (High Volume)", f.feed.title
+            "CourtListener.com: All Opinions (High Volume)", f.feed.title
         )
         # Per https://pythonhosted.org/feedparser/bozo.html
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
@@ -117,7 +117,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         )
         f = feedparser.parse(url)
         self.assertEqual(
-            u"CourtListener.com: All opinions for the Testing Supreme Court",
+            "CourtListener.com: All opinions for the Testing Supreme Court",
             f.feed.title,
         )
         # Per https://pythonhosted.org/feedparser/bozo.html

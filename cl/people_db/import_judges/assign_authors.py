@@ -27,20 +27,23 @@ def assign_authors_to_opinions(jurisdictions=None, testing=False):
 
     for cluster in clusters:
         i += 1
-        print u"(%s/%s): Processing: %s, %s" % (
-            i,
-            total,
-            cluster.pk,
-            cluster.date_filed,
+        print(
+            "(%s/%s): Processing: %s, %s"
+            % (
+                i,
+                total,
+                cluster.pk,
+                cluster.date_filed,
+            )
         )
 
         judge_str = unidecode(cluster.judges)
-        print "  Judge string: %s" % judge_str
+        print("  Judge string: %s" % judge_str)
 
         if "curiam" in judge_str.lower():
             opinion = cluster.sub_opinions.all()[0]
             opinion.per_curiam = True
-            print u"  Per Curiam assigned."
+            print("  Per Curiam assigned.")
             if not testing:
                 opinion.save(index=False)
             continue
@@ -50,19 +53,19 @@ def assign_authors_to_opinions(jurisdictions=None, testing=False):
         )
         if len(candidates) < 1:
             # No DB matches
-            print u"  No match."
+            print("  No match.")
 
         elif len(candidates) == 1:
             # only one candidate, assign author
             opinion = cluster.sub_opinions.all()[0]
             opinion.author = candidates[0]
-            print u"  Author assigned: %s" % unidecode(str(candidates[0]))
+            print("  Author assigned: %s" % unidecode(str(candidates[0])))
             if not testing:
                 opinion.save(index=False)
 
         elif len(candidates) > 1:
             # more than one DB match, assign panel
-            print u"  Panel assigned: %s" % candidates
+            print("  Panel assigned: %s" % candidates)
             if not testing:
                 for candidate in candidates:
                     cluster.panel.add(candidate)
@@ -76,7 +79,7 @@ def assign_authors_to_oral_arguments(testing=False):
     )
     for af in afs:
         judge_str = unidecode(af.judges)
-        print "  Judge string: %s" % judge_str
+        print("  Judge string: %s" % judge_str)
 
         candidates = get_candidate_judges(
             judge_str, af.docket.court_id, af.docket.date_argued

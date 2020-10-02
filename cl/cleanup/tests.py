@@ -30,8 +30,8 @@ class CitationTaxCleanup(TestCase):
                 data = json.loads(f.read())
             cite = find_tax_court_citation(data["html"])
             self.assertEqual(cite.base_citation(), data["cite"])
-            print ("Success ✓")
-            print (data["notes"])
+            print("Success ✓")
+            print(data["notes"])
 
     @mock.patch(
         "cl.cleanup.management.commands.fix_tax_court.find_tax_court_citation",
@@ -44,7 +44,7 @@ class CitationTaxCleanup(TestCase):
                 data = json.loads(f.read())
             cite = find_tax_court_citation(data["html"])
             self.assertFalse(cite)
-            print ("Success ✓")
+            print("Success ✓")
 
     @mock.patch(
         "cl.cleanup.management.commands.fix_tax_court.get_tax_docket_numbers",
@@ -56,12 +56,12 @@ class CitationTaxCleanup(TestCase):
             with open(path) as f:
                 data = json.loads(f.read())
             for case in data:
-                answer = re.sub(u"–", "-", case["answer"])
-                answer = re.sub(u"—", "-", answer)
-                answer = re.sub(u"–", "-", answer)
-                print (answer)
+                answer = re.sub("–", "-", case["answer"])
+                answer = re.sub("—", "-", answer)
+                answer = re.sub("–", "-", answer)
+                print(answer)
                 self.assertEqual(get_tax_docket_numbers(case["text"]), answer)
-                print ("Success ✓")
+                print("Success ✓")
 
 
 class CleanupTest(TestCase):
@@ -278,10 +278,10 @@ with Virginia Historic Tax Credit Fund""",
             ),
         )
         for q, a in test_pairs:
-            print "Searching for %s" % a,
+            print("Searching for %s" % a, end=" ")
             docket_numbers_found = get_tax_docket_numbers(q)
             self.assertEqual(docket_numbers_found, a, msg="Success")
-            print "✓"
+            print("✓")
 
     def test_tax_court_citation_extractor(self):
         """Find Tax Court Citations """
@@ -351,7 +351,7 @@ with Virginia Historic Tax Credit Fund""",
                 "2003 T.C. Summary Opinion 150",
             ),
             (
-                u"""
+                """
                    MICHAEL KEITH SHENK, PETITIONER v. COMMISSIONER
                                                     OF INTERNAL REVENUE, RESPONDENT
 
@@ -451,4 +451,4 @@ VerDate Nov 24 2008   10:59 Jul 11, 2014   Jkt 372897   PO 20012   Frm 00002   F
                 [str(cite.volume), cite.reporter, str(cite.page)]
             )
             self.assertEqual(cite_string, a, msg="Success")
-            print "✓"
+            print("✓")

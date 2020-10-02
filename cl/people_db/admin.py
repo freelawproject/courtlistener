@@ -204,7 +204,7 @@ class RoleAdmin(admin.ModelAdmin):
     )
     list_filter = ("role",)
     list_display = (
-        "__unicode__",
+        "__str__",
         "attorney",
         "get_role_display",
         "party",
@@ -225,7 +225,7 @@ class AttorneyOrgAssAdmin(admin.ModelAdmin):
         "docket",
     )
     list_display = (
-        "__unicode__",
+        "__str__",
         "attorney",
         "docket",
         "attorney_organization",

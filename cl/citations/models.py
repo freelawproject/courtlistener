@@ -83,7 +83,7 @@ class Citation(object):
         pass
 
     def base_citation(self):
-        return u"%d %s %s" % (self.volume, self.reporter, self.page)
+        return "%d %s %s" % (self.volume, self.reporter, self.page)
 
     def to_model(self):
         # Create a citation object as in our models. Eventually, the version in
@@ -105,20 +105,20 @@ class Citation(object):
     def __repr__(self):
         print_string = self.base_citation()
         if self.defendant:
-            print_string = u" ".join([self.defendant, print_string])
+            print_string = " ".join([self.defendant, print_string])
             if self.plaintiff:
-                print_string = u" ".join([self.plaintiff, "v.", print_string])
+                print_string = " ".join([self.plaintiff, "v.", print_string])
         if self.extra:
-            print_string = u" ".join([print_string, self.extra])
+            print_string = " ".join([print_string, self.extra])
         if self.court and self.year:
-            paren = u"(%s %d)" % (self.court, self.year)
+            paren = "(%s %d)" % (self.court, self.year)
         elif self.year:
-            paren = u"(%d)" % self.year
+            paren = "(%d)" % self.year
         elif self.court:
-            paren = u"(%s)" % self.court
+            paren = "(%s)" % self.court
         else:
             paren = ""
-        print_string = u" ".join([print_string, paren])
+        print_string = " ".join([print_string, paren])
         return print_string.encode("utf-8")
 
     def __eq__(self, other):
@@ -168,19 +168,19 @@ class FullCitation(Citation):
         # against accidentally updating things like docket number 22 Cr. 1 as
         # 22 Cranch 1, which is totally wrong.
         template = (
-            u'<span class="volume">%(volume)d</span>\\g<1>'
-            u'<span class="reporter">%(reporter)s</span>\\g<2>'
-            u'<span class="page">%(page)s</span>\\g<3>'
+            '<span class="volume">%(volume)d</span>\\g<1>'
+            '<span class="reporter">%(reporter)s</span>\\g<2>'
+            '<span class="page">%(page)s</span>\\g<3>'
         )
         inner_html = template % self.__dict__
         span_class = "citation"
         if self.match_url:
-            inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
-            data_attr = u' data-id="%s"' % self.match_id
+            inner_html = '<a href="%s">%s</a>' % (self.match_url, inner_html)
+            data_attr = ' data-id="%s"' % self.match_id
         else:
             span_class += " no-link"
             data_attr = ""
-        return u'<span class="%s"%s>%s</span>' % (
+        return '<span class="%s"%s>%s</span>' % (
             span_class,
             data_attr,
             inner_html,
@@ -210,7 +210,7 @@ class ShortformCitation(Citation):
         self.antecedent_guess = antecedent_guess
 
     def __repr__(self):
-        print_string = u"%s, %d %s, at %s" % (
+        print_string = "%s, %d %s, at %s" % (
             self.antecedent_guess,
             self.volume,
             self.reporter,
@@ -230,20 +230,20 @@ class ShortformCitation(Citation):
         # Don't include the antecedent guess in the HTML link, since the guess
         # might be horribly wrong.
         inner_html = (
-            u'<span class="volume">%(volume)d</span>\\g<2>'
-            + u'<span class="reporter">%(reporter)s</span>\\g<3>\\g<4>at\\g<5>'
-            + u'<span class="page">%(page)s</span>\\g<6>'
+            '<span class="volume">%(volume)d</span>\\g<2>'
+            + '<span class="reporter">%(reporter)s</span>\\g<3>\\g<4>at\\g<5>'
+            + '<span class="page">%(page)s</span>\\g<6>'
         )
         inner_html = inner_html % self.__dict__
         span_class = "citation"
         if self.match_url:
-            inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
-            data_attr = u' data-id="%s"' % self.match_id
+            inner_html = '<a href="%s">%s</a>' % (self.match_url, inner_html)
+            data_attr = ' data-id="%s"' % self.match_id
         else:
             span_class += " no-link"
             data_attr = ""
         return (
-            u'<span class="%s"%s><span class="antecedent_guess">%s</span>\\g<1>%s</span>'
+            '<span class="%s"%s><span class="antecedent_guess">%s</span>\\g<1>%s</span>'
             % (span_class, data_attr, self.antecedent_guess, inner_html)
         )
 
@@ -289,38 +289,37 @@ class SupraCitation(Citation):
 
     def as_html(self):
         inner_html = (
-            u'<span class="antecedent_guess">%s</span>' % self.antecedent_guess
+            '<span class="antecedent_guess">%s</span>' % self.antecedent_guess
         )
         if self.volume:
             inner_html += (
-                u'\\g<1><span class="volume">%d</span>\\g<2>supra'
-                % self.volume
+                '\\g<1><span class="volume">%d</span>\\g<2>supra' % self.volume
             )
             if self.page:
                 inner_html += (
-                    u',\\g<3>at\\g<4><span class="page">%s</span>\\g<5>'
+                    ',\\g<3>at\\g<4><span class="page">%s</span>\\g<5>'
                     % self.page
                 )
             else:
-                inner_html += u"\\g<3>"
+                inner_html += "\\g<3>"
         else:
-            inner_html += u"\\g<1>supra"
+            inner_html += "\\g<1>supra"
             if self.page:
                 inner_html += (
-                    u',\\g<2>at\\g<3><span class="page">%s</span>\\g<4>'
+                    ',\\g<2>at\\g<3><span class="page">%s</span>\\g<4>'
                     % self.page
                 )
             else:
-                inner_html += u"\\g<2>"
+                inner_html += "\\g<2>"
 
         span_class = "citation"
         if self.match_url:
-            inner_html = u'<a href="%s">%s</a>' % (self.match_url, inner_html)
-            data_attr = u' data-id="%s"' % self.match_id
+            inner_html = '<a href="%s">%s</a>' % (self.match_url, inner_html)
+            data_attr = ' data-id="%s"' % self.match_id
         else:
             span_class += " no-link"
             data_attr = ""
-        return u'<span class="%s"%s>%s</span>' % (
+        return '<span class="%s"%s>%s</span>' % (
             span_class,
             data_attr,
             inner_html,
@@ -389,7 +388,7 @@ class IdCitation(Citation):
         #   dynamically generated because total number of "after tokens" varies
         # Produces something like this:
         # "\\g<2>after_token_1\\g<3>after_token_2\\g<4>after_token_3" ...
-        template = u"\\g<%s>%s"
+        template = "\\g<%s>%s"
         after_token_html = "".join(
             [
                 template % (str(i + 2), t)
@@ -409,26 +408,26 @@ class IdCitation(Citation):
         if self.match_url:
             if self.should_linkify:
                 id_string_template = (
-                    u'<a href="%s"><span class="id_token">%s</span>%s</a>'
+                    '<a href="%s"><span class="id_token">%s</span>%s</a>'
                 )
             else:
                 id_string_template = (
-                    u'<a href="%s"><span class="id_token">%s</span></a>%s'
+                    '<a href="%s"><span class="id_token">%s</span></a>%s'
                 )
             id_string = id_string_template % (
                 self.match_url,
                 self.id_token,
                 after_token_html,
             )
-            data_attr = u' data-id="%s"' % self.match_id
+            data_attr = ' data-id="%s"' % self.match_id
         else:
-            id_string = u'<span class="id_token">%s</span>%s' % (
+            id_string = '<span class="id_token">%s</span>%s' % (
                 self.id_token,
                 after_token_html,
             )
             span_class += " no-link"
             data_attr = ""
-        return u'<span class="%s"%s>\\g<1>%s</span>' % (
+        return '<span class="%s"%s>\\g<1>%s</span>' % (
             span_class,
             data_attr,
             id_string,

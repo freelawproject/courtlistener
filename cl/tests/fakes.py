@@ -44,7 +44,7 @@ class FakePossibleCaseNumberApi:
 
 
 class FakeAttachmentPage:
-    response = MagicMock(text=u"")
+    response = MagicMock(text="")
     _parse_text = MagicMock()
 
     def __init__(self, *args, **kwargs):

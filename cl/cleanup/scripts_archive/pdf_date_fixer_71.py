@@ -1,7 +1,11 @@
 import os
 import sys
 
-execfile("/etc/courtlistener")
+exec(
+    compile(
+        open("/etc/courtlistener", "rb").read(), "/etc/courtlistener", "exec"
+    )
+)
 sys.path.append(INSTALL_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
@@ -52,16 +56,20 @@ def update_date(doc, simulate):
         date_filed = doc.date_filed
     else:
         # break from this function.
-        print "\n***No date_filed value for doc: " + str(
-            doc.pk
-        ) + ". Punting.***\n"
+        print(
+            "\n***No date_filed value for doc: "
+            + str(doc.pk)
+            + ". Punting.***\n"
+        )
         return 1
     if doc.local_path != "":
         local_path = doc.local_path
     else:
-        print "\n***No local_path value for doc: " + str(
-            doc.pk
-        ) + ". Punting.***\n"
+        print(
+            "\n***No local_path value for doc: "
+            + str(doc.pk)
+            + ". Punting.***\n"
+        )
         return 2
     root = settings.MEDIA_ROOT
 
@@ -82,7 +90,7 @@ def update_date(doc, simulate):
             except OSError as exc:
                 if exc.errno == 17:
                     # Error 17: File exists. Append "2", and move on.
-                    print "Duplicate file found, appending 2"
+                    print("Duplicate file found, appending 2")
                     filename = (
                         filename[0 : string.rfind(filename, ".")]
                         + "2"
@@ -93,7 +101,7 @@ def update_date(doc, simulate):
                         os.link(old, new)
                     except OSError as exc:
                         if exc.errno == 17:
-                            print "Duplicate file found again, appending 3"
+                            print("Duplicate file found again, appending 3")
                             filename = (
                                 filename[0 : string.rfind(filename, ".")]
                                 + "3"
@@ -106,11 +114,15 @@ def update_date(doc, simulate):
 
             doc.local_path = os.path.join("pdf", year, month, day, filename)
             doc.save()
-        print "***Created new hard link to " + new + " for doc: " + str(
-            doc.pk
-        ) + " ***"
+        print(
+            "***Created new hard link to "
+            + new
+            + " for doc: "
+            + str(doc.pk)
+            + " ***"
+        )
     else:
-        print "Same. Not updating link for " + str(doc.pk)
+        print("Same. Not updating link for " + str(doc.pk))
 
 
 def main():
@@ -161,9 +173,9 @@ def main():
             )
 
     if simulate:
-        print "\n*****************************"
-        print "* Running in simulate mode! *"
-        print "*****************************\n"
+        print("\n*****************************")
+        print("* Running in simulate mode! *")
+        print("*****************************\n")
         time.sleep(1)
 
     if all:

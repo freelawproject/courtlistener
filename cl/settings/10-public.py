@@ -515,7 +515,7 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": "/var/log/courtlistener/django.log",
-            "maxBytes": "16777216",  # 16 megabytes
+            "maxBytes": 16777216,  # 16 megabytes
             "formatter": "verbose",
             "filters": ["skip_unreadable_posts"],
         },

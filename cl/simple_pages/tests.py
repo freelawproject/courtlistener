@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function
+
 
 import datetime
 import os
@@ -167,7 +167,7 @@ class StaticFilesTest(TestCase):
     def setUp(self):
         self.court = Court.objects.get(pk="test")
         self.docket = Docket(
-            case_name=u"Docket", court=self.court, source=Docket.DEFAULT
+            case_name="Docket", court=self.court, source=Docket.DEFAULT
         )
         self.docket.save()
 
@@ -182,7 +182,7 @@ class StaticFilesTest(TestCase):
         self.audio.save(index=False)
 
         self.opinioncluster = OpinionCluster(
-            case_name=u"Hotline Bling",
+            case_name="Hotline Bling",
             docket=self.docket,
             date_filed=datetime.date(2015, 12, 14),
         )

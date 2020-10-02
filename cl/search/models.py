@@ -9,7 +9,7 @@ from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.template import loader
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import force_str
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -170,7 +170,7 @@ class OriginatingCourtInformation(models.Model):
         null=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "<OriginatingCourtInformation: %s>" % self.pk
 
     def get_absolute_url(self):
@@ -603,11 +603,11 @@ class Docket(models.Model):
             ),
         )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.case_name:
-            return smart_unicode("%s: %s" % (self.pk, self.case_name))
+            return force_str("%s: %s" % (self.pk, self.case_name))
         else:
-            return u"{pk}".format(pk=self.pk)
+            return "{pk}".format(pk=self.pk)
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
@@ -671,15 +671,15 @@ class Docket(models.Model):
                 path = "/n/beam/servlet/TransportRoom?"
 
             return (
-                u"https://ecf.%s.uscourts.gov"
+                "https://ecf.%s.uscourts.gov"
                 + path
-                + u"servlet=CaseSummary.jsp&"
-                u"caseNum=%s&"
-                u"incOrigDkt=Y&"
-                u"incDktEntries=Y"
+                + "servlet=CaseSummary.jsp&"
+                "caseNum=%s&"
+                "incOrigDkt=Y&"
+                "incDktEntries=Y"
             ) % (court_id, self.pacer_case_id)
         else:
-            return u"https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
+            return "https://ecf.%s.uscourts.gov/cgi-bin/DktRpt.pl?%s" % (
                 court_id,
                 self.pacer_case_id,
             )
@@ -966,7 +966,7 @@ class DocketEntry(models.Model):
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "<DocketEntry:%s ---> %s >" % (
             self.pk,
             trunc(self.description, 50, ellipsis="..."),
@@ -1076,7 +1076,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
             self.pk,
             self.docket_entry.docket.docket_number,
@@ -1423,7 +1423,7 @@ class BankruptcyInformation(models.Model):
     class Meta:
         verbose_name_plural = "Bankruptcy Information"
 
-    def __unicode__(self):
+    def __str__(self):
         return "Bankruptcy Info for docket %s" % self.docket_id
 
 
@@ -1541,7 +1541,7 @@ class Claim(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "Claim #%s on docket %s with pk %s" % (
             self.claim_number,
             self.docket_id,
@@ -1829,8 +1829,8 @@ class Court(models.Model):
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
-    def __unicode__(self):
-        return u"{name}".format(name=self.full_name)
+    def __str__(self):
+        return "{name}".format(name=self.full_name)
 
     @property
     def is_terminated(self):
@@ -2174,10 +2174,10 @@ class OpinionCluster(models.Model):
         citations = sorted(self.citations.all(), key=sort_cites)
         if not citations:
             if self.docket.docket_number:
-                caption += u", %s" % self.docket.docket_number
+                caption += ", %s" % self.docket.docket_number
         else:
             if citations[0].type == Citation.NEUTRAL:
-                caption += u", %s" % citations[0]
+                caption += ", %s" % citations[0]
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
             elif (
@@ -2185,15 +2185,15 @@ class OpinionCluster(models.Model):
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
             ):
-                caption += u", %s, %s" % (citations[0], citations[1])
+                caption += ", %s, %s" % (citations[0], citations[1])
             else:
-                caption += u", %s" % citations[0]
+                caption += ", %s" % citations[0]
 
-        if self.docket.court_id != u"scotus":
-            court = re.sub(u" ", u"&nbsp;", self.docket.court.citation_string)
+        if self.docket.court_id != "scotus":
+            court = re.sub(" ", "&nbsp;", self.docket.court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
             year = self.date_filed.isoformat().split("-")[0]
-            caption += u"&nbsp;({court}&nbsp;{year})".format(
+            caption += "&nbsp;({court}&nbsp;{year})".format(
                 court=court, year=year
             )
         return caption
@@ -2265,11 +2265,11 @@ class OpinionCluster(models.Model):
             published=True, deleted=False
         ).order_by("-view_count")
 
-    def __unicode__(self):
+    def __str__(self):
         if self.case_name:
-            return u"%s: %s" % (self.pk, self.case_name)
+            return "%s: %s" % (self.pk, self.case_name)
         else:
-            return u"%s" % self.pk
+            return "%s" % self.pk
 
     def get_absolute_url(self):
         return reverse("view_case", args=[self.pk, self.slug])
@@ -2387,7 +2387,7 @@ class OpinionCluster(models.Model):
                     "joined_by_ids": [j.pk for j in opinion.joined_by.all()],
                     "type": opinion.type,
                     "download_url": opinion.download_url or None,
-                    "local_path": unicode(opinion.local_path),
+                    "local_path": str(opinion.local_path),
                     "text": text_template.render(
                         {
                             "item": opinion,
@@ -2461,9 +2461,9 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
-    def __unicode__(self):
+    def __str__(self):
         # Note this representation is used in the front end.
-        return u"{volume} {reporter} {page}".format(**self.__dict__)
+        return "{volume} {reporter} {page}".format(**self.__dict__)
 
     def get_absolute_url(self):
         return self.cluster.get_absolute_url()
@@ -2687,13 +2687,13 @@ class Opinion(models.Model):
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
-    def __unicode__(self):
+    def __str__(self):
         try:
-            return u"{pk} - {cn}".format(
+            return "{pk} - {cn}".format(
                 pk=getattr(self, "pk", None), cn=self.cluster.case_name
             )
         except AttributeError:
-            return u"Orphan opinion with ID: %s" % self.pk
+            return "Orphan opinion with ID: %s" % self.pk
 
     def get_absolute_url(self):
         return reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
@@ -2728,7 +2728,7 @@ class Opinion(models.Model):
                 "joined_by_ids": [judge.pk for judge in self.joined_by.all()],
                 "type": self.type,
                 "download_url": self.download_url or None,
-                "local_path": unicode(self.local_path),
+                "local_path": str(self.local_path),
             }
         )
 
@@ -2834,8 +2834,8 @@ class OpinionsCited(models.Model):
     # treatment: positive, negative, etc.
     #
 
-    def __unicode__(self):
-        return u"%s ⤜--cites⟶  %s" % (
+    def __str__(self):
+        return "%s ⤜--cites⟶  %s" % (
             self.citing_opinion.id,
             self.cited_opinion.id,
         )
@@ -2866,8 +2866,8 @@ class Tag(models.Model):
         unique=True,
     )
 
-    def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name)
+    def __str__(self):
+        return "%s: %s" % (self.pk, self.name)
 
     def tag_object(self, thing):
         """Atomically add a tag to an item.
@@ -2940,7 +2940,7 @@ class Tag(models.Model):
 #         max_length=1,
 #         choices=REVIEW_STANDARDS,
 #     )
-#     def __unicode__(self):
+#     def __str__(self):
 #         return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
 #                                         self.upper_court.id)
 #

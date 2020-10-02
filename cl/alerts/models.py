@@ -55,8 +55,8 @@ class Alert(models.Model):
         max_length=40,
     )
 
-    def __unicode__(self):
-        return u"Alert %s: %s" % (self.pk, self.name)
+    def __str__(self):
+        return "Alert %s: %s" % (self.pk, self.name)
 
     class Meta:
         ordering = ["rate", "query"]
@@ -99,8 +99,8 @@ class DocketAlert(models.Model):
     class Meta:
         unique_together = ("docket", "user")
 
-    def __unicode__(self):
-        return u"DocketAlert %s: %s" % (self.pk, self.docket_id)
+    def __str__(self):
+        return "DocketAlert %s: %s" % (self.pk, self.docket_id)
 
     def save(self, *args, **kwargs):
         """Ensure we get a token when we save the first time."""

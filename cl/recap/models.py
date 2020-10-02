@@ -180,21 +180,21 @@ class ProcessingQueue(models.Model):
         on_delete=models.CASCADE,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.upload_type in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
             UPLOAD_TYPE.APPELLATE_DOCKET,
             UPLOAD_TYPE.DOCUMENT_ZIP,
         ]:
-            return u"ProcessingQueue %s: %s case #%s (%s)" % (
+            return "ProcessingQueue %s: %s case #%s (%s)" % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id,
                 self.get_upload_type_display(),
             )
         elif self.upload_type == UPLOAD_TYPE.PDF:
-            return u"ProcessingQueue: %s: %s.%s.%s.%s (%s)" % (
+            return "ProcessingQueue: %s: %s.%s.%s.%s (%s)" % (
                 self.pk,
                 self.court_id,
                 self.pacer_case_id or None,
@@ -203,7 +203,7 @@ class ProcessingQueue(models.Model):
                 self.get_upload_type_display(),
             )
         else:
-            return u"ProcessingQueue: %s (%s)" % (
+            return "ProcessingQueue: %s (%s)" % (
                 self.pk,
                 self.get_upload_type_display(),
             )
@@ -365,8 +365,8 @@ class PacerFetchQueue(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
-        return u"PacerFetchQueue: %s (%s)" % (
+    def __str__(self):
+        return "PacerFetchQueue: %s (%s)" % (
             self.pk,
             self.get_request_type_display(),
         )
@@ -851,8 +851,8 @@ class FjcIntegratedDatabase(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
-        return u"%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
+    def __str__(self):
+        return "%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
 
     class Meta:
         verbose_name_plural = "FJC Integrated Database Entries"

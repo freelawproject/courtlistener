@@ -1,5 +1,5 @@
 import logging
-from urlparse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 
 import requests
 import simplejson as json  # This is needed to handle Decimal objects.

@@ -1,6 +1,6 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
-from urllib import urlencode
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist

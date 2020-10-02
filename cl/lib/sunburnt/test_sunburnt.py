@@ -1,11 +1,6 @@
-from __future__ import absolute_import
+from io import StringIO
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
-import cgi, datetime, urlparse
+import cgi, datetime, urllib.parse
 
 from lxml.builder import E
 from lxml.etree import tostring
@@ -116,8 +111,8 @@ class MockConnection(object):
 
     def request(self, uri, method="GET", body=None, headers=None):
 
-        u = urlparse.urlparse(uri)
-        params = urlparse.parse_qs(u.query)
+        u = urllib.parse.urlparse(uri)
+        params = urllib.parse.parse_qs(u.query)
 
         self.tracking_dict.update(
             url=uri,
@@ -159,7 +154,7 @@ conn = SolrInterface(
 pagination_slice_tests = (
     (
         (None, None),
-        range(0, 10),
+        list(range(0, 10)),
         (
             slice(None, None, None),
             slice(0, 10, None),
@@ -192,7 +187,7 @@ pagination_slice_tests = (
     ### and now with pre-paginated queries:
     (
         (2, 6),
-        range(2, 8),
+        list(range(2, 8)),
         (
             slice(None, None, None),
             slice(0, 6, None),
@@ -240,7 +235,7 @@ def test_slice_pagination():
 pagination_index_tests = (
     (
         (None, None),
-        range(0, 10),
+        list(range(0, 10)),
         (
             (0, None),
             (5, None),
@@ -256,7 +251,7 @@ pagination_index_tests = (
     ),
     (
         (2, 6),
-        range(2, 8),
+        list(range(2, 8)),
         (
             (0, None),
             (3, None),
@@ -332,7 +327,7 @@ mlt_query_tests = (
     ((None, None, None), ({"mlt.fl": ["text_field"]}, "GET", ""), None),
     (("Content", "not-an-encoding", None), (), LookupError),
     (
-        (u"Content", None, None),
+        ("Content", None, None),
         ({"stream.body": ["Content"], "mlt.fl": ["text_field"]}, "GET", ""),
         None,
     ),

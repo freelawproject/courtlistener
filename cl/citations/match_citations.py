@@ -37,7 +37,7 @@ def make_name_param(defendant, plaintiff=None):
         token_list.extend(plaintiff.split())
         # Strip out punctuation, which Solr doesn't like
     query_words = [strip_punct(t) for t in token_list]
-    return u" ".join(query_words), len(query_words)
+    return " ".join(query_words), len(query_words)
 
 
 def reverse_match(conn, results, citing_doc):
@@ -68,7 +68,7 @@ def case_name_query(conn, params, citation, citing_doc):
     results = []
     # Use Solr minimum match search, starting with requiring all words to match,
     # and decreasing by one word each time until a match is found
-    for num_words in xrange(length, 0, -1):
+    for num_words in range(length, 0, -1):
         params["mm"] = num_words
         new_results = conn.raw_query(**params).execute()
         if len(new_results) >= 1:

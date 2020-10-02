@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 
 from django.utils.html import strip_tags
 
@@ -297,7 +297,7 @@ def judges_exist(text, judges):
     """
     matched = []
     for judge in judges:
-        if isinstance(judge, basestring):
+        if isinstance(judge, str):
             if re.search(r"\b%s\b" % judge, text):
                 matched.append(judge)
             continue

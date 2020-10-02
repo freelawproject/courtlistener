@@ -10,7 +10,7 @@ from reporters_db import EDITIONS, VARIATIONS_ONLY
 
 # We need to build a REGEX that has all the variations and the reporters in
 # order from longest to shortest.
-REGEX_LIST = EDITIONS.keys() + VARIATIONS_ONLY.keys()
+REGEX_LIST = list(EDITIONS.keys()) + list(VARIATIONS_ONLY.keys())
 REGEX_LIST.sort(key=len, reverse=True)
 REGEX_STR = "|".join(map(re.escape, REGEX_LIST))
 REPORTER_RE = re.compile(r"(^|\s)(%s)(\s|,)" % REGEX_STR)
@@ -59,7 +59,7 @@ def tokenize(text):
     strings = REPORTER_RE.split(text)
     words = []
     for string in strings:
-        if string in EDITIONS.keys() + VARIATIONS_ONLY.keys():
+        if string in list(EDITIONS.keys()) + list(VARIATIONS_ONLY.keys()):
             words.append(string)
         else:
             # Normalize spaces
