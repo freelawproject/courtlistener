@@ -208,7 +208,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
-        self.data["pacer_case_id"] = "☠☠☠"
+        self.data["pacer_case_id"] = u"☠☠☠"
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
@@ -1434,7 +1434,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         self.assertTrue(og_info)
         self.assertIn("Gloria", og_info.court_reporter)
         self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
-        self.assertEqual(og_info.docket_number, "1:17-cv-00050")
+        self.assertEqual(og_info.docket_number, u"1:17-cv-00050")
 
 
 class RecapCriminalDataUploadTaskTest(TestCase):

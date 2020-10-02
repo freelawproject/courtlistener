@@ -1,4 +1,4 @@
-FROM python:2.7
+FROM python:3.8
 
 WORKDIR /usr/src/app
 
@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir -r requirements-dev.txt && \
 
 COPY requirements-flp.txt ./
 RUN pip install --no-cache-dir -r requirements-flp.txt
-
 ENV \
     PYTHONPATH="${PYTHONPATH}"
 

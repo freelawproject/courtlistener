@@ -1,5 +1,5 @@
 #Inherit our django image which has the same pip requirements start the celery container.
-FROM freelawproject/courtlistener-django:bte_beta
+FROM freelawproject/courtlistener-django:bte_beta38
 
 WORKDIR /usr/src/app
 
