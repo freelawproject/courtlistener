@@ -9,7 +9,7 @@ from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q
 from django.template import loader
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import force_str
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -605,7 +605,7 @@ class Docket(models.Model):
 
     def __str__(self):
         if self.case_name:
-            return smart_unicode("%s: %s" % (self.pk, self.case_name))
+            return force_str("%s: %s" % (self.pk, self.case_name))
         else:
             return "{pk}".format(pk=self.pk)
 
