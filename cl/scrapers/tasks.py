@@ -1,29 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-from ast import literal_eval
-
-from cl.scrapers.transformer_extractor_utils import (
-    get_page_count,
-    document_extract,
-    convert_audio,
-)
-import os
 import logging
 import random
 import traceback
-import uuid
 
-import eyed3
 import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.utils.timezone import now
-from eyed3 import id3
+from juriscraper.pacer import PacerSession, CaseQuery
 from requests import Timeout
-from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
 from cl.celery import app
@@ -32,7 +21,6 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
-from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import (
@@ -40,9 +28,13 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
 )
 from cl.scrapers.models import ErrorLog
+from cl.scrapers.transformer_extractor_utils import (
+    get_page_count,
+    document_extract,
+    convert_and_clean_audio,
+)
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import add_items_to_solr
-from juriscraper.pacer import PacerSession, CaseQuery
 
 logger = logging.getLogger(__name__)
 
@@ -184,129 +176,37 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
     return processed
 
 
-def set_mp3_meta_data(audio_obj, mp3_path):
-    """Sets the meta data on the mp3 file to good values.
-
-    :param audio_obj: an Audio object to clean up.
-    :param mp3_path: the path to the mp3 to be converted.
-    """
-    court = audio_obj.docket.court
-
-    # Load the file, delete the old tags and create a new one.
-    audio_file = eyed3.load(mp3_path)
-
-    # Undocumented API from eyed3.plugins.classic.ClassicPlugin#handleRemoves
-    id3.Tag.remove(
-        audio_file.tag.file_info.name,
-        id3.ID3_ANY_VERSION,
-        preserve_file_time=False,
-    )
-    audio_file.initTag()
-    audio_file.tag.title = best_case_name(audio_obj)
-    audio_file.tag.album = u"{court}, {year}".format(
-        court=court.full_name, year=audio_obj.docket.date_argued.year
-    )
-    audio_file.tag.artist = court.full_name
-    audio_file.tag.artist_url = court.url
-    audio_file.tag.audio_source_url = audio_obj.download_url
-    audio_file.tag.comments.set(
-        u"Argued: {date_argued}. Docket number: {docket_number}".format(
-            date_argued=audio_obj.docket.date_argued.strftime("%Y-%m-%d"),
-            docket_number=audio_obj.docket.docket_number,
-        )
-    )
-    audio_file.tag.genre = u"Speech"
-    audio_file.tag.publisher = u"Free Law Project"
-    audio_file.tag.publisher_url = u"https://free.law"
-    audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime(
-        "%Y-%m-%d"
-    )
-
-    # Add images to the mp3. If it has a seal, use that for the Front Cover
-    # and use the FLP logo for the Publisher Logo. If it lacks a seal, use the
-    # Publisher logo for both the front cover and the Publisher logo.
-    try:
-        has_seal = seals_data[court.pk]["has_seal"]
-    except AttributeError:
-        # Unknown court in Seal Rookery.
-        has_seal = False
-    except KeyError:
-        # Unknown court altogether (perhaps a test?)
-        has_seal = False
-
-    flp_image_frames = [
-        3,  # "Front Cover". Complete list at eyed3/id3/frames.py
-        14,  # "Publisher logo".
-    ]
-    if has_seal:
-        with open(
-            os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
-        ) as f:
-            audio_file.tag.images.set(
-                3, f.read(), "image/png", u"Seal for %s" % court.short_name
-            )
-        flp_image_frames.remove(3)
-
-    for frame in flp_image_frames:
-        with open(
-            os.path.join(
-                settings.INSTALL_ROOT,
-                "cl",
-                "audio",
-                "static",
-                "png",
-                "producer-300x300.png",
-            ),
-            "r",
-        ) as f:
-            audio_file.tag.images.set(
-                frame,
-                f.read(),
-                "image/png",
-                u"Created for the public domain by Free Law Project",
-            )
-
-    audio_file.tag.save()
-
-
 @app.task
 def process_audio_file(pk):
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
     """
     af = Audio.objects.get(pk=pk)
-    tmp_path = os.path.join("/tmp", "audio_" + uuid.uuid4().hex + ".mp3")
-    response = convert_audio(af.local_path_original_file.path)
+    try:
+        response = convert_and_clean_audio(af).json()
+        cf = ContentFile(response["content"])
+        file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
+        af.file_with_date = af.docket.date_argued
+        af.local_path_mp3.save(file_name, cf, save=False)
+        af.duration = response["duration"]
 
-    err = int(response["error_code"])
-    if not err == Timeout:
-        with open(tmp_path, "w") as mp3:
-            mp3.write(literal_eval(response["content"]))
-        set_mp3_meta_data(af, tmp_path)
-        try:
-            with open(tmp_path, "r") as mp3:
-                cf = ContentFile(mp3.read())
-                file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
-                af.file_with_date = af.docket.date_argued
-                af.local_path_mp3.save(file_name, cf, save=False)
-        except:
-            msg = (
-                "Unable to save mp3 to audio_file in scraper.tasks."
-                "process_audio_file for item: %s\n"
-                "Traceback:\n"
-                "%s" % (af.pk, traceback.format_exc())
-            )
-            print(msg)
-            ErrorLog.objects.create(
-                log_level="CRITICAL", court=af.docket.court, message=msg
-            )
-    else:
+    except Timeout:
         ErrorLog.objects.create(
             log_level="CRITICAL",
             court=af.docket.court,
             message="Timeout occurred in docker container for %s" % (af.pk),
         )
-    af.duration = eyed3.load(tmp_path).info.time_secs
+    except:
+        msg = (
+            "Unable to save mp3 to audio_file in scraper.tasks."
+            "process_audio_file for item: %s\n"
+            "Traceback:\n"
+            "%s" % (af.pk, traceback.format_exc())
+        )
+        logger.warn(msg)
+        ErrorLog.objects.create(
+            log_level="CRITICAL", court=af.docket.court, message=msg
+        )
     af.processing_complete = True
     af.save()
 
