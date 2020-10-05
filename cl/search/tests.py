@@ -374,7 +374,9 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
-        self.assertIn(b"Honda", r.content, "Result not found by docket number!")
+        self.assertIn(
+            b"Honda", r.content, "Result not found by docket number!"
+        )
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""

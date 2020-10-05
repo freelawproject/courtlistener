@@ -151,7 +151,6 @@ class SolrConnection(object):
         else:
             kwargs = dict(method="GET")
         r, c = self.request(url, **kwargs)
-
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -246,7 +245,6 @@ class SolrInterface(object):
             hasattr(docs, "items") or not hasattr(docs, "__iter__")
         ):
             docs = [docs]
-
 
         delete_message = self.schema.make_delete(docs, queries)
         # THIS IS BROKEN
