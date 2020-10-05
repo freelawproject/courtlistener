@@ -13,6 +13,7 @@ Dependencies that needed updating:
 -` enum34` isn't necessary anymore.
 - it's not possible to install `seal-rookery` from PyPI due to missing `sdist` distributions. As workaround, install directly from GitHub.
 - `reporters-db` can't be installed because it relies on `python-dateutil==2.5.0`.
+- `mock` is no longer needed as this is part of the standard library in `unittest.mock` as of py3.3.
 
 ## Code changes
 
@@ -21,6 +22,7 @@ Updating of the actual code:
 - Run 2to3 and hand-modify the output to remove false positives and other automatic errors. It picked up a false positive around importing `from celery import Celery` when there was a local file called `celery.py`, and there were a bunch of false positives where 2to3 converts `for x, y in dict.values()` to `for x, y in list(dict.values())` which is unnecessary and inefficient. Other than that the results were pretty good. The main consideration going forwards is that somewhere there's a comparison between a `b"some bytes string"` and a `"some unicode string"` which can't be found at runtime but will never be equal. More details of 2to3 changes below.
 - In `10-public.py`, the `maxBytes` setting needs to be changed to an int, not a string.
 - `django.utils.encoding.smart_unicode` was renamed to `django.utils.encoding.smart_text` but it's actually just an alias to `django.utils.encoding.force_str`, so may as well just change it to that.
+- Any instances of `import mock` or `from mock import ...` need to be trivially changed to `from unittest import mock` and `from unittest.mock import ...`.
 
 ### 2to3
 
