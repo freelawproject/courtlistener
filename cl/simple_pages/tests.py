@@ -216,7 +216,7 @@ class StaticFilesTest(TestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "text/plain")
         self.assertIn("inline;", response["Content-Disposition"])
-        self.assertIn("FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content)
+        self.assertIn(b"FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content)
 
     def test_serve_static_file_serves_pdf(self):
         request = HttpRequest()

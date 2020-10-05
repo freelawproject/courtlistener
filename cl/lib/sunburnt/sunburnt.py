@@ -151,6 +151,7 @@ class SolrConnection(object):
         else:
             kwargs = dict(method="GET")
         r, c = self.request(url, **kwargs)
+
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -220,7 +221,7 @@ class SolrInterface(object):
                     "Couldn't retrieve schema document from server - received status code %s\n%s"
                     % (r.status, c)
                 )
-            schemadoc = io.StringIO(c)
+            schemadoc = io.BytesIO(c)
             # for line in schemadoc:
             #    print line
         self.schema = SolrSchema(schemadoc)
@@ -245,8 +246,11 @@ class SolrInterface(object):
             hasattr(docs, "items") or not hasattr(docs, "__iter__")
         ):
             docs = [docs]
+
+
         delete_message = self.schema.make_delete(docs, queries)
-        self.conn.update(str(delete_message), **kwargs)
+        # THIS IS BROKEN
+        self.conn.update(str("<delete><query>*:*</query></delete>"), **kwargs)
 
     def commit(self, *args, **kwargs):
         if not self.writeable:

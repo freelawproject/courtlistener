@@ -329,23 +329,23 @@ class SearchTest(IndexedSolrTestCase):
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         r = self.client.get(reverse("show_results"), {"q": "supreme"})
-        self.assertIn("Honda", r.content)
-        self.assertIn("1 Opinion", r.content)
+        self.assertIn(b"Honda", r.content)
+        self.assertIn(b"1 Opinion", r.content)
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get(
             reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
         )
-        self.assertIn("Honda", r.content)
-        self.assertNotIn("an error", r.content)
+        self.assertIn(b"Honda", r.content)
+        self.assertNotIn(b"an error", r.content)
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
@@ -353,7 +353,7 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"),
             {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
         )
-        self.assertIn("Honda", response.content)
+        self.assertIn(b"Honda", response.content)
 
     def test_faceted_queries(self):
         """Does querying in a given court return the document? Does querying
@@ -362,33 +362,33 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "court_test": "on"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
         r = self.client.get(
             reverse("show_results"), {"q": "*", "stat_Errata": "on"}
         )
-        self.assertNotIn("Honda", r.content)
-        self.assertIn("Debbas", r.content)
+        self.assertNotIn(b"Honda", r.content)
+        self.assertIn(b"Debbas", r.content)
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
-        self.assertIn("Honda", r.content, "Result not found by docket number!")
+        self.assertIn(b"Honda", r.content, "Result not found by docket number!")
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
         for get_dict in get_dicts:
             r = self.client.get(reverse("show_results"), get_dict)
-            self.assertIn("Honda", r.content)
+            self.assertIn(b"Honda", r.content)
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
@@ -403,16 +403,16 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "judge": "david"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
         r = self.client.get(reverse("show_results"), {"q": "judge:david"})
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
         r = self.client.get(
             reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn(b"Honda", r.content)
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
@@ -420,13 +420,13 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"), {"q": "*", "cited_lt": 7, "cited_gt": 5}
         )
         self.assertIn(
-            "Honda",
+            b"Honda",
             r.content,
             msg="Did not get case back when filtering by citation count.",
         )
         r = self.client.get("/", {"q": "*", "cited_lt": 100, "cited_gt": 80})
         self.assertIn(
-            "had no results",
+            b"had no results",
             r.content,
             msg="Got case back when filtering by crazy citation count.",
         )
@@ -436,8 +436,8 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "order_by": "citeCount desc"}
         )
-        most_cited_name = "case name cluster 3"
-        less_cited_name = "Howard v. Honda"
+        most_cited_name = b"case name cluster 3"
+        less_cited_name = b"Howard v. Honda"
         self.assertTrue(
             r.content.index(most_cited_name)
             < r.content.index(less_cited_name),
@@ -462,13 +462,13 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
-        self.assertNotIn("an error", r.content)
+        self.assertNotIn(b"an error", r.content)
 
     def test_oa_results_basic(self):
         r = self.client.get(
             reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
         )
-        self.assertIn("Jose", r.content)
+        self.assertIn(b"Jose", r.content)
 
     def test_oa_results_date_argued_ordering(self):
         r = self.client.get(
@@ -479,7 +479,7 @@ class SearchTest(IndexedSolrTestCase):
             },
         )
         self.assertTrue(
-            r.content.index("SEC") < r.content.index("Jose"),
+            r.content.index(b"SEC") < r.content.index(b"Jose"),
             msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
         )
 
@@ -488,7 +488,7 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
         )
         self.assertTrue(
-            r.content.index("Jose") < r.content.index("SEC"),
+            r.content.index(b"Jose") < r.content.index(b"SEC"),
             msg="'Jose' should come AFTER 'SEC' when order_by asc.",
         )
 
@@ -526,7 +526,7 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "argued_after": "2014-10-01"},
         )
         self.assertNotIn(
-            "an error",
+            b"an error",
             r.content,
             msg="Got an error when doing a Date Argued filter.",
         )
@@ -547,7 +547,7 @@ class SearchTest(IndexedSolrTestCase):
         """Is the homepage loaded when no GET parameters are provided?"""
         response = self.client.get(reverse("show_results"))
         self.assertIn(
-            'id="homepage"',
+            b'id="homepage"',
             response.content,
             msg="Did not find the #homepage id when attempting to "
             "load the homepage",
@@ -561,7 +561,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(
             "an error",
-            response.content,
+            response.content.decode("utf-8"),
             msg="Invalid search did not result in an error.",
         )
 
@@ -678,8 +678,8 @@ class RelatedSearchTest(IndexedSolrTestCase):
             expected_article_count, SearchTest.get_article_count(r)
         )
         self.assertTrue(
-            r.content.index("/opinion/%i/" % expected_first_pk)
-            < r.content.index("/opinion/%i/" % expected_second_pk),
+            r.content.index(b"/opinion/%i/" % expected_first_pk)
+            < r.content.index(b"/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
@@ -783,7 +783,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
                 "/", {"type": SEARCH_TYPES.PEOPLE, "ordered_by": sort_field}
             )
             self.assertNotIn(
-                "an error",
+                b"an error",
                 r.content.lower(),
                 msg="Got an error when doing a judge search ordered "
                 "by %s" % sort_field,
