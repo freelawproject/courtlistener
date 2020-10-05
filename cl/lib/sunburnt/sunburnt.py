@@ -151,6 +151,20 @@ class SolrConnection(object):
         else:
             kwargs = dict(method="GET")
         r, c = self.request(url, **kwargs)
+        # print("\nResponse:\n")
+        # print(r.status)
+        # print("\nURL:")
+        # print(url)
+        # print("\n")
+        # print("CURL:")
+        # # curl = self.request("http://cl-solr:8983/solr/collection1/admin/ping",
+        # #                     **kwargs)
+        # curl = self.request("http://cl-solr:8983/solr/collection1/select?q=*%3A*&rows=1",
+        #                     **kwargs)
+        # print(curl[0])
+        # print(curl[1])
+        # print("------")
+
         if r.status != 200:
             raise SolrError(r, c)
         return c
@@ -220,7 +234,7 @@ class SolrInterface(object):
                     "Couldn't retrieve schema document from server - received status code %s\n%s"
                     % (r.status, c)
                 )
-            schemadoc = io.StringIO(c)
+            schemadoc = io.BytesIO(c)
             # for line in schemadoc:
             #    print line
         self.schema = SolrSchema(schemadoc)

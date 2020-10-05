@@ -75,3 +75,4 @@ usaddress
 xlrd
 unidecode
 Pillow
+pyasn1

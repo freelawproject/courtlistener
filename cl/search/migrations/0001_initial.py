@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('position', models.FloatField(help_text=b'A dewey-decimal-style numeral indicating a hierarchical ordering of jurisdictions', unique=True, null=True, db_index=True)),
                 ('citation_string', models.CharField(help_text=b'the citation abbreviation for the court as dictated by Blue Book', max_length=100, blank=True)),
                 ('short_name', models.CharField(help_text=b'a short name of the court', max_length=100)),
-                ('full_name', models.CharField(help_text=b'the full name of the court', max_length=b'200')),
+                ('full_name', models.CharField(help_text=b'the full name of the court', max_length=200)),
                 ('url', models.URLField(help_text=b'the homepage for each court or the closest thing thereto', max_length=500)),
                 ('start_date', models.DateField(help_text=b'the date the court was established, if known', null=True, blank=True)),
                 ('end_date', models.DateField(help_text=b'the date the court was abolished, if known', null=True, blank=True)),
