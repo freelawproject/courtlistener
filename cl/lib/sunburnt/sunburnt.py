@@ -151,7 +151,6 @@ class SolrConnection(object):
         else:
             kwargs = dict(method="GET")
         r, c = self.request(url, **kwargs)
-
         if r.status != 200:
             raise SolrError(r, c)
         return c
