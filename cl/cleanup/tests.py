@@ -280,7 +280,11 @@ with Virginia Historic Tax Credit Fund""",
         for q, a in test_pairs:
             print("Searching for %s" % a, end=" ")
             docket_numbers_found = get_tax_docket_numbers(q)
-            self.assertEqual(docket_numbers_found, a, msg="Success")
+            self.assertEqual(
+                docket_numbers_found.encode("utf8"),
+                a.encode("utf8"),
+                msg="Success",
+            )
             print("✓")
 
     def test_tax_court_citation_extractor(self):
