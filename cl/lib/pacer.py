@@ -234,12 +234,13 @@ def process_docket_data(d, filepath, report_type):
             "supported. Perhaps you need to add it?" % report_type
         )
     with open(filepath, "r") as f:
-        text = f.read().decode("utf-8")
+        text = f.read()
     report._parse_text(text)
     data = report.data
     if data == {}:
         return None
 
+    print(report)
     if report_type == UPLOAD_TYPE.CLAIMS_REGISTER:
         add_bankruptcy_data_to_docket(d, data)
         add_claims_to_docket(d, data["claims"])

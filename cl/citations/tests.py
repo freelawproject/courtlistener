@@ -651,8 +651,8 @@ class CiteTest(TestCase):
             citations = get_citations(s)
             created_html = create_cited_html(opinion, citations)
             self.assertEqual(
-                created_html,
-                expected_html,
+                created_html.encode(),
+                expected_html.encode(),
                 msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
             )
             print("✓")

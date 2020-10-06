@@ -177,7 +177,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "666666", "court_id": "test"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-        self.assertInHTML("Get Docket Alerts", r.content)
+        self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
 @override_settings(

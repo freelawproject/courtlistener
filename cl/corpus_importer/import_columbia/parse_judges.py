@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import html
 import re
 from html.parser import HTMLParser
 
@@ -258,7 +258,7 @@ def find_judge_names(text, first_names=False):
 
     # Strip HTML elements and unescape HTML entities.
     line = strip_tags(line)
-    line = h.unescape(line)
+    line = html.unescape(line)
 
     # normalize text and get candidate judge names
     line = "".join([c if c.isalpha() else " " for c in line.lower()])
