@@ -45,7 +45,7 @@ class ContactTest(TestCase):
         # resolved, we should not see anything about the previously logged-in
         # user, pandora.
         r = self.client.get(reverse("contact"))
-        self.assertNotIn("pandora", r.content)
+        self.assertNotIn("pandora", r.content.decode())
 
     def test_contact_logged_in(self):
         """Can we use the contact form to send a message when logged in?"""

@@ -131,7 +131,7 @@ class UserTest(LiveServerTestCase):
             "Instead got %s" % r.status_code,
         )
         self.assertIn(
-            "has been confirmed",
+            b"has been confirmed",
             r.content,
             msg="Test string not found in response.content",
         )
@@ -153,7 +153,7 @@ class UserTest(LiveServerTestCase):
             )
         )
         self.assertIn(
-            "has been confirmed",
+            b"has been confirmed",
             r.content,
             msg="Test string not found in response.content",
         )
@@ -198,7 +198,7 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content
+            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
         )
 
     def test_can_i_change_to_bad_email_address(self):
@@ -212,7 +212,7 @@ class DisposableEmailTest(TestCase):
             follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content
+            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
         )
 
 
@@ -256,7 +256,7 @@ class LiveUserTest(BaseSeleniumTest):
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(str(up.user.pk)),
+                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
                     "token": token,
                 },
             ),

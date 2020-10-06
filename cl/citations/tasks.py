@@ -98,7 +98,7 @@ def create_cited_html(opinion, citations):
             repl = '</pre>%s<pre class="inline">' % citation.as_html()
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
         new_html = '<pre class="inline">%s</pre>' % inner_html
-    return new_html.encode("utf-8")
+    return new_html
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)

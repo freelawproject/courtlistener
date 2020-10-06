@@ -276,7 +276,6 @@ def extract_full_citation(words, reporter_index):
     if is_tax_citation:
         volume, page = (
             words[reporter_index + 1]
-            .encode("utf-8")
             .replace("–", "-")
             .split("-")
         )
