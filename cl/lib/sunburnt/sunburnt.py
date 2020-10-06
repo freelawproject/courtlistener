@@ -1,3 +1,5 @@
+from lxml.etree import tostring
+
 from cl.lib.decorators import retry
 import io
 from itertools import islice
@@ -247,8 +249,7 @@ class SolrInterface(object):
             docs = [docs]
 
         delete_message = self.schema.make_delete(docs, queries)
-        # THIS IS BROKEN
-        self.conn.update(str("<delete><query>*:*</query></delete>"), **kwargs)
+        self.conn.update(tostring(delete_message.xml).decode(), **kwargs)
 
     def commit(self, *args, **kwargs):
         if not self.writeable:
