@@ -117,7 +117,8 @@ class Person(models.Model):
         max_length=158,  # len(self.name_full)
     )
     name_first = models.CharField(
-        help_text="The first name of this person.", max_length=50,
+        help_text="The first name of this person.",
+        max_length=50,
     )
     name_middle = models.CharField(
         help_text="The middle name or names of this person",
@@ -125,7 +126,9 @@ class Person(models.Model):
         blank=True,
     )
     name_last = models.CharField(
-        help_text="The last name of this person", max_length=50, db_index=True,
+        help_text="The last name of this person",
+        max_length=50,
+        db_index=True,
     )
     name_suffix = models.CharField(
         help_text="Any suffixes that this person's name may have",
@@ -134,16 +137,24 @@ class Person(models.Model):
         blank=True,
     )
     date_dob = models.DateField(
-        help_text="The date of birth for the person", null=True, blank=True,
+        help_text="The date of birth for the person",
+        null=True,
+        blank=True,
     )
     date_granularity_dob = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_dod = models.DateField(
-        help_text="The date of death for the person", null=True, blank=True,
+        help_text="The date of death for the person",
+        null=True,
+        blank=True,
     )
     date_granularity_dod = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     dob_city = models.CharField(
         help_text="The city where the person was born.",
@@ -151,7 +162,8 @@ class Person(models.Model):
         blank=True,
     )
     dob_state = local_models.USStateField(
-        help_text="The state where the person was born.", blank=True,
+        help_text="The state where the person was born.",
+        blank=True,
     )
     dob_country = models.CharField(
         help_text="The country where the person was born.",
@@ -160,10 +172,13 @@ class Person(models.Model):
         max_length=50,
     )
     dod_city = models.CharField(
-        help_text="The city where the person died.", max_length=50, blank=True,
+        help_text="The city where the person died.",
+        max_length=50,
+        blank=True,
     )
     dod_state = local_models.USStateField(
-        help_text="The state where the person died.", blank=True,
+        help_text="The state where the person died.",
+        blank=True,
     )
     dod_country = models.CharField(
         help_text="The country where the person died.",
@@ -322,24 +337,35 @@ class Person(models.Model):
                 "date_nominated": solr_list(positions, "date_nominated"),
                 "date_elected": solr_list(positions, "date_elected"),
                 "date_recess_appointment": solr_list(
-                    positions, "date_recess_appointment",
+                    positions,
+                    "date_recess_appointment",
                 ),
                 "date_referred_to_judicial_committee": solr_list(
-                    positions, "date_referred_to_judicial_committee",
+                    positions,
+                    "date_referred_to_judicial_committee",
                 ),
                 "date_judicial_committee_action": solr_list(
-                    positions, "date_judicial_committee_action",
+                    positions,
+                    "date_judicial_committee_action",
                 ),
                 "date_hearing": solr_list(positions, "date_hearing"),
                 "date_confirmation": solr_list(positions, "date_confirmation"),
                 "date_start": solr_list(positions, "date_start"),
                 "date_granularity_start": solr_list(
-                    positions, "date_granularity_start",
+                    positions,
+                    "date_granularity_start",
                 ),
-                "date_retirement": solr_list(positions, "date_retirement",),
-                "date_termination": solr_list(positions, "date_termination",),
+                "date_retirement": solr_list(
+                    positions,
+                    "date_retirement",
+                ),
+                "date_termination": solr_list(
+                    positions,
+                    "date_termination",
+                ),
                 "date_granularity_termination": solr_list(
-                    positions, "date_granularity_termination",
+                    positions,
+                    "date_granularity_termination",
                 ),
                 "judicial_committee_action": [
                     p.get_judicial_committee_action_display()
@@ -505,7 +531,10 @@ class Position(models.Model):
             (
                 # Acting
                 (ACTING_JUDGE, "Acting Judge"),
-                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge",),
+                (
+                    ACTING_PRESIDING_JUDGE,
+                    "Acting Presiding Judge",
+                ),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
@@ -821,7 +850,9 @@ class Position(models.Model):
         db_index=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_termination = models.DateField(
         help_text="The last date of their employment. The compliment to "
@@ -837,7 +868,9 @@ class Position(models.Model):
         blank=True,
     )
     date_granularity_termination = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_retirement = models.DateField(
         help_text="The date when they become a senior judge by going into "
@@ -1050,7 +1083,8 @@ class RetentionEvent(models.Model):
         max_length=10,
     )
     date_retention = models.DateField(
-        help_text="The date of retention", db_index=True,
+        help_text="The date of retention",
+        db_index=True,
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
@@ -1149,7 +1183,9 @@ class Education(models.Model):
         blank=True,
     )
     degree_year = models.PositiveSmallIntegerField(
-        help_text="The year the degree was awarded.", null=True, blank=True,
+        help_text="The year the degree was awarded.",
+        null=True,
+        blank=True,
     )
 
     def __unicode__(self):
@@ -1179,7 +1215,11 @@ class Race(models.Model):
         ("p", "Native Hawaiian or Other Pacific Islander"),
         ("h", "Hispanic/Latino"),
     )
-    race = models.CharField(choices=RACES, max_length=5, unique=True,)
+    race = models.CharField(
+        choices=RACES,
+        max_length=5,
+        unique=True,
+    )
 
     def __unicode__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
@@ -1239,13 +1279,19 @@ class PoliticalAffiliation(models.Model):
         blank=True,
     )
     date_granularity_start = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
     date_end = models.DateField(
-        help_text="The date the affiliation ended.", null=True, blank=True,
+        help_text="The date the affiliation ended.",
+        null=True,
+        blank=True,
     )
     date_granularity_end = models.CharField(
-        choices=DATE_GRANULARITIES, max_length=15, blank=True,
+        choices=DATE_GRANULARITIES,
+        max_length=15,
+        blank=True,
     )
 
     def save(self, *args, **kwargs):
@@ -1282,7 +1328,9 @@ class Source(models.Model):
         blank=True,
     )
     date_accessed = models.DateField(
-        help_text="The date the data was gathered.", blank=True, null=True,
+        help_text="The date the data was gathered.",
+        blank=True,
+        null=True,
     )
     notes = models.TextField(
         help_text="Any additional notes about the data's provenance, in "
@@ -1395,10 +1443,14 @@ class PartyType(models.Model):
     """
 
     docket = models.ForeignKey(
-        "search.Docket", related_name="party_types", on_delete=models.CASCADE,
+        "search.Docket",
+        related_name="party_types",
+        on_delete=models.CASCADE,
     )
     party = models.ForeignKey(
-        "Party", related_name="party_types", on_delete=models.CASCADE,
+        "Party",
+        related_name="party_types",
+        on_delete=models.CASCADE,
     )
     name = models.CharField(
         help_text="The name of the type (Defendant, Plaintiff, etc.)",
@@ -1412,7 +1464,9 @@ class PartyType(models.Model):
         blank=True,
     )
     extra_info = models.TextField(
-        help_text="Additional info from PACER", db_index=True, blank=True,
+        help_text="Additional info from PACER",
+        db_index=True,
+        blank=True,
     )
     highest_offense_level_opening = models.TextField(
         help_text="In a criminal case, the highest offense level at the "
@@ -1495,7 +1549,8 @@ class CriminalComplaint(models.Model):
         "Reentry of Deported Alien'",
     )
     disposition = models.TextField(
-        help_text="The disposition of the criminal complaint.", blank=True,
+        help_text="The disposition of the criminal complaint.",
+        blank=True,
     )
 
 
@@ -1516,7 +1571,10 @@ class Party(models.Model):
         through="Role",
         related_name="parties",
     )
-    name = models.TextField(help_text="The name of the party.", db_index=True,)
+    name = models.TextField(
+        help_text="The name of the party.",
+        db_index=True,
+    )
     extra_info = models.TextField(
         # See: 7d4c916a34207c3c55b58cc385425a9fc7021004
         help_text="Prior to March, 2018, this field briefly held additional "
@@ -1561,10 +1619,14 @@ class Role(models.Model):
         (UNKNOWN, "Unknown"),
     )
     party = models.ForeignKey(
-        Party, related_name="roles", on_delete=models.CASCADE,
+        Party,
+        related_name="roles",
+        on_delete=models.CASCADE,
     )
     attorney = models.ForeignKey(
-        "Attorney", related_name="roles", on_delete=models.CASCADE,
+        "Attorney",
+        related_name="roles",
+        on_delete=models.CASCADE,
     )
     docket = models.ForeignKey(
         "search.Docket",
@@ -1627,10 +1689,12 @@ class Attorney(models.Model):
         through="AttorneyOrganizationAssociation",
     )
     name = models.TextField(
-        help_text="The name of the attorney.", db_index=True,
+        help_text="The name of the attorney.",
+        db_index=True,
     )
     contact_raw = models.TextField(
-        help_text="The raw contents of the contact field", db_index=True,
+        help_text="The raw contents of the contact field",
+        db_index=True,
     )
     phone = local_models.PhoneNumberField(
         help_text="The phone number of the attorney.",
@@ -1638,7 +1702,9 @@ class Attorney(models.Model):
     fax = local_models.PhoneNumberField(
         help_text="The fax number of the attorney.",
     )
-    email = models.EmailField(help_text="The email address of the attorney.",)
+    email = models.EmailField(
+        help_text="The email address of the attorney.",
+    )
 
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1702,16 +1768,20 @@ class AttorneyOrganization(models.Model):
         unique=True,
     )
     name = models.TextField(
-        help_text="The name of the organization.", db_index=True,
+        help_text="The name of the organization.",
+        db_index=True,
     )
     address1 = models.TextField(
-        help_text="The normalized address1 of the organization", db_index=True,
+        help_text="The normalized address1 of the organization",
+        db_index=True,
     )
     address2 = models.TextField(
-        help_text="The normalized address2 of the organization", db_index=True,
+        help_text="The normalized address2 of the organization",
+        db_index=True,
     )
     city = models.TextField(
-        help_text="The normalized city of the organization", db_index=True,
+        help_text="The normalized city of the organization",
+        db_index=True,
     )
     state = local_models.USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "
@@ -1753,22 +1823,27 @@ class Individual(models.Model):
 
     committees = models.ManyToManyField(Committee)
     name = models.CharField(
-        help_text="Individual contributor name", db_index=True,
+        help_text="Individual contributor name",
+        db_index=True,
     )
     city = models.CharField(
-        help_text="City where individual contributor lives", blank=True,
+        help_text="City where individual contributor lives",
+        blank=True,
     )
     state = models.CharField(
         help_text="State where individual contributor lives",
     )
     zip_code = models.CharField(
-        help_text="Zip code for individual contributor", blank=True,
+        help_text="Zip code for individual contributor",
+        blank=True,
     )
     employer = models.CharField(
-        help_text="Employer of individual contributor", blank=True,
+        help_text="Employer of individual contributor",
+        blank=True,
     )
     occupation = models.CharField(
-        help_text="Occupation of individual contributor", blank=True,
+        help_text="Occupation of individual contributor",
+        blank=True,
     )
 
 
@@ -2133,12 +2208,17 @@ class Contribution(models.Model):
 
     contributor = models.ForeignKey(Individual)
     valid = models.BooleanField(
-        help_text="Is the record valid?", null=True, blank=True,
+        help_text="Is the record valid?",
+        null=True,
+        blank=True,
     )
     dt_transaction = models.DateField(
-        help_text="Transaction date", blank=True,
+        help_text="Transaction date",
+        blank=True,
     )
-    transaction_amt = models.IntegerField(help_text="Transaction amount",)
+    transaction_amt = models.IntegerField(
+        help_text="Transaction amount",
+    )
     sub_id = models.CharField(
         help_text="Unique FEC record number of the contribution",
         db_index=True,
@@ -2148,19 +2228,27 @@ class Contribution(models.Model):
         "electronic filings.",
         blank=True,
     )
-    image_num = models.CharField(help_text="FEC image number", db_index=True,)
+    image_num = models.CharField(
+        help_text="FEC image number",
+        db_index=True,
+    )
     transaction_pgi = models.CharField(
         help_text="Primary or general election and it's ID/year",
     )
-    year = models.IntegerField(help_text="Year",)
+    year = models.IntegerField(
+        help_text="Year",
+    )
     transaction_type = models.CharField(
-        help_text="Transaction type", choices=TRANSACTION_CHOICES,
+        help_text="Transaction type",
+        choices=TRANSACTION_CHOICES,
     )
     amend_indicator = models.CharField(
-        help_text="Amendment indicator", choices=AMENDMENT_CHOICES,
+        help_text="Amendment indicator",
+        choices=AMENDMENT_CHOICES,
     )
     report_type = models.CharField(
-        help_text="Report type", choices=REPORT_TYPE_CHOICES,
+        help_text="Report type",
+        choices=REPORT_TYPE_CHOICES,
     )
     memo_cd = models.CharField(
         help_text="Memo code.  X indicates that the amount is NOT to be "
@@ -2173,7 +2261,10 @@ class Contribution(models.Model):
         "These transactions are included in the itemization total. ",
         blank=True,
     )
-    file_num = models.CharField(help_text="Unique report id", blank=True,)
+    file_num = models.CharField(
+        help_text="Unique report id",
+        blank=True,
+    )
 
 
 class Committee(models.Model):
@@ -2271,21 +2362,32 @@ class Committee(models.Model):
     )
 
     committee_id = models.CharField(
-        help_text="Unique ID for committee", db_index=True,
+        help_text="Unique ID for committee",
+        db_index=True,
     )
-    committee_name = models.CharField(help_text="Committee name", blank=True,)
+    committee_name = models.CharField(
+        help_text="Committee name",
+        blank=True,
+    )
     committee_party = models.CharField(
-        help_text="Political party affiliation", blank=True,
+        help_text="Political party affiliation",
+        blank=True,
     )
     candidate_id = models.CharField(
-        help_text="Unique ID for candidate supported by committee", blank=True,
+        help_text="Unique ID for candidate supported by committee",
+        blank=True,
     )
     connected_org_name = models.CharField(
-        help_text="Connected organization name", blank=True,
+        help_text="Connected organization name",
+        blank=True,
     )
-    file_num = models.CharField(help_text="Unique report ID",)
+    file_num = models.CharField(
+        help_text="Unique report ID",
+    )
     committee_type = models.CharField(
-        help_text="Committee type", choices=COMMITTEE_CHOICES, blank=True,
+        help_text="Committee type",
+        choices=COMMITTEE_CHOICES,
+        blank=True,
     )
     committee_designation = models.CharField(
         help_text="Committee designation",
