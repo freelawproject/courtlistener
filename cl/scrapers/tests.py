@@ -153,19 +153,19 @@ class ExtensionIdentificationTest(TestCase):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
     def test_wpd_extension(self):
-        with open(os.path.join(self.path, "opinion_wpd.wpd"), "r") as f:
+        with open(os.path.join(self.path, "opinion_wpd.wpd"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".wpd")
 
     def test_pdf_extension(self):
         with open(
-            os.path.join(self.path, "opinion_pdf_text_based.pdf"), "r"
+            os.path.join(self.path, "opinion_pdf_text_based.pdf"), "rb"
         ) as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".pdf")
 
     def test_doc_extension(self):
-        with open(os.path.join(self.path, "opinion_doc.doc"), "r") as f:
+        with open(os.path.join(self.path, "opinion_doc.doc"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".doc")
 

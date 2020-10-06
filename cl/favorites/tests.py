@@ -52,7 +52,7 @@ class FavoriteTest(TestCase):
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
             self.assertEqual(r.status_code, 200)
-            self.assertIn("It worked", r.content)
+            self.assertIn(b"It worked", r.content)
 
         # And can we delete them?
         for params in [self.fave_cluster_params, self.fave_audio_params]:

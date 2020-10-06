@@ -1349,7 +1349,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
-
+        print(self.live_server_url)
+        print("\n\n\n")
+        print(self.browser.page_source)
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
         page_text = self.browser.find_element_by_tag_name("body").text

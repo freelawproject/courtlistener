@@ -56,7 +56,7 @@ def follow_redirections(r, s):
 
 def get_extension(content):
     """A handful of workarounds for getting extensions we can trust."""
-    file_str = magic.from_buffer(content)
+    file_str = magic.from_buffer(content).decode()
     if file_str.startswith("Composite Document File V2 Document"):
         # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
         # in libmagic 5.11-2.
@@ -65,6 +65,10 @@ def get_extension(content):
         mime = "application/vnd.wordperfect"
     elif file_str == "C source, ASCII text":
         mime = "text/plain"
+    elif file_str.startswith("WordPerfect document"):
+        return ".wpd"
+    elif file_str.startswith("PDF document"):
+        return ".pdf"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)

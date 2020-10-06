@@ -168,7 +168,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "blah", "court_id": "blah"},
         )
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
-        self.assertIn("Refresh this Page", r.content)
+        self.assertIn(b"Refresh this Page", r.content)
 
     def test_all_systems_go(self):
         """Does everything work with good parameters and good data?"""
@@ -247,7 +247,7 @@ class UploadPublication(TestCase):
             content_type="application/pdf",
         )
         self.png = SimpleUploadedFile(
-            "file.png", "file_content", content_type="image/png"
+            b"file.png", b"file_content", content_type="image/png"
         )
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")

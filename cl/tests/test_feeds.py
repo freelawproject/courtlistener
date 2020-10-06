@@ -210,3 +210,5 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 found_similar_title,
                 "Should have seen a search result similar to %s" % entry.title,
             )
+
+

@@ -387,7 +387,7 @@ def serve_static_file(request, file_path=""):
      - Serve up the file using Apache2's xsendfile
     """
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode("utf-8"))
+    file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
     if file_path.startswith("mp3"):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = "audio/mpeg"
@@ -429,7 +429,8 @@ def serve_static_file(request, file_path=""):
 
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
-        response.content = open(file_loc, "r").read()
+        with open(file_loc, "rb") as f:
+            response.content = f.read()
     else:
         response["X-Sendfile"] = file_loc
     file_name = file_path.split("/")[-1]
