@@ -1,5 +1,6 @@
 import logging
 
+import scorched
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -45,8 +46,10 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = conn.raw_query(**build_court_count_query()).execute()
+    # conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    # response = conn.raw_query(**build_court_count_query()).execute()
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    response = si.query(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
