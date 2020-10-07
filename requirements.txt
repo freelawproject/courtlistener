@@ -1,4 +1,4 @@
-ansible
+ansible~=2.9.0
 argparse
 beautifulsoup4~=4.8.0
 boto3==1.9.38
