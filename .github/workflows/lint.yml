@@ -1,0 +1,19 @@
+name: Lint
+
+on:
+  push:
+    branches: [master, ]
+  pull_request:
+    branches: [master]
+
+jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2-beta
+      - uses: actions/setup-python@v2
+        with:
+          # Once codebase is updated, this can easily be changed to any specific version.
+          python-version: "2.7"
+      - name: Black Code Formatter
+        uses: psf/black@stable
