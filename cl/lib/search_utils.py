@@ -3,6 +3,7 @@ from datetime import date
 from datetime import timedelta
 from urllib.parse import parse_qs, urlencode
 
+import scorched
 from django.conf import settings
 from django.core.cache import cache
 from django.core.cache import caches
@@ -349,7 +350,7 @@ def make_fq_proximity_query(cd, field, key):
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
-    q = re.sub('[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
+    q = re.sub(r'[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
 
     # Remove all valid Solr words
     tokens = []
@@ -723,7 +724,7 @@ def add_grouping(main_params, cd, group):
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         and group is True
     ):
-        docket_query = re.search("docket_id:\d+", cd["q"])
+        docket_query = re.search(r"docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
@@ -800,7 +801,7 @@ def cleanup_main_query(query_string):
     """
     inside_a_phrase = False
     cleaned_items = []
-    for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
+    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
         if not item:
             continue
 
@@ -999,8 +1000,8 @@ def get_citing_clusters_with_cache(cluster, is_bot):
         "sort": "citeCount desc",
         "caller": "view_opinion",
     }
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    citing_clusters = conn.raw_query(**q).execute()
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    citing_clusters = si.query(**q).execute()
     a_month = 60 * 60 * 24 * 30
     cache.set(cache_key, citing_clusters, a_month)
 
@@ -1058,15 +1059,15 @@ def get_related_clusters_with_cache(cluster, request):
             "mintf": settings.RELATED_MLT_MINTF,
             "minwl": settings.RELATED_MLT_MINWL,
             "maxwl": settings.RELATED_MLT_MAXWL,
-            "maxdf": settings.RELATED_MLT_MAXDF,
+            # "maxdf": settings.RELATED_MLT_MAXDF,
         }
 
+        si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+
         mlt_query = (
-            conn.query(sub_opinion_query)
-            .mlt(**mlt_params)
+            si.query(sub_opinion_query).mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
-
         if settings.RELATED_FILTER_BY_STATUS:
             # Filter results by status (e.g., Precedential)
             mlt_query = mlt_query.filter(
@@ -1080,10 +1081,10 @@ def get_related_clusters_with_cache(cluster, request):
 
         mlt_res = mlt_query.execute()
 
-        if mlt_res.more_like_this is not None:
+        if "more_like_this" in mlt_res.__dict__.keys():
             # Only a single sub opinion
             related_clusters = mlt_res.more_like_this.docs
-        elif mlt_res.more_like_these is not None:
+        elif "more_like_these" in mlt_res.__dict__.keys():
             # Multiple sub opinions
 
             # Get result list for each sub opinion
