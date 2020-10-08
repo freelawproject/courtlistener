@@ -4,13 +4,13 @@
 {% load extras %}
 {% load humanize %}
 
-{% block title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
-{% block og_title %}Network Graph of {{ viz.title }} – CourtListener.com{% endblock %}
+{% block title %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}
-    Network graph of {{ viz.title }} at CourtListener.com
+  {{ title }} at CourtListener.com
 {% endblock %}
 {% block og_description %}
-    Network graph of {{ viz.title }} at CourtListener.com
+  {{ title }} at CourtListener.com
 {% endblock %}
 {% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-viz-image-1000x450.png{% endblock %}
 {% block og_image_width %}1000{% endblock %}
