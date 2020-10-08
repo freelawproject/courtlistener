@@ -32,7 +32,7 @@ def render_visualization_page(request, pk, embed):
     status = None
     if viz.deleted:
         status = statuses.HTTP_410_GONE
-        title = u"Visualization deleted by owner"
+        title = u"Visualization deleted by creator"
     else:
         if viz.published is False and viz.user != request.user:
             # Not deleted, private and not the owner
