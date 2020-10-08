@@ -32,10 +32,14 @@ def render_visualization_page(request, pk, embed):
     status = None
     if viz.deleted:
         status = statuses.HTTP_410_GONE
+        title = u"Visualization deleted by owner"
     else:
         if viz.published is False and viz.user != request.user:
             # Not deleted, private and not the owner
             status = statuses.HTTP_401_UNAUTHORIZED
+            title = u"Private visualization"
+        else:
+            title = u"Network graph of %s" % viz.title
 
     if embed:
         if all([viz.published is True, viz.deleted is False]):
@@ -52,7 +56,10 @@ def render_visualization_page(request, pk, embed):
     else:
         template = "visualization.html"
     return render(
-        request, template, {"viz": viz, "private": False}, status=status
+        request,
+        template,
+        {"viz": viz, "title": title, "private": False},
+        status=status,
     )
 
 
