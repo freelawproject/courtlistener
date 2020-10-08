@@ -969,28 +969,20 @@ def add_depth_counts(search_data, search_results):
         return None
 
 
-def get_citing_clusters_with_cache(cluster, is_bot):
+def get_citing_clusters_with_cache(cluster):
     """Use Solr to get clusters citing the one we're looking at
-
-    If it's not a bot, cache the results for a long time. If it is a bot, load
-    those results if they exist. Otherwise, return None.
 
     :param cluster: The cluster we're targeting
     :type cluster: OpinionCluster
-    :param is_bot: Whether the page running this was loaded by a bot
-    :type is_bot: bool
-    :return: A search result of the top five citing clusters or None
-    :rtype: SolrSearch or None
+    :return: A tuple of the list of solr results and the number of results
     """
     cache_key = "citing:%s" % cluster.pk
     cache = caches["db_cache"]
-    if is_bot:
-        # If the cache was set by a real user, bots can access it. But if no
-        # user set the cache, this will just return None.
-        return cache.get(cache_key)
+    cached_results = cache.get(cache_key)
+    if cached_results is not None:
+        return cached_results
 
-    # Get the citing results from Solr for speed. Only do this for humans
-    # to save on disk usage.
+    # Cache miss. Get the citing results from Solr
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
     ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
     q = {
@@ -999,13 +991,16 @@ def get_citing_clusters_with_cache(cluster, is_bot):
         "start": 0,
         "sort": "citeCount desc",
         "caller": "view_opinion",
+        "fl": "absolute_url,caseName,dateFiled",
     }
     conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    citing_clusters = conn.raw_query(**q).execute()
-    a_month = 60 * 60 * 24 * 30
-    cache.set(cache_key, citing_clusters, a_month)
+    results = conn.raw_query(**q).execute()
+    citing_clusters = list(results)
+    citing_cluster_count = results.result.numFound
+    a_week = 60 * 60 * 24 * 7
+    cache.set(cache_key, (citing_clusters, citing_cluster_count), a_week)
 
-    return citing_clusters
+    return citing_clusters, citing_cluster_count
 
 
 def get_related_clusters_with_cache(cluster, request):
