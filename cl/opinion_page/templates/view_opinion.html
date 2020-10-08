@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load text_filters %}
+{% load humanize %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -84,15 +85,15 @@
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">
           <h3>
-            <span>Cited By ({{ citing_clusters.result.numFound }}) <a
+            <span>Cited By ({{ citing_cluster_count|intcomma }}) <a
               href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
                 <i class="gray fa fa-rss"
                    title="Subscribe to a feed of citations to this case."></i>
               </a>
             </span>
           </h3>
-          {% if citing_clusters.result.numFound > 0 %}
-            <p class="bottom">This case has been cited by these opinions:</p>
+          {% if citing_cluster_count > 0 %}
+            <p class="bottom">This case has been cited by other opinions:</p>
             <ul>
               {% for citing_cluster in citing_clusters %}
                 <li>
@@ -126,7 +127,7 @@
         {# Show cases this case cites #}
         {% if authorities_count > 0  %}
             <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ authorities_count }})</span></h3>
+                <h3><span>Authorities ({{ authorities_count|intcomma }})</span></h3>
                 <p class="bottom">This opinion cites:</p>
                 <ul>
                     {% for authority in top_authorities %}
