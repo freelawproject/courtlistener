@@ -87,7 +87,7 @@ class UserTest(LiveServerTestCase):
             if is_evil:
                 self.assertNotIn(
                     next_param,
-                    response.content.decode(),
+                    response.content.decode("utf-8"),
                     msg="'%s' found in HTML of response. This suggests it was "
                     "not cleaned by the sanitize_redirection function."
                     % next_param,
@@ -95,7 +95,7 @@ class UserTest(LiveServerTestCase):
             else:
                 self.assertIn(
                     next_param,
-                    response.content.decode(),
+                    response.content.decode("utf-8"),
                     msg="'%s' not found in HTML of response. This suggests it "
                     "was sanitized when it should not have been." % next_param,
                 )
@@ -132,7 +132,7 @@ class UserTest(LiveServerTestCase):
         )
         self.assertIn(
             "has been confirmed",
-            r.content.decode(),
+            r.content,
             msg="Test string not found in response.content",
         )
 
@@ -153,8 +153,8 @@ class UserTest(LiveServerTestCase):
             )
         )
         self.assertIn(
-            "has been confirmed",
-            r.content.decode(),
+            b"has been confirmed",
+            r.content,
             msg="Test string not found in response.content",
         )
         self.assertEqual(
@@ -198,8 +198,7 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain,
-            r.content.decode(),
+            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
         )
 
     def test_can_i_change_to_bad_email_address(self):
@@ -213,8 +212,7 @@ class DisposableEmailTest(TestCase):
             follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain,
-            r.content.decode(),
+            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
         )
 
 
