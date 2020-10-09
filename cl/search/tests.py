@@ -142,7 +142,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 3
         self.assertEqual(
