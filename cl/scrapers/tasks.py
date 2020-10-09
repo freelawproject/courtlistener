@@ -550,7 +550,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
                 "png",
                 "producer-300x300.png",
             ),
-            "r",
+            "rb",
         ) as f:
             audio_file.tag.images.set(
                 frame,
@@ -597,7 +597,7 @@ def process_audio_file(pk):
 
     set_mp3_meta_data(af, tmp_path)
     try:
-        with open(tmp_path, "r") as mp3:
+        with open(tmp_path, "rb") as mp3:
             cf = ContentFile(mp3.read())
             file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
             af.file_with_date = af.docket.date_argued
