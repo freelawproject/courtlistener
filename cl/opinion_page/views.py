@@ -411,7 +411,9 @@ def view_opinion(request, pk, _):
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    citing_clusters = get_citing_clusters_with_cache(cluster, is_bot(request))
+    citing_clusters, citing_cluster_count = get_citing_clusters_with_cache(
+        cluster
+    )
 
     (
         related_clusters,
@@ -430,6 +432,7 @@ def view_opinion(request, pk, _):
             "get_string": get_string,
             "private": cluster.blocked,
             "citing_clusters": citing_clusters,
+            "citing_cluster_count": citing_cluster_count,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
             "sub_opinion_ids": sub_opinion_ids,
