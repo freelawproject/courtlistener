@@ -40,7 +40,7 @@ class AlertTest(TestCase):
             reverse("show_results"), self.alert_params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], 302)
-        self.assertIn("successfully", r.content)
+        self.assertIn("successfully", r.content.decode())
         self.client.logout()
 
     def test_fail_gracefully(self):
@@ -54,7 +54,7 @@ class AlertTest(TestCase):
         )
         r = self.client.post("/", bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
-        self.assertIn("error creating your alert", r.content)
+        self.assertIn("error creating your alert", r.content.decode())
         self.client.logout()
 
     def test_new_alert_gets_secret_key(self):
