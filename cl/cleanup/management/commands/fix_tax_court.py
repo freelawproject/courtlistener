@@ -10,10 +10,15 @@ from cl.search.models import Opinion, OpinionCluster, Docket, Citation
 
 
 def remove_en_em_dash(opinion_text):
-    opinion_text = re.sub("–", "-", opinion_text)
-    opinion_text = re.sub("—", "-", opinion_text)
-    opinion_text = re.sub("–", "-", opinion_text)
-    return opinion_text
+    """Convert en & em dash(es) to hyphen(s) in opinion text
+
+    :param opinion_text:
+    :return: opinion_text
+    """
+    opinion_text = opinion_text.encode()
+    opinion_text = re.sub(br"\xe2\x80\x93", b"-", opinion_text)
+    opinion_text = re.sub(br"\xe2\x80\x98", b"-", opinion_text)
+    return opinion_text.decode()
 
 
 def get_tax_docket_numbers(opinion_text):
