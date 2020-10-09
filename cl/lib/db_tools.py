@@ -42,7 +42,7 @@ def queryset_generator(queryset, chunksize=1000):
             yield row
             row_id = get_attr_or_value(row, "id")
             if row_id == highest_pk:
-                raise StopIteration
+                return
             else:
                 # After first loop, tweak lookup to be a gt query. This allows
                 # the loop to support single results, which require gte, and
