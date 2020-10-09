@@ -725,10 +725,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         # Test for click tracking order
         self.assertTrue(
-            r.content.index(
+            r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
             )
-            < r.content.index(
+            < r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i,"
                 % (seed_pk, expected_second_pk)
             ),
