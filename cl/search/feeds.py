@@ -138,7 +138,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)["local_path"].encode("utf-8"),
+                get_item(item)["local_path"],
             )
             return os.path.getsize(file_loc)
         except:
@@ -148,7 +148,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)["local_path"].encode("utf-8"),
+                get_item(item)["local_path"],
             )
             return lookup_mime_type(file_loc)
         except:
