@@ -993,7 +993,9 @@ def get_citing_clusters_with_cache(cluster, is_bot):
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
     ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
     si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    citing_clusters = si.query(cites=ids_str).paginate(start=0, rows=5).sort_by('-citeCount')
+    citing_clusters = (
+        si.query(cites=ids_str).paginate(start=0, rows=5).sort_by("-citeCount")
+    )
     a_month = 60 * 60 * 24 * 30
     cache.set(cache_key, citing_clusters, a_month)
 
