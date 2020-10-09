@@ -98,7 +98,7 @@ def import_tn_corpus(log, skip_until, filepath):
         pdf_path = glob(
             "%s/%s/*.pdf" % (os.path.dirname(filepath.name), case["label"])
         )[0]
-        with open(pdf_path, "r") as p:
+        with open(pdf_path, "rb") as p:
             pdf_data = p.read()
 
         sha1_hash = sha1(force_bytes(pdf_data))
