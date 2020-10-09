@@ -274,7 +274,7 @@ with Virginia Historic Tax Credit Fund""",
                                                any Form 8332 to his return. He also claimed head-of-house-
                                                hold filing status. His ex-wife, the custodial parent, timely
                                                filed a Federal income tax return""",
-                "5706–12",
+                "5706-12",
             ),
         )
         for q, a in test_pairs:
