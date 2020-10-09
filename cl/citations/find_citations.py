@@ -274,11 +274,7 @@ def extract_full_citation(words, reporter_index):
     # Handle tax citations
     is_tax_citation = is_neutral_tc_reporter(reporter)
     if is_tax_citation:
-        volume, page = (
-            words[reporter_index + 1]
-            .replace("–", "-")
-            .split("-")
-        )
+        volume, page = words[reporter_index + 1].replace("–", "-").split("-")
 
     # Handle "normal" citations, e.g., XX F.2d YY
     else:
