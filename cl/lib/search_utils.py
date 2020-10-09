@@ -349,7 +349,7 @@ def make_fq_proximity_query(cd, field, key):
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
-    q = re.sub('[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
+    q = re.sub(r'[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
 
     # Remove all valid Solr words
     tokens = []
@@ -723,7 +723,7 @@ def add_grouping(main_params, cd, group):
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         and group is True
     ):
-        docket_query = re.search("docket_id:\d+", cd["q"])
+        docket_query = re.search(r"docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
@@ -800,7 +800,7 @@ def cleanup_main_query(query_string):
     """
     inside_a_phrase = False
     cleaned_items = []
-    for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
+    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
         if not item:
             continue
 
@@ -1051,7 +1051,6 @@ def get_related_clusters_with_cache(cluster, request):
             "mintf": settings.RELATED_MLT_MINTF,
             "minwl": settings.RELATED_MLT_MINWL,
             "maxwl": settings.RELATED_MLT_MAXWL,
-            "maxdf": settings.RELATED_MLT_MAXDF,
         }
 
         mlt_query = (
