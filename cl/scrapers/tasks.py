@@ -49,8 +49,7 @@ from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import add_items_to_solr
 from juriscraper.pacer import PacerSession, CaseQuery
 
-with open("/dev/null", "w") as f:
-    DEVNULL = f
+DEVNULL = open("/dev/null", "w")
 
 logger = logging.getLogger(__name__)
 
