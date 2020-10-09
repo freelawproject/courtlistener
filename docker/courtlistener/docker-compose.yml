@@ -1,5 +1,8 @@
 # Run using `docker-compose up`
 version: "3.7"
+volumes:
+  cl-judge-pics:
+  cl-seal-rookery:
 networks:
     cl_net_overlay:
         driver: bridge
@@ -45,31 +48,39 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:latest
+        image: freelawproject/task-server:py38
         depends_on:
             - cl-postgresql
             - cl-redis
+            - cl-judge-pics
+            - cl-seal-rookery
         volumes:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
+            - cl-judge-pics:${JUDGE_PICS3_PATH}
+            - cl-seal-rookery:${SEAL_ROOKERY3_PATH}
         networks:
             - cl_net_overlay
 
     cl-django:
         container_name: cl-django
-        image: freelawproject/courtlistener-django:latest
+        image: freelawproject/courtlistener-django:py38
         depends_on:
             - cl-postgresql
             - cl-redis
             - cl-celery
             - cl-solr
             - cl-selenium
+            - cl-judge-pics
+            - cl-seal-rookery
         ports:
             - "8000:8000"
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
+            - cl-judge-pics:${JUDGE_PICS3_PATH}
+            - cl-seal-rookery:${SEAL_ROOKERY3_PATH}
         networks:
             - cl_net_overlay
         command: >
@@ -87,3 +98,15 @@ services:
             - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
         networks:
             - cl_net_overlay
+
+    cl-judge-pics:
+        image: freelawproject/judge-pics:latest
+        container_name: "cl-judge-pics"
+        volumes:
+          - cl-judge-pics:${JUDGE_PICS_PATH}
+
+    cl-seal-rookery:
+        image: freelawproject/seal-rookery:latest
+        container_name: "cl-seal-rookery"
+        volumes:
+          - cl-seal-rookery:${SEAL_ROOKERY_PATH}
