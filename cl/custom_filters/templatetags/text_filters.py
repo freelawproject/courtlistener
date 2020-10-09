@@ -135,9 +135,9 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
     len_minute = 60
 
     trunc_s = seconds % len_day % len_hour % len_minute
-    trunc_m = seconds % len_day % len_hour / len_minute
-    trunc_h = seconds % len_day / len_hour
-    trunc_d = seconds / len_day
+    trunc_m = seconds % len_day % len_hour // len_minute
+    trunc_h = seconds % len_day // len_hour
+    trunc_d = seconds // len_day
 
     if as_dict:
         return {
