@@ -27,7 +27,7 @@ django-storages~=1.7.0
 djangorestframework-xml==1.4.0
 docutils==0.12
 drf-dynamic-fields
-eyeD3==0.7.11
+eyeD3
 feedparser==5.2.1
 geonamescache==0.20
 gevent
