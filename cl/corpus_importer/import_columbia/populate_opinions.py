@@ -6,17 +6,18 @@ import string
 from collections import OrderedDict
 from datetime import date
 
+import scorched
 from django.conf import settings
+from scorched.strings import DismaxString
 
 from cl.citations.find_citations import get_citations
-from cl.lib import sunburnt
 from cl.lib.import_lib import find_person
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
 from .convert_columbia_html import convert_columbia_html
 
 # only make a solr connection onece
-SOLR_CONN = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+SOLR_CONN = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
 
 # used to identify dates
@@ -473,16 +474,14 @@ def find_dups(docket, cluster):
         # if there aren't any citations, assume
         # for now that there's no duplicate
         return []
-    params = {
-        "fq": [
-            "court_id:%s" % docket.court_id,
-            "citation:(%s)"
-            % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
-        ],
-        "rows": 100,
-        "caller": "corpus_importer.import_columbia.populate_opinions",
-    }
-    results = SOLR_CONN.raw_query(**params).execute()
+    citation = " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c)
+    results = (
+        SOLR_CONN.query("*")
+        .filter(court_id=docket.court_id)
+        .filter(citation=DismaxString('("%s")' % citation))
+        .paginate(start=0, rows=100)
+        .execute()
+    )
     if len(results) == 1:
         # found the duplicate
         return results

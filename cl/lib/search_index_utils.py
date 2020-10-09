@@ -33,7 +33,7 @@ def normalize_search_dicts(d):
 
     1. Remove any kv from a dictionary if v is None
 
-       This is needed to send dictionaries to Sunburnt or Scorched, instead of
+       This is needed to send dictionaries to Scorched, instead of
        sending objects, and should provide a performance improvement. If you try
        to send None values to integer fields (for example), things break, b/c
        integer fields shouldn't be getting None values. Fair 'nuf.

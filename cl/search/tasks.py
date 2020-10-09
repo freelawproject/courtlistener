@@ -5,10 +5,10 @@ import scorched
 from django.apps import apps
 from django.conf import settings
 from django.utils.timezone import now
+from scorched.exc import SolrError
 
 from cl.celery import app
 from cl.lib.search_index_utils import InvalidDocumentError
-from cl.lib.sunburnt import SolrError
 from cl.search.models import OpinionCluster, RECAPDocument, Docket
 
 

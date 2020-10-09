@@ -1,5 +1,6 @@
 import logging
 
+import scorched
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -8,7 +9,7 @@ from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
 from cl.api.utils import get_replication_statuses
-from cl.lib import sunburnt
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_coverage_query,
     build_court_count_query,
@@ -45,8 +46,11 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = conn.raw_query(**build_court_count_query()).execute()
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    # Not sure if this generates the same query, but it passes the test.
+    response = (
+        si.query(**build_court_count_query()).facet_by("court_exact").execute()
+    )
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
@@ -139,9 +143,25 @@ def coverage_data(request, version, court):
     else:
         court_str = "all"
     q = request.GET.get("q")
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = conn.raw_query(**build_coverage_query(court_str, q)).execute()
-    counts = response.facet_counts.facet_ranges[0][1][0][1]
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    fq = {}
+    if court_str.lower() != "all":
+        fq = {"court_exact": court_str}
+
+    response = (
+        si.query(**{"q": q or "*"})
+        .facet_range(
+            **{
+                "fields": "dateFiled",
+                "start": "1600-01-01T00:00:00Z",
+                "gap": "+1YEAR",
+                "end": "NOW/DAY",
+            }
+        )
+        .facet_query(**fq)
+        .execute()
+    )
+    counts = response.facet_counts.facet_ranges["dateFiled"]["counts"]
     counts = strip_zero_years(counts)
 
     # Calculate the totals

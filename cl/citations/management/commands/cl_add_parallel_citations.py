@@ -2,6 +2,7 @@
 import networkx as nx
 import sys
 
+import scorched
 from celery.canvas import group
 from django.conf import settings
 from django.core.management import call_command, CommandError
@@ -18,7 +19,6 @@ from cl.citations.tasks import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
-from cl.lib.sunburnt import sunburnt
 from cl.search.models import Opinion, OpinionCluster
 
 # Parallel citations need to be identified this many times before they should be
@@ -53,7 +53,7 @@ class Command(VerboseCommand):
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
         self.g = nx.Graph()
-        self.conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+        self.conn = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
         self.update_count = 0
 
     def add_arguments(self, parser):
@@ -108,7 +108,7 @@ class Command(VerboseCommand):
             main_params["fq"].append("court_exact:%s" % citation.court)
 
         # Query Solr
-        return self.conn.raw_query(**main_params).execute()
+        return self.conn.query(**main_params).execute()
 
     def handle_subgraph(self, sub_graph, options):
         """Add edges to the database if significant.

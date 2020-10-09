@@ -4,8 +4,7 @@ import json
 import lxml
 import requests
 from django.conf import settings
-
-from cl.lib.sunburnt import SolrError
+from scorched.exc import SolrError
 
 
 def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):

@@ -141,16 +141,17 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
+    content = content.decode()
     if content.strip() == "" and do_ocr:
         success, content = extract_by_ocr(path)
+        content = content.decode()
         if success:
             opinion.extracted_by_ocr = True
         elif content == "" or not success:
             content = "Unable to extract document content."
     elif "e" not in content:
         # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(str(content, "utf-8", errors="ignore"))
-
+        content = fix_mojibake(content)
     return content, err
 
 

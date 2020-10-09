@@ -7,7 +7,6 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from lxml import etree
 
-from cl.lib import sunburnt
 from cl.search.models import Court
 
 
@@ -32,18 +31,15 @@ class EmptySolrTestCase(TestCase):
         self.core_name_people = settings.SOLR_PEOPLE_TEST_CORE_NAME
         self.core_name_recap = settings.SOLR_RECAP_TEST_CORE_NAME
 
-        self.si_opinion = sunburnt.SolrInterface(
+        self.si_opinion = scorched.SolrInterface(
             settings.SOLR_OPINION_URL, mode="rw"
         )
-        self.si_audio = sunburnt.SolrInterface(
+        self.si_audio = scorched.SolrInterface(
             settings.SOLR_AUDIO_URL, mode="rw"
         )
-        self.si_people = sunburnt.SolrInterface(
+        self.si_people = scorched.SolrInterface(
             settings.SOLR_PEOPLE_URL, mode="rw"
         )
-        # This will cause headaches, but it follows in the mission to slowly
-        # migrate off of sunburnt. This was added after the items above, and so
-        # uses scorched, not sunburnt.
         self.si_recap = scorched.SolrInterface(
             settings.SOLR_RECAP_URL, mode="rw"
         )
