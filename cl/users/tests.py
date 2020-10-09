@@ -132,7 +132,7 @@ class UserTest(LiveServerTestCase):
         )
         self.assertIn(
             "has been confirmed",
-            r.content,
+            r.content.decode(),
             msg="Test string not found in response.content",
         )
 
@@ -153,8 +153,8 @@ class UserTest(LiveServerTestCase):
             )
         )
         self.assertIn(
-            b"has been confirmed",
-            r.content,
+            "has been confirmed",
+            r.content.decode(),
             msg="Test string not found in response.content",
         )
         self.assertEqual(
