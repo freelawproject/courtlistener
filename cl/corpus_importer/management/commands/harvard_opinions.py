@@ -277,7 +277,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
         ]
         # Flatten and dedupe list of judges
         judges = ", ".join(
-            list(set(itertools.chain.from_iterable(judge_list + author_list)))
+            sorted(list(set(itertools.chain.from_iterable(judge_list + author_list))))
         )
         judges = titlecase(judges)
         docket_string = (
