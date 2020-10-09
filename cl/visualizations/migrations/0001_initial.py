@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('date_created', models.DateTimeField(help_text=b'The time when this item was created', auto_now_add=True, db_index=True)),
                 ('date_modified', models.DateTimeField(help_text=b'The time when this item was modified', auto_now=True, db_index=True)),
-                ('url', models.URLField(help_text=b'The URL where this item was embedded.', max_length=b'3000', db_index=True)),
+                ('url', models.URLField(help_text=b'The URL where this item was embedded.', max_length=3000, db_index=True)),
                 ('page_title', models.CharField(help_text=b'The title of the page where the item was embedded', max_length=500, blank=True)),
                 ('display', models.BooleanField(default=False, help_text=b'Should this item be displayed?')),
             ],

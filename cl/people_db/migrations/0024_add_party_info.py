@@ -71,7 +71,7 @@ class Migration(migrations.Migration):
             name='PartyType',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('name', models.CharField(help_text=b'The name of the type (Defendant, Plaintiff, etc.)', max_length=b'100', db_index=True)),
+                ('name', models.CharField(help_text=b'The name of the type (Defendant, Plaintiff, etc.)', max_length=100, db_index=True)),
                 ('docket', models.ForeignKey(related_name='party_types', to='search.Docket',
                                              on_delete=models.CASCADE)),
                 ('party', models.ForeignKey(related_name='party_types', to='people_db.Party',
