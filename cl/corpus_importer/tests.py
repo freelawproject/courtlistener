@@ -657,7 +657,7 @@ class HarvardTests(TestCase):
 
         self.assertEqual(
             cite.cluster.judges,
-            "Thomas, Kennedy, Auto, Stevens, Scaua, Breyer, Roberts, Sotjter, Ginsbtjrg",
+            "Auto, Breyer, Ginsbtjrg, Kennedy, Roberts, Scaua, Sotjter, Stevens, Thomas",
         )
         print("Success ✓")
 
