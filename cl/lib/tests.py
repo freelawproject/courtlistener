@@ -99,7 +99,7 @@ class TestDBTools(TestCase):
 
         print("Testing a good values query...", end="")
         self.assertEqual(
-            sum(1 for _ in queryset_generator(list(UrlHash.objects.values()))),
+            sum(1 for _ in queryset_generator(UrlHash.objects.values())),
             2,
         )
         print("✓")
