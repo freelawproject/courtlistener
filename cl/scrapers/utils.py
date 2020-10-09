@@ -65,6 +65,8 @@ def get_extension(content):
         mime = "application/vnd.wordperfect"
     elif file_str == "C source, ASCII text":
         mime = "text/plain"
+    elif file_str.startswith("WordPerfect document"):
+        mime = "application/vnd.wordperfect"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)
