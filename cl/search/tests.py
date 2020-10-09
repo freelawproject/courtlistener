@@ -79,7 +79,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         self.assertEqual(
             actual_count,
@@ -93,7 +93,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         )
 
         # Check a simple citation query
-        results = self.si_opinion.query(**{"q": "cites:3"}).execute()
+        results = self.si_opinion.query(cites=3).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 2
         self.assertEqual(
@@ -116,7 +116,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 0
         self.assertEqual(
@@ -935,7 +935,7 @@ class FeedTest(IndexedSolrTestCase):
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content.decode())
+        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//a:feed/a:entry", 5),
             ("//a:feed/a:entry/a:title", 5),
