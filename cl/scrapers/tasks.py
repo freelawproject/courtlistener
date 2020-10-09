@@ -167,7 +167,8 @@ def extract_from_txt(path):
     """
     try:
         err = False
-        data = open(path).read()
+        with open(path, "rb") as f:
+            data = f.read()
         try:
             # Alas, cp1252 is probably still more popular than utf-8.
             content = smart_text(data, encoding="cp1252")
