@@ -45,7 +45,7 @@ class ContactTest(TestCase):
         # resolved, we should not see anything about the previously logged-in
         # user, pandora.
         r = self.client.get(reverse("contact"))
-        self.assertNotIn("pandora", r.content)
+        self.assertNotIn("pandora", r.content.decode())
 
     def test_contact_logged_in(self):
         """Can we use the contact form to send a message when logged in?"""
@@ -216,7 +216,9 @@ class StaticFilesTest(TestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "text/plain")
         self.assertIn("inline;", response["Content-Disposition"])
-        self.assertIn("FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content)
+        self.assertIn(
+            "FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content.decode()
+        )
 
     def test_serve_static_file_serves_pdf(self):
         request = HttpRequest()
