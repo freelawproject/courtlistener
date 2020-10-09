@@ -5,6 +5,7 @@ import os
 import re
 from datetime import timedelta
 
+import magic
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
@@ -20,7 +21,6 @@ from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
-from cl.lib import magic
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_matomo
 from cl.lib.ratelimiter import ratelimiter_slow

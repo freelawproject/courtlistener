@@ -1,4 +1,6 @@
 import os
+
+import magic
 from django.conf import settings
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.urls import reverse
@@ -7,7 +9,6 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib import magic
 from cl.lib.bot_detector import is_bot
 from cl.lib.sunburnt import SolrInterface
 from cl.people_db.models import Person, FinancialDisclosure

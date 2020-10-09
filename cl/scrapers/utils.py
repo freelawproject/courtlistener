@@ -1,16 +1,16 @@
 import mimetypes
 import os
+import sys
 import traceback
 from urllib.parse import urljoin
 
+import magic
 import requests
-import sys
 from django.conf import settings
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 
-from cl.lib import magic
 from cl.lib.celery_utils import CeleryThrottle
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
