@@ -3,11 +3,11 @@ argparse
 beautifulsoup4~=4.8.0
 boto3==1.9.38
 cchardet==2.1.1
-celery==4.3.0
+celery==4.3.1
 certifi==2019.9.11
 chardet==3.0.4
 coreapi==2.3.3
-cryptography==2.2.2
+cryptography
 defusedxml==0.6.0
 disposable-email-domains
 Django~=1.11.0
@@ -27,16 +27,15 @@ django-storages~=1.7.0
 djangorestframework-xml==1.4.0
 docutils==0.12
 drf-dynamic-fields
-enum34==1.1.2
 eyeD3==0.7.11
 feedparser==5.2.1
 geonamescache==0.20
-gevent<1.3
+gevent
 hiredis==0.2.0
 httplib2
 internetarchive
 ipaddress==1.0.16
-ipython==3.2.0
+ipython
 itypes==1.1.0
 # Kombu 4.6.5 is bad, and its authors should feel bad. Pin Kombu at a lower
 # version, which actually should work. See:
@@ -51,23 +50,24 @@ ndg-httpsclient==0.4.0
 networkx==1.10
 nose
 openapi-codec==1.3.1
-pandas==0.18.1
-Pillow==6.2.2
-psycopg2>=2.7,<2.8 --no-binary psycopg2
+pandas
+Pillow
+pyasn1
+psycopg2
 pycparser==2.14
-pydot==1.1.0
+pydot
 pyinotify==0.9.6; sys_platform != 'darwin'
 pyOpenSSL
 pyparsing==2.4.2
 PyPDF2==1.26.0
-python-dateutil==2.5.0
+python-dateutil
 python-igraph
+python-magic==0.4.18
 python-mimeparse==0.1.4
 pytz
 redis~=3.2.0
-requests==2.20.0
-scorched==0.11.0
-seal_rookery
+requests
+scorched==0.13.0
 selenium~=3.0
 sentry-sdk~=0.0
 simplejson
@@ -77,6 +77,5 @@ stripe==1.22.3
 timeout-decorator
 tldextract
 usaddress
-wsgiref==0.1.2
 xlrd
 unidecode
