@@ -41,7 +41,7 @@ class ViewDocumentTest(TestCase):
         """Does the page load properly?"""
         response = self.client.get("/opinion/1/asdf/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("33 state 1", response.content)
+        self.assertIn("33 state 1", response.content.decode())
 
 
 class CitationRedirectorTest(TestCase):
@@ -177,7 +177,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "666666", "court_id": "test"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-        self.assertInHTML("Get Docket Alerts", r.content)
+        self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
 @override_settings(
@@ -328,7 +328,7 @@ class UploadPublication(TestCase):
         self.assertEqual(
             form.errors["pdf_upload"],
             [
-                "File extension 'png' is not allowed. Allowed extensions are: 'pdf'."
+                "File extension 'b'png'' is not allowed. Allowed extensions are: 'pdf'."
             ],
         )
 
