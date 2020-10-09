@@ -571,8 +571,8 @@ class CiteTest(TestCase):
 
             # Short form citation across line break
             ('asdf.’ ” 123 \n U.S., at 456. Foo bar foobar',
-             '<pre class="inline">asdf.\xe2\x80\x99 </pre><span class="'
-             'citation no-link"><span class="antecedent_guess">\xe2\x80\x9d'
+             '<pre class="inline">asdf.’ </pre><span class="'
+             'citation no-link"><span class="antecedent_guess">”'
              '</span> <span class="volume">123</span> \n <span class='
              '"reporter">U.S.</span>, at <span class="page">456</span></span>'
              '<pre class="inline">. Foo bar foobar</pre>'),
