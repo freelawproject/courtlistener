@@ -656,7 +656,14 @@ class HarvardTests(TestCase):
 
         self.assertEqual(
             sorted([x.strip() for x in cite.cluster.judges.split(",")]),
-           sorted([x.strip() for x in "Scaua, Stevens, Sotjter, Ginsbtjrg, Kennedy, Auto, Thomas, Breyer, Roberts".split(",")])
+            sorted(
+                [
+                    x.strip()
+                    for x in "Scaua, Stevens, Sotjter, Ginsbtjrg, Kennedy, Auto, Thomas, Breyer, Roberts".split(
+                        ","
+                    )
+                ]
+            ),
         )
         print("Success ✓")
 

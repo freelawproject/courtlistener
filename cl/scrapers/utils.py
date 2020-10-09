@@ -80,7 +80,7 @@ def get_extension(content):
         return ".html"
     elif mime == b"audio/mpeg":
         return ".mp3"
-    elif mime == b'video/x-ms-asf':
+    elif mime == b"video/x-ms-asf":
         return ".wma"
     extension = mimetypes.guess_extension(mime)
     if extension == ".obj":

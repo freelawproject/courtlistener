@@ -198,7 +198,8 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
+            "%s is a blocked email provider" % self.bad_domain,
+            r.content.decode(),
         )
 
     def test_can_i_change_to_bad_email_address(self):
@@ -212,7 +213,8 @@ class DisposableEmailTest(TestCase):
             follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content.decode()
+            "%s is a blocked email provider" % self.bad_domain,
+            r.content.decode(),
         )
 
 

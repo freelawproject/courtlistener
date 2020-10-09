@@ -1065,7 +1065,8 @@ def get_related_clusters_with_cache(cluster, request):
         si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
         mlt_query = (
-            si.query(sub_opinion_query).mlt(**mlt_params)
+            si.query(sub_opinion_query)
+            .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
         if settings.RELATED_FILTER_BY_STATUS:
