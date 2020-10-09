@@ -208,7 +208,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
-        self.data["pacer_case_id"] = "☠☠☠"
+        self.data["pacer_case_id"] = u"☠☠☠"
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
@@ -465,12 +465,12 @@ class DebugRecapUploadtest(TestCase):
         )
         self.d_filename = "cand.html"
         d_path = os.path.join(test_dir, self.d_filename)
-        with open(d_path, "r") as f:
+        with open(d_path, "rb") as f:
             self.docket = SimpleUploadedFile(self.d_filename, f.read())
 
         self.att_filename = "dcd_04505578698.html"
         att_path = os.path.join(test_dir, self.att_filename)
-        with open(att_path, "r") as f:
+        with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
 
     def tearDown(self):
@@ -675,7 +675,7 @@ class RecapZipTaskTest(TestCase):
         user = User.objects.get(username="recap")
         self.filename = "1-20-cv-10189-FDS.zip"
         self.file_path = os.path.join(self.test_dir, self.filename)
-        with open(self.file_path, "r") as f:
+        with open(self.file_path, "rb") as f:
             self.file_content = f.read()
         f = SimpleUploadedFile(self.filename, self.file_content)
         self.pq = ProcessingQueue.objects.create(
@@ -1079,7 +1079,7 @@ class RecapMinuteEntriesTest(TestCase):
     def make_pq(self, filename="azd.html", upload_type=UPLOAD_TYPE.DOCKET):
         """Make a simple pq object for processing"""
         path = self.make_path(filename)
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(filename, f.read())
         return ProcessingQueue.objects.create(
             court_id="scotus",
@@ -1143,7 +1143,7 @@ class RecapMinuteEntriesTest(TestCase):
         court_id = "scotus"
         rss_feed = PacerRssFeed(court_id)
         rss_feed.is_bankruptcy = True  # Needed because we say SCOTUS above.
-        with open(self.make_path("rss_sample_unnumbered_mdb.xml")) as f:
+        with open(self.make_path("rss_sample_unnumbered_mdb.xml"), "rb") as f:
             text = f.read().decode("utf-8")
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
@@ -1263,7 +1263,7 @@ class RecapDocketTaskTest(TestCase):
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
         )
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
@@ -1354,7 +1354,7 @@ class ClaimsRegistryTaskTest(TestCase):
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
         )
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="canb",
@@ -1384,7 +1384,7 @@ class ClaimsRegistryTaskTest(TestCase):
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", filename
         )
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(filename, f.read())
         self.pq.filepath_local = f
         self.pq.save()
@@ -1404,7 +1404,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
         )
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
@@ -1434,7 +1434,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         self.assertTrue(og_info)
         self.assertIn("Gloria", og_info.court_reporter)
         self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
-        self.assertEqual(og_info.docket_number, "1:17-cv-00050")
+        self.assertEqual(og_info.docket_number, u"1:17-cv-00050")
 
 
 class RecapCriminalDataUploadTaskTest(TestCase):
@@ -1448,7 +1448,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
         )
-        with open(path, "r") as f:
+        with open(path, "rb") as f:
             f = SimpleUploadedFile(self.filename, f.read())
         self.pq = ProcessingQueue.objects.create(
             court_id="scotus",
@@ -1489,7 +1489,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         )
         self.att_filename = "dcd_04505578698.html"
         att_path = os.path.join(test_dir, self.att_filename)
-        with open(att_path, "r") as f:
+        with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
         d = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="asdf"

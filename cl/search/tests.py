@@ -324,28 +324,28 @@ class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
         """Get the article count in a query response"""
-        return len(html.fromstring(r.content).xpath("//article"))
+        return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         r = self.client.get(reverse("show_results"), {"q": "supreme"})
-        self.assertIn("Honda", r.content)
-        self.assertIn("1 Opinion", r.content)
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get(
             reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
         )
-        self.assertIn("Honda", r.content)
-        self.assertNotIn("an error", r.content)
+        self.assertIn("Honda", r.content.decode())
+        self.assertNotIn("an error", r.content.decode())
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
@@ -362,33 +362,35 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "court_test": "on"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
         r = self.client.get(
             reverse("show_results"), {"q": "*", "stat_Errata": "on"}
         )
-        self.assertNotIn("Honda", r.content)
-        self.assertIn("Debbas", r.content)
+        self.assertNotIn("Honda", r.content.decode())
+        self.assertIn("Debbas", r.content.decode())
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
-        self.assertIn("Honda", r.content, "Result not found by docket number!")
+        self.assertIn(
+            "Honda", r.content.decode(), "Result not found by docket number!"
+        )
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
         for get_dict in get_dicts:
             r = self.client.get(reverse("show_results"), get_dict)
-            self.assertIn("Honda", r.content)
+            self.assertIn("Honda", r.content.decode())
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
@@ -403,16 +405,16 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "judge": "david"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
         r = self.client.get(reverse("show_results"), {"q": "judge:david"})
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
         r = self.client.get(
             reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
@@ -421,13 +423,13 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertIn(
             "Honda",
-            r.content,
+            r.content.decode(),
             msg="Did not get case back when filtering by citation count.",
         )
         r = self.client.get("/", {"q": "*", "cited_lt": 100, "cited_gt": 80})
         self.assertIn(
             "had no results",
-            r.content,
+            r.content.decode(),
             msg="Got case back when filtering by crazy citation count.",
         )
 
@@ -439,16 +441,16 @@ class SearchTest(IndexedSolrTestCase):
         most_cited_name = "case name cluster 3"
         less_cited_name = "Howard v. Honda"
         self.assertTrue(
-            r.content.index(most_cited_name)
-            < r.content.index(less_cited_name),
+            r.content.decode().index(most_cited_name)
+            < r.content.decode().index(less_cited_name),
             msg="'%s' should come BEFORE '%s' when ordered by descending "
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
         r = self.client.get("/", {"q": "*", "order_by": "citeCount asc"})
         self.assertTrue(
-            r.content.index(most_cited_name)
-            > r.content.index(less_cited_name),
+            r.content.decode().index(most_cited_name)
+            > r.content.decode().index(less_cited_name),
             msg="'%s' should come AFTER '%s' when ordered by ascending "
             "citeCount." % (most_cited_name, less_cited_name),
         )
@@ -462,13 +464,13 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
-        self.assertNotIn("an error", r.content)
+        self.assertNotIn("an error", r.content.decode())
 
     def test_oa_results_basic(self):
         r = self.client.get(
             reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
         )
-        self.assertIn("Jose", r.content)
+        self.assertIn("Jose", r.content.decode())
 
     def test_oa_results_date_argued_ordering(self):
         r = self.client.get(
@@ -479,7 +481,7 @@ class SearchTest(IndexedSolrTestCase):
             },
         )
         self.assertTrue(
-            r.content.index("SEC") < r.content.index("Jose"),
+            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
             msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
         )
 
@@ -488,7 +490,7 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
         )
         self.assertTrue(
-            r.content.index("Jose") < r.content.index("SEC"),
+            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
             msg="'Jose' should come AFTER 'SEC' when order_by asc.",
         )
 
@@ -527,7 +529,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertNotIn(
             "an error",
-            r.content,
+            r.content.decode(),
             msg="Got an error when doing a Date Argued filter.",
         )
 
@@ -678,8 +680,8 @@ class RelatedSearchTest(IndexedSolrTestCase):
             expected_article_count, SearchTest.get_article_count(r)
         )
         self.assertTrue(
-            r.content.index("/opinion/%i/" % expected_first_pk)
-            < r.content.index("/opinion/%i/" % expected_second_pk),
+            r.content.decode().index("/opinion/%i/" % expected_first_pk)
+            < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
@@ -698,7 +700,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         # Test if related opinion exist
         self.assertGreater(
-            r.content.index(
+            r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
             ),
             0,
@@ -723,10 +725,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         # Test for click tracking order
         self.assertTrue(
-            r.content.index(
+            r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
             )
-            < r.content.index(
+            < r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i,"
                 % (seed_pk, expected_second_pk)
             ),
@@ -784,14 +786,14 @@ class JudgeSearchTest(IndexedSolrTestCase):
             )
             self.assertNotIn(
                 "an error",
-                r.content.lower(),
+                r.content.decode().lower(),
                 msg="Got an error when doing a judge search ordered "
                 "by %s" % sort_field,
             )
 
     def _test_article_count(self, params, expected_count, field_name):
         r = self.client.get("/", params)
-        tree = html.fromstring(r.content)
+        tree = html.fromstring(r.content.decode())
         got = len(tree.xpath("//article"))
         self.assertEqual(
             got,
