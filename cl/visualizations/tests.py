@@ -186,7 +186,7 @@ class TestViews(TestCase):
         )
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
-        self.assertNotIn(b"My Private Visualization", response.context)
+        self.assertNotIn(b"My Private Visualization", response.content)
 
     def test_view_counts_increment_by_one(self):
         """Test the view count for a Visualization increments on page view
