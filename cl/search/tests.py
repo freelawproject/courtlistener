@@ -353,7 +353,7 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"),
             {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
         )
-        self.assertIn("Honda", response.content)
+        self.assertIn("Honda", response.content.decode())
 
     def test_faceted_queries(self):
         """Does querying in a given court return the document? Does querying
@@ -550,7 +550,7 @@ class SearchTest(IndexedSolrTestCase):
         response = self.client.get(reverse("show_results"))
         self.assertIn(
             'id="homepage"',
-            response.content,
+            response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
             "load the homepage",
         )
@@ -563,7 +563,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(
             "an error",
-            response.content,
+            response.content.decode(),
             msg="Invalid search did not result in an error.",
         )
 
@@ -935,7 +935,7 @@ class FeedTest(IndexedSolrTestCase):
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content)
+        xml_tree = etree.fromstring(response.content.decode())
         node_tests = (
             ("//a:feed/a:entry", 5),
             ("//a:feed/a:entry/a:title", 5),
