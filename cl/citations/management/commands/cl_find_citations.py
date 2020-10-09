@@ -2,8 +2,9 @@
 import time
 import sys
 
+import scorched
+
 from cl.citations.tasks import find_citations_for_opinion_by_pks
-from cl.lib import sunburnt
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
@@ -104,7 +105,7 @@ class Command(VerboseCommand):
             )
 
         self.index = options["index"]
-        self.si = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
+        self.si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="rw")
 
         # Use query chaining to build the query
         query = Opinion.objects.all().order_by("pk")

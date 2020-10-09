@@ -3,8 +3,10 @@
 
 from datetime import date, datetime
 
+import scorched
 from django.conf import settings
 from reporters_db import REPORTERS
+from scorched.strings import DismaxString, RawString
 
 from cl.citations.find_citations import strip_punct
 from cl.citations.models import (
@@ -13,7 +15,6 @@ from cl.citations.models import (
     IdCitation,
     NonopinionCitation,
 )
-from cl.lib import sunburnt
 from cl.search.models import Opinion
 from cl.custom_filters.templatetags.text_filters import best_case_name
 
@@ -55,7 +56,7 @@ def reverse_match(conn, results, citing_doc):
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params["q"] = '"%s"~%d' % (query, len(query_tokens))
         params["caller"] = "reverse_match"
-        new_results = conn.raw_query(**params).execute()
+        new_results = conn.query(**params).execute()
         if len(new_results) == 1:
             return [result]
     return []
@@ -63,14 +64,14 @@ def reverse_match(conn, results, citing_doc):
 
 def case_name_query(conn, params, citation, citing_doc):
     query, length = make_name_param(citation.defendant, citation.plaintiff)
-    params["q"] = "caseName:(%s)" % query
-    params["caller"] = "match_citations"
+    params["caseName"] = "(%s)" % query
+    # params["caller"] = "match_citations"
     results = []
     # Use Solr minimum match search, starting with requiring all words to match,
     # and decreasing by one word each time until a match is found
     for num_words in range(length, 0, -1):
         params["mm"] = num_words
-        new_results = conn.raw_query(**params).execute()
+        new_results = conn.query(**params).execute()
         if len(new_results) >= 1:
             # For 1 result, make sure case name of match actually appears in
             # citing doc. For multiple results, use same technique to
@@ -108,17 +109,11 @@ def match_citation(citation, citing_doc=None):
       - a Solr Result object with the results, or an empty list if no hits
     """
     # TODO: Create shared solr connection for all queries
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    main_params = {
-        "q": "*",
-        "fq": [
-            "status:Precedential",  # Non-precedential documents aren't cited
-        ],
-        "caller": "citation.match_citations.match_citation",
-    }
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    fq = {}
     if citing_doc is not None:
         # Eliminate self-cites.
-        main_params["fq"].append("-id:%s" % citing_doc.pk)
+        fq["-id"] = citing_doc.pk
     # Set up filter parameters
     if citation.year:
         start_year = end_year = citation.year
@@ -126,22 +121,29 @@ def match_citation(citation, citing_doc=None):
         start_year, end_year = get_years_from_reporter(citation)
         if citing_doc is not None and citing_doc.cluster.date_filed:
             end_year = min(end_year, citing_doc.cluster.date_filed.year)
-    main_params["fq"].append(
-        "dateFiled:%s" % build_date_range(start_year, end_year)
-    )
 
     if citation.court:
-        main_params["fq"].append("court_exact:%s" % citation.court)
+        fq["court_exact"] = citation.court
 
     # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append('citation:("%s")' % citation.base_citation())
-    results = conn.raw_query(**main_params).execute()
+    results = (
+        si.query("*")
+        .filter(**fq)
+        .filter(citation=DismaxString('("%s")' % citation.base_citation()))
+        .filter(
+            dateFiled__range=(
+                datetime(start_year, 1, 1),
+                datetime(end_year, 12, 31),
+            )
+        )
+        .execute()
+    )
     if len(results) == 1:
         return results
     if len(results) > 1:
         if citing_doc is not None and citation.defendant:
             # Refine using defendant, if there is one
-            results = case_name_query(conn, main_params, citation, citing_doc)
+            results = case_name_query(si, fq, citation, citing_doc)
         return results
 
     # Give up.
