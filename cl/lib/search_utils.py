@@ -3,6 +3,7 @@ from datetime import date
 from datetime import timedelta
 from urllib.parse import parse_qs, urlencode
 
+import scorched
 from django.conf import settings
 from django.core.cache import cache
 from django.core.cache import caches
@@ -12,7 +13,6 @@ from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
 from cl.citations.models import Citation
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.constants import (
@@ -992,15 +992,8 @@ def get_citing_clusters_with_cache(cluster, is_bot):
     # to save on disk usage.
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
     ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
-    q = {
-        "q": "cites:(%s)" % ids_str,
-        "rows": 5,
-        "start": 0,
-        "sort": "citeCount desc",
-        "caller": "view_opinion",
-    }
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    citing_clusters = conn.raw_query(**q).execute()
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    citing_clusters = si.query(cites=ids_str).paginate(start=0, rows=5).sort_by('-citeCount')
     a_month = 60 * 60 * 24 * 30
     cache.set(cache_key, citing_clusters, a_month)
 
@@ -1023,7 +1016,7 @@ def get_related_clusters_with_cache(cluster, request):
         # If it is a bot or is not beta tester, return empty results
         return [], [], url_search_params
 
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
@@ -1040,7 +1033,7 @@ def get_related_clusters_with_cache(cluster, request):
         # Cache is empty
 
         # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+        sub_opinion_queries = [si.Q(id=sub_id) for sub_id in sub_opinion_ids]
 
         # Take one Q object from the list
         sub_opinion_query = sub_opinion_queries.pop()
@@ -1062,7 +1055,7 @@ def get_related_clusters_with_cache(cluster, request):
         }
 
         mlt_query = (
-            conn.query(sub_opinion_query)
+            si.query(sub_opinion_query)
             .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
@@ -1080,10 +1073,10 @@ def get_related_clusters_with_cache(cluster, request):
 
         mlt_res = mlt_query.execute()
 
-        if mlt_res.more_like_this is not None:
+        if "more_like_this" in mlt_res.__dict__.keys():
             # Only a single sub opinion
             related_clusters = mlt_res.more_like_this.docs
-        elif mlt_res.more_like_these is not None:
+        elif "more_like_these" in mlt_res.__dict__.keys():
             # Multiple sub opinions
 
             # Get result list for each sub opinion
