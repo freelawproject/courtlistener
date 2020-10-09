@@ -119,7 +119,7 @@ class Citation(object):
         else:
             paren = ""
         print_string = " ".join([print_string, paren])
-        return print_string.encode("utf-8")
+        return print_string
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -216,7 +216,7 @@ class ShortformCitation(Citation):
             self.reporter,
             self.page,
         )
-        return print_string.encode("utf-8")
+        return print_string
 
     def as_regex(self):
         return r"%s(\s+)%d(\s+)%s(,?)(\s+)at(\s+)%s(\s?)" % (
@@ -271,7 +271,7 @@ class SupraCitation(Citation):
 
     def __repr__(self):
         print_string = "%s supra, at %s" % (self.antecedent_guess, self.page)
-        return print_string.encode("utf-8")
+        return print_string
 
     def as_regex(self):
         if self.volume:
@@ -348,7 +348,7 @@ class IdCitation(Citation):
 
     def __repr__(self):
         print_string = "%s %s" % (self.id_token, self.after_tokens)
-        return print_string.encode("utf-8")
+        return print_string
 
     def as_regex(self):
         # This works by matching only the Id. token that precedes the "after
@@ -450,7 +450,7 @@ class NonopinionCitation(object):
         self.match_token = match_token
 
     def __repr__(self):
-        return "NonopinionCitation".encode("utf-8")
+        return "NonopinionCitation"
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
