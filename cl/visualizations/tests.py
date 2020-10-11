@@ -63,10 +63,10 @@ class TestVizModels(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user("Joe", "joe@cl.com", "password")
-        self.start = OpinionCluster.objects.get(
+        self.start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
+        self.end = OpinionCluster.objects.get(
             case_name="Town of Greece v. Galloway"
         )
-        self.end = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
 
     def test_SCOTUSMap_builds_nx_digraph(self):
         """ Tests build_nx_digraph method to see how it works """
@@ -86,7 +86,7 @@ class TestVizModels(TestCase):
         }
 
         g = viz.build_nx_digraph(**build_kwargs)
-        self.assertTrue(g.edges() > 0)
+        self.assertTrue(len(g.edges()) > 0)
 
     def test_SCOTUSMap_deletes_cascade(self):
         """
