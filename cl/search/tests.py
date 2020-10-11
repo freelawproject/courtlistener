@@ -305,7 +305,7 @@ class IndexingTest(EmptySolrTestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
             document_number="1",
             pacer_doc_id="1",
-            filepath_local=fake_path
+            filepath_local=fake_path,
         )
         rd2 = RECAPDocument.objects.create(
             docket_entry=de,
@@ -313,7 +313,7 @@ class IndexingTest(EmptySolrTestCase):
             document_number="1",
             attachment_number=1,
             pacer_doc_id="2",
-            filepath_local=fake_path
+            filepath_local=fake_path,
         )
         # Do the absolute URLs differ when pulled from the DB?
         self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
