@@ -1816,33 +1816,178 @@ class AttorneyOrganization(models.Model):
         )
 
 
+class Committee(models.Model):
+    """
+    Details about committee receiving campaign contribution.
+    """
+
+    COMMITTEE_CHOICES = (
+        ("C", "Communication cost"),
+        (
+            "D",
+            "Delegate committees are organized for the purpose of "
+            "influencing the selection of delegates to Presidential "
+            "nominating conventions. The term includes a group of "
+            "delegates, a group of individuals seeking to become "
+            "delegates, and a group of individuals supporting delegates.",
+        ),
+        ("E", "Groups (other than PACs) making electioneering communications"),
+        (
+            "H",
+            "Campaign committees for candidates for the U.S. House of "
+            "Representatives",
+        ),
+        (
+            "I",
+            "Individuals or groups (other than PACs) making independent "
+            "expenditures over $250 in a year must disclose those "
+            "expenditures",
+        ),
+        (
+            "N",
+            "PAC - unqualified : PACs that have not yet been in existence "
+            "for six months and received contributions from 50 people "
+            "and made contributions to five federal candidates. These "
+            "committees have lower limits for their contributions to "
+            "candidates.",
+        ),
+        ("O", "Independent expenditure-only (Super PACs)"),
+        ("P", "Campaign committee for candidate for U.S. President"),
+        (
+            "Q",
+            "PAC - qualified : PACs that have been in existence for six "
+            "months and received contributions from 50 people and made "
+            "contributions to five federal candidates",
+        ),
+        ("S", "Campaign committee for candidate for Senate"),
+        ("U", "Single-candidate independent expenditure"),
+        (
+            "V",
+            "PAC with non-contribution account - nonqualified  : "
+            "Political committees with non-contribution accounts",
+        ),
+        (
+            "W",
+            "PAC with non-contribution account - qaualified : Political "
+            "committees with non-contribution accounts",
+        ),
+        (
+            "X",
+            "Party - nonqualified : Party committees that have not yet "
+            "been in existence for six months and received contributions "
+            "from 50 people, unless they are affiliated with another "
+            "party committee that has met these requirements.",
+        ),
+        (
+            "Y",
+            "Party - qualified : Party committees that have existed for "
+            "at least six months and received contributions from 50 "
+            "people or are affiliated with another party committee that "
+            "meets these requirements.",
+        ),
+        (
+            "Z",
+            "National party nonfederal accounts. Not permitted after "
+            "enactment of Bipartisan Campaign Reform Act of 2002. ",
+        ),
+    )
+
+    COMMITTEE_DESIGNATION_CHOICES = (
+        ("A", "Authorized by a candidate"),
+        ("B", "Lobbyist / Registrant PAC"),
+        ("D", "Leadership PAC"),
+        ("J", "Joint fundraiser"),
+        ("P", "Principal campaign committee of a candidate"),
+        ("U", "Unauthorized"),
+    )
+
+    ORG_TYPE_CHOICES = (
+        ("C", "Corporation"),
+        ("L", "Labor organization"),
+        ("M", "Membership organization"),
+        ("T", "Trade association"),
+        ("V", "Cooperative"),
+        ("W", "Corporation without capital stock"),
+    )
+
+    committee_id = models.CharField(
+        help_text="Unique ID for committee",
+        max_length=9,
+        db_index=True,
+    )
+    committee_name = models.CharField(
+        help_text="Committee name",
+        max_length=200,
+        blank=True,
+    )
+    committee_party = models.CharField(
+        help_text="Political party affiliation",
+        max_length=3,
+        blank=True,
+    )
+    candidate_id = models.CharField(
+        help_text="Unique ID for candidate supported by committee",
+        max_length=9,
+        blank=True,
+    )
+    connected_org_name = models.CharField(
+        help_text="Connected organization name",
+        max_length=200,
+        blank=True,
+    )
+    committee_type = models.CharField(
+        help_text="Committee type",
+        choices=COMMITTEE_CHOICES,
+        max_length=1,
+        blank=True,
+    )
+    committee_designation = models.CharField(
+        help_text="Committee designation",
+        choices=COMMITTEE_DESIGNATION_CHOICES,
+        max_length=1,
+        blank=True,
+    )
+    org_type = models.CharField(
+        help_text="Interest group category",
+        choices=ORG_TYPE_CHOICES,
+        max_length=1,
+        blank=True,
+    )
+
+
 class Individual(models.Model):
     """
     Individual making a campaign contribution.
     """
 
-    committees = models.ManyToManyField(Committee)
+    committees = models.ManyToManyField("Committee")
     name = models.CharField(
         help_text="Individual contributor name",
+        max_length=200,
         db_index=True,
     )
     city = models.CharField(
         help_text="City where individual contributor lives",
+        max_length=30,
         blank=True,
     )
     state = models.CharField(
         help_text="State where individual contributor lives",
+        max_length=2,
     )
     zip_code = models.CharField(
         help_text="Zip code for individual contributor",
+        max_length=9,
         blank=True,
     )
     employer = models.CharField(
         help_text="Employer of individual contributor",
+        max_length=38,
         blank=True,
     )
     occupation = models.CharField(
         help_text="Occupation of individual contributor",
+        max_length=38,
         blank=True,
     )
 
@@ -2178,7 +2323,7 @@ class Contribution(models.Model):
             "Covers from the end of the last quarterly or mid-year report "
             "through December 31 - due January 31",
         ),
-        ("90S", "Post inaugural supplement", " "),
+        ("90S", "Post inaugural supplement"),
         (
             "90D",
             "Filing of Presidential inaugural committee - due 90 days "
@@ -2207,7 +2352,7 @@ class Contribution(models.Model):
     )
 
     contributor = models.ForeignKey(Individual)
-    valid = models.BooleanField(
+    valid = models.NullBooleanField(
         help_text="Is the record valid?",
         null=True,
         blank=True,
@@ -2221,181 +2366,57 @@ class Contribution(models.Model):
     )
     sub_id = models.CharField(
         help_text="Unique FEC record number of the contribution",
+        max_length=19,
         db_index=True,
     )
     transaction_id = models.CharField(
         help_text="FEC identifier for the contribution.  Only valid for "
         "electronic filings.",
+        max_length=32,
         blank=True,
     )
     image_num = models.CharField(
         help_text="FEC image number",
+        max_length=18,
         db_index=True,
     )
     transaction_pgi = models.CharField(
         help_text="Primary or general election and it's ID/year",
+        max_length=5,
     )
     year = models.IntegerField(
         help_text="Year",
     )
     transaction_type = models.CharField(
         help_text="Transaction type",
+        max_length=3,
         choices=TRANSACTION_CHOICES,
     )
     amend_indicator = models.CharField(
         help_text="Amendment indicator",
+        max_length=1,
         choices=AMENDMENT_CHOICES,
     )
     report_type = models.CharField(
         help_text="Report type",
+        max_length=3,
         choices=REPORT_TYPE_CHOICES,
     )
     memo_cd = models.CharField(
         help_text="Memo code.  X indicates that the amount is NOT to be "
         "included in the itemization total. ",
+        max_length=1,
         blank=True,
     )
     memo_text = models.CharField(
         help_text="Memo text. A description of the activity. Memo Text is "
         "available on itemized amounts on Schedules A and B. "
         "These transactions are included in the itemization total. ",
+        max_length=100,
         blank=True,
     )
     file_num = models.CharField(
         help_text="Unique report id",
-        blank=True,
-    )
-
-
-class Committee(models.Model):
-    """
-    Details about committee receiving campaign contribution.
-    """
-
-    COMMITTEE_CHOICES = (
-        ("C", "Communication cost"),
-        (
-            "D",
-            "Delegate committees are organized for the purpose of "
-            "influencing the selection of delegates to Presidential "
-            "nominating conventions. The term includes a group of "
-            "delegates, a group of individuals seeking to become "
-            "delegates, and a group of individuals supporting delegates.",
-        ),
-        ("E", "Groups (other than PACs) making electioneering communications"),
-        (
-            "H",
-            "Campaign committees for candidates for the U.S. House of "
-            "Representatives",
-        ),
-        (
-            "I",
-            "Individuals or groups (other than PACs) making independent "
-            "expenditures over $250 in a year must disclose those "
-            "expenditures",
-        ),
-        (
-            "N",
-            "PAC - unqualified : PACs that have not yet been in existence "
-            "for six months and received contributions from 50 people "
-            "and made contributions to five federal candidates. These "
-            "committees have lower limits for their contributions to "
-            "candidates.",
-        ),
-        ("O", "Independent expenditure-only (Super PACs)"),
-        ("P", "Campaign committee for candidate for U.S. President"),
-        (
-            "Q",
-            "PAC - qualified : PACs that have been in existence for six "
-            "months and received contributions from 50 people and made "
-            "contributions to five federal candidates",
-        ),
-        ("S", "Campaign committee for candidate for Senate"),
-        ("U", "Single-candidate independent expenditure"),
-        (
-            "V",
-            "PAC with non-contribution account - nonqualified  : "
-            "Political committees with non-contribution accounts",
-        ),
-        (
-            "W",
-            "PAC with non-contribution account - qaualified : Political "
-            "committees with non-contribution accounts",
-        ),
-        (
-            "X",
-            "Party - nonqualified : Party committees that have not yet "
-            "been in existence for six months and received contributions "
-            "from 50 people, unless they are affiliated with another "
-            "party committee that has met these requirements.",
-        ),
-        (
-            "Y",
-            "Party - qualified : Party committees that have existed for "
-            "at least six months and received contributions from 50 "
-            "people or are affiliated with another party committee that "
-            "meets these requirements.",
-        ),
-        (
-            "Z",
-            "National party nonfederal accounts. Not permitted after "
-            "enactment of Bipartisan Campaign Reform Act of 2002. ",
-        ),
-    )
-
-    COMMITTEE_DESIGNATION_CHOICES = (
-        ("A", "Authorized by a candidate"),
-        ("B", "Lobbyist / Registrant PAC"),
-        ("D", "Leadership PAC"),
-        ("J", "Joint fundraiser"),
-        ("P", "Principal campaign committee of a candidate"),
-        ("U", "Unauthorized"),
-    )
-
-    ORG_TYPE_CHOICES = (
-        ("C", "Corporation"),
-        ("L", "Labor organization"),
-        ("M", "Membership organization"),
-        ("T", "Trade association"),
-        ("V", "Cooperative"),
-        ("W", "Corporation without capital stock"),
-    )
-
-    committee_id = models.CharField(
-        help_text="Unique ID for committee",
-        db_index=True,
-    )
-    committee_name = models.CharField(
-        help_text="Committee name",
-        blank=True,
-    )
-    committee_party = models.CharField(
-        help_text="Political party affiliation",
-        blank=True,
-    )
-    candidate_id = models.CharField(
-        help_text="Unique ID for candidate supported by committee",
-        blank=True,
-    )
-    connected_org_name = models.CharField(
-        help_text="Connected organization name",
-        blank=True,
-    )
-    file_num = models.CharField(
-        help_text="Unique report ID",
-    )
-    committee_type = models.CharField(
-        help_text="Committee type",
-        choices=COMMITTEE_CHOICES,
-        blank=True,
-    )
-    committee_designation = models.CharField(
-        help_text="Committee designation",
-        choices=COMMITTEE_DESIGNATION_CHOICES,
-        blank=True,
-    )
-    org_type = models.CharField(
-        help_text="Interest group category",
-        choices=ORG_TYPE_CHOICES,
+        max_length=22,
         blank=True,
     )
