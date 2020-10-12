@@ -10,3 +10,4 @@
 
 # But no matter what, ignore these things.
 */assets/media*
+*/node_modules
