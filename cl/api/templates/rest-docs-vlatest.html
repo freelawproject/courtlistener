@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load extras %}
 
-{% block title %}REST API, v3.11 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.12 &ndash; CourtListener.com{% endblock %}
 {% block description %}
   REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.
 {% endblock %}
@@ -17,7 +17,7 @@
 
 {% block content %}
   <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.11</h1>
+    <h1 id="about">REST API &ndash; v3.12</h1>
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
     <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
@@ -42,7 +42,7 @@
 
     <pre class="scrollable">curl -X OPTIONS {% get_full_host %}{% url "api-root" version="v3" %}</pre>
 
-    <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger interface</a> and a <a href="{% url "core_api_schema" %}">Core API representation</a> of the API. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
+    <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger/OpenAPI interface</a>. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
     </p>
 
     <h3>Data Modeling</h3>
@@ -450,9 +450,6 @@
       <a href="{% url "swagger_schema" %}"
          target="_blank"
          class="btn btn-lg btn-primary">Show Swagger Schema</a>
-      <a href="{% url "core_api_schema" %}"
-         target="_blank"
-         class="btn btn-lg btn-primary">Show Core API Schema</a>
     </p>
     <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
     <p><code>Docket</code> objects link <code>Opinion Cluster</code>, <code>Audio</code>, and <code>Docket Entry</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
