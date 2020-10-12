@@ -41,3 +41,5 @@ cl/settings/google_auth.json
 
 
 cl/assets/media/lasc-data/*/
+
+cl/node_modules
