@@ -111,18 +111,44 @@ scorched = {git = "https://github.com/mlissner/scorched.git", rev = "patch-3"}
 pylint = "^2.6.0"
 pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.4.*,>=3.4.0"
+black = {version = "^20.8b1", allow-prereleases = true}
+flake8 = "^3.8.3"
+mypy = "^0.782"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
 
 [tool.black]
-exclude = '.*migrations.*'
 include = '''
 (
     cl         # Just include a few directories for now
 )*\.pyi?$
 '''
+exclude = '''
+(
+      \.eggs
+    | .*\.egg-info
+    | .*migrations.*
+    | \.mypy_cache
+    | __pycache__
+    | \.venv
+)
+'''
 line-length = 79
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 79
+
+[tool.pylint.messages_control]
+disable = "C0330, C0326"
+
+[tool.pylint.format]
+max-line-length = "79"
 
 [build-system]
 build-backend = "poetry.masonry.api"
