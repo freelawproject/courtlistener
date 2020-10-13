@@ -16,6 +16,7 @@ from cl.search.models import Court, RECAPDocument, Docket
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):
+    # Powers the RECAP upload endpoint
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
     )
@@ -44,7 +45,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProcessingQueue
-        exclude = ("uploader",)  # Private
+        fields = "__all__"
         read_only_fields = (
             "error_message",
             "status",
