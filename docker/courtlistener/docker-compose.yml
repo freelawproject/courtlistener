@@ -48,7 +48,7 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:poetry2
+        image: freelawproject/task-server:poetry-ml3
         depends_on:
             - cl-postgresql
             - cl-redis
@@ -65,7 +65,7 @@ services:
 
     cl-django:
         container_name: cl-django
-        image: freelawproject/courtlistener-django:poetry2
+        image: freelawproject/courtlistener-django:poetry-ml3
         depends_on:
             - cl-postgresql
             - cl-redis
