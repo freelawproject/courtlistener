@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='ia_upload_failure_count',
-            field=models.SmallIntegerField(help_text=b'Number of times the upload to the Internet Archive failed.', null=True, blank=True),
+            field=models.SmallIntegerField(help_text='Number of times the upload to the Internet Archive failed.', null=True, blank=True),
         ),
     ]

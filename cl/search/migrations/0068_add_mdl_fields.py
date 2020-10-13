@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='mdl_status',
-            field=models.CharField(help_text=b'The MDL status of a case before the Judicial Panel for Multidistrict Litigation', max_length=100, blank=True),
+            field=models.CharField(help_text='The MDL status of a case before the Judicial Panel for Multidistrict Litigation', max_length=100, blank=True),
         ),
     ]

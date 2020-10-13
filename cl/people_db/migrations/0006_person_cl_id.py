@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='cl_id',
-            field=models.CharField(help_text=b'A unique identifier for judge, also indicating source of data.', max_length=30, unique=True, null=True, db_index=True),
+            field=models.CharField(help_text='A unique identifier for judge, also indicating source of data.', max_length=30, unique=True, null=True, db_index=True),
         ),
     ]

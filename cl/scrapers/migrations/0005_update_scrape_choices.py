@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='recaplog',
             name='status',
-            field=models.SmallIntegerField(help_text=b'The current status of the RECAP scrape.', choices=[(1, b'Scrape Completed Successfully'), (2, b'Scrape currently in progress'), (4, b'Getting list of new content from archive server'), (5, b'Successfully got the change list.'), (6, b'Getting and merging items from server'), (3, b'Scrape Failed')]),
+            field=models.SmallIntegerField(help_text='The current status of the RECAP scrape.', choices=[(1, 'Scrape Completed Successfully'), (2, 'Scrape currently in progress'), (4, 'Getting list of new content from archive server'), (5, 'Successfully got the change list.'), (6, 'Getting and merging items from server'), (3, 'Scrape Failed')]),
         ),
     ]

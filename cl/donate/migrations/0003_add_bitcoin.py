@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='donation',
             name='payment_provider',
-            field=models.CharField(default=None, max_length=50, choices=[(b'dwolla', b'Dwolla'), (b'paypal', b'PayPal'), (b'cc', b'Credit Card'), (b'check', b'Check'), (b'bitcoin', b'Bitcoin')]),
+            field=models.CharField(default=None, max_length=50, choices=[('dwolla', 'Dwolla'), ('paypal', 'PayPal'), ('cc', 'Credit Card'), ('check', 'Check'), ('bitcoin', 'Bitcoin')]),
         ),
     ]

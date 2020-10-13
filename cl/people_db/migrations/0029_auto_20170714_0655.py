@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='how_selected',
-            field=models.CharField(blank=True, help_text=b'The method that was used for selecting this judge for this position (generally an election or appointment).', max_length=20, choices=[(b'Election', ((b'e_part', b'Partisan Election'), (b'e_non_part', b'Non-Partisan Election'))), (b'Appointment', ((b'a_pres', b'Appointment (President)'), (b'a_gov', b'Appointment (Governor)'), (b'a_legis', b'Appointment (Legislature)'), (b'a_judge', b'Appointment (Judge)')))]),
+            field=models.CharField(blank=True, help_text='The method that was used for selecting this judge for this position (generally an election or appointment).', max_length=20, choices=[('Election', (('e_part', 'Partisan Election'), ('e_non_part', 'Non-Partisan Election'))), ('Appointment', (('a_pres', 'Appointment (President)'), ('a_gov', 'Appointment (Governor)'), ('a_legis', 'Appointment (Legislature)'), ('a_judge', 'Appointment (Judge)')))]),
         ),
     ]

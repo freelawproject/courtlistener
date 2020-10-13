@@ -21,11 +21,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='recapdocument',
             name='filepath_ia',
-            field=models.CharField(help_text=b'The URL of the file in IA', max_length=1000, blank=True),
+            field=models.CharField(help_text='The URL of the file in IA', max_length=1000, blank=True),
         ),
         migrations.AlterField(
             model_name='recapdocument',
             name='filepath_local',
-            field=models.FileField(help_text=b'The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_recap_path, blank=True),
+            field=models.FileField(help_text='The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_recap_path, blank=True),
         ),
     ]

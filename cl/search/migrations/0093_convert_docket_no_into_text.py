@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='docket_number',
-            field=models.TextField(blank=True, db_index=True, help_text=b'The docket numbers of a case, can be consolidated and quite long', null=True),
+            field=models.TextField(blank=True, db_index=True, help_text='The docket numbers of a case, can be consolidated and quite long', null=True),
         ),
     ]

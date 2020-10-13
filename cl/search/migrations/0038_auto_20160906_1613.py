@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='recapdocument',
             name='ocr_status',
-            field=models.SmallIntegerField(blank=True, help_text=b'The status of OCR processing on this item.', null=True, choices=[(1, b'OCR Complete'), (2, b'OCR Not Necessary'), (3, b'OCR Failed'), (4, b'OCR Needed')]),
+            field=models.SmallIntegerField(blank=True, help_text='The status of OCR processing on this item.', null=True, choices=[(1, 'OCR Complete'), (2, 'OCR Not Necessary'), (3, 'OCR Failed'), (4, 'OCR Needed')]),
         ),
     ]

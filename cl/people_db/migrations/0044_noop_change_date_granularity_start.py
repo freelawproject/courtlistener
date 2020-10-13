@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='date_granularity_start',
-            field=models.CharField(blank=True, choices=[(b'%Y', b'Year'), (b'%Y-%m', b'Month'), (b'%Y-%m-%d', b'Day')], max_length=15),
+            field=models.CharField(blank=True, choices=[('%Y', 'Year'), ('%Y-%m', 'Month'), ('%Y-%m-%d', 'Day')], max_length=15),
         ),
     ]

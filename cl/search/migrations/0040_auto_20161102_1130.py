@@ -14,17 +14,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinion',
             name='author_str',
-            field=models.TextField(help_text=b'The primary author of this opinion, as a simple text string. This field is used when normalized judges cannot be placed into the author field.', blank=True),
+            field=models.TextField(help_text='The primary author of this opinion, as a simple text string. This field is used when normalized judges cannot be placed into the author field.', blank=True),
         ),
         migrations.AlterField(
             model_name='opinion',
             name='author',
-            field=models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text=b'The primary author of this opinion as a normalized field', null=True,
+            field=models.ForeignKey(related_name='opinions_written', blank=True, to='people_db.Person', help_text='The primary author of this opinion as a normalized field', null=True,
                                     on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='opinioncluster',
             name='date_filed',
-            field=models.DateField(help_text=b'The date the cluster of opinions was filed by the court', db_index=True),
+            field=models.DateField(help_text='The date the cluster of opinions was filed by the court', db_index=True),
         ),
     ]

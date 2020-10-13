@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='opinion',
             name='type',
-            field=models.CharField(max_length=20, choices=[(b'010combined', b'Combined Opinion'), (b'020lead', b'Lead Opinion'), (b'030concurrence', b'Concurrence'), (b'040dissent', b'Dissent'), (b'050addendum', b'Addendum')]),
+            field=models.CharField(max_length=20, choices=[('010combined', 'Combined Opinion'), ('020lead', 'Lead Opinion'), ('030concurrence', 'Concurrence'), ('040dissent', 'Dissent'), ('050addendum', 'Addendum')]),
         ),
     ]
