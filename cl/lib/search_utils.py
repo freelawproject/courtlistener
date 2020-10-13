@@ -991,8 +991,8 @@ def get_citing_clusters_with_cache(cluster):
         "sort": "citeCount desc",
         "caller": "view_opinion",
     }
-    conn = scorched.ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    results = conn.raw_query(**q).execute()
+    conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    results = conn.query().add_extra(**q).execute()
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
