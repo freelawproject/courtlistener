@@ -42,7 +42,7 @@ from cl.people_db.models import (
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Person.objects.all().order_by("-id")
     serializer_class = PersonSerializer
-    filter_class = PersonFilter
+    filterset_class = PersonFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -55,7 +55,7 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
-    filter_class = PositionFilter
+    filterset_class = PositionFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -76,28 +76,28 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
 class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = RetentionEvent.objects.all().order_by("-id")
     serializer_class = RetentionEventSerializer
-    filter_class = RetentionEventFilter
+    filterset_class = RetentionEventFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_retention")
 
 
 class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Education.objects.all().order_by("-id")
     serializer_class = EducationSerializer
-    filter_class = EducationFilter
+    filterset_class = EducationFilter
     ordering_fields = ("id", "date_created", "date_modified")
 
 
 class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
-    filter_class = SchoolFilter
+    filterset_class = SchoolFilter
     ordering_fields = ("id", "date_created", "date_modified")
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = PoliticalAffiliation.objects.all().order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
-    filter_class = PoliticalAffiliationFilter
+    filterset_class = PoliticalAffiliationFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -110,7 +110,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
 class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Source.objects.all().order_by("-id")
     serializer_class = SourceSerializer
-    filter_class = SourceFilter
+    filterset_class = SourceFilter
     ordering_fields = (
         "id",
         "date_modified",
@@ -121,7 +121,7 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
 class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = ABARating.objects.all().order_by("-id")
     serializer_class = ABARatingSerializer
-    filter_class = ABARatingFilter
+    filterset_class = ABARatingFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -133,7 +133,7 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = PartySerializer
-    filter_class = PartyFilter
+    filterset_class = PartyFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -149,7 +149,7 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = AttorneySerializer
-    filter_class = AttorneyFilter
+    filterset_class = AttorneyFilter
     ordering_fields = (
         "id",
         "date_created",

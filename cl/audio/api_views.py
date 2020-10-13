@@ -8,7 +8,7 @@ from cl.audio.models import Audio
 
 class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = AudioSerializer
-    filter_class = AudioFilter
+    filterset_class = AudioFilter
     ordering_fields = (
         "id",
         "date_created",
