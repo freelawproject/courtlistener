@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils.timezone import now
 from scorched.exc import SolrError
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.search.models import OpinionCluster, RECAPDocument, Docket
 

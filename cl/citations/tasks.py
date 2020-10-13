@@ -4,7 +4,7 @@ from collections import Counter
 
 from django.db.models import F
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from cl.search.tasks import add_items_to_solr

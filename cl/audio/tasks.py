@@ -3,7 +3,7 @@ from django.utils.text import slugify
 
 from cl.audio.models import Audio
 from cl.audio.utils import make_af_filename
-from cl.celery import app
+from cl.celery_init import app
 from cl.corpus_importer.tasks import upload_to_ia, increment_failure_count
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.recap_utils import get_bucket_name

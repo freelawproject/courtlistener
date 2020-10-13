@@ -9,7 +9,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.versioning import URLPathVersioning
 
 from cl.api.utils import BulkJsonHistory
-from cl.celery import app
+from cl.celery_init import app
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.lib.utils import deepgetattr, mkdir_p
