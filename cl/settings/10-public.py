@@ -357,7 +357,7 @@ REST_FRAMEWORK = {
     ),
     # Filtering
     "DEFAULT_FILTER_BACKENDS": (
-        # This is a tweaked version of DjangoFilterBackend
+        # This is a tweaked version of RestFrameworkFilterBackend
         "cl.api.utils.DisabledHTMLFilterBackend",
         "rest_framework.filters.OrderingFilter",
     ),
