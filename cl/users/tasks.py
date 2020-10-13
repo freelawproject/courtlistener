@@ -9,7 +9,7 @@ from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
 )
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.lib.crypto import md5
 
 logger = logging.getLogger(__name__)

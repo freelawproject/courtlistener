@@ -2,7 +2,7 @@ import subprocess
 
 from django.core.files.base import ContentFile
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure

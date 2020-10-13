@@ -47,7 +47,7 @@ from rest_framework.status import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import (

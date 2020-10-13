@@ -30,7 +30,7 @@ from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
 from cl.audio.utils import get_audio_binary
-from cl.celery import app
+from cl.celery_init import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
