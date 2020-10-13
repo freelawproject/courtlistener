@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='usertag',
             name='dockets',
-            field=models.ManyToManyField(blank=True, help_text=b'Dockets that are tagged with by this item', related_name='user_tags', through='favorites.DocketTag', to='search.Docket'),
+            field=models.ManyToManyField(blank=True, help_text='Dockets that are tagged with by this item', related_name='user_tags', through='favorites.DocketTag', to='search.Docket'),
         ),
         migrations.AlterUniqueTogether(
             name='dockettag',

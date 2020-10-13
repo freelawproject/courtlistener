@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='assigned_to_str',
-            field=models.TextField(help_text=b'The judge that the case was assigned to, as a string.', blank=True),
+            field=models.TextField(help_text='The judge that the case was assigned to, as a string.', blank=True),
         ),
         migrations.AddField(
             model_name='docket',
             name='referred_to_str',
-            field=models.TextField(help_text=b'The judge that the case was referred to, as a string.', blank=True),
+            field=models.TextField(help_text='The judge that the case was referred to, as a string.', blank=True),
         ),
     ]

@@ -15,11 +15,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='pacerhtmlfiles',
             name='upload_type',
-            field=models.SmallIntegerField(choices=[(1, b'HTML Docket'), (2, b'HTML attachment page'), (3, b'PDF'), (4, b'Docket history report'), (5, b'Appellate HTML docket'), (6, b'Appellate HTML attachment page'), (7, b'Internet Archive XML docket'), (8, b'Case report (iquery.pl) page'), (9, b'Claims register page'), (10, b'Zip archive of RECAP Documents')], help_text=b'The type of object that is uploaded'),
+            field=models.SmallIntegerField(choices=[(1, 'HTML Docket'), (2, 'HTML attachment page'), (3, 'PDF'), (4, 'Docket history report'), (5, 'Appellate HTML docket'), (6, 'Appellate HTML attachment page'), (7, 'Internet Archive XML docket'), (8, 'Case report (iquery.pl) page'), (9, 'Claims register page'), (10, 'Zip archive of RECAP Documents')], help_text='The type of object that is uploaded'),
         ),
         migrations.AlterField(
             model_name='processingqueue',
             name='upload_type',
-            field=models.SmallIntegerField(choices=[(1, b'HTML Docket'), (2, b'HTML attachment page'), (3, b'PDF'), (4, b'Docket history report'), (5, b'Appellate HTML docket'), (6, b'Appellate HTML attachment page'), (7, b'Internet Archive XML docket'), (8, b'Case report (iquery.pl) page'), (9, b'Claims register page'), (10, b'Zip archive of RECAP Documents')], help_text=b'The type of object that is uploaded'),
+            field=models.SmallIntegerField(choices=[(1, 'HTML Docket'), (2, 'HTML attachment page'), (3, 'PDF'), (4, 'Docket history report'), (5, 'Appellate HTML docket'), (6, 'Appellate HTML attachment page'), (7, 'Internet Archive XML docket'), (8, 'Case report (iquery.pl) page'), (9, 'Claims register page'), (10, 'Zip archive of RECAP Documents')], help_text='The type of object that is uploaded'),
         ),
     ]

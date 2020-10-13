@@ -15,8 +15,8 @@ class Migration(migrations.Migration):
             name='Event',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('date_created', models.DateTimeField(help_text=b'The moment when the event was logged', auto_now_add=True)),
-                ('description', models.CharField(help_text=b'A human-readable description of the event', max_length=200)),
+                ('date_created', models.DateTimeField(help_text='The moment when the event was logged', auto_now_add=True)),
+                ('description', models.CharField(help_text='A human-readable description of the event', max_length=200)),
             ],
         ),
     ]

@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='nature_of_suit',
-            field=models.CharField(help_text=b'The nature of suit code from PACER.', max_length=1000, blank=True),
+            field=models.CharField(help_text='The nature of suit code from PACER.', max_length=1000, blank=True),
         ),
     ]

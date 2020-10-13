@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='opinion',
             name='sha1',
-            field=models.CharField(blank=True, db_index=True, help_text=b'unique ID for the document, as generated via SHA1 of the binary file or text data', max_length=40),
+            field=models.CharField(blank=True, db_index=True, help_text='unique ID for the document, as generated via SHA1 of the binary file or text data', max_length=40),
         ),
     ]
