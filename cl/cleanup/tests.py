@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-import mock
+from unittest import mock
 from glob import iglob
 import json
 
