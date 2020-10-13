@@ -1,6 +1,6 @@
 from datetime import date
 
-from mock import MagicMock
+from unittest.mock import MagicMock
 
 
 DOCKET_NUMBER = "5:18-cr-00227"
