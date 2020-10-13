@@ -4,8 +4,7 @@ import json
 import os
 import unittest
 from datetime import date, datetime
-import mock
-from mock import patch
+from unittest import mock
 from glob import iglob
 
 import pytest
