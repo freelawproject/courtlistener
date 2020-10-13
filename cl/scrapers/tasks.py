@@ -533,7 +533,7 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     ]
     if has_seal:
         with open(
-            os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
+            os.path.join(seals_root, "512", "%s.png" % court.pk), "rb"
         ) as f:
             audio_file.tag.images.set(
                 3, f.read(), "image/png", "Seal for %s" % court.short_name
