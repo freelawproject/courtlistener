@@ -294,6 +294,17 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "deprecation"
+version = "2.1.0"
+description = "A library to handle automated deprecations"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+packaging = "*"
+
+[[package]]
 name = "disposable-email-domains"
 version = "0.0.64"
 description = "A set of disposable email domains"
@@ -503,16 +514,33 @@ python-versions = "*"
 
 [[package]]
 name = "eyed3"
-version = "0.7.11"
-description = "Python audio data toolkit (ID3 and MP3) [for Python 2.6]"
+version = "0.9.5"
+description = "Python audio data toolkit (ID3 and MP3)"
 category = "main"
 optional = false
 python-versions = "*"
+
+[package.dependencies]
+deprecation = "*"
+filetype = "*"
+
+[package.extras]
+yaml-plugin = ["ruamel.yaml"]
+art-plugin = ["pylast", "requests", "pillow"]
+display-plugin = ["grako"]
 
 [[package]]
 name = "feedparser"
 version = "5.2.1"
 description = "Universal feed parser, handles RSS 0.9x, RSS 1.0, RSS 2.0, CDF, Atom 0.3, and Atom 1.0 feeds"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
+name = "filetype"
+version = "1.0.7"
+description = "Infer file type and MIME type of any file/buffer. No external dependencies."
 category = "main"
 optional = false
 python-versions = "*"
@@ -1425,7 +1453,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "ae6871305be24ef7b4a3a670d9b7e92def42f25b2dd2d578af4f3818ce444d00"
+content-hash = "0249a0c7d391102aec862d6d9b6e8dc6de8ee67175ba738f3c366c7fcab60946"
 
 [metadata.files]
 amqp = [
@@ -1604,6 +1632,10 @@ defusedxml = [
     {file = "defusedxml-0.6.0-py2.py3-none-any.whl", hash = "sha256:6687150770438374ab581bb7a1b327a847dd9c5749e396102de3fad4e8a3ef93"},
     {file = "defusedxml-0.6.0.tar.gz", hash = "sha256:f684034d135af4c6cbb949b8a4d2ed61634515257a67299e5f940fbaa34377f5"},
 ]
+deprecation = [
+    {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
+    {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
+]
 disposable-email-domains = [
     {file = "disposable-email-domains-0.0.64.tar.gz", hash = "sha256:da4b9099542af33c854a2f482d825b759a7db43819c535bb3a20e37eb01a2534"},
     {file = "disposable_email_domains-0.0.64-py2.py3-none-any.whl", hash = "sha256:f3b061bb80fe5923978e64d7fc20e0dc06173163b8e4d1da008e8557c8e3ad76"},
@@ -1678,12 +1710,18 @@ drf-dynamic-fields = [
     {file = "drf_dynamic_fields-0.3.1.tar.gz", hash = "sha256:de75969abff74332f339d082931f1815dc91c2ff1ed6e741bd33d1d5057dceb1"},
 ]
 eyed3 = [
-    {file = "eyeD3-0.7.11.tar.gz", hash = "sha256:2788f09d6ddb98ac71c30f02a260ade7eb3198cfcb6d6be9b1a5c20d95bb043b"},
+    {file = "eyeD3-0.9.5-py2.py3-none-any.whl", hash = "sha256:94d475c0b55d9227a7f885f0be0f8433da9de6e5037e5164a524b042e78a2b62"},
+    {file = "eyeD3-0.9.5-py3.8.egg", hash = "sha256:5e517b8c0eb36d5225e9bc3e85ab340e211a0887dfb83507a1dd8f586bf55df9"},
+    {file = "eyeD3-0.9.5.tar.gz", hash = "sha256:faf5806197f2093e82c2830d41f2378f07b3a9da07a16fafb14fc6fbdebac50a"},
 ]
 feedparser = [
     {file = "feedparser-5.2.1.tar.bz2", hash = "sha256:ce875495c90ebd74b179855449040003a1beb40cd13d5f037a0654251e260b02"},
     {file = "feedparser-5.2.1.tar.gz", hash = "sha256:bd030652c2d08532c034c27fcd7c85868e7fa3cb2b17f230a44a6bbc92519bf9"},
     {file = "feedparser-5.2.1.zip", hash = "sha256:cd2485472e41471632ed3029d44033ee420ad0b57111db95c240c9160a85831c"},
+]
+filetype = [
+    {file = "filetype-1.0.7-py2.py3-none-any.whl", hash = "sha256:353369948bb1c09b8b3ea3d78390b5586e9399bff9aab894a1dff954e31a66f6"},
+    {file = "filetype-1.0.7.tar.gz", hash = "sha256:da393ece8d98b47edf2dd5a85a2c8733e44b769e32c71af4cd96ed8d38d96aa7"},
 ]
 future = [
     {file = "future-0.18.2.tar.gz", hash = "sha256:b1bead90b70cf6ec3f0710ae53a525360fa360d306a86583adc6bf83a4db537d"},
