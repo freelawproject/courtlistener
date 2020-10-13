@@ -63,8 +63,8 @@ WORKDIR $PYSETUP_PATH
 COPY poetry.lock pyproject.toml ./
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install
-RUN poetry install --extras flp
+RUN poetry install --no-root
+RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
 RUN apt purge --assume-yes \
