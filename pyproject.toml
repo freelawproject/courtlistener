@@ -89,7 +89,6 @@ pytz = "*"
 pyyaml = "^5.3.1"
 redis = "==3.2.*,>=3.2.0"
 requests = "^2.20.0"
-scorched = "^0.11.0"
 selenium = "^3.141.0"
 sentry-sdk = "==0.*,>=0.0.0"
 simplejson = "*"
@@ -106,6 +105,7 @@ reporters-db = {version = "^2.0.5", optional = true}
 # Currently this doesn't support py3, which blocks installation due to outdated dependencies.
 #juriscraper = {version = "^1.28.16", optional = true}
 juriscraper = {git = "https://github.com/freelawproject/juriscraper", rev = "py38", optional = true}
+scorched = {git = "https://github.com/mlissner/scorched.git", rev = "patch-3"}
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.6.0"

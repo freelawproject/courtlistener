@@ -1202,7 +1202,7 @@ contextlib2 = ">=0.5.5"
 
 [[package]]
 name = "scorched"
-version = "0.11.0"
+version = "0.13.1.dev0"
 description = "solr search orm like query builder"
 category = "main"
 optional = false
@@ -1214,6 +1214,12 @@ pytz = "*"
 
 [package.extras]
 test = ["nose", "coverage", "mock"]
+
+[package.source]
+type = "git"
+url = "https://github.com/mlissner/scorched.git"
+reference = "patch-3"
+resolved_reference = "47b1335e085f20799630c25d9a850796633f5148"
 
 [[package]]
 name = "selenium"
@@ -1419,7 +1425,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "bdfbbfb251cf7d884cc2e99d190b1318d623d8b9334dad530341a38ecfc7d6f9"
+content-hash = "ae6871305be24ef7b4a3a670d9b7e92def42f25b2dd2d578af4f3818ce444d00"
 
 [metadata.files]
 amqp = [
@@ -2184,9 +2190,7 @@ schema = [
     {file = "schema-0.7.3-py2.py3-none-any.whl", hash = "sha256:c331438b60f634cab5664ab720d3083cc444f924d55269530c36b33e3354276f"},
     {file = "schema-0.7.3.tar.gz", hash = "sha256:4cf529318cfd1e844ecbe02f41f7e5aa027463e7403666a52746f31f04f47a5e"},
 ]
-scorched = [
-    {file = "scorched-0.11.0.tar.gz", hash = "sha256:cf9e325d9ac8605d705de5009806f0170398476e47dee74281a17fc4aa25a308"},
-]
+scorched = []
 selenium = [
     {file = "selenium-3.141.0-py2.py3-none-any.whl", hash = "sha256:2d7131d7bc5a5b99a2d9b04aaf2612c411b03b8ca1b1ee8d3de5845a9be2cb3c"},
     {file = "selenium-3.141.0.tar.gz", hash = "sha256:deaf32b60ad91a4611b98d8002757f29e6f2c2d5fcaf202e1c9ad06d6772300d"},
