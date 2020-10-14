@@ -25,10 +25,8 @@ from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 
 
-class IngestionTest(IndexedSolrTestCase):
-    fixtures = ["test_court.json"]
-
-    def test_ingest_opinions(self):
+class ScraperIngestionTest(TestCase):
+    def test_ingest_opinions_from_scraper(self):
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
@@ -65,18 +63,20 @@ class IngestionTest(IndexedSolrTestCase):
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
+
+class IngestionTest(IndexedSolrTestCase):
     def test_content_extraction(self):
         """Do all of the supported mimetypes get extracted to text
         successfully, including OCR?"""
         test_strings = [
-            "supreme",
-            "intelligence",
-            "indiana",
-            "reagan",
-            "indiana",
-            "fidelity",
+            "indiana",  # opinion_doc.doc
+            "intelligence",  # opinion_pdf_image_based.pdf
+            "tarrant",  # opinion_pdf_text_based.pdf
+            "reagan",  # opinion_html.html
+            "greene",  # opinion_wpd.wpd
+            "ideal",  # opinion_text.txt
         ]
-        opinions = Opinion.objects.all()
+        opinions = Opinion.objects.all().order_by("pk")
         for op, test_string in zip(opinions, test_strings):
             ext = get_extension(op.local_path.file.read())
             extract_doc_content(op.pk, do_ocr=True)
@@ -85,10 +85,6 @@ class IngestionTest(IndexedSolrTestCase):
                 self.assertIn(test_string, op.html.lower())
             else:
                 self.assertIn(test_string, op.plain_text.lower())
-
-
-class ExtractionTest(TestCase):
-    fixtures = ["tax_court_test.json"]
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
@@ -108,6 +104,10 @@ class ExtractionTest(TestCase):
             content,
             "Issue extracting/encoding text from file at: %s" % path,
         )
+
+
+class ExtractionTest(TestCase):
+    fixtures = ["tax_court_test.json"]
 
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db?"""
