@@ -1002,6 +1002,7 @@ def get_citing_clusters_with_cache(cluster):
         "start": 0,
         "sort": "citeCount desc",
         "caller": "view_opinion",
+        "fl": "absolute_url,caseName,dateFiled",
     }
     conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     results = conn.query().add_extra(**q).execute()
