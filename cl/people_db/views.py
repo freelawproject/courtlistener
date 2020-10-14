@@ -178,7 +178,7 @@ def financial_disclosures_fileserver(request, pk, slug, filepath):
     file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode("utf-8"))
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
-        response.content = open(file_loc, "r").read()
+        response.content = open(file_loc, "rb").read()
     else:
         response["X-Sendfile"] = file_loc
     filename = filepath.split("/")[-1]
