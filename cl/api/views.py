@@ -46,7 +46,6 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    # Not sure if this generates the same query, but it passes the test.
     response = si.query().add_extra(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
