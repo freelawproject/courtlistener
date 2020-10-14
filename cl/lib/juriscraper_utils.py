@@ -19,4 +19,13 @@ def get_scraper_object_by_name(court_id):
         # any suffixes like _p, _u
         module_name = full_module_path.rsplit(".", 1)[1].rsplit("_", 1)[0]
         if module_name == court_id:
-            return importlib.import_module(full_module_path).Site()
+            try:
+                return importlib.import_module(full_module_path).Site()
+            except AttributeError:
+                # This can happen when there's no Site() attribute, which can
+                # happen when your court name intersects with the name of
+                # something in Juriscraper. For example, a court named "test"
+                # matches the juriscraper.lib.test_utils module after "_utils"
+                # has been stripped off it. In any case, just ignore it when
+                # this happens.
+                continue
