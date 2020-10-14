@@ -1,6 +1,5 @@
 import logging
 
-import scorched
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -46,11 +45,9 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     # Not sure if this generates the same query, but it passes the test.
-    response = (
-        si.query(**build_court_count_query()).facet_by("court_exact").execute()
-    )
+    response = si.query().add_extra(**build_court_count_query()).execute()
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
@@ -144,24 +141,13 @@ def coverage_data(request, version, court):
         court_str = "all"
     q = request.GET.get("q")
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    fq = {}
-    if court_str.lower() != "all":
-        fq = {"court_exact": court_str}
-
+    facet_field = "dateFiled"
     response = (
-        si.query(**{"q": q or "*"})
-        .facet_range(
-            **{
-                "fields": "dateFiled",
-                "start": "1600-01-01T00:00:00Z",
-                "gap": "+1YEAR",
-                "end": "NOW/DAY",
-            }
-        )
-        .facet_query(**fq)
+        si.query()
+        .add_extra(**build_coverage_query(court_str, q, facet_field))
         .execute()
     )
-    counts = response.facet_counts.facet_ranges["dateFiled"]["counts"]
+    counts = response.facet_counts.facet_ranges[facet_field]["counts"]
     counts = strip_zero_years(counts)
 
     # Calculate the totals

@@ -140,19 +140,23 @@ def update_judges_by_solr(candidate_id_map, debug):
                     ]
                 )
             ).replace(",", "")
-            results = conn.query(
-                **{
-                    "caller": "ftm_update_judges_by_solr",
-                    "fq": [
-                        "name:(%s)" % name,
-                        "court_exact:%s" % court_id,
-                        # This filters out Sr/Jr problems by insisting on recent
-                        # positions. 1980 is arbitrary, based on testing.
-                        "date_start:[1980-12-31T23:59:59Z TO *]",
-                    ],
-                    "q": "*",
-                }
-            ).execute()
+            results = (
+                conn.query()
+                .add_extra(
+                    **{
+                        "caller": "ftm_update_judges_by_solr",
+                        "fq": [
+                            "name:(%s)" % name,
+                            "court_exact:%s" % court_id,
+                            # This filters out Sr/Jr problems by insisting on recent
+                            # positions. 1980 is arbitrary, based on testing.
+                            "date_start:[1980-12-31T23:59:59Z TO *]",
+                        ],
+                        "q": "*",
+                    }
+                )
+                .execute()
+            )
 
             if len(results) == 0:
                 match_stats[len(results)] += 1

@@ -1,17 +1,16 @@
 import os
 
 import magic
-import scorched
 from django.conf import settings
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.urls import reverse
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
-from scorched import SolrInterface
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.bot_detector import is_bot
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person, FinancialDisclosure
 from cl.stats.utils import tally_stat
 
@@ -73,7 +72,7 @@ def view_person(request, pk, slug):
     positions = judicial_positions + other_positions
 
     # Use Solr to get relevant opinions that the person wrote
-    conn = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     q = {
         "q": "author_id:{p} OR panel_ids:{p}".format(p=person.pk),
         "fl": [
@@ -94,10 +93,10 @@ def view_person(request, pk, slug):
         "sort": "score desc",
         "caller": "view_person",
     }
-    authored_opinions = conn.query(**q).execute()
+    authored_opinions = conn.query().add_extra(**q).execute()
 
     # Use Solr to get the oral arguments for the judge
-    conn = SolrInterface(settings.SOLR_AUDIO_URL, mode="r")
+    conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
     q = {
         "q": "panel_ids:{p}".format(p=person.pk),
         "fl": [
@@ -114,7 +113,7 @@ def view_person(request, pk, slug):
         "sort": "dateArgued desc",
         "caller": "view_person",
     }
-    oral_arguments_heard = conn.query(**q).execute()
+    oral_arguments_heard = conn.query().add_extra(**q).execute()
 
     return render(
         request,
