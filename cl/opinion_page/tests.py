@@ -168,7 +168,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "blah", "court_id": "blah"},
         )
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
-        self.assertIn(b"Refresh this Page", r.content)
+        self.assertIn("Refresh this Page", r.content.decode())
 
     def test_all_systems_go(self):
         """Does everything work with good parameters and good data?"""
