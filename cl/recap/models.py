@@ -216,7 +216,7 @@ class ProcessingQueue(models.Model):
     @property
     def file_contents(self):
         with open(self.filepath_local.path, "r") as f:
-            return f.read().decode("utf-8")
+            return f.read().decode()
 
     def print_file_contents(self):
         print(self.file_contents)

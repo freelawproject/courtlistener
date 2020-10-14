@@ -206,7 +206,7 @@ def convert_file_to_txt(path):
     p = subprocess.Popen(
         tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    return p.communicate()[0].decode("utf-8")
+    return p.communicate()[0].decode()
 
 
 def get_page_count(path, extension):
