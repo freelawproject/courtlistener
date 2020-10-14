@@ -96,7 +96,7 @@ def make_objects(item, court, sha1_hash, content):
             "Unable to save binary to disk. Deleted audio file: %s.\n "
             "%s" % (item["case_names"], traceback.format_exc())
         )
-        logger.critical(msg.encode("utf-8"))
+        logger.critical(msg.encode())
         ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
         error = True
 
@@ -155,7 +155,7 @@ class Command(cl_scrape_opinions.Command):
                     # Not a duplicate, carry on
                     logger.info(
                         "Adding new document found at: %s"
-                        % item["download_urls"].encode("utf-8")
+                        % item["download_urls"].encode()
                     )
                     dup_checker.reset()
 
@@ -179,7 +179,7 @@ class Command(cl_scrape_opinions.Command):
                     logger.info(
                         "Successfully added audio file {pk}: {name}".format(
                             pk=audio_file.pk,
-                            name=item["case_names"].encode("utf-8"),
+                            name=item["case_names"].encode(),
                         )
                     )
 

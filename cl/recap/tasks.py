@@ -452,7 +452,7 @@ def process_recap_docket(self, pk):
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
 
     try:
-        text = pq.filepath_local.read().decode("utf-8")
+        text = pq.filepath_local.read().decode()
     except IOError as exc:
         msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -547,7 +547,7 @@ def process_recap_attachment(self, pk, tag_names=None):
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     try:
-        text = pq.filepath_local.read().decode("utf-8")
+        text = pq.filepath_local.read().decode()
     except IOError as exc:
         msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -621,7 +621,7 @@ def process_recap_claims_register(self, pk):
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     try:
-        text = pq.filepath_local.read().decode("utf-8")
+        text = pq.filepath_local.read().decode()
     except IOError as exc:
         msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -707,7 +707,7 @@ def process_recap_docket_history_report(self, pk):
     logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
 
     try:
-        text = pq.filepath_local.read().decode("utf-8")
+        text = pq.filepath_local.read().decode()
     except IOError as exc:
         msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -820,7 +820,7 @@ def process_recap_appellate_docket(self, pk):
     report = AppellateDocketReport(map_cl_to_pacer_id(pq.court_id))
 
     try:
-        text = pq.filepath_local.read().decode("utf-8")
+        text = pq.filepath_local.read().decode()
     except IOError as exc:
         msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
         if (self.request.retries == self.max_retries) or pq.debug:

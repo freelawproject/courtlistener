@@ -110,7 +110,7 @@ class Command(VerboseCommand):
             ]
         ):
             logger.info(
-                "Updating %s with %s." % (attribute, new_value.encode("utf-8"))
+                "Updating %s with %s." % (attribute, new_value.encode())
             )
             setattr(obj, attribute, new_value)
         else:
@@ -313,9 +313,9 @@ class Command(VerboseCommand):
             logger.info(
                 "https://www.courtlistener.com%s" % cluster.get_absolute_url()
             )
-            logger.info("%s" % cluster.case_name.encode("utf-8"))
+            logger.info("%s" % cluster.case_name.encode())
             if cluster.docket.docket_number:
-                logger.info(cluster.docket.docket_number.encode("utf-8"))
+                logger.info(cluster.docket.docket_number.encode())
             logger.info(cluster.date_filed)
         logger.info("SCDB info:")
         logger.info(d["caseName"])

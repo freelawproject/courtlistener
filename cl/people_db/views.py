@@ -175,16 +175,16 @@ def financial_disclosures_for_somebody(request, pk, slug):
 def financial_disclosures_fileserver(request, pk, slug, filepath):
     """Serve up the financial disclosure files."""
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode("utf-8"))
+    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode())
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
         response.content = open(file_loc, "rb").read()
     else:
         response["X-Sendfile"] = file_loc
     filename = filepath.split("/")[-1]
-    response[
-        "Content-Disposition"
-    ] = 'inline; filename="%s"' % filename.encode("utf-8")
+    response["Content-Disposition"] = (
+        'inline; filename="%s"' % filename.encode()
+    )
     response["Content-Type"] = magic.from_file(file_loc, mime=True)
     if not is_bot(request):
         tally_stat("financial_reports.static_file.served")

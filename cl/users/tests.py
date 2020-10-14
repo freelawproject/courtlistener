@@ -87,7 +87,7 @@ class UserTest(LiveServerTestCase):
             if is_evil:
                 self.assertNotIn(
                     next_param,
-                    response.content.decode("utf-8"),
+                    response.content.decode(),
                     msg="'%s' found in HTML of response. This suggests it was "
                     "not cleaned by the sanitize_redirection function."
                     % next_param,
@@ -95,7 +95,7 @@ class UserTest(LiveServerTestCase):
             else:
                 self.assertIn(
                     next_param,
-                    response.content.decode("utf-8"),
+                    response.content.decode(),
                     msg="'%s' not found in HTML of response. This suggests it "
                     "was sanitized when it should not have been." % next_param,
                 )
