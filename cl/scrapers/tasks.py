@@ -80,7 +80,7 @@ def extract_from_doc(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content, err
+    return content.decode(), err
 
 
 def extract_from_docx(path):
@@ -95,7 +95,7 @@ def extract_from_docx(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content, err
+    return content.decode(), err
 
 
 def extract_from_html(path):
@@ -104,7 +104,8 @@ def extract_from_html(path):
     A simple wrapper to go get content, and send it along.
     """
     try:
-        content = open(path).read()
+        with open(path) as f:
+            content = f.read()
         content = get_clean_body_content(content)
         encodings = ["utf-8", "ISO8859", "cp1252"]
         for encoding in encodings:
@@ -316,6 +317,10 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
         )
         return
 
+    assert isinstance(
+        content, str
+    ), "content must be of type str, not %s" % type(content)
+
     # Do page count, if possible
     opinion.page_count = get_page_count(path, extension)
 
@@ -460,7 +465,7 @@ def cleanup_ocr_text(txt):
 
 
 @app.task
-def extract_by_ocr(path):
+def extract_by_ocr(path: str) -> (bool, str):
     """Extract the contents of a PDF using OCR."""
     fail_msg = (
         "Unable to extract the content from this file. Please try "
