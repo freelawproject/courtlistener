@@ -474,7 +474,7 @@ def find_dups(docket, cluster):
         # if there aren't any citations, assume
         # for now that there's no duplicate
         return []
-    citation = " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c)
+
     params = {
         "fq": [
             "court_id:%s" % docket.court_id,
