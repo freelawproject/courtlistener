@@ -5,9 +5,9 @@ from collections import defaultdict
 import requests
 from django.conf import settings
 from django.utils.timezone import now
-from scorched import SolrInterface
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.import_judges.courtid_levels import courtid2statelevel
 from cl.people_db.models import Person
 
@@ -122,7 +122,7 @@ def print_stats(match_stats, candidate_eid_lists):
 
 def update_judges_by_solr(candidate_id_map, debug):
     """Update judges by looking up each entity from FTM in Solr."""
-    conn = SolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+    conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
     match_stats = defaultdict(int)
     # These IDs are ones that cannot be updated due to being identified as
     # problematic in FTM's data.
