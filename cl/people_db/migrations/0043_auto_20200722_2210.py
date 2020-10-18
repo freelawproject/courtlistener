@@ -26,37 +26,37 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='date_completed',
-            field=models.DateTimeField(blank=True, help_text=b'Whenever an editor last decided that a profile was complete in some sense.', null=True),
+            field=models.DateTimeField(blank=True, help_text='Whenever an editor last decided that a profile was complete in some sense.', null=True),
         ),
         migrations.AddField(
             model_name='person',
             name='dob_country',
-            field=models.CharField(blank=True, default=b'United States', help_text=b'The country where the person was born.', max_length=50),
+            field=models.CharField(blank=True, default='United States', help_text='The country where the person was born.', max_length=50),
         ),
         migrations.AddField(
             model_name='person',
             name='dod_country',
-            field=models.CharField(blank=True, default=b'United States', help_text=b'The country where the person died.', max_length=50),
+            field=models.CharField(blank=True, default='United States', help_text='The country where the person died.', max_length=50),
         ),
         migrations.AddField(
             model_name='position',
             name='sector',
-            field=models.SmallIntegerField(blank=True, choices=[(1, b'Private sector'), (2, b'Public sector')], default=None, help_text=b'Whether the job was private or public sector.', null=True),
+            field=models.SmallIntegerField(blank=True, choices=[(1, 'Private sector'), (2, 'Public sector')], default=None, help_text='Whether the job was private or public sector.', null=True),
         ),
         # Noop
         migrations.AlterField(
             model_name='party',
             name='extra_info',
-            field=models.TextField(db_index=True, help_text=b'Prior to March, 2018, this field briefly held additional info from PACER about particular parties. That was a modelling mistake and the information has been moved to the PartyType.extra_info field instead. This field will be removed in October, 2020.'),
+            field=models.TextField(db_index=True, help_text='Prior to March, 2018, this field briefly held additional info from PACER about particular parties. That was a modelling mistake and the information has been moved to the PartyType.extra_info field instead. This field will be removed in October, 2020.'),
         ),
         migrations.AlterField(
             model_name='position',
             name='date_start',
-            field=models.DateField(blank=True, db_index=True, help_text=b'The date the position starts active duty.', null=True),
+            field=models.DateField(blank=True, db_index=True, help_text='The date the position starts active duty.', null=True),
         ),
         migrations.AlterField(
             model_name='position',
             name='position_type',
-            field=models.CharField(blank=True, choices=[(b'Judge', ((b'act-jud', b'Acting Judge'), (b'act-pres-jud', b'Acting Presiding Judge'), (b'ass-jud', b'Associate Judge'), (b'ass-c-jud', b'Associate Chief Judge'), (b'ass-pres-jud', b'Associate Presiding Judge'), (b'jud', b'Judge'), (b'jus', b'Justice'), (b'c-jud', b'Chief Judge'), (b'c-jus', b'Chief Justice'), (b'c-spec-m', b'Chief Special Master'), (b'pres-jud', b'Presiding Judge'), (b'pres-jus', b'Presiding Justice'), (b'com', b'Commissioner'), (b'com-dep', b'Deputy Commissioner'), (b'jud-pt', b'Judge Pro Tem'), (b'jus-pt', b'Justice Pro Tem'), (b'ref-jud-tr', b'Judge Trial Referee'), (b'ref-off', b'Official Referee'), (b'ref-state-trial', b'State Trial Referee'), (b'ret-act-jus', b'Active Retired Justice'), (b'ret-ass-jud', b'Retired Associate Judge'), (b'ret-c-jud', b'Retired Chief Judge'), (b'ret-jus', b'Retired Justice'), (b'ret-senior-jud', b'Senior Judge'), (b'mag', b'Magistrate'), (b'c-mag', b'Chief Magistrate'), (b'pres-mag', b'Presiding Magistrate'), (b'mag-pt', b'Magistrate Pro Tem'), (b'mag-rc', b'Magistrate (Recalled)'), (b'mag-part-time', b'Magistrate (Part-Time)'), (b'spec-chair', b'Special Chairman'), (b'spec-jud', b'Special Judge'), (b'spec-m', b'Special Master'), (b'spec-scjcbc', b'Special Superior Court Judge for Complex Business Cases'), (b'chair', b'Chairman'), (b'chan', b'Chancellor'), (b'presi-jud', b'President'), (b'res-jud', b'Reserve Judge'), (b'trial-jud', b'Trial Judge'), (b'vice-chan', b'Vice Chancellor'), (b'vice-cj', b'Vice Chief Judge'))), (b'Attorney General', ((b'att-gen', b'Attorney General'), (b'att-gen-ass', b'Assistant Attorney General'), (b'att-gen-ass-spec', b'Special Assistant Attorney General'), (b'sen-counsel', b'Senior Counsel'), (b'dep-sol-gen', b'Deputy Solicitor General'))), (b'Appointing Authority', ((b'pres', b'President of the United States'), (b'gov', b'Governor'))), (b'Clerkships', ((b'clerk', b'Clerk'), (b'clerk-chief-dep', b'Chief Deputy Clerk'), (b'staff-atty', b'Staff Attorney'))), (b'prof', b'Professor'), (b'Practitioner', b'Practitioner'), (b'Prosecutor', b'Prosecutor'), (b'Public Defender', b'Public Defender'), (b'legis', b'Legislator')], help_text=b'If this is a judicial position, this indicates the role the person had. This field may be blank if job_title is complete instead.', max_length=20, null=True),
+            field=models.CharField(blank=True, choices=[('Judge', (('act-jud', 'Acting Judge'), ('act-pres-jud', 'Acting Presiding Judge'), ('ass-jud', 'Associate Judge'), ('ass-c-jud', 'Associate Chief Judge'), ('ass-pres-jud', 'Associate Presiding Judge'), ('jud', 'Judge'), ('jus', 'Justice'), ('c-jud', 'Chief Judge'), ('c-jus', 'Chief Justice'), ('c-spec-m', 'Chief Special Master'), ('pres-jud', 'Presiding Judge'), ('pres-jus', 'Presiding Justice'), ('com', 'Commissioner'), ('com-dep', 'Deputy Commissioner'), ('jud-pt', 'Judge Pro Tem'), ('jus-pt', 'Justice Pro Tem'), ('ref-jud-tr', 'Judge Trial Referee'), ('ref-off', 'Official Referee'), ('ref-state-trial', 'State Trial Referee'), ('ret-act-jus', 'Active Retired Justice'), ('ret-ass-jud', 'Retired Associate Judge'), ('ret-c-jud', 'Retired Chief Judge'), ('ret-jus', 'Retired Justice'), ('ret-senior-jud', 'Senior Judge'), ('mag', 'Magistrate'), ('c-mag', 'Chief Magistrate'), ('pres-mag', 'Presiding Magistrate'), ('mag-pt', 'Magistrate Pro Tem'), ('mag-rc', 'Magistrate (Recalled)'), ('mag-part-time', 'Magistrate (Part-Time)'), ('spec-chair', 'Special Chairman'), ('spec-jud', 'Special Judge'), ('spec-m', 'Special Master'), ('spec-scjcbc', 'Special Superior Court Judge for Complex Business Cases'), ('chair', 'Chairman'), ('chan', 'Chancellor'), ('presi-jud', 'President'), ('res-jud', 'Reserve Judge'), ('trial-jud', 'Trial Judge'), ('vice-chan', 'Vice Chancellor'), ('vice-cj', 'Vice Chief Judge'))), ('Attorney General', (('att-gen', 'Attorney General'), ('att-gen-ass', 'Assistant Attorney General'), ('att-gen-ass-spec', 'Special Assistant Attorney General'), ('sen-counsel', 'Senior Counsel'), ('dep-sol-gen', 'Deputy Solicitor General'))), ('Appointing Authority', (('pres', 'President of the United States'), ('gov', 'Governor'))), ('Clerkships', (('clerk', 'Clerk'), ('clerk-chief-dep', 'Chief Deputy Clerk'), ('staff-atty', 'Staff Attorney'))), ('prof', 'Professor'), ('Practitioner', 'Practitioner'), ('Prosecutor', 'Prosecutor'), ('Public Defender', 'Public Defender'), ('legis', 'Legislator')], help_text='If this is a judicial position, this indicates the role the person had. This field may be blank if job_title is complete instead.', max_length=20, null=True),
         ),
     ]

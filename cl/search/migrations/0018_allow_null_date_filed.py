@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docketentry',
             name='date_filed',
-            field=models.DateField(help_text=b'The created date of the Docket Entry.', null=True, blank=True),
+            field=models.DateField(help_text='The created date of the Docket Entry.', null=True, blank=True),
         ),
     ]

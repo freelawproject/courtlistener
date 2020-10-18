@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='donation',
             name='status',
-            field=models.SmallIntegerField(choices=[(0, b'Awaiting Payment'), (1, b'Unknown Error'), (2, b'Completed, but awaiting processing'), (3, b'Cancelled'), (4, b'Processed'), (5, b'Pending'), (6, b'Failed'), (7, b'Reclaimed/Refunded'), (8, b'Captured'), (9, b'Disputed'), (10, b'Dispute closed')]),
+            field=models.SmallIntegerField(choices=[(0, 'Awaiting Payment'), (1, 'Unknown Error'), (2, 'Completed, but awaiting processing'), (3, 'Cancelled'), (4, 'Processed'), (5, 'Pending'), (6, 'Failed'), (7, 'Reclaimed/Refunded'), (8, 'Captured'), (9, 'Disputed'), (10, 'Dispute closed')]),
         ),
     ]

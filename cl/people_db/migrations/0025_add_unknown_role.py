@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='role',
             name='role',
-            field=models.SmallIntegerField(help_text=b"The name of the attorney's role.", db_index=True, choices=[(1, b'Attorney to be noticed'), (2, b'Lead attorney'), (3, b'Attorney in sealed group'), (4, b'Pro hac vice'), (5, b'Self-terminated'), (6, b'Terminated'), (7, b'Suspended'), (8, b'Inactive'), (9, b'Disbarred'), (10, b'Unknown')]),
+            field=models.SmallIntegerField(help_text="The name of the attorney's role.", db_index=True, choices=[(1, 'Attorney to be noticed'), (2, 'Lead attorney'), (3, 'Attorney in sealed group'), (4, 'Pro hac vice'), (5, 'Self-terminated'), (6, 'Terminated'), (7, 'Suspended'), (8, 'Inactive'), (9, 'Disbarred'), (10, 'Unknown')]),
         ),
     ]

@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='court',
             name='pacer_court_id',
-            field=models.PositiveSmallIntegerField(help_text=b'The numeric ID for the court in PACER. This can be found by looking at the first three digits of any doc1 URL in PACER.', null=True, blank=True),
+            field=models.PositiveSmallIntegerField(help_text='The numeric ID for the court in PACER. This can be found by looking at the first three digits of any doc1 URL in PACER.', null=True, blank=True),
         ),
     ]

@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='lascpdf',
             name='filepath_s3',
-            field=models.FileField(blank=True, help_text=b'The path of the file in the s3 bucket.', max_length=150, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_pdf_path),
+            field=models.FileField(blank=True, help_text='The path of the file in the s3 bucket.', max_length=150, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_pdf_path),
         ),
     ]

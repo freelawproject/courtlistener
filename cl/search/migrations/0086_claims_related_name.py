@@ -16,6 +16,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='claimhistory',
             name='claim',
-            field=models.ForeignKey(help_text=b'The claim that the history row is associated with.', on_delete=django.db.models.deletion.CASCADE, related_name='claim_history_entries', to='search.Claim'),
+            field=models.ForeignKey(help_text='The claim that the history row is associated with.', on_delete=django.db.models.deletion.CASCADE, related_name='claim_history_entries', to='search.Claim'),
         ),
     ]

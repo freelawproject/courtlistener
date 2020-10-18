@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='referer',
             name='url',
-            field=models.URLField(db_index=True, help_text=b'The URL where this item was embedded.', max_length=3000),
+            field=models.URLField(db_index=True, help_text='The URL where this item was embedded.', max_length=3000),
         ),
     ]

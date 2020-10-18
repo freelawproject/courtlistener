@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                     field=models.IntegerField(
                         db_index=True,
                         default=1,
-                        help_text=b"The number of times the cited opinion was cited in the citing opinion",
+                        help_text="The number of times the cited opinion was cited in the citing opinion",
                     ),
                 ),
             ],

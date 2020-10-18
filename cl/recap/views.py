@@ -33,7 +33,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (RECAPUploaders,)
     queryset = ProcessingQueue.objects.all().order_by("-id")
     serializer_class = ProcessingQueueSerializer
-    filter_class = ProcessingQueueFilter
+    filterset_class = ProcessingQueueFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -48,7 +48,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     queryset = PacerFetchQueue.objects.all().order_by("-id")
     serializer_class = PacerFetchQueueSerializer
-    filter_class = PacerFetchQueueFilter
+    filterset_class = PacerFetchQueueFilter
     permission_classes = (IsAuthenticatedOrReadOnly,)
     ordering_fields = (
         "id",
@@ -80,7 +80,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         .order_by("-id")
     )
     serializer_class = PacerDocIdLookUpSerializer
-    filter_class = RECAPDocumentFilter
+    filterset_class = RECAPDocumentFilter
     pagination_class = BigPagination
 
     def get_view_name(self):
@@ -102,7 +102,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
     queryset = FjcIntegratedDatabase.objects.all().order_by("-id")
     serializer_class = FjcIntegratedDatabaseSerializer
-    filter_class = FjcIntegratedDatabaseFilter
+    filterset_class = FjcIntegratedDatabaseFilter
     ordering_fields = (
         "id",
         "date_created",

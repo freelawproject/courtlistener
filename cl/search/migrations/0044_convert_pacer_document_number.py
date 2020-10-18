@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='recapdocument',
             name='document_number',
-            field=models.CharField(help_text=b'If the file is a document, the number is the document_number in RECAP docket.', max_length=32, db_index=True),
+            field=models.CharField(help_text='If the file is a document, the number is the document_number in RECAP docket.', max_length=32, db_index=True),
         ),
     ]

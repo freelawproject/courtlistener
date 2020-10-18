@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docketentry',
             name='entry_number',
-            field=models.BigIntegerField(help_text=b'# on the PACER docket page.'),
+            field=models.BigIntegerField(help_text='# on the PACER docket page.'),
         ),
     ]

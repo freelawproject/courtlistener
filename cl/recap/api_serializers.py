@@ -171,7 +171,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PacerFetchQueue
-        exclude = ("user",)  # Private
+        fields = "__all__"
         read_only_fields = (
             "date_created",
             "date_modified",

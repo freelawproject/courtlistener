@@ -37,4 +37,4 @@ class Command(VerboseCommand):
         if r.ok:
             print("Item deleted successfully")
         else:
-            print("No luck with deletion: %s: %s" % (r.status_code, r.content))
+            print("No luck with deletion: %s: %s" % (r.status_code, r.text))

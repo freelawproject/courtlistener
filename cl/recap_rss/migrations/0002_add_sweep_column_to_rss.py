@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='rssfeedstatus',
             name='is_sweep',
-            field=models.BooleanField(default=False, help_text=b'Whether this object is tracking the progress of a sweep or a partial crawl.'),
+            field=models.BooleanField(default=False, help_text='Whether this object is tracking the progress of a sweep or a partial crawl.'),
         ),
     ]

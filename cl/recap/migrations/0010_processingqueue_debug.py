@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='processingqueue',
             name='debug',
-            field=models.BooleanField(default=False, help_text=b'Are you debugging? Debugging uploads will be validated, but not saved to the database.'),
+            field=models.BooleanField(default=False, help_text='Are you debugging? Debugging uploads will be validated, but not saved to the database.'),
         ),
     ]

@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='court',
             name='position',
-            field=models.FloatField(default=0, help_text=b'A dewey-decimal-style numeral indicating a hierarchical ordering of jurisdictions', unique=True, db_index=True),
+            field=models.FloatField(default=0, help_text='A dewey-decimal-style numeral indicating a hierarchical ordering of jurisdictions', unique=True, db_index=True),
             preserve_default=False,
         ),
     ]

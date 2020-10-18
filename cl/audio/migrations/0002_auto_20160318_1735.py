@@ -16,12 +16,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='audio',
             name='docket',
-            field=models.ForeignKey(related_name='audio_files', blank=True, to='search.Docket', help_text=b'The docket that the oral argument is a part of', null=True,
+            field=models.ForeignKey(related_name='audio_files', blank=True, to='search.Docket', help_text='The docket that the oral argument is a part of', null=True,
                                     on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='audio',
             name='panel',
-            field=models.ManyToManyField(help_text=b'The judges that heard the oral arguments', related_name='oral_argument_panel_members', to='people_db.Person', blank=True),
+            field=models.ManyToManyField(help_text='The judges that heard the oral arguments', related_name='oral_argument_panel_members', to='people_db.Person', blank=True),
         ),
     ]

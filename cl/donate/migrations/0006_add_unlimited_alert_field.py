@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='donation',
             name='amount',
-            field=models.DecimalField(default=None, max_digits=10, decimal_places=2, validators=[django.core.validators.MinValueValidator(5, b'Sorry, the minimum donation amount is $5.00.')]),
+            field=models.DecimalField(default=None, max_digits=10, decimal_places=2, validators=[django.core.validators.MinValueValidator(5, 'Sorry, the minimum donation amount is $5.00.')]),
         ),
     ]

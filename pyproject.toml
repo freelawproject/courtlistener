@@ -40,7 +40,6 @@ django = "==1.11.*,>=1.11.0"
 django-cache-memoize = "==0.*,>=0.1.0"
 django-cors-headers = "3.2.1"
 django-extensions = "==2.2.*,>=2.2.0"
-django-filter = "^1.1"
 django-localflavor = "^1.1"
 django-markdown-deux = "*"
 django-mathfilters = "*"
@@ -49,7 +48,6 @@ django-redis-cache = "==2.0.*,>=2.0.0"
 django-rest-swagger = "==2.1.2"
 django-storages = "==1.7.*,>=1.7.0"
 djangorestframework = "3.11.*"
-djangorestframework-filters = "==0.11.*,>=0.11.0"
 djangorestframework-xml = "^1.4.0"
 docutils = "^0.12"
 drf-dynamic-fields = "*"
@@ -106,6 +104,8 @@ reporters-db = {version = "^2.0.5", optional = true}
 #juriscraper = {version = "^1.28.16", optional = true}
 juriscraper = {git = "https://github.com/freelawproject/juriscraper", rev = "py38", optional = true}
 scorched = {git = "https://github.com/mlissner/scorched.git", rev = "patch-3"}
+django-filter = "2.2.0"
+djangorestframework-filters = "1.0.0.dev2"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.6.0"

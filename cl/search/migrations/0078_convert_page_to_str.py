@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='citation',
             name='page',
-            field=models.TextField(help_text=b"The 'page' of the citation in the reporter. Unfortunately, this is not an integer, but is a string-type because several jurisdictions do funny things with the so-called 'page'. For example, we have seen Roman numerals in Nebraska, 13301-M in Connecticut, and 144M in Montana."),
+            field=models.TextField(help_text="The 'page' of the citation in the reporter. Unfortunately, this is not an integer, but is a string-type because several jurisdictions do funny things with the so-called 'page'. For example, we have seen Roman numerals in Nebraska, 13301-M in Connecticut, and 144M in Montana."),
         ),
     ]

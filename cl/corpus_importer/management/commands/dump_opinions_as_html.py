@@ -43,4 +43,4 @@ class Command(VerboseCommand):
             mkdir_p(output_dir)
             output_path = os.path.join(output_dir, "%s.html" % op.pk)
             with open(output_path, "w") as f:
-                f.write(content.encode("utf-8"))
+                f.write(content.encode())

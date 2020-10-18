@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='processingqueue',
             name='pacer_doc_id',
-            field=models.CharField(help_text=b'The ID of the document in PACER.', max_length=32, blank=True),
+            field=models.CharField(help_text='The ID of the document in PACER.', max_length=32, blank=True),
         ),
     ]

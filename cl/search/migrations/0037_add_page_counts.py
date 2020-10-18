@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinion',
             name='page_count',
-            field=models.IntegerField(help_text=b'The number of pages in the document, if known', null=True, blank=True),
+            field=models.IntegerField(help_text='The number of pages in the document, if known', null=True, blank=True),
         ),
         migrations.AddField(
             model_name='recapdocument',
             name='page_count',
-            field=models.IntegerField(help_text=b'The number of pages in the document, if known', null=True, blank=True),
+            field=models.IntegerField(help_text='The number of pages in the document, if known', null=True, blank=True),
         ),
     ]

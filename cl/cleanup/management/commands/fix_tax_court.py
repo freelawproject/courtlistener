@@ -15,10 +15,8 @@ def remove_en_em_dash(opinion_text):
     :param opinion_text:
     :return: opinion_text
     """
-    opinion_text = opinion_text.encode()
-    opinion_text = re.sub(br"\xe2\x80\x93", b"-", opinion_text)
-    opinion_text = re.sub(br"\xe2\x80\x98", b"-", opinion_text)
-    return opinion_text.decode()
+    opinion_text = re.sub(r"[–—]", "-", opinion_text)
+    return opinion_text
 
 
 def get_tax_docket_numbers(opinion_text):

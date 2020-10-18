@@ -16,11 +16,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='is_free_on_pacer',
-            field=models.NullBooleanField(help_text=b'Is this item freely available as an opinion on PACER?', db_index=True),
+            field=models.NullBooleanField(help_text='Is this item freely available as an opinion on PACER?', db_index=True),
         ),
         migrations.AlterField(
             model_name='recapdocument',
             name='filepath_local',
-            field=models.FileField(help_text=b'The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_pdf_path, blank=True),
+            field=models.FileField(help_text='The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_pdf_path, blank=True),
         ),
     ]

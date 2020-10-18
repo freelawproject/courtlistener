@@ -520,9 +520,9 @@ class Position(models.Model):
     CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
     STAFF_ATTORNEY = "staff-atty"
     PROFESSOR = "prof"
-    PRACTITIONER = "Practitioner"
-    PROSECUTOR = "Prosecutor"
-    PUBLIC_DEFENDER = "Public Defender"
+    PRACTITIONER = "prac"
+    PROSECUTOR = "pros"
+    PUBLIC_DEFENDER = "pub-def"
     LEGISLATOR = "legis"
 
     POSITION_TYPES = (

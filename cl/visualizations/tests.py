@@ -161,7 +161,7 @@ class TestViews(TestCase):
             self.client.login(username="user", password="password")
         )
         response = self.client.get(reverse("viz_gallery"))
-        html = response.content.decode("utf-8")
+        html = response.content.decode()
         html = " ".join(html.split())
         self.assertIn("Shared by Admin", html)
         self.assertIn("FREE KESHA", html)
@@ -179,14 +179,14 @@ class TestViews(TestCase):
         )
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"My Private Visualization", response.content)
+        self.assertIn("My Private Visualization", response.content.decode())
 
         self.assertTrue(
             self.client.login(username="user", password="password")
         )
         response = self.client.get(url)
         self.assertNotEqual(response.status_code, 200)
-        self.assertNotIn(b"My Private Visualization", response.content)
+        self.assertNotIn("My Private Visualization", response.content.decode())
 
     def test_view_counts_increment_by_one(self):
         """Test the view count for a Visualization increments on page view
