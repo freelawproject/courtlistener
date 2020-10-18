@@ -1,5 +1,5 @@
 # Inherit our django image which has the same req to start the container.
-FROM freelawproject/courtlistener-django:poetry
+FROM freelawproject/courtlistener-django:poetry-ml3
 
 WORKDIR /usr/src/app
 

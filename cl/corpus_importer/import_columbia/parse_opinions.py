@@ -314,7 +314,7 @@ def get_xml_string(e):
     inner_string = re.sub(
         r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
     )
-    return inner_string.decode("utf-8").strip()
+    return inner_string.decode().strip()
 
 
 def parse_dates(raw_dates):

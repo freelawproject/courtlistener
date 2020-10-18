@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='docket_number',
-            field=models.TextField(blank=True, db_index=True, help_text=b'The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster.', null=True),
+            field=models.TextField(blank=True, db_index=True, help_text='The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster.', null=True),
         ),
     ]

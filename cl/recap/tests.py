@@ -1144,7 +1144,7 @@ class RecapMinuteEntriesTest(TestCase):
         rss_feed = PacerRssFeed(court_id)
         rss_feed.is_bankruptcy = True  # Needed because we say SCOTUS above.
         with open(self.make_path("rss_sample_unnumbered_mdb.xml"), "rb") as f:
-            text = f.read().decode("utf-8")
+            text = f.read().decode()
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
         d, docket_count = find_docket_object(

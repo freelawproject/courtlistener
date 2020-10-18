@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='opinioncluster',
             name='lexis_cite',
-            field=models.CharField(help_text=b'LexisNexis citation (e.g. 1 LEXIS 38237)', max_length=50, blank=True),
+            field=models.CharField(help_text='LexisNexis citation (e.g. 1 LEXIS 38237)', max_length=50, blank=True),
         ),
     ]

@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='party',
             name='extra_info',
-            field=models.TextField(db_index=True, help_text=b'Prior to March, 2018, this field briefly held additional info from PACER about particular parties. That was a modelling mistake and the information has been moved to the PartyType.extra_info field instead. This field will eventually be removed.'),
+            field=models.TextField(db_index=True, help_text='Prior to March, 2018, this field briefly held additional info from PACER about particular parties. That was a modelling mistake and the information has been moved to the PartyType.extra_info field instead. This field will eventually be removed.'),
         ),
     ]

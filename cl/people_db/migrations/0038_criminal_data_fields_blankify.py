@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='criminalcomplaint',
             name='disposition',
-            field=models.TextField(help_text=b'The disposition of the criminal complaint.', blank=True),
+            field=models.TextField(help_text='The disposition of the criminal complaint.', blank=True),
         ),
         migrations.AlterField(
             model_name='partytype',
             name='extra_info',
-            field=models.TextField(help_text=b'Additional info from PACER', db_index=True, blank=True),
+            field=models.TextField(help_text='Additional info from PACER', db_index=True, blank=True),
         ),
     ]

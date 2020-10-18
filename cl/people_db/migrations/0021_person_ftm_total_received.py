@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='ftm_total_received',
-            field=models.FloatField(help_text=b'The amount of money received by this person and logged by Follow the Money.', null=True, db_index=True, blank=True),
+            field=models.FloatField(help_text='The amount of money received by this person and logged by Follow the Money.', null=True, db_index=True, blank=True),
         ),
     ]

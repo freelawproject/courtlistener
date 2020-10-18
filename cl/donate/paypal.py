@@ -34,7 +34,7 @@ def get_paypal_access_token():
     else:
         logger.critical(
             "Problem getting paypal token status_code was: %s, "
-            "with content: %s" % (r.status_code, r.content)
+            "with content: %s" % (r.status_code, r.text)
         )
     return json.loads(r.content).get("access_token")
 
@@ -76,7 +76,7 @@ def process_paypal_callback(request):
     else:
         logger.critical(
             "Unable to execute PayPal transaction. Status code %s "
-            "with data: %s" % (r.status_code, r.content)
+            "with data: %s" % (r.status_code, r.text)
         )
         d.status = Donation.UNKNOWN_ERROR
         d.save()

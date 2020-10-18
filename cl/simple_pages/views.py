@@ -434,8 +434,8 @@ def serve_static_file(request, file_path=""):
     else:
         response["X-Sendfile"] = file_loc
     file_name = file_path.split("/")[-1]
-    response[
-        "Content-Disposition"
-    ] = 'inline; filename="%s"' % file_name.encode("utf-8")
+    response["Content-Disposition"] = (
+        'inline; filename="%s"' % file_name.encode()
+    )
     response["Content-Type"] = mimetype
     return response

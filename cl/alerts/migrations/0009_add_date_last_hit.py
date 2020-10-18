@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docketalert',
             name='date_last_hit',
-            field=models.DateTimeField(null=True, verbose_name=b'time of last trigger', blank=True),
+            field=models.DateTimeField(null=True, verbose_name='time of last trigger', blank=True),
         ),
     ]

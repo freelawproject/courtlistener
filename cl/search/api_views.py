@@ -44,7 +44,7 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DocketSerializer
-    filter_class = DocketFilter
+    filterset_class = DocketFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -75,7 +75,7 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = DocketEntrySerializer
-    filter_class = DocketEntryFilter
+    filterset_class = DocketEntryFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_filed")
 
     queryset = (
@@ -96,7 +96,7 @@ class RECAPDocumentViewSet(
 ):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = RECAPDocumentSerializer
-    filter_class = RECAPDocumentFilter
+    filterset_class = RECAPDocumentFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     queryset = (
         RECAPDocument.objects.select_related(
@@ -109,7 +109,7 @@ class RECAPDocumentViewSet(
 
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
-    filter_class = CourtFilter
+    filterset_class = CourtFilter
     ordering_fields = (
         "id",
         "date_modified",
@@ -124,7 +124,7 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionClusterSerializer
-    filter_class = OpinionClusterFilter
+    filterset_class = OpinionClusterFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -140,7 +140,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionSerializer
-    filter_class = OpinionFilter
+    filterset_class = OpinionFilter
     ordering_fields = (
         "id",
         "date_created",
@@ -155,7 +155,7 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionsCitedSerializer
-    filter_class = OpinionsCitedFilter
+    filterset_class = OpinionsCitedFilter
     queryset = OpinionsCited.objects.all().order_by("-id")
 
 

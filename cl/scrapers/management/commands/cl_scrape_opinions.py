@@ -112,7 +112,7 @@ def make_objects(item, court, sha1_hash, content):
             item["case_names"],
             traceback.format_exc(),
         )
-        logger.critical(msg.encode("utf-8"))
+        logger.critical(msg.encode())
         ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
         error = True
 
@@ -264,7 +264,7 @@ class Command(VerboseCommand):
             # Not a duplicate, carry on
             logger.info(
                 "Adding new document found at: %s"
-                % item["download_urls"].encode("utf-8")
+                % item["download_urls"].encode()
             )
             dup_checker.reset()
 
@@ -291,7 +291,7 @@ class Command(VerboseCommand):
 
             logger.info(
                 "Successfully added doc {pk}: {name}".format(
-                    pk=opinion.pk, name=item["case_names"].encode("utf-8")
+                    pk=opinion.pk, name=item["case_names"].encode()
                 )
             )
 

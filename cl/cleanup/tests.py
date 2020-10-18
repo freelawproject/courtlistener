@@ -11,6 +11,7 @@ from django.conf import settings
 from cl.cleanup.management.commands.fix_tax_court import (
     find_tax_court_citation,
     get_tax_docket_numbers,
+    remove_en_em_dash,
 )
 
 
@@ -282,6 +283,17 @@ with Virginia Historic Tax Credit Fund""",
             docket_numbers_found = get_tax_docket_numbers(q)
             self.assertEqual(docket_numbers_found, a, msg="Success")
             print("✓")
+
+    def test_dash_handling(self):
+        """Can we convert dashes nicely?"""
+        tests = {
+            "en dash –": "en dash -",  # En-dash
+            "em dash —": "em dash -",  # Em-dash
+            "dash -": "dash -",  # Regular dash
+        }
+        for test, answer in tests.items():
+            computed = remove_en_em_dash(test)
+            self.assertEqual(computed, answer)
 
     def test_tax_court_citation_extractor(self):
         """Find Tax Court Citations """

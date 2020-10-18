@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='fjcintegrateddatabase',
             name='defendant',
-            field=models.TextField(help_text=b'First listed defendant. This field appears to be cut off at 30 characters.', db_index=True, blank=True),
+            field=models.TextField(help_text='First listed defendant. This field appears to be cut off at 30 characters.', db_index=True, blank=True),
         ),
         migrations.AlterField(
             model_name='fjcintegrateddatabase',
             name='plaintiff',
-            field=models.TextField(help_text=b'First listed plaintiff. This field appears to be cut off at 30 characters', db_index=True, blank=True),
+            field=models.TextField(help_text='First listed plaintiff. This field appears to be cut off at 30 characters', db_index=True, blank=True),
         ),
     ]

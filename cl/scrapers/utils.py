@@ -47,9 +47,7 @@ def follow_redirections(r, s):
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info(
-            "Following a meta redirection to: %s" % url.encode("utf-8")
-        )
+        logger.info("Following a meta redirection to: %s" % url.encode())
         r = follow_redirections(s.get(url), s)
     return r
 

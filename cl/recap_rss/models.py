@@ -114,7 +114,7 @@ class RssFeedData(models.Model):
     @property
     def file_contents(self):
         with open(self.filepath.path, "rb") as f:
-            return bz2.decompress(f.read()).decode("utf-8")
+            return bz2.decompress(f.read()).decode()
 
     def print_file_contents(self):
         print(self.file_contents)

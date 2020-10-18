@@ -29,11 +29,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='lascpdf',
             name='filepath_s3',
-            field=models.FileField(blank=True, help_text=b'The path of the file in the s3 bucket.', max_length=150, storage=storages.backends.s3boto3.S3Boto3Storage(), upload_to=cl.lib.model_helpers.make_pdf_path),
+            field=models.FileField(blank=True, help_text='The path of the file in the s3 bucket.', max_length=150, storage=storages.backends.s3boto3.S3Boto3Storage(), upload_to=cl.lib.model_helpers.make_pdf_path),
         ),
         migrations.AlterField(
             model_name='lascjson',
             name='filepath',
-            field=models.FileField(blank=True, help_text=b'The path of the file in the local storage area.', max_length=150, upload_to=cl.lib.model_helpers.make_lasc_json_path),
+            field=models.FileField(blank=True, help_text='The path of the file in the local storage area.', max_length=150, upload_to=cl.lib.model_helpers.make_lasc_json_path),
         ),
     ]

@@ -34,9 +34,9 @@ class Migration(migrations.Migration):
                     name='filepath_json_harvard',
                     field=models.FileField(blank=True,
                                            db_index=True,
-                                           help_text=b'Path to local storage of JSON collected from Harvard Case Law project containing available metadata, opinion and opinion cluster.',
+                                           help_text='Path to local storage of JSON collected from Harvard Case Law project containing available metadata, opinion and opinion cluster.',
                                            max_length=1000,
-                                           upload_to=b''),
+                                           upload_to=''),
                 ),
             ]
         ),

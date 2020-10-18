@@ -14,11 +14,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='tags',
-            field=models.ManyToManyField(help_text=b'The tags associated with the docket.', related_name='dockets', to='search.Tag', blank=True),
+            field=models.ManyToManyField(help_text='The tags associated with the docket.', related_name='dockets', to='search.Tag', blank=True),
         ),
         migrations.AddField(
             model_name='docketentry',
             name='tags',
-            field=models.ManyToManyField(help_text=b'The tags associated with the docket entry.', related_name='docket_entries', to='search.Tag', blank=True),
+            field=models.ManyToManyField(help_text='The tags associated with the docket entry.', related_name='docket_entries', to='search.Tag', blank=True),
         ),
     ]

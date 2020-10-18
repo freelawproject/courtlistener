@@ -18,12 +18,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docketentry',
             name='description_short',
-            field=models.TextField(default='', help_text=b'The short description of the docket entry that appears on the docket page.'),
+            field=models.TextField(default='', help_text='The short description of the docket entry that appears on the docket page.'),
             preserve_default=False,
         ),
         migrations.AlterField(
             model_name='docketentry',
             name='description',
-            field=models.TextField(help_text=b'The text content of the docket entry that appears in the PACER docket page.'),
+            field=models.TextField(help_text='The text content of the docket entry that appears in the PACER docket page.'),
         ),
     ]

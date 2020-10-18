@@ -3,7 +3,6 @@ from datetime import date
 from datetime import timedelta
 from urllib.parse import parse_qs, urlencode
 
-import scorched
 from django.conf import settings
 from django.core.cache import cache
 from django.core.cache import caches
@@ -878,10 +877,23 @@ def build_main_query_from_query_string(
     return main_query
 
 
-def build_coverage_query(court, q):
+def build_coverage_query(court, q, facet_field):
+    """
+    Create a coverage that can be used to make a facet query
+
+    :param court: String representation of the court to filter to, e.g. 'ca1',
+    defaults to 'all'.
+    :type court: str
+    :param q: A query to limit the coverage query, defaults to '*'
+    :type q: str
+    :param facet_field: The field to do faceting on
+    :type facet_field: str
+    :return: A coverage query dict
+    :rtype: dict
+    """
     params = {
         "facet": "true",
-        "facet.range": "dateFiled",
+        "facet.range": facet_field,
         "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
         "facet.range.end": "NOW/DAY",
         "facet.range.gap": "+1YEAR",
@@ -990,6 +1002,7 @@ def get_citing_clusters_with_cache(cluster):
         "start": 0,
         "sort": "citeCount desc",
         "caller": "view_opinion",
+        "fl": "absolute_url,caseName,dateFiled",
     }
     conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     results = conn.query().add_extra(**q).execute()
@@ -1017,7 +1030,7 @@ def get_related_clusters_with_cache(cluster, request):
         # If it is a bot or is not beta tester, return empty results
         return [], [], url_search_params
 
-    si = scorched.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
