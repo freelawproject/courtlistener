@@ -40,7 +40,9 @@ class JurisdictionPodcast(JurisdictionFeed):
             "start": "0",
             "caller": "JurisdictionPodcast",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -104,7 +106,9 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
             "start": "0",
             "caller": "AllJurisdictionsPodcast",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items
 
 
 class SearchPodcast(JurisdictionPodcast):
@@ -129,6 +133,8 @@ class SearchPodcast(JurisdictionPodcast):
                     "caller": "SearchFeed",
                 }
             )
-            return solr.query().add_extra(**main_params).execute()
+            items = solr.query().add_extra(**main_params).execute()
+            solr.conn.http_connection.close()
+            return items
         else:
             return []

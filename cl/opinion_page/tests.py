@@ -203,7 +203,7 @@ class OpinionSitemapTest(SitemapTest):
         params["fq"] = ["court_exact:%s" % self.court_id]
 
         r = conn.query().add_extra(**params).execute()
-
+        conn.conn.http_connection.close()
         # the underlying SitemapTest relies on counting url elements in the xml
         # response...this logic mimics the creation of the xml, so we at least
         # know what we *should* get getting for a count if the SiteMapTest's

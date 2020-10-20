@@ -62,7 +62,9 @@ class SearchFeed(Feed):
             )
             # Eliminate items that lack the ordering field.
             main_params["fq"].append("%s:[* TO *]" % order_by)
-            return solr.query().add_extra(**main_params).execute()
+            items = solr.query().add_extra(**main_params).execute()
+            solr.conn.http_connection.close()
+            return items
         else:
             return []
 
@@ -108,7 +110,9 @@ class JurisdictionFeed(Feed):
             "start": "0",
             "caller": "JurisdictionFeed",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -171,4 +175,6 @@ class AllJurisdictionsFeed(JurisdictionFeed):
             "start": "0",
             "caller": "AllJurisdictionsFeed",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items

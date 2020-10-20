@@ -94,7 +94,7 @@ def view_person(request, pk, slug):
         "caller": "view_person",
     }
     authored_opinions = conn.query().add_extra(**q).execute()
-
+    conn.conn.http_connection.close()
     # Use Solr to get the oral arguments for the judge
     conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
     q = {
@@ -114,7 +114,7 @@ def view_person(request, pk, slug):
         "caller": "view_person",
     }
     oral_arguments_heard = conn.query().add_extra(**q).execute()
-
+    conn.conn.http_connection.close()
     return render(
         request,
         "view_person.html",
