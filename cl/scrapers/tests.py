@@ -65,26 +65,49 @@ class ScraperIngestionTest(TestCase):
 
 
 class IngestionTest(IndexedSolrTestCase):
-    def test_content_extraction(self):
-        """Do all of the supported mimetypes get extracted to text
-        successfully, including OCR?"""
-        test_strings = [
-            "indiana",  # opinion_doc.doc
-            "intelligence",  # opinion_pdf_image_based.pdf
-            "tarrant",  # opinion_pdf_text_based.pdf
-            "reagan",  # opinion_html.html
-            "greene",  # opinion_wpd.wpd
-            "ideal",  # opinion_text.txt
-        ]
-        opinions = Opinion.objects.all().order_by("pk")
-        for op, test_string in zip(opinions, test_strings):
-            ext = get_extension(op.local_path.file.read())
-            extract_doc_content(op.pk, do_ocr=True)
-            op.refresh_from_db()
-            if ext in [".html", ".wpd"]:
-                self.assertIn(test_string, op.html.lower())
-            else:
-                self.assertIn(test_string, op.plain_text.lower())
+
+    def test_doc_content_extraction(self):
+        """Can we ingest a doc file?"""
+        image_opinion = Opinion.objects.get(pk=1)
+        extract_doc_content(image_opinion.pk, do_ocr=False)
+        image_opinion.refresh_from_db()
+        self.assertIn("indiana", image_opinion.plain_text.lower())
+
+    def test_image_based_pdf(self):
+        """Can we ingest an image based pdf file?"""
+        image_opinion = Opinion.objects.get(pk=2)
+        extract_doc_content(image_opinion.pk, do_ocr=True)
+        image_opinion.refresh_from_db()
+        self.assertIn("intelligence", image_opinion.plain_text.lower())
+
+    def test_text_based_pdf(self):
+        """Can we ingest a text based pdf file?"""
+        txt_opinion = Opinion.objects.get(pk=3)
+        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        txt_opinion.refresh_from_db()
+        self.assertIn("tarrant", txt_opinion.plain_text.lower())
+
+    def test_html_content_extraction(self):
+        """Can we ingest an html file?"""
+        html_opinion = Opinion.objects.get(pk=4)
+        extract_doc_content(html_opinion.pk, do_ocr=False)
+        html_opinion.refresh_from_db()
+        self.assertIn("reagan", html_opinion.html.lower())
+
+    def test_wpd_content_extraction(self):
+        """Can we ingest a wpd file?"""
+        wpd_opinion = Opinion.objects.get(pk=5)
+        extract_doc_content(wpd_opinion.pk, do_ocr=False)
+        wpd_opinion.refresh_from_db()
+        self.assertIn("greene", wpd_opinion.html.lower())
+
+    def test_txt_content_extraction(self):
+        """Can we ingest a txt file?"""
+        txt_opinion = Opinion.objects.get(pk=6)
+        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        txt_opinion.refresh_from_db()
+        self.assertIn("ideal", txt_opinion.plain_text.lower())
+
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""

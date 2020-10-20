@@ -104,7 +104,7 @@ def extract_from_html(path):
     A simple wrapper to go get content, and send it along.
     """
     try:
-        with open(path) as f:
+        with open(path, "rb") as f:
             content = f.read()
         content = get_clean_body_content(content)
         encodings = ["utf-8", "ISO8859", "cp1252"]
@@ -145,7 +145,6 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     content = content.decode()
     if content.strip() == "" and do_ocr:
         success, content = extract_by_ocr(path)
-        content = content.decode()
         if success:
             opinion.extracted_by_ocr = True
         elif content == "" or not success:
@@ -195,6 +194,7 @@ def extract_from_wpd(path, opinion):
     content, err = process.communicate()
 
     content = get_clean_body_content(content)
+    content = content.decode()
 
     if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
@@ -336,6 +336,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     update_document_from_text(opinion)
 
     if err:
+        print(err)
         print(
             "****Error extracting text from %s: %s****" % (extension, opinion)
         )
