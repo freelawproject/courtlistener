@@ -52,6 +52,7 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
             items.update(date_modified=now(), date_last_index=now())
         si.conn.http_connection.close()
 
+
 @app.task(ignore_resutls=True)
 def add_or_update_recap_docket(
     data, force_commit=False, update_threshold=60 * 60
