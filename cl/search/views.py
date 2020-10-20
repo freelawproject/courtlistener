@@ -216,7 +216,7 @@ def do_search(
         if related_cluster_pks
         else None
     )
-
+    si.conn.http_connection.close()
     return {
         "results": paged_results,
         "facet_fields": make_stats_variable(search_form, paged_results),
