@@ -206,6 +206,7 @@ def update_judges_by_solr(candidate_id_map, debug):
     logger.info("Blacklisted IDs: %s" % blacklisted_ids)
     conn.conn.http_connection.close()
 
+
 class Command(VerboseCommand):
     help = (
         "Use the Follow the Money API to lookup judges by name and "
