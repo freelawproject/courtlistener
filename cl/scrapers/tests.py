@@ -65,7 +65,6 @@ class ScraperIngestionTest(TestCase):
 
 
 class IngestionTest(IndexedSolrTestCase):
-
     def test_doc_content_extraction(self):
         """Can we ingest a doc file?"""
         image_opinion = Opinion.objects.get(pk=1)
@@ -107,7 +106,6 @@ class IngestionTest(IndexedSolrTestCase):
         extract_doc_content(txt_opinion.pk, do_ocr=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
-
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
