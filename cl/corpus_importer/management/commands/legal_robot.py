@@ -39,6 +39,7 @@ def get_documents(options):
     )
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
     results = si.query().add_extra(**main_query).execute()
+    si.conn.http_connection.close()
     logger.info("Got %s search results.", results.result.numFound)
 
     for i, result in enumerate(results):

@@ -1006,6 +1006,7 @@ def get_citing_clusters_with_cache(cluster):
     }
     conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     results = conn.query().add_extra(**q).execute()
+    conn.conn.http_connection.close()
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
@@ -1117,7 +1118,7 @@ def get_related_clusters_with_cache(cluster, request):
         cache.set(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
-
+    si.conn.http_connection.close()
     return related_clusters, sub_opinion_ids, url_search_params
 
 

@@ -204,7 +204,7 @@ def update_judges_by_solr(candidate_id_map, debug):
 
     print_stats(match_stats, candidate_id_map)
     logger.info("Blacklisted IDs: %s" % blacklisted_ids)
-
+    conn.conn.http_connection.close()
 
 class Command(VerboseCommand):
     help = (

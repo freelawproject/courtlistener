@@ -21,6 +21,7 @@ def docket_pks_for_query(query_string):
     main_query["sort"] = "dateFiled asc"
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
     search = si.query().add_extra(**main_query)
+    si.conn.http_connection.close()
     page_size = 100
     paginator = Paginator(search, page_size)
     for page_number in paginator.page_range:

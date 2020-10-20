@@ -29,6 +29,7 @@ def get_docket_ids(main_query):
     """
     si = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
     results = si.query().add_extra(**main_query).execute()
+    si.conn.http_connection.close()
     docket_ids = set()
 
     for result in results:
