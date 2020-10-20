@@ -138,13 +138,16 @@ def match_citation(citation, citing_doc=None):
     main_params["fq"].append('citation:("%s")' % citation.base_citation())
     results = si.query().add_extra(**main_params).execute()
     if len(results) == 1:
+        si.conn.http_connection.close()
         return results
     if len(results) > 1:
         if citing_doc is not None and citation.defendant:
             # Refine using defendant, if there is one
-            results = case_name_query(conn, main_params, citation, citing_doc)
+            results = case_name_query(si, main_params, citation, citing_doc)
+        si.conn.http_connection.close()
         return results
 
+    si.conn.http_connection.close()
     # Give up.
     return []
 

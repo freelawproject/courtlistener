@@ -43,13 +43,14 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
         si.add(search_dicts)
         if force_commit:
             si.commit()
+            si.conn.http_connection.close()
     except (socket.error, SolrError) as exc:
         add_items_to_solr.retry(exc=exc, countdown=30)
     else:
         # Mark dockets as updated if needed
         if model == Docket:
             items.update(date_modified=now(), date_last_index=now())
-
+        si.conn.http_connection.close()
 
 @app.task(ignore_resutls=True)
 def add_or_update_recap_docket(
