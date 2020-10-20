@@ -277,7 +277,6 @@ class IndexingTest(EmptySolrTestCase):
 
     fixtures = ["test_court.json"]
 
-
     def test_issue_729_url_coalescing(self):
         """Are URL's coalesced properly?"""
         # Save a docket to the backend using coalescing
