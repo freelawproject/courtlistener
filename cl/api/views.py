@@ -199,7 +199,7 @@ def get_result_count(request, version, day_count):
         .add_extra(**build_alert_estimation_query(cd, int(day_count)))
         .execute()
     )
-
+    si.conn.http_connection.close()
     return JsonResponse({"count": response.result.numFound}, safe=True)
 
 
