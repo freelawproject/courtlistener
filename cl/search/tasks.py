@@ -43,7 +43,7 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
         si.add(search_dicts)
         if force_commit:
             si.commit()
-            si.conn.http_connection.close()
+        si.conn.http_connection.close()
     except (socket.error, SolrError) as exc:
         add_items_to_solr.retry(exc=exc, countdown=30)
     else:
@@ -97,6 +97,7 @@ def add_or_update_recap_docket(
             si.add(d.as_search_list())
             if force_commit:
                 si.commit()
+            si.conn.http_connection.close()
         except SolrError as exc:
             add_or_update_recap_docket.retry(exc=exc, countdown=30)
         else:
@@ -130,6 +131,7 @@ def add_docket_to_solr_by_rds(item_pks, force_commit=False):
         si.add([item.as_search_dict(docket_metadata=metadata) for item in rds])
         if force_commit:
             si.commit()
+        si.conn.http_connection.close()
     except SolrError as exc:
         add_docket_to_solr_by_rds.retry(exc=exc, countdown=30)
 
@@ -141,5 +143,6 @@ def delete_items(items, app_label, force_commit=False):
         si.delete_by_ids(list(items))
         if force_commit:
             si.commit()
+        si.conn.http_connection.close()
     except SolrError as exc:
         delete_items.retry(exc=exc, countdown=30)

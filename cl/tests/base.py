@@ -203,3 +203,4 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             si = scorched.SolrInterface(conn, mode="rw")
             si.delete_all()
             si.commit()
+            si.conn.http_connection.close()

@@ -277,11 +277,6 @@ class IndexingTest(EmptySolrTestCase):
 
     fixtures = ["test_court.json"]
 
-    def tearDown(self):
-        super(EmptySolrTestCase, self).tearDown()
-        Docket.objects.all().delete()
-        DocketEntry.objects.all().delete()
-        RECAPDocument.objects.all().delete()
 
     def test_issue_729_url_coalescing(self):
         """Are URL's coalesced properly?"""
@@ -327,6 +322,9 @@ class IndexingTest(EmptySolrTestCase):
             r1.result.docs[0]["absolute_url"],
             r2.result.docs[0]["absolute_url"],
         )
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
 
 
 class SearchTest(IndexedSolrTestCase):
