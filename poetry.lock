@@ -1336,9 +1336,9 @@ test = ["nose", "coverage", "mock"]
 
 [package.source]
 type = "git"
-url = "https://github.com/flooie/scorched.git"
-reference = "patch-3"
-resolved_reference = "2bcf5d0049bd028fe1185077ebcb4f26ad85a171"
+url = "https://github.com/freelawproject/scorched.git"
+reference = "master"
+resolved_reference = "2f152a4ada643b9ccf836bbc5aea54d17ec856af"
 
 [[package]]
 name = "selenium"
