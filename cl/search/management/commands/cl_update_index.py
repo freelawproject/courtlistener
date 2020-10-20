@@ -220,6 +220,7 @@ class Command(VerboseCommand):
         if options.get("optimize_everything"):
             self.optimize_everything()
 
+        self.si.conn.http_connection.close()
         if not any(
             [
                 options["update"],

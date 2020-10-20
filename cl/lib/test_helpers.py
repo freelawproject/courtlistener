@@ -54,6 +54,7 @@ class EmptySolrTestCase(TestCase):
         for si in self.all_sis:
             si.delete_all()
             si.commit()
+            si.conn.http_connection.close()
 
 
 class SolrTestCase(EmptySolrTestCase):
