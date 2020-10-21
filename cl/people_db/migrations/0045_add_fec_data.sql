@@ -2,7 +2,7 @@ BEGIN;
 --
 -- Create model Committee
 --
-CREATE TABLE "people_db_committee" ("id" serial NOT NULL PRIMARY KEY, "committee_id" varchar(9) NOT NULL, "committee_name" varchar(200) NOT NULL, "committee_party" varchar(3) NOT NULL, "candidate_id" varchar(9) NOT NULL, "connected_org_name" varchar(200) NOT NULL, "committee_type" varchar(1) NOT NULL, "committee_designation" varchar(1) NOT NULL, "org_type" varchar(1) NOT NULL);
+CREATE TABLE "people_db_committee" ("id" serial NOT NULL PRIMARY KEY, "committee_uniq_id" varchar(9) NOT NULL, "committee_name" varchar(200) NOT NULL, "committee_party" varchar(3) NOT NULL, "candidate_id" varchar(9) NOT NULL, "connected_org_name" varchar(200) NOT NULL, "committee_type" varchar(1) NOT NULL, "committee_designation" varchar(1) NOT NULL, "org_type" varchar(1) NOT NULL);
 --
 -- Create model Contribution
 --
@@ -10,14 +10,14 @@ CREATE TABLE "people_db_contribution" ("id" serial NOT NULL PRIMARY KEY, "valid"
 --
 -- Create model Individual
 --
-CREATE TABLE "people_db_individual" ("id" serial NOT NULL PRIMARY KEY, "name" varchar(200) NOT NULL, "city" varchar(30) NOT NULL, "state" varchar(2) NOT NULL, "zip_code" varchar(9) NOT NULL, "employer" varchar(38) NOT NULL, "occupation" varchar(38) NOT NULL);
+CREATE TABLE "people_db_individual" ("id" serial NOT NULL PRIMARY KEY, "name" varchar(200) NOT NULL, "city" varchar(30) NOT NULL, "state" varchar(2) NOT NULL, "zip_code" varchar(9) NOT NULL, "employer" varchar(38) NOT NULL, "occupation" varchar(38) NOT NULL, "entity_type" varchar(3) NOT NULL);
 CREATE TABLE "people_db_individual_committees" ("id" serial NOT NULL PRIMARY KEY, "individual_id" integer NOT NULL, "committee_id" integer NOT NULL);
 --
 -- Add field contributor to contribution
 --
 ALTER TABLE "people_db_contribution" ADD COLUMN "contributor_id" integer NOT NULL;
-CREATE INDEX "people_db_committee_committee_id_83d5c845" ON "people_db_committee" ("committee_id");
-CREATE INDEX "people_db_committee_committee_id_83d5c845_like" ON "people_db_committee" ("committee_id" varchar_pattern_ops);
+CREATE INDEX "people_db_committee_committee_uniq_id_9693dcba" ON "people_db_committee" ("committee_uniq_id");
+CREATE INDEX "people_db_committee_committee_uniq_id_9693dcba_like" ON "people_db_committee" ("committee_uniq_id" varchar_pattern_ops);
 CREATE INDEX "people_db_contribution_sub_id_c17aab73" ON "people_db_contribution" ("sub_id");
 CREATE INDEX "people_db_contribution_sub_id_c17aab73_like" ON "people_db_contribution" ("sub_id" varchar_pattern_ops);
 CREATE INDEX "people_db_contribution_image_num_a2b3288c" ON "people_db_contribution" ("image_num");

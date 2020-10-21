@@ -1910,7 +1910,7 @@ class Committee(models.Model):
         ("W", "Corporation without capital stock"),
     )
 
-    committee_id = models.CharField(
+    committee_uniq_id = models.CharField(
         help_text="Unique ID for committee",
         max_length=9,
         db_index=True,
@@ -1960,7 +1960,17 @@ class Individual(models.Model):
     Individual making a campaign contribution.
     """
 
-    committees = models.ManyToManyField("Committee")
+    ENTITY_TYPE_CHOICES = (
+        ("CAN", "Candidate"),
+        ("CCM", "Candidate committee"),
+        ("COM", "Committee"),
+        ("IND", "Individual"),
+        ("ORG", "Organization (not a committee or person"),
+        ("PAC", "Political Action Committee"),
+        ("PTY", "Party Organization"),
+    )
+
+    committees = models.ManyToManyField("people_db.Committee")
     name = models.CharField(
         help_text="Individual contributor name",
         max_length=200,
@@ -1990,6 +2000,13 @@ class Individual(models.Model):
         max_length=38,
         blank=True,
     )
+    entity_type = models.CharField(
+        help_text="Type of entity donated to.",
+        max_length=3,
+        blank=True,
+        choices=ENTITY_TYPE_CHOICES,
+    )
+
 
 
 class Contribution(models.Model):
