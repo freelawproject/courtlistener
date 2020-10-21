@@ -48,7 +48,7 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:poetry-wp1
+        image: freelawproject/task-server:poetry-wp2
         depends_on:
             - cl-postgresql
             - cl-redis
@@ -65,7 +65,7 @@ services:
 
     cl-django:
         container_name: cl-django
-        image: freelawproject/courtlistener-django:poetry-wp1
+        image: freelawproject/courtlistener-django:poetry-wp2
         depends_on:
             - cl-postgresql
             - cl-redis
@@ -98,6 +98,8 @@ services:
             - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
         networks:
             - cl_net_overlay
+        environment:
+            - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
     cl-judge-pics:
         image: freelawproject/judge-pics:latest
