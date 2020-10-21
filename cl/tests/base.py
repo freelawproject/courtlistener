@@ -66,8 +66,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             return webdriver.Remote(
                 settings.DOCKER_SELENIUM_HOST,
                 desired_capabilities=capabilities,
+                keep_alive=True,
             )
-        return webdriver.Chrome(chrome_options=options)
+        return webdriver.Chrome(chrome_options=options, keep_alive=True)
 
     @classmethod
     def setUpClass(cls):
