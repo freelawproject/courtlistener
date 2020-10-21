@@ -8,6 +8,7 @@ from django.test import LiveServerTestCase, Client, TestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -233,7 +234,7 @@ class LiveUserTest(BaseSeleniumTest):
                 host=self.live_server_url, path=reverse("password_reset")
             )
         )
-        email_input = self.browser.find_element_by_name("email")
+        email_input = self.browser.find_element(By.NAME, "email")
         email_input.send_keys("pandora@courtlistener.com")
         email_input.submit()
 
@@ -269,9 +270,9 @@ class LiveUserTest(BaseSeleniumTest):
         self.assertIn("Enter New Password", self.browser.page_source)
 
         # Next, change the user's password and submit the form.
-        pwd1 = self.browser.find_element_by_name("new_password1")
+        pwd1 = self.browser.find_element(By.NAME, "new_password1")
         pwd1.send_keys("password")
-        pwd2 = self.browser.find_element_by_name("new_password2")
+        pwd2 = self.browser.find_element(By.NAME, "new_password2")
         pwd2.send_keys("password")
         pwd2.submit()
 

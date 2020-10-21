@@ -15,6 +15,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
@@ -1104,9 +1105,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     ]
 
     def _perform_wildcard_search(self):
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.submit()
-        result_count = self.browser.find_element_by_id("result-count")
+        result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
 
     def test_query_cleanup_function(self):
@@ -1158,7 +1159,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
         self.browser.get(self.live_server_url)
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.clear()
         searchbox.send_keys("19-2205")
         searchbox.submit()
@@ -1166,7 +1167,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # with the query, there should be none
         self.assertRaises(
             NoSuchElementException,
-            self.browser.find_element_by_id,
+            self.browser.find_element,
+            By.ID,
             "result-count",
         )
 
@@ -1179,15 +1181,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Dora sees she has Opinion results, but wants Oral Arguments
         self.assertTrue(self.extract_result_count_from_serp() > 0)
-        label = self.browser.find_element_by_css_selector(
-            'label[for="id_type_0"]'
+        label = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_type_0"]'
         )
         self.assertIn("selected", label.get_attribute("class"))
         self.assert_text_in_node("Date Filed", "body")
         self.assert_text_not_in_node("Date Argued", "body")
 
         # She clicks on Oral Arguments
-        self.browser.find_element_by_id("navbar-oa").click()
+        self.browser.find_element(By.ID, "navbar-oa").click()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_facet_docket_numbers(self):
@@ -1199,12 +1201,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Seeing a result that has a docket number displayed, she wants
         # to find all similar opinions with the same or similar docket
         # number
-        search_results = self.browser.find_element_by_id("search-results")
+        search_results = self.browser.find_element(By.ID, "search-results")
         self.assertIn("Docket Number:", search_results.text)
 
         # She types part of the docket number into the docket number
         # filter on the left and hits enter
-        text_box = self.browser.find_element_by_id("id_docket_number")
+        text_box = self.browser.find_element(By.ID, "id_docket_number")
         text_box.send_keys("1337")
         text_box.submit()
 
@@ -1213,32 +1215,32 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         new_count = self.extract_result_count_from_serp()
         self.assertTrue(new_count < initial_count)
 
-        search_results = self.browser.find_element_by_id("search-results")
-        for result in search_results.find_elements_by_tag_name("article"):
+        search_results = self.browser.find_element(By.ID, "search-results")
+        for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id("id_q").send_keys("voutila")
-        self.browser.find_element_by_id("id_q").submit()
+        self.browser.find_element(By.ID, "id_q").send_keys("voutila")
+        self.browser.find_element(By.ID, "id_q").submit()
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
-        articles = self.browser.find_elements_by_tag_name("article")
-        articles[0].find_elements_by_tag_name("a")[0].click()
+        articles = self.browser.find_elements(By.TAG_NAME, "article")
+        articles[0].find_elements(By.TAG_NAME, "a")[0].click()
 
         # She is brought to the detail page for the results
         self.assertNotIn("Search Results", self.browser.title)
-        article_text = self.browser.find_element_by_tag_name("article").text
+        article_text = self.browser.find_element(By.TAG_NAME, "article").text
 
         # and she can see lots of detail! This includes things like:
         # The name of the jurisdiction/court,
         # the status of the Opinion, any citations, the docket number,
         # the Judges, and a unique fingerpring ID
-        meta_data = self.browser.find_elements_by_css_selector(
-            ".meta-data-header"
+        meta_data = self.browser.find_elements(
+            By.CSS_SELECTOR, ".meta-data-header"
         )
         headers = [
             "Filed:",
@@ -1254,26 +1256,29 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The complete body of the opinion is also displayed for her to
         # read on the page
         self.assertNotEqual(
-            self.browser.find_element_by_id("opinion-content").text.strip(), ""
+            self.browser.find_element(By.ID, "opinion-content").text.strip(),
+            "",
         )
 
         # She wants to dig a big deeper into the influence of this Opinion,
         # so she's able to see links to the first five citations on the left
         # and a link to the full list
-        cited_by = self.browser.find_element_by_id("cited-by")
-        self.assertIn("Cited By", cited_by.find_element_by_tag_name("h3").text)
-        citations = cited_by.find_elements_by_tag_name("li")
+        cited_by = self.browser.find_element(By.ID, "cited-by")
+        self.assertIn(
+            "Cited By", cited_by.find_element(By.TAG_NAME, "h3").text
+        )
+        citations = cited_by.find_elements(By.TAG_NAME, "li")
         self.assertTrue(0 < len(citations) < 6)
 
         # She clicks the "Full List of Citations" link and is brought to
         # a SERP page with all the citations, generated by a query
-        full_list = cited_by.find_element_by_link_text("View Citing Opinions")
+        full_list = cited_by.find_element(By.LINK_TEXT, "View Citing Opinions")
         full_list.click()
 
         # She notices this submits a new query targeting anything citing the
         # original opinion she was viewing. She notices she's back on the SERP
         self.assertIn("Search Results for", self.browser.title)
-        query = self.browser.find_element_by_id("id_q").get_attribute("value")
+        query = self.browser.find_element(By.ID, "id_q").get_attribute("value")
         self.assertIn("cites:", query)
 
         # She wants to go back to the Opinion page, so she clicks back in her
@@ -1281,17 +1286,18 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.back()
         self.assertNotIn("Search Results", self.browser.title)
         self.assertEqual(
-            self.browser.find_element_by_tag_name("article").text, article_text
+            self.browser.find_element(By.TAG_NAME, "article").text,
+            article_text,
         )
 
         # She now wants to see details on the list of Opinions cited within
         # this particular opinion. She notices an abbreviated list on the left,
         # and can click into a Full Table of Authorities. (She does so.)
-        authorities = self.browser.find_element_by_id("authorities")
+        authorities = self.browser.find_element(By.ID, "authorities")
         self.assertIn(
-            "Authorities", authorities.find_element_by_tag_name("h3").text
+            "Authorities", authorities.find_element(By.TAG_NAME, "h3").text
         )
-        authority_links = authorities.find_elements_by_tag_name("li")
+        authority_links = authorities.find_elements(By.TAG_NAME, "li")
         self.assertTrue(0 < len(authority_links) < 6)
         self.click_link_for_new_page("View All Authorities")
         self.assertIn("Table of Authorities", self.browser.title)
@@ -1303,7 +1309,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # And she's back at the Opinion in question and pretty happy about that
         self.assertNotIn("Table of Authorities", self.browser.title)
         self.assertEqual(
-            self.browser.find_element_by_tag_name("article").text, article_text
+            self.browser.find_element(By.TAG_NAME, "article").text,
+            article_text,
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -1315,15 +1322,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
-        prec = self.browser.find_element_by_id("id_stat_Precedential")
-        non_prec = self.browser.find_element_by_id("id_stat_Non-Precedential")
+        prec = self.browser.find_element(By.ID, "id_stat_Precedential")
+        non_prec = self.browser.find_element(By.ID, "id_stat_Non-Precedential")
         self.assertEqual(prec.get_attribute("checked"), "true")
         self.assertIsNone(non_prec.get_attribute("checked"))
-        prec_count = self.browser.find_element_by_css_selector(
-            'label[for="id_stat_Precedential"]'
+        prec_count = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_stat_Precedential"]'
         )
-        non_prec_count = self.browser.find_element_by_css_selector(
-            'label[for="id_stat_Non-Precedential"]'
+        non_prec_count = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_stat_Non-Precedential"]'
         )
         self.assertNotIn("(0)", prec_count.text)
         self.assertNotIn("(0)", non_prec_count.text)
@@ -1337,12 +1344,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertEqual(first_count, self.extract_result_count_from_serp())
 
         # She goes ahead and clicks the Search button again to resubmit
-        self.browser.find_element_by_id("search-button").click()
+        self.browser.find_element(By.ID, "search-button").click()
 
         # She didn't change the query, so the search box should still look
         # the same (which is blank)
         self.assertEqual(
-            self.browser.find_element_by_id("id_q").get_attribute("value"), ""
+            self.browser.find_element(By.ID, "id_q").get_attribute("value"), ""
         )
 
         # And now she notices her result set increases thanks to adding in
@@ -1358,12 +1365,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Latest Opinions", page_text)
         self.assertIn("Latest Oral Arguments", page_text)
 
-        search_box = self.browser.find_element_by_id("id_q")
-        search_button = self.browser.find_element_by_id("search-button")
+        search_box = self.browser.find_element(By.ID, "id_q")
+        search_button = self.browser.find_element(By.ID, "search-button")
         self.assertIn("Search", search_button.text)
 
         self.assertIn("Sign in / Register", page_text)
@@ -1377,12 +1384,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The browser brings her to a search engine result page with some
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
-        result_count = self.browser.find_element_by_id("result-count")
+        result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("1 Opinion", result_count.text)
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
-        facet_sidebar = self.browser.find_element_by_id("extra-search-fields")
+        facet_sidebar = self.browser.find_element(By.ID, "extra-search-fields")
         self.assertIn("Precedential Status", facet_sidebar.text)
 
         # She notes her URL For after signing in
@@ -1390,77 +1397,77 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Wanting to keep an eye on this Lissner guy, she decides to sign-in
         # and so she can create an alert
-        sign_in = self.browser.find_element_by_link_text("Sign in / Register")
+        sign_in = self.browser.find_element(By.LINK_TEXT, "Sign in / Register")
         sign_in.click()
 
         # she providers her usename and password to sign in
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Sign In", page_text)
         self.assertIn("Username", page_text)
         self.assertIn("Password", page_text)
-        btn = self.browser.find_element_by_css_selector(
-            'button[type="submit"]'
+        btn = self.browser.find_element(
+            By.CSS_SELECTOR, 'button[type="submit"]'
         )
         self.assertEqual("Sign In", btn.text)
 
-        self.browser.find_element_by_id("username").send_keys("pandora")
-        self.browser.find_element_by_id("password").send_keys("password")
+        self.browser.find_element(By.ID, "username").send_keys("pandora")
+        self.browser.find_element(By.ID, "password").send_keys("password")
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
         # to where she was, which still has "lissner" in the search box.
         self.browser.get(results_url)
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
-        alert_bell = self.browser.find_element_by_css_selector(
-            ".input-group-addon-blended i"
+        alert_bell = self.browser.find_element(
+            By.CSS_SELECTOR, ".input-group-addon-blended i"
         )
         alert_bell.click()
         time.sleep(1)  # Wait for the modal to open
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        self.browser.find_element_by_id("id_name")
-        self.browser.find_element_by_id("id_rate")
-        btn = self.browser.find_element_by_id("alertSave")
+        self.browser.find_element(By.ID, "id_name")
+        self.browser.find_element(By.ID, "id_rate")
+        btn = self.browser.find_element(By.ID, "alertSave")
         self.assertEqual("Create Alert", btn.text)
-        x_button = self.browser.find_elements_by_css_selector(".close")[0]
+        x_button = self.browser.find_elements(By.CSS_SELECTOR, ".close")[0]
         x_button.click()
 
         # But she decides to wait until another time. Instead she decides she
         # will log out. She notices a Profile link dropdown in the top of the
         # page, clicks it, and selects Sign out
-        profile_dropdown = self.browser.find_elements_by_css_selector(
-            "a.dropdown-toggle"
+        profile_dropdown = self.browser.find_elements(
+            By.CSS_SELECTOR, "a.dropdown-toggle"
         )[0]
         self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
-        dropdown_menu = self.browser.find_element_by_css_selector(
-            "ul.dropdown-menu"
+        dropdown_menu = self.browser.find_element(
+            By.CSS_SELECTOR, "ul.dropdown-menu"
         )
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
         profile_dropdown.click()
 
-        sign_out = self.browser.find_element_by_link_text("Sign out")
+        sign_out = self.browser.find_element(By.LINK_TEXT, "Sign out")
         sign_out.click()
 
         # She receives a sign out confirmation with links back to the homepage,
         # the block, and an option to sign back in.
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("You Have Successfully Signed Out", page_text)
-        links = self.browser.find_elements_by_tag_name("a")
+        links = self.browser.find_elements(By.TAG_NAME, "a")
         self.assertIn("Go to the homepage", [link.text for link in links])
         self.assertIn("Read our blog", [link.text for link in links])
 
-        bootstrap_btns = self.browser.find_elements_by_css_selector("a.btn")
+        bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
 
 
@@ -1545,3 +1552,9 @@ class CaptionTest(TestCase):
         # Now sort the messed up list, and check if it worked.
         cs_sorted = sorted(cs_shuffled, key=sort_cites)
         self.assertEqual(cs, cs_sorted)
+
+
+class CaptionTest(BaseSeleniumTest):
+    def test_again(self):
+        self.browser.get(self.live_server_url)
+        self.browser.get("https://www.daringfireball.net")
