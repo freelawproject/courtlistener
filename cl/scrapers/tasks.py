@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
+
 
 import os
 import logging
@@ -30,7 +30,7 @@ from seal_rookery import seals_data, seals_root
 
 from cl.audio.models import Audio
 from cl.audio.utils import get_audio_binary
-from cl.celery import app
+from cl.celery_init import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
@@ -80,7 +80,7 @@ def extract_from_doc(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content, err
+    return content.decode(), err
 
 
 def extract_from_docx(path):
@@ -95,7 +95,7 @@ def extract_from_docx(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content, err
+    return content.decode(), err
 
 
 def extract_from_html(path):
@@ -104,7 +104,8 @@ def extract_from_html(path):
     A simple wrapper to go get content, and send it along.
     """
     try:
-        content = open(path).read()
+        with open(path, "rb") as f:
+            content = f.read()
         content = get_clean_body_content(content)
         encodings = ["utf-8", "ISO8859", "cp1252"]
         for encoding in encodings:
@@ -141,6 +142,7 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
+    content = content.decode()
     if content.strip() == "" and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
@@ -149,8 +151,7 @@ def extract_from_pdf(path, opinion, do_ocr=False):
             content = "Unable to extract document content."
     elif "e" not in content:
         # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(unicode(content, "utf-8", errors="ignore"))
-
+        content = fix_mojibake(content)
     return content, err
 
 
@@ -167,7 +168,8 @@ def extract_from_txt(path):
     """
     try:
         err = False
-        data = open(path).read()
+        with open(path, "rb") as f:
+            data = f.read()
         try:
             # Alas, cp1252 is probably still more popular than utf-8.
             content = smart_text(data, encoding="cp1252")
@@ -192,6 +194,7 @@ def extract_from_wpd(path, opinion):
     content, err = process.communicate()
 
     content = get_clean_body_content(content)
+    content = content.decode()
 
     if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
@@ -204,7 +207,7 @@ def convert_file_to_txt(path):
     p = subprocess.Popen(
         tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    return p.communicate()[0].decode("utf-8")
+    return p.communicate()[0].decode()
 
 
 def get_page_count(path, extension):
@@ -314,6 +317,10 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
         )
         return
 
+    assert isinstance(
+        content, str
+    ), "content must be of type str, not %s" % type(content)
+
     # Do page count, if possible
     opinion.page_count = get_page_count(path, extension)
 
@@ -329,6 +336,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     update_document_from_text(opinion)
 
     if err:
+        print(err)
         print(
             "****Error extracting text from %s: %s****" % (extension, opinion)
         )
@@ -384,11 +392,11 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
                 success, content = extract_by_ocr(path)
                 if success:
                     rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                elif content == u"" or not success:
-                    content = u"Unable to extract document content."
+                elif content == "" or not success:
+                    content = "Unable to extract document content."
                     rd.ocr_status = RECAPDocument.OCR_FAILED
             else:
-                content = u""
+                content = ""
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
         else:
             rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
@@ -449,8 +457,8 @@ def cleanup_ocr_text(txt):
     :return: Txt output, cleaned up.
     """
     simple_replacements = (
-        (u"Fi|ed", u"Filed"),
-        (u" Il ", u" II "),
+        ("Fi|ed", "Filed"),
+        (" Il ", " II "),
     )
     for replacement in simple_replacements:
         txt = txt.replace(replacement[0], replacement[1])
@@ -458,11 +466,11 @@ def cleanup_ocr_text(txt):
 
 
 @app.task
-def extract_by_ocr(path):
+def extract_by_ocr(path: str) -> (bool, str):
     """Extract the contents of a PDF using OCR."""
     fail_msg = (
-        u"Unable to extract the content from this file. Please try "
-        u"reading the original."
+        "Unable to extract the content from this file. Please try "
+        "reading the original."
     )
     with NamedTemporaryFile(prefix="ocr_", suffix=".tiff") as tmp:
         out, err, returncode = rasterize_pdf(path, tmp.name)
@@ -494,21 +502,21 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     )
     audio_file.initTag()
     audio_file.tag.title = best_case_name(audio_obj)
-    audio_file.tag.album = u"{court}, {year}".format(
+    audio_file.tag.album = "{court}, {year}".format(
         court=court.full_name, year=audio_obj.docket.date_argued.year
     )
     audio_file.tag.artist = court.full_name
     audio_file.tag.artist_url = court.url
     audio_file.tag.audio_source_url = audio_obj.download_url
     audio_file.tag.comments.set(
-        u"Argued: {date_argued}. Docket number: {docket_number}".format(
+        "Argued: {date_argued}. Docket number: {docket_number}".format(
             date_argued=audio_obj.docket.date_argued.strftime("%Y-%m-%d"),
             docket_number=audio_obj.docket.docket_number,
         )
     )
-    audio_file.tag.genre = u"Speech"
-    audio_file.tag.publisher = u"Free Law Project"
-    audio_file.tag.publisher_url = u"https://free.law"
+    audio_file.tag.genre = "Speech"
+    audio_file.tag.publisher = "Free Law Project"
+    audio_file.tag.publisher_url = "https://free.law"
     audio_file.tag.recording_date = audio_obj.docket.date_argued.strftime(
         "%Y-%m-%d"
     )
@@ -531,10 +539,10 @@ def set_mp3_meta_data(audio_obj, mp3_path):
     ]
     if has_seal:
         with open(
-            os.path.join(seals_root, "512", "%s.png" % court.pk), "r"
+            os.path.join(seals_root, "512", "%s.png" % court.pk), "rb"
         ) as f:
             audio_file.tag.images.set(
-                3, f.read(), "image/png", u"Seal for %s" % court.short_name
+                3, f.read(), "image/png", "Seal for %s" % court.short_name
             )
         flp_image_frames.remove(3)
 
@@ -548,13 +556,13 @@ def set_mp3_meta_data(audio_obj, mp3_path):
                 "png",
                 "producer-300x300.png",
             ),
-            "r",
+            "rb",
         ) as f:
             audio_file.tag.images.set(
                 frame,
                 f.read(),
                 "image/png",
-                u"Created for the public domain by Free Law Project",
+                "Created for the public domain by Free Law Project",
             )
 
     audio_file.tag.save()
@@ -595,7 +603,7 @@ def process_audio_file(pk):
 
     set_mp3_meta_data(af, tmp_path)
     try:
-        with open(tmp_path, "r") as mp3:
+        with open(tmp_path, "rb") as mp3:
             cf = ContentFile(mp3.read())
             file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
             af.file_with_date = af.docket.date_argued

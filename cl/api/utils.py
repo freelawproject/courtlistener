@@ -24,7 +24,7 @@ from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
-from rest_framework_filters.backends import DjangoFilterBackend
+from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
@@ -70,7 +70,7 @@ class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
     id = serializers.ReadOnlyField()
 
 
-class DisabledHTMLFilterBackend(DjangoFilterBackend):
+class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """Disable showing filters in the browsable API.
 
     Ideally, we'd want to show fields in the browsable API, but for related
@@ -88,11 +88,14 @@ class SimpleMetadataWithFilters(SimpleMetadata):
             request, view
         )
         filters = OrderedDict()
-        if not hasattr(view, "filter_class"):
+        if not hasattr(view, "filterset_class"):
             # This is the API Root, which is not filtered.
             return metadata
 
-        for filter_name, filter_type in view.filter_class.base_filters.items():
+        for (
+            filter_name,
+            filter_type,
+        ) in view.filterset_class.base_filters.items():
             filter_parts = filter_name.split("__")
             filter_name = filter_parts[0]
             attrs = OrderedDict()

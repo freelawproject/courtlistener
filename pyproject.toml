@@ -1,10 +1,153 @@
+[tool.poetry]
+authors = ["Mike Lissner <mike@free.law>"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Legal Industry",
+]
+description = "A free and powerful system for awareness and research of the American judicial system."
+documentation = "https://github.com/freelawproject/courtlistener/wiki"
+homepage = "https://www.courtlistener.com/"
+include = ["manage.py"]
+keywords = ["legal", "courts", "databases", "judiciary", "laws"] # Max: 5
+license = "AGPL-3.0" # Should be spdx ID: https://spdx.org/licenses/
+maintainers = ["Mike Lissner <mike@free.law>"]
+name = "cl"
+readme = "README.md"
+repository = "https://github.com/freelawproject/courtlistener"
+version = "0.14.24"
+
+[tool.poetry.scripts]
+cl-manage = "manage:main"
+
+[tool.poetry.dependencies]
+ansible = "*"
+argparse = "*"
+beautifulsoup4 = "==4.8.*,>=4.8.0"
+boto3 = "^1.9.38"
+cchardet = "^2.1.1"
+celery = "^4.3.0"
+certifi = "^2019.9.11"
+chardet = "^3.0.4"
+defusedxml = "^0.6.0"
+disposable-email-domains = "*"
+django = "==1.11.*,>=1.11.0"
+django-cache-memoize = "==0.*,>=0.1.0"
+django-cors-headers = "3.2.1"
+django-extensions = "==2.2.*,>=2.2.0"
+django-localflavor = "^1.1"
+django-markdown-deux = "*"
+django-mathfilters = "*"
+django-ratelimit = "==2.0.*,>=2.0.0"
+django-redis-cache = "==2.0.*,>=2.0.0"
+django-rest-swagger = "==2.1.2"
+django-storages = "==1.7.*,>=1.7.0"
+djangorestframework = "3.11.*"
+djangorestframework-xml = "^1.4.0"
+docutils = "^0.12"
+drf-dynamic-fields = "*"
+eyeD3 = "0.9.5"
+feedparser = "^5.2.1"
+geonamescache = "^0.20"
+hiredis = "^0.2.0"
+httplib2 = "*"
+internetarchive = "*"
+ipaddress = "^1.0.16"
+ipython = "^3.2.0"
+itypes = "^1.1.0"
+kombu = "^4.6.4"
+logilab-common = "^0.63.2"
+lxml = "==4.*,>=4.0.0"
+markdown = "==2.*,>=2.6.0"
+markdown2 = "==2.3.*,>=2.3.0"
+ndg-httpsclient = "^0.4.0"
+networkx = "^1.10"
+nose = "*"
+openapi-codec = "^1.3.1"
+pandas = "^1.1.2"
+pillow = "*"
+psycopg2 = "^2.8.6"
+pycparser = "^2.14"
+pyinotify = {version = "==0.9.6", markers = "sys_platform != 'darwin'"}
+pyopenssl = "*"
+pyparsing = "^2.4.2"
+pypdf2 = "^1.26.0"
+python = "^3.8"
+python-dateutil = "^2.8.1"
+python-igraph = "*"
+python-magic = "^0.4.18"
+python-mimeparse = "^0.1.4"
+pytz = "*"
+pyyaml = "^5.3.1"
+redis = "==3.2.*,>=3.2.0"
+requests = "^2.20.0"
+selenium = "4.0.0a6.post2"
+sentry-sdk = "==0.*,>=0.0.0"
+simplejson = "*"
+six = "*"
+sqlparse = "^0.1.15"
+stripe = "^1.22.3"
+timeout-decorator = "*"
+tldextract = "*"
+unidecode = "*"
+usaddress = "*"
+reporters-db = {version = "^2.0.5", optional = true}
+
+
+# Currently this doesn't support py3, which blocks installation due to outdated dependencies.
+juriscraper = "2.0.1"
+scorched = {git = "https://github.com/freelawproject/scorched.git"}
+django-filter = "2.2.0"
+djangorestframework-filters = "1.0.0.dev2"
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.6.0"
+pytest = "==4.4.*,>=4.4.0"
+pytest-django = "==3.4.*,>=3.4.0"
+black = {version = "^20.8b1", allow-prereleases = true}
+flake8 = "^3.8.3"
+mypy = "^0.782"
+
+[tool.poetry.extras]
+flp = ["reporters-db", "juriscraper"]
+
 [tool.black]
-line-length = 79
 include = '''
 (
     cl         # Just include a few directories for now
 )*\.pyi?$
 '''
-exclude = '.*migrations.*'
+exclude = '''
+(
+      \.eggs
+    | .*\.egg-info
+    | .*migrations.*
+    | \.mypy_cache
+    | __pycache__
+    | \.venv
+)
+'''
+line-length = 79
 
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 79
 
+[tool.pylint.messages_control]
+disable = "C0330, C0326"
+
+[tool.pylint.format]
+max-line-length = "79"
+
+[build-system]
+build-backend = "poetry.masonry.api"
+requires = ["poetry>=0.12"]

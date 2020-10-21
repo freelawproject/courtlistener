@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='cause',
-            field=models.CharField(help_text=b'The cause for the case.', max_length=1000, blank=True),
+            field=models.CharField(help_text='The cause for the case.', max_length=1000, blank=True),
         ),
     ]

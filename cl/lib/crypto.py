@@ -13,9 +13,12 @@ def md5(s):
     ! usage is discouraged. Please use SHA256 instead.  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    :param s: The data to hash
+    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
+    will convert it to bytes first.
     :return a hexadecimal MD5 hash of the data
     """
+    if isinstance(s, str):
+        s = s.encode()
     md5sum = hashlib.md5()
     md5sum.update(s)
     return md5sum.hexdigest()
@@ -29,9 +32,12 @@ def sha1(s):
     ! usage is discouraged. Please use SHA256 instead.  !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    :param s: The data to hash
+    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
+    will convert it to bytes first.
     :return: a hexadecimal SHA1 hash of the data
     """
+    if isinstance(s, str):
+        s = s.encode()
     sha1sum = hashlib.sha1()
     sha1sum.update(s)
     return sha1sum.hexdigest()
@@ -69,7 +75,7 @@ def sha1_of_json_data(d):
     """
     json_as_python = json.loads(d)
     json_without_spaces = json.dumps(json_as_python, separators=(",", ":"))
-    return sha1(json_without_spaces)
+    return sha1(json_without_spaces.encode())
 
 
 def sha1_activation_key(s):
@@ -78,17 +84,20 @@ def sha1_activation_key(s):
     :param s: The data to use with the salt to make the activation key
     :return: A SHA1 activation key
     """
-    salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-    activation_key = hashlib.sha1(salt + s).hexdigest()
+    salt = hashlib.sha1(str(random.random()).encode()).hexdigest()[:5]
+    activation_key = hashlib.sha1((salt + s).encode()).hexdigest()
     return activation_key
 
 
 def sha256(s):
     """Return the sha256sum of a string.
 
-    :param s: The data to hash
+    :param s: The data to hash. Ideally bytes, but if unicode is passed in, it
+    will convert it to bytes first.
     :return A hexidecimal SHA256 hash of the data
     """
+    if isinstance(s, str):
+        s = s.encode()
     sha256sum = hashlib.sha256()
     sha256sum.update(s)
     return sha256sum.hexdigest()

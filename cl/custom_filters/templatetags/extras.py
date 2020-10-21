@@ -90,10 +90,10 @@ def granular_date(
             return date_format(d, format="Y")
 
     raise ValidationError(
-        u"Fell through date granularity template tag. This could mean that you "
-        u"have a date without an associated granularity. Did you apply the "
-        u"validation rules? Is full_clean() getting called in your save() "
-        u"method?"
+        "Fell through date granularity template tag. This could mean that you "
+        "have a date without an associated granularity. Did you apply the "
+        "validation rules? Is full_clean() getting called in your save() "
+        "method?"
     )
 
 

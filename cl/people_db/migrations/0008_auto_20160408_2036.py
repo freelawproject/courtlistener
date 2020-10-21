@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='has_photo',
-            field=models.BooleanField(default=False, help_text=b'Whether there is a photo corresponding to this person in the judge pics project.'),
+            field=models.BooleanField(default=False, help_text='Whether there is a photo corresponding to this person in the judge pics project.'),
         ),
     ]

@@ -9,10 +9,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from io import StringIO
 from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 
@@ -50,7 +47,7 @@ from rest_framework.status import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.pacer import (

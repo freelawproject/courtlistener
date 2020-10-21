@@ -17,7 +17,7 @@ from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
 
 from cl.alerts.tasks import enqueue_docket_alert
-from cl.celery import app
+from cl.celery_init import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.recap.constants import COURT_TIMEZONES

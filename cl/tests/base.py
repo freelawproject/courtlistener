@@ -13,8 +13,8 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.expected_conditions import staleness_of
+from selenium.webdriver.support.ui import WebDriverWait
 from timeout_decorator import TimeoutError
 
 from cl.audio.models import Audio
@@ -66,8 +66,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             return webdriver.Remote(
                 settings.DOCKER_SELENIUM_HOST,
                 desired_capabilities=capabilities,
+                keep_alive=True,
             )
-        return webdriver.Chrome(chrome_options=options)
+        return webdriver.Chrome(chrome_options=options, keep_alive=True)
 
     @classmethod
     def setUpClass(cls):
@@ -113,7 +114,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         :raises: AssertionError if the text cannot be found
         :returns None
         """
-        node = self.browser.find_element_by_tag_name(tag_name)
+        node = self.browser.find_element(By.TAG_NAME, tag_name)
         self.assertIn(text, node.text)
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
@@ -125,7 +126,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         :raises: AssertionError if the text is NOT in the node
         :return: None
         """
-        node = self.browser.find_element_by_tag_name(tag_name)
+        node = self.browser.find_element(By.TAG_NAME, tag_name)
         self.assertNotIn(text, node.text)
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
@@ -137,7 +138,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         :raises: AssertionError if the text cannot be found
         :returns None
         """
-        node = self.browser.find_element_by_id(tag_id)
+        node = self.browser.find_element(By.ID, tag_id)
         self.assertIn(text, node.text)
 
     @retry(NoSuchElementException, tries=3, delay=0.25, backoff=1)
@@ -151,26 +152,26 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         :param id_: The ID of the element to find.
         :return: The element found.
         """
-        return node.find_element_by_id(id_)
+        return node.find_element(By.ID, id_)
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
     def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
-        old_page = self.browser.find_element_by_tag_name("html")
+        old_page = self.browser.find_element(By.TAG_NAME, "html")
         yield
         WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
 
     @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
     def click_link_for_new_page(self, link_text, timeout=SELENIUM_TIMEOUT):
         with self.wait_for_page_load(timeout=timeout):
-            self.browser.find_element_by_link_text(link_text).click()
+            self.browser.find_element(By.LINK_TEXT, link_text).click()
 
     def attempt_sign_in(self, username, password):
         self.click_link_for_new_page("Sign in / Register")
         self.assertIn("Sign In", self.browser.title)
-        self.browser.find_element_by_id("username").send_keys(username)
-        self.browser.find_element_by_id("password").send_keys(password)
-        self.browser.find_element_by_id("password").submit()
+        self.browser.find_element(By.ID, "username").send_keys(username)
+        self.browser.find_element(By.ID, "password").send_keys(password)
+        self.browser.find_element(By.ID, "password").submit()
 
     def get_url_and_wait(self, url, timeout=SELENIUM_TIMEOUT):
         self.browser.get(url)
@@ -178,9 +179,9 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "html")))
 
     def extract_result_count_from_serp(self):
-        results = self.browser.find_element_by_id("result-count").text.strip()
+        results = self.browser.find_element(By.ID, "result-count").text.strip()
         try:
-            count = long(results.split(" ")[0].replace(",", ""))
+            count = int(results.split(" ")[0].replace(",", ""))
         except (IndexError, ValueError):
             self.fail("Cannot extract result count from SERP.")
         return count
@@ -203,3 +204,4 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
             si = scorched.SolrInterface(conn, mode="rw")
             si.delete_all()
             si.commit()
+            si.conn.http_connection.close()

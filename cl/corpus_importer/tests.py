@@ -1,11 +1,10 @@
 # coding=utf-8
-from __future__ import print_function
+
 import json
 import os
 import unittest
 from datetime import date, datetime
-import mock
-from mock import patch
+from unittest import mock
 from glob import iglob
 
 import pytest
@@ -383,17 +382,17 @@ class PacerDocketParserTest(TestCase):
 
         floyd = petro.attorneys.distinct().get(name__contains="Floyd")
         self.assertEqual(floyd.roles.all().count(), self.NUM_FLOYD_ROLES)
-        self.assertEqual(floyd.name, u"Floyd G. Short")
-        self.assertEqual(floyd.email, u"fshort@susmangodfrey.com")
-        self.assertEqual(floyd.fax, u"(206) 516-3883")
-        self.assertEqual(floyd.phone, u"(206) 373-7381")
+        self.assertEqual(floyd.name, "Floyd G. Short")
+        self.assertEqual(floyd.email, "fshort@susmangodfrey.com")
+        self.assertEqual(floyd.fax, "(206) 516-3883")
+        self.assertEqual(floyd.phone, "(206) 373-7381")
 
         godfrey_llp = floyd.organizations.all()[0]
-        self.assertEqual(godfrey_llp.name, u"Susman Godfrey, LLP")
-        self.assertEqual(godfrey_llp.address1, u"1201 Third Ave.")
-        self.assertEqual(godfrey_llp.address2, u"Suite 3800")
-        self.assertEqual(godfrey_llp.city, u"Seattle")
-        self.assertEqual(godfrey_llp.state, u"WA")
+        self.assertEqual(godfrey_llp.name, "Susman Godfrey, LLP")
+        self.assertEqual(godfrey_llp.address1, "1201 Third Ave.")
+        self.assertEqual(godfrey_llp.address2, "Suite 3800")
+        self.assertEqual(godfrey_llp.city, "Seattle")
+        self.assertEqual(godfrey_llp.state, "WA")
 
 
 class GetQuarterTest(unittest.TestCase):
@@ -657,7 +656,7 @@ class HarvardTests(TestCase):
 
         self.assertEqual(
             cite.cluster.judges,
-            "Thomas, Kennedy, Auto, Stevens, Scaua, Breyer, Roberts, Sotjter, Ginsbtjrg",
+            "Auto, Breyer, Ginsbtjrg, Kennedy, Roberts, Scaua, Sotjter, Stevens, Thomas",
         )
         print("Success ✓")
 

@@ -1,8 +1,7 @@
 import re
 from datetime import date
 from datetime import timedelta
-from urllib import urlencode
-from urlparse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.cache import cache
@@ -13,7 +12,6 @@ from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
 from cl.citations.models import Citation
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.lib import sunburnt
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.constants import (
@@ -350,7 +348,7 @@ def make_fq_proximity_query(cd, field, key):
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
-    q = re.sub('[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
+    q = re.sub(r'[\^\?\*:\(\)!"~\-\[\]]', " ", cd[key])
 
     # Remove all valid Solr words
     tokens = []
@@ -379,8 +377,8 @@ def make_date_query(query_field, before, after):
 
 def make_cite_count_query(cd):
     """Given the cleaned data from a form, return a valid Solr fq string"""
-    start = cd.get("cited_gt") or u"*"
-    end = cd.get("cited_lt") or u"*"
+    start = cd.get("cited_gt") or "*"
+    end = cd.get("cited_lt") or "*"
     if start == "*" and end == "*":
         return ""
     else:
@@ -724,7 +722,7 @@ def add_grouping(main_params, cd, group):
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         and group is True
     ):
-        docket_query = re.search("docket_id:\d+", cd["q"])
+        docket_query = re.search(r"docket_id:\d+", cd["q"])
         if docket_query:
             group_sort = map_to_docket_entry_sorting(main_params["sort"])
         else:
@@ -801,7 +799,7 @@ def cleanup_main_query(query_string):
     """
     inside_a_phrase = False
     cleaned_items = []
-    for item in re.split('([^a-zA-Z0-9_\-~":]+)', query_string):
+    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
         if not item:
             continue
 
@@ -879,10 +877,23 @@ def build_main_query_from_query_string(
     return main_query
 
 
-def build_coverage_query(court, q):
+def build_coverage_query(court, q, facet_field):
+    """
+    Create a coverage that can be used to make a facet query
+
+    :param court: String representation of the court to filter to, e.g. 'ca1',
+    defaults to 'all'.
+    :type court: str
+    :param q: A query to limit the coverage query, defaults to '*'
+    :type q: str
+    :param facet_field: The field to do faceting on
+    :type facet_field: str
+    :return: A coverage query dict
+    :rtype: dict
+    """
     params = {
         "facet": "true",
-        "facet.range": "dateFiled",
+        "facet.range": facet_field,
         "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
         "facet.range.end": "NOW/DAY",
         "facet.range.gap": "+1YEAR",
@@ -993,8 +1004,9 @@ def get_citing_clusters_with_cache(cluster):
         "caller": "view_opinion",
         "fl": "absolute_url,caseName,dateFiled",
     }
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    results = conn.raw_query(**q).execute()
+    conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    results = conn.query().add_extra(**q).execute()
+    conn.conn.http_connection.close()
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
@@ -1019,7 +1031,7 @@ def get_related_clusters_with_cache(cluster, request):
         # If it is a bot or is not beta tester, return empty results
         return [], [], url_search_params
 
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
@@ -1036,7 +1048,7 @@ def get_related_clusters_with_cache(cluster, request):
         # Cache is empty
 
         # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [conn.Q(id=sub_id) for sub_id in sub_opinion_ids]
+        sub_opinion_queries = [si.Q(id=sub_id) for sub_id in sub_opinion_ids]
 
         # Take one Q object from the list
         sub_opinion_query = sub_opinion_queries.pop()
@@ -1058,7 +1070,7 @@ def get_related_clusters_with_cache(cluster, request):
         }
 
         mlt_query = (
-            conn.query(sub_opinion_query)
+            si.query(sub_opinion_query)
             .mlt(**mlt_params)
             .field_limit(fields=["id", "caseName", "absolute_url"])
         )
@@ -1076,10 +1088,10 @@ def get_related_clusters_with_cache(cluster, request):
 
         mlt_res = mlt_query.execute()
 
-        if mlt_res.more_like_this is not None:
+        if hasattr(mlt_res, "more_like_this"):
             # Only a single sub opinion
             related_clusters = mlt_res.more_like_this.docs
-        elif mlt_res.more_like_these is not None:
+        elif hasattr(mlt_res, "more_like_these"):
             # Multiple sub opinions
 
             # Get result list for each sub opinion
@@ -1106,7 +1118,7 @@ def get_related_clusters_with_cache(cluster, request):
         cache.set(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
-
+    si.conn.http_connection.close()
     return related_clusters, sub_opinion_ids, url_search_params
 
 

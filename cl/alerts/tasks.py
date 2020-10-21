@@ -5,7 +5,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import DocketAlert
-from cl.celery import app
+from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc

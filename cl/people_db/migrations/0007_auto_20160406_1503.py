@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='person',
             name='cl_id',
-            field=models.CharField(help_text=b'A unique identifier for judge, also indicating source of data.', unique=True, max_length=30, db_index=True),
+            field=models.CharField(help_text='A unique identifier for judge, also indicating source of data.', unique=True, max_length=30, db_index=True),
         ),
         migrations.AlterField(
             model_name='person',

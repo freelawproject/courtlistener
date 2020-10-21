@@ -16,8 +16,8 @@ from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
-from parse_judges import find_judge_names
-from regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
+from .parse_judges import find_judge_names
+from .regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()
@@ -314,7 +314,7 @@ def get_xml_string(e):
     inner_string = re.sub(
         r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
     )
-    return inner_string.decode("utf-8").strip()
+    return inner_string.decode().strip()
 
 
 def parse_dates(raw_dates):

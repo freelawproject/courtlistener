@@ -215,8 +215,8 @@ class Person(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name_full)
+    def __str__(self):
+        return "%s: %s" % (self.pk, self.name_full)
 
     class Meta:
         verbose_name_plural = "people"
@@ -237,7 +237,7 @@ class Person(models.Model):
 
     @property
     def name_full(self):
-        return u" ".join(
+        return " ".join(
             [
                 v
                 for v in [
@@ -252,7 +252,7 @@ class Person(models.Model):
 
     @property
     def name_full_reverse(self):
-        return u"{name_last}, {name_first} {name_middle}, {suffix}".format(
+        return "{name_last}, {name_first} {name_middle}, {suffix}".format(
             suffix=self.get_name_suffix_display(), **self.__dict__
         ).strip(", ")
 
@@ -429,15 +429,15 @@ class School(models.Model):
         db_index=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         if self.is_alias_of:
-            return u"%s: %s (alias: %s)" % (
+            return "%s: %s (alias: %s)" % (
                 self.pk,
                 self.name,
                 self.is_alias_of.name,
             )
         else:
-            return u"%s: %s" % (self.pk, self.name)
+            return "%s: %s" % (self.pk, self.name)
 
     @property
     def is_alias(self):
@@ -520,9 +520,9 @@ class Position(models.Model):
     CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
     STAFF_ATTORNEY = "staff-atty"
     PROFESSOR = "prof"
-    PRACTITIONER = "Practitioner"
-    PROSECUTOR = "Prosecutor"
-    PUBLIC_DEFENDER = "Public Defender"
+    PRACTITIONER = "prac"
+    PROSECUTOR = "pros"
+    PUBLIC_DEFENDER = "pub-def"
     LEGISLATOR = "legis"
 
     POSITION_TYPES = (
@@ -934,8 +934,8 @@ class Position(models.Model):
         default=False,
     )
 
-    def __unicode__(self):
-        return u"%s: %s at %s" % (
+    def __str__(self):
+        return "%s: %s at %s" % (
             self.pk,
             self.person.name_full,
             self.court_id,
@@ -1188,8 +1188,8 @@ class Education(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
-        return u"%s: Degree in %s from %s in the year %s" % (
+    def __str__(self):
+        return "%s: Degree in %s from %s in the year %s" % (
             self.pk,
             self.degree_detail,
             self.school.name,
@@ -1221,9 +1221,9 @@ class Race(models.Model):
         unique=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         # This is used in the API via the StringRelatedField. Do not cthange.
-        return u"{race}".format(race=self.race)
+        return "{race}".format(race=self.race)
 
 
 class PoliticalAffiliation(models.Model):
@@ -1482,8 +1482,8 @@ class PartyType(models.Model):
     class Meta:
         unique_together = ("docket", "party", "name")
 
-    def __unicode__(self):
-        return u"%s: Party %s is %s in Docket %s" % (
+    def __str__(self):
+        return "%s: Party %s is %s in Docket %s" % (
             self.pk,
             self.party_id,
             self.name,
@@ -1589,8 +1589,8 @@ class Party(models.Model):
         verbose_name_plural = "Parties"
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name)
+    def __str__(self):
+        return "%s: %s" % (self.pk, self.name)
 
 
 class Role(models.Model):
@@ -1661,8 +1661,8 @@ class Role(models.Model):
             "date_action",
         )
 
-    def __unicode__(self):
-        return u"%s: Attorney %s is %s for Party %s in docket %s" % (
+    def __str__(self):
+        return "%s: Attorney %s is %s for Party %s in docket %s" % (
             self.pk,
             self.attorney_id,
             self.get_role_display(),
@@ -1709,8 +1709,8 @@ class Attorney(models.Model):
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __unicode__(self):
-        return u"%s: %s" % (self.pk, self.name)
+    def __str__(self):
+        return "%s: %s" % (self.pk, self.name)
 
 
 class AttorneyOrganizationAssociation(models.Model):
@@ -1742,8 +1742,8 @@ class AttorneyOrganizationAssociation(models.Model):
     class Meta:
         unique_together = ("attorney", "attorney_organization", "docket")
 
-    def __unicode__(self):
-        return u"%s: Atty %s worked on docket %s while at org %s" % (
+    def __str__(self):
+        return "%s: Atty %s worked on docket %s while at org %s" % (
             self.pk,
             self.attorney_id,
             self.docket_id,
@@ -1804,7 +1804,7 @@ class AttorneyOrganization(models.Model):
             "zip_code",
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: %s, %s, %s, %s, %s, %s" % (
             self.pk,
             self.name,

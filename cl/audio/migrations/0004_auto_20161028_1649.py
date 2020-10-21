@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='audio',
             name='stt_status',
-            field=models.SmallIntegerField(default=0, help_text=b'The status of the Speech to Text for this item?', choices=[(0, b'Speech to Text Needed'), (1, b'Speech to Text Complete'), (2, b'Speech to Text Failed')]),
+            field=models.SmallIntegerField(default=0, help_text='The status of the Speech to Text for this item?', choices=[(0, 'Speech to Text Needed'), (1, 'Speech to Text Complete'), (2, 'Speech to Text Failed')]),
         ),
     ]

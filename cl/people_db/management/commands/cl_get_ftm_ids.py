@@ -7,7 +7,7 @@ from django.conf import settings
 from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.sunburnt import SolrInterface
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.import_judges.courtid_levels import courtid2statelevel
 from cl.people_db.models import Person
 
@@ -122,7 +122,7 @@ def print_stats(match_stats, candidate_eid_lists):
 
 def update_judges_by_solr(candidate_id_map, debug):
     """Update judges by looking up each entity from FTM in Solr."""
-    conn = SolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
+    conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
     match_stats = defaultdict(int)
     # These IDs are ones that cannot be updated due to being identified as
     # problematic in FTM's data.
@@ -140,19 +140,23 @@ def update_judges_by_solr(candidate_id_map, debug):
                     ]
                 )
             ).replace(",", "")
-            results = conn.raw_query(
-                **{
-                    "caller": "ftm_update_judges_by_solr",
-                    "fq": [
-                        "name:(%s)" % name,
-                        "court_exact:%s" % court_id,
-                        # This filters out Sr/Jr problems by insisting on recent
-                        # positions. 1980 is arbitrary, based on testing.
-                        "date_start:[1980-12-31T23:59:59Z TO *]",
-                    ],
-                    "q": "*",
-                }
-            ).execute()
+            results = (
+                conn.query()
+                .add_extra(
+                    **{
+                        "caller": "ftm_update_judges_by_solr",
+                        "fq": [
+                            "name:(%s)" % name,
+                            "court_exact:%s" % court_id,
+                            # This filters out Sr/Jr problems by insisting on recent
+                            # positions. 1980 is arbitrary, based on testing.
+                            "date_start:[1980-12-31T23:59:59Z TO *]",
+                        ],
+                        "q": "*",
+                    }
+                )
+                .execute()
+            )
 
             if len(results) == 0:
                 match_stats[len(results)] += 1
@@ -200,6 +204,7 @@ def update_judges_by_solr(candidate_id_map, debug):
 
     print_stats(match_stats, candidate_id_map)
     logger.info("Blacklisted IDs: %s" % blacklisted_ids)
+    conn.conn.http_connection.close()
 
 
 class Command(VerboseCommand):

@@ -25,10 +25,8 @@ from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 
 
-class IngestionTest(IndexedSolrTestCase):
-    fixtures = ["test_court.json"]
-
-    def test_ingest_opinions(self):
+class ScraperIngestionTest(TestCase):
+    def test_ingest_opinions_from_scraper(self):
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
@@ -65,30 +63,49 @@ class IngestionTest(IndexedSolrTestCase):
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
-    def test_content_extraction(self):
-        """Do all of the supported mimetypes get extracted to text
-        successfully, including OCR?"""
-        test_strings = [
-            "supreme",
-            "intelligence",
-            "indiana",
-            "reagan",
-            "indiana",
-            "fidelity",
-        ]
-        opinions = Opinion.objects.all()
-        for op, test_string in zip(opinions, test_strings):
-            ext = get_extension(op.local_path.file.read())
-            extract_doc_content(op.pk, do_ocr=True)
-            op.refresh_from_db()
-            if ext in [".html", ".wpd"]:
-                self.assertIn(test_string, op.html.lower())
-            else:
-                self.assertIn(test_string, op.plain_text.lower())
 
+class IngestionTest(IndexedSolrTestCase):
+    def test_doc_content_extraction(self):
+        """Can we ingest a doc file?"""
+        image_opinion = Opinion.objects.get(pk=1)
+        extract_doc_content(image_opinion.pk, do_ocr=False)
+        image_opinion.refresh_from_db()
+        self.assertIn("indiana", image_opinion.plain_text.lower())
 
-class ExtractionTest(TestCase):
-    fixtures = ["tax_court_test.json"]
+    def test_image_based_pdf(self):
+        """Can we ingest an image based pdf file?"""
+        image_opinion = Opinion.objects.get(pk=2)
+        extract_doc_content(image_opinion.pk, do_ocr=True)
+        image_opinion.refresh_from_db()
+        self.assertIn("intelligence", image_opinion.plain_text.lower())
+
+    def test_text_based_pdf(self):
+        """Can we ingest a text based pdf file?"""
+        txt_opinion = Opinion.objects.get(pk=3)
+        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        txt_opinion.refresh_from_db()
+        self.assertIn("tarrant", txt_opinion.plain_text.lower())
+
+    def test_html_content_extraction(self):
+        """Can we ingest an html file?"""
+        html_opinion = Opinion.objects.get(pk=4)
+        extract_doc_content(html_opinion.pk, do_ocr=False)
+        html_opinion.refresh_from_db()
+        self.assertIn("reagan", html_opinion.html.lower())
+
+    def test_wpd_content_extraction(self):
+        """Can we ingest a wpd file?"""
+        wpd_opinion = Opinion.objects.get(pk=5)
+        extract_doc_content(wpd_opinion.pk, do_ocr=False)
+        wpd_opinion.refresh_from_db()
+        self.assertIn("greene", wpd_opinion.html.lower())
+
+    def test_txt_content_extraction(self):
+        """Can we ingest a txt file?"""
+        txt_opinion = Opinion.objects.get(pk=6)
+        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        txt_opinion.refresh_from_db()
+        self.assertIn("ideal", txt_opinion.plain_text.lower())
 
     def test_txt_extraction_with_bad_data(self):
         """Can we extract text from nasty files lacking encodings?"""
@@ -104,10 +121,14 @@ class ExtractionTest(TestCase):
             err, "Error reported while extracting text from %s" % path
         )
         self.assertIn(
-            u"¶  1.  DOOLEY, J.   Plaintiffs",
+            "¶  1.  DOOLEY, J.   Plaintiffs",
             content,
             "Issue extracting/encoding text from file at: %s" % path,
         )
+
+
+class ExtractionTest(TestCase):
+    fixtures = ["tax_court_test.json"]
 
     def test_juriscraper_object_creation(self):
         """Can we extract text from tax court pdf and add to db?"""
@@ -145,28 +166,28 @@ class ExtensionIdentificationTest(TestCase):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
     def test_wpd_extension(self):
-        with open(os.path.join(self.path, "opinion_wpd.wpd"), "r") as f:
+        with open(os.path.join(self.path, "opinion_wpd.wpd"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".wpd")
 
     def test_pdf_extension(self):
         with open(
-            os.path.join(self.path, "opinion_pdf_text_based.pdf"), "r"
+            os.path.join(self.path, "opinion_pdf_text_based.pdf"), "rb"
         ) as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".pdf")
 
     def test_doc_extension(self):
-        with open(os.path.join(self.path, "opinion_doc.doc"), "r") as f:
+        with open(os.path.join(self.path, "opinion_doc.doc"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".doc")
 
     def test_html_extension(self):
-        with open(os.path.join(self.path, "opinion_html.html"), "r") as f:
+        with open(os.path.join(self.path, "opinion_html.html"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".html")
 
-        with open(os.path.join(self.path, "not_wpd.html"), "r") as f:
+        with open(os.path.join(self.path, "not_wpd.html"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".html")
 

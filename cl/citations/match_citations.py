@@ -13,7 +13,7 @@ from cl.citations.models import (
     IdCitation,
     NonopinionCitation,
 )
-from cl.lib import sunburnt
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion
 from cl.custom_filters.templatetags.text_filters import best_case_name
 
@@ -37,7 +37,7 @@ def make_name_param(defendant, plaintiff=None):
         token_list.extend(plaintiff.split())
         # Strip out punctuation, which Solr doesn't like
     query_words = [strip_punct(t) for t in token_list]
-    return u" ".join(query_words), len(query_words)
+    return " ".join(query_words), len(query_words)
 
 
 def reverse_match(conn, results, citing_doc):
@@ -55,7 +55,7 @@ def reverse_match(conn, results, citing_doc):
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params["q"] = '"%s"~%d' % (query, len(query_tokens))
         params["caller"] = "reverse_match"
-        new_results = conn.raw_query(**params).execute()
+        new_results = conn.query().add_extra(**params).execute()
         if len(new_results) == 1:
             return [result]
     return []
@@ -66,11 +66,11 @@ def case_name_query(conn, params, citation, citing_doc):
     params["q"] = "caseName:(%s)" % query
     params["caller"] = "match_citations"
     results = []
-    # Use Solr minimum match search, starting with requiring all words to match,
-    # and decreasing by one word each time until a match is found
-    for num_words in xrange(length, 0, -1):
+    # Use Solr minimum match search, starting with requiring all words to
+    # match and decreasing by one word each time until a match is found
+    for num_words in range(length, 0, -1):
         params["mm"] = num_words
-        new_results = conn.raw_query(**params).execute()
+        new_results = conn.query().add_extra(**params).execute()
         if len(new_results) >= 1:
             # For 1 result, make sure case name of match actually appears in
             # citing doc. For multiple results, use same technique to
@@ -108,7 +108,7 @@ def match_citation(citation, citing_doc=None):
       - a Solr Result object with the results, or an empty list if no hits
     """
     # TODO: Create shared solr connection for all queries
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     main_params = {
         "q": "*",
         "fq": [
@@ -126,6 +126,7 @@ def match_citation(citation, citing_doc=None):
         start_year, end_year = get_years_from_reporter(citation)
         if citing_doc is not None and citing_doc.cluster.date_filed:
             end_year = min(end_year, citing_doc.cluster.date_filed.year)
+
     main_params["fq"].append(
         "dateFiled:%s" % build_date_range(start_year, end_year)
     )
@@ -135,13 +136,14 @@ def match_citation(citation, citing_doc=None):
 
     # Take 1: Use a phrase query to search the citation field.
     main_params["fq"].append('citation:("%s")' % citation.base_citation())
-    results = conn.raw_query(**main_params).execute()
+    results = si.query().add_extra(**main_params).execute()
+    si.conn.http_connection.close()
     if len(results) == 1:
         return results
     if len(results) > 1:
         if citing_doc is not None and citation.defendant:
             # Refine using defendant, if there is one
-            results = case_name_query(conn, main_params, citation, citing_doc)
+            results = case_name_query(si, main_params, citation, citing_doc)
         return results
 
     # Give up.

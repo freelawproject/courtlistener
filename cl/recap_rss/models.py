@@ -64,8 +64,8 @@ class RssFeedStatus(models.Model):
     class Meta:
         verbose_name_plural = "RSS Feed Statuses"
 
-    def __unicode__(self):
-        return u"RssFeedStatus: %s, %s" % (self.pk, self.court_id)
+    def __str__(self):
+        return "RssFeedStatus: %s, %s" % (self.pk, self.court_id)
 
 
 class RssItemCache(models.Model):
@@ -114,7 +114,7 @@ class RssFeedData(models.Model):
     @property
     def file_contents(self):
         with open(self.filepath.path, "rb") as f:
-            return bz2.decompress(f.read()).decode("utf-8")
+            return bz2.decompress(f.read()).decode()
 
     def print_file_contents(self):
         print(self.file_contents)

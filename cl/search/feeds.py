@@ -62,7 +62,9 @@ class SearchFeed(Feed):
             )
             # Eliminate items that lack the ordering field.
             main_params["fq"].append("%s:[* TO *]" % order_by)
-            return solr.query().add_extra(**main_params).execute()
+            items = solr.query().add_extra(**main_params).execute()
+            solr.conn.http_connection.close()
+            return items
         else:
             return []
 
@@ -108,7 +110,9 @@ class JurisdictionFeed(Feed):
             "start": "0",
             "caller": "JurisdictionFeed",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -138,7 +142,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)["local_path"].encode("utf-8"),
+                get_item(item)["local_path"],
             )
             return os.path.getsize(file_loc)
         except:
@@ -148,7 +152,7 @@ class JurisdictionFeed(Feed):
         try:
             file_loc = os.path.join(
                 settings.MEDIA_ROOT,
-                get_item(item)["local_path"].encode("utf-8"),
+                get_item(item)["local_path"],
             )
             return lookup_mime_type(file_loc)
         except:
@@ -171,4 +175,6 @@ class AllJurisdictionsFeed(JurisdictionFeed):
             "start": "0",
             "caller": "AllJurisdictionsFeed",
         }
-        return solr.query().add_extra(**params).execute()
+        items = solr.query().add_extra(**params).execute()
+        solr.conn.http_connection.close()
+        return items

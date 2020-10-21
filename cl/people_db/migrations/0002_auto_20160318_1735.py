@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -33,13 +33,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='position',
             name='school',
-            field=models.ForeignKey(blank=True, to='people_db.School', help_text=b'If academic job, the school where they work.', null=True,
+            field=models.ForeignKey(blank=True, to='people_db.School', help_text='If academic job, the school where they work.', null=True,
                                     on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='position',
             name='supervisor',
-            field=models.ForeignKey(related_name='supervised_positions', blank=True, to='people_db.Person', help_text=b'If this is a clerkship, the supervising judge.', null=True,
+            field=models.ForeignKey(related_name='supervised_positions', blank=True, to='people_db.Person', help_text='If this is a clerkship, the supervising judge.', null=True,
                                     on_delete=models.CASCADE),
         ),
         migrations.AddField(

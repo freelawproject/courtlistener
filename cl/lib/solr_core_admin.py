@@ -1,11 +1,10 @@
-import StringIO
+import io
 import json
 
 import lxml
 import requests
 from django.conf import settings
-
-from cl.lib.sunburnt import SolrError
+from scorched.exc import SolrError
 
 
 def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
@@ -42,7 +41,7 @@ def get_solr_core_status(core="all", url=settings.SOLR_HOST):
         )
 
     try:
-        solr_config = lxml.etree.parse(StringIO.StringIO(r.content))
+        solr_config = lxml.etree.parse(io.StringIO(r.content))
     except lxml.etree.XMLSyntaxError as e:
         raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
@@ -71,7 +70,7 @@ def get_term_frequency(
             for result in content_as_json["fields"]["text"]["topTerms"]:
                 # Top terms is a list of alternating terms and counts. Their
                 # types are different, so we'll use that.
-                if isinstance(result, basestring):
+                if isinstance(result, str):
                     top_terms.append(result)
             return top_terms
     elif result_type == "dict":
@@ -82,7 +81,7 @@ def get_term_frequency(
             for result in content_as_json["fields"]["text"]["topTerms"]:
                 # We set aside the term until we reach its count, then we add
                 # them as a k,v pair
-                if isinstance(result, basestring):
+                if isinstance(result, str):
                     key = result
                 else:
                     top_terms[key] = result

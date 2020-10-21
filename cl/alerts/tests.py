@@ -5,6 +5,7 @@ from django.core import mail
 from django.urls import reverse
 from django.test import Client, TestCase
 from django.utils.timezone import now
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.alerts.management.commands.handle_old_docket_alerts import (
@@ -40,7 +41,7 @@ class AlertTest(TestCase):
             reverse("show_results"), self.alert_params, follow=True
         )
         self.assertEqual(r.redirect_chain[0][1], 302)
-        self.assertIn("successfully", r.content)
+        self.assertIn("successfully", r.content.decode())
         self.client.logout()
 
     def test_fail_gracefully(self):
@@ -54,7 +55,7 @@ class AlertTest(TestCase):
         )
         r = self.client.post("/", bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
-        self.assertIn("error creating your alert", r.content)
+        self.assertIn("error creating your alert", r.content.decode())
         self.client.logout()
 
     def test_new_alert_gets_secret_key(self):
@@ -225,9 +226,9 @@ class AlertSeleniumTest(BaseSeleniumTest):
         self.assertIn(reverse("sign-in"), self.browser.current_url)
 
         # So Pan signs in.
-        self.browser.find_element_by_id("username").send_keys("pandora")
-        self.browser.find_element_by_id("password").send_keys("password")
-        self.browser.find_element_by_id("password").submit()
+        self.browser.find_element(By.ID, "username").send_keys("pandora")
+        self.browser.find_element(By.ID, "password").send_keys("password")
+        self.browser.find_element(By.ID, "password").submit()
 
         # And gets redirected to the SERP where they see a notice about their
         # alert being edited.

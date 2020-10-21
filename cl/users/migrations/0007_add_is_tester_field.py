@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='userprofile',
             name='is_tester',
-            field=models.BooleanField(default=False, help_text=b'The user tests new features before they are finished'),
+            field=models.BooleanField(default=False, help_text='The user tests new features before they are finished'),
         ),
     ]

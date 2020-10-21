@@ -95,7 +95,7 @@ class Command(VerboseCommand):
         return ok: Whether the item was set successfully
         """
         current_value = getattr(obj, attribute)
-        if current_value is not None and isinstance(current_value, basestring):
+        if current_value is not None and isinstance(current_value, str):
             current_value = current_value.strip()
 
         does_not_currently_have_a_value = not current_value
@@ -110,15 +110,15 @@ class Command(VerboseCommand):
             ]
         ):
             logger.info(
-                "Updating %s with %s." % (attribute, new_value.encode("utf-8"))
+                "Updating %s with %s." % (attribute, new_value.encode())
             )
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
             values_differ = False
             if (
-                isinstance(current_value, basestring)
-                and isinstance(new_value, basestring)
+                isinstance(current_value, str)
+                and isinstance(new_value, str)
                 and "".join(current_value.split())
                 != "".join(new_value.split())
             ):
@@ -313,9 +313,9 @@ class Command(VerboseCommand):
             logger.info(
                 "https://www.courtlistener.com%s" % cluster.get_absolute_url()
             )
-            logger.info("%s" % cluster.case_name.encode("utf-8"))
+            logger.info("%s" % cluster.case_name.encode())
             if cluster.docket.docket_number:
-                logger.info(cluster.docket.docket_number.encode("utf-8"))
+                logger.info(cluster.docket.docket_number.encode())
             logger.info(cluster.date_filed)
         logger.info("SCDB info:")
         logger.info(d["caseName"])
@@ -330,7 +330,7 @@ class Command(VerboseCommand):
             self.skipped_count += 1
             return clusters[0]
         else:
-            choice = raw_input(
+            choice = input(
                 "Which item should we update? [0-%s] " % (len(clusters) - 1)
             )
 

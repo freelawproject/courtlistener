@@ -3,6 +3,7 @@
 Functional tests for the Visualization feature of CourtListener
 """
 from django.contrib.auth.models import User
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
@@ -37,9 +38,11 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.attempt_sign_in("user", "password")
 
         # She selects "New Visualization" from the new Visualization menu
-        menu = self.browser.find_element_by_partial_link_text("Visualizations")
+        menu = self.browser.find_element(
+            By.PARTIAL_LINK_TEXT, "Visualizations"
+        )
         menu.click()
-        menu_item = self.browser.find_element_by_link_text("New Network")
+        menu_item = self.browser.find_element(By.LINK_TEXT, "New Network")
         menu_item.click()
         self.assertIn("Create a New Citation Network", self.browser.title)
 
@@ -49,13 +52,15 @@ class VisualizationCrudTests(BaseSeleniumTest):
         self.assert_text_in_node("Second Case", "body")
 
         # For the First Case, she starts typing 'Marsh'
-        first_case = self.browser.find_element_by_id(
-            "starting-cluster-typeahead"
+        first_case = self.browser.find_element(
+            By.ID, "starting-cluster-typeahead"
         )
 
-        type_ahead = self.browser.find_element_by_css_selector(".tt-dataset-0")
+        type_ahead = self.browser.find_element(
+            By.CSS_SELECTOR, ".tt-dataset-0"
+        )
         first_case.send_keys("Marsh")
-        suggestion = type_ahead.find_element_by_css_selector(".tt-suggestion")
+        suggestion = type_ahead.find_element(By.CSS_SELECTOR, ".tt-suggestion")
         # She notices a drop down from the type-ahead search!
         suggestion_text = suggestion.text
         self.assertIn("Marsh v. Chambers", suggestion_text)
@@ -64,31 +69,33 @@ class VisualizationCrudTests(BaseSeleniumTest):
         suggestion.click()
 
         # And the new case name is now in the input!
-        first_case = self.browser.find_element_by_id(
-            "starting-cluster-typeahead"
+        first_case = self.browser.find_element(
+            By.ID, "starting-cluster-typeahead"
         )
         v = first_case.get_attribute("value")
         self.assertIn(suggestion_text, v)
 
         # For the Second Case, she starts typing 'Cutter'
-        second_case = self.browser.find_element_by_id(
-            "ending-cluster-typeahead-search"
+        second_case = self.browser.find_element(
+            By.ID, "ending-cluster-typeahead-search"
         )
-        type_ahead = self.browser.find_element_by_css_selector(".tt-dataset-1")
+        type_ahead = self.browser.find_element(
+            By.CSS_SELECTOR, ".tt-dataset-1"
+        )
         second_case.send_keys("Cutter")
-        suggestion = type_ahead.find_element_by_css_selector(".tt-suggestion")
+        suggestion = type_ahead.find_element(By.CSS_SELECTOR, ".tt-suggestion")
 
         # In the new type-ahead, selects the Jon B. Cutter case
         suggestion_text = suggestion.text
         self.assertIn("JON B. CUTTER", suggestion_text)
         suggestion.click()
-        second_case = self.browser.find_element_by_id(
-            "ending-cluster-typeahead-search"
+        second_case = self.browser.find_element(
+            By.ID, "ending-cluster-typeahead-search"
         )
         self.assertIn(suggestion_text, second_case.get_attribute("value"))
 
         # She notices a "More Options" button and, why not, she clicks it
-        more = self.browser.find_element_by_id("more")
+        more = self.browser.find_element(By.ID, "more")
         self.assertIn("More Options", more.text)
 
         self.assert_text_not_in_node("Title", "body")
@@ -97,15 +104,15 @@ class VisualizationCrudTests(BaseSeleniumTest):
 
         # Wow, looks like she can enter a Title and Description
         self.assert_text_in_node("Title", "body")
-        title = self.browser.find_element_by_id("id_title")
+        title = self.browser.find_element(By.ID, "id_title")
         title.send_keys("Selenium Test Visualization")
 
         self.assert_text_in_node("Description", "body")
-        description = self.browser.find_element_by_id("id_notes")
+        description = self.browser.find_element(By.ID, "id_notes")
         description.send_keys("Test description.\n#FreeKe$ha")
 
         # She clicks Make this Network when she's done
-        self.browser.find_element_by_id("make-viz-button").click()
+        self.browser.find_element(By.ID, "make-viz-button").click()
 
         # And she's brought to the new Visualization she just created!
         self.assertIn("Network Graph of Selenium", self.browser.title)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -22,23 +22,23 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='description',
-            field=models.TextField(help_text=b'The short description of the docket entry that appears on the attachments page.', blank=True),
+            field=models.TextField(help_text='The short description of the docket entry that appears on the attachments page.', blank=True),
         ),
         migrations.AlterField(
             model_name='docketentry',
             name='description',
-            field=models.TextField(help_text=b'The text content of the docket entry that appears in the PACER docket page.', blank=True),
+            field=models.TextField(help_text='The text content of the docket entry that appears in the PACER docket page.', blank=True),
         ),
         migrations.AlterField(
             model_name='docketentry',
             name='docket',
-            field=models.ForeignKey(related_name='docket_entries', to='search.Docket', help_text=b'Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to.',
+            field=models.ForeignKey(related_name='docket_entries', to='search.Docket', help_text='Foreign key as a relation to the corresponding Docket object. Specifies which docket the docket entry belongs to.',
                                     on_delete=models.CASCADE),
         ),
         migrations.AlterField(
             model_name='recapdocument',
             name='docket_entry',
-            field=models.ForeignKey(related_name='recap_documents', to='search.DocketEntry', help_text=b'Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)',
+            field=models.ForeignKey(related_name='recap_documents', to='search.DocketEntry', help_text='Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)',
                                     on_delete=models.CASCADE),
         ),
     ]

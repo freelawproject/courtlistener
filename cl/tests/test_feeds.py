@@ -8,6 +8,7 @@ import feedparser
 from django.conf import settings
 from django.urls import reverse
 from django.test.utils import override_settings
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.storage import IncrementingFileSystemStorage
@@ -51,7 +52,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
     def test_can_get_to_feeds_from_homepage(self):
         """Can we get to the feeds/podcasts page from the homepage?"""
         self.browser.get(self.live_server_url)
-        link = self.browser.find_element_by_link_text("Feeds")
+        link = self.browser.find_element(By.LINK_TEXT, "Feeds")
         link.click()
 
         self.assertIn("Feeds", self.browser.title)
@@ -60,7 +61,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         # Podcasts
         self.browser.get(self.live_server_url)
-        link = self.browser.find_element_by_link_text("Podcasts")
+        link = self.browser.find_element(By.LINK_TEXT, "Podcasts")
         link.click()
 
         self.assertIn("Podcasts", self.browser.title)
@@ -79,20 +80,20 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_node("Jurisdiction Feeds for Opinions", "body")
 
         for court in courts:
-            link = self.browser.find_element_by_link_text(court.full_name)
-            print "Testing link to %s..." % court.full_name,
+            link = self.browser.find_element(By.LINK_TEXT, court.full_name)
+            print("Testing link to %s..." % court.full_name, end=" ")
             self.assertEqual(
                 link.get_attribute("href"),
                 "%s/feed/court/%s/" % (self.live_server_url, court.pk),
             )
             link.click()
-            print "clicked...",
+            print("clicked...", end=" ")
             self.assertIn(
                 'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
                 self.browser.page_source,
             )
             self.browser.back()
-            print "✓"
+            print("✓")
 
     def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
         """
@@ -102,7 +103,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             "%s%s" % (self.live_server_url, reverse("all_jurisdictions_feed"))
         )
         self.assertEqual(
-            u"CourtListener.com: All Opinions (High Volume)", f.feed.title
+            "CourtListener.com: All Opinions (High Volume)", f.feed.title
         )
         # Per https://pythonhosted.org/feedparser/bozo.html
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
@@ -117,7 +118,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         )
         f = feedparser.parse(url)
         self.assertEqual(
-            u"CourtListener.com: All opinions for the Testing Supreme Court",
+            "CourtListener.com: All opinions for the Testing Supreme Court",
             f.feed.title,
         )
         # Per https://pythonhosted.org/feedparser/bozo.html
@@ -135,7 +136,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
                 self.assertTrue(len(entry.enclosures[0].type) > 0)
-                self.assertTrue(entry.enclosures[0].length > 1)
+                self.assertTrue(int(entry.enclosures[0].length) > 1)
                 r = self.client.get(entry.enclosures[0].href, follow=True)
                 self.assertEqual(
                     r.status_code,
@@ -172,19 +173,19 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
         # Dora goes to CL and searches for Bonvini
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id("id_q").send_keys("bonvini")
-        self.browser.find_element_by_id("id_q").submit()
+        self.browser.find_element(By.ID, "id_q").send_keys("bonvini")
+        self.browser.find_element(By.ID, "id_q").submit()
 
         # She's brought to the SERP.
         self.assertIn("Search Results", self.browser.title)
-        articles = self.browser.find_elements_by_tag_name("article")
-        link_titles = [a.find_element_by_tag_name("a").text for a in articles]
+        articles = self.browser.find_elements(By.TAG_NAME, "article")
+        link_titles = [a.find_element(By.TAG_NAME, "a").text for a in articles]
 
         # Seeing the results, she wants to keep tabs on any new Opinions that
         # come into CL related to her Search. She notices a little RSS icon
         # and decides to click it
-        result_count = self.browser.find_element_by_id("result-count")
-        rss_link = result_count.find_element_by_tag_name("a")
+        result_count = self.browser.find_element(By.ID, "result-count")
+        rss_link = result_count.find_element(By.TAG_NAME, "a")
 
         with self.wait_for_page_load(timeout=10):
             rss_link.click()
@@ -197,7 +198,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         # The RSS Reader validates the feed and Dora is thrilled! The same
         # first page of results are there!
-        xml = self.browser.find_element_by_tag_name("pre").text
+        xml = self.browser.find_element(By.TAG_NAME, "pre").text
         f = feedparser.parse(xml)
         self.assertEqual(len(link_titles), len(f.entries))
 

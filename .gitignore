@@ -1,3 +1,6 @@
+.venv
+*.egg-info
+
 # no compiled files!
 *.class
 *.pyc
@@ -38,3 +41,5 @@ cl/settings/google_auth.json
 
 
 cl/assets/media/lasc-data/*/
+
+cl/node_modules

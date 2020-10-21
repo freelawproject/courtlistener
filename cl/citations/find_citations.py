@@ -127,7 +127,7 @@ def get_court_by_paren(paren_string, citation):
         court_str = strip_punct(paren_string[:year_index])
 
     court_code = None
-    if court_str == u"":
+    if court_str == "":
         court_code = None
     else:
         # Map the string to a court, if possible.
@@ -175,10 +175,10 @@ def add_post_citation(citation, words):
     # either the end of the words list or to FORWARD_SEEK tokens from where you
     # started.
     fwd_sk = citation.reporter_index + FORWARD_SEEK
-    for start in xrange(citation.reporter_index + 2, min(fwd_sk, len(words))):
+    for start in range(citation.reporter_index + 2, min(fwd_sk, len(words))):
         if words[start].startswith("("):
             # Get the year by looking for a token that ends in a paren.
-            for end in xrange(start, start + FORWARD_SEEK):
+            for end in range(start, start + FORWARD_SEEK):
                 try:
                     has_ending_paren = words[end].find(")") > -1
                 except IndexError:
@@ -191,14 +191,14 @@ def add_post_citation(citation, words):
                     else:
                         citation.year = get_year(words[end])
                     citation.court = get_court_by_paren(
-                        u" ".join(words[start : end + 1]), citation
+                        " ".join(words[start : end + 1]), citation
                     )
                     break
 
             if start > citation.reporter_index + 2:
                 # Then there's content between page and (), starting with a
                 # comma, which we skip
-                citation.extra = u" ".join(
+                citation.extra = " ".join(
                     words[citation.reporter_index + 2 : start]
                 )
             break
@@ -211,7 +211,7 @@ def add_defendant(citation, words):
     """
     start_index = None
     back_seek = citation.reporter_index - BACKWARD_SEEK
-    for index in xrange(citation.reporter_index - 1, max(back_seek, 0), -1):
+    for index in range(citation.reporter_index - 1, max(back_seek, 0), -1):
         word = words[index]
         if word == ",":
             # Skip it
@@ -225,7 +225,7 @@ def add_defendant(citation, words):
             # String citation
             break
     if start_index:
-        citation.defendant = u" ".join(
+        citation.defendant = " ".join(
             words[start_index : citation.reporter_index - 1]
         )
 
@@ -274,12 +274,7 @@ def extract_full_citation(words, reporter_index):
     # Handle tax citations
     is_tax_citation = is_neutral_tc_reporter(reporter)
     if is_tax_citation:
-        volume, page = (
-            words[reporter_index + 1]
-            .encode("utf-8")
-            .replace("–", "-")
-            .split("-")
-        )
+        volume, page = words[reporter_index + 1].replace("–", "-").split("-")
 
     # Handle "normal" citations, e.g., XX F.2d YY
     else:
@@ -407,7 +402,7 @@ def extract_id_citation(words, id_index):
 
     # List of literals that could come after an id token
     ID_REFERENCE_TOKEN_LITERALS = set(
-        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", u"¶", u"¶¶"]
+        ["at", "p.", "p", "pp.", "p", "@", "pg", "pg.", "¶", "¶¶"]
     )
 
     # Helper function to see whether a token qualifies as a page candidate
@@ -614,7 +609,7 @@ def remove_address_citations(citations):
             good_citations.append(citation)
             continue
 
-        if not isinstance(citation.page, basestring):
+        if not isinstance(citation.page, str):
             good_citations.append(citation)
             continue
 
@@ -651,13 +646,15 @@ def get_citations(
     words = reporter_tokenizer.tokenize(text)
     citations = []
 
-    for i in xrange(0, len(words) - 1):
+    for i in range(0, len(words) - 1):
         citation_token = words[i]
 
         # CASE 1: Citation token is a reporter (e.g., "U. S.").
         # In this case, first try extracting it as a standard, full citation,
         # and if that fails try extracting it as a short form citation.
-        if citation_token in (EDITIONS.keys() + VARIATIONS_ONLY.keys()):
+        if citation_token in list(EDITIONS.keys()) + list(
+            VARIATIONS_ONLY.keys()
+        ):
             citation = extract_full_citation(words, i)
             if citation:
                 # CASE 1A: Standard citation found, try to add additional data
@@ -693,7 +690,7 @@ def get_citations(
         # In this case, it's likely that this is a reference to a non-
         # opinion document. So we record this marker in order to keep
         # an accurate list of the possible antecedents for id citations.
-        elif u"§" in citation_token:
+        elif "§" in citation_token:
             citation = NonopinionCitation(match_token=citation_token)
 
         # CASE 5: The token is not a citation.

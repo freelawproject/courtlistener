@@ -248,19 +248,19 @@ class SearchResultSerializer(serializers.Serializer):
         raise NotImplementedError
 
     solr_field_mappings = {
-        u"boolean": serializers.BooleanField,
-        u"string": serializers.CharField,
-        u"text_en_splitting_cl": serializers.CharField,
-        u"text_no_word_parts": serializers.CharField,
-        u"date": serializers.DateTimeField,
+        "boolean": serializers.BooleanField,
+        "string": serializers.CharField,
+        "text_en_splitting_cl": serializers.CharField,
+        "text_no_word_parts": serializers.CharField,
+        "date": serializers.DateTimeField,
         # Numbers
-        u"int": serializers.IntegerField,
-        u"tint": serializers.IntegerField,
-        u"long": serializers.IntegerField,
+        "int": serializers.IntegerField,
+        "tint": serializers.IntegerField,
+        "long": serializers.IntegerField,
         # schema.SolrFloatField: serializers.FloatField,
         # schema.SolrDoubleField: serializers.IntegerField,
         # Other
-        u"pagerank": serializers.CharField,
+        "pagerank": serializers.CharField,
     }
     skipped_fields = ["_version_", "django_ct", "django_id", "text"]
 
@@ -276,8 +276,8 @@ class SearchResultSerializer(serializers.Serializer):
             if field.get("multiValued"):
                 drf_field = serializers.ListField
             else:
-                drf_field = self.solr_field_mappings[field[u"type"]]
-            fields[field[u"name"]] = drf_field(read_only=True)
+                drf_field = self.solr_field_mappings[field["type"]]
+            fields[field["name"]] = drf_field(read_only=True)
 
         for field in self.skipped_fields:
             if field in fields:

@@ -357,11 +357,12 @@ REST_FRAMEWORK = {
     ),
     # Filtering
     "DEFAULT_FILTER_BACKENDS": (
-        # This is a tweaked version of DjangoFilterBackend
+        # This is a tweaked version of RestFrameworkFilterBackend
         "cl.api.utils.DisabledHTMLFilterBackend",
         "rest_framework.filters.OrderingFilter",
     ),
     # Assorted & Sundry
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "URL_FIELD_NAME": "resource_uri",
     "DEFAULT_METADATA_CLASS": "cl.api.utils.SimpleMetadataWithFilters",
@@ -515,7 +516,7 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
             "filename": "/var/log/courtlistener/django.log",
-            "maxBytes": "16777216",  # 16 megabytes
+            "maxBytes": 16777216,  # 16 megabytes
             "formatter": "verbose",
             "filters": ["skip_unreadable_posts"],
         },

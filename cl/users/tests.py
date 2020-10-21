@@ -8,6 +8,7 @@ from django.test import LiveServerTestCase, Client, TestCase
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -87,7 +88,7 @@ class UserTest(LiveServerTestCase):
             if is_evil:
                 self.assertNotIn(
                     next_param,
-                    response.content.decode("utf-8"),
+                    response.content.decode(),
                     msg="'%s' found in HTML of response. This suggests it was "
                     "not cleaned by the sanitize_redirection function."
                     % next_param,
@@ -95,7 +96,7 @@ class UserTest(LiveServerTestCase):
             else:
                 self.assertIn(
                     next_param,
-                    response.content.decode("utf-8"),
+                    response.content.decode(),
                     msg="'%s' not found in HTML of response. This suggests it "
                     "was sanitized when it should not have been." % next_param,
                 )
@@ -132,7 +133,7 @@ class UserTest(LiveServerTestCase):
         )
         self.assertIn(
             "has been confirmed",
-            r.content,
+            r.content.decode(),
             msg="Test string not found in response.content",
         )
 
@@ -154,7 +155,7 @@ class UserTest(LiveServerTestCase):
         )
         self.assertIn(
             "has been confirmed",
-            r.content,
+            r.content.decode(),
             msg="Test string not found in response.content",
         )
         self.assertEqual(
@@ -198,7 +199,8 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content
+            "%s is a blocked email provider" % self.bad_domain,
+            r.content.decode(),
         )
 
     def test_can_i_change_to_bad_email_address(self):
@@ -212,7 +214,8 @@ class DisposableEmailTest(TestCase):
             follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain, r.content
+            "%s is a blocked email provider" % self.bad_domain,
+            r.content.decode(),
         )
 
 
@@ -231,7 +234,7 @@ class LiveUserTest(BaseSeleniumTest):
                 host=self.live_server_url, path=reverse("password_reset")
             )
         )
-        email_input = self.browser.find_element_by_name("email")
+        email_input = self.browser.find_element(By.NAME, "email")
         email_input.send_keys("pandora@courtlistener.com")
         email_input.submit()
 
@@ -256,7 +259,7 @@ class LiveUserTest(BaseSeleniumTest):
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(str(up.user.pk)),
+                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
                     "token": token,
                 },
             ),
@@ -267,9 +270,9 @@ class LiveUserTest(BaseSeleniumTest):
         self.assertIn("Enter New Password", self.browser.page_source)
 
         # Next, change the user's password and submit the form.
-        pwd1 = self.browser.find_element_by_name("new_password1")
+        pwd1 = self.browser.find_element(By.NAME, "new_password1")
         pwd1.send_keys("password")
-        pwd2 = self.browser.find_element_by_name("new_password2")
+        pwd2 = self.browser.find_element(By.NAME, "new_password2")
         pwd2.send_keys("password")
         pwd2.submit()
 

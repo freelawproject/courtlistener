@@ -1,7 +1,8 @@
 # coding=utf-8
-from __future__ import absolute_import
+
 import os
 import sys
+
 from celery import Celery
 
 # set the default Django settings module for the 'celery' program.

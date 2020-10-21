@@ -127,7 +127,7 @@ class AbstractFile(models.Model):
     @property
     def file_contents(self):
         with open(self.filepath.path, "r") as f:
-            return f.read().decode("utf-8")
+            return f.read().decode()
 
     def print_file_contents(self):
         print(self.file_contents)
