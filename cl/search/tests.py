@@ -1552,9 +1552,3 @@ class CaptionTest(TestCase):
         # Now sort the messed up list, and check if it worked.
         cs_sorted = sorted(cs_shuffled, key=sort_cites)
         self.assertEqual(cs, cs_sorted)
-
-
-class CaptionTest(BaseSeleniumTest):
-    def test_again(self):
-        self.browser.get(self.live_server_url)
-        self.browser.get("https://www.daringfireball.net")
