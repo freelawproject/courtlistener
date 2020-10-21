@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='originatingcourtinformation',
             name='docket_number',
-            field=models.TextField(help_text=b'The docket number in the lower court.', blank=True),
+            field=models.TextField(help_text='The docket number in the lower court.', blank=True),
         ),
     ]

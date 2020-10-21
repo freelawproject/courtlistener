@@ -1,16 +1,16 @@
 import mimetypes
 import os
-import traceback
-from urlparse import urljoin
-
-import requests
 import sys
+import traceback
+from urllib.parse import urljoin
+
+import magic
+import requests
 from django.conf import settings
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 
-from cl.lib import magic
 from cl.lib.celery_utils import CeleryThrottle
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
@@ -47,9 +47,7 @@ def follow_redirections(r, s):
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info(
-            "Following a meta redirection to: %s" % url.encode("utf-8")
-        )
+        logger.info("Following a meta redirection to: %s" % url.encode())
         r = follow_redirections(s.get(url), s)
     return r
 
@@ -65,6 +63,8 @@ def get_extension(content):
         mime = "application/vnd.wordperfect"
     elif file_str == "C source, ASCII text":
         mime = "text/plain"
+    elif file_str.startswith("WordPerfect document"):
+        mime = "application/vnd.wordperfect"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)

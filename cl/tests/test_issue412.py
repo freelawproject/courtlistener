@@ -4,6 +4,7 @@ Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
 from django.urls import reverse
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
@@ -40,7 +41,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # She notices a widget letting her know it's blocked by search engines
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertIn(BLOCKED_MSG, sidebar.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -57,7 +58,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # She does NOT see a widget telling her the page is blocked
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -74,7 +75,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # She does NOT see a widget telling her the page is blocked
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
 
@@ -122,8 +123,8 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # And does not see a badge indicating that it's blocked.
-        btns = self.browser.find_elements_by_css_selector(
-            ".content .btn.btn-danger"
+        btns = self.browser.find_elements(
+            By.CSS_SELECTOR, ".content .btn.btn-danger"
         )
         expected_btn_count = 1
         actual_btn_count = len(btns)
@@ -149,7 +150,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         )
 
         # And does not see a badge that lets her know it's blocked
-        btn = self.browser.find_element_by_css_selector(".btn.btn-success")
+        btn = self.browser.find_element(By.CSS_SELECTOR, ".btn.btn-success")
         self.assertNotIn(BLOCKED_MSG, btn.text)
 
 
@@ -175,21 +176,21 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in("admin", "password")
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser.find_element_by_css_selector("#navbar-oa a").click()
+        self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.submit()
 
         # The SERP updates and she selects the one she knows is blocked
-        blocked_argument = self.browser.find_element_by_link_text(
-            "Blocked Oral Argument (Test 2015)"
+        blocked_argument = self.browser.find_element(
+            By.LINK_TEXT, "Blocked Oral Argument (Test 2015)"
         )
         blocked_argument.click()
 
         # She notices a widget letting her know it's blocked by search engines
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertIn(BLOCKED_MSG, sidebar.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -200,18 +201,18 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in("pandora", "password")
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser.find_element_by_css_selector("#navbar-oa a").click()
+        self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.submit()
 
         # The SERP updates and she selects the one she knows is blocked
         self.click_link_for_new_page("Blocked Oral Argument (Test 2015)")
 
         # She notices a widget letting her know it's blocked by search engines
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -222,19 +223,19 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.attempt_sign_in("admin", "password")
 
         # She selects Oral Arguments to toggle the results to audio
-        self.browser.find_element_by_css_selector("#navbar-oa a").click()
+        self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.submit()
 
         # The SERP updates and she selects the one she knows is blocked
-        blocked_argument = self.browser.find_element_by_link_text(
-            "Not Blocked Oral Argument (Test 2015)"
+        blocked_argument = self.browser.find_element(
+            By.LINK_TEXT, "Not Blocked Oral Argument (Test 2015)"
         )
         blocked_argument.click()
 
         # She notices a widget letting her know it's blocked by search engines
-        sidebar = self.browser.find_element_by_id("sidebar")
+        sidebar = self.browser.find_element(By.ID, "sidebar")
         self.assertNotIn(BLOCKED_MSG, sidebar.text)

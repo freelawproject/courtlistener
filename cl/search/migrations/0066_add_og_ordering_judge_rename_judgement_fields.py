@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -25,12 +25,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='originatingcourtinformation',
             name='ordering_judge',
-            field=models.ForeignKey(related_name='+', blank=True, to='people_db.Person', help_text=b'The judge that issued the final order in the case.', null=True,
+            field=models.ForeignKey(related_name='+', blank=True, to='people_db.Person', help_text='The judge that issued the final order in the case.', null=True,
                                     on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='originatingcourtinformation',
             name='ordering_judge_str',
-            field=models.TextField(help_text=b'The judge that issued the final order in the case, as a string.', blank=True),
+            field=models.TextField(help_text='The judge that issued the final order in the case, as a string.', blank=True),
         ),
     ]

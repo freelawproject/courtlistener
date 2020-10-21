@@ -5,7 +5,7 @@ from juriscraper.lib.string_utils import trunc
 from lxml import html
 from requests.exceptions import HTTPError, MissingSchema, TooManyRedirects
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.visualizations.models import Referer
 from cl.visualizations.utils import emails
 from cl.visualizations.network_utils import new_title_for_viz

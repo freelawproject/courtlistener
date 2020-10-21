@@ -41,7 +41,7 @@ class ViewDocumentTest(TestCase):
         """Does the page load properly?"""
         response = self.client.get("/opinion/1/asdf/")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("33 state 1", response.content)
+        self.assertIn("33 state 1", response.content.decode())
 
 
 class CitationRedirectorTest(TestCase):
@@ -168,7 +168,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "blah", "court_id": "blah"},
         )
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
-        self.assertIn("Refresh this Page", r.content)
+        self.assertIn("Refresh this Page", r.content.decode())
 
     def test_all_systems_go(self):
         """Does everything work with good parameters and good data?"""
@@ -177,7 +177,7 @@ class NewDocketAlertTest(TestCase):
             data={"pacer_case_id": "666666", "court_id": "test"},
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
-        self.assertInHTML("Get Docket Alerts", r.content)
+        self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
 @override_settings(
@@ -203,7 +203,7 @@ class OpinionSitemapTest(SitemapTest):
         params["fq"] = ["court_exact:%s" % self.court_id]
 
         r = conn.query().add_extra(**params).execute()
-
+        conn.conn.http_connection.close()
         # the underlying SitemapTest relies on counting url elements in the xml
         # response...this logic mimics the creation of the xml, so we at least
         # know what we *should* get getting for a count if the SiteMapTest's
@@ -247,7 +247,7 @@ class UploadPublication(TestCase):
             content_type="application/pdf",
         )
         self.png = SimpleUploadedFile(
-            "file.png", "file_content", content_type="image/png"
+            b"file.png", b"file_content", content_type="image/png"
         )
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
@@ -328,7 +328,7 @@ class UploadPublication(TestCase):
         self.assertEqual(
             form.errors["pdf_upload"],
             [
-                "File extension 'png' is not allowed. Allowed extensions are: 'pdf'."
+                "File extension 'b'png'' is not allowed. Allowed extensions are: 'pdf'."
             ],
         )
 
@@ -393,10 +393,10 @@ class UploadPublication(TestCase):
             court_id="tennworkcompcl",
             pacer_case_id=None,
             docket_number="1234123",
-            case_name=u"One v. Two",
+            case_name="One v. Two",
         )
         oc = OpinionCluster.objects.create(
-            case_name=u"One v. Two",
+            case_name="One v. Two",
             docket=d,
             date_filed=datetime.date(2010, 1, 1),
         )
@@ -418,5 +418,5 @@ class UploadPublication(TestCase):
             form2.save()
 
         self.assertIn(
-            u"Document already in database", form2.errors["pdf_upload"][0]
+            "Document already in database", form2.errors["pdf_upload"][0]
         )

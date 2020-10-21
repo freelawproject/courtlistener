@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import force_str
 
 
 class Stat(models.Model):
@@ -8,8 +8,8 @@ class Stat(models.Model):
     date_logged = models.DateField(db_index=True)
     count = models.IntegerField()
 
-    def __unicode__(self):
-        return smart_unicode(
+    def __str__(self):
+        return force_str(
             "%s: %s on %s: %s"
             % (self.pk, self.name, self.date_logged, self.count)
         )
@@ -34,5 +34,5 @@ class Event(models.Model):
         blank=True,
     )
 
-    def __unicode__(self):
+    def __str__(self):
         return "%s: Event Object" % self.pk

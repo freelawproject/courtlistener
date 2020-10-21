@@ -66,6 +66,8 @@ def remove_duplicate_citations_by_regex(citations):
     citation's generated regex. Because each citation's regex matches every
     instance of that citation in an opinion, we do not need to redundantly
     match multiple citations with the same regexes."""
-    return {
-        hash(citation.as_regex()): citation for citation in citations
-    }.values()
+    return list(
+        {
+            hash(citation.as_regex()): citation for citation in citations
+        }.values()
+    )

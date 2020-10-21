@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='parties',
-            field=models.ManyToManyField(help_text=b'The parties involved in the docket', related_name='dockets', through='people_db.PartyType', to='people_db.Party', blank=True),
+            field=models.ManyToManyField(help_text='The parties involved in the docket', related_name='dockets', through='people_db.PartyType', to='people_db.Party', blank=True),
         ),
     ]

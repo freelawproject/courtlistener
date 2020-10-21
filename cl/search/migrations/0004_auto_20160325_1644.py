@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='source',
-            field=models.SmallIntegerField(help_text=b'contains the source of the Docket.', choices=[(0, b'Default'), (1, b'RECAP'), (2, b'Scraper')]),
+            field=models.SmallIntegerField(help_text='contains the source of the Docket.', choices=[(0, 'Default'), (1, 'RECAP'), (2, 'Scraper')]),
         ),
     ]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinion',
             name='per_curiam',
-            field=models.BooleanField(default=False, help_text=b'Is this opinion per curiam, without a single author?'),
+            field=models.BooleanField(default=False, help_text='Is this opinion per curiam, without a single author?'),
         ),
     ]

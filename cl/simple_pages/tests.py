@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function
+
 
 import datetime
 import os
@@ -45,7 +45,7 @@ class ContactTest(TestCase):
         # resolved, we should not see anything about the previously logged-in
         # user, pandora.
         r = self.client.get(reverse("contact"))
-        self.assertNotIn("pandora", r.content)
+        self.assertNotIn("pandora", r.content.decode())
 
     def test_contact_logged_in(self):
         """Can we use the contact form to send a message when logged in?"""
@@ -167,7 +167,7 @@ class StaticFilesTest(TestCase):
     def setUp(self):
         self.court = Court.objects.get(pk="test")
         self.docket = Docket(
-            case_name=u"Docket", court=self.court, source=Docket.DEFAULT
+            case_name="Docket", court=self.court, source=Docket.DEFAULT
         )
         self.docket.save()
 
@@ -182,7 +182,7 @@ class StaticFilesTest(TestCase):
         self.audio.save(index=False)
 
         self.opinioncluster = OpinionCluster(
-            case_name=u"Hotline Bling",
+            case_name="Hotline Bling",
             docket=self.docket,
             date_filed=datetime.date(2015, 12, 14),
         )
@@ -216,7 +216,9 @@ class StaticFilesTest(TestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response["Content-Type"], "text/plain")
         self.assertIn("inline;", response["Content-Disposition"])
-        self.assertIn("FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content)
+        self.assertIn(
+            "FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content.decode()
+        )
 
     def test_serve_static_file_serves_pdf(self):
         request = HttpRequest()

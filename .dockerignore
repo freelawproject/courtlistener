@@ -5,6 +5,9 @@
 !requirements*.txt
 !.circleci
 !cl
+!poetry.lock
+!pyproject.toml
 
 # But no matter what, ignore these things.
 */assets/media*
+*/node_modules

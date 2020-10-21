@@ -167,7 +167,7 @@ class TennWorkersForm(forms.Form):
         label="Cite Year",
         required=True,
         widget=forms.Select(
-            choices=[(x, x) for x in xrange(datetime.now().year, 2013, -1)],
+            choices=[(x, x) for x in range(datetime.now().year, 2013, -1)],
             attrs={"class": "form-control"},
         ),
     )

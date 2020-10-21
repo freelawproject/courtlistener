@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -25,16 +25,16 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='date_retirement',
-            field=models.DateField(help_text=b'The date when they become a senior judge by going into active retirement', null=True, db_index=True, blank=True),
+            field=models.DateField(help_text='The date when they become a senior judge by going into active retirement', null=True, db_index=True, blank=True),
         ),
         migrations.AlterField(
             model_name='position',
             name='date_termination',
-            field=models.DateField(help_text=b'The last date of their employment. The compliment to date_start', null=True, db_index=True, blank=True),
+            field=models.DateField(help_text='The last date of their employment. The compliment to date_start', null=True, db_index=True, blank=True),
         ),
         migrations.AlterField(
             model_name='position',
             name='organization_name',
-            field=models.CharField(help_text=b"If org isn't court or school, type here.", max_length=120, null=True, blank=True),
+            field=models.CharField(help_text="If org isn't court or school, type here.", max_length=120, null=True, blank=True),
         ),
     ]

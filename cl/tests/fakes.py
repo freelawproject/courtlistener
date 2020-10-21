@@ -1,6 +1,6 @@
 from datetime import date
 
-from mock import MagicMock
+from unittest.mock import MagicMock
 
 
 DOCKET_NUMBER = "5:18-cr-00227"
@@ -44,7 +44,7 @@ class FakePossibleCaseNumberApi:
 
 
 class FakeAttachmentPage:
-    response = MagicMock(text=u"")
+    response = MagicMock(text="")
     _parse_text = MagicMock()
 
     def __init__(self, *args, **kwargs):

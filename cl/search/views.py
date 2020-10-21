@@ -1,7 +1,7 @@
 import logging
 import traceback
 from datetime import date, datetime, timedelta
-from urllib import quote
+from urllib.parse import quote
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -131,6 +131,7 @@ def do_search(
         try:
             si = get_solr_interface(cd)
         except NotImplementedError:
+            si.conn.http_connection.close()
             logger.error(
                 "Tried getting solr connection for %s, but it's not "
                 "implemented yet",
@@ -154,11 +155,13 @@ def do_search(
                     # Original query
                     cd["q"].replace(related_prefix_match.group("pfx"), ""),
                 )
+                si.conn.http_connection.close()
             else:
                 # Regular search queries
                 results = si.query().add_extra(
                     **build_main_query(cd, facet=facet)
                 )
+                si.conn.http_connection.close()
 
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
@@ -213,7 +216,7 @@ def do_search(
         if related_cluster_pks
         else None
     )
-
+    si.conn.http_connection.close()
     return {
         "results": paged_results,
         "facet_fields": make_stats_variable(search_form, paged_results),

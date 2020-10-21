@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -22,12 +22,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='abarating',
             name='year_rated',
-            field=models.PositiveSmallIntegerField(help_text=b'The year of the rating.', null=True),
+            field=models.PositiveSmallIntegerField(help_text='The year of the rating.', null=True),
         ),
         migrations.AddField(
             model_name='position',
             name='vote_type',
-            field=models.CharField(blank=True, max_length=2, choices=[(b's', b'Senate'), (b'p', b'Partisan Election'), (b'np', b'Non-Partisan Election')]),
+            field=models.CharField(blank=True, max_length=2, choices=[('s', 'Senate'), ('p', 'Partisan Election'), ('np', 'Non-Partisan Election')]),
         ),
         migrations.AddField(
             model_name='position',

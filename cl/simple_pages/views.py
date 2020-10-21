@@ -5,6 +5,7 @@ import os
 import re
 from datetime import timedelta
 
+import magic
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
@@ -20,7 +21,6 @@ from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
-from cl.lib import magic
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_matomo
 from cl.lib.ratelimiter import ratelimiter_slow
@@ -128,7 +128,7 @@ def markdown_help(request):
 def build_court_dicts(courts):
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
-    court_dicts = [{"pk": "all", "short_name": u"All Courts"}]
+    court_dicts = [{"pk": "all", "short_name": "All Courts"}]
     court_dicts.extend(
         [
             {"pk": court.pk, "short_name": court.full_name}
@@ -255,39 +255,39 @@ def contact(
             # begins with three digits, assume it's spam; fake success.
             if re.match("\d{3}", cd["phone_number"]):
                 logger.info("Detected spam message. Not sending email.")
-                return HttpResponseRedirect(reverse(u"contact_thanks"))
+                return HttpResponseRedirect(reverse("contact_thanks"))
 
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
-                subject=u"[CourtListener] Contact: "
-                u"{phone_number}".format(**cd),
-                body=u"Subject: {phone_number}\n"
-                u"From: {name} ({email})\n"
-                u"\n\n{message}\n\n"
-                u"Browser: {browser}".format(
-                    browser=request.META.get(u"HTTP_USER_AGENT", u"Unknown"),
+                subject="[CourtListener] Contact: "
+                "{phone_number}".format(**cd),
+                body="Subject: {phone_number}\n"
+                "From: {name} ({email})\n"
+                "\n\n{message}\n\n"
+                "Browser: {browser}".format(
+                    browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
                     **cd
                 ),
                 to=["info@free.law"],
-                reply_to=[cd.get(u"email", default_from) or default_from],
+                reply_to=[cd.get("email", default_from) or default_from],
             ).send()
-            return HttpResponseRedirect(reverse(u"contact_thanks"))
+            return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
         try:
-            initial[u"email"] = request.user.email
-            initial[u"name"] = request.user.get_full_name()
+            initial["email"] = request.user.email
+            initial["name"] = request.user.get_full_name()
             form = ContactForm(initial=initial)
         except AttributeError:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 
-    template_data.update({u"form": form, u"private": False})
+    template_data.update({"form": form, "private": False})
     return render(request, template_path, template_data)
 
 
 def contact_thanks(request):
-    return render(request, u"contact_thanks.html", {u"private": True})
+    return render(request, "contact_thanks.html", {"private": True})
 
 
 def advanced_search(request):
@@ -299,7 +299,7 @@ def old_terms(request, v):
         request,
         "terms/%s.html" % v,
         {
-            "title": u"Archived Terms of Service and Policies, v%s – CourtListener.com"
+            "title": "Archived Terms of Service and Policies, v%s – CourtListener.com"
             % v,
             "private": True,
         },
@@ -311,7 +311,7 @@ def latest_terms(request):
         request,
         "terms/latest.html",
         {
-            "title": u"Terms of Service and Policies – CourtListener.com",
+            "title": "Terms of Service and Policies – CourtListener.com",
             "private": False,
         },
     )
@@ -387,7 +387,7 @@ def serve_static_file(request, file_path=""):
      - Serve up the file using Apache2's xsendfile
     """
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, file_path.encode("utf-8"))
+    file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
     if file_path.startswith("mp3"):
         item = get_object_or_404(Audio, local_path_mp3=file_path)
         mimetype = "audio/mpeg"
@@ -429,12 +429,13 @@ def serve_static_file(request, file_path=""):
 
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
-        response.content = open(file_loc, "r").read()
+        with open(file_loc, "rb") as f:
+            response.content = f.read()
     else:
         response["X-Sendfile"] = file_loc
     file_name = file_path.split("/")[-1]
-    response[
-        "Content-Disposition"
-    ] = 'inline; filename="%s"' % file_name.encode("utf-8")
+    response["Content-Disposition"] = (
+        'inline; filename="%s"' % file_name.encode()
+    )
     response["Content-Type"] = mimetype
     return response

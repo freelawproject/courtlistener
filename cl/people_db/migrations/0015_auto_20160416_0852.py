@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='politicalaffiliation',
             name='political_party',
-            field=models.CharField(max_length=5, choices=[(b'd', b'Democrat'), (b'r', b'Republican'), (b'i', b'Independent'), (b'g', b'Green'), (b'l', b'Libertarian'), (b'f', b'Federalist'), (b'w', b'Whig'), (b'j', b'Jeffersonian Republican'), (b'u', b'National Union')]),
+            field=models.CharField(max_length=5, choices=[('d', 'Democrat'), ('r', 'Republican'), ('i', 'Independent'), ('g', 'Green'), ('l', 'Libertarian'), ('f', 'Federalist'), ('w', 'Whig'), ('j', 'Jeffersonian Republican'), ('u', 'National Union')]),
         ),
     ]

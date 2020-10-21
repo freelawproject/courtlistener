@@ -21,9 +21,9 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
     :param separator: The separator between the items. Typically a comma.
     :returns s: A string with the items in the list joined together.
     """
-    items = map(force_text, items)
+    items = list(map(force_text, items))
     if autoescape:
-        items = map(conditional_escape, items)
+        items = list(map(conditional_escape, items))
 
     num_items = len(items)
     if num_items == 0:
@@ -135,9 +135,9 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
     len_minute = 60
 
     trunc_s = seconds % len_day % len_hour % len_minute
-    trunc_m = seconds % len_day % len_hour / len_minute
-    trunc_h = seconds % len_day / len_hour
-    trunc_d = seconds / len_day
+    trunc_m = seconds % len_day % len_hour // len_minute
+    trunc_h = seconds % len_day // len_hour
+    trunc_d = seconds // len_day
 
     if as_dict:
         return {

@@ -64,7 +64,7 @@ def make_solr_sitemap(
     params["start"] = (page - 1) * items_per_sitemap
     params["fq"] = ["court_exact:%s" % court]
     results = solr.query().add_extra(**params).execute()
-
+    solr.conn.http_connection.close()
     urls = []
     cl = "https://www.courtlistener.com"
     for result in results:
@@ -111,6 +111,7 @@ def index_sitemap_maker(request):
         response = (
             conn.query().add_extra(**build_court_count_query(group)).execute()
         )
+        conn.conn.http_connection.close()
         court_count_tuples = response.facet_counts.facet_fields["court_exact"]
         for court, count in court_count_tuples:
             num_pages = count / items_per_sitemap + 1

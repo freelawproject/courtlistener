@@ -13,7 +13,7 @@ from cl.favorites.models import UserTag, DocketTag
 class UserTagViewSet(LoggingMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = UserTagSerializer
-    filter_class = UserTagFilter
+    filterset_class = UserTagFilter
     ordering_fields = (
         "date_created",
         "date_modified",

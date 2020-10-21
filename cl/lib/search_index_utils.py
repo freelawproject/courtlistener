@@ -23,7 +23,9 @@ class InvalidDocumentError(Exception):
 
 
 # Used to nuke null and control characters.
-null_map = dict.fromkeys(range(0, 10) + range(11, 13) + range(14, 32))
+null_map = dict.fromkeys(
+    list(range(0, 10)) + list(range(11, 13)) + list(range(14, 32))
+)
 
 
 def normalize_search_dicts(d):
@@ -31,7 +33,7 @@ def normalize_search_dicts(d):
 
     1. Remove any kv from a dictionary if v is None
 
-       This is needed to send dictionaries to Sunburnt or Scorched, instead of
+       This is needed to send dictionaries to Scorched, instead of
        sending objects, and should provide a performance improvement. If you try
        to send None values to integer fields (for example), things break, b/c
        integer fields shouldn't be getting None values. Fair 'nuf.

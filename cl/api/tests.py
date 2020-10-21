@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function
+
 import json
 import shutil
 from datetime import timedelta, date
@@ -51,6 +51,14 @@ class BasicAPIPageTest(TestCase):
 
     def test_api_index(self):
         r = self.client.get(reverse("api_index"))
+        self.assertEqual(r.status_code, 200)
+
+    def test_swagger_interface(self):
+        r = self.client.get(reverse("swagger_schema"))
+        self.assertEqual(r.status_code, 200)
+
+    def test_options_request(self):
+        r = self.client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
     def test_court_index(self):
@@ -298,6 +306,7 @@ class FilteringCountTestCase(object):
 
     # noinspection PyPep8Naming
     def assertCountInResults(self, expected_count):
+        """Do we get the correct number of API results from the endpoint?"""
         print("Path and q are: %s, %s" % (self.path, self.q))
         r = self.client.get(self.path, self.q)
         self.assertLess(r.status_code, 400)  # A valid status code?
@@ -360,7 +369,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.path = reverse("person-list", kwargs={"version": "v3"})
 
         # No results for a bad query
-        self.q["educations__degree_level"] = "XXX"
+        self.q["educations__degree_level"] = "cert"
         self.assertCountInResults(0)
 
         # One result for a good query
@@ -386,13 +395,13 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertCountInResults(1)
 
         # Moving on to titles...bad value, then good.
-        self.q["positions__position_type"] = "XXX"
+        self.q["positions__position_type"] = "act-jud"
         self.assertCountInResults(0)
-        self.q["positions__position_type"] = "c-jud"
+        self.q["positions__position_type"] = "prac"
         self.assertCountInResults(1)
 
         # Political affiliation filtering...bad, then good.
-        self.q["political_affiliations__political_party"] = "XXX"
+        self.q["political_affiliations__political_party"] = "r"
         self.assertCountInResults(0)
         self.q["political_affiliations__political_party"] = "d"
         self.assertCountInResults(2)
@@ -416,7 +425,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Filter by degree
-        self.q["degree_level"] = "XXX"
+        self.q["degree_level"] = "cert"
         self.assertCountInResults(0)
         self.q["degree_level"] = "jd"
         self.assertCountInResults(1)
@@ -432,7 +441,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
         # Filter by title_name
-        self.q["position_type"] = "XXX"
+        self.q["position_type"] = "act-jud"
         self.assertCountInResults(0)
         self.q["position_type"] = "c-jud"
         self.assertCountInResults(1)
@@ -741,8 +750,6 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertCountInResults(1)
 
         # Related filters
-        self.q["court"] = "test-nope"
-        self.assertCountInResults(0)
         self.q["court"] = "test"
         self.assertCountInResults(1)
 
@@ -770,8 +777,6 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertCountInResults(1)
 
         # Related filter
-        self.q["docket__court"] = "test-nope"
-        self.assertCountInResults(0)
         self.q["docket__court"] = "test"
         self.assertCountInResults(1)
 
@@ -913,7 +918,7 @@ class BulkDataTest(TestCase):
 
     def setUp(self):
         docket = Docket(
-            case_name=u"foo",
+            case_name="foo",
             court=Court.objects.get(pk="test"),
             source=Docket.DEFAULT,
         )
@@ -921,7 +926,7 @@ class BulkDataTest(TestCase):
         # Must be more than a year old for all tests to be runnable.
         last_month = now().date() - timedelta(days=400)
         self.doc_cluster = OpinionCluster(
-            case_name=u"foo", docket=docket, date_filed=last_month
+            case_name="foo", docket=docket, date_filed=last_month
         )
         self.doc_cluster.save(index=False)
         opinion = Opinion(cluster=self.doc_cluster, type="Lead Opinion")

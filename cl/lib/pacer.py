@@ -234,7 +234,7 @@ def process_docket_data(d, filepath, report_type):
             "supported. Perhaps you need to add it?" % report_type
         )
     with open(filepath, "r") as f:
-        text = f.read().decode("utf-8")
+        text = f.read()
     report._parse_text(text)
     data = report.data
     if data == {}:
@@ -267,26 +267,26 @@ def normalize_attorney_role(r):
 
     r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.
-    if any([r.startswith(u"bar status"), r.startswith(u"designation")]):
+    if any([r.startswith("bar status"), r.startswith("designation")]):
         return role
 
-    if u"to be noticed" in r:
+    if "to be noticed" in r:
         role["role"] = Role.ATTORNEY_TO_BE_NOTICED
-    elif u"lead attorney" in r:
+    elif "lead attorney" in r:
         role["role"] = Role.ATTORNEY_LEAD
-    elif u"sealed group" in r:
+    elif "sealed group" in r:
         role["role"] = Role.ATTORNEY_IN_SEALED_GROUP
-    elif u"pro hac vice" in r:
+    elif "pro hac vice" in r:
         role["role"] = Role.PRO_HAC_VICE
-    elif u"self- terminated" in r:
+    elif "self- terminated" in r:
         role["role"] = Role.SELF_TERMINATED
-    elif u"terminated" in r:
+    elif "terminated" in r:
         role["role"] = Role.TERMINATED
-    elif u"suspended" in r:
+    elif "suspended" in r:
         role["role"] = Role.SUSPENDED
-    elif u"inactive" in r:
+    elif "inactive" in r:
         role["role"] = Role.INACTIVE
-    elif u"disbarred" in r:
+    elif "disbarred" in r:
         role["role"] = Role.DISBARRED
 
     try:
@@ -440,7 +440,7 @@ def normalize_attorney_contact(c, fallback_name=""):
                 continue
 
         # First line containing an ampersand? These are usually law firm names.
-        if u"&" in line and i == 0:
+        if "&" in line and i == 0:
             fallback_name = line
             continue
 
@@ -488,7 +488,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     }
     try:
         address_info, address_type = usaddress.tag(
-            u", ".join(address_lines), tag_mapping=mapping
+            ", ".join(address_lines), tag_mapping=mapping
         )
     except (usaddress.RepeatedLabelError, UnicodeEncodeError):
         # See https://github.com/datamade/probableparsing/issues/2 for why we

@@ -86,5 +86,14 @@
     },
     "model": "search.tag",
     "pk": 1
+  },
+  {
+    "fields": {
+      "date_created": "2017-09-12T22:50:51.507Z",
+      "name": "test2",
+      "date_modified": "2017-09-12T22:50:51.507Z"
+    },
+    "model": "search.tag",
+    "pk": 2
   }
 ]

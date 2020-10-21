@@ -182,7 +182,9 @@ class StripeTest(TestCase):
         token, r = self.make_a_donation(
             stripe_test_numbers["bad"]["cvc_fail"], amount="25"
         )
-        self.assertIn("Your card's security code is incorrect.", r.content)
+        self.assertIn(
+            "Your card's security code is incorrect.", r.content.decode()
+        )
         self.assertEventPostsCorrectly(token)
 
     def test_making_a_donation_with_a_decimal_value(self):

@@ -8,6 +8,7 @@ from rest_framework.status import (
     HTTP_200_OK,
 )
 from rest_framework.test import APITestCase
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.models import Favorite, DocketTag, UserTag
@@ -52,7 +53,7 @@ class FavoriteTest(TestCase):
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
             self.assertEqual(r.status_code, 200)
-            self.assertIn("It worked", r.content)
+            self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.fave_cluster_params, self.fave_audio_params]:
@@ -63,7 +64,7 @@ class FavoriteTest(TestCase):
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
         self.assertEqual(r.status_code, 200)
-        self.assertIn("It worked", r.content)
+        self.assertIn("It worked", r.content.decode())
         self.client.logout()
 
 
@@ -93,23 +94,23 @@ class UserFavoritesTest(BaseSeleniumTest):
         # Dora needs to do some research, so she fires up CL and performs
         # an initial query on her subject: Lissner
         self.browser.get(self.live_server_url)
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         search_box.send_keys("lissner")
         search_box.submit()
 
         # She looks over the results and sees one in particular possibly of
         # interest so she clicks on the title
-        articles = self.browser.find_elements_by_tag_name("article")
+        articles = self.browser.find_elements(By.TAG_NAME, "article")
         self.assertTrue(len(articles) == 1, "Should have 1 result")
 
-        title_anchor = articles[0].find_elements_by_tag_name("a")[0]
+        title_anchor = articles[0].find_elements(By.TAG_NAME, "a")[0]
         self.assertNotEqual(title_anchor.text.strip(), "")
         title_anchor.click()
 
         # On the detail page she now sees it might be useful later, so she
         # clicks on the little star next to the result result title
-        title = self.browser.find_element_by_css_selector("article h2").text
-        star = self.browser.find_element_by_id("favorites-star")
+        title = self.browser.find_element(By.CSS_SELECTOR, "article h2").text
+        star = self.browser.find_element(By.ID, "favorites-star")
         self.assertEqual(
             star.get_attribute("title").strip(),
             "Save this record as a favorite in your profile",
@@ -117,7 +118,9 @@ class UserFavoritesTest(BaseSeleniumTest):
         star.click()
 
         # Oops! She's not signed in and she sees a prompt telling her as such
-        link = self.browser.find_element_by_css_selector("#modal-logged-out a")
+        link = self.browser.find_element(
+            By.CSS_SELECTOR, "#modal-logged-out a"
+        )
         self.assertIn("Sign In", link.text)
         link.click()
 
@@ -127,19 +130,19 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assert_text_in_node("Password", "body")
 
         # She logs in
-        self.browser.find_element_by_id("username").send_keys("pandora")
-        self.browser.find_element_by_id("password").send_keys("password")
-        self.browser.find_element_by_id("password").submit()
+        self.browser.find_element(By.ID, "username").send_keys("pandora")
+        self.browser.find_element(By.ID, "password").send_keys("password")
+        self.browser.find_element(By.ID, "password").submit()
 
         # And is brought back to that item!
         self.assert_text_in_node(title.strip(), "body")
 
         # Clicking the star now brings up the "Save Favorite" dialog. Nice!
-        star = self.browser.find_element_by_id("favorites-star")
+        star = self.browser.find_element(By.ID, "favorites-star")
         star.click()
 
-        self.browser.find_element_by_id("modal-save-favorite")
-        modal_title = self.browser.find_element_by_id("save-favorite-title")
+        self.browser.find_element(By.ID, "modal-save-favorite")
+        modal_title = self.browser.find_element(By.ID, "save-favorite-title")
         self.assertIn("Save Favorite", modal_title.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -151,20 +154,20 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         search_box.send_keys("lissner")
         search_box.submit()
 
         # Drilling into the result she's interested brings her to the details
         # TODO: Candidate for refactor
-        articles = self.browser.find_elements_by_tag_name("article")
-        title_anchor = articles[0].find_elements_by_tag_name("a")[0]
+        articles = self.browser.find_elements(By.TAG_NAME, "article")
+        title_anchor = articles[0].find_elements(By.TAG_NAME, "a")[0]
         search_title = title_anchor.text.strip()
         self.assertNotEqual(search_title, "")
         title_anchor.click()
 
         # She has used CL before and knows to click the star to favorite it
-        star = self.browser.find_element_by_id("favorites-star")
+        star = self.browser.find_element(By.ID, "favorites-star")
         self.assertEqual(
             star.get_attribute("title").strip(),
             "Save this record as a favorite in your profile",
@@ -177,23 +180,23 @@ class UserFavoritesTest(BaseSeleniumTest):
         # populated with the original title from the search and there's an
         # empty notes field for her to add whatever she wants. She adds a note
         # to help her remember what was interesting about this result.
-        title = self.browser.find_element_by_id("save-favorite-title")
+        title = self.browser.find_element(By.ID, "save-favorite-title")
         self.assertIn("Save Favorite", title.text.strip())
 
-        name_field = self.browser.find_element_by_id(
-            "save-favorite-name-field"
+        name_field = self.browser.find_element(
+            By.ID, "save-favorite-name-field"
         )
         short_title = name_field.get_attribute("value")
         self.assertIn(short_title, search_title)
-        notes = self.browser.find_element_by_id("save-favorite-notes-field")
+        notes = self.browser.find_element(By.ID, "save-favorite-notes-field")
         notes.send_keys("Hey, Dora. Remember something important!")
 
         # She clicks 'Save'
-        self.browser.find_element_by_id("saveFavorite").click()
+        self.browser.find_element(By.ID, "saveFavorite").click()
 
         # She now sees the star is full on yellow implying it's a fave!
         time.sleep(1)  # Selenium is sometimes faster than JS.
-        star = self.browser.find_element_by_id("favorites-star")
+        star = self.browser.find_element(By.ID, "favorites-star")
         self.assertIn("gold", star.get_attribute("class"))
         self.assertNotIn("gray", star.get_attribute("class"))
 
@@ -208,13 +211,13 @@ class UserFavoritesTest(BaseSeleniumTest):
 
         # TODO: Refactor. Same code used in
         #       test_basic_homepage_search_and_signin_and_signout
-        profile_dropdown = self.browser.find_elements_by_css_selector(
-            "a.dropdown-toggle"
+        profile_dropdown = self.browser.find_elements(
+            By.CSS_SELECTOR, "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
-        dropdown_menu = self.browser.find_element_by_css_selector(
-            "ul.dropdown-menu"
+        dropdown_menu = self.browser.find_element(
+            By.CSS_SELECTOR, "ul.dropdown-menu"
         )
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
@@ -226,10 +229,10 @@ class UserFavoritesTest(BaseSeleniumTest):
         # There are columns that show the names and notes of her favorites
         # Along with options to Edit or Delete each favorite!
         self.assertIn("Favorites", self.browser.title)
-        table = self.browser.find_element_by_css_selector(".settings-table")
-        table_header = table.find_element_by_tag_name("thead")
+        table = self.browser.find_element(By.CSS_SELECTOR, ".settings-table")
+        table_header = table.find_element(By.TAG_NAME, "thead")
         # Select the opinions pill
-        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
         [
             self.assertIn(heading, table_header.text)
@@ -237,7 +240,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         ]
 
         already_found = False
-        for tr in table.find_elements_by_tag_name("tr"):
+        for tr in table.find_elements(By.TAG_NAME, "tr"):
             if short_title in tr.text:
                 if already_found:
                     self.fail("Title appears twice!")
@@ -260,30 +263,30 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
-        profile_dropdown = self.browser.find_elements_by_css_selector(
-            "a.dropdown-toggle"
+        profile_dropdown = self.browser.find_elements(
+            By.CSS_SELECTOR, "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
-        dropdown_menu = self.browser.find_element_by_css_selector(
-            "ul.dropdown-menu"
+        dropdown_menu = self.browser.find_element(
+            By.CSS_SELECTOR, "ul.dropdown-menu"
         )
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
         profile_dropdown.click()
 
-        favorites = self.browser.find_element_by_link_text("Favorites")
+        favorites = self.browser.find_element(By.LINK_TEXT, "Favorites")
         favorites.click()
 
         # She sees an edit link next to one of them and clicks it
         self.assertIn("Favorites", self.browser.title)
         # Select the opinions pill
-        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
         self.assert_text_in_node(
             "Totes my Notes 2", "body"
         )  # in favorites.json
-        edit_link = self.browser.find_element_by_link_text("Edit / Delete")
+        edit_link = self.browser.find_element(By.LINK_TEXT, "Edit / Delete")
         edit_link.click()
 
         # Greeted with an "Edit This Favorite" dialog, she fixes a typo in
@@ -307,7 +310,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         notes.send_keys("Modified Notes")
 
         # She clicks Save
-        button = modal.find_element_by_id("saveFavorite")
+        button = modal.find_element(By.ID, "saveFavorite")
         self.assertIn("Save", button.text)
         button.click()
 
@@ -322,7 +325,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # Skeptical, she hits refresh to be sure
         self.browser.refresh()
         # Select the opinions pill
-        opinions_pill = self.browser.find_element_by_link_text("Opinions 1")
+        opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
         self.assert_text_in_node("Renamed Favorite", "body")
         self.assert_text_in_node("Modified Notes", "body")

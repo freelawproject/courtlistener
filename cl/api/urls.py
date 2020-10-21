@@ -2,6 +2,7 @@ from django.conf.urls import url, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
+from rest_framework.renderers import JSONOpenAPIRenderer
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.favorites import api_views as favorite_views
@@ -12,33 +13,33 @@ from cl.visualizations import api_views as viz_views
 
 router = DefaultRouter()
 # Search & Audio
-router.register(r"dockets", search_views.DocketViewSet, base_name="docket")
+router.register(r"dockets", search_views.DocketViewSet, basename="docket")
 router.register(
     r"originating-court-information",
     search_views.OriginatingCourtInformationViewSet,
-    base_name="originatingcourtinformation",
+    basename="originatingcourtinformation",
 )
 router.register(
-    r"docket-entries", search_views.DocketEntryViewSet, base_name="docketentry"
+    r"docket-entries", search_views.DocketEntryViewSet, basename="docketentry"
 )
 router.register(
     r"recap-documents",
     search_views.RECAPDocumentViewSet,
-    base_name="recapdocument",
+    basename="recapdocument",
 )
-router.register(r"courts", search_views.CourtViewSet, base_name="court")
-router.register(r"audio", audio_views.AudioViewSet, base_name="audio")
+router.register(r"courts", search_views.CourtViewSet, basename="court")
+router.register(r"audio", audio_views.AudioViewSet, basename="audio")
 router.register(
-    r"clusters", search_views.OpinionClusterViewSet, base_name="opinioncluster"
+    r"clusters", search_views.OpinionClusterViewSet, basename="opinioncluster"
 )
-router.register(r"opinions", search_views.OpinionViewSet, base_name="opinion")
+router.register(r"opinions", search_views.OpinionViewSet, basename="opinion")
 router.register(
     r"opinions-cited",
     search_views.OpinionsCitedViewSet,
-    base_name="opinionscited",
+    basename="opinionscited",
 )
-router.register(r"search", search_views.SearchViewSet, base_name="search")
-router.register(r"tag", search_views.TagViewSet, base_name="tag")
+router.register(r"search", search_views.SearchViewSet, basename="search")
+router.register(r"tag", search_views.TagViewSet, basename="tag")
 
 # People & Entities
 router.register(r"people", people_views.PersonViewSet)
@@ -51,9 +52,9 @@ router.register(
 )
 router.register(r"sources", people_views.SourceViewSet)
 router.register(r"aba-ratings", people_views.ABARatingViewSet)
-router.register(r"parties", people_views.PartyViewSet, base_name="party")
+router.register(r"parties", people_views.PartyViewSet, basename="party")
 router.register(
-    r"attorneys", people_views.AttorneyViewSet, base_name="attorney"
+    r"attorneys", people_views.AttorneyViewSet, basename="attorney"
 )
 
 # RECAP
@@ -62,30 +63,31 @@ router.register(r"recap-fetch", recap_views.PacerFetchRequestViewSet)
 router.register(
     r"recap-query",
     recap_views.PacerDocIdLookupViewSet,
-    base_name="fast-recapdocument",
+    basename="fast-recapdocument",
 )
 router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
 )
 
 # Tags
-router.register(r"tags", favorite_views.UserTagViewSet, base_name="UserTag")
+router.register(r"tags", favorite_views.UserTagViewSet, basename="UserTag")
 router.register(
-    r"docket-tags", favorite_views.DocketTagViewSet, base_name="DocketTag"
+    r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
 )
 
 # Visualizations
 router.register(
-    r"visualizations/json", viz_views.JSONViewSet, base_name="jsonversion"
+    r"visualizations/json", viz_views.JSONViewSet, basename="jsonversion"
 )
 router.register(
-    r"visualizations", viz_views.VisualizationViewSet, base_name="scotusmap"
+    r"visualizations", viz_views.VisualizationViewSet, basename="scotusmap"
 )
 
 API_TITLE = "CourtListener Legal Data API"
-core_api_schema_view = get_schema_view(title=API_TITLE)
-swagger_schema_view = get_schema_view(
-    title=API_TITLE, renderer_classes=[OpenAPIRenderer, SwaggerUIRenderer]
+schema_view = get_schema_view(
+    title=API_TITLE,
+    url="https://www.courtlistener.com/api/rest/v3/",
+    renderer_classes=[JSONOpenAPIRenderer],
 )
 
 
@@ -96,8 +98,12 @@ urlpatterns = [
     ),
     url(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
     # Schemas
-    url("^api/schema/$", core_api_schema_view, name="core_api_schema"),
-    url("^api/swagger/$", swagger_schema_view, name="swagger_schema"),
+    url(
+        "^api/schema/$",
+        views.deprecated_api,
+        name="deprecated_core_api_schema",
+    ),
+    url("^api/swagger/$", schema_view, name="swagger_schema"),
     # Documentation
     url(r"^api/$", views.api_index, name="api_index"),
     url(r"^api/jurisdictions/$", views.court_index, name="court_index"),

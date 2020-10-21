@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function
+
 
 import fnmatch
 import os
@@ -682,7 +682,7 @@ def get_xml_string(e):
     inner_string = re.sub(
         r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag),
         "",
-        ET.tostring(e).decode("utf-8"),
+        ET.tostring(e).decode(),
     )
     return inner_string.strip()
 

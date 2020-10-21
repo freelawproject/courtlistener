@@ -72,7 +72,7 @@ class SolrList(object):
     def __getitem__(self, item):
         self.main_query["start"] = self.offset
         r = self.conn.query().add_extra(**self.main_query).execute()
-
+        self.conn.conn.http_connection.close()
         if r.group_field is None:
             # Pull the text snippet up a level
             for result in r.result.docs:

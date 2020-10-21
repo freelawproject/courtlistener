@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
 from cl.api.utils import get_replication_statuses
-from cl.lib import sunburnt
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_coverage_query,
     build_court_count_query,
@@ -45,8 +45,9 @@ def annotate_courts_with_counts(courts, court_count_tuples):
 
 def make_court_variable():
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = conn.raw_query(**build_court_count_query()).execute()
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    response = si.query().add_extra(**build_court_count_query()).execute()
+    si.conn.http_connection.close()
     court_count_tuples = response.facet_counts.facet_fields["court_exact"]
     courts = annotate_courts_with_counts(courts, court_count_tuples)
     return courts
@@ -139,9 +140,15 @@ def coverage_data(request, version, court):
     else:
         court_str = "all"
     q = request.GET.get("q")
-    conn = sunburnt.SolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    response = conn.raw_query(**build_coverage_query(court_str, q)).execute()
-    counts = response.facet_counts.facet_ranges[0][1][0][1]
+    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
+    facet_field = "dateFiled"
+    response = (
+        si.query()
+        .add_extra(**build_coverage_query(court_str, q, facet_field))
+        .execute()
+    )
+    si.conn.http_connection.close()
+    counts = response.facet_counts.facet_ranges[facet_field]["counts"]
     counts = strip_zero_years(counts)
 
     # Calculate the totals
@@ -192,7 +199,7 @@ def get_result_count(request, version, day_count):
         .add_extra(**build_alert_estimation_query(cd, int(day_count)))
         .execute()
     )
-
+    si.conn.http_connection.close()
     return JsonResponse({"count": response.result.numFound}, safe=True)
 
 

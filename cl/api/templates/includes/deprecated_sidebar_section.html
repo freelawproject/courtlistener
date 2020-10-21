@@ -2,6 +2,11 @@
   <h3><span>API Change Log</span></h3>
   <ul>
     <li>
+      <p><strong>v3.12</strong> &mdash; This version deprecates the experimental Core API interface we tried previously. Swagger/OpenAPI has become the standard. Our support of OpenAPI remains experimental, but our toolkit should support it better than previously.</p>
+      <p>Many endpoints can only be filtered by specific values. For example, to filter the <code>educations</code> endpoint to only bachelor's degrees, you'd use <code>degree_level=ba</code> as part of your GET request. In the past, if invalid filter values were used, zero results would be returned because zero items would match that query. This made sense, but did not help users identify their error. These values now return a <code>400</code> status code and an error message instead.</p>
+    </li>
+
+    <li>
       <p><strong>v3.11</strong> &mdash; This version adds several fields and changes one.</p>
       <p><code>Person.date_completed</code>: The date and time the person was last considered complete.</p>
       <p><code>Person.dod_country</code> and <code>Person.dob_country</code>: The country where a person was born or died.</p>

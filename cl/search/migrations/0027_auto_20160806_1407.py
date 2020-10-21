@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,16 +14,16 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='opinioncluster',
             name='federal_cite_one',
-            field=models.CharField(help_text=b'Primary federal citation', max_length=50, db_index=True, blank=True),
+            field=models.CharField(help_text='Primary federal citation', max_length=50, db_index=True, blank=True),
         ),
         migrations.AlterField(
             model_name='opinioncluster',
             name='federal_cite_three',
-            field=models.CharField(help_text=b'Tertiary federal citation', max_length=50, db_index=True, blank=True),
+            field=models.CharField(help_text='Tertiary federal citation', max_length=50, db_index=True, blank=True),
         ),
         migrations.AlterField(
             model_name='opinioncluster',
             name='federal_cite_two',
-            field=models.CharField(help_text=b'Secondary federal citation', max_length=50, db_index=True, blank=True),
+            field=models.CharField(help_text='Secondary federal citation', max_length=50, db_index=True, blank=True),
         ),
     ]

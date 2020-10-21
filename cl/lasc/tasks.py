@@ -13,7 +13,7 @@ from juriscraper.lasc.fetch import LASCSearch
 from juriscraper.lasc.http import LASCSession
 from requests import RequestException
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.lasc.models import (
     Docket,
     DocumentImage,

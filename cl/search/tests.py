@@ -1,5 +1,5 @@
 # coding=utf-8
-import StringIO
+import io
 import os
 import time
 from datetime import date
@@ -15,6 +15,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
+from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
@@ -79,7 +80,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.raw_query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         self.assertEqual(
             actual_count,
@@ -93,7 +94,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         )
 
         # Check a simple citation query
-        results = self.si_opinion.raw_query(**{"q": "cites:3"}).execute()
+        results = self.si_opinion.query(cites=3).execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 2
         self.assertEqual(
@@ -116,7 +117,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.raw_query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 0
         self.assertEqual(
@@ -142,7 +143,7 @@ class UpdateIndexCommandTest(SolrTestCase):
             ]
         )
         call_command("cl_update_index", *args)
-        results = self.si_opinion.raw_query(**{"q": "*"}).execute()
+        results = self.si_opinion.query("*").execute()
         actual_count = self._get_result_count(results)
         expected_citation_count = 3
         self.assertEqual(
@@ -159,10 +160,10 @@ class ModelTest(TestCase):
 
     def setUp(self):
         self.docket = Docket.objects.create(
-            case_name=u"Blah", court_id="test", source=Docket.DEFAULT
+            case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         self.oc = OpinionCluster.objects.create(
-            case_name=u"Blah", docket=self.docket, date_filed=date(2010, 1, 1)
+            case_name="Blah", docket=self.docket, date_filed=date(2010, 1, 1)
         )
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
@@ -182,14 +183,14 @@ class ModelTest(TestCase):
     def test_save_old_opinion(self):
         """Can we save opinions older than 1900?"""
         docket = Docket(
-            case_name=u"Blah", court_id="test", source=Docket.DEFAULT
+            case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
         docket.save()
         self.oc.date_filed = date(1899, 1, 1)
         self.oc.save()
 
         try:
-            cf = ContentFile(StringIO.StringIO("blah").read())
+            cf = ContentFile(io.StringIO("blah").read())
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save(index=False)
@@ -237,7 +238,7 @@ class ModelTest(TestCase):
 
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .filter(docket__case_name=u"Blah")
+            .filter(docket__case_name="Blah")
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
@@ -277,15 +278,16 @@ class IndexingTest(EmptySolrTestCase):
 
     fixtures = ["test_court.json"]
 
-    def tearDown(self):
-        super(EmptySolrTestCase, self).tearDown()
-        Docket.objects.all().delete()
-        DocketEntry.objects.all().delete()
-        RECAPDocument.objects.all().delete()
-
     def test_issue_729_url_coalescing(self):
         """Are URL's coalesced properly?"""
         # Save a docket to the backend using coalescing
+
+        test_dir = os.path.join(
+            settings.INSTALL_ROOT, "cl", "assets", "media", "test", "search"
+        )
+        self.att_filename = "fake_document.html"
+        fake_path = os.path.join(test_dir, self.att_filename)
+
         d = Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
@@ -298,6 +300,7 @@ class IndexingTest(EmptySolrTestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
             document_number="1",
             pacer_doc_id="1",
+            filepath_local=fake_path,
         )
         rd2 = RECAPDocument.objects.create(
             docket_entry=de,
@@ -305,6 +308,7 @@ class IndexingTest(EmptySolrTestCase):
             document_number="1",
             attachment_number=1,
             pacer_doc_id="2",
+            filepath_local=fake_path,
         )
         # Do the absolute URLs differ when pulled from the DB?
         self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
@@ -318,34 +322,37 @@ class IndexingTest(EmptySolrTestCase):
             r1.result.docs[0]["absolute_url"],
             r2.result.docs[0]["absolute_url"],
         )
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
 
 
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
         """Get the article count in a query response"""
-        return len(html.fromstring(r.content).xpath("//article"))
+        return len(html.fromstring(r.content.decode()).xpath("//article"))
 
     def test_a_simple_text_query(self):
         """Does typing into the main query box work?"""
         r = self.client.get(reverse("show_results"), {"q": "supreme"})
-        self.assertIn("Honda", r.content)
-        self.assertIn("1 Opinion", r.content)
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
 
     def test_a_case_name_query(self):
         """Does querying by case name work?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_query_with_white_space_only(self):
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get(
             reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
         )
-        self.assertIn("Honda", r.content)
-        self.assertNotIn("an error", r.content)
+        self.assertIn("Honda", r.content.decode())
+        self.assertNotIn("an error", r.content.decode())
 
     def test_a_query_with_a_date(self):
         """Does querying by date work?"""
@@ -353,7 +360,7 @@ class SearchTest(IndexedSolrTestCase):
             reverse("show_results"),
             {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
         )
-        self.assertIn("Honda", response.content)
+        self.assertIn("Honda", response.content.decode())
 
     def test_faceted_queries(self):
         """Does querying in a given court return the document? Does querying
@@ -362,33 +369,35 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "court_test": "on"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
         r = self.client.get(
             reverse("show_results"), {"q": "*", "stat_Errata": "on"}
         )
-        self.assertNotIn("Honda", r.content)
-        self.assertIn("Debbas", r.content)
+        self.assertNotIn("Honda", r.content.decode())
+        self.assertIn("Debbas", r.content.decode())
 
     def test_a_docket_number_query(self):
         """Can we query by docket number?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
         )
-        self.assertIn("Honda", r.content, "Result not found by docket number!")
+        self.assertIn(
+            "Honda", r.content.decode(), "Result not found by docket number!"
+        )
 
     def test_a_west_citation_query(self):
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
         for get_dict in get_dicts:
             r = self.client.get(reverse("show_results"), get_dict)
-            self.assertIn("Honda", r.content)
+            self.assertIn("Honda", r.content.decode())
 
     def test_a_neutral_citation_query(self):
         """Can we query by neutral citation numbers?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_query_with_a_old_date(self):
         """Do we have any recurrent issues with old dates and strftime (issue
@@ -403,16 +412,16 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "judge": "david"}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
         r = self.client.get(reverse("show_results"), {"q": "judge:david"})
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_a_nature_of_suit_query(self):
         """Can we query by nature of suit?"""
         r = self.client.get(
             reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
-        self.assertIn("Honda", r.content)
+        self.assertIn("Honda", r.content.decode())
 
     def test_citation_filtering(self):
         """Can we find Documents by citation filtering?"""
@@ -421,14 +430,14 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertIn(
             "Honda",
-            r.content,
-            msg=u"Did not get case back when filtering by citation count.",
+            r.content.decode(),
+            msg="Did not get case back when filtering by citation count.",
         )
         r = self.client.get("/", {"q": "*", "cited_lt": 100, "cited_gt": 80})
         self.assertIn(
             "had no results",
-            r.content,
-            msg=u"Got case back when filtering by crazy citation count.",
+            r.content.decode(),
+            msg="Got case back when filtering by crazy citation count.",
         )
 
     def test_citation_ordering(self):
@@ -439,16 +448,16 @@ class SearchTest(IndexedSolrTestCase):
         most_cited_name = "case name cluster 3"
         less_cited_name = "Howard v. Honda"
         self.assertTrue(
-            r.content.index(most_cited_name)
-            < r.content.index(less_cited_name),
+            r.content.decode().index(most_cited_name)
+            < r.content.decode().index(less_cited_name),
             msg="'%s' should come BEFORE '%s' when ordered by descending "
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
         r = self.client.get("/", {"q": "*", "order_by": "citeCount asc"})
         self.assertTrue(
-            r.content.index(most_cited_name)
-            > r.content.index(less_cited_name),
+            r.content.decode().index(most_cited_name)
+            > r.content.decode().index(less_cited_name),
             msg="'%s' should come AFTER '%s' when ordered by ascending "
             "citeCount." % (most_cited_name, less_cited_name),
         )
@@ -462,13 +471,13 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "*", "order_by": "random_123 desc"}
         )
-        self.assertNotIn("an error", r.content)
+        self.assertNotIn("an error", r.content.decode())
 
     def test_oa_results_basic(self):
         r = self.client.get(
             reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
         )
-        self.assertIn("Jose", r.content)
+        self.assertIn("Jose", r.content.decode())
 
     def test_oa_results_date_argued_ordering(self):
         r = self.client.get(
@@ -479,7 +488,7 @@ class SearchTest(IndexedSolrTestCase):
             },
         )
         self.assertTrue(
-            r.content.index("SEC") < r.content.index("Jose"),
+            r.content.decode().index("SEC") < r.content.decode().index("Jose"),
             msg="'SEC' should come BEFORE 'Jose' when order_by desc.",
         )
 
@@ -488,7 +497,7 @@ class SearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "order_by": "dateArgued asc"},
         )
         self.assertTrue(
-            r.content.index("Jose") < r.content.index("SEC"),
+            r.content.decode().index("Jose") < r.content.decode().index("SEC"),
             msg="'Jose' should come AFTER 'SEC' when order_by asc.",
         )
 
@@ -527,7 +536,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertNotIn(
             "an error",
-            r.content,
+            r.content.decode(),
             msg="Got an error when doing a Date Argued filter.",
         )
 
@@ -548,7 +557,7 @@ class SearchTest(IndexedSolrTestCase):
         response = self.client.get(reverse("show_results"))
         self.assertIn(
             'id="homepage"',
-            response.content,
+            response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
             "load the homepage",
         )
@@ -561,7 +570,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(
             "an error",
-            response.content,
+            response.content.decode(),
             msg="Invalid search did not result in an error.",
         )
 
@@ -678,8 +687,8 @@ class RelatedSearchTest(IndexedSolrTestCase):
             expected_article_count, SearchTest.get_article_count(r)
         )
         self.assertTrue(
-            r.content.index("/opinion/%i/" % expected_first_pk)
-            < r.content.index("/opinion/%i/" % expected_second_pk),
+            r.content.decode().index("/opinion/%i/" % expected_first_pk)
+            < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
@@ -698,7 +707,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         # Test if related opinion exist
         self.assertGreater(
-            r.content.index(
+            r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
             ),
             0,
@@ -723,10 +732,10 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
         # Test for click tracking order
         self.assertTrue(
-            r.content.index(
+            r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i," % (seed_pk, expected_first_pk)
             )
-            < r.content.index(
+            < r.content.decode().index(
                 "'clickRelated_mlt_seed%i', %i,"
                 % (seed_pk, expected_second_pk)
             ),
@@ -784,14 +793,14 @@ class JudgeSearchTest(IndexedSolrTestCase):
             )
             self.assertNotIn(
                 "an error",
-                r.content.lower(),
+                r.content.decode().lower(),
                 msg="Got an error when doing a judge search ordered "
                 "by %s" % sort_field,
             )
 
     def _test_article_count(self, params, expected_count, field_name):
         r = self.client.get("/", params)
-        tree = html.fromstring(r.content)
+        tree = html.fromstring(r.content.decode())
         got = len(tree.xpath("//article"))
         self.assertEqual(
             got,
@@ -1096,9 +1105,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
     ]
 
     def _perform_wildcard_search(self):
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.submit()
-        result_count = self.browser.find_element_by_id("result-count")
+        result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
 
     def test_query_cleanup_function(self):
@@ -1150,7 +1159,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
         self.browser.get(self.live_server_url)
-        searchbox = self.browser.find_element_by_id("id_q")
+        searchbox = self.browser.find_element(By.ID, "id_q")
         searchbox.clear()
         searchbox.send_keys("19-2205")
         searchbox.submit()
@@ -1158,7 +1167,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # with the query, there should be none
         self.assertRaises(
             NoSuchElementException,
-            self.browser.find_element_by_id,
+            self.browser.find_element,
+            By.ID,
             "result-count",
         )
 
@@ -1171,15 +1181,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Dora sees she has Opinion results, but wants Oral Arguments
         self.assertTrue(self.extract_result_count_from_serp() > 0)
-        label = self.browser.find_element_by_css_selector(
-            'label[for="id_type_0"]'
+        label = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_type_0"]'
         )
         self.assertIn("selected", label.get_attribute("class"))
         self.assert_text_in_node("Date Filed", "body")
         self.assert_text_not_in_node("Date Argued", "body")
 
         # She clicks on Oral Arguments
-        self.browser.find_element_by_id("navbar-oa").click()
+        self.browser.find_element(By.ID, "navbar-oa").click()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_and_facet_docket_numbers(self):
@@ -1191,12 +1201,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # Seeing a result that has a docket number displayed, she wants
         # to find all similar opinions with the same or similar docket
         # number
-        search_results = self.browser.find_element_by_id("search-results")
+        search_results = self.browser.find_element(By.ID, "search-results")
         self.assertIn("Docket Number:", search_results.text)
 
         # She types part of the docket number into the docket number
         # filter on the left and hits enter
-        text_box = self.browser.find_element_by_id("id_docket_number")
+        text_box = self.browser.find_element(By.ID, "id_docket_number")
         text_box.send_keys("1337")
         text_box.submit()
 
@@ -1205,40 +1215,40 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         new_count = self.extract_result_count_from_serp()
         self.assertTrue(new_count < initial_count)
 
-        search_results = self.browser.find_element_by_id("search-results")
-        for result in search_results.find_elements_by_tag_name("article"):
+        search_results = self.browser.find_element(By.ID, "search-results")
+        for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self):
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
-        self.browser.find_element_by_id("id_q").send_keys("voutila")
-        self.browser.find_element_by_id("id_q").submit()
+        self.browser.find_element(By.ID, "id_q").send_keys("voutila")
+        self.browser.find_element(By.ID, "id_q").submit()
 
         # Seeing an Opinion immediately on the first page of results, she
         # wants more details so she clicks the title and drills into the result
-        articles = self.browser.find_elements_by_tag_name("article")
-        articles[0].find_elements_by_tag_name("a")[0].click()
+        articles = self.browser.find_elements(By.TAG_NAME, "article")
+        articles[0].find_elements(By.TAG_NAME, "a")[0].click()
 
         # She is brought to the detail page for the results
         self.assertNotIn("Search Results", self.browser.title)
-        article_text = self.browser.find_element_by_tag_name("article").text
+        article_text = self.browser.find_element(By.TAG_NAME, "article").text
 
         # and she can see lots of detail! This includes things like:
         # The name of the jurisdiction/court,
         # the status of the Opinion, any citations, the docket number,
         # the Judges, and a unique fingerpring ID
-        meta_data = self.browser.find_elements_by_css_selector(
-            ".meta-data-header"
+        meta_data = self.browser.find_elements(
+            By.CSS_SELECTOR, ".meta-data-header"
         )
         headers = [
-            u"Filed:",
-            u"Precedential Status:",
-            u"Citations:",
-            u"Docket Number:",
-            u"Author:",
-            u"Nature of suit:",
+            "Filed:",
+            "Precedential Status:",
+            "Citations:",
+            "Docket Number:",
+            "Author:",
+            "Nature of suit:",
         ]
         for header in headers:
             self.assertIn(header, [meta.text for meta in meta_data])
@@ -1246,26 +1256,29 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The complete body of the opinion is also displayed for her to
         # read on the page
         self.assertNotEqual(
-            self.browser.find_element_by_id("opinion-content").text.strip(), ""
+            self.browser.find_element(By.ID, "opinion-content").text.strip(),
+            "",
         )
 
         # She wants to dig a big deeper into the influence of this Opinion,
         # so she's able to see links to the first five citations on the left
         # and a link to the full list
-        cited_by = self.browser.find_element_by_id("cited-by")
-        self.assertIn("Cited By", cited_by.find_element_by_tag_name("h3").text)
-        citations = cited_by.find_elements_by_tag_name("li")
+        cited_by = self.browser.find_element(By.ID, "cited-by")
+        self.assertIn(
+            "Cited By", cited_by.find_element(By.TAG_NAME, "h3").text
+        )
+        citations = cited_by.find_elements(By.TAG_NAME, "li")
         self.assertTrue(0 < len(citations) < 6)
 
         # She clicks the "Full List of Citations" link and is brought to
         # a SERP page with all the citations, generated by a query
-        full_list = cited_by.find_element_by_link_text("View Citing Opinions")
+        full_list = cited_by.find_element(By.LINK_TEXT, "View Citing Opinions")
         full_list.click()
 
         # She notices this submits a new query targeting anything citing the
         # original opinion she was viewing. She notices she's back on the SERP
         self.assertIn("Search Results for", self.browser.title)
-        query = self.browser.find_element_by_id("id_q").get_attribute("value")
+        query = self.browser.find_element(By.ID, "id_q").get_attribute("value")
         self.assertIn("cites:", query)
 
         # She wants to go back to the Opinion page, so she clicks back in her
@@ -1273,17 +1286,18 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.back()
         self.assertNotIn("Search Results", self.browser.title)
         self.assertEqual(
-            self.browser.find_element_by_tag_name("article").text, article_text
+            self.browser.find_element(By.TAG_NAME, "article").text,
+            article_text,
         )
 
         # She now wants to see details on the list of Opinions cited within
         # this particular opinion. She notices an abbreviated list on the left,
         # and can click into a Full Table of Authorities. (She does so.)
-        authorities = self.browser.find_element_by_id("authorities")
+        authorities = self.browser.find_element(By.ID, "authorities")
         self.assertIn(
-            "Authorities", authorities.find_element_by_tag_name("h3").text
+            "Authorities", authorities.find_element(By.TAG_NAME, "h3").text
         )
-        authority_links = authorities.find_elements_by_tag_name("li")
+        authority_links = authorities.find_elements(By.TAG_NAME, "li")
         self.assertTrue(0 < len(authority_links) < 6)
         self.click_link_for_new_page("View All Authorities")
         self.assertIn("Table of Authorities", self.browser.title)
@@ -1295,7 +1309,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # And she's back at the Opinion in question and pretty happy about that
         self.assertNotIn("Table of Authorities", self.browser.title)
         self.assertEqual(
-            self.browser.find_element_by_tag_name("article").text, article_text
+            self.browser.find_element(By.TAG_NAME, "article").text,
+            article_text,
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -1307,15 +1322,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         first_count = self.extract_result_count_from_serp()
 
         # She notices only Precedential results are being displayed
-        prec = self.browser.find_element_by_id("id_stat_Precedential")
-        non_prec = self.browser.find_element_by_id("id_stat_Non-Precedential")
-        self.assertEqual(prec.get_attribute("checked"), u"true")
+        prec = self.browser.find_element(By.ID, "id_stat_Precedential")
+        non_prec = self.browser.find_element(By.ID, "id_stat_Non-Precedential")
+        self.assertEqual(prec.get_attribute("checked"), "true")
         self.assertIsNone(non_prec.get_attribute("checked"))
-        prec_count = self.browser.find_element_by_css_selector(
-            'label[for="id_stat_Precedential"]'
+        prec_count = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_stat_Precedential"]'
         )
-        non_prec_count = self.browser.find_element_by_css_selector(
-            'label[for="id_stat_Non-Precedential"]'
+        non_prec_count = self.browser.find_element(
+            By.CSS_SELECTOR, 'label[for="id_stat_Non-Precedential"]'
         )
         self.assertNotIn("(0)", prec_count.text)
         self.assertNotIn("(0)", non_prec_count.text)
@@ -1329,12 +1344,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertEqual(first_count, self.extract_result_count_from_serp())
 
         # She goes ahead and clicks the Search button again to resubmit
-        self.browser.find_element_by_id("search-button").click()
+        self.browser.find_element(By.ID, "search-button").click()
 
         # She didn't change the query, so the search box should still look
         # the same (which is blank)
         self.assertEqual(
-            self.browser.find_element_by_id("id_q").get_attribute("value"), u""
+            self.browser.find_element(By.ID, "id_q").get_attribute("value"), ""
         )
 
         # And now she notices her result set increases thanks to adding in
@@ -1350,12 +1365,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Latest Opinions", page_text)
         self.assertIn("Latest Oral Arguments", page_text)
 
-        search_box = self.browser.find_element_by_id("id_q")
-        search_button = self.browser.find_element_by_id("search-button")
+        search_box = self.browser.find_element(By.ID, "id_q")
+        search_button = self.browser.find_element(By.ID, "search-button")
         self.assertIn("Search", search_button.text)
 
         self.assertIn("Sign in / Register", page_text)
@@ -1369,12 +1384,12 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The browser brings her to a search engine result page with some
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
-        result_count = self.browser.find_element_by_id("result-count")
+        result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("1 Opinion", result_count.text)
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
-        facet_sidebar = self.browser.find_element_by_id("extra-search-fields")
+        facet_sidebar = self.browser.find_element(By.ID, "extra-search-fields")
         self.assertIn("Precedential Status", facet_sidebar.text)
 
         # She notes her URL For after signing in
@@ -1382,77 +1397,77 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Wanting to keep an eye on this Lissner guy, she decides to sign-in
         # and so she can create an alert
-        sign_in = self.browser.find_element_by_link_text("Sign in / Register")
+        sign_in = self.browser.find_element(By.LINK_TEXT, "Sign in / Register")
         sign_in.click()
 
         # she providers her usename and password to sign in
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Sign In", page_text)
         self.assertIn("Username", page_text)
         self.assertIn("Password", page_text)
-        btn = self.browser.find_element_by_css_selector(
-            'button[type="submit"]'
+        btn = self.browser.find_element(
+            By.CSS_SELECTOR, 'button[type="submit"]'
         )
         self.assertEqual("Sign In", btn.text)
 
-        self.browser.find_element_by_id("username").send_keys("pandora")
-        self.browser.find_element_by_id("password").send_keys("password")
+        self.browser.find_element(By.ID, "username").send_keys("pandora")
+        self.browser.find_element(By.ID, "password").send_keys("password")
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
         # to where she was, which still has "lissner" in the search box.
         self.browser.get(results_url)
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
-        search_box = self.browser.find_element_by_id("id_q")
+        search_box = self.browser.find_element(By.ID, "id_q")
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
-        alert_bell = self.browser.find_element_by_css_selector(
-            ".input-group-addon-blended i"
+        alert_bell = self.browser.find_element(
+            By.CSS_SELECTOR, ".input-group-addon-blended i"
         )
         alert_bell.click()
         time.sleep(1)  # Wait for the modal to open
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        self.browser.find_element_by_id("id_name")
-        self.browser.find_element_by_id("id_rate")
-        btn = self.browser.find_element_by_id("alertSave")
+        self.browser.find_element(By.ID, "id_name")
+        self.browser.find_element(By.ID, "id_rate")
+        btn = self.browser.find_element(By.ID, "alertSave")
         self.assertEqual("Create Alert", btn.text)
-        x_button = self.browser.find_elements_by_css_selector(".close")[0]
+        x_button = self.browser.find_elements(By.CSS_SELECTOR, ".close")[0]
         x_button.click()
 
         # But she decides to wait until another time. Instead she decides she
         # will log out. She notices a Profile link dropdown in the top of the
         # page, clicks it, and selects Sign out
-        profile_dropdown = self.browser.find_elements_by_css_selector(
-            "a.dropdown-toggle"
+        profile_dropdown = self.browser.find_elements(
+            By.CSS_SELECTOR, "a.dropdown-toggle"
         )[0]
-        self.assertEqual(profile_dropdown.text.strip(), u"Profile")
+        self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
-        dropdown_menu = self.browser.find_element_by_css_selector(
-            "ul.dropdown-menu"
+        dropdown_menu = self.browser.find_element(
+            By.CSS_SELECTOR, "ul.dropdown-menu"
         )
         self.assertIsNone(dropdown_menu.get_attribute("display"))
 
         profile_dropdown.click()
 
-        sign_out = self.browser.find_element_by_link_text("Sign out")
+        sign_out = self.browser.find_element(By.LINK_TEXT, "Sign out")
         sign_out.click()
 
         # She receives a sign out confirmation with links back to the homepage,
         # the block, and an option to sign back in.
-        page_text = self.browser.find_element_by_tag_name("body").text
+        page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("You Have Successfully Signed Out", page_text)
-        links = self.browser.find_elements_by_tag_name("a")
+        links = self.browser.find_elements(By.TAG_NAME, "a")
         self.assertIn("Go to the homepage", [link.text for link in links])
         self.assertIn("Read our blog", [link.text for link in links])
 
-        bootstrap_btns = self.browser.find_elements_by_css_selector("a.btn")
+        bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
 
 

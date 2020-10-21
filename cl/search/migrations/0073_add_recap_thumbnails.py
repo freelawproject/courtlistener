@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -17,11 +17,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='thumbnail',
-            field=models.FileField(help_text=b'A thumbnail of the first page of the document', storage=cl.lib.storage.IncrementingFileSystemStorage(), null=True, upload_to=cl.lib.model_helpers.make_recap_path, blank=True),
+            field=models.FileField(help_text='A thumbnail of the first page of the document', storage=cl.lib.storage.IncrementingFileSystemStorage(), null=True, upload_to=cl.lib.model_helpers.make_recap_path, blank=True),
         ),
         migrations.AddField(
             model_name='recapdocument',
             name='thumbnail_status',
-            field=models.SmallIntegerField(default=0, help_text=b'The status of the thumbnail generation', choices=[(0, b'Thumbnail needed'), (1, b'Thumbnail completed successfully'), (2, b'Unable to generate thumbnail')]),
+            field=models.SmallIntegerField(default=0, help_text='The status of the thumbnail generation', choices=[(0, 'Thumbnail needed'), (1, 'Thumbnail completed successfully'), (2, 'Unable to generate thumbnail')]),
         ),
     ]

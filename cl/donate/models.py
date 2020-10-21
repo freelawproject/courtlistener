@@ -109,8 +109,8 @@ class Donation(models.Model):
     status = models.SmallIntegerField(choices=PAYMENT_STATUSES)
     referrer = models.TextField("GET or HTTP referrer", blank=True)
 
-    def __unicode__(self):
-        return u"%s: $%s, %s" % (
+    def __str__(self):
+        return "%s: $%s, %s" % (
             self.get_payment_provider_display(),
             self.amount,
             self.get_status_display(),
@@ -153,8 +153,8 @@ class MonthlyDonation(models.Model):
         default=0,
     )
 
-    def __unicode__(self):
-        return u"%s: $%s by %s" % (
+    def __str__(self):
+        return "%s: $%s by %s" % (
             self.pk,
             self.monthly_donation_amount,
             self.get_payment_provider_display(),

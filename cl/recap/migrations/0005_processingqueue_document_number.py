@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+
 
 from django.db import migrations, models
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='processingqueue',
             name='document_number',
-            field=models.BigIntegerField(help_text=b'The docket entry number for the document.', null=True, blank=True),
+            field=models.BigIntegerField(help_text='The docket entry number for the document.', null=True, blank=True),
         ),
     ]

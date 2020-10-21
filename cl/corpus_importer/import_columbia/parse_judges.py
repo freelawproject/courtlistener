@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-
+import html
 import re
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 
 from django.utils.html import strip_tags
 
@@ -258,7 +258,7 @@ def find_judge_names(text, first_names=False):
 
     # Strip HTML elements and unescape HTML entities.
     line = strip_tags(line)
-    line = h.unescape(line)
+    line = html.unescape(line)
 
     # normalize text and get candidate judge names
     line = "".join([c if c.isalpha() else " " for c in line.lower()])
@@ -297,7 +297,7 @@ def judges_exist(text, judges):
     """
     matched = []
     for judge in judges:
-        if isinstance(judge, basestring):
+        if isinstance(judge, str):
             if re.search(r"\b%s\b" % judge, text):
                 matched.append(judge)
             continue

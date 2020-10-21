@@ -1,10 +1,10 @@
 import re
-from httplib import ResponseNotReady
+from http.client import ResponseNotReady
 from collections import Counter
 
 from django.db.models import F
 
-from cl.celery import app
+from cl.celery_init import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from cl.search.tasks import add_items_to_solr
@@ -95,10 +95,10 @@ def create_cited_html(opinion, citations):
     elif opinion.plain_text:
         inner_html = opinion.plain_text
         for citation in citations:
-            repl = u'</pre>%s<pre class="inline">' % citation.as_html()
+            repl = '</pre>%s<pre class="inline">' % citation.as_html()
             inner_html = re.sub(citation.as_regex(), repl, inner_html)
-        new_html = u'<pre class="inline">%s</pre>' % inner_html
-    return new_html.encode("utf-8")
+        new_html = '<pre class="inline">%s</pre>' % inner_html
+    return new_html
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
