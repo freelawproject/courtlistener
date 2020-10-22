@@ -46,17 +46,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
-        curl git \
-        # Document extraction and OCR tools
-        antiword docx2txt ghostscript libwpd-tools poppler-utils \
-        # Filetype identification (the python library is just a wrapper)
-        libmagic1 \
-        # Audio extraction/manipulation tools
-        ffmpeg \
-        # Image & OCR tools
-        imagemagick tesseract-ocr tesseract-ocr-eng \
-        # Other dependencies
-        libffi-dev libxml2-dev libxslt-dev
+        curl git libmagic1
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
@@ -70,10 +60,7 @@ RUN poetry install --no-root
 RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
-RUN apt purge --assume-yes \
-        build-essential curl gcc git python-dev \
-        libffi-dev libxml2-dev libxslt-dev \
-    && apt autoremove --assume-yes
+RUN apt purge --assume-yes build-essential curl gcc git python-dev && apt autoremove --assume-yes
 
 # will become mountpoint of our code
 WORKDIR /opt

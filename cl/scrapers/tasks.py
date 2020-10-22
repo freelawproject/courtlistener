@@ -14,7 +14,7 @@ from juriscraper.pacer import PacerSession, CaseQuery
 from requests import Timeout
 
 from cl.audio.models import Audio
-from cl.celery import app
+from cl.celery_init import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
