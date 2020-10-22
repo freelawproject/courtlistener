@@ -98,8 +98,6 @@ services:
             - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
         networks:
             - cl_net_overlay
-        environment:
-            - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
     cl-judge-pics:
         image: freelawproject/judge-pics:latest
