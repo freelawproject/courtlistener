@@ -64,16 +64,16 @@ def convert_and_clean_audio(af):
     :return:
     """
     service = "%s/%s/%s" % (settings.BTE_URL, "convert", "audio")
-    audio_json = serialize_audio_object(af)
     with open(af.local_path_original_file.path, "rb") as wma_file:
         wav = wma_file.read()
 
     files = {
         "file": ("the_audio.wav", wav),
-        "af": ("the_json.json", audio_json),
     }
+
     return requests.post(
         url=service,
+        params={"audio_obj": serialize_audio_object(af)},
         files=files,
         timeout=60 * 60,
     )
