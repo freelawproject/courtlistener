@@ -48,39 +48,37 @@ services:
     # Task Server
     cl-celery:
         container_name: cl-celery
-        image: freelawproject/task-server:latest
+        image: freelawproject/task-server:poetry-bte-wp-1
         depends_on:
             - cl-postgresql
             - cl-redis
+            - cl-binary-transformers-and-extractors
             - cl-judge-pics
-            - cl-seal-rookery
         volumes:
             - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
             - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-            - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
         networks:
             - cl_net_overlay
 
     cl-django:
         container_name: cl-django
-        image: freelawproject/courtlistener-django:latest
+        image: freelawproject/courtlistener-django:poetry-bte-wp-1
         depends_on:
             - cl-postgresql
             - cl-redis
             - cl-celery
             - cl-solr
             - cl-selenium
+            - cl-binary-transformers-and-extractors
             - cl-judge-pics
-            - cl-seal-rookery
         ports:
             - "8000:8000"
         volumes:
             - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
             - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
             - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-            - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
         networks:
             - cl_net_overlay
         command: >
@@ -98,8 +96,18 @@ services:
             - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
         networks:
             - cl_net_overlay
-        environment:
-            - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
+
+    cl-binary-transformers-and-extractors:
+        image: freelawproject/binary-transformers-and-extractors:latest
+        container_name: "cl-binary-transformers-and-extractors"
+        depends_on:
+          - cl-seal-rookery
+        ports:
+          - "5050:5050"
+        networks:
+            - cl_net_overlay
+        volumes:
+            - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
 
     cl-judge-pics:
         image: freelawproject/judge-pics:latest

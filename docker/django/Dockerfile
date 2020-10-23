@@ -27,6 +27,9 @@ ENV PYTHONUNBUFFERED=1 \
     VENV_PATH="/opt/pysetup/.venv"
 
 
+# Use lots of layers. Bigger image, but faster builds. Slow stuff is up here at
+# the top.
+RUN apt-get update
 # prepend poetry and venv to path
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
@@ -39,21 +42,11 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         --assume-yes \
         --quiet=2 \
         # So we can use Python-slim
-        build-essential gcc python-dev\
+        build-essential \
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
-        curl git \
-        # Document extraction and OCR tools
-        antiword docx2txt ghostscript libwpd-tools poppler-utils \
-        # Filetype identification (the python library is just a wrapper)
-        libmagic1 \
-        # Audio extraction/manipulation tools
-        ffmpeg \
-        # Image & OCR tools
-        imagemagick tesseract-ocr tesseract-ocr-eng \
-        # Other dependencies
-        libffi-dev libxml2-dev libxslt-dev
+        curl git
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
@@ -67,10 +60,7 @@ RUN poetry install --no-root
 RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
-RUN apt purge --assume-yes \
-        build-essential curl gcc git python-dev \
-        libffi-dev libxml2-dev libxslt-dev \
-    && apt autoremove --assume-yes
+RUN apt purge --assume-yes build-essential curl git && apt autoremove --assume-yes
 
 # will become mountpoint of our code
 WORKDIR /opt
