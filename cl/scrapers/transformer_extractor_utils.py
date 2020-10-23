@@ -99,7 +99,7 @@ def extract_mime_type_from(file_path=None, bytes=None, mime=False):
         files=file_obj,
         timeout=60,
     ).json()
-    return response["mime_type"]
+    return response["mimetype"]
 
 
 def generate_thumbnail(path=None, file_content=None):
