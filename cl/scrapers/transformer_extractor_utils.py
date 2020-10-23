@@ -8,12 +8,12 @@ from django.core import serializers
 
 
 def document_extract(path=None, file_content=None, do_ocr=False):
-    """Extract document content.
+    """Extract document content for different file types.
 
-    :param path:
-    :param file_content:
-    :param do_ocr:
-    :return:
+    :param path: File path location
+    :param file_content: Byte representation of the document
+    :param do_ocr: Should we OCR the document
+    :return: File content
     """
     service = "%s/%s" % (settings.BTE_URL, "extract_doc_content")
     if path is not None:
@@ -35,10 +35,10 @@ def document_extract(path=None, file_content=None, do_ocr=False):
 
 
 def serialize_audio_object(af):
-    """
+    """Convert serialize aduio object into json for processing.
 
-    :param af: Audio File Object
-    :return: Convert audio w/ metadata
+    :param af: Audio File object
+    :return: Modified serailized audio file for processing in BTE
     """
     af_dict = json.loads(serializers.serialize("json", [af]))[0]["fields"]
     docket_dict = json.loads(serializers.serialize("json", [af.docket]))[0][
@@ -57,30 +57,26 @@ def serialize_audio_object(af):
     return af
 
 
-def convert_and_clean_audio(af):
-    """Convert audio file to MP3 and add metadata
+def convert_and_clean_audio(audio_obj):
+    """Convert audio file to MP3 w/ metadata and image.
 
-    :param path:
-    :return:
+    :param audio_obj: Audio file object
+    :return: Processed audio file
+    :type: JSON object
     """
-    service = "%s/%s/%s" % (settings.BTE_URL, "convert", "audio")
-    with open(af.local_path_original_file.path, "rb") as wma_file:
-        wav = wma_file.read()
-
-    files = {
-        "file": ("the_audio.wav", wav),
-    }
-
-    return requests.post(
-        url=service,
-        params={"audio_obj": serialize_audio_object(af)},
-        files=files,
-        timeout=60 * 60,
-    )
+    with open(audio_obj.local_path_original_file.path, "rb") as audio_file:
+        return requests.post(
+            url="%s/%s/%s" % (settings.BTE_URL, "convert", "audio"),
+            params={"audio_obj": serialize_audio_object(audio_obj)},
+            files={
+                "file": ("audio_file", audio_file.read()),
+            },
+            timeout=60 * 60,
+        )
 
 
 def extract_mime_type_from(file_path=None, bytes=None, mime=False):
-    """Extract mime type from file or buffer/bytes
+    """Extract mime type from file or buffer/bytes.
 
     :param file_path: File location
     :param bytes: Files byte repr
@@ -103,10 +99,11 @@ def extract_mime_type_from(file_path=None, bytes=None, mime=False):
 
 
 def generate_thumbnail(path=None, file_content=None):
-    """Generate a thumbnail of page 1 of a PDF
+    """Generate a thumbnail of page 1 of a PDF.
 
-    :param path:
-    :return:
+    :param path: PDF file location
+    :param file_content: Byte repr of pdf
+    :return: Thumbnail of PDF
     """
     service = "%s/%s" % (settings.BTE_URL, "make_png_thumbnail")
     if path is not None:
@@ -123,14 +120,14 @@ def generate_thumbnail(path=None, file_content=None):
 
 
 def get_page_count(path=None, file_content=None):
-    """Get page count from document
+    """Get page count from a document.
 
     Sends file to binary-transformers-and-extractors and returns a json
     object containing the pg count
 
     :param path: path of the document
-    :param pdf_bytes:
-    :return:  {"pg_count: "", "err": ""}
+    :param file_content: Byte representation of file
+    :return: Page count of file
     """
     service = "%s/%s" % (settings.BTE_URL, "get_page_count")
     if path is not None:
@@ -151,6 +148,9 @@ def extract_jw_financial_document(
 ):
     """Extract financial data from financial disclosures.
 
+    :param url: AWS path to judicial watch document
+    :param file_content: Byte representation of judical watch doc
+    :param judicial_watch: Should we use judicial watch specific extration
     :return: Financial data
     :type: dict
     """
@@ -176,9 +176,11 @@ def extract_jw_financial_document(
 
 
 def make_pdf_from_single_image(aws_path=None, file_content=None):
-    """Send aws path to BTE to generate pdf from single tiff
+    """Send aws_path to BTE to generate pdf from single tiff.
 
-    :return: pdf file
+    :param aws_path: AWS path of image
+    :param file_content: Byte representation of image
+    :return: Converted image to PDF
     """
     service = "%s/%s/%s" % (
         settings.BTE_URL,
@@ -193,8 +195,10 @@ def make_pdf_from_single_image(aws_path=None, file_content=None):
 
 
 def make_pdf_from_multiple_images(aws_path=None, file_content=None):
-    """Pass aws path to BTE to generate PDF from many tiffs
+    """Pass aws path to BTE to generate PDF from many tiffs.
 
+    :param aws_path: AWS path of image
+    :param file_content: Byte representation of image
     :return: pdf file
     """
     service = "%s/%s/%s" % (
