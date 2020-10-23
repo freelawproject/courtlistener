@@ -1,11 +1,14 @@
-import subprocess
+from ast import literal_eval
 
 from django.core.files.base import ContentFile
+from requests import Timeout
 
 from cl.celery_init import app
 from cl.lib.bot_detector import is_og_bot
+from cl.lib.command_utils import logger
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.people_db.models import FinancialDisclosure
+from cl.scrapers.transformer_extractor_utils import generate_thumbnail
 from cl.search.models import RECAPDocument
 
 
@@ -22,37 +25,23 @@ def make_png_thumbnail_for_instance(
     :param max_dimension: The longest you want any edge to be
     """
     item = InstanceClass.objects.get(pk=pk)
-    command = [
-        "pdftoppm",
-        "-jpeg",
-        getattr(item, file_attr).path,
-        # Start and end on the first page
-        "-f",
-        "1",
-        "-l",
-        "1",
-        # Set the max dimension (generally the height). Alas, we can't just
-        # set the width, so this is our only hope.
-        "-scale-to",
-        str(max_dimension),
-    ]
+    filepath = getattr(item, file_attr).path
 
-    # Note that pdftoppm adds things like -01.png to the end of whatever
-    # filename you give it, which makes using a temp file difficult. But,
-    # if you don't give it an output file, it'll send the result to stdout,
-    # so that's why we are capturing it here.
-    p = subprocess.Popen(
-        command, close_fds=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    stdout, stderr = p.communicate()
-    if p.returncode != 0:
-        item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        item.save()
-        return item.pk
+    try:
+        thumbnail_resp = generate_thumbnail(filepath)
+    except Timeout:
+        logger.error("Thumbnail generation failed via timeout.")
+    finally:
+        if "thumbnail_resp" not in locals():
+            item.thumbnail_status = THUMBNAIL_STATUSES.FAILED
+            item.save()
+            return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
     filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
-    item.thumbnail.save(filename, ContentFile(stdout))
+    item.thumbnail.save(
+        filename, ContentFile(literal_eval(thumbnail_resp["content"]))
+    )
 
     return item.pk
 
