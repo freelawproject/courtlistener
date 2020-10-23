@@ -93,7 +93,8 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     extension = path.split(".")[-1]
     response = document_extract(path, do_ocr)
     content = response["content"]
-    success = response["err"]
+    error = response["err"]
+    success = response['error_code']
     # Do page count, if possible
     opinion.page_count = get_page_count(path)["pg_count"]
 
