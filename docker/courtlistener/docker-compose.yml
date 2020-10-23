@@ -102,10 +102,8 @@ services:
         container_name: "cl-binary-transformers-and-extractors"
         depends_on:
           - cl-seal-rookery
-        expose:
-            - "5011"
         ports:
-            - "80:80"
+          - "5050:80"
         networks:
             - cl_net_overlay
         volumes:
