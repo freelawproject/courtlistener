@@ -3,6 +3,7 @@
 import logging
 import random
 import traceback
+from ast import literal_eval
 
 import requests
 from django.apps import apps
@@ -94,7 +95,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     response = document_extract(path, do_ocr)
     content = response["content"]
     error = response["err"]
-    success = response['error_code']
+    success = response["error_code"]
     # Do page count, if possible
     opinion.page_count = get_page_count(path)["pg_count"]
 

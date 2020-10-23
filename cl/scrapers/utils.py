@@ -64,7 +64,9 @@ def get_extension(content):
     elif file_str == "C source, ASCII text":
         mime = "text/plain"
     elif file_str.startswith("WordPerfect document"):
-        mime = "application/vnd.wordperfect"
+        return ".wpd"
+    elif file_str.startswith("Microsoft ASF"):
+        return ".wma"
     else:
         # No workaround necessary
         mime = extract_mime_type_from(bytes=content, mime=True)
