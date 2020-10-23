@@ -326,14 +326,14 @@ def parse_dates(raw_dates):
     :param raw_dates: A list of (probably) date-containing strings
     """
     months = re.compile(
-        "january|february|march|april|may|june|july|august|"
-        "september|october|november|december"
+        r"january|february|march|april|may|june|july|august|"
+        r"september|october|november|december"
     )
     dates = []
     for raw_date in raw_dates:
         # there can be multiple years in a string, so we split on possible
         # indicators
-        raw_parts = re.split("(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
+        raw_parts = re.split(r"(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
 
         # index over split line and add dates
         inner_dates = []
@@ -342,7 +342,7 @@ def parse_dates(raw_dates):
             no_month = False
             if re.search(months, raw_part.lower()) is None:
                 no_month = True
-                if re.search("[0-9][0-9][0-9][0-9]", raw_part) is None:
+                if re.search(r"[0-9][0-9][0-9][0-9]", raw_part) is None:
                     continue
             # strip parenthesis from the raw string (this messes with the date
             # parser)
@@ -356,12 +356,12 @@ def parse_dates(raw_dates):
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
             if no_month:
-                text = re.compile("(\d+)").split(raw_part.lower())[0].strip()
+                text = re.compile(r"(\d+)").split(raw_part.lower())[0].strip()
             else:
                 text = months.split(raw_part.lower())[0].strip()
             # remove footnotes and non-alphanumeric characters
-            text = re.sub("(\[fn.?\])", "", text)
-            text = re.sub("[^A-Za-z ]", "", text).strip()
+            text = re.sub(r"(\[fn.?\])", "", text)
+            text = re.sub(r"[^A-Za-z ]", "", text).strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
                 inner_dates.append((clean_string(text), d))
