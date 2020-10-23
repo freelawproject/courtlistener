@@ -5,7 +5,6 @@ import os
 import re
 from datetime import timedelta
 
-import magic
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
@@ -26,6 +25,7 @@ from cl.lib.decorators import track_in_matomo
 from cl.lib.ratelimiter import ratelimiter_slow
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
+from cl.scrapers.transformer_extractor_utils import extract_mime_type_from
 from cl.search.forms import SearchForm
 from cl.search.models import (
     Court,
@@ -420,7 +420,7 @@ def serve_static_file(request, file_path=""):
         item = get_object_or_404(Opinion, local_path=file_path)
         item.blocked = item.cluster.blocked
         try:
-            mimetype = magic.from_file(file_loc, mime=True)
+            mimetype = extract_mime_type_from(file_path=file_loc, mime=True)
         except IOError:
             raise Http404
 

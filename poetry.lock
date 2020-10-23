@@ -1162,14 +1162,6 @@ texttable = ">=1.6.2"
 plotting = ["pycairo (>=1.18.0)"]
 
 [[package]]
-name = "python-magic"
-version = "0.4.18"
-description = "File type identification using libmagic"
-category = "main"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
-
-[[package]]
 name = "python-mimeparse"
 version = "0.1.4"
 description = "A module provides basic functions for parsing mime-type names and matching them against a list of media-ranges."
@@ -2282,10 +2274,6 @@ python-igraph = [
     {file = "python_igraph-0.8.3-pp36-pypy36_pp73-macosx_10_9_x86_64.whl", hash = "sha256:c290c4d0586cf2a4353b0b204cac365b02626bf96e7f7dba265a6265b24806c5"},
     {file = "python_igraph-0.8.3-pp36-pypy36_pp73-manylinux2010_x86_64.whl", hash = "sha256:52aba4fbc92cac1482aadb69a248b64ddbd594ef9b293e4119b428435cfd8cd2"},
     {file = "python_igraph-0.8.3-pp36-pypy36_pp73-win32.whl", hash = "sha256:ab063dbef3d3d442b9b351049961a81b4c281d0700d8e4f75f0a0c157e84864a"},
-]
-python-magic = [
-    {file = "python-magic-0.4.18.tar.gz", hash = "sha256:b757db2a5289ea3f1ced9e60f072965243ea43a2221430048fd8cacab17be0ce"},
-    {file = "python_magic-0.4.18-py2.py3-none-any.whl", hash = "sha256:356efa93c8899047d1eb7d3eb91e871ba2f5b1376edbaf4cc305e3c872207355"},
 ]
 python-mimeparse = [
     {file = "python-mimeparse-0.1.4.linux-x86_64.exe", hash = "sha256:a4baeab6061428239d87c9b619f814bc6bd66b9c4c71c023301a50ddc519eeb4"},

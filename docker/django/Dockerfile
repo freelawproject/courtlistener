@@ -46,7 +46,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
-        curl git libmagic1
+        curl git
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python

@@ -79,6 +79,29 @@ def convert_and_clean_audio(af):
     )
 
 
+def extract_mime_type_from(file_path=None, bytes=None, mime=False):
+    """Extract mime type from file or buffer/bytes
+
+    :param file_path: File location
+    :param bytes: Files byte repr
+    :return: Mime type
+    """
+    service = "%s/%s/%s" % (settings.BTE_URL, "utility", "mime_type")
+    if file_path:
+        with open(file_path, "rb") as file:
+            f = file.read()
+            file_obj = {"file": ("tmpfile", f)}
+    else:
+        file_obj = {"file": ("tmpfile", bytes)}
+    response = requests.post(
+        url=service,
+        params={"mime": mime},
+        files=file_obj,
+        timeout=60,
+    ).json()
+    return response["mime_type"]
+
+
 def generate_thumbnail(path=None, file_content=None):
     """Generate a thumbnail of page 1 of a PDF
 
