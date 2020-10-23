@@ -42,7 +42,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         --assume-yes \
         --quiet=2 \
         # So we can use Python-slim
-        build-essential gcc python-dev\
+        build-essential \
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
@@ -60,7 +60,7 @@ RUN poetry install --no-root
 RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
-RUN apt purge --assume-yes build-essential curl gcc git python-dev && apt autoremove --assume-yes
+RUN apt purge --assume-yes build-essential curl git && apt autoremove --assume-yes
 
 # will become mountpoint of our code
 WORKDIR /opt
