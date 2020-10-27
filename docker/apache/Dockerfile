@@ -54,7 +54,6 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 #
 # And test after upgrading that the correct version of Python is used by using
 # the python_version_test.py WSGI file.
-WORKDIR /tmp
 RUN wget https://codeload.github.com/GrahamDumpleton/mod_wsgi/tar.gz/4.7.1 --output-document mod_wsgi.tar.gz \
   && tar -x -f mod_wsgi.tar.gz \
   && cd mod_wsgi-4.7.1/ \
@@ -63,7 +62,7 @@ RUN wget https://codeload.github.com/GrahamDumpleton/mod_wsgi/tar.gz/4.7.1 --out
 RUN apt-get purge --assume-yes --quiet=2 --auto-remove apache2-dev wget
 
 # With mod_wsgi in place, set up the modules
-COPY mods-enabled/mpm_worker.conf /etc/apache2/mods-available/mpm_worker.conf
+COPY docker/apache/mods-available/mpm_worker.conf /etc/apache2/mods-available/mpm_worker.conf
 RUN a2dismod mpm_event && \
   a2enmod \
     # Keep all static modules; they're compiled in
@@ -139,7 +138,7 @@ RUN echo "ServerName courtlistener.com" >> /etc/apache2/conf-available/fqdn.conf
   a2enconf fqdn
 
 # Set up the sites
-COPY sites-enabled/* /etc/apache2/sites-available/
+COPY docker/apache/sites-available/* /etc/apache2/sites-available/
 WORKDIR /etc/apache2/sites-available
 RUN a2ensite * && \
   a2dissite 000-default.conf default-ssl.conf
@@ -148,7 +147,7 @@ RUN a2ensite * && \
 # Do a graceful shutdown with: kill -SIGWINCH pid
 STOPSIGNAL SIGWINCH
 
-COPY apache2-foreground /usr/local/bin/
+COPY docker/apache/apache2-foreground /usr/local/bin/
 
 EXPOSE 80
 EXPOSE 443
