@@ -32,15 +32,18 @@
 #
 FROM freelawproject/courtlistener-django:latest
 
-RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
-    apt-get install \
+RUN apt-get update --option "Acquire::Retries=3" --quiet=2 \
+  && apt-get install \
         --no-install-recommends \
         --assume-yes \
         --quiet=2 \
         # Apache
         apache2 \
         # Extra Apache modules & tools
-        apache2-dev libapache2-mod-xsendfile wget
+        apache2-dev libapache2-mod-xsendfile locales wget \
+  # Enable our locale and generate it.
+  && sed -i 's/^# *\(en_US.UTF-8\)/\1/' /etc/locale.gen \
+  && locale-gen
 
 # Install mod_wsgi manually. This is necessary because the version that comes
 # with Ubuntu will only link against the default version of Python, which is
