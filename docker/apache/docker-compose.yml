@@ -17,7 +17,7 @@ services:
           - "443:443"
         logging:
           driver: journald
-        resart: on-failure
+        restart: on-failure
     cl-a2-judge-pics:
         image: freelawproject/judge-pics:latest
         container_name: "cl-a2-judge-pics"
