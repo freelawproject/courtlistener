@@ -1,6 +1,5 @@
 ---
 
-install_root: "/var/www/courtlistener"
-virtualenv_root: "/var/www/.virtualenvs/courtlistener"
-solr_xmx: "20G"
+install_root: "/var/www/cl"
+virtualenv_root: "/var/www/.venv/cl"
 web_user: 'www-data'

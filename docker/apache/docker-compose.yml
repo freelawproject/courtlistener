@@ -1,0 +1,35 @@
+# Minimal docker compose file for running Apache
+version: "3.7"
+services:
+    apache:
+        container_name: apache
+        image: freelawproject/apache2:latest
+        depends_on:
+          - cl-a2-judge-pics
+          - cl-a2-seal-rookery
+        volumes:
+            - cl-a2-judge-pics:${PYTHON_PACKAGES}/judge_pics
+            - cl-a2-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+            - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+            - ${CERT_HOME:-/etc/letsencrypt}:/etc/letsencrypt:ro
+        ports:
+          - "80:80"
+          - "443:443"
+        logging:
+          driver: journald
+        resart: on-failure
+    cl-a2-judge-pics:
+        image: freelawproject/judge-pics:latest
+        container_name: "cl-a2-judge-pics"
+        volumes:
+          - cl-a2-judge-pics:${PYTHON_PACKAGES}/judge_pics
+
+    cl-a2-seal-rookery:
+        image: freelawproject/seal-rookery:latest
+        container_name: "cl-a2-seal-rookery"
+        volumes:
+          - cl-a2-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+
+volumes:
+  cl-a2-judge-pics:
+  cl-a2-seal-rookery:
