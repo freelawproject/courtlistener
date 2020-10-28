@@ -7,13 +7,6 @@ services:
         depends_on:
           - cl-a2-judge-pics
           - cl-a2-seal-rookery
-        deploy:
-          resources:
-            limits:
-              cpus: "${APACHE_CPU_COUNT:-16}"
-              memory: "${APACHE_MEMORY:-30}GB"
-          restart_policy:
-            condition: on-failure
         volumes:
             - cl-a2-judge-pics:${PYTHON_PACKAGES}/judge_pics
             - cl-a2-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
@@ -24,6 +17,7 @@ services:
           - "443:443"
         logging:
           driver: journald
+        resart: on-failure
     cl-a2-judge-pics:
         image: freelawproject/judge-pics:latest
         container_name: "cl-a2-judge-pics"
