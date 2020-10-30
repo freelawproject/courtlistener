@@ -10,7 +10,7 @@ services:
         volumes:
             - cl-a2-judge-pics:${PYTHON_PACKAGES}/judge_pics
             - cl-a2-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
-            - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+            - ${CL_BASE_DIR:-../../}:/opt/courtlistener
             - ${CERT_HOME:-/etc/letsencrypt}:/etc/letsencrypt:ro
         ports:
           - "80:80"
