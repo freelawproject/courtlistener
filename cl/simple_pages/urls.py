@@ -18,9 +18,6 @@ from cl.simple_pages.views import (
     old_terms,
     podcasts,
     robots,
-    validate_for_bing,
-    validate_for_google,
-    validate_for_google2,
     validate_for_wot,
     help_home,
 )
@@ -57,9 +54,6 @@ urlpatterns = [
         name="simple_pages_sitemap",
     ),
     # SEO-related stuff
-    url(r"^BingSiteAuth.xml$", validate_for_bing),
-    url(r"^googleef3d845637ccb353.html$", validate_for_google),
-    url(r"^google646349975c2495b6.html$", validate_for_google2),
     url(r"^mywot8f5568174e171ff0acff.html$", validate_for_wot),
     # Favicon, touch icons, etc.
     url(
