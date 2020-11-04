@@ -1,0 +1,62 @@
+# Run using `docker-compose up`
+version: "3.7"
+volumes:
+  cl-judge-pics:
+  cl-seal-rookery:
+
+services:
+  gunicorn:
+    container_name: gunicorn
+    image: freelawproject/courtlistener-django:latest
+    depends_on:
+      - cl-judge-pics
+      - cl-seal-rookery
+    expose:
+      - 8000
+    volumes:
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    logging:
+      driver: journald
+    restart: on-failure
+    command: >
+      bash -c "gunicorn cl_wsgi:application \
+        --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+        `# Set high number of workers. Docs recommend 2-4× core count` \
+        --workers ${NUM_WORKERS:-48} \
+        `# Allow longer queries to solr.` \
+        --limit-request-line 6000 \
+        `# Reset each worker once in a while` \
+        --max-requests 10000 \
+        --max-requests-jitter 100 \
+        --bind 0.0.0.0:8000"
+
+  cl-nginx:
+    container_name: cl-nginx
+    image: freelawproject/nginx:latest
+    depends_on:
+      - gunicorn
+    volumes:
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CERT_HOME:-/etc/letsencrypt}:/etc/letsencrypt:ro
+      - ${BULK_DIR:-/sata/}:/storage/
+    ports:
+      - "80:80"
+      - "443:443"
+    logging:
+      driver: journald
+    restart: on-failure
+
+  cl-judge-pics:
+    image: freelawproject/judge-pics:latest
+    container_name: "cl-judge-pics"
+    volumes:
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+
+  cl-seal-rookery:
+    image: freelawproject/seal-rookery:latest
+    container_name: "cl-seal-rookery"
+    volumes:
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
