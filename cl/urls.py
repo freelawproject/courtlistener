@@ -33,7 +33,7 @@ urlpatterns = [
     # Catch-alls that could conflict with other regexps -- place them last
     #   Serve a static file
     url(
-        r"^(?P<file_path>(?:pdf|wpd|txt|doc|docx|html|mp3|recap)/.+)$",
+        r"^(?P<file_path>recap/.+)$",
         serve_static_file,
     ),
 ]
