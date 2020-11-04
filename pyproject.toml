@@ -104,6 +104,7 @@ scorched = {git = "https://github.com/freelawproject/scorched.git"}
 django-filter = "2.2.0"
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.18.1"
+gunicorn = "^20.0.4"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.6.0"

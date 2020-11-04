@@ -632,6 +632,20 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "gunicorn"
+version = "20.0.4"
+description = "WSGI HTTP Server for UNIX"
+category = "main"
+optional = false
+python-versions = ">=3.4"
+
+[package.extras]
+tornado = ["tornado (>=0.2)"]
+gevent = ["gevent (>=0.13)"]
+setproctitle = ["setproctitle"]
+eventlet = ["eventlet (>=0.9.7)"]
+
+[[package]]
 name = "hiredis"
 version = "0.2.0"
 description = "Python wrapper for hiredis"
@@ -1686,7 +1700,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "868d8e3b76d75a2508dda4db863e0f315b027b0a298ec2e91a782691f7ed0774"
+content-hash = "062a2224b99212eee0e269cfb06798cc7732d8f243b314b86630aa5ef0f9a407"
 
 [metadata.files]
 amqp = [
@@ -1985,6 +1999,10 @@ future = [
 geonamescache = [
     {file = "geonamescache-0.20-py2-none-any.whl", hash = "sha256:3f5779d671de6e76dfbe7518f84edad665e3a92309db2e2f9865c6d4482942e4"},
     {file = "geonamescache-0.20.tar.gz", hash = "sha256:7e5e6b98e7fb179a207985650227d423a121fad0e526f6ef728ba68e8352aab8"},
+]
+gunicorn = [
+    {file = "gunicorn-20.0.4-py2.py3-none-any.whl", hash = "sha256:cd4a810dd51bf497552cf3f863b575dabd73d6ad6a91075b65936b151cbf4f9c"},
+    {file = "gunicorn-20.0.4.tar.gz", hash = "sha256:1904bb2b8a43658807108d59c3f3d56c2b6121a701161de0ddf9ad140073c626"},
 ]
 hiredis = [
     {file = "hiredis-0.2.0-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:71303245ea72cd85e72705ad237eb9d3847cdeff45f4ec81b0fa08ef4941610f"},
