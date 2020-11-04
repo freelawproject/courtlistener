@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.conf.urls import include, url
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.views.generic import RedirectView
 from cl.sitemap import index_sitemap_maker
@@ -36,4 +38,4 @@ urlpatterns = [
         r"^(?P<file_path>recap/.+)$",
         serve_static_file,
     ),
-]
+] + static("/", document_root=settings.MEDIA_ROOT)
