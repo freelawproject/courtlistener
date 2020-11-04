@@ -137,14 +137,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertEqual(len(entry.enclosures), 1)
                 self.assertTrue(len(entry.enclosures[0].type) > 0)
                 self.assertTrue(int(entry.enclosures[0].length) > 1)
-                r = self.client.get(entry.enclosures[0].href, follow=True)
-                self.assertEqual(
-                    r.status_code,
-                    200,
-                    "GET %s should result in HTTP 200"
-                    % entry.enclosures[0].href,
-                )
-                self.assertIn("inline;", r["Content-Disposition"])
 
     def test_oral_argument_feeds_contain_valid_mp3_links(self):
         """
@@ -157,14 +149,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         for entry in f.entries:
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
-                r = self.client.get(entry.enclosures[0].href, follow=True)
-                self.assertEqual(
-                    r.status_code,
-                    200,
-                    "GET %s should result in HTTP 200"
-                    % entry.enclosures[0].href,
-                )
-                self.assertEqual(r["Content-Type"], "audio/mpeg")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_search_based_opinion_feed(self):

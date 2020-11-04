@@ -18,9 +18,6 @@ from cl.simple_pages.views import (
     old_terms,
     podcasts,
     robots,
-    validate_for_bing,
-    validate_for_google,
-    validate_for_google2,
     validate_for_wot,
     help_home,
 )
@@ -57,80 +54,5 @@ urlpatterns = [
         name="simple_pages_sitemap",
     ),
     # SEO-related stuff
-    url(r"^BingSiteAuth.xml$", validate_for_bing),
-    url(r"^googleef3d845637ccb353.html$", validate_for_google),
-    url(r"^google646349975c2495b6.html$", validate_for_google2),
     url(r"^mywot8f5568174e171ff0acff.html$", validate_for_wot),
-    # Favicon, touch icons, etc.
-    url(
-        r"^favicon\.ico$",
-        RedirectView.as_view(url="/static/ico/favicon.ico", permanent=True),
-    ),
-    url(
-        r"^touch-icon-192x192\.png",
-        RedirectView.as_view(
-            url="/static/png/touch-icon-192x192.png", permanent=True
-        ),
-    ),
-    url(
-        r"^apple-touch-icon\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon.png", permanent=True
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-72x72-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-72x72-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-76x76-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-76x76-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-114x114-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-114x114-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-120x120-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-120x120-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-144x144-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-144x144-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-152x152-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-152x152-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-180x180-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-180x180-precomposed.png",
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^apple-touch-icon-precomposed\.png$",
-        RedirectView.as_view(
-            url="/static/png/apple-touch-icon-precomposed.png", permanent=True
-        ),
-    ),
 ]
