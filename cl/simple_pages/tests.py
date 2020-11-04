@@ -157,8 +157,6 @@ class SimplePagesTest(TestCase):
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
 class StaticFilesTest(TestCase):
-    good_mp3_path = "mp3/2014/06/09/ander_v._leo.mp3"
-    good_txt_path = "txt/2015/12/28/opinion_text.txt"
     good_pdf_path = (
         "pdf/2013/06/12/"
         + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
@@ -166,20 +164,9 @@ class StaticFilesTest(TestCase):
 
     def setUp(self):
         self.court = Court.objects.get(pk="test")
-        self.docket = Docket(
+        self.docket = Docket.objects.create(
             case_name="Docket", court=self.court, source=Docket.DEFAULT
         )
-        self.docket.save()
-
-        self.audio = Audio(
-            local_path_original_file=self.good_mp3_path,
-            local_path_mp3=self.good_mp3_path,
-            docket=self.docket,
-            blocked=False,
-            case_name_full="Ander v. Leo",
-            date_created=datetime.date(2014, 6, 9),
-        )
-        self.audio.save(index=False)
 
         self.opinioncluster = OpinionCluster(
             case_name="Hotline Bling",
@@ -188,37 +175,12 @@ class StaticFilesTest(TestCase):
         )
         self.opinioncluster.save(index=False)
 
-        self.txtopinion = Opinion(
-            cluster=self.opinioncluster,
-            type="Lead Opinion",
-            local_path=self.good_txt_path,
-        )
-        self.txtopinion.save(index=False)
-
         self.pdfopinion = Opinion(
             cluster=self.opinioncluster,
             type="Lead Opinion",
             local_path=self.good_pdf_path,
         )
         self.pdfopinion.save(index=False)
-
-    def test_serve_static_file_serves_mp3(self):
-        request = HttpRequest()
-        file_path = self.audio.local_path_mp3
-        response = serve_static_file(request, file_path=self.good_mp3_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(response["Content-Type"], "audio/mpeg")
-        self.assertIn("inline;", response["Content-Disposition"])
-
-    def test_serve_static_file_serves_txt(self):
-        request = HttpRequest()
-        response = serve_static_file(request, file_path=self.good_txt_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(response["Content-Type"], "text/plain")
-        self.assertIn("inline;", response["Content-Disposition"])
-        self.assertIn(
-            "FOR THE DISTRICT OF COLUMBIA CIRCUIT", response.content.decode()
-        )
 
     def test_serve_static_file_serves_pdf(self):
         request = HttpRequest()
