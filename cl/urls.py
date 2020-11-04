@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.conf.urls import include, url
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.views.generic import RedirectView
 from cl.sitemap import index_sitemap_maker
@@ -30,31 +32,10 @@ urlpatterns = [
         r"^removal/$",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
-    url(
-        r"^report/2010/$",
-        RedirectView.as_view(
-            url="https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^report/2012/$",
-        RedirectView.as_view(
-            url="https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
-    url(
-        r"report/2013/$",
-        RedirectView.as_view(
-            url="https://github.com/freelawproject/related-literature/raw/master/CourtListener%20Studies/Sarah%20Tyler/sarah_tyler_dissertation.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
     # Catch-alls that could conflict with other regexps -- place them last
     #   Serve a static file
     url(
-        r"^(?P<file_path>(?:pdf|wpd|txt|doc|docx|html|mp3|recap)/.+)$",
+        r"^(?P<file_path>recap/.+)$",
         serve_static_file,
     ),
-]
+] + static("/", document_root=settings.MEDIA_ROOT)

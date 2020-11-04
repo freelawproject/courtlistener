@@ -75,7 +75,8 @@ RUN apt purge --assume-yes \
 # will become mountpoint of our code
 WORKDIR /opt
 
-RUN mkdir /var/log/courtlistener && \
-    chmod 777 /var/log/courtlistener
+RUN mkdir /var/log/courtlistener \
+  && chmod 777 /var/log/courtlistener \
+  && mkdir -p /opt/courtlistener/cl/assets/static/
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
