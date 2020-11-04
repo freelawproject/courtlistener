@@ -359,65 +359,43 @@ def ratelimited(request, exception):
 
 @track_in_matomo(timeout=0.01)
 def serve_static_file(request, file_path=""):
-    """Sends a static file to a user.
+    """Serve a recap file or redirect to HTML if it's a bot.
 
-    This serves up the static case files such as the PDFs in a way that can be
-    blocked from search engines if necessary. We do four things:
-     - Look up the document  or audio file associated with the filepath
-     - Check if it's blocked
-     - If blocked, we set the x-robots-tag HTTP header
-     - Serve up the file using Apache2's xsendfile
+    Use nginx's X-Accel system to set headers without putting files in memory.
     """
     response = HttpResponse()
     file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
-    if file_path.startswith("mp3"):
-        item = get_object_or_404(Audio, local_path_mp3=file_path)
-        mimetype = "audio/mpeg"
-    elif file_path.startswith("recap"):
-        # Either we serve up a special HTML file to make open graph crawlers
-        # happy, or we serve the PDF to make a human happy.
-        og_disabled = bool(request.GET.get("no-og"))
-        if is_og_bot(request) and not og_disabled:
-            # Serve up the regular HTML page, which has the twitter card info.
-            try:
-                rd = RECAPDocument.objects.get(filepath_local=file_path)
-            except (
-                RECAPDocument.DoesNotExist,
-                RECAPDocument.MultipleObjectsReturned,
-            ):
-                pass
-            else:
-                return view_recap_document(
-                    request,
-                    docket_id=rd.docket_entry.docket_id,
-                    doc_num=rd.document_number,
-                    att_num=rd.attachment_number,
-                )
-        # A human or unable to find the item in the DB. Create an empty object,
-        # and set it to blocked. (All recap pdfs are blocked.)
-        item = RECAPDocument()
-        item.blocked = True
-        mimetype = "application/pdf"
-    else:
-        item = get_object_or_404(Opinion, local_path=file_path)
-        item.blocked = item.cluster.blocked
-        try:
-            mimetype = magic.from_file(file_loc, mime=True)
-        except IOError:
-            raise Http404
+    response["Content-Type"] = "application/pdf"
+    response["Content-Disposition"] = (
+        'inline; filename="%s"' % file_path.split("/")[-1].encode()
+    )
+    response["X-Accel-Redirect"] = file_loc
+    # Use microcache for RECAP PDFs. This should help with traffic bursts.
+    response["X-Accel-Expires"] = "5"
+    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
 
-    if item.blocked:
-        response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
+    # Either we serve up a special HTML file to make open graph crawlers
+    # happy, or we serve the PDF to make a human happy.
+    og_disabled = bool(request.GET.get("no-og"))
+    if is_og_bot(request) and not og_disabled:
+        # Serve up the regular HTML page, which has the twitter card info.
+        try:
+            rd = RECAPDocument.objects.get(filepath_local=file_path)
+        except (
+            RECAPDocument.DoesNotExist,
+            RECAPDocument.MultipleObjectsReturned,
+        ):
+            pass
+        else:
+            return view_recap_document(
+                request,
+                docket_id=rd.docket_entry.docket_id,
+                doc_num=rd.document_number,
+                att_num=rd.attachment_number,
+            )
 
     if settings.DEVELOPMENT:
-        # X-Sendfile will only confuse you in a dev env.
+        # X-Accel-Redirect will only confuse you in a dev env.
         with open(file_loc, "rb") as f:
             response.content = f.read()
-    else:
-        response["X-Sendfile"] = file_loc
-    file_name = file_path.split("/")[-1]
-    response["Content-Disposition"] = (
-        'inline; filename="%s"' % file_name.encode()
-    )
-    response["Content-Type"] = mimetype
     return response
