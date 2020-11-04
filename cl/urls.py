@@ -30,27 +30,6 @@ urlpatterns = [
         r"^removal/$",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
-    url(
-        r"^report/2010/$",
-        RedirectView.as_view(
-            url="https://www.ischool.berkeley.edu/files/student_projects/Final_Report_Michael_Lissner_2010-05-07_2.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
-    url(
-        r"^report/2012/$",
-        RedirectView.as_view(
-            url="https://www.ischool.berkeley.edu/files/student_projects/mcdonald_rustad_report.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
-    url(
-        r"report/2013/$",
-        RedirectView.as_view(
-            url="https://github.com/freelawproject/related-literature/raw/master/CourtListener%20Studies/Sarah%20Tyler/sarah_tyler_dissertation.pdf",  # noqa: E501
-            permanent=True,
-        ),
-    ),
     # Catch-alls that could conflict with other regexps -- place them last
     #   Serve a static file
     url(
