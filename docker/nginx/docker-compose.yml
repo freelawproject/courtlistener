@@ -20,6 +20,8 @@ services:
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     logging:
       driver: journald
+    extra_hosts:
+      - "localhost:192.168.0.122"
     restart: on-failure
     command: >
       bash -c "gunicorn cl_wsgi:application \
@@ -48,6 +50,8 @@ services:
       - "443:443"
     logging:
       driver: journald
+    extra_hosts:
+      - "localhost:192.168.0.122"
     restart: on-failure
 
   cl-judge-pics:
