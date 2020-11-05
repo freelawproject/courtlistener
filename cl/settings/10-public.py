@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import sys
+from pathlib import Path
 
 import sentry_sdk
 from django.contrib.messages import constants as message_constants
@@ -14,7 +15,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 
 from cl.lib.redis_utils import make_redis_interface
 
-INSTALL_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
+INSTALL_ROOT = Path(__file__).resolve().parents[1]
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
