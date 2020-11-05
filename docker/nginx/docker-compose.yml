@@ -15,6 +15,7 @@ services:
       - 8000
     volumes:
       - ${CL_BASE_DIR:-../..}:/opt/courtlistener
+      - ${BULK_DIR:-/sata/}:/storage/
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     logging:
