@@ -363,19 +363,8 @@ def serve_static_file(request, file_path=""):
 
     Use nginx's X-Accel system to set headers without putting files in memory.
     """
-    response = HttpResponse()
-    file_loc = os.path.join("/protected/", file_path)
-    response["Content-Type"] = "application/pdf"
-    response["Content-Disposition"] = (
-        'inline; filename="%s"' % file_path.split("/")[-1].encode()
-    )
-    response["X-Accel-Redirect"] = file_loc
-    # Use microcache for RECAP PDFs. This should help with traffic bursts.
-    response["X-Accel-Expires"] = "5"
-    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
-
-    # Either we serve up a special HTML file to make open graph crawlers
-    # happy, or we serve the PDF to make a human happy.
+    # If it's a open graph crawler, serve the HTML page so they can get
+    # thumbnails instead of serving the PDF binary.
     og_disabled = bool(request.GET.get("no-og"))
     if is_og_bot(request) and not og_disabled:
         # Serve up the regular HTML page, which has the twitter card info.
@@ -385,6 +374,7 @@ def serve_static_file(request, file_path=""):
             RECAPDocument.DoesNotExist,
             RECAPDocument.MultipleObjectsReturned,
         ):
+            # Fall through; serve it normally.
             pass
         else:
             return view_recap_document(
@@ -394,8 +384,24 @@ def serve_static_file(request, file_path=""):
                 att_num=rd.attachment_number,
             )
 
+    response = HttpResponse()
+    response["Content-Type"] = "application/pdf"
+    response["Content-Disposition"] = (
+        'inline; filename="%s"' % file_path.split("/")[-1].encode()
+    )
+
+    # Use microcache for RECAP PDFs. This should help with traffic bursts.
+    response["X-Accel-Expires"] = "5"
+    # Block all RECAP PDFs
+    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
+
     if settings.DEVELOPMENT:
         # X-Accel-Redirect will only confuse you in a dev env.
+        file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
         with open(file_loc, "rb") as f:
             response.content = f.read()
+    else:
+        file_loc = os.path.join("/protected/", file_path)
+        response["X-Accel-Redirect"] = file_loc
+
     return response
