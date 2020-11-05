@@ -14,7 +14,7 @@ services:
     expose:
       - 8000
     volumes:
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     logging:
@@ -39,7 +39,7 @@ services:
       - gunicorn
     volumes:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
       - ${CERT_HOME:-/etc/letsencrypt}:/etc/letsencrypt:ro
       - ${BULK_DIR:-/sata/}:/storage/
     ports:
