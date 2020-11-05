@@ -364,7 +364,7 @@ def serve_static_file(request, file_path=""):
     Use nginx's X-Accel system to set headers without putting files in memory.
     """
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
+    file_loc = os.path.join("/protected/", file_path)
     response["Content-Type"] = "application/pdf"
     response["Content-Disposition"] = (
         'inline; filename="%s"' % file_path.split("/")[-1].encode()

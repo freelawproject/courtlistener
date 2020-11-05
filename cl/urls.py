@@ -35,7 +35,7 @@ urlpatterns = [
     # Catch-alls that could conflict with other regexps -- place them last
     #   Serve a static file
     url(
-        r"^(?P<file_path>recap/.+)$",
+        r"^(?P<file_path>(?:recap)/.+)$",
         serve_static_file,
     ),
 ] + static("/", document_root=settings.MEDIA_ROOT)
