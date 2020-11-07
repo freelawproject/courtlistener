@@ -49,7 +49,7 @@ The DockerFile exists to keep things simple. You can use this as a developer,
 to test things, or to avoid running all the other bits and pieces needed by the
 full docker-compose file. When you launch the image associated with this 
 DockerFile, you will run one Celery worker. This is *fine* for development, but 
-if you want more than one, you should use the compose file, which will can 
+if you want more than one, you should use the compose file, which can 
 launch as many as hundreds of workers at a time.
 
 To run the image described in the DockerFile, run something like:
@@ -128,8 +128,6 @@ With that done, you'll run something like:
     sudo \
     CELERY_PREFORK_CONCURRENCY=10 \
     CELERY_PREFORK_MEMORY=5 \
-    CELERY_GEVENT_CONCURRENCY=512 \
-    CELERY_GEVENT_MEMORY=10 \
     CL_CODE_DIR=/home/username/projects/courtlistener \
     DJANGO_MEDIA_ROOT=/sata \
     POSTGRESQL_SOCK=/var/run/postgresql \
@@ -141,15 +139,9 @@ Some explanation of variables:
    workers running in prefork mode. This sets how many tasks to run 
    concurrently in prefork mode and sets a docker CPU limit of that number of 
    CPUs.
-   
- - `CELERY_GEVENT_CONCURRENCY` — Same, but for the `gevent` worker that we 
-   start (which is optimized for IO-bound tasks).
-   
- - `CELERY_{PREFORK,GEVENT}_MEMORY` — The amount of memory (in GB) to give to
-   the prefork and gevent workers. Defaults are 1GB each.
-   
- - `CELERY_GEVENT_CPU_LIMIT` — An optional variable for setting the number of 
-   CPUs available to the gevent worker. Default is 20 CPUs.
+
+ - `CELERY_PREFORK_MEMORY` — The amount of memory (in GB) to give to
+   the prefork workers. Defaults are 1GB each.
    
  - `CL_CODE_DIR` — Where the image can find the CourtListener code. 
  
@@ -165,13 +157,14 @@ Some explanation of variables:
 ## Running jobs
 
 Running jobs can be done by placing them into one of two queues:
-
- - io_bound — for IO bound tasks like networking ones, where a gevent pool will 
-   help. When using `docker run` this will just use prefork otherwise, it uses
-   gevent.
  
  - celery — the default queue, which uses a prefork multiprocessing pool to do 
    the work. If you don't specify a queue, you'll wind up here.
+   
+ - batch1,batch2,iauploads, etc - See the full list in the docker compose file.
+   This is where you'll put batch work, with the idea being that if you want to
+   run multiple batch jobs simultaneously, you can do so by running them in 
+   different queues.
 
 To run a job, then, do something like:
 
