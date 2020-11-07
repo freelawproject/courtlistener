@@ -81,14 +81,17 @@ def get_last_build_date(s):
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
 
     :param s: The content of the RSS feed as a string
+    :type s: bytes! This is a performance enhancement, but perhaps a premature
+    one. Depending on how this function returns we might not need to decode
+    the byte-string to text, so we just regex it as is.
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
-    date_re = r"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
+    date_re = rb"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
     m = re.search(date_re, s)
     if m is None:
         return None
-    last_build_date_str = m.group(2)
-    return parser.parse(last_build_date_str, fuzzy=False)
+    last_build_date_b = m.group(2)
+    return parser.parse(last_build_date_b, fuzzy=False)
 
 
 def alert_on_staleness(current_build_date, court_id, url):
