@@ -114,7 +114,7 @@ def index_sitemap_maker(request):
         conn.conn.http_connection.close()
         court_count_tuples = response.facet_counts.facet_fields["court_exact"]
         for court, count in court_count_tuples:
-            num_pages = count / items_per_sitemap + 1
+            num_pages = count // items_per_sitemap + 1
             for page in range(1, num_pages + 1):
                 sites.append(
                     "https://www.courtlistener.com%s?p=%s&court=%s"
