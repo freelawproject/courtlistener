@@ -5,12 +5,13 @@ volumes:
   cl-seal-rookery:
 
 services:
-  gunicorn:
-    container_name: gunicorn
+  cl-python:
+    container_name: cl-python
     image: freelawproject/courtlistener-django:latest
     depends_on:
       - cl-judge-pics
       - cl-seal-rookery
+      - cl-selenium
     expose:
       - 8000
     volumes:
@@ -18,6 +19,9 @@ services:
       - ${BULK_DIR:-/sata/}:/storage/
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    environment:
+      # Make it easy to connect to selenium. Juriscraper will pick up this var.
+      - WEBDRIVER_CONN="http://cl-selenium:4444/wd/hub"
     logging:
       driver: journald
     extra_hosts:
@@ -39,7 +43,7 @@ services:
     container_name: cl-nginx
     image: freelawproject/nginx:latest
     depends_on:
-      - gunicorn
+      - cl-python
     volumes:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
       - ${CL_BASE_DIR:-../..}:/opt/courtlistener
@@ -48,6 +52,21 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    logging:
+      driver: journald
+    extra_hosts:
+      - "localhost:192.168.0.122"
+    restart: on-failure
+
+  cl-selenium:
+    container_name: cl-selenium-scraper
+    image: selenium/standalone-chrome-debug
+    ports:
+      - 4444:4444  # Selenium
+    volumes:
+      - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
+    environment:
+      - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
     logging:
       driver: journald
     extra_hosts:
