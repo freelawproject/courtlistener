@@ -385,6 +385,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
         path = rd.filepath_local.path
         process = make_pdftotext_process(path)
         content, err = process.communicate()
+        content = content.decode()
 
         if needs_ocr(content):
             if not skip_ocr:
