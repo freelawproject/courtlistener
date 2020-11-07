@@ -76,7 +76,7 @@ RUN apt purge --assume-yes \
 WORKDIR /opt
 
 RUN mkdir /var/log/courtlistener \
-  && chmod 777 /var/log/courtlistener \
+  && ln -sf /dev/stdout /var/log/courtlistener/django.log \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
