@@ -607,7 +607,7 @@ def mailchimp_webhook(request):
             email = request.POST.get("data[email]")
             profiles = UserProfile.objects.filter(user__email=email)
             logger.info(
-                "Updating %s profiles for email %s", (profiles.count(), email)
+                "Updating %s profiles for email %s", profiles.count(), email
             )
             profiles.update(wants_newsletter=wants_newsletter)
 
