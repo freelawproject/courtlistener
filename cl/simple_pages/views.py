@@ -5,15 +5,14 @@ import os
 import re
 from datetime import timedelta
 
-import magic
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.urls import reverse
 from django.db.models import Count, Sum
 from django.http import HttpResponse
-from django.http import HttpResponseRedirect, Http404
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
 from django.template import loader
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
