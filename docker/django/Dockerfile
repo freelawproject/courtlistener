@@ -53,7 +53,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # Image & OCR tools
         imagemagick tesseract-ocr tesseract-ocr-eng \
         # Other dependencies
-        libffi-dev libxml2-dev libxslt-dev
+        libffi-dev libxml2-dev libxslt-dev procps
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
