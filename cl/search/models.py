@@ -822,7 +822,7 @@ class Docket(models.Model):
                         "page_count": rd.page_count,
                     }
                 )
-                if hasattr(rd.filepath_local, "path"):
+                if rd.filepath_local:
                     rd_out["filepath_local"] = rd.filepath_local.path
                 try:
                     rd_out["absolute_url"] = rd.get_absolute_url()
