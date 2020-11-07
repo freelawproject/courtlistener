@@ -163,6 +163,8 @@ def do_search(
                 )
                 si.conn.http_connection.close()
 
+            si.conn.http_connection.close()
+
             paged_results = paginate_cached_solr_results(
                 get_params, cd, results, rows, cache_key
             )
@@ -216,7 +218,6 @@ def do_search(
         if related_cluster_pks
         else None
     )
-    si.conn.http_connection.close()
     return {
         "results": paged_results,
         "facet_fields": make_stats_variable(search_form, paged_results),
