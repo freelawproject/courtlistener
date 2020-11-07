@@ -174,7 +174,7 @@ def generate_ia_json(d_pk, database="default"):
     json_str = renderer.render(
         IADocketSerializer(d).data,
         accepted_media_type="application/json; indent=2",
-    )
+    ).decode()
     return d, json_str
 
 
