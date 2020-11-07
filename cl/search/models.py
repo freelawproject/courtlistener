@@ -1351,7 +1351,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
                 "page_count": self.page_count,
             }
         )
-        if hasattr(self.filepath_local, "path"):
+        if self.filepath_local:
             out["filepath_local"] = self.filepath_local.path
 
         try:
