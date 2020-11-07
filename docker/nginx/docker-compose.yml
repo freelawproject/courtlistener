@@ -22,6 +22,7 @@ services:
     environment:
       # Make it easy to connect to selenium. Juriscraper will pick up this var.
       - WEBDRIVER_CONN="http://cl-selenium:4444/wd/hub"
+      - JURISCRAPER_LOG="/dev/stdout"
     logging:
       driver: journald
     extra_hosts:
