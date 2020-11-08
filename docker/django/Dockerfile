@@ -75,8 +75,8 @@ RUN apt purge --assume-yes \
 # will become mountpoint of our code
 WORKDIR /opt
 
-RUN mkdir /var/log/courtlistener \
-  && ln -sf /dev/stdout /var/log/courtlistener/django.log \
+RUN mkdir /var/log/juriscraper \
+  && ln -sf /dev/stdout /var/log/juriscraper/debug.log \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
