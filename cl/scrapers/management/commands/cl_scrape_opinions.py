@@ -218,7 +218,6 @@ class Command(VerboseCommand):
             msg, r = get_binary_content(
                 item["download_urls"],
                 site.cookies,
-                site._get_adapter_instance(),
                 method=site.method,
             )
             if msg:
