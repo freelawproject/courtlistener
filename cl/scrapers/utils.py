@@ -87,13 +87,12 @@ def get_extension(content):
     return fixes.get(extension, extension).lower()
 
 
-def get_binary_content(download_url, cookies, adapter, method="GET"):
+def get_binary_content(download_url, cookies, method="GET"):
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param cookies: Cookies that might be necessary to download the item.
-    :param adapter: An HTTPAdapter for use when getting content.
     :param method: The HTTP method used to get the item, or "LOCAL" to get an
     item during testing
     :return: Two values. The first is a msg indicating any errors encountered.
@@ -117,7 +116,6 @@ def get_binary_content(download_url, cookies, adapter, method="GET"):
             # Note that we do a GET even if site.method is POST. This is
             # deliberate.
             s = requests.session()
-            s.mount("https://", adapter)
             headers = {"User-Agent": "CourtListener"}
 
             r = s.get(
