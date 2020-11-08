@@ -512,7 +512,10 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "simple",
+            "filters": ["skip_unreadable_posts"],
         },
+        # Use this if you're not yet dockerized. If dockerized, the stream
+        # handler will send everything to stdout, which is what you want.
         "log_file": {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
@@ -544,16 +547,19 @@ LOGGING = {
             "propagate": False,
         },
         # This is the one that's used practically everywhere in the code.
-        "cl": {"handlers": ["log_file"], "level": "INFO", "propagate": True},
+        "cl": {"handlers": ["console"], "level": "INFO", "propagate": True},
     },
 }
 
 if DEVELOPMENT:
+    # Log SQL queries
     LOGGING["loggers"]["django.db.backends"] = {
         "handlers": ["console"],
         "level": "DEBUG",
         "propagate": False,
     }
+    # Versbose logs for devs
+    LOGGING["handlers"]["console"]["formatter"] = "verbose"
 
 ###################
 # Related content #
