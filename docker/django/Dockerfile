@@ -75,7 +75,11 @@ RUN apt purge --assume-yes \
 # will become mountpoint of our code
 WORKDIR /opt
 
-RUN mkdir /var/log/juriscraper \
+# We log to stdout by default, but we have a config for logging here. Even if
+# we don't use this logger, we need to have the file or else Python is unhappy.
+RUN mkdir /var/log/courtlistener \
+  && ln -sf /dev/stdout /var/log/courtlistener/django.log \
+  && mkdir /var/log/juriscraper \
   && ln -sf /dev/stdout /var/log/juriscraper/debug.log \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
