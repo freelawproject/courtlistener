@@ -200,7 +200,7 @@ def upload_recap_json(self, pk, database="default"):
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
-        files={file_name: StringIO(json_str)},
+        files={file_name: StringIO(json_str.encode())},
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
