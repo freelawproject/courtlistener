@@ -37,7 +37,7 @@ services:
         `# Reset each worker once in a while` \
         --max-requests 10000 \
         --max-requests-jitter 100 \
-        --timeout 90 \
+        --timeout 180 \
         --bind 0.0.0.0:8000"
 
   cl-nginx:
