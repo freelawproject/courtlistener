@@ -78,8 +78,8 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
-        self.connections = {
+        super().__init__(*args, **kwargs)
+        self.sis = {
             SEARCH_TYPES.OPINION: ExtraSolrInterface(
                 settings.SOLR_OPINION_URL, mode="r"
             ),
@@ -92,6 +92,10 @@ class Command(VerboseCommand):
         }
         self.options = {}
         self.valid_ids = {}
+
+    def __del__(self):
+        for si in self.sis.values():
+            si.conn.http_connection.close()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -167,7 +171,7 @@ class Command(VerboseCommand):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 results = (
-                    self.connections[query_type]
+                    self.sis[query_type]
                     .query()
                     .add_extra(**main_params)
                     .execute()
