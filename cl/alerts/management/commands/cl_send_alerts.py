@@ -280,7 +280,7 @@ class Command(VerboseCommand):
                     ],
                 }
                 results = (
-                    self.connections[item_type]
+                    self.sis[item_type]
                     .query()
                     .add_extra(**main_params)
                     .execute()
