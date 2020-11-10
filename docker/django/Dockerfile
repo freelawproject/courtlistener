@@ -78,9 +78,9 @@ WORKDIR /opt
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
 RUN mkdir /var/log/courtlistener \
-  && ln -sf /dev/stdout /var/log/courtlistener/django.log \
+  && chown -R www-data:www-data /var/log/courtlistener \
   && mkdir /var/log/juriscraper \
-  && ln -sf /dev/stdout /var/log/juriscraper/debug.log \
+  && chown -R www-data:www-data /var/log/juriscraper/ \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
