@@ -399,7 +399,7 @@ def serve_static_file(request, file_path=""):
     except UnicodeEncodeError:
         # Ascii failed. Do utf-8 params.
         file_expr = "filename*=utf-8''{}".format(quote(file_name))
-    response["Content-Disposition"] = b"inline; %s" % file_expr
+    response["Content-Disposition"] = "inline; %s" % file_expr
 
     # Use microcache for RECAP PDFs. This should help with traffic bursts.
     response["X-Accel-Expires"] = "5"
