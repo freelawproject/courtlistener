@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from datetime import timedelta
+from urllib.parse import quote
 
 from django.conf import settings
 from django.core.cache import cache
@@ -385,9 +386,20 @@ def serve_static_file(request, file_path=""):
 
     response = HttpResponse()
     response["Content-Type"] = "application/pdf"
-    response["Content-Disposition"] = (
-        'inline; filename="%s"' % file_path.split("/")[-1].encode()
-    )
+
+    file_name = file_path.split("/")[-1]
+
+    # HTTP headers didn't get encoding figured out until recently. As a result
+    # content disposition headers are a mess. Luckily, we can steal the junk
+    # below from Django.
+    try:
+        # Try with ascii. If it works, do it.
+        file_name.encode("ascii")
+        file_expr = 'filename="{}"'.format(file_name)
+    except UnicodeEncodeError:
+        # Ascii failed. Do utf-8 params.
+        file_expr = "filename*=utf-8''{}".format(quote(file_name))
+    response["Content-Disposition"] = b"inline; %s" % file_expr
 
     # Use microcache for RECAP PDFs. This should help with traffic bursts.
     response["X-Accel-Expires"] = "5"
