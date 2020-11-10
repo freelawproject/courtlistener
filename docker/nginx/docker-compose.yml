@@ -30,6 +30,8 @@ services:
     command: >
       bash -c "gunicorn cl_wsgi:application \
         --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+        --user www-data \
+        --group www-data \
         `# Set high number of workers. Docs recommend 2-4× core count` \
         --workers ${NUM_WORKERS:-48} \
         `# Allow longer queries to solr.` \
