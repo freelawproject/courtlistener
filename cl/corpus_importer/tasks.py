@@ -9,7 +9,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
 
-from io import StringIO
+from io import BytesIO
 from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
 
@@ -200,7 +200,7 @@ def upload_recap_json(self, pk, database="default"):
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
-        files={file_name: StringIO(json_str.encode())},
+        files={file_name: BytesIO(json_str.encode())},
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
