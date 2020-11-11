@@ -12,4 +12,5 @@ def make_redis_interface(db_name):
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         db=settings.REDIS_DATABASES[db_name],
+        decode_responses=True,
     )

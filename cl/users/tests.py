@@ -169,6 +169,25 @@ class UserTest(LiveServerTestCase):
             self.assertTrue(up.email_confirmed)
 
 
+class ProfileTest(TestCase):
+    fixtures = ["authtest_data.json"]
+
+    def test_api_page_with_data(self) -> None:
+        """Can we access the API stats page after the API has been used?"""
+        # Get the page anonymously to populate the stats with anon data
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
+
+        # Log in, get the API again, and then load the profile page
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        self.client.get(reverse("audio-list", kwargs={"version": "v3"}))
+
+        # Now get the API page
+        r = self.client.get(reverse("view_api"))
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+
 class DisposableEmailTest(TestCase):
     fixtures = ["authtest_data.json"]
     """
