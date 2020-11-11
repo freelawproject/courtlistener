@@ -96,7 +96,9 @@ class ContactTest(TestCase):
 
 
 class SimplePagesTest(TestCase):
-    def check_for_title(self, content):
+    fixtures = ["authtest_data.json"]
+
+    def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
         print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
@@ -111,10 +113,35 @@ class SimplePagesTest(TestCase):
             0,
             msg="The text in this title tag is empty.",
         )
-
         print("✓")
 
-    def test_simple_pages(self):
+    def assert_page_loads_ok(self, reverse_param: dict) -> None:
+        """Does a page load properly?
+
+        :param reverse_param: Params that can be sent to Django's reverse
+        function to get a URL path.
+        :return: None
+        """
+        path = reverse(**reverse_param)
+        print("Testing basic load of: {path}...".format(path=path), end="")
+        r = self.client.get(path)
+        self.assertEqual(
+            r.status_code,
+            HTTP_200_OK,
+            msg="Got wrong status code for page at: {path}\n  args: "
+            "{args}\n  kwargs: {kwargs}\n  Status Code: {code}".format(
+                path=path,
+                args=reverse_param.get("args", []),
+                kwargs=reverse_param.get("kwargs", {}),
+                code=r.status_code,
+            ),
+        )
+        print("✓")
+        is_html = "text/html" in r["content-type"]
+        if r["content-type"] and is_html:
+            self.assert_page_title_in_html(r.content)
+
+    def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params = [
             {"viewname": "faq"},
@@ -133,21 +160,24 @@ class SimplePagesTest(TestCase):
             {"viewname": "robots"},
         ]
         for reverse_param in reverse_params:
-            path = reverse(**reverse_param)
-            print("Testing basic load of: {path}...".format(path=path), end="")
-            r = self.client.get(path)
-            self.assertEqual(
-                r.status_code,
-                HTTP_200_OK,
-                msg="Got wrong status code for page at: {path}\n  args: "
-                "{args}\n  kwargs: {kwargs}\n  Status Code: {code}".format(
-                    path=path,
-                    args=reverse_param.get("args", []),
-                    kwargs=reverse_param.get("kwargs", {}),
-                    code=r.status_code,
-                ),
-            )
-            print("✓")
-            is_html = "text/html" in r["content-type"]
-            if r["content-type"] and is_html:
-                self.check_for_title(r.content)
+            self.assert_page_loads_ok(reverse_param)
+
+    def test_profile_urls(self) -> None:
+        """Do all of the profile URLs load properly?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        reverse_params = [
+            {"viewname": "view_settings"},
+            {"viewname": "profile_favorites"},
+            {"viewname": "profile_alerts"},
+            {"viewname": "view_visualizations"},
+            {"viewname": "view_deleted_visualizations"},
+            {"viewname": "password_change"},
+            {"viewname": "delete_account"},
+            {"viewname": "take_out"},
+            {"viewname": "profile_donations"},
+            {"viewname": "view_api"},
+        ]
+        for reverse_param in reverse_params:
+            self.assert_page_loads_ok(reverse_param)
