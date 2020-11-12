@@ -96,9 +96,10 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--do-missing-date-filed",
-            default=False,
+            default=0,
             help="Whether to scrape dockets with missing date_filed field."
             "if set, should be the number of dockets to scrape",
+            type=int,
         )
         parser.add_argument(
             "--day-count",
