@@ -18,7 +18,7 @@ services:
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
             - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-            - "${DJANGO_MEDIA_ROOT:-/sata}:/sata"
+            - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
             - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
             - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
         logging:
@@ -51,7 +51,7 @@ services:
         volumes:
             - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
             - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-            - "${DJANGO_MEDIA_ROOT:-/sata}:/sata"
+            - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
             - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
             - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
         logging:
