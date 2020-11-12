@@ -37,31 +37,37 @@ def get_docket_ids(last_x_days):
     """
     docket_ids = set()
     if hasattr(settings, "MATOMO_TOKEN"):
-        visits = requests.get(
-            settings.MATOMO_REPORT_URL,
-            timeout=10,
-            params={
-                "idSite": settings.MATOMO_SITE_ID,
-                "module": "API",
-                "method": "Live.getLastVisitsDetails",
-                "period": "day",
-                "format": "json",
-                "date": "last%s" % last_x_days,
-                "token_auth": settings.MATOMO_TOKEN,
-            },
-        )
+        try:
+            visits = requests.get(
+                settings.MATOMO_REPORT_URL,
+                timeout=10,
+                params={
+                    "idSite": settings.MATOMO_SITE_ID,
+                    "module": "API",
+                    "method": "Live.getLastVisitsDetails",
+                    "period": "day",
+                    "format": "json",
+                    "date": "last%s" % last_x_days,
+                    "token_auth": settings.MATOMO_TOKEN,
+                },
+            )
 
-        for item in visits.json():
-            for actiondetail in item["actionDetails"]:
-                url = actiondetail.get("url")
-                if url is None:
-                    continue
-                match = re.search(
-                    r"^https://www\.courtlistener\.com/docket/([0-9]+)/", url
-                )
-                if match is None:
-                    continue
-                docket_ids.add(match.group(1))
+            for item in visits.json():
+                for actiondetail in item["actionDetails"]:
+                    url = actiondetail.get("url")
+                    if url is None:
+                        continue
+                    match = re.search(
+                        r"^https://www\.courtlistener\.com/docket/([0-9]+)/",
+                        url,
+                    )
+                    if match is None:
+                        continue
+                    docket_ids.add(match.group(1))
+        except ValueError:
+            pass
+        except requests.exceptions.ConnectTimeout:
+            pass
 
     # Add in docket IDs that have docket alerts or are favorited
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
