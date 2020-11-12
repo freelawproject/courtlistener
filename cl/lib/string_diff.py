@@ -9,10 +9,10 @@ from collections import Counter
 def remove_words(phrase):
     # Removes words and punctuation that don't help the diff comparison.
     stop_words = (
-        "a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
-        + "|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error"
-        + "|others|against|ex|parte|complainants?|original|claimants?|devisee"
-        + "|executrix|executor"
+        r"a|an|and|as|at|but|by|en|etc|for|if|in|is|of|on|or|the|to|v\.?|via"
+        + r"|vs\.?|united|states?|et|al|appellants?|defendants?|administrator|plaintiffs?|error"
+        + r"|others|against|ex|parte|complainants?|original|claimants?|devisee"
+        + r"|executrix|executor"
     )
     stop_words_reg = re.compile(r"^(%s)$" % stop_words, re.IGNORECASE)
 

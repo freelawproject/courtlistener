@@ -43,7 +43,7 @@ for line in open("import_columbia_output_stage_2.log"):
     if "Failed to get a citation" in line:
         seg = line.split("'")[1]
 
-        newseg = re.sub("\d", "#", seg)
+        newseg = re.sub(r"\d", "#", seg)
         # print(newseg)
         # if 'Ct. Sup.' not in newseg:
         #    if 'Ohio App.' not in newseg:

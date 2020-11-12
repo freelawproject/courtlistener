@@ -65,7 +65,7 @@ def nbsp(text, autoescape=None):
         # This is an anonymous python identity function. Simply returns the
         # value of x when x is given.
         esc = lambda x: x
-    return mark_safe(re.sub("\s", "&nbsp;", esc(text.strip())))
+    return mark_safe(re.sub(r"\s", "&nbsp;", esc(text.strip())))
 
 
 @register.filter(needs_autoescape=True)
@@ -77,7 +77,7 @@ def v_wrapper(text, autoescape=None):
     else:
         esc = lambda x: x
     return mark_safe(
-        re.sub(" v\. ", '<span class="alt"> v. </span>', esc(text))
+        re.sub(r" v\. ", '<span class="alt"> v. </span>', esc(text))
     )
 
 
