@@ -514,6 +514,15 @@ class CiteTest(TestCase):
             #  FullCitation(volume=1, reporter='La.', page='1',
             #                          canonical_reporter='La.',
             #                          lookup_index=0)]),
+            # 9. Johnson #1 should pass and identify the citation
+            ('1 Johnson 1 (1890)',
+             [FullCitation(volume=1, reporter='N.M. (J.)', page='1',
+                           canonical_reporter='N.M. (J.)', lookup_index=0,
+                           reporter_index=1, reporter_found='Johnson',
+                           year=1890,
+                           )]),
+            # 10. Johnson #2 should fail to disambiguate with year alone
+            ('1 Johnson 1 (1806)', []),
         ]
         # fmt: on
         for pair in test_pairs:
