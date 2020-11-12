@@ -283,9 +283,12 @@ def view_parties(request, docket_id, slug):
 @ratelimit_if_not_whitelisted
 def docket_idb_data(request, docket_id, slug):
     docket, context = core_docket_data(request, docket_id)
+    if docket.idb_data is None:
+        return Http404("No IDB data for this docket at this time")
     context.update(
         {
-            "parties": docket.parties.exists(),  # Needed to show/hide parties tab.
+            # Needed to show/hide parties tab.
+            "parties": docket.parties.exists(),
             "docket_entries": docket.docket_entries.exists(),
             "origin_csv": choices_to_csv(docket.idb_data, "origin"),
             "jurisdiction_csv": choices_to_csv(
