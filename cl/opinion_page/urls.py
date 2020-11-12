@@ -26,17 +26,17 @@ urlpatterns = [
     ),
     # Opinion pages
     url(
-        r"^opinion/(?P<pk>\d*)/(?P<slug>[^/]*)/authorities/$",
+        r"^opinion/(?P<pk>\d{1,})/(?P<slug>[^/]*)/authorities/$",
         view_authorities,
         name="view_authorities",
     ),
     url(
-        r"^opinion/(?P<pk>\d*)/(?P<slug>[^/]*)/visualizations/$",
+        r"^opinion/(?P<pk>\d{1,})/(?P<slug>[^/]*)/visualizations/$",
         cluster_visualizations,
         name="cluster_visualizations",
     ),
-    url(r"^opinion/(\d*)/([^/]*)/$", view_opinion, name="view_case"),
-    url(r"^docket/(\d*)/([^/]*)/$", view_docket, name="view_docket"),
+    url(r"^opinion/(\d{1,})/([^/]*)/$", view_opinion, name="view_case"),
+    url(r"^docket/(\d{1,})/([^/]*)/$", view_docket, name="view_docket"),
     url(
         r"^recap/gov.uscourts"
         r"\.(?P<court>[^\./]+)"
@@ -45,24 +45,24 @@ urlpatterns = [
         name="redirect_docket_recap",
     ),
     url(
-        r"^docket/(?P<docket_id>\d*)/parties/(?P<slug>[^/]*)/$",
+        r"^docket/(?P<docket_id>\d{1,})/parties/(?P<slug>[^/]*)/$",
         view_parties,
         name="docket_parties",
     ),
     url(
-        r"^docket/(?P<docket_id>\d*)/idb/(?P<slug>[^/]*)/$",
+        r"^docket/(?P<docket_id>\d{1,})/idb/(?P<slug>[^/]*)/$",
         docket_idb_data,
         name="docket_idb_data",
     ),
     url(
-        r"^docket/(?P<docket_id>\d*)/(?P<doc_num>\d*)/(?P<slug>[^/]*)/$",
+        r"^docket/(?P<docket_id>\d{1,})/(?P<doc_num>\d{1,})/(?P<slug>[^/]*)/$",
         view_recap_document,
         name="view_recap_document",
     ),
     url(
-        r"^docket/(?P<docket_id>\d*)/"
-        r"(?P<doc_num>\d*)/"
-        r"(?P<att_num>\d*)/"
+        r"^docket/(?P<docket_id>\d{1,})/"
+        r"(?P<doc_num>\d{1,})/"
+        r"(?P<att_num>\d{1,})/"
         r"(?P<slug>[^/]*)/$",
         view_recap_document,
         name="view_recap_attachment",
