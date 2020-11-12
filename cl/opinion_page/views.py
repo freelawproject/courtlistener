@@ -383,6 +383,28 @@ def view_opinion(request, pk, _):
     unbound form.
     """
     # Look up the court, cluster, title and favorite information
+    if len(pk) == 0:
+        slug = request.get_full_path().split("/")[3]
+        try:
+            cluster = get_object_or_404(OpinionCluster, slug=slug)
+            return HttpResponseRedirect(cluster.get_absolute_url())
+        except OpinionCluster.MultipleObjectsReturned:
+            clusters = OpinionCluster.objects.filter(slug=slug)
+            return HttpResponse(
+                content=loader.render_to_string(
+                    "missing_cluster_info_page.html",
+                    {
+                        "too_many": True,
+                        "slug_str": slug,
+                        "clusters": clusters,
+                        "private": True,
+                    },
+                    request=request,
+                ),
+                status=HTTP_300_MULTIPLE_CHOICES,
+            )
+        except:
+            raise Http404("No opinion page matches the above partial URL.")
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
