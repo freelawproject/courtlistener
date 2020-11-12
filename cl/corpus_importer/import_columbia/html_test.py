@@ -109,7 +109,7 @@ def clean_string(s):
     # we don't know the order of the various punctuation items to be stripped.
     # We split on the v., and handle fixes at either end of plaintiff or
     # appellant.
-    bad_punctuation = "(-|–|_|/|;|,|\s)*"
+    bad_punctuation = r"(-|–|_|/|;|,|\s)*"
     bad_endings = re.compile(r"%s$" % bad_punctuation)
     bad_beginnings = re.compile(r"^%s" % bad_punctuation)
 
@@ -129,16 +129,16 @@ def clean_string(s):
 
 # For use in harmonize function
 # More details: http://www.law.cornell.edu/citation/4-300.htm
-US = "USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States"
+US = r"USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States"
 UNITED_STATES = re.compile(r"^(%s)(,|\.)?$" % US, re.I)
 THE_STATE = re.compile(r"the state", re.I)
-ET_AL = re.compile(",?\set\.?\sal\.?", re.I)
+ET_AL = re.compile(r",?\set\.?\sal\.?", re.I)
 BW = (
-    "appell(ee|ant)s?|claimants?|complainants?|defendants?|defendants?(--?|/)appell(ee|ant)s?"
-    + "|devisee|executor|executrix|pet(\.|itioner)s?|petitioners?(--?|/)appell(ee|ant)s?"
-    + "|petitioners?(--?|/)defendants?|plaintiffs?|plaintiffs?(--?|/)appell(ee|ant)s?|respond(e|a)nts?"
-    + "|respond(e|a)nts?(--?|/)appell(ee|ant)s?|cross(--?|/)respondents?|crosss?(--?|/)petitioners?"
-    + "|cross(--?|/)appell(ees|ant)s?|deceased"
+    r"appell(ee|ant)s?|claimants?|complainants?|defendants?|defendants?(--?|/)appell(ee|ant)s?"
+    + r"|devisee|executor|executrix|pet(\.|itioner)s?|petitioners?(--?|/)appell(ee|ant)s?"
+    + r"|petitioners?(--?|/)defendants?|plaintiffs?|plaintiffs?(--?|/)appell(ee|ant)s?|respond(e|a)nts?"
+    + r"|respond(e|a)nts?(--?|/)appell(ee|ant)s?|cross(--?|/)respondents?|crosss?(--?|/)petitioners?"
+    + r"|cross(--?|/)appell(ees|ant)s?|deceased"
 )
 BAD_WORDS = re.compile(r"^(%s)(,|\.)?$" % BW, re.I)
 BIG = (
@@ -146,7 +146,7 @@ BIG = (
     "FTC|HSBC|IBM|II|III|IV|JJ|LLC|LLP|MCI|MJL|MSPB|ND|NLRB|PTO|SD|UPS|RSS|SEC|UMG|US|USA|USC|"
     "USPS|WTO"
 )
-SMALL = "a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?"
+SMALL = r"a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?"
 NUMS = "0123456789"
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
 WEIRD_CHARS = r"¼½¾§ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜßàáâãäåæçèéêëìíîïñòóôœõöøùúûüÿ"
@@ -628,7 +628,7 @@ def parse_dates(raw_dates, caseyear):
     for raw_date in raw_dates:
         # there can be multiple years in a string, so we split on possible
         # indicators
-        raw_parts = re.split("(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
+        raw_parts = re.split(r"(?<=[0-9][0-9][0-9][0-9])(\s|.)", raw_date)
 
         # index over split line and add dates
         inner_dates = []
@@ -658,12 +658,12 @@ def parse_dates(raw_dates, caseyear):
             # split on either the month or the first number (e.g. for a
             # 1/1/2016 date) to get the text before it
             if no_month:
-                text = re.compile("(\d+)").split(raw_part.lower())[0].strip()
+                text = re.compile(r"(\d+)").split(raw_part.lower())[0].strip()
             else:
                 text = months.split(raw_part.lower())[0].strip()
             # remove footnotes and non-alphanumeric characters
-            text = re.sub("(\[fn.?\])", "", text)
-            text = re.sub("[^A-Za-z ]", "", text).strip()
+            text = re.sub(r"(\[fn.?\])", "", text)
+            text = re.sub(r"[^A-Za-z ]", "", text).strip()
             # if we ended up getting some text, add it, else ignore it
             if text:
                 inner_dates.append((clean_string(text), date))
