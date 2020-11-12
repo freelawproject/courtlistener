@@ -16,7 +16,7 @@ SPECIAL_REGEXES = {
         (re.compile("Court of Errors and Appeals", re.I), "nj"),
     ),
     "north_carolina/court_opinions": (
-        (re.compile("U\.S\. Circuit Court", re.I), "circtnc"),
+        (re.compile(r"U\.S\. Circuit Court", re.I), "circtnc"),
     ),
     "tennessee/court_opinions": (
         (re.compile("(Supreme )?Court of Errors and Appeals", re.I), "tenn"),

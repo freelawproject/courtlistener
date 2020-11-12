@@ -45,7 +45,7 @@ def transform_employ(string):
     employ_list = [
         [a]
         if a is None or a.startswith("Nominated")
-        else re.split("\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1)
+        else re.split(r"\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1)
         for a in string_list
     ]
 
@@ -142,10 +142,10 @@ def transform_bankruptcy(string):
     bankruptcy_list = [
         None
         if a is None
-        else re.split("\,+\s+(?=\d)+", a, 1)
+        else re.split(r"\,+\s+(?=\d)+", a, 1)
         if not any(month in a for month in month_list)
         else re.split(
-            ",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+            r",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
             a,
             1,
         )
