@@ -3,6 +3,7 @@
 
 import re
 from datetime import datetime
+from typing import Set
 
 import requests
 from django.conf import settings
@@ -15,7 +16,7 @@ from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Docket, Court
 
 
-def get_docket_ids_missing_info(num_to_get):
+def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     return set(
         Docket.objects.filter(
             date_filed__isnull=True, source__in=Docket.RECAP_SOURCES

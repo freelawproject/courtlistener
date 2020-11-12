@@ -2,6 +2,7 @@
 # encoding: utf-8
 import re
 import sys
+from typing import List
 
 from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
@@ -450,7 +451,7 @@ def is_date_in_reporter(editions, year):
     return False
 
 
-def disambiguate_reporters(citations):
+def disambiguate_reporters(citations: List[Citation]) -> List[Citation]:
     """Convert a list of citations to a list of unambiguous ones.
 
     Goal is to figure out:
