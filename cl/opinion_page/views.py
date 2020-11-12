@@ -374,7 +374,7 @@ def view_recap_document(
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def view_opinion(request, pk, _):
+def view_opinion(request, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
     We also test if the cluster ID is a favorite for the user, and send data
