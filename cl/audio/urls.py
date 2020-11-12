@@ -9,7 +9,7 @@ from cl.audio.sitemap import oral_argument_sitemap_maker
 from cl.audio.views import view_audio_file
 
 urlpatterns = [
-    url(r"^audio/(\d{1,})/(.*)/$", view_audio_file, name="view_audio_file"),
+    url(r"^audio/(\d+)/(.*)/$", view_audio_file, name="view_audio_file"),
     # Podcasts
     url(
         r"^podcast/court/all/$",
