@@ -579,7 +579,9 @@ def disambiguate_reporters(citations: List[Citation]) -> List[Citation]:
                         key = REPORTERS[EDITIONS[reporter_key]]
                         if citation.year:
                             cite_year = citation.year
-                            if is_date_in_reporter(key[i]["editions"], cite_year):
+                            if is_date_in_reporter(
+                                key[i]["editions"], cite_year
+                            ):
                                 possible_citations.append((reporter_key, i))
                 if len(possible_citations) == 1:
                     # We were able to identify only one hit after filtering by
