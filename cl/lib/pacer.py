@@ -299,10 +299,10 @@ def normalize_attorney_role(r):
 
 def normalize_us_phone_number(phone):
     """Tidy up phone numbers so they're nice."""
-    phone = re.sub("(\(|\)|\s+)", "", phone)
+    phone = re.sub(r"(\(|\)|\s+)", "", phone)
     m = phone_digits_re.search(phone)
     if m:
-        return "(%s) %s-%s" % (m.group(1), m.group(2), m.group(3))
+        return f"({m.group(1)}) {m.group(2)}-{m.group(3)}"
     return ""
 
 
@@ -411,7 +411,7 @@ def normalize_attorney_contact(c, fallback_name=""):
     address_lines = []
     lines = c.split("\n")
     for i, line in enumerate(lines):
-        line = re.sub("Email:\s*", "", line).strip()
+        line = re.sub(r"Email:\s*", "", line).strip()
         line = re.sub("pro se", "", line, flags=re.I)
         if not line:
             continue
