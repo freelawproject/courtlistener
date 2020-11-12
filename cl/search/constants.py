@@ -35,11 +35,11 @@ SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 
 # Search query for related items
 RELATED_PATTERN = re.compile(
-    """
+    r"""
     (^|\s)                      # beginning of string or whitespace
-    (?P<pfx>related:            # "related:" query prefix 
+    (?P<pfx>related:            # "related:" query prefix
         (?P<pks>(               # find related items for these IDs
-            ([0-9]+)(,[0-9]+)*  # one or more integers (comma separated) 
+            ([0-9]+)(,[0-9]+)*  # one or more integers (comma separated)
             )
         )
     )

@@ -278,7 +278,7 @@ def find_judge_names(text, first_names=False):
         first_last_names = [(None, names[0])]
         for i in range(len(names))[1:]:
             first_last = "%s %s" % (names[i - 1], names[i])
-            first_m_last = "%s [a-z]\.? %s" % (names[i - 1], names[i])
+            first_m_last = r"%s [a-z]\.? %s" % (names[i - 1], names[i])
             if re.search("%s|%s" % (first_last, first_m_last), text):
                 first_last_names[-1] = (first_last_names[-1][1], names[i])
                 last_names[-1] = names[i]
@@ -302,7 +302,7 @@ def judges_exist(text, judges):
                 matched.append(judge)
             continue
         first_last = "%s %s" % judge
-        first_m_last = "%s [a-z]\.? %s" % judge
+        first_m_last = r"%s [a-z]\.? %s" % judge
         if re.search(r"\b(%s|%s)\b" % (first_last, first_m_last), text):
             matched.append(judge)
     return matched

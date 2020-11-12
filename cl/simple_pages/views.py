@@ -253,7 +253,7 @@ def contact(
             cd = form.cleaned_data
             # Uses phone_number as Subject field to defeat spam. If this field
             # begins with three digits, assume it's spam; fake success.
-            if re.match("\d{3}", cd["phone_number"]):
+            if re.match(r"\d{3}", cd["phone_number"]):
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 

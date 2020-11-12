@@ -37,9 +37,9 @@ def convert_columbia_html(text):
 
     for ref in foot_references:
         try:
-            fnum = re.search("[\*\d]+", ref).group()
+            fnum = re.search(r"[\*\d]+", ref).group()
         except AttributeError:
-            fnum = re.search("\[fn(.+)\]", ref).group(1)
+            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
         rep = '<sup id="ref-fn%s"><a href="#fn%s">%s</a></sup>' % (
             fnum,
             fnum,
@@ -51,9 +51,9 @@ def convert_columbia_html(text):
 
     for ref in foot_numbers:
         try:
-            fnum = re.search("[\*\d]+", ref).group()
+            fnum = re.search(r"[\*\d]+", ref).group()
         except:
-            fnum = re.search("\[fn(.+)\]", ref).group(1)
+            fnum = re.search(r"\[fn(.+)\]", ref).group(1)
         rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
             fnum,
             fnum,
@@ -65,9 +65,9 @@ def convert_columbia_html(text):
     # nests paragraphs inside blockquotes, rather than vice versa. The former
     # looks good. The latter is bad.
     text = "<p>" + text + "</p>"
-    text = re.sub("</blockquote>\s*<blockquote>", "\n\n", text)
+    text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
     text = re.sub("\n\n", "</p>\n<p>", text)
-    text = re.sub("<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
+    text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)
     text = re.sub("</blockquote></p>", "</p></blockquote>", text, re.M)
 
     return text
