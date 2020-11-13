@@ -10,19 +10,19 @@ from django.conf.urls import url
 
 urlpatterns = [
     url(
-        r"^person/(?P<pk>\d*)/(?P<slug>[^/]*)/$",
+        r"^person/(?P<pk>\d+)/(?P<slug>[^/]*)/$",
         view_person,
         name="view_person",
     ),
     url(
-        r"^person/(?P<pk>\d*)/(?P<slug>[^/]*)/financial-disclosures/$",
+        r"^person/(?P<pk>\d+)/(?P<slug>[^/]*)/financial-disclosures/$",
         financial_disclosures_for_somebody,
         name="financial_disclosures_for_somebody",
     ),
     # Serve the PDFs, TIFFS, and thumbnails
     url(
         r"^person/"
-        r"(?P<pk>\d*)/"
+        r"(?P<pk>\d+)/"
         r"(?P<slug>[^/]*)/"
         r"(?P<filepath>financial-disclosures/"
         r"(?:thumbnails/)?"
