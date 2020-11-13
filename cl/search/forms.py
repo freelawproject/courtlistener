@@ -549,7 +549,7 @@ class SearchForm(forms.Form):
             q = re.sub(bad, good, q)
 
         # Make pipes work
-        q = re.sub("\|", " OR ", q)
+        q = re.sub(r"\|", " OR ", q)
 
         return q
 
