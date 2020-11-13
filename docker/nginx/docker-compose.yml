@@ -81,9 +81,15 @@ services:
     container_name: "cl-judge-pics"
     volumes:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+    deploy:
+      restart_policy:
+        condition: none
 
   cl-seal-rookery:
     image: freelawproject/seal-rookery:latest
     container_name: "cl-seal-rookery"
     volumes:
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    deploy:
+      restart_policy:
+        condition: none
