@@ -39,6 +39,23 @@ from cl.search.models import (
     OpinionsCited,
 )
 from cl.stats.models import Event
+from cl.tests.base import BaseSeleniumTest
+
+
+class ApiRootLoadTest(BaseSeleniumTest):
+    """Check that API root loads properly.
+
+    During the py3 conversion poetry failed to catch a necessary markdown bump
+    required by django rest framework.  This selenium test validates that
+    it is properly working.
+    """
+
+    def test_root(self):
+        """Does API root load properly?"""
+        self.browser.get(f"{self.live_server_url}{reverse('api_root')}")
+        self.assertEqual(
+            "Api Root – Django REST framework", self.browser.title
+        )
 
 
 class BasicAPIPageTest(TestCase):
