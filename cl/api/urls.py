@@ -106,7 +106,6 @@ urlpatterns = [
     url("^api/swagger/$", schema_view, name="swagger_schema"),
     # Documentation
     url(r"^api/$", views.api_index, name="api_index"),
-    url(r"^api/rest/v3/$", views.api_index, name="api_root"),
     url(r"^api/jurisdictions/$", views.court_index, name="court_index"),
     url(
         r"^api/rest-info/(?P<version>v[123])?/?$",
