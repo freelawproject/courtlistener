@@ -49,6 +49,13 @@ class BasicAPIPageTest(TestCase):
     def setUp(self):
         self.client = Client()
 
+    def test_api_root(self):
+        r = self.client.get(
+            reverse("api-root", kwargs={"version": "v3"}),
+            HTTP_ACCEPT="text/html",
+        )
+        self.assertEqual(r.status_code, 200)
+
     def test_api_index(self):
         r = self.client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
