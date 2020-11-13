@@ -7,86 +7,86 @@ networks:
     driver: overlay
     external: true
 services:
-    celery_prefork:
-        image: freelawproject/task-server:latest
-        depends_on:
-          - cl-judge-pics
-          - cl-seal-rookery
-        deploy:
-            resources:
-                limits:
-                    cpus: "${CELERY_PREFORK_CONCURRENCY}"
-                    memory: "${CELERY_PREFORK_MEMORY:-1}GB"
-            restart_policy:
-                condition: on-failure
-        volumes:
-            - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-            - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-            - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
-            - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-            - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
-        logging:
-            driver: journald
-        networks:
-            - cl_net_overlay
-        command: >
-            celery
-              --app=cl worker
-              --loglevel=info
-              --events
-              --pool=prefork
-              --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
-              --queues=celery
-              --hostname=prefork@%h
-              --prefetch-multiplier=1
+  celery_prefork:
+    image: freelawproject/task-server:latest
+    depends_on:
+      - cl-judge-pics
+      - cl-seal-rookery
+    deploy:
+      resources:
+        limits:
+          cpus: "${CELERY_PREFORK_CONCURRENCY}"
+          memory: "${CELERY_PREFORK_MEMORY:-1}GB"
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
+      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
+      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    logging:
+      driver: journald
+    networks:
+      - cl_net_overlay
+    command: >
+      celery
+        --app=cl worker
+        --loglevel=info
+        --events
+        --pool=prefork
+        --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
+        --queues=celery
+        --hostname=prefork@%h
+        --prefetch-multiplier=1
 
-    celery_prefork_bulk:
-        image: freelawproject/task-server:latest
-        depends_on:
-          - cl-judge-pics
-          - cl-seal-rookery
-        deploy:
-            resources:
-                limits:
-                    cpus: "${CELERY_PREFORK_BULK_CONCURRENCY}"
-                    memory: "${CELERY_PREFORK_BULK_MEMORY:-1}GB"
-            restart_policy:
-                condition: on-failure
-        volumes:
-            - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-            - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-            - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
-            - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-            - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
-        logging:
-            driver: journald
-        networks:
-            - cl_net_overlay
-        command: >
-            celery
-              --app=cl worker
-              --loglevel=info
-              --events
-              --pool=prefork
-              --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
-              --queues=batch1,batch2,iauploads
-              --hostname=prefork@%h
-              --prefetch-multiplier=5
+  celery_prefork_bulk:
+    image: freelawproject/task-server:latest
+    depends_on:
+      - cl-judge-pics
+      - cl-seal-rookery
+    deploy:
+      resources:
+        limits:
+          cpus: "${CELERY_PREFORK_BULK_CONCURRENCY}"
+          memory: "${CELERY_PREFORK_BULK_MEMORY:-1}GB"
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
+      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
+      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    logging:
+      driver: journald
+    networks:
+      - cl_net_overlay
+    command: >
+      celery
+        --app=cl worker
+        --loglevel=info
+        --events
+        --pool=prefork
+        --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
+        --queues=batch1,batch2,iauploads
+        --hostname=prefork@%h
+        --prefetch-multiplier=5
 
-    cl-judge-pics:
-      image: freelawproject/judge-pics:latest
-      container_name: "cl-judge-pics"
-      deploy:
-        restart_policy:
-          condition: none
-      volumes:
-        - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+  cl-judge-pics:
+    image: freelawproject/judge-pics:latest
+    container_name: "cl-judge-pics"
+    deploy:
+      restart_policy:
+        condition: none
+    volumes:
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
 
-    cl-seal-rookery:
-      image: freelawproject/seal-rookery:latest
-      container_name: "cl-seal-rookery"
-      deploy:
-        restart_policy:
-          condition: none
-      volumes:
-        - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+  cl-seal-rookery:
+    image: freelawproject/seal-rookery:latest
+    container_name: "cl-seal-rookery"
+    deploy:
+      restart_policy:
+        condition: none
+    volumes:
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
