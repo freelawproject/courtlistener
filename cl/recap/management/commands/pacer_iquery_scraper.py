@@ -7,6 +7,8 @@ from typing import Set
 
 import requests
 from django.conf import settings
+from requests import HTTPError
+from simplejson import JSONDecodeError
 
 from cl.alerts.models import DocketAlert
 from cl.favorites.models import Favorite
@@ -26,18 +28,16 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     )
 
 
-def get_docket_ids(last_x_days):
-    """
+def get_docket_ids(last_x_days: int) -> Set[int]:
+    """Get docket IDs to update via iquery
 
     :param last_x_days: How many of the last days relative to today should we
     inspect? E.g. 1 means just today, 2 means today and yesterday, etc.
-    :type last_x_days: int
     :return: docket IDs for which we should crawl iquery
-    :rtype: set
     """
     docket_ids = set()
     if hasattr(settings, "MATOMO_TOKEN"):
-        visits = requests.get(
+        r = requests.get(
             settings.MATOMO_REPORT_URL,
             timeout=10,
             params={
@@ -50,18 +50,27 @@ def get_docket_ids(last_x_days):
                 "token_auth": settings.MATOMO_TOKEN,
             },
         )
-
-        for item in visits.json():
-            for actiondetail in item["actionDetails"]:
-                url = actiondetail.get("url")
-                if url is None:
-                    continue
-                match = re.search(
-                    r"^https://www\.courtlistener\.com/docket/([0-9]+)/", url
-                )
-                if match is None:
-                    continue
-                docket_ids.add(match.group(1))
+        try:
+            r.raise_for_status()
+            j = r.json()
+        except (HTTPError, JSONDecodeError) as e:
+            logger.warning(
+                "iQuery scraper was unable to get results from Matomo. Got "
+                "exception: %s" % e
+            )
+        else:
+            for item in j:
+                for actiondetail in item["actionDetails"]:
+                    url = actiondetail.get("url")
+                    if url is None:
+                        continue
+                    match = re.search(
+                        r"^https://www\.courtlistener\.com/docket/([0-9]+)/",
+                        url,
+                    )
+                    if match is None:
+                        continue
+                    docket_ids.add(match.group(1))
 
     # Add in docket IDs that have docket alerts or are favorited
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
