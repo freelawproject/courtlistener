@@ -290,21 +290,32 @@ def get_and_save_free_document_report(self, court_id, start, end):
     msg = None
     try:
         report.query(start, end, sort="case_number")
-    except TypeError as exc:
-        msg = (
-            "TypeError getting free document report results, likely due "
-            "to failure to get Nonce."
-        )
-    except (RequestException, ReadTimeoutError) as exc:
-        msg = "Unable to get free document report results at %s (%s to %s)."
-    except PacerLoginException as exc:
-        msg = "PacerLoginException while getting free docs at %s (%s to %s)."
-    except ParsingException as exc:
-        msg = "Didn't get nonce at %s (%s to %s)."
-    except SoftTimeLimitExceeded as exc:
-        msg = "Soft time limit exceeded at %s (%s to %s)."
+    except (
+        TypeError,
+        RequestException,
+        ReadTimeoutError,
+        PacerLoginException,
+        ParsingException,
+        SoftTimeLimitExceeded,
+    ) as exc:
+        if isinstance(exc, TypeError):
+            msg = (
+                "TypeError getting free document report results, likely due "
+                "to failure to get Nonce."
+            )
+        elif isinstance(exc, (RequestException, ReadTimeoutError)):
+            msg = (
+                "Unable to get free document report results at %s (%s to %s)."
+            )
+        elif isinstance(exc, PacerLoginException):
+            msg = (
+                "PacerLoginException while getting free docs at %s (%s to %s)."
+            )
+        elif isinstance(exc, ParsingException):
+            msg = "Didn't get nonce at %s (%s to %s)."
+        elif isinstance(exc, SoftTimeLimitExceeded):
+            msg = "Soft time limit exceeded at %s (%s to %s)."
 
-    if msg is not None:
         if self.request.retries == self.max_retries:
             logger.error(msg, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
@@ -827,18 +838,18 @@ def get_pacer_case_id_and_title(
     msg = None
     try:
         report.query(docket_number)
-    except (requests.RequestException, ReadTimeoutError) as exc:
-        msg = (
-            "Network error while running possible case number query on: "
-            "%s.%s"
-        )
-    except PacerLoginException as exc:
-        msg = (
-            "PacerLoginException while running possible case number query on: "
-            "%s.%s"
-        )
+    except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
+        if isinstance(exc, (RequestException, ReadTimeoutError)):
+            msg = (
+                "Network error while running possible case number query on: "
+                "%s.%s"
+            )
+        elif isinstance(exc, PacerLoginException):
+            msg = (
+                "PacerLoginException while running possible case number query "
+                "on: %s.%s"
+            )
 
-    if msg:
         if self.request.retries == self.max_retries:
             logger.warning(msg, court_id, docket_number)
             self.request.chain = None
