@@ -3,6 +3,10 @@ import copy
 import logging
 import os
 import shutil
+from datetime import date
+from typing import Dict, Any, Optional
+
+from celery import Task
 
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.corpus_importer.utils import mark_ia_upload_needed
@@ -267,14 +271,19 @@ def download_recap_item(self, url, filename, clobber=False):
 
 
 @app.task(bind=True, max_retries=2, soft_time_limit=240)
-def get_and_save_free_document_report(self, court_id, start, end):
+def get_and_save_free_document_report(
+    self: Task,
+    court_id: str,
+    start: date,
+    end: date,
+) -> int:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
-    :return: None
+    :return: The status code of the scrape
     """
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
@@ -777,16 +786,16 @@ def make_fjc_idb_lookup_params(item):
     ignore_results=True,
 )
 def get_pacer_case_id_and_title(
-    self,
-    pass_through,
-    docket_number,
-    court_id,
-    cookies=None,
-    user_pk=None,
-    case_name=None,
-    office_number=None,
-    docket_number_letters=None,
-):
+    self: Task,
+    pass_through: Any,
+    docket_number: str,
+    court_id: str,
+    cookies: Optional[str] = None,
+    user_pk: Optional[int] = None,
+    case_name: Optional[str] = None,
+    office_number: Optional[str] = None,
+    docket_number_letters: Optional[str] = None,
+) -> Optional[Dict[str, str]]:
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
