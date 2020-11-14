@@ -1083,7 +1083,10 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
             self.attachment_number,
         )
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        if not self.document_number:
+            # Numberless entries don't get URLs
+            return ""
         if self.document_type == self.PACER_DOCUMENT:
             return reverse(
                 "view_recap_document",
