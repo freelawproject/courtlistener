@@ -1,5 +1,3 @@
-# coding=utf-8
-
 import json
 import shutil
 from datetime import timedelta, date

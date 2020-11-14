@@ -1,4 +1,3 @@
-# coding=utf-8
 # Code for merging PACER content into the DB
 import logging
 import re

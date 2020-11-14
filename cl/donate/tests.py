@@ -1,4 +1,3 @@
-# coding=utf-8
 import json
 from datetime import datetime, timedelta
 from unittest import skipIf

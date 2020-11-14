@@ -1,4 +1,3 @@
-# coding=utf-8
 from datetime import timedelta
 
 from django.contrib.auth.tokens import default_token_generator

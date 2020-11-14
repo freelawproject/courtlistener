@@ -1,21 +1,8 @@
-# coding=utf-8
-
-
-import datetime
-import os
-
-from django.conf import settings
 from django.core import mail
 from django.urls import reverse
-from django.http import HttpRequest
 from django.test import TestCase
-from django.test.utils import override_settings
 from lxml.html import fromstring
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
-
-from cl.audio.models import Audio
-from cl.search.models import Opinion, OpinionCluster, Docket, Court
-from cl.simple_pages.views import serve_static_file
 
 
 class ContactTest(TestCase):

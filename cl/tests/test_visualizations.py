@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 Functional tests for the Visualization feature of CourtListener
 """

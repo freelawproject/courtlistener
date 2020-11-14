@@ -1,4 +1,3 @@
-# coding=utf-8
 import sys
 from django.conf import settings
 from django.core.management import call_command
