@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 Functional testing of courtlistener RSS feeds
 """

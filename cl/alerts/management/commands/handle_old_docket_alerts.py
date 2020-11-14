@@ -1,4 +1,3 @@
-# coding=utf-8
 from argparse import RawTextHelpFormatter
 
 from django.conf import settings
