@@ -1,12 +1,14 @@
 from collections import defaultdict, OrderedDict
 from itertools import groupby
+from typing import Optional, Dict
 from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import F, Prefetch
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpRequest
 from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
@@ -29,8 +31,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
-from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import suppress_autotime, choices_to_csv
+from cl.lib.model_helpers import choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
@@ -52,12 +53,12 @@ from cl.search.models import (
     Docket,
     OpinionCluster,
     RECAPDocument,
-    DOCUMENT_STATUSES,
+    Court,
 )
 from cl.search.views import do_search
 
 
-def court_homepage(request, pk):
+def court_homepage(request: HttpRequest, pk: int) -> HttpResponse:
     if pk not in ["tennworkcompcl", "tennworkcompapp"]:
         raise Http404("Court pages only implemented for Tennessee so far.")
 
@@ -88,12 +89,11 @@ def court_homepage(request, pk):
 
 
 @group_required("tenn_work_uploaders")
-def court_publish_page(request, pk):
+def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     """Display upload form and intake Opinions for Tenn. Workers Comp Cl/App
 
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
-    :return:
     """
 
     if pk not in ["tennworkcompcl", "tennworkcompapp"]:
@@ -119,7 +119,11 @@ def court_publish_page(request, pk):
     )
 
 
-def redirect_docket_recap(request, court, pacer_case_id):
+def redirect_docket_recap(
+    request: HttpRequest,
+    court: Court,
+    pacer_case_id: str,
+) -> HttpResponseRedirect:
     docket = get_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
@@ -128,7 +132,7 @@ def redirect_docket_recap(request, court, pacer_case_id):
     )
 
 
-def make_docket_title(docket):
+def make_docket_title(docket: Docket) -> str:
     title = ", ".join(
         [
             s
@@ -142,7 +146,7 @@ def make_docket_title(docket):
     return title
 
 
-def user_has_alert(user, docket):
+def user_has_alert(user: User, docket: Docket) -> bool:
     has_alert = False
     if user.is_authenticated:
         has_alert = DocketAlert.objects.filter(
@@ -151,7 +155,7 @@ def user_has_alert(user, docket):
     return has_alert
 
 
-def core_docket_data(request, pk):
+def core_docket_data(request: HttpRequest, pk: int) -> HttpResponse:
     """Gather the core data for a docket, party, or IDB page."""
     docket = get_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
@@ -187,7 +191,7 @@ def core_docket_data(request, pk):
 @cache_page(60)
 @vary_on_cookie
 @ratelimit_if_not_whitelisted
-def view_docket(request, pk, slug):
+def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
 
@@ -229,7 +233,11 @@ def view_docket(request, pk, slug):
 
 
 @ratelimit_if_not_whitelisted
-def view_parties(request, docket_id, slug):
+def view_parties(
+    request: HttpRequest,
+    docket_id: int,
+    slug: str,
+) -> HttpResponse:
     """Show the parties and attorneys tab on the docket."""
     docket, context = core_docket_data(request, docket_id)
 
@@ -281,7 +289,11 @@ def view_parties(request, docket_id, slug):
 
 
 @ratelimit_if_not_whitelisted
-def docket_idb_data(request, docket_id, slug):
+def docket_idb_data(
+    request: HttpRequest,
+    docket_id: int,
+    slug: str,
+) -> HttpResponse:
     docket, context = core_docket_data(request, docket_id)
     if docket.idb_data is None:
         raise Http404("No IDB data for this docket at this time")
@@ -314,7 +326,7 @@ def docket_idb_data(request, docket_id, slug):
     return render(request, "docket_idb_data.html", context)
 
 
-def make_rd_title(rd):
+def make_rd_title(rd: RECAPDocument) -> str:
     de = rd.docket_entry
     d = de.docket
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
@@ -331,8 +343,12 @@ def make_rd_title(rd):
 
 @ratelimit_if_not_whitelisted
 def view_recap_document(
-    request, docket_id=None, doc_num=None, att_num=None, slug=""
-):
+    request: HttpRequest,
+    docket_id: Optional[int] = None,
+    doc_num: Optional[int] = None,
+    att_num: Optional[int] = None,
+    slug: str = "",
+) -> HttpResponse:
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
     """
@@ -374,7 +390,7 @@ def view_recap_document(
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def view_opinion(request, pk: int, _: str) -> HttpResponse:
+def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
     We also test if the cluster ID is a favorite for the user, and send data
@@ -448,7 +464,7 @@ def view_opinion(request, pk: int, _: str) -> HttpResponse:
 
 
 @ratelimit_if_not_whitelisted
-def view_authorities(request, pk, slug):
+def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
     return render(
@@ -465,7 +481,9 @@ def view_authorities(request, pk, slug):
 
 
 @ratelimit_if_not_whitelisted
-def cluster_visualizations(request, pk, slug):
+def cluster_visualizations(
+    request: HttpRequest, pk: int, slug: str
+) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     return render(
         request,
@@ -479,7 +497,7 @@ def cluster_visualizations(request, pk, slug):
     )
 
 
-def throw_404(request, context):
+def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     return render(
         request,
         "volumes_for_reporter.html",
@@ -488,7 +506,9 @@ def throw_404(request, context):
     )
 
 
-def reporter_or_volume_handler(request, reporter, volume=None):
+def reporter_or_volume_handler(
+    request: HttpRequest, reporter: str, volume: Optional[str] = None
+) -> HttpResponse:
     """Show all the volumes for a given reporter abbreviation or all the cases
     for a reporter-volume dyad.
 
@@ -584,7 +604,7 @@ def reporter_or_volume_handler(request, reporter, volume=None):
         )
 
 
-def make_reporter_dict():
+def make_reporter_dict() -> OrderedDict:
     """Make a dict of reporter names and abbreviations
 
     The format here is something like:
@@ -608,7 +628,12 @@ def make_reporter_dict():
     return reporters
 
 
-def citation_handler(request, reporter, volume, page):
+def citation_handler(
+    request: HttpRequest,
+    reporter: str,
+    volume: str,
+    page: str,
+) -> HttpResponse:
     """Load the page when somebody looks up a complete citation"""
 
     citation_str = " ".join([volume, reporter, page])
@@ -655,9 +680,14 @@ def citation_handler(request, reporter, volume, page):
         )
 
 
-def citation_redirector(request, reporter=None, volume=None, page=None):
-    """Take a citation URL and use it to redirect the user to the canonical page
-    for that citation.
+def citation_redirector(
+    request: HttpRequest,
+    reporter: Optional[str] = None,
+    volume: Optional[str] = None,
+    page: Optional[str] = None,
+) -> HttpResponse:
+    """Take a citation URL and use it to redirect the user to the canonical
+    page for that citation.
 
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
@@ -704,7 +734,7 @@ def citation_redirector(request, reporter=None, volume=None, page=None):
 
 
 @ensure_csrf_cookie
-def block_item(request):
+def block_item(request: HttpRequest) -> HttpResponse:
     """Block an item from search results using AJAX"""
     if request.is_ajax() and request.user.is_superuser:
         obj_type = request.POST["type"]
