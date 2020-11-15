@@ -41,7 +41,7 @@ def get_solr_core_status(core="all", url=settings.SOLR_HOST):
         )
 
     try:
-        solr_config = lxml.etree.parse(io.StringIO(r.content))
+        solr_config = lxml.etree.parse(io.StringIO(r.text))
     except lxml.etree.XMLSyntaxError as e:
         raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
 
