@@ -1,5 +1,6 @@
 import io
 import json
+from typing import Dict, Union, List
 
 import lxml
 import requests
@@ -7,7 +8,11 @@ from django.conf import settings
 from scorched.exc import SolrError
 
 
-def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
+def swap_solr_core(
+    current_core: str,
+    desired_core: str,
+    url: str = settings.SOLR_HOST,
+) -> None:
     """Swap cores, keeping on on deck for easy reversion.
 
     @current_core is the core you are currently using which will be swapped OUT.
@@ -27,7 +32,10 @@ def swap_solr_core(current_core, desired_core, url=settings.SOLR_HOST):
         )
 
 
-def get_solr_core_status(core="all", url=settings.SOLR_HOST):
+def get_solr_core_status(
+    core: str = "all",
+    url: str = settings.SOLR_HOST,
+) -> Dict:
     """Get the status for the solr core as an XML document."""
     if core == "all":
         core_query = ""
@@ -49,8 +57,11 @@ def get_solr_core_status(core="all", url=settings.SOLR_HOST):
 
 
 def get_term_frequency(
-    count=500, result_type="dict", field="text", url=settings.SOLR_HOST
-):
+    count: int = 500,
+    result_type: str = "dict",
+    field: str = "text",
+    url: str = settings.SOLR_HOST,
+) -> Union[Dict[str, int], List[str]]:
     """Get the term frequency in the index.
 
     result_type can be json, list or dict.
@@ -90,7 +101,7 @@ def get_term_frequency(
         raise ValueError("Unknown output type!")
 
 
-def get_data_dir(core, url=settings.SOLR_HOST):
+def get_data_dir(core: str, url: str = settings.SOLR_HOST):
     """
     Interrogate Solr to get the location of its data directory.
 
