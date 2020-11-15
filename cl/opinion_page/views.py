@@ -284,7 +284,7 @@ def view_parties(request, docket_id, slug):
 def docket_idb_data(request, docket_id, slug):
     docket, context = core_docket_data(request, docket_id)
     if docket.idb_data is None:
-        return Http404("No IDB data for this docket at this time")
+        raise Http404("No IDB data for this docket at this time")
     context.update(
         {
             # Needed to show/hide parties tab.
