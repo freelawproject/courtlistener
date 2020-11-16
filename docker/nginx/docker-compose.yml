@@ -41,6 +41,42 @@ services:
         --timeout 180 \
         --bind 0.0.0.0:8000"
 
+  cl-scrape-rss:
+    container_name: cl-scrape-rss
+    image: freelawproject/courtlistener-django:latest
+    volumes:
+      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
+      - ${BULK_DIR:-/sata/}:/storage/
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    logging:
+      driver: journald
+    user: www-data
+    extra_hosts:
+      - "localhost:192.168.0.122"
+    restart: on-failure
+    command: /opt/courtlistener/manage.py scrape_rss
+
+  cl-ia-recap-uploader:
+    container_name: cl-ia-recap-uploader
+    image: freelawproject/courtlistener-django:latest
+    volumes:
+      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
+      - ${BULK_DIR:-/sata/}:/storage/
+      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    logging:
+      driver: journald
+    user: www-data
+    extra_hosts:
+      - "localhost:192.168.0.122"
+    restart: on-failure
+    command: >
+        /opt/courtlistener/manage.py upload_to_ia
+        --action upload-recap-data-to-ia
+        --queue iauploads
+        --database replica
+
   # Before renaming this service, see: freelawproject/courtlistener#1433
   cl-nginx:
     container_name: cl-nginx
