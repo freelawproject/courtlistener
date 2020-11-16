@@ -1,4 +1,3 @@
-# Run using `docker-compose up`
 version: "3.7"
 volumes:
   cl-judge-pics:
@@ -42,6 +41,7 @@ services:
         --timeout 180 \
         --bind 0.0.0.0:8000"
 
+  # Before renaming this service, see: freelawproject/courtlistener#1433
   cl-nginx:
     container_name: cl-nginx
     image: freelawproject/nginx:latest
