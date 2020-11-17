@@ -99,7 +99,7 @@ services:
 
   cl-selenium:
     container_name: cl-selenium-scraper
-    image: selenium/standalone-chrome-debug
+    image: selenium/standalone-firefox-debug
     ports:
       - 4444:4444  # Selenium
     volumes:
