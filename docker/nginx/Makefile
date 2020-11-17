@@ -3,7 +3,7 @@ DOCKER_REPOSITORY ?= freelawproject/nginx
 DOCKER ?= docker
 export DOCKER
 
-DOCKER_TAG = $(shell cat docker/nginx/version.txt)
+DOCKER_TAG = $(shell head -1 docker/nginx/version.txt)
 
 .PHONY: all image push
 
