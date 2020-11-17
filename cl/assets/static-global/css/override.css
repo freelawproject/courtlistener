@@ -1049,3 +1049,14 @@ body.embed .caseHoverText {
 img:not([width]):not([height]) {
   border: 2px solid red;
 }
+
+/* Tax specific css tweak*/
+.footnotes > ul {
+  padding: 0px;
+}
+
+.courtsummary {
+border: 1px solid;
+padding: 10px;
+background: whitesmoke;
+}
