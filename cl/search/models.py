@@ -2670,9 +2670,7 @@ class Opinion(models.Model):
     html_columbia = models.TextField(
         help_text="HTML of Columbia archive", blank=True
     )
-    html_2020_X = models.TextField(
-        help_text="HTML of 2020 X db", blank=True
-    )
+    html_2020_X = models.TextField(help_text="HTML of 2020 X db", blank=True)
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
