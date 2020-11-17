@@ -4,7 +4,7 @@ DOCKER_REPOSITORY ?= freelawproject/courtlistener-django
 DOCKER ?= docker
 export DOCKER
 
-DOCKER_TAG = $(shell cat docker/django/version.txt)
+DOCKER_TAG = $(shell head -1 docker/django/version.txt)
 
 .PHONY: all image push
 

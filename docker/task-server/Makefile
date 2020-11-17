@@ -4,7 +4,7 @@ DOCKER_REPOSITORY ?= freelawproject/task-server
 DOCKER ?= docker
 export DOCKER
 
-DOCKER_TAG = $(shell cat docker/task-server/version.txt)
+DOCKER_TAG = $(shell head -1 docker/task-server/version.txt)
 
 .PHONY: all image push
 
