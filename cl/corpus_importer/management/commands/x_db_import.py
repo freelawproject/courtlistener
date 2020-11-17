@@ -24,7 +24,7 @@ cnt = CaseNameTweaker()
 
 
 def validate_dt(date_str) -> Tuple[datetime.date, bool]:
-    """ Validate datetime string
+    """Validate datetime string
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
     and mark the date as an estimate.
@@ -68,16 +68,14 @@ def should_we_add_opinion(cluster_id: int) -> bool:
     :param cluster_id:
     :return: bool
     """
-    ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(
-        html_2020_X=""
-    )
+    ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(html_2020_X="")
     if len(ops) > 0:
         return False
     return True
 
 
 def check_publication_status(found_cites) -> str:
-    """ Identify if the opinion is published in a specific reporter
+    """Identify if the opinion is published in a specific reporter
 
     We can use BTA TC and TC No to identify if the cases are published.
 
@@ -95,7 +93,7 @@ def check_publication_status(found_cites) -> str:
 
 
 def add_only_opinion(soup, cluster_id) -> None:
-    """ Add opinion to opinion cluster with X db import.
+    """Add opinion to opinion cluster with X db import.
 
     If already in the system, just add opinion to cluster and move on.
 
@@ -337,4 +335,3 @@ class Command(VerboseCommand):
         import_dir = options["import_dir"]
         make_searchable = options["make_searchable"]
         import_x_db(import_dir, skip_until, make_searchable)
-
