@@ -1467,7 +1467,7 @@ urllib3 = {version = "*", extras = ["secure"]}
 
 [[package]]
 name = "sentry-sdk"
-version = "0.19.1"
+version = "0.19.3"
 description = "Python client for Sentry (https://sentry.io)"
 category = "main"
 optional = false
@@ -1703,7 +1703,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e8baa4298ea2eb34a67c4421ee9ceb0fcea8531f1cdcff0ce846c9343c4d8a98"
+content-hash = "c7980de4419ff1b24bc67581e32de6c9680487ad7520db615b455cdb7c481bc7"
 
 [metadata.files]
 amqp = [
@@ -2591,8 +2591,8 @@ selenium = [
     {file = "selenium-4.0.0a6.macosx-10.15-x86_64.tar.gz", hash = "sha256:270e5fa9b0437054cc496147337fff08daaef6f8ef6e54bc464fce6f89e29d98"},
 ]
 sentry-sdk = [
-    {file = "sentry-sdk-0.19.1.tar.gz", hash = "sha256:5cf36eb6b1dc62d55f3c64289792cbaebc8ffa5a9da14474f49b46d20caa7fc8"},
-    {file = "sentry_sdk-0.19.1-py2.py3-none-any.whl", hash = "sha256:0eea248408d36e8e7037c7b73827bea20b13a4375bf1719c406cae6fcbc094e3"},
+    {file = "sentry-sdk-0.19.3.tar.gz", hash = "sha256:fd48f627945511c140546939b4d73815be4860cd1d2b9149577d7f6563e7bd60"},
+    {file = "sentry_sdk-0.19.3-py2.py3-none-any.whl", hash = "sha256:81d7a5d8ca0b13a16666e8280127b004565aa988bfeec6481e98a8601804b215"},
 ]
 simplejson = [
     {file = "simplejson-3.17.2-cp27-cp27m-macosx_10_13_x86_64.whl", hash = "sha256:2d3eab2c3fe52007d703a26f71cf649a8c771fcdd949a3ae73041ba6797cfcf8"},
