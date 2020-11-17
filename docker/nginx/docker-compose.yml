@@ -104,8 +104,6 @@ services:
       - 4444:4444  # Selenium
     volumes:
       - ${CL_SHM_DIR:-/dev/shm}:/dev/shm
-    environment:
-      - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
     logging:
       driver: journald
     extra_hosts:
