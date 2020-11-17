@@ -1,6 +1,7 @@
 import logging
 import time
 from functools import wraps
+from typing import Callable, Type
 
 import requests
 import tldextract
@@ -12,7 +13,13 @@ from cl.lib.bot_detector import is_bot
 logger = logging.getLogger(__name__)
 
 
-def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
+def retry(
+    ExceptionToCheck: Type[Exception],
+    tries: int = 4,
+    delay: float = 3,
+    backoff: float = 2,
+    logger: logging.Logger = None,
+) -> Callable:
     """Retry calling the decorated function using an exponential backoff.
 
     http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
@@ -32,7 +39,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     :type logger: logging.Logger instance
     """
 
-    def deco_retry(f):
+    def deco_retry(f: Callable) -> Callable:
         @wraps(f)
         def f_retry(*args, **kwargs):
             mtries, mdelay = tries, delay
@@ -55,7 +62,11 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
-def track_in_matomo(original_func=None, timeout=0.5, check_bots=True):
+def track_in_matomo(
+    original_func: Callable = None,
+    timeout: float = 0.5,
+    check_bots: bool = True,
+) -> Callable:
     """A decorator to track a request in Matomo.
 
     This decorator is needed on static assets that we want to track because
@@ -87,7 +98,7 @@ def track_in_matomo(original_func=None, timeout=0.5, check_bots=True):
     :returns the result of the wrapped function
     """
 
-    def _decorate(f):
+    def _decorate(f: Callable) -> Callable:
         @wraps(f)
         def wrapper(*args, **kwargs):
             t1 = time.time()
