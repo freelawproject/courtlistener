@@ -69,9 +69,9 @@ def should_we_add_opinion(cluster_id: int) -> bool:
     :return: bool
     """
     ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(html_2020_X="")
-    if len(ops) > 0:
-        return False
-    return True
+    if len(ops) == 0:
+        return True
+    return False
 
 
 def check_publication_status(found_cites) -> str:
@@ -105,7 +105,7 @@ def add_only_opinion(soup, cluster_id) -> None:
     op = Opinion(
         cluster_id=cluster_id,
         type=Opinion.COMBINED,
-        html_2020_X_db=html_str,
+        html_2020_X=html_str,
         extracted_by_ocr=False,
     )
     op.save()
