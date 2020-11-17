@@ -12,6 +12,7 @@ from django.test.utils import override_settings
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.expected_conditions import staleness_of
 from selenium.webdriver.support.ui import WebDriverWait
@@ -48,7 +49,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
     host = "0.0.0.0"
 
     @staticmethod
-    def _create_browser():
+    def _create_browser() -> webdriver.Chrome:
         options = webdriver.ChromeOptions()
         if settings.SELENIUM_HEADLESS is True:
             options.add_argument("headless")
@@ -71,7 +72,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         return webdriver.Chrome(chrome_options=options, keep_alive=True)
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         super(BaseSeleniumTest, cls).setUpClass()
 
         if "SELENIUM_DEBUG" in os.environ:
@@ -82,11 +83,11 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # Set host to externally accessible web server address
         cls.host = socket.gethostbyname(socket.gethostname())
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
 
-    def reset_browser(self):
+    def reset_browser(self) -> None:
         try:
             self.browser.quit()
         except AttributeError:
@@ -97,7 +98,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
         self.browser.implicitly_wait(5)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if self.screenshot:
             filename = type(self).__name__ + "-selenium.png"
             print("\nSaving screenshot: %s" % (filename,))
@@ -106,7 +107,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self._teardown_test_solr()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
-    def assert_text_in_node(self, text, tag_name):
+    def assert_text_in_node(self, text: str, tag_name: str) -> None:
         """Is the text in a given node?
 
         :param text: The text you want to look for
@@ -118,7 +119,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.assertIn(text, node.text)
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
-    def assert_text_not_in_node(self, text, tag_name):
+    def assert_text_not_in_node(self, text: str, tag_name: str) -> None:
         """Assert that text is not in a node by name
 
         :param text: The text you want not to appear
@@ -130,7 +131,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.assertNotIn(text, node.text)
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
-    def assert_text_in_node_by_id(self, text, tag_id):
+    def assert_text_in_node_by_id(self, text: str, tag_id: str) -> None:
         """Is the text in a node selected by ID?
 
         :param text: The text you want to look for
@@ -142,7 +143,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         self.assertIn(text, node.text)
 
     @retry(NoSuchElementException, tries=3, delay=0.25, backoff=1)
-    def find_element_by_id(self, node, id_):
+    def find_element_by_id(self, node: WebElement, id_):
         """Find an element by its ID.
 
         This only exists to add the retry functionality, without which, things
@@ -156,29 +157,37 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
 
     # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
-    def wait_for_page_load(self, timeout=SELENIUM_TIMEOUT):
+    def wait_for_page_load(self, timeout: int = SELENIUM_TIMEOUT):
         old_page = self.browser.find_element(By.TAG_NAME, "html")
         yield
         WebDriverWait(self.browser, timeout).until(staleness_of(old_page))
 
     @retry(TimeoutError, tries=3, delay=0.25, backoff=1)
-    def click_link_for_new_page(self, link_text, timeout=SELENIUM_TIMEOUT):
+    def click_link_for_new_page(
+        self,
+        link_text: str,
+        timeout: int = SELENIUM_TIMEOUT,
+    ) -> None:
         with self.wait_for_page_load(timeout=timeout):
             self.browser.find_element(By.LINK_TEXT, link_text).click()
 
-    def attempt_sign_in(self, username, password):
+    def attempt_sign_in(self, username: str, password: str) -> None:
         self.click_link_for_new_page("Sign in / Register")
         self.assertIn("Sign In", self.browser.title)
         self.browser.find_element(By.ID, "username").send_keys(username)
         self.browser.find_element(By.ID, "password").send_keys(password)
         self.browser.find_element(By.ID, "password").submit()
 
-    def get_url_and_wait(self, url, timeout=SELENIUM_TIMEOUT):
+    def get_url_and_wait(
+        self,
+        url: str,
+        timeout: int = SELENIUM_TIMEOUT,
+    ) -> None:
         self.browser.get(url)
         wait = WebDriverWait(self.browser, timeout)
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "html")))
 
-    def extract_result_count_from_serp(self):
+    def extract_result_count_from_serp(self) -> int:
         results = self.browser.find_element(By.ID, "result-count").text.strip()
         try:
             count = int(results.split(" ")[0].replace(",", ""))
@@ -187,7 +196,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         return count
 
     @staticmethod
-    def _update_index():
+    def _update_index() -> None:
         # For now, until some model/api issues are worked out for Audio
         # objects, we'll avoid using the cl_update_index command and do
         # this the hard way using tasks
@@ -197,7 +206,7 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         add_items_to_solr(audio_keys, "audio.Audio", force_commit=True)
 
     @staticmethod
-    def _teardown_test_solr():
+    def _teardown_test_solr() -> None:
         """Empty out the test cores that we use"""
         conns = [settings.SOLR_OPINION_TEST_URL, settings.SOLR_AUDIO_TEST_URL]
         for conn in conns:
