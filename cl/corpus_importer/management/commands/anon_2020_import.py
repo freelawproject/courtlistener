@@ -6,7 +6,6 @@ from typing import Optional, Tuple, Dict, List
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
-from django.db.utils import OperationalError
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
 
@@ -49,7 +48,7 @@ def validate_dt(date_str: str) -> Tuple[datetime.date, bool]:
 def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
     """Extract citations from raw string.
 
-    :param case_data: Case information from the 2020 X db.
+    :param case_data: Case information from the anon 2020 db.
     :return: Citation objects found in the raw string.
     """
     found_citations = []
@@ -66,8 +65,8 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
 def should_we_add_opinion(cluster_id: int) -> bool:
     """Check if we previously added this document.
 
-    If we find the citation in our system, we check if the x-db html has been
-    added to the system previously.
+    If we find the citation in our system, we check if the anon-2020 DB html
+    has been added to the system previously.
 
     :param cluster_id: ID of any cluster opinion found.
     :return: Should we had the opinion to found cluster.
@@ -102,7 +101,7 @@ def add_only_opinion(soup, cluster_id) -> None:
     """Add opinion to the cluster object.
 
     This is only run if we are already in the system and just need
-    to add the 2020 x db html to our cluster.
+    to add the anon 2020 db html to our cluster.
 
     :param soup: bs4 html object of opinion.
     :param cluster_id: Cluster ID for the opinion to save.
@@ -140,7 +139,7 @@ def attempt_cluster_lookup(citations: List[FoundCitation]) -> Optional[int]:
 def import_x_db(
     import_dir: str, skip_until: Optional[str], make_searchable: Optional[bool]
 ) -> None:
-    """Import data from 2020 X DB into our system.
+    """Import data from anon 2020 DB into our system.
 
     Iterate over thousands of directories each containing a tax case
     containing case json and a preprocessed HTML object. Check if we have
@@ -320,7 +319,7 @@ class MissingDocumentError(Exception):
 
 
 class Command(VerboseCommand):
-    help = "Import 2020 X DB."
+    help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
 
@@ -348,4 +347,4 @@ class Command(VerboseCommand):
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
         make_searchable = options["make_searchable"]
-        import_x_db(import_dir, skip_until, make_searchable)
+        import_anon_2020_db(import_dir, skip_until, make_searchable)
