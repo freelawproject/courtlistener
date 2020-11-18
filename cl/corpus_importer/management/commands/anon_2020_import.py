@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from glob import iglob
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, AnyStr
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -153,6 +153,17 @@ def do_case_name(soup, data) -> Dict[str, str]:
     }
 
 
+def find_court_id(data) -> AnyStr:
+    """Extract cl court id from court name
+
+    :param data: The full json data dict
+    :return: The cl court id for associated tax court.
+    """
+    if data["court"] == "United States Board of Tax Appeals":
+        return "bta"
+    return "tax"
+
+
 def import_anon_2020_db(
     import_dir: str,
     skip_until: Optional[str],
@@ -288,7 +299,6 @@ def import_anon_2020_db(
             if make_searchable:
                 add_items_to_solr.delay([op.pk], "search.Opinion")
         logger.info("Finished: %s", found_cites[0].base_citation())
-
 
 
 class Command(VerboseCommand):
