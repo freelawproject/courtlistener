@@ -209,7 +209,7 @@ class Docket(models.Model):
     HARVARD = 16
     SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
     DIRECT_INPUT = 32
-    X = 64
+    ANON_2020 = 64
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -233,7 +233,7 @@ class Docket(models.Model):
         (HARVARD, "Harvard"),
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (DIRECT_INPUT, "Direct court input"),
-        (X, "2020 anonymous database"),
+        (ANON_2020, "2020 anonymous database"),
     )
     RECAP_SOURCES = [
         RECAP,
@@ -2670,7 +2670,10 @@ class Opinion(models.Model):
     html_columbia = models.TextField(
         help_text="HTML of Columbia archive", blank=True
     )
-    html_2020_X = models.TextField(help_text="HTML of 2020 X db", blank=True)
+    html_anon_2020 = models.TextField(
+        help_text="HTML of 2020 anonymous archive",
+        blank=True,
+    )
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )

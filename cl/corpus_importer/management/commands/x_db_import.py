@@ -74,7 +74,9 @@ def should_we_add_opinion(cluster_id: int) -> bool:
     :param cluster_id: ID of any cluster opinion found.
     :return: Should we had the opinion to found cluster.
     """
-    ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(html_2020_X="")
+    ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(
+        html_anon_2020=""
+    )
     if len(ops) == 0:
         return True
     return False
@@ -112,7 +114,7 @@ def add_only_opinion(soup, cluster_id) -> None:
     op = Opinion(
         cluster_id=cluster_id,
         type=Opinion.COMBINED,
-        html_2020_X=html_str,
+        html_anon_2020=html_str,
         extracted_by_ocr=False,
     )
     op.save()
@@ -206,7 +208,7 @@ def import_x_db(
                     case_name_full=case_name_full,
                     docket_number=data["docket_number"],
                     court_id=court_id,
-                    source=Docket.X,
+                    source=Docket.ANON_2020,
                     ia_needs_upload=False,
                     date_argued=date_argued,
                 )
@@ -242,7 +244,7 @@ def import_x_db(
                     case_name_full=case_name_full,
                     precedential_status=status,
                     docket_id=docket.id,
-                    source=docket.X,
+                    source=docket.ANON_2020,
                     date_filed=date_filed,
                     date_filed_is_approximate=is_approximate,
                     attorneys=data["representation"]
@@ -297,7 +299,7 @@ def import_x_db(
                 op = Opinion(
                     cluster_id=cluster.id,
                     type=Opinion.COMBINED,
-                    html_2020_X=html_str,
+                    html_anon_2020=html_str,
                     extracted_by_ocr=False,
                 )
                 op.save()

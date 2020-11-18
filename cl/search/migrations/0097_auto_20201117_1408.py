@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='opinion',
-            name='html_2020_X',
+            name='html_anon_2020',
             field=models.TextField(blank=True, help_text='HTML of 2020 X db'),
         ),
         migrations.AlterField(
