@@ -273,11 +273,6 @@ def import_anon_2020_db(
                     cluster_id=cluster.id,
                 )
 
-            # xxx Lets check if we need this, if not, let's axe it.
-            if len(str(soup)) < 10:
-                logger.info(f"Failed: HTML is empty at {dir}")
-                raise MissingDocumentError("Missing HTML content")
-
             html_str = soup.find(
                 "div", {"class": "container"}
             ).decode_contents()
@@ -294,12 +289,6 @@ def import_anon_2020_db(
                 add_items_to_solr.delay([op.pk], "search.Opinion")
         logger.info("Finished: %s", found_cites[0].base_citation())
 
-
-class MissingDocumentError(Exception):
-    """The document could not be opened or was empty."""
-
-    def __init__(self, message):
-        Exception.__init__(self, message)
 
 
 class Command(VerboseCommand):
