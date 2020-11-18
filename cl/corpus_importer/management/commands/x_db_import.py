@@ -290,7 +290,7 @@ def import_x_db(import_dir, skip_until, make_searchable):
                     add_items_to_solr.delay([op.pk], "search.Opinion")
 
             logger.info("Finished: %s", found_cites[0].base_citation())
-            break
+
         except MissingDocumentError:
             logger.info(f"HTML was empty for {dir}")
         except Exception as e:
