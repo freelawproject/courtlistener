@@ -23,16 +23,17 @@ from cl.search.tasks import add_items_to_solr
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str) -> Tuple[datetime.date, bool]:
-    """Validate datetime string
+def validate_dt(date_str: str) -> Tuple[datetime.date, bool]:
+    """Validate datetime string.
+
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
     and mark the date as an estimate.
 
     If unable to validate date return an empty string, True tuple.
 
-    :param date_str: a date string we receive from the harvard corpus
-    :returns: Tuple of date obj or date obj estimate
+    :param date_str: a date string we receive from the harvard corpus.
+    :returns: Tuple of date obj or date obj estimate.
     and boolean indicating estimated date or actual date.
     """
     date_approx = False
@@ -47,14 +48,16 @@ def validate_dt(date_str) -> Tuple[datetime.date, bool]:
     return date_obj, date_approx
 
 
-def find_cites(data: dict) -> list:
-    """Extract citations from raw string
+def find_cites(case_data: dict) -> list:
+    """Extract citations from raw string.
 
-    :param data:
-    :return: Found citations.
+    :param case_data: Case information from the 2020 X db.
+    :return: Citation objects found in the raw string.
     """
     found_citations = []
-    cites = re.findall(r"\"(.*?)\"", data["lexis_ids_normalized"], re.DOTALL)
+    cites = re.findall(
+        r"\"(.*?)\"", case_data["lexis_ids_normalized"], re.DOTALL
+    )
     for cite in cites:
         fc = get_citations(cite)
         if len(fc) > 0:
@@ -65,8 +68,11 @@ def find_cites(data: dict) -> list:
 def should_we_add_opinion(cluster_id: int) -> bool:
     """Check if we previously added this document.
 
-    :param cluster_id:
-    :return: bool
+    If we find the citation in our system, we check if the x-db html has been
+    added to the system previously.
+
+    :param cluster_id: ID of any cluster opinion found.
+    :return: Should we had the opinion to found cluster.
     """
     ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(html_2020_X="")
     if len(ops) == 0:
@@ -75,12 +81,12 @@ def should_we_add_opinion(cluster_id: int) -> bool:
 
 
 def check_publication_status(found_cites) -> str:
-    """Identify if the opinion is published in a specific reporter
+    """Identify if the opinion is published in a specific reporter.
 
-    We can use BTA TC and TC No to identify if the cases are published.
+    Check if one of the found citations matches published reporters.
 
-    :param found_cites: Citations found
-    :return: Status of the opinion
+    :param found_cites: List of found citations.
+    :return: Opinion status.
     """
     for cite in found_cites:
         if cite.reporter == "B.T.A.":
@@ -93,13 +99,14 @@ def check_publication_status(found_cites) -> str:
 
 
 def add_only_opinion(soup, cluster_id) -> None:
-    """Add opinion to opinion cluster with X db import.
+    """Add opinion to the cluster object.
 
-    If already in the system, just add opinion to cluster and move on.
+    This is only run if we are already in the system and just need
+    to add the 2020 x db html to our cluster.
 
-    :param soup: HTML object to save
-    :param cluster_id: Cluster ID for the opinion to save
-    :return:None
+    :param soup: bs4 html object of opinion.
+    :param cluster_id: Cluster ID for the opinion to save.
+    :return:None.
     """
     html_str = str(soup.find("div", {"class": "container"}).decode_contents())
     op = Opinion(
@@ -111,13 +118,15 @@ def add_only_opinion(soup, cluster_id) -> None:
     op.save()
 
 
-def check_if_new(cites: list) -> Optional[int]:
-    """Check if citation in our system
+def check_if_new(citations: list) -> Optional[int]:
+    """Check if the citation in our database.
 
-    :param cites: Array of citations parsed from string
-    :return: cluster id for citations
+    If citation in found citations in our database, return cluster ID.
+
+    :param citations: Array of citations parsed from string.
+    :return: Cluster id for citations.
     """
-    for citation in cites:
+    for citation in citations:
         cite_query = Citation.objects.filter(
             reporter=citation.reporter,
             page=citation.page,
@@ -128,19 +137,26 @@ def check_if_new(cites: list) -> Optional[int]:
     return None
 
 
-def import_x_db(import_dir, skip_until, make_searchable):
-    """Import from X db.
+def import_x_db(
+    import_dir: str, skip_until: Optional[str], make_searchable: Optional[bool]
+) -> None:
+    """Import data from 2020 X DB into our system.
 
-    :param test_dir: Location of files to import
-    :param skip_until: Skip processing until directory
-    :param make_searchable: Should we add content to SOLR
-    :return: None
+    Iterate over thousands of directories each containing a tax case
+    containing case json and a preprocessed HTML object. Check if we have
+    a copy of this opinion in our system and either add the opinion to a
+    case we already have or create a new docket, cluster, citations and opinion
+    to our database.
+
+    :param import_dir: Location of directory of import data.
+    :param skip_until: ID for case we should begin processing, if any.
+    :param make_searchable: Should we add content to SOLR.
+    :return: None.
     """
-
     directories = iglob(f"{import_dir}/*/????-*.json")
     for dir in directories:
         try:
-            logger.info(f"Importing: {dir}")
+            logger.info(f"Importing case at: {dir}")
             if skip_until:
                 if skip_until in dir:
                     continue
@@ -217,7 +233,7 @@ def import_x_db(import_dir, skip_until, make_searchable):
                         data["date_standard"]
                     )
                 logger.info(
-                    "Adding cluster for: %s", found_cites[0].base_citation()
+                    "Add cluster for: %s", found_cites[0].base_citation()
                 )
                 status = check_publication_status(found_cites)
                 cluster = OpinionCluster(
@@ -288,25 +304,23 @@ def import_x_db(import_dir, skip_until, make_searchable):
 
                 if make_searchable:
                     add_items_to_solr.delay([op.pk], "search.Opinion")
-
             logger.info("Finished: %s", found_cites[0].base_citation())
 
         except MissingDocumentError:
-            logger.info(f"HTML was empty for {dir}")
+            logger.info(f"HTML was missing/empty for {dir}")
         except Exception as e:
-            print(str(e))
-            logger.info(f"Failed to save {dir} to database.")
+            logger.info(f"Failed to save {dir} to database.  Err msg {str(e)}")
 
 
 class MissingDocumentError(Exception):
-    """The document could not be opened or was empty"""
+    """The document could not be opened or was empty."""
 
     def __init__(self, message):
         Exception.__init__(self, message)
 
 
 class Command(VerboseCommand):
-    help = "Import X db."
+    help = "Import 2020 X DB."
 
     def add_arguments(self, parser):
 
@@ -320,7 +334,7 @@ class Command(VerboseCommand):
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
             required=False,
-            help="Glob path to the json objects to import",
+            help="Path to our directory of import files.",
         )
 
         parser.add_argument(
