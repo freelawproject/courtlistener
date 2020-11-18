@@ -71,12 +71,11 @@ def should_we_add_opinion(cluster_id: int) -> bool:
     :param cluster_id: ID of any cluster opinion found.
     :return: Should we had the opinion to found cluster.
     """
-    ops = Opinion.objects.filter(cluster_id=cluster_id).exclude(
-        html_anon_2020=""
+    return (
+        Opinion.objects.filter(cluster_id=cluster_id)
+        .exclude(html_anon_2020="")
+        .exists()
     )
-    if len(ops) == 0:
-        return True
-    return False
 
 
 def check_publication_status(found_cites: List[Citation]) -> str:
@@ -107,7 +106,7 @@ def add_only_opinion(soup, cluster_id) -> None:
     :param cluster_id: Cluster ID for the opinion to save.
     :return:None.
     """
-    html_str = str(soup.find("div", {"class": "container"}).decode_contents())
+    html_str = soup.find("div", {"class": "container"}).decode_contents()
     op = Opinion(
         cluster_id=cluster_id,
         type=Opinion.COMBINED,
@@ -126,18 +125,38 @@ def attempt_cluster_lookup(citations: List[FoundCitation]) -> Optional[int]:
     :return: Cluster id for citations.
     """
     for citation in citations:
-        cite_query = Citation.objects.filter(
+        cite = Citation.objects.get(
             reporter=citation.reporter,
             page=citation.page,
             volume=citation.volume,
         )
-        if len(cite_query) > 0:
-            return cite_query[0].cluster_id
+        if cite:
+            return cite.cluster_id
     return None
 
 
-def import_x_db(
-    import_dir: str, skip_until: Optional[str], make_searchable: Optional[bool]
+def do_case_name(soup, data) -> Dict[str, str]:
+    """Extract and normalize the case name
+
+    :param soup: bs4 html object of opinion.
+    :param data: The full json data dict
+    :return: A dict of the case_name{short,full}, that can be put
+    into the dockets and opinions.
+    """
+    case_name = harmonize(data["name"])
+    return {
+        "case_name_short": cnt.make_case_name_short(case_name),
+        "case_name": case_name,
+        "case_name_full": harmonize(
+            soup.find("div", {"class": "fullcasename"}).decode_contents()
+        ),
+    }
+
+
+def import_anon_2020_db(
+    import_dir: str,
+    skip_until: Optional[str],
+    make_searchable: Optional[bool],
 ) -> None:
     """Import data from anon 2020 DB into our system.
 
@@ -154,161 +173,126 @@ def import_x_db(
     """
     directories = iglob(f"{import_dir}/*/????-*.json")
     for dir in directories:
-        try:
-            logger.info(f"Importing case at: {dir}")
-            if skip_until:
-                if skip_until in dir:
-                    continue
-                skip_until = False
-            with open(dir, "rb") as f:
-                data = json.load(f)
+        logger.info(f"Importing case at: {dir}")
+        if skip_until:
+            if skip_until in dir:
+                continue
+            skip_until = False
 
-            with open(dir.replace("json", "html"), "rb") as f:
-                soup = bs4(f.read(), "html.parser")
-            case_name_full = str(
-                soup.find("div", {"class": "fullcasename"}).decode_contents()
+        # Prepare data and HTML
+        with open(dir, "rb") as f:
+            data = json.load(f)
+        with open(dir.replace("json", "html"), "rb") as f:
+            soup = bs4(f.read(), "html.parser")
+
+        found_cites = find_cites(data)
+        if found_cites is not None:
+            cluster_id = attempt_cluster_lookup(found_cites)
+            if cluster_id is not None:
+                add_opinion = should_we_add_opinion(cluster_id)
+                if add_opinion:
+                    logger.info(f"Adding opinion to cluster {cluster_id}.")
+                    add_only_opinion(soup, cluster_id)
+                else:
+                    logger.info(f"Opinion in system at {cluster_id}.")
+                continue
+
+        # xxx move court stuff to function
+        if data["court"] == "United States Tax Court":
+            court_id = "tax"
+        else:
+            court_id = "bta"
+
+        with transaction.atomic():
+            logger.info(
+                "Creating docket for: %s", found_cites[0].base_citation()
             )
-            found_cites = find_cites(data)
 
-            if found_cites is not None:
-                cluser_id = check_if_new(found_cites)
-                if cluser_id is not None:
-                    add_opinion = should_we_add_opinion(cluser_id)
-                    if add_opinion:
-                        logger.info(f"Adding opinion to cluster {cluser_id}.")
-                        add_only_opinion(soup, cluser_id)
-                    else:
-                        logger.info(f"Opinion in system at {cluser_id}.")
-                    continue
+            # XXX move this into validate function
+            try:
+                date_argued, is_approximate = validate_dt(data["date_argued"])
+            except:
+                # xxx add exception type
+                date_argued, is_approximate = None, None
 
-            case_name = harmonize(data["name"])
-            case_name_short = cnt.make_case_name_short(case_name)
-            case_name_full = harmonize(case_name_full)
-            if data["court"] == "United States Tax Court":
-                court_id = "tax"
-            else:
-                court_id = "bta"
-            with transaction.atomic():
+            try:
+                date_filed, is_approximate = validate_dt(data["date_filed"])
+            except:
+                # xxx naked exceptions in rare circumstances only
+                date_filed, is_approximate = validate_dt(data["date_standard"])
+
+            # xxx do all parsing, normalizing, etc, up front, then to all
+            #     merging next, so stuff isn't intermixed.
+
+            case_names = do_case_name(soup, data)
+            status = check_publication_status(found_cites)
+            docket_number = trunc(
+                data["docket_number"],
+                length=5000,
+                ellipsis="...",
+            )
+            docket = Docket.objects.create(
+                **case_names,
+                docket_number=docket_number,
+                court_id=court_id,
+                source=Docket.ANON_2020,
+                ia_needs_upload=False,
+                date_argued=date_argued,
+            )
+
+            logger.info("Add cluster for: %s", found_cites[0].base_citation())
+            cluster = OpinionCluster(
+                **case_names,
+                precedential_status=status,
+                docket_id=docket.id,
+                source=docket.ANON_2020,
+                date_filed=date_filed,
+                date_filed_is_approximate=is_approximate,
+                attorneys=data["representation"] or "",
+                disposition=data["summary_disposition"] or "",
+                summary=data["summary_court"] or "",
+                history=data["history"] or "",
+                other_dates=data["date_standard"] or "",
+                cross_reference=data["history_docket_numbers"] or "",
+                correction=data["publication_status_note"] or "",
+                judges=data["judges"].replace("{", "").replace("}", "") or "",
+            )
+            cluster.save(index=False)
+
+            for citation in found_cites:
                 logger.info(
-                    "Creating docket for: %s", found_cites[0].base_citation()
+                    "Adding citation for: %s", citation.base_citation()
                 )
-                try:
-                    date_argued, is_approximate = validate_dt(
-                        data["date_argued"]
-                    )
-                except:
-                    date_argued, is_approximate = None, None
-
-                docket = Docket(
-                    case_name=case_name,
-                    case_name_short=case_name_short,
-                    case_name_full=case_name_full,
-                    docket_number=data["docket_number"],
-                    court_id=court_id,
-                    source=Docket.ANON_2020,
-                    ia_needs_upload=False,
-                    date_argued=date_argued,
-                )
-                try:
-                    with transaction.atomic():
-                        docket.save()
-                except OperationalError as e:
-                    if "exceeds maximum" in str(e):
-                        docket.docket_number = (
-                            "%s, See Corrections for full Docket Number"
-                            % trunc(
-                                data["docket_number"],
-                                length=5000,
-                                ellipsis="...",
-                            )
-                        )
-                        docket.save()
-                try:
-                    date_filed, is_approximate = validate_dt(
-                        data["date_filed"]
-                    )
-                except:
-                    date_filed, is_approximate = validate_dt(
-                        data["date_standard"]
-                    )
-                logger.info(
-                    "Add cluster for: %s", found_cites[0].base_citation()
-                )
-                status = check_publication_status(found_cites)
-                cluster = OpinionCluster(
-                    case_name=case_name,
-                    case_name_short=case_name_short,
-                    case_name_full=case_name_full,
-                    precedential_status=status,
-                    docket_id=docket.id,
-                    source=docket.ANON_2020,
-                    date_filed=date_filed,
-                    date_filed_is_approximate=is_approximate,
-                    attorneys=data["representation"]
-                    if data["representation"] is not None
-                    else "",
-                    disposition=data["summary_disposition"]
-                    if data["summary_disposition"] is not None
-                    else "",
-                    summary=data["summary_court"]
-                    if data["summary_court"] is not None
-                    else "",
-                    history=data["history"]
-                    if data["history"] is not None
-                    else "",
-                    other_dates=data["date_standard"]
-                    if data["date_standard"] is not None
-                    else "",
-                    cross_reference=data["history_docket_numbers"]
-                    if data["history_docket_numbers"] is not None
-                    else "",
-                    correction=data["publication_status_note"]
-                    if data["publication_status_note"] is not None
-                    else "",
-                    judges=data["judges"].replace("{", "").replace("}", "")
-                    if data["judges"] is not None
-                    else "",
-                )
-                cluster.save(index=False)
-
-                for citation in found_cites:
-                    logger.info(
-                        "Adding citation for: %s", citation.base_citation()
-                    )
-                    Citation.objects.create(
-                        volume=citation.volume,
-                        reporter=citation.reporter,
-                        page=citation.page,
-                        type=map_reporter_db_cite_type(
-                            REPORTERS[citation.canonical_reporter][0][
-                                "cite_type"
-                            ]
-                        ),
-                        cluster_id=cluster.id,
-                    )
-                if len(str(soup)) < 10:
-                    logger.info(f"Failed: HTML is empty at {dir}")
-                    raise MissingDocumentError("Missing HTML content")
-
-                html_str = str(
-                    soup.find("div", {"class": "container"}).decode_contents()
-                )
-                op = Opinion(
+                Citation.objects.create(
+                    volume=citation.volume,
+                    reporter=citation.reporter,
+                    page=citation.page,
+                    type=map_reporter_db_cite_type(
+                        REPORTERS[citation.canonical_reporter][0]["cite_type"]
+                    ),
                     cluster_id=cluster.id,
-                    type=Opinion.COMBINED,
-                    html_anon_2020=html_str,
-                    extracted_by_ocr=False,
                 )
-                op.save()
 
-                if make_searchable:
-                    add_items_to_solr.delay([op.pk], "search.Opinion")
-            logger.info("Finished: %s", found_cites[0].base_citation())
+            # xxx Lets check if we need this, if not, let's axe it.
+            if len(str(soup)) < 10:
+                logger.info(f"Failed: HTML is empty at {dir}")
+                raise MissingDocumentError("Missing HTML content")
 
-        except MissingDocumentError:
-            logger.info(f"HTML was missing/empty for {dir}")
-        except Exception as e:
-            logger.info(f"Failed to save {dir} to database.  Err msg {str(e)}")
+            html_str = soup.find(
+                "div", {"class": "container"}
+            ).decode_contents()
+
+            op = Opinion(
+                cluster_id=cluster.id,
+                type=Opinion.COMBINED,
+                html_anon_2020=html_str,
+                extracted_by_ocr=False,
+            )
+            op.save()
+
+            if make_searchable:
+                add_items_to_solr.delay([op.pk], "search.Opinion")
+        logger.info("Finished: %s", found_cites[0].base_citation())
 
 
 class MissingDocumentError(Exception):
