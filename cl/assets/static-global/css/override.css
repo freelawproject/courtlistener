@@ -1056,7 +1056,7 @@ img:not([width]):not([height]) {
 }
 
 .courtsummary {
-border: 1px solid;
-padding: 10px;
-background: whitesmoke;
+  border: 1px solid;
+  padding: 10px;
+  background: whitesmoke;
 }
