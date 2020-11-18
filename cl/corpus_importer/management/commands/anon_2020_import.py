@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from glob import iglob
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -11,6 +11,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
 
 from cl.citations.find_citations import get_citations
+from cl.citations.models import Citation as FoundCitation
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
@@ -45,7 +46,7 @@ def validate_dt(date_str: str) -> Tuple[datetime.date, bool]:
     return date_obj, date_approx
 
 
-def find_cites(case_data: dict) -> list:
+def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
     """Extract citations from raw string.
 
     :param case_data: Case information from the 2020 X db.
@@ -79,7 +80,7 @@ def should_we_add_opinion(cluster_id: int) -> bool:
     return False
 
 
-def check_publication_status(found_cites) -> str:
+def check_publication_status(found_cites: List[Citation]) -> str:
     """Identify if the opinion is published in a specific reporter.
 
     Check if one of the found citations matches published reporters.
@@ -117,7 +118,7 @@ def add_only_opinion(soup, cluster_id) -> None:
     op.save()
 
 
-def check_if_new(citations: list) -> Optional[int]:
+def attempt_cluster_lookup(citations: List[FoundCitation]) -> Optional[int]:
     """Check if the citation in our database.
 
     If citation in found citations in our database, return cluster ID.
