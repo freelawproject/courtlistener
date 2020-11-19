@@ -667,6 +667,15 @@ class Docket(models.Model):
         ]:
             self.source = self.source + self.IDB
 
+    def add_anon_2020_source(self) -> None:
+        if self.source not in [
+            self.ANON_2020,
+            self.ANON_2020_AND_HARVARD,
+            self.ANON_2020_AND_SCRAPER,
+            self.ANON_2020_AND_SCRAPER_AND_HARVARD,
+        ]:
+            self.source = self.source + self.ANON_2020
+
     @property
     def pacer_url(self):
         if not self.pacer_case_id:
