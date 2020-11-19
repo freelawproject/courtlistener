@@ -1074,10 +1074,6 @@ emphasis {
   text-align: center;
 }
 
-.caseopinions > div > bodytext > p:first-child {
-  text-align: center;
-}
-
 /*New paragraphs are indented in tax reports*/
 .caseopinions > div > bodytext > p {
   text-indent: 10px;
