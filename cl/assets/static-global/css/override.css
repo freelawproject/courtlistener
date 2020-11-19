@@ -1056,7 +1056,30 @@ img:not([width]):not([height]) {
 }
 
 .courtsummary {
-  border: 1px solid;
-  padding: 10px;
-  background: whitesmoke;
+  padding:20px;
 }
+
+.courtcasedocbody > hr {
+  display: none !important;
+}
+
+/* This ends up being the decision decided commentary in tax cases that
+is right aligned in the reporters*/
+
+emphasis {
+  font-style: italic;
+}
+
+.fullcasename, .shortcasename, .docketnumber, .courtinfo {
+  text-align: center;
+}
+
+.caseopinions > div > bodytext > p:first-child {
+  text-align: center;
+}
+
+/*New paragraphs are indented in tax reports*/
+.caseopinions > div > bodytext > p {
+  text-indent: 10px;
+}
+/* END Tax specific css tweak*/
