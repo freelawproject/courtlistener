@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from glob import iglob
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -41,7 +41,7 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
 def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
-    data: Dict[str, Optional[str, int]],
+    data: Dict[str, Any],
     date_argued: datetime.date,
     date_filed: datetime.date,
     case_names: Dict[str, str],
@@ -154,7 +154,7 @@ def merge_or_add_opinions(
 @transaction.atomic
 def add_new_records(
     html_str: str,
-    data: Dict[str, Optional[str, int]],
+    data: Dict[str, Any],
     date_argued: datetime.date,
     date_filed: datetime.date,
     case_names: Dict[str, str],
@@ -271,7 +271,7 @@ def attempt_cluster_lookup(citations: List[FoundCitation]) -> Optional[int]:
     return None
 
 
-def do_case_name(soup, data: Dict[str, Optional[str, int]]) -> Dict[str, str]:
+def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
     """Extract and normalize the case name
 
     :param soup: bs4 html object of opinion.
@@ -301,7 +301,7 @@ def find_court_id(court_str: str) -> str:
 
 
 def process_dates(
-    data: Dict[str, Optional[str, int]]
+    data: Dict[str, Any]
 ) -> Tuple[datetime.date, datetime.date]:
     """Process date argued and date filed
 
@@ -362,8 +362,8 @@ def import_anon_2020_db(
             ellipsis="...",
         )
         html_str = soup.find("div", {"class": "container"}).decode_contents()
-        status = check_publication_status(found_cites)
         found_cites = find_cites(data)
+        status = check_publication_status(found_cites)
 
         cluster_id = None
         if found_cites:
