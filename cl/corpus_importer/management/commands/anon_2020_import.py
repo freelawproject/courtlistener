@@ -220,13 +220,13 @@ def find_court_id(court_str: str) -> str:
 
 def process_dates(
     data: Dict[str, Optional[str, int]]
-) -> Tuple[datetime.date, datetime.date()]:
+) -> Tuple[datetime.date, datetime.date]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.
     We use date standard as the key for filed and/or decided.
-    :param data:
-    :return:
+    :param data: Import case data
+    :return: Date objects for date argued and date filed
     """
     date_argued = date_filed = None
     if data["date_argued"]:
