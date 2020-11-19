@@ -210,6 +210,9 @@ class Docket(models.Model):
     SCRAPER_AND_HARVARD = 17  # This should be 18; 17 s/b HARVARD_AND_RECAP.
     DIRECT_INPUT = 32
     ANON_2020 = 64
+    ANON_2020_AND_SCRAPER = 66
+    ANON_2020_AND_HARVARD = 80
+    ANON_2020_AND_SCRAPER_AND_HARVARD = 82
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -234,6 +237,12 @@ class Docket(models.Model):
         (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
         (DIRECT_INPUT, "Direct court input"),
         (ANON_2020, "2020 anonymous database"),
+        (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
+        (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
+        (
+            ANON_2020_AND_SCRAPER_AND_HARVARD,
+            "2020 anonymous database, Scraper, and Harvard",
+        ),
     )
     RECAP_SOURCES = [
         RECAP,
