@@ -37,6 +37,7 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
     return found_citations
 
 
+@transaction.atomic
 def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
@@ -47,11 +48,11 @@ def merge_or_add_opinions(
     status: str,
     docket_number: str,
     found_citations: List[FoundCitation],
-):
+) -> Optional[Docket]:
     """Merge opinions if applicable.
 
     If opinion not in system, merge or add to cluster.
-    If opinion is on system came from harvard, add new opinion to cluster, else
+    If opinion in system came from harvard, add new opinion to cluster, else
     we merge new opinion data into scraped opinion.
 
     :param cluster_id: Opinion Cluster id.
@@ -59,7 +60,11 @@ def merge_or_add_opinions(
     :param data: Case data to import.
     :param date_argued: Date case was argued.
     :param date_filed: Date case was filed.
-    :return: None.
+    :param case_names: A dict with the three case name types
+    :param status: Whether it's precedential
+    :param docket_number: The docket number
+    :param found_citations: A list of FoundCitation objects.
+    :return: The merged docket, cluster, and opinion.
     """
     does_exist = (
         Opinion.objects.filter(cluster_id=cluster_id)
@@ -79,7 +84,7 @@ def merge_or_add_opinions(
     # validation and is_approx not needed
 
     # Merge docket information
-    docket.source = docket.source + docket.ANON_2020
+    docket.source = docket.add_anon_2020_source()
     docket.date_argued = date_argued or docket.date_argued
     docket.docket_number = docket_number or docket.docket_number
     docket.case_name_short = (
@@ -91,7 +96,6 @@ def merge_or_add_opinions(
     )
 
     # Merge cluster information
-
     cluster.date_filed = date_filed or cluster.date_filed
     cluster.precedential_status = status or cluster.precedential_status
     cluster.attorneys = data["representation"] or cluster.attorneys
@@ -136,15 +140,93 @@ def merge_or_add_opinions(
         logger.info("Merge with Harvard data")
         opinion.html_anon_2020 = html_str
     else:
-        op = Opinion(
+        opinion = Opinion(
             cluster_id=cluster.id,
             type=Opinion.COMBINED,
             html_anon_2020=html_str,
             extracted_by_ocr=False,
         )
-        op.save()
-
+    opinion.save()
     logger.info(f"Finished merging opinion in cluster {cluster_id}.")
+    return docket
+
+
+@transaction.atomic
+def add_new_records(
+    html_str: str,
+    data: Dict[str, Optional[str, int]],
+    date_argued: datetime.date,
+    date_filed: datetime.date,
+    case_names: Dict[str, str],
+    status: str,
+    docket_number: str,
+    found_citations: List[FoundCitation],
+    court_id: str,
+) -> Docket:
+    """Create new records in the DB based on parsed data
+
+    :param html_str: HTML opinion to add
+    :param data: Case data to import
+    :param date_argued: Date case was argued.
+    :param date_filed: Date case was filed.
+    :param case_names: A dict with the three case name types
+    :param status: Whether it's precedential
+    :param docket_number: The docket number
+    :param found_citations: A list of FoundCitation objects.
+    :param court_id: The CL id of the court
+    :return: None.
+    """
+    docket = Docket.objects.create(
+        **case_names,
+        docket_number=docket_number,
+        court_id=court_id,
+        source=Docket.ANON_2020,
+        ia_needs_upload=False,
+        date_argued=date_argued,
+    )
+
+    logger.info("Add cluster for: %s", found_citations[0].base_citation())
+    judges = data["judges"] or ""
+    cluster = OpinionCluster(
+        **case_names,
+        precedential_status=status,
+        docket_id=docket.id,
+        source=docket.ANON_2020,
+        date_filed=date_filed,
+        attorneys=data["representation"] or "",
+        disposition=data["summary_disposition"] or "",
+        summary=data["summary_court"] or "",
+        history=data["history"] or "",
+        other_dates=data["date_standard"] or "",
+        cross_reference=data["history_docket_numbers"] or "",
+        correction=data["publication_status_note"] or "",
+        judges=judges.replace("{", "").replace("}", "") or "",
+    )
+    cluster.save(index=False)
+
+    for citation in found_citations:
+        logger.info("Adding citation for: %s", citation.base_citation())
+        Citation.objects.get_or_create(
+            volume=citation.volume,
+            reporter=citation.reporter,
+            page=citation.page,
+            type=map_reporter_db_cite_type(
+                REPORTERS[citation.canonical_reporter][0]["cite_type"]
+            ),
+            cluster_id=cluster.id,
+        )
+
+    op = Opinion(
+        cluster_id=cluster.id,
+        type=Opinion.COMBINED,
+        html_anon_2020=html_str,
+        extracted_by_ocr=False,
+    )
+    op.save()
+    logger.info(
+        f"Finished importing cluster {cluster.id}; {found_citations[0].base_citation()}"
+    )
+    return docket
 
 
 def check_publication_status(found_cites: List[Citation]) -> str:
@@ -280,84 +362,42 @@ def import_anon_2020_db(
             ellipsis="...",
         )
         html_str = soup.find("div", {"class": "container"}).decode_contents()
-        found_cites = find_cites(data)
         status = check_publication_status(found_cites)
+        found_cites = find_cites(data)
 
-        if found_cites is not None:
+        cluster_id = None
+        if found_cites:
             cluster_id = attempt_cluster_lookup(found_cites)
-            if cluster_id is not None:
-                merge_or_add_opinions(
-                    cluster_id,
-                    html_str,
-                    data,
-                    date_argued,
-                    date_filed,
-                    case_names,
-                    status,
-                    docket_number,
-                    found_cites,
-                )
-                continue
-        with transaction.atomic():
-            logger.info(
-                "Creating docket for: %s", found_cites[0].base_citation()
+
+        if cluster_id is not None:
+            # Matching citations. Merge.
+            docket = merge_or_add_opinions(
+                cluster_id,
+                html_str,
+                data,
+                date_argued,
+                date_filed,
+                case_names,
+                status,
+                docket_number,
+                found_cites,
+            )
+        else:
+            # No matching citations. Create new records.
+            docket = add_new_records(
+                html_str,
+                data,
+                date_argued,
+                date_filed,
+                case_names,
+                status,
+                docket_number,
+                found_cites,
+                court_id,
             )
 
-            docket = Docket.objects.create(
-                **case_names,
-                docket_number=docket_number,
-                court_id=court_id,
-                source=Docket.ANON_2020,
-                ia_needs_upload=False,
-                date_argued=date_argued,
-            )
-
-            logger.info("Add cluster for: %s", found_cites[0].base_citation())
-            judges = data["judges"] or ""
-            cluster = OpinionCluster(
-                **case_names,
-                precedential_status=status,
-                docket_id=docket.id,
-                source=docket.ANON_2020,
-                date_filed=date_filed,
-                attorneys=data["representation"] or "",
-                disposition=data["summary_disposition"] or "",
-                summary=data["summary_court"] or "",
-                history=data["history"] or "",
-                other_dates=data["date_standard"] or "",
-                cross_reference=data["history_docket_numbers"] or "",
-                correction=data["publication_status_note"] or "",
-                judges=judges.replace("{", "").replace("}", "") or "",
-            )
-            cluster.save(index=False)
-
-            for citation in found_cites:
-                logger.info(
-                    "Adding citation for: %s", citation.base_citation()
-                )
-                Citation.objects.get_or_create(
-                    volume=citation.volume,
-                    reporter=citation.reporter,
-                    page=citation.page,
-                    type=map_reporter_db_cite_type(
-                        REPORTERS[citation.canonical_reporter][0]["cite_type"]
-                    ),
-                    cluster_id=cluster.id,
-                )
-
-            op = Opinion(
-                cluster_id=cluster.id,
-                type=Opinion.COMBINED,
-                html_anon_2020=html_str,
-                extracted_by_ocr=False,
-            )
-            op.save()
-
-            if make_searchable:
-                add_items_to_solr.delay([op.pk], "search.Opinion")
-        logger.info(
-            f"Finished importing cluster {cluster.id}; {found_cites[0].base_citation()}"
-        )
+        if make_searchable and docket:
+            add_items_to_solr.delay([docket.pk], "search.Docket")
 
 
 class Command(VerboseCommand):
