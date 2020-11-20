@@ -300,9 +300,7 @@ def find_court_id(court_str: str) -> str:
     return "tax"
 
 
-def process_dates(
-    data: Dict[str, Any]
-) -> Tuple[datetime.date, datetime.date]:
+def process_dates(data: Dict[str, Any]) -> Tuple[datetime.date, datetime.date]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.
