@@ -1049,3 +1049,33 @@ body.embed .caseHoverText {
 img:not([width]):not([height]) {
   border: 2px solid red;
 }
+
+/* Tax specific css tweak*/
+.footnotes > ul {
+  padding: 0px;
+}
+
+.courtsummary {
+  padding:20px;
+}
+
+.courtcasedocbody > hr {
+  display: none !important;
+}
+
+/* This ends up being the decision decided commentary in tax cases that
+is right aligned in the reporters*/
+
+emphasis {
+  font-style: italic;
+}
+
+.fullcasename, .shortcasename, .docketnumber, .courtinfo {
+  text-align: center;
+}
+
+/*New paragraphs are indented in tax reports*/
+.caseopinions > div > bodytext > p {
+  text-indent: 10px;
+}
+/* END Tax specific css tweak*/
