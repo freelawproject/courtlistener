@@ -247,27 +247,41 @@ def check_publication_status(found_cites: List[Citation]) -> str:
     return "Unpublished"
 
 
-def attempt_cluster_lookup(citations: List[FoundCitation]) -> Optional[int]:
+def clean_docket_number(docket_number: str) -> str:
+    """Strip out non-numbers from docket numbers"""
+    return re.sub(r"[^\d]", "", docket_number)
+
+
+def attempt_cluster_lookup(
+    citations: List[FoundCitation],
+    new_docket_number: str,
+) -> Optional[int]:
     """Check if the citation in our database.
 
     If citation in found citations in our database, return cluster ID.
 
     :param citations: Array of citations parsed from string.
+    :param new_docket_number: The docket number we hope to merge, to use for
+    disambiguation.
     :return: Cluster id for citations.
     """
     for citation in citations:
-        cite_exists = Citation.objects.filter(
+        cites = Citation.objects.filter(
             reporter=citation.reporter,
             page=citation.page,
             volume=citation.volume,
-        ).exists()
-        if cite_exists:
-            citation = Citation.objects.get(
-                reporter=citation.reporter,
-                page=citation.page,
-                volume=citation.volume,
-            )
-            return citation.cluster_id
+        )
+        cite_count = cites.count()
+        if cite_count == 1:
+            return cites[0].cluster_id
+        elif cite_count > 1:
+            new_docket_number = clean_docket_number(new_docket_number)
+            for cite in cites:
+                found_dn = clean_docket_number(
+                    cite.cluster.docket.docket_number
+                )
+                if found_dn == new_docket_number:
+                    return cite.cluster_id
     return None
 
 
@@ -365,7 +379,7 @@ def import_anon_2020_db(
 
         cluster_id = None
         if found_cites:
-            cluster_id = attempt_cluster_lookup(found_cites)
+            cluster_id = attempt_cluster_lookup(found_cites, docket_number)
 
         if cluster_id is not None:
             # Matching citations. Merge.
