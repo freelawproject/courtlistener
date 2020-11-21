@@ -301,6 +301,22 @@ def do_case_name(soup, data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+def do_docket_number(data: Dict[str, Any]) -> str:
+    """Extract the docket number
+
+    :param data: The full json data dict
+    :return: The docket number
+    """
+    if data["docket_number"]:
+        return trunc(
+            data["docket_number"],
+            length=5000,
+            ellipsis="...",
+        )
+    else:
+        return ""
+
+
 def find_court_id(court_str: str) -> str:
     """Extract cl court id from court name
 
@@ -366,11 +382,7 @@ def import_anon_2020_db(
         case_names = do_case_name(soup, data)
         court_id = find_court_id(data["court"])
         date_argued, date_filed = process_dates(data)
-        docket_number = trunc(
-            data["docket_number"],
-            length=5000,
-            ellipsis="...",
-        )
+        docket_number = do_docket_number(data)
         html_str = soup.find("div", {"class": "container"}).decode_contents()
         found_cites = find_cites(data)
         status = check_publication_status(found_cites)
