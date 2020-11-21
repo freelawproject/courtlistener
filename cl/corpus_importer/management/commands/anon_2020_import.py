@@ -102,7 +102,6 @@ def merge_or_add_opinions(
     cluster.disposition = data["summary_disposition"] or cluster.disposition
     cluster.summary = data["summary_court"] or cluster.summary
     cluster.history = data["history"] or cluster.history
-    cluster.other_dates = data["date_standard"] or cluster.other_dates
     cluster.cross_reference = (
         data["history_docket_numbers"] or cluster.cross_reference
     )
@@ -197,7 +196,6 @@ def add_new_records(
         disposition=data["summary_disposition"] or "",
         summary=data["summary_court"] or "",
         history=data["history"] or "",
-        other_dates=data["date_standard"] or "",
         cross_reference=data["history_docket_numbers"] or "",
         correction=data["publication_status_note"] or "",
         judges=judges.replace("{", "").replace("}", "") or "",
