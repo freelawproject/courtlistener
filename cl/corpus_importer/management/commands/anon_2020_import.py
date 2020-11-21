@@ -84,7 +84,7 @@ def merge_or_add_opinions(
     # validation and is_approx not needed
 
     # Merge docket information
-    docket.source = docket.add_anon_2020_source()
+    docket.add_anon_2020_source()
     docket.date_argued = date_argued or docket.date_argued
     docket.docket_number = docket_number or docket.docket_number
     docket.case_name_short = (
