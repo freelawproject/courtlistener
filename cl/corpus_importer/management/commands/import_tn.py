@@ -3,6 +3,7 @@ import logging
 import os
 from glob import glob
 
+import argparse
 from dateutil import parser
 from django.utils.encoding import force_bytes
 
@@ -136,14 +137,13 @@ def import_tn_corpus(log, skip_until, filepath):
             "Successfully added Tennessee object cluster: %s", cluster.id
         )
 
-
 class Command(VerboseCommand):
     help = "Import TN data corpus received from TN Workers Comp boards."
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--input-file",
-            type=file,
+            type=argparse.FileType('r'),
             help="The filepath to our preprocessed data file.",
             required=True,
         )
