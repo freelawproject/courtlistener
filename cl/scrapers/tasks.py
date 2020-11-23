@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 
-
-import os
 import logging
 import random
 import subprocess
 import traceback
-import uuid
 from tempfile import NamedTemporaryFile
 
-import eyed3
 import requests
 from PyPDF2 import PdfFileReader
 from PyPDF2.utils import PdfReadError
@@ -17,19 +13,12 @@ from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
-from django.utils.encoding import (
-    smart_text,
-    DjangoUnicodeDecodeError,
-    force_text,
-)
 from django.utils.timezone import now
-from eyed3 import id3
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
-from seal_rookery import seals_data, seals_root
+from requests import Timeout
 
 from cl.audio.models import Audio
-from cl.audio.utils import get_audio_binary
 from cl.celery_init import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -45,11 +34,12 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
 )
 from cl.scrapers.models import ErrorLog
+from cl.scrapers.transformer_extractor_utils import (
+    convert_and_clean_audio,
+)
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import add_items_to_solr
 from juriscraper.pacer import PacerSession, CaseQuery
-
-DEVNULL = open("/dev/null", "w")
 
 logger = logging.getLogger(__name__)
 
@@ -382,6 +372,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
+
         path = rd.filepath_local.path
         process = make_pdftotext_process(path)
         content, err = process.communicate()
@@ -575,41 +566,31 @@ def process_audio_file(pk):
     meta data to the database.
     """
     af = Audio.objects.get(pk=pk)
-    tmp_path = os.path.join("/tmp", "audio_" + uuid.uuid4().hex + ".mp3")
-    av_path = get_audio_binary()
-    av_command = [
-        av_path,
-        "-i",
-        af.local_path_original_file.path,
-        "-ar",
-        "22050",  # sample rate (audio samples/s) of 22050Hz
-        "-ab",
-        "48k",  # constant bit rate (sample resolution) of 48kbps
-        tmp_path,
-    ]
     try:
-        _ = subprocess.check_output(av_command, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        print(
-            "%s failed command: %s\nerror code: %s\noutput: %s\n%s"
-            % (
-                av_path,
-                av_command,
-                e.returncode,
-                e.output,
-                traceback.format_exc(),
-            )
-        )
-        raise
-
-    set_mp3_meta_data(af, tmp_path)
-    with open(tmp_path, "rb") as mp3:
-        cf = ContentFile(mp3.read())
+        response = convert_and_clean_audio(af).json()
+        cf = ContentFile(response["content"])
         file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
         af.file_with_date = af.docket.date_argued
         af.local_path_mp3.save(file_name, cf, save=False)
+        af.duration = response["duration"]
 
-    af.duration = eyed3.load(tmp_path).info.time_secs
+    except Timeout:
+        ErrorLog.objects.create(
+            log_level="CRITICAL",
+            court=af.docket.court,
+            message="Timeout occurred in docker container for %s" % (af.pk),
+        )
+    except:
+        msg = (
+            "Unable to save mp3 to audio_file in scraper.tasks."
+            "process_audio_file for item: %s\n"
+            "Traceback:\n"
+            "%s" % (af.pk, traceback.format_exc())
+        )
+        print(msg)
+        ErrorLog.objects.create(
+            log_level="CRITICAL", court=af.docket.court, message=msg
+        )
     af.processing_complete = True
     af.save()
 
