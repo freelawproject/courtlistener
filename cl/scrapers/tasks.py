@@ -175,7 +175,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
 
     return processed
 
-
+@app.task
 def process_audio_file(pk):
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
