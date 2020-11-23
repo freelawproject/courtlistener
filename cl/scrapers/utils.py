@@ -4,7 +4,6 @@ import sys
 import traceback
 from urllib.parse import urljoin
 
-import magic
 import requests
 from django.conf import settings
 from juriscraper.AbstractSite import logger
@@ -13,11 +12,12 @@ from lxml import html
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.transformer_extractor_utils import extract_mime_type_from
 from cl.search.models import RECAPDocument
 
 
 def test_for_meta_redirections(r):
-    mime = magic.from_buffer(r.content, mime=True)
+    mime = extract_mime_type_from(bytes=r.content, mime=True)
     extension = mimetypes.guess_extension(mime)
     if extension == ".html":
         html_tree = html.fromstring(r.text)
@@ -54,7 +54,7 @@ def follow_redirections(r, s):
 
 def get_extension(content):
     """A handful of workarounds for getting extensions we can trust."""
-    file_str = magic.from_buffer(content)
+    file_str = extract_mime_type_from(bytes=content)
     if file_str.startswith("Composite Document File V2 Document"):
         # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
         # in libmagic 5.11-2.
@@ -64,10 +64,12 @@ def get_extension(content):
     elif file_str == "C source, ASCII text":
         mime = "text/plain"
     elif file_str.startswith("WordPerfect document"):
-        mime = "application/vnd.wordperfect"
+        return ".wpd"
+    elif file_str.startswith("Microsoft ASF"):
+        return ".wma"
     else:
         # No workaround necessary
-        mime = magic.from_buffer(content, mime=True)
+        mime = extract_mime_type_from(bytes=content, mime=True)
     extension = mimetypes.guess_extension(mime)
     if extension == ".obj":
         # It could be a wpd, if it's not a PDF

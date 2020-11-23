@@ -1,6 +1,5 @@
 import os
 
-import magic
 from django.conf import settings
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.urls import reverse
@@ -12,6 +11,7 @@ from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person, FinancialDisclosure
+from cl.scrapers.transformer_extractor_utils import extract_mime_type_from
 from cl.stats.utils import tally_stat
 
 
@@ -185,7 +185,9 @@ def financial_disclosures_fileserver(request, pk, slug, filepath):
     response["Content-Disposition"] = (
         'inline; filename="%s"' % filename.encode()
     )
-    response["Content-Type"] = magic.from_file(file_loc, mime=True)
+    response["Content-Type"] = extract_mime_type_from(
+        file_path=file_loc, mime=True
+    )
     if not is_bot(request):
         tally_stat("financial_reports.static_file.served")
     return response
