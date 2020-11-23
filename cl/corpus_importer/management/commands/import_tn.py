@@ -3,6 +3,7 @@ import logging
 import os
 from glob import glob
 
+import argparse
 from dateutil import parser
 from django.utils.encoding import force_bytes
 
@@ -143,7 +144,7 @@ class Command(VerboseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--input-file",
-            type=file,
+            type=argparse.FileType("r"),
             help="The filepath to our preprocessed data file.",
             required=True,
         )
