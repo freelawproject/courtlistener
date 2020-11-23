@@ -475,6 +475,7 @@ class AudioFileTaskTest(TestCase):
             resp.status_code, 200, msg="Unsuccessful audio conversion"
         )
 
+
 class BinaryTransformerExtractionTest(TestCase):
     def setUp(self):
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")

@@ -400,6 +400,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
 
     return processed
 
+
 @app.task
 
 def rasterize_pdf(path, destination):
