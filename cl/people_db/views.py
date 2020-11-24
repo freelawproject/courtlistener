@@ -172,21 +172,16 @@ def financial_disclosures_for_somebody(request, pk, slug):
     )
 
 
-def financial_disclosures_fileserver(request, pk, slug, thumbnail, order):
+def financial_disclosures_fileserver(request, pk, slug, filepath):
+    """Serve up the financial disclosure files."""
     response = HttpResponse()
-    p = get_object_or_404(Person, pk=pk)
-    fd = FinancialDisclosure.objects.filter(person=p)[int(order)-1]
-    if thumbnail:
-        file_path = str(fd.thumbnail)
-    else:
-        file_path = str(fd.filepath)
-    file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
-    filename = file_path.split("/")[-1]
+    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode())
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
         response.content = open(file_loc, "rb").read()
     else:
         response["X-Sendfile"] = file_loc
+    filename = filepath.split("/")[-1]
     response["Content-Disposition"] = (
         'inline; filename="%s"' % filename.encode()
     )
