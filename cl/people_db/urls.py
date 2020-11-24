@@ -26,7 +26,7 @@ urlpatterns = [
         r"(?P<slug>[^/]*)/"
         r"(?P<filepath>financial-disclosures/"
         r"(?:thumbnails/)?"
-        r".+\.(?:pdf|tiff|png))$",
+        r".+\.(?:pdf|tiff|png|jpeg))$",
         financial_disclosures_fileserver,
         name="financial_disclosures_fileserver",
     ),
