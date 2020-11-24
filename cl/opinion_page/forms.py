@@ -327,15 +327,12 @@ class TennWorkersForm(forms.Form):
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
         court = Court.objects.get(pk=self.cleaned_data.get("court_str"))
 
-        docket, opinion, cluster, citations, error = make_objects(
+        docket, opinion, cluster, citations = make_objects(
             self.cleaned_data.get("item"),
             court,
             sha1_hash,
             self.cleaned_data.get("pdf_upload"),
         )
-
-        if error:
-            raise ValidationError("PDF failed to upload. %s")
 
         save_everything(
             items={
