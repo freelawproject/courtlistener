@@ -33,18 +33,16 @@ class Command(VerboseCommand):
             help="end id for a range of documents to update (inclusive)",
         )
         parser.add_argument(
-            # Note that there's a temptation to add a field here for
-            # date_modified, to get any recently modified files. The danger of
-            # doing this is that you modify files as you process them,
-            # creating an endless loop. You'll start the program reporting X
-            # files to modify, but after those items finish, you'll discover
-            # that the program continues onto the newly edited files,
-            # including those files that have new citations to them.
-            # ♪♪♪ Smoke in the server, fire in the wires. ♪♪♪
             "--filed-after",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
-            "update. Dates will be converted to ",
+            "update.",
+        )
+        parser.add_argument(
+            "--modified-after",
+            type=valid_date_time,
+            help="The modification date ISO-8601 format for a range of "
+            "Opinion objects to update.",
         )
         parser.add_argument(
             "--all",
@@ -85,6 +83,7 @@ class Command(VerboseCommand):
             options.get("start_id") is not None
             or options.get("end_id") is not None
             or options.get("filed_after") is not None
+            or options.get("modified_after") is not None
         )
         no_option = not any(
             [
@@ -92,6 +91,7 @@ class Command(VerboseCommand):
                 options.get("start_id") is None,
                 options.get("end_id") is None,
                 options.get("filed_after") is None,
+                options.get("modified_after") is None,
                 options.get("all") is False,
             ]
         )
@@ -116,6 +116,8 @@ class Command(VerboseCommand):
             query = query.filter(
                 cluster__date_filed__gte=options["filed_after"]
             )
+        if options.get("modified_after"):
+            query = query.filter(date_modified__gte=options["modified_after"])
         if options.get("all"):
             query = Opinion.objects.all()
         self.count = query.count()
