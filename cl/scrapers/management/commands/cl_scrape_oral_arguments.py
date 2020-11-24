@@ -80,27 +80,15 @@ def make_objects(item, court, sha1_hash, content):
         date_blocked=date_blocked,
     )
 
-    error = False
-    try:
-        cf = ContentFile(content)
-        extension = get_extension(content)
-        if extension not in [".mp3", ".wma"]:
-            extension = "." + item["download_urls"].lower().rsplit(".", 1)[1]
-        # See bitbucket issue #215 for why this must be
-        # lower-cased.
-        file_name = trunc(item["case_names"].lower(), 75) + extension
-        audio_file.file_with_date = docket.date_argued
-        audio_file.local_path_original_file.save(file_name, cf, save=False)
-    except:
-        msg = (
-            "Unable to save binary to disk. Deleted audio file: %s.\n "
-            "%s" % (item["case_names"], traceback.format_exc())
-        )
-        logger.critical(msg.encode())
-        ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
-        error = True
+    cf = ContentFile(content)
+    extension = get_extension(content)
+    if extension not in [".mp3", ".wma"]:
+        extension = "." + item["download_urls"].lower().rsplit(".", 1)[1]
+    file_name = trunc(item["case_names"].lower(), 75) + extension
+    audio_file.file_with_date = docket.date_argued
+    audio_file.local_path_original_file.save(file_name, cf, save=False)
 
-    return docket, audio_file, error
+    return docket, audio_file
 
 
 class Command(cl_scrape_opinions.Command):
@@ -158,13 +146,9 @@ class Command(cl_scrape_opinions.Command):
                     )
                     dup_checker.reset()
 
-                    docket, audio_file, error = make_objects(
+                    docket, audio_file = make_objects(
                         item, court, sha1_hash, content
                     )
-
-                    if error:
-                        download_error = True
-                        continue
 
                     save_everything(
                         items={"docket": docket, "audio_file": audio_file},
@@ -186,6 +170,6 @@ class Command(cl_scrape_opinions.Command):
             logger.info(
                 "%s: Successfully crawled oral arguments." % site.court_id
             )
-            if not download_error and not full_crawl:
+            if not full_crawl:
                 # Only update the hash if no errors occurred.
                 dup_checker.update_site_hash(site.hash)

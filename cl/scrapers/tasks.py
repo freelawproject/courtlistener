@@ -603,23 +603,11 @@ def process_audio_file(pk):
         raise
 
     set_mp3_meta_data(af, tmp_path)
-    try:
-        with open(tmp_path, "rb") as mp3:
-            cf = ContentFile(mp3.read())
-            file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
-            af.file_with_date = af.docket.date_argued
-            af.local_path_mp3.save(file_name, cf, save=False)
-    except:
-        msg = (
-            "Unable to save mp3 to audio_file in scraper.tasks."
-            "process_audio_file for item: %s\n"
-            "Traceback:\n"
-            "%s" % (af.pk, traceback.format_exc())
-        )
-        print(msg)
-        ErrorLog.objects.create(
-            log_level="CRITICAL", court=af.docket.court, message=msg
-        )
+    with open(tmp_path, "rb") as mp3:
+        cf = ContentFile(mp3.read())
+        file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
+        af.file_with_date = af.docket.date_argued
+        af.local_path_mp3.save(file_name, cf, save=False)
 
     af.duration = eyed3.load(tmp_path).info.time_secs
     af.processing_complete = True

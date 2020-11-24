@@ -100,23 +100,13 @@ def make_objects(item, court, sha1_hash, content):
         download_url=item["download_urls"],
     )
 
-    error = False
-    try:
-        cf = ContentFile(content)
-        extension = get_extension(content)
-        file_name = trunc(item["case_names"].lower(), 75) + extension
-        opinion.file_with_date = cluster.date_filed
-        opinion.local_path.save(file_name, cf, save=False)
-    except:
-        msg = "Unable to save binary to disk. Deleted " "item: %s.\n %s" % (
-            item["case_names"],
-            traceback.format_exc(),
-        )
-        logger.critical(msg.encode())
-        ErrorLog(log_level="CRITICAL", court=court, message=msg).save()
-        error = True
+    cf = ContentFile(content)
+    extension = get_extension(content)
+    file_name = trunc(item["case_names"].lower(), 75) + extension
+    opinion.file_with_date = cluster.date_filed
+    opinion.local_path.save(file_name, cf, save=False)
 
-    return docket, opinion, cluster, citations, error
+    return docket, opinion, cluster, citations
 
 
 @transaction.atomic
@@ -202,7 +192,6 @@ class Command(VerboseCommand):
         )
 
     def scrape_court(self, site, full_crawl=False):
-        download_error = False
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -267,13 +256,9 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
-            docket, opinion, cluster, citations, error = make_objects(
+            docket, opinion, cluster, citations = make_objects(
                 item, court, sha1_hash, content
             )
-
-            if error:
-                download_error = True
-                continue
 
             save_everything(
                 items={
@@ -296,7 +281,7 @@ class Command(VerboseCommand):
 
         # Update the hash if everything finishes properly.
         logger.info("%s: Successfully crawled opinions." % site.court_id)
-        if not download_error and not full_crawl:
+        if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
 
@@ -331,44 +316,20 @@ class Command(VerboseCommand):
             mod = __import__(
                 "%s.%s" % (package, module), globals(), locals(), [module]
             )
-            # noinspection PyBroadException
-            try:
-                self.parse_and_scrape_site(mod, options["full_crawl"])
-            except Exception as e:
-                # noinspection PyBroadException
-                try:
-                    msg = (
-                        "********!! CRAWLER DOWN !!***********\n"
-                        "*****scrape_court method failed!*****\n"
-                        "********!! ACTION NEEDED !!**********\n%s"
-                        % traceback.format_exc()
-                    )
-                    logger.critical(msg)
-
-                    # opinions.united_states.federal.ca9_u --> ca9
-                    court_str = mod.Site.__module__.split(".")[-1].split("_")[
-                        0
-                    ]
-                    court = Court.objects.get(pk=court_str)
-                    ErrorLog(
-                        log_level="CRITICAL", court=court, message=msg
-                    ).save()
-                except Exception as e:
-                    # This is very important. Without this, an exception
-                    # above will crash the caller.
-                    pass
-            finally:
-                time.sleep(wait)
-                last_court_in_list = i == (num_courts - 1)
-                if last_court_in_list and options["daemon"]:
-                    # Start over...
+            self.parse_and_scrape_site(mod, options["full_crawl"])
+            last_court_in_list = i == (num_courts - 1)
+            daemon_mode = options["daemon"]
+            if last_court_in_list:
+                if not daemon_mode:
+                    break
+                else:
                     logger.info(
                         "All jurisdictions done. Looping back to "
                         "the beginning because daemon mode is enabled."
                     )
                     i = 0
-                else:
-                    i += 1
+            else:
+                i += 1
+            time.sleep(wait)
 
         logger.info("The scraper has stopped.")
-        sys.exit(0)

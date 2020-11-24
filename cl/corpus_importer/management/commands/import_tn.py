@@ -111,7 +111,7 @@ def import_tn_corpus(log, skip_until, filepath):
                 % (op.get_absolute_url(), op.cluster.case_name)
             )
 
-        docket, opinion, cluster, citations, error = make_objects(
+        docket, opinion, cluster, citations = make_objects(
             make_item(case),
             courts[case["court"]],
             sha1_hash,
