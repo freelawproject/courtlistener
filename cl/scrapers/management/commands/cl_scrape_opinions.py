@@ -10,6 +10,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
+from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
 from cl.citations.find_citations import get_citations
@@ -329,7 +330,10 @@ class Command(VerboseCommand):
             mod = __import__(
                 "%s.%s" % (package, module), globals(), locals(), [module]
             )
-            self.parse_and_scrape_site(mod, options["full_crawl"])
+            try:
+                self.parse_and_scrape_site(mod, options["full_crawl"])
+            except Exception as e:
+                capture_exception(e)
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:
