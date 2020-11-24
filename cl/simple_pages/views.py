@@ -405,7 +405,10 @@ def serve_static_file(request, file_path=""):
     # Block all RECAP PDFs
     response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
 
-    if settings.DEVELOPMENT:
+    if (
+        settings.DEVELOPMENT
+        and request.get_host() is not "www.courtlistener.com"
+    ):
         # X-Accel-Redirect will only confuse you in a dev env.
         file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
         with open(file_loc, "rb") as f:
