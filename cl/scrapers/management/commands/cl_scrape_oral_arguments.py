@@ -1,6 +1,6 @@
 import random
-import traceback
 from datetime import date
+from typing import Dict, Any, Tuple, Union
 
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -24,7 +24,11 @@ cnt = CaseNameTweaker()
 
 
 @transaction.atomic
-def save_everything(items, index=False, backscrape=False):
+def save_everything(
+    items: Dict[str, Union[Docket, Audio]],
+    index: bool = False,
+    backscrape: bool = False,
+) -> None:
     docket, af = items["docket"], items["audio_file"]
     docket.save()
     af.docket = docket
@@ -47,7 +51,12 @@ def save_everything(items, index=False, backscrape=False):
 
 
 @transaction.atomic
-def make_objects(item, court, sha1_hash, content):
+def make_objects(
+    item: Dict[str, Any],
+    court: Court,
+    sha1_hash: str,
+    content: str,
+) -> Tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:
         date_blocked = date.today()
@@ -92,8 +101,12 @@ def make_objects(item, court, sha1_hash, content):
 
 
 class Command(cl_scrape_opinions.Command):
-    def scrape_court(self, site, full_crawl=False, backscrape=False):
-        download_error = False
+    def scrape_court(
+        self,
+        site,
+        full_crawl: bool = False,
+        backscrape: bool = False,
+    ) -> None:
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]

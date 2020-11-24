@@ -1,8 +1,8 @@
 import signal
 import sys
 import time
-import traceback
 from datetime import date
+from typing import Tuple, List, Dict, Union, Any
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
@@ -31,7 +31,11 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
-def make_citation(cite_str, cluster, cite_type):
+def make_citation(
+    cite_str: str,
+    cluster: OpinionCluster,
+    cite_type: int,
+) -> Citation:
     """Create and return a citation object for the input values."""
     citation_obj = get_citations(cite_str)[0]
     return Citation(
@@ -44,7 +48,12 @@ def make_citation(cite_str, cluster, cite_type):
 
 
 @transaction.atomic
-def make_objects(item, court, sha1_hash, content):
+def make_objects(
+    item: Dict[str, Union[str, Any]],
+    court: Court,
+    sha1_hash: str,
+    content: bytes,
+) -> Tuple[Docket, Opinion, OpinionCluster, List[Citation]]:
     """Takes the meta data from the scraper and associates it with objects.
 
     Returns the created objects.
@@ -110,7 +119,11 @@ def make_objects(item, court, sha1_hash, content):
 
 
 @transaction.atomic
-def save_everything(items, index=False, backscrape=False):
+def save_everything(
+    items: Dict[str, Any],
+    index: bool = False,
+    backscrape: bool = False,
+) -> None:
     """Saves all the sub items and associates them as appropriate."""
     docket, cluster = items["docket"], items["cluster"]
     opinion, citations = items["opinion"], items["citations"]
