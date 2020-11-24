@@ -175,7 +175,7 @@ def financial_disclosures_for_somebody(request, pk, slug):
 def financial_disclosures_fileserver(request, pk, slug, thumbnail, order):
     response = HttpResponse()
     p = get_object_or_404(Person, pk=pk)
-    fd = FinancialDisclosure.objects.filter(person=p)[int(order) - 1]
+    fd = FinancialDisclosure.objects.filter(person=p)[int(order)-1]
     if thumbnail:
         file_path = str(fd.thumbnail)
     else:
