@@ -175,7 +175,7 @@ def financial_disclosures_for_somebody(request, pk, slug):
 def financial_disclosures_fileserver(request, pk, slug, filepath):
     """Serve up the financial disclosure files."""
     response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode())
+    file_loc = os.path.join(settings.MEDIA_ROOT, filepath)
     if settings.DEVELOPMENT:
         # X-Sendfile will only confuse you in a dev env.
         response.content = open(file_loc, "rb").read()
