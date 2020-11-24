@@ -1,6 +1,6 @@
 import time
 import sys
-
+from typing import Iterable
 
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.argparse_types import valid_date_time
@@ -125,7 +125,7 @@ class Command(VerboseCommand):
         self.update_documents(opinion_pks, options["queue"])
         self.add_to_solr(options["queue"])
 
-    def log_progress(self, processed_count, last_pk):
+    def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
             self.t1 = time.time()
         if processed_count % 1000 == 0:
@@ -149,7 +149,7 @@ class Command(VerboseCommand):
         )
         sys.stdout.flush()
 
-    def update_documents(self, opinion_pks, queue_name):
+    def update_documents(self, opinion_pks: Iterable, queue_name: str) -> None:
         sys.stdout.write("Graph size is {0:d} nodes.\n".format(self.count))
         sys.stdout.flush()
 
@@ -175,7 +175,7 @@ class Command(VerboseCommand):
 
             self.log_progress(processed_count, opinion_pk)
 
-    def add_to_solr(self, queue_name):
+    def add_to_solr(self, queue_name: str) -> None:
         if self.index == "all-at-end":
             # fmt: off
             call_command(
