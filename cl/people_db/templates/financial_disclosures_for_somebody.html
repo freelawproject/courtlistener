@@ -38,11 +38,11 @@
             <div class="col-xs-5 col-md-4 col-lg-3">
                 <h3>Disclosure for {{ disclosure.year }}</h3>
                 <h4>{{ disclosure.page_count }} page{{ disclosure.page_count|pluralize }}</h4>
-                <a href="{{ disclosure.person.get_absolute_url }}{{ disclosure.filepath }}" class="btn btn-lg btn-primary"><i class="fa fa-download"></i>&nbsp;Download</a>
+                <a href="{{ disclosure.person.get_absolute_url }}financial-disclosures/{{ disclosure.id }}/" class="btn btn-lg btn-primary"><i class="fa fa-download"></i>&nbsp;Download</a>
             </div>
             <div class="col-xs-7 col-md-8 col-lg-9 v-offset-above-1">
-                <a href="{{ disclosure.person.get_absolute_url }}{{ disclosure.filepath }}">
-                    <img src="{{ disclosure.person.get_absolute_url }}{{ disclosure.thumbnail }}"
+                  <a href="{{ disclosure.person.get_absolute_url }}financial-disclosures/{{ disclosure.id }}/">
+                    <img src="{{ disclosure.person.get_absolute_url }}financial-disclosures/thumbnail/{{ disclosure.id }}/"
                          alt="Thumbnail of disclosure form"
                          width="350"
                          class="img-responsive thumbnail shadow"
