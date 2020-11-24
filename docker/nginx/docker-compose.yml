@@ -20,7 +20,7 @@ services:
       - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     environment:
       # Make it easy to connect to selenium. Juriscraper will pick up this var.
-      - WEBDRIVER_CONN="http://cl-selenium:4444/wd/hub"
+      - WEBDRIVER_CONN=http://cl-selenium:4444/wd/hub
     logging:
       driver: journald
     extra_hosts:
