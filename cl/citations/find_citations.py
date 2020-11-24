@@ -2,7 +2,7 @@
 # encoding: utf-8
 import re
 import sys
-from typing import List
+from typing import List, Union
 
 from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
@@ -639,12 +639,12 @@ def remove_address_citations(citations):
 
 
 def get_citations(
-    text,
-    html=True,
-    do_post_citation=True,
-    do_defendant=True,
-    disambiguate=True,
-):
+    text: str,
+    html: bool = True,
+    do_post_citation: bool = True,
+    do_defendant: bool = True,
+    disambiguate: bool = True,
+) -> List[Union[NonopinionCitation, Citation]]:
     if html:
         text = get_visible_text(text)
     words = reporter_tokenizer.tokenize(text)
