@@ -1,8 +1,6 @@
 import os
 from datetime import timedelta
-from glob import iglob
 
-import requests
 from django.conf import settings
 from django.test import TestCase
 from django.utils.timezone import now
@@ -17,12 +15,12 @@ from cl.scrapers.management.commands import (
 )
 from cl.scrapers.models import UrlHash, ErrorLog
 from cl.scrapers.tasks import (
+    extract_from_txt,
     extract_doc_content,
     process_audio_file,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.transformer_extractor_utils import (
-    document_extract,
     convert_and_clean_audio,
 )
 from cl.scrapers.utils import get_extension
@@ -120,12 +118,9 @@ class IngestionTest(IndexedSolrTestCase):
             "search",
             "txt_file_with_no_encoding.txt",
         )
-        response = document_extract(path)
-        content = response["content"]
-
+        content, err = extract_from_txt(path)
         self.assertFalse(
-            int(response["error_code"]),
-            "Error reported while extracting text from %s" % path,
+            err, "Error reported while extracting text from %s" % path
         )
         self.assertIn(
             "¶  1.  DOOLEY, J.   Plaintiffs",
@@ -474,23 +469,3 @@ class AudioFileTaskTest(TestCase):
         self.assertEqual(
             resp.status_code, 200, msg="Unsuccessful audio conversion"
         )
-
-
-class BinaryTransformerExtractionTest(TestCase):
-    def setUp(self):
-        self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
-
-    def test_heartbeat(self):
-        """Can we start container and check sanity test?"""
-        response = requests.get(url=settings.BTE_URL, timeout=1).json()
-        self.assertTrue(response["success"], msg="Failed heartbeat test.")
-        print(response)
-
-    def test_document_extractor(self):
-        opinions = sorted(iglob(os.path.join(self.path, "*")))
-        for opinion in opinions:
-            response = document_extract(opinion, do_ocr=True)
-            self.assertFalse(
-                int(response["error_code"]), msg="Document failed extraction"
-            )
-            print("Successful response for %s" % os.path.basename(opinion))
