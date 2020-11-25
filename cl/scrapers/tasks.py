@@ -19,6 +19,7 @@ from django.utils.encoding import (
     force_text,
 )
 from django.utils.timezone import now
+from juriscraper.pacer import PacerSession, CaseQuery
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
 from requests import Timeout
@@ -44,7 +45,6 @@ from cl.scrapers.transformer_extractor_utils import (
 )
 from cl.search.models import Opinion, RECAPDocument, Docket
 from cl.search.tasks import add_items_to_solr
-from juriscraper.pacer import PacerSession, CaseQuery
 
 DEVNULL = open("/dev/null", "w")
 
@@ -379,7 +379,6 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
-
         path = rd.filepath_local.path
         process = make_pdftotext_process(path)
         content, err = process.communicate()
