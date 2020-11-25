@@ -1027,14 +1027,14 @@ def get_related_clusters_with_cache(cluster, request):
     available_statuses = dict(DOCUMENT_STATUSES).values()
     url_search_params = {"stat_" + v: "on" for v in available_statuses}
 
-    if is_bot(request):
-        # If it is a bot or is not beta tester, return empty results
+    # Opinions that belong to the targeted cluster
+    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
+
+    if is_bot(request) or not sub_opinion_ids:
+        # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-
-    # Opinions that belong to the targeted cluster
-    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
 
     # Use cache if enabled
     mlt_cache_key = "mlt-cluster:%s" % cluster.pk
