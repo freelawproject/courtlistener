@@ -1,12 +1,14 @@
 import re
 from datetime import date
 from datetime import timedelta
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.cache import caches
-from django.http import QueryDict
+from django.http import QueryDict, HttpRequest
+from scorched.response import SolrResponse
 
 from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
@@ -68,7 +70,7 @@ BOOSTS = {
 }
 
 
-def get_solr_interface(cd):
+def get_solr_interface(cd: Dict[str, Any]) -> ExtraSolrInterface:
     """Get the correct solr interface for the query"""
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
@@ -85,7 +87,10 @@ def get_solr_interface(cd):
     return si
 
 
-def make_get_string(request, nuke_fields=None):
+def make_get_string(
+    request: HttpRequest,
+    nuke_fields: Optional[List[str]] = None,
+) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
     """
@@ -103,7 +108,7 @@ def make_get_string(request, nuke_fields=None):
     return get_string
 
 
-def get_query_citation(cd):
+def get_query_citation(cd: Dict[str, Any]) -> Optional[List[Citation]]:
     """Extract citations from the query string and return them, or return
     None
     """
@@ -126,7 +131,10 @@ def get_query_citation(cd):
     return matches
 
 
-def make_stats_variable(search_form, paged_results):
+def make_stats_variable(
+    search_form: SearchForm,
+    paged_results: SolrResponse,
+) -> List[str]:
     """Create a useful facet variable for use in a template
 
     This function merges the fields in the form with the facet counts from
@@ -950,7 +958,10 @@ def build_court_count_query(group=False):
     return params
 
 
-def add_depth_counts(search_data, search_results):
+def add_depth_counts(
+    search_data: Dict[str, Any],
+    search_results: SolrResponse,
+) -> Optional[OpinionCluster]:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each Solr
     result and the cited OpinionCluster. We only do this for *single* "cites"
@@ -980,7 +991,9 @@ def add_depth_counts(search_data, search_results):
         return None
 
 
-def get_citing_clusters_with_cache(cluster):
+def get_citing_clusters_with_cache(
+    cluster: OpinionCluster,
+) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
 
     :param cluster: The cluster we're targeting
@@ -1015,12 +1028,16 @@ def get_citing_clusters_with_cache(cluster):
     return citing_clusters, citing_cluster_count
 
 
-def get_related_clusters_with_cache(cluster, request):
+def get_related_clusters_with_cache(
+    cluster: OpinionCluster,
+    request: HttpRequest,
+) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
     """Use Solr to get related opinions with Solr-MoreLikeThis query
 
     :param cluster: The cluster we're targeting
     :param request: Request object for checking if user is permitted
-    :return: Tuple[List, List, Dict] Related clusters, sub-opinion IDs and URL parameters
+    :return: A list of related clusters, a list of sub-opinion IDs, and a dict
+    of URL parameters
     """
 
     # By default all statuses are included
