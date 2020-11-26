@@ -29,8 +29,8 @@ def convert_and_clean_audio(audio_obj):
     """
     with open(audio_obj.local_path_original_file.path, "rb") as audio_file:
         return requests.post(
-            url="%s/%s/%s" % (settings.BTE_URL, "convert", "audio"),
-            params=make_audio_post_data(audio_obj),
+            url=settings.BTE_URLS['convert_audio'],
+            params=make_audio_post_params(audio_obj),
             files={
                 "file": ("audio_file", audio_file.read()),
             },
