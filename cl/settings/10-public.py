@@ -593,4 +593,8 @@ CLOUDFRONT_DOMAIN = ""
 # Binary Transformers & Extractors #
 ####################################
 
-BTE_URL = "http://cl-binary-transformers-and-extractors:5050"
+BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
+BTE_URLS = {
+    "convert_audio": f"{BTE_HOST}/convert/audio"
+}
+
