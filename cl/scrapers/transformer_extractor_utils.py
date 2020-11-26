@@ -27,12 +27,11 @@ def convert_and_clean_audio(audio_obj):
     :return: Converted audio
     :type: JSON response
     """
-    with open(audio_obj.local_path_original_file.path, "rb") as audio_file:
-        return requests.post(
-            url=settings.BTE_URLS['convert_audio'],
-            params=make_audio_post_params(audio_obj),
-            files={
-                "file": ("audio_file", audio_file.read()),
-            },
-            timeout=60 * 60,
-        )
+    with open(audio_obj.local_path_original_file.path, "rb") as af:
+        audio_file = {"file": ("audio_file", af.read())}
+    return requests.post(
+        url=settings.BTE_URLS["convert_audio"],
+        params=make_audio_post_params(audio_obj),
+        files=audio_file,
+        timeout=60 * 60,
+    )
