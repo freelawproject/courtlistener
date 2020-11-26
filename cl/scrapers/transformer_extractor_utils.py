@@ -5,10 +5,10 @@ from django.conf import settings
 from django.core.serializers import serialize
 
 
-def make_audio_post_data(af):
-    """Make audio data object for posting.
+def make_audio_post_params(af):
+    """Make audio object parameters used in conversion process.
 
-    :param af: Audio file
+    :param af: Audio file.
     :return: Audio data in json format
     :type: JSON
     """
@@ -24,8 +24,8 @@ def convert_and_clean_audio(audio_obj):
     """Convert audio file to MP3 w/ metadata and image.
 
     :param audio_obj: Audio file object
-    :return: Processed audio file
-    :type: JSON object
+    :return: Converted audio
+    :type: JSON response
     """
     with open(audio_obj.local_path_original_file.path, "rb") as audio_file:
         return requests.post(
