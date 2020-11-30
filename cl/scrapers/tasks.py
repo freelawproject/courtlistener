@@ -22,6 +22,7 @@ from django.utils.timezone import now
 from juriscraper.pacer import PacerSession, CaseQuery
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
+from sentry_sdk import capture_exception
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -493,24 +494,8 @@ def process_audio_file(pk):
         af.file_with_date = af.docket.date_argued
         af.local_path_mp3.save(file_name, cf, save=False)
         af.duration = response["duration"]
-
-    except requests.Timeout:
-        ErrorLog.objects.create(
-            log_level="CRITICAL",
-            court=af.docket.court,
-            message="Timeout occurred in docker container for %s" % (af.pk),
-        )
-    except:
-        msg = (
-            "Unable to save mp3 to audio_file in scraper.tasks."
-            "process_audio_file for item: %s\n"
-            "Traceback:\n"
-            "%s" % (af.pk, traceback.format_exc())
-        )
-        print(msg)
-        ErrorLog.objects.create(
-            log_level="CRITICAL", court=af.docket.court, message=msg
-        )
+    except Exception as e:
+        capture_exception(e)
     af.processing_complete = True
     af.save()
 
