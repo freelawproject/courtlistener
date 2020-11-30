@@ -445,11 +445,10 @@ if DEVELOPMENT:
         db["ENCODING"] = "UTF8"
         db["TEST_ENCODING"] = "UTF8"
         db["CONN_MAX_AGE"] = 0
-
-
 else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 ########################
