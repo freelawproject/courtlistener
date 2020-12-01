@@ -464,8 +464,10 @@ class AudioFileTaskTest(TestCase):
 
     def test_BTE_audio_conversion(self):
         """Can we convert wav to audio and update the metadata"""
-        af = Audio.objects.get(pk=1)
-        resp = convert_and_clean_audio(af)
+        audio_obj = Audio.objects.get(pk=1)
+        bte_respone_obj = convert_and_clean_audio(audio_obj)
         self.assertEqual(
-            resp.status_code, 200, msg="Unsuccessful audio conversion"
+            bte_respone_obj.status_code,
+            200,
+            msg="Unsuccessful audio conversion",
         )
