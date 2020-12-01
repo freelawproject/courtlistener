@@ -48,11 +48,11 @@
             </li>
             <li class="{% block nav-password %}inactive{% endblock %}"
                 role="presentation">
-                <a href="/profile/password/change"><i class="fa fa-lock gray"></i>&nbsp;Password</a>
+                <a href="{% url "password_change" %}"><i class="fa fa-lock gray"></i>&nbsp;Password</a>
             </li>
             <li class="{% block nav-api%}inactive{% endblock %}"
                 role="presentation">
-                <a href="/profile/api/"><i class="fa fa-code gray"></i>&nbsp;API</a>
+                <a href="{% url "view_api" %}"><i class="fa fa-code gray"></i>&nbsp;API</a>
             </li>
         </ul>
     </div>
