@@ -495,7 +495,7 @@ def process_audio_file(self, pk) -> None:
         bte_audio_response = convert_and_clean_audio(af)
         bte_audio_response.raise_for_status()
         audio_obj = bte_audio_response.json()
-        cf = ContentFile(audio_obj['audio_b64'])
+        cf = ContentFile(audio_obj["audio_b64"])
         file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
         af.file_with_date = af.docket.date_argued
         af.local_path_mp3.save(file_name, cf, save=False)
