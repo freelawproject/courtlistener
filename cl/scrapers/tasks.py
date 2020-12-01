@@ -481,23 +481,29 @@ def extract_by_ocr(path: str) -> (bool, str):
     return True, txt
 
 
-@app.task
-def process_audio_file(pk):
+@app.task(bind=True, max_retries=1)
+def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
+
+    :param self: A Celery task object
+    :param pk: Audio file pk
+    :return: None
     """
-    af = Audio.objects.get(pk=pk)
     try:
-        response = convert_and_clean_audio(af).json()
-        cf = ContentFile(response["content"])
+        af = Audio.objects.get(pk=pk)
+        bte_audio_response = convert_and_clean_audio(af)
+        bte_audio_response.raise_for_status()
+        audio_obj = bte_audio_response.json()
+        cf = ContentFile(audio_obj['audio_b64'])
         file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
         af.file_with_date = af.docket.date_argued
         af.local_path_mp3.save(file_name, cf, save=False)
-        af.duration = response["duration"]
+        af.duration = audio_obj["duration"]
+        af.processing_complete = True
+        af.save()
     except Exception as e:
-        capture_exception(e)
-    af.processing_complete = True
-    af.save()
+        raise self.retry(exc=e, countdown=2)
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
