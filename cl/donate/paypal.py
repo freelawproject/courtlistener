@@ -5,7 +5,7 @@ import requests
 import simplejson as json  # This is needed to handle Decimal objects.
 from django.conf import settings
 from django.urls import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
@@ -147,7 +147,7 @@ def process_paypal_payment(cd_donation_form):
         raise PaymentFailureException("UNABLE_TO_MAKE_PAYMENT")
 
 
-def donate_paypal_cancel(request):
+def donate_paypal_cancel(request: HttpRequest) -> HttpResponse:
     d = Donation.objects.get(transaction_id=request.GET["token"])
     d.status = Donation.CANCELLED
     d.save()

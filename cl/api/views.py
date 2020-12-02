@@ -1,7 +1,7 @@
 import logging
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.template import TemplateDoesNotExist
 from rest_framework import status
@@ -53,7 +53,7 @@ def make_court_variable():
     return courts
 
 
-def court_index(request):
+def court_index(request: HttpRequest) -> HttpResponse:
     """Shows the information we have available for the courts."""
     courts = make_court_variable()
     return render(
@@ -72,7 +72,7 @@ def rest_docs(request, version):
         return render(request, "rest-docs-vlatest.html", context)
 
 
-def api_index(request):
+def api_index(request: HttpRequest) -> HttpResponse:
     court_count = Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).count()
@@ -81,11 +81,11 @@ def api_index(request):
     )
 
 
-def replication_docs(request):
+def replication_docs(request: HttpRequest) -> HttpResponse:
     return render(request, "replication.html", {"private": False})
 
 
-def replication_status(request):
+def replication_status(request: HttpRequest) -> HttpResponse:
     statuses = get_replication_statuses()
     return render(
         request,
@@ -94,7 +94,7 @@ def replication_status(request):
     )
 
 
-def bulk_data_index(request):
+def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
     courts = make_court_variable()
     court_count = len(courts)
