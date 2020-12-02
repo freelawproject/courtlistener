@@ -224,3 +224,16 @@ def read_more(s, show_words, autoescape=True):
     words.insert(show_words, insertion)
     words.append("</span>")
     return mark_safe(" ".join(words))
+
+
+from re import IGNORECASE, compile, escape as rescape
+
+@register.filter(name='highlight')
+def highlight(text, search):
+    rgx = compile(rescape(search), IGNORECASE)
+    return mark_safe(
+        rgx.sub(
+            lambda m: '<b id="highlight" class="text text-warning">{}</b>'.format(m.group()),
+            text
+        )
+    )

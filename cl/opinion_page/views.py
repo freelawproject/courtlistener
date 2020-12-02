@@ -390,7 +390,9 @@ def view_recap_document(
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
+def view_opinion(
+    request: HttpRequest, pk: int, _: str, highlight: str
+) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
     We also test if the cluster ID is a favorite for the user, and send data
@@ -399,6 +401,12 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     unbound form.
     """
     # Look up the court, cluster, title and favorite information
+
+    if "?highlight=" in request.get_full_path():
+        highlight = request.get_full_path().split("?highlight=")[1].replace("+", " ")
+    else:
+        highlight = "•"
+
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
@@ -459,6 +467,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": "&" + urlencode(related_search_params),
+            "q": highlight,
         },
     )
 
