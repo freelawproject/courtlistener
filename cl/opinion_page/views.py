@@ -403,7 +403,9 @@ def view_opinion(
     # Look up the court, cluster, title and favorite information
 
     if "?highlight=" in request.get_full_path():
-        highlight = request.get_full_path().split("?highlight=")[1].replace("+", " ")
+        highlight = (
+            request.get_full_path().split("?highlight=")[1].replace("+", " ")
+        )
     else:
         highlight = "•"
 
