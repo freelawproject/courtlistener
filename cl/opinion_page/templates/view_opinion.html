@@ -16,8 +16,9 @@
 {% block footer-scripts %}
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
     <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js?v=20200722"></script>
+    <script defer type="text/javascript" src="{{ STATIC_URL }}js/shareable_links.js?v=20200722"></script>
     {% if request.user.is_staff %}
-        <script defer type="text/javascript" src="{{ STATIC_URL }}js/admin_tools.js"></script>
+        <script defer type="text/javascript" src="{{ STATIC_URL }}js/admisave-favoritesn_tools.js"></script>
         {% if DEBUG %}
             <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
         {% else %}
@@ -424,12 +425,12 @@
                                 {% if sub_opinion.html_with_citations %}
                                   {% if cluster.source == "C" %}
                                     {# It's a PDF with no HTML enrichment #}
-                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe|highlight:q }}</div>
                                   {% else %}
-                                    <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="serif-text">{{ sub_opinion.html_with_citations|safe|highlight:q }}</div>
                                   {% endif %}
                                 {% elif sub_opinion.html_columbia %}
-                                  <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
+                                  <div class="serif-text">{{ sub_opinion.html_columbia|safe|highlight:q }}</div>
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
@@ -439,7 +440,7 @@
                                 {% elif sub_opinion.html %}
                                   <div class="serif-text">{{sub_opinion.html|safe}}</div>
                                 {% else %}
-                                    <pre>{{sub_opinion.plain_text}}</pre>
+                                    <pre>{{sub_opinion.plain_text | highlight:q}}</pre>
                                 {% endif %}
                             </div>
                         </div>
