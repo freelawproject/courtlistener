@@ -42,8 +42,8 @@ class UserTest(LiveServerTestCase):
         params = {
             "username": "pan",
             "email": "pan@courtlistener.com",
-            "password1": "a",
-            "password2": "a",
+            "password1": "test_creating_a_new_user",
+            "password2": "test_creating_a_new_user",
             "first_name": "dora",
             "last_name": "☠☠☠☠☠☠☠☠☠☠☠",
             "skip_me_if_alive": "",
@@ -289,9 +289,9 @@ class LiveUserTest(BaseSeleniumTest):
 
         # Next, change the user's password and submit the form.
         pwd1 = self.browser.find_element(By.NAME, "new_password1")
-        pwd1.send_keys("password")
+        pwd1.send_keys("reallylonghardpassword")
         pwd2 = self.browser.find_element(By.NAME, "new_password2")
-        pwd2.send_keys("password")
+        pwd2.send_keys("reallylonghardpassword")
         pwd2.submit()
 
         self.assertEqual(
