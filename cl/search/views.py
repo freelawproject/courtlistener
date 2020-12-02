@@ -11,6 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Sum, Count
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
 from django.urls import reverse
 from django.utils.timezone import utc, make_aware
@@ -294,7 +295,7 @@ def get_homepage_stats():
 
 @never_cache
 @ratelimit_if_not_whitelisted
-def show_results(request):
+def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:
      - In its most simple form, it is called via GET and without any
@@ -454,7 +455,7 @@ def show_results(request):
             return render(request, "search.html", render_dict)
 
 
-def advanced(request):
+def advanced(request: HttpRequest) -> HttpResponse:
     render_dict = {"private": False}
 
     # I'm not thrilled about how this is repeating URLs in a view.

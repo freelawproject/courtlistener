@@ -8,6 +8,7 @@ from django.http import (
     HttpResponseRedirect,
     HttpResponseNotAllowed,
     HttpResponse,
+    HttpRequest,
 )
 from django.shortcuts import render
 from django.utils.timezone import now
@@ -107,7 +108,7 @@ def add_monthly_donations(cd_donation_form, user, customer):
     monthly_donation.save()
 
 
-def make_payment_page_context(request):
+def make_payment_page_context(request: HttpRequest) -> HttpResponse:
     """Load the donate page or process a submitted donation.
 
     This page has several branches. The logic is as follows:
@@ -268,7 +269,7 @@ def process_donation_forms(
 
 
 @ratelimiter_unsafe_methods
-def donate(request):
+def donate(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = False
     return process_donation_forms(
@@ -281,7 +282,7 @@ def donate(request):
 
 
 @ratelimiter_unsafe_methods
-def cc_payment(request):
+def cc_payment(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = True
     return process_donation_forms(
@@ -294,7 +295,7 @@ def cc_payment(request):
 
 
 @ratelimiter_unsafe_methods
-def badge_signup(request):
+def badge_signup(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = True
     return process_donation_forms(
@@ -331,7 +332,7 @@ def payment_complete(request, template_name):
     )
 
 
-def toggle_monthly_donation(request):
+def toggle_monthly_donation(request: HttpRequest) -> HttpResponse:
     """Use Ajax to enable/disable monthly contributions"""
     if request.is_ajax() and request.method == "POST":
         monthly_pk = request.POST.get("id")
@@ -352,7 +353,7 @@ def toggle_monthly_donation(request):
 
 
 @staff_member_required
-def make_check_donation(request):
+def make_check_donation(request: HttpRequest) -> HttpResponse:
     """A page for admins to use to input check donations manually."""
     if request.method == "POST":
         data = request.POST.copy()

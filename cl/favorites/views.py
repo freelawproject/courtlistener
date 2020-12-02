@@ -7,6 +7,7 @@ from django.http import (
     HttpResponseServerError,
     HttpResponseNotAllowed,
     Http404,
+    HttpRequest,
 )
 from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
@@ -16,7 +17,7 @@ from cl.favorites.models import Favorite, UserTag
 from cl.lib.view_utils import increment_view_count
 
 
-def get_favorite(request):
+def get_favorite(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
     cluster_pk = request.POST.get("cluster_id")
     docket_pk = request.POST.get("docket_id")
@@ -51,7 +52,7 @@ def get_favorite(request):
 
 
 @login_required
-def save_or_update_favorite(request):
+def save_or_update_favorite(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a favorite.
 
     Receives a request as an argument, and then uses that plus POST data to
@@ -87,7 +88,7 @@ def save_or_update_favorite(request):
 
 
 @login_required
-def delete_favorite(request):
+def delete_favorite(request: HttpRequest) -> HttpResponse:
     """Delete a user's favorite
 
     Deletes a favorite for a user using an ajax call and post data.
