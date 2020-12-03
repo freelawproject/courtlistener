@@ -1,1 +1,3 @@
-0.0.11
+0.0.12
+
+0.0.12: Remove X-Frame-Option header and add security headers to location block
