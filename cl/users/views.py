@@ -301,7 +301,8 @@ def delete_account(request: HttpRequest) -> HttpResponse:
             request.user.scotus_maps.all().update(
                 date_modified=now(), deleted=True
             )
-            convert_to_stub_account(request.user)
+            user = convert_to_stub_account(request.user)
+            update_session_auth_hash(request, user)
             logout(request)
             update_mailchimp.delay(request.user.email, "unsubscribed")
 
