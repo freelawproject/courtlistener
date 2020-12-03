@@ -60,15 +60,12 @@ def render_visualization_page(
         template = "visualization_embedded.html"
     else:
         template = "visualization.html"
-    response = render(
+    return render(
         request,
         template,
         {"viz": viz, "title": title, "private": False},
         status=status,
     )
-    if embed:
-        response["X-Frame-Options"] = ""
-    return response
 
 
 @xframe_options_exempt
