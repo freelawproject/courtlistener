@@ -4,7 +4,7 @@ from typing import Set
 
 import requests
 from django.conf import settings
-from requests import HTTPError
+from requests import RequestException
 from simplejson import JSONDecodeError
 
 from cl.alerts.models import DocketAlert
@@ -50,7 +50,7 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
         try:
             r.raise_for_status()
             j = r.json()
-        except (HTTPError, JSONDecodeError) as e:
+        except (RequestException, JSONDecodeError) as e:
             logger.warning(
                 "iQuery scraper was unable to get results from Matomo. Got "
                 "exception: %s" % e
