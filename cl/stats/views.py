@@ -1,10 +1,10 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 
 from cl.celery_init import fail_task
 from cl.lib.redis_utils import make_redis_interface
 
 
-def redis_writes(request):
+def redis_writes(request: HttpRequest) -> HttpResponse:
     """Just return 200 OK if we can write to redis. Else return 500 Error."""
     r = make_redis_interface("STATS")
 
@@ -19,10 +19,10 @@ def redis_writes(request):
     return HttpResponse("Successful Redis write.")
 
 
-def sentry_fail(request):
+def sentry_fail(request: HttpRequest) -> HttpResponse:
     division_by_zero = 1 / 0
 
 
-def celery_fail(request):
+def celery_fail(request: HttpRequest) -> HttpResponse:
     fail_task.delay()
     return HttpResponse("Successfully failed Celery.")

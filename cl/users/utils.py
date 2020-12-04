@@ -176,7 +176,7 @@ emails = {
         "To send you emails, we need you to activate your account with "
         "CourtListener. To activate your account, click this link "
         "within five days:\n\n"
-        "    https://www.courtlistener.com/email/confirm/%s\n\n"
+        "    https://www.courtlistener.com/email/confirm/%s/\n\n"
         "We're always adding features and listening to your requests. "
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"

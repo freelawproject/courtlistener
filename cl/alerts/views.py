@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
-from django.http import HttpResponseNotAllowed, HttpResponse
+from django.http import HttpResponseNotAllowed, HttpResponse, HttpRequest
 from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
 from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
@@ -94,7 +94,7 @@ def enable_alert(request, secret_key):
     )
 
 
-def toggle_docket_alert(request):
+def toggle_docket_alert(request: HttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
     if request.is_ajax() and request.method == "POST":
         docket_pk = request.POST.get("id")
@@ -114,7 +114,7 @@ def toggle_docket_alert(request):
         )
 
 
-def new_docket_alert(request):
+def new_docket_alert(request: HttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")

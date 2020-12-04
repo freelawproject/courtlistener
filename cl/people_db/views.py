@@ -4,7 +4,7 @@ import magic
 from django.conf import settings
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from django.urls import reverse
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, HttpRequest
 from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
 
@@ -136,7 +136,7 @@ def view_person(request, pk, slug):
     )
 
 
-def financial_disclosures_home(request):
+def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     """The home page for financial disclosures
 
     This page shows:

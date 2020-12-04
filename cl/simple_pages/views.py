@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.urls import reverse
 from django.db.models import Count, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.template import loader
@@ -38,12 +38,12 @@ from cl.simple_pages.forms import ContactForm
 logger = logging.getLogger(__name__)
 
 
-def about(request):
+def about(request: HttpRequest) -> HttpResponse:
     """Loads the about page"""
     return render(request, "about.html", {"private": False})
 
 
-def faq(request):
+def faq(request: HttpRequest) -> HttpResponse:
     """Loads the FAQ page"""
     faq_cache_key = "faq-stats"
     template_data = cache.get(faq_cache_key)
@@ -73,11 +73,11 @@ def faq(request):
     )
 
 
-def help_home(request):
+def help_home(request: HttpRequest) -> HttpResponse:
     return render(request, "help/index.html", {"private": False})
 
 
-def alert_help(request):
+def alert_help(request: HttpRequest) -> HttpResponse:
     no_feeds = Court.federal_courts.district_pacer_courts().filter(
         pacer_has_rss_feed=False,
     )
@@ -112,15 +112,15 @@ def alert_help(request):
     return render(request, "help/alert_help.html", context)
 
 
-def donation_help(request):
+def donation_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/donation_help.html", {"private": False})
 
 
-def delete_help(request):
+def delete_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/delete_account_help.html", {"private": False})
 
 
-def markdown_help(request):
+def markdown_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/markdown_help.html", {"private": False})
 
 
@@ -138,7 +138,7 @@ def build_court_dicts(courts):
     return court_dicts
 
 
-def coverage_graph(request):
+def coverage_graph(request: HttpRequest) -> HttpResponse:
     coverage_cache_key = "coverage-data-v2"
     coverage_data = cache.get(coverage_cache_key)
     if coverage_data is None:
@@ -195,7 +195,7 @@ def coverage_graph(request):
     return render(request, "coverage.html", coverage_data)
 
 
-def feeds(request):
+def feeds(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "feeds.html",
@@ -208,7 +208,7 @@ def feeds(request):
     )
 
 
-def podcasts(request):
+def podcasts(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "podcasts.html",
@@ -222,7 +222,7 @@ def podcasts(request):
     )
 
 
-def contribute(request):
+def contribute(request: HttpRequest) -> HttpResponse:
     return render(request, "contribute.html", {"private": False})
 
 
@@ -285,11 +285,11 @@ def contact(
     return render(request, template_path, template_data)
 
 
-def contact_thanks(request):
+def contact_thanks(request: HttpRequest) -> HttpResponse:
     return render(request, "contact_thanks.html", {"private": True})
 
 
-def advanced_search(request):
+def advanced_search(request: HttpRequest) -> HttpResponse:
     return render(request, "advanced_search.html", {"private": False})
 
 
@@ -305,7 +305,7 @@ def old_terms(request, v):
     )
 
 
-def latest_terms(request):
+def latest_terms(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "terms/latest.html",
@@ -317,7 +317,7 @@ def latest_terms(request):
 
 
 @cache_page(60 * 60 * 6)
-def robots(request):
+def robots(request: HttpRequest) -> HttpResponse:
     """Generate the robots.txt file"""
     response = HttpResponse(content_type="text/plain")
     t = loader.get_template("robots.txt")
@@ -343,7 +343,7 @@ def robots(request):
     return response
 
 
-def validate_for_wot(request):
+def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 

@@ -8,6 +8,7 @@ from django.http import (
     HttpResponseRedirect,
     HttpResponse,
     HttpResponseNotAllowed,
+    HttpRequest,
 )
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -25,7 +26,11 @@ from cl.visualizations.utils import message_dict, build_visualization
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 
-def render_visualization_page(request, pk, embed):
+def render_visualization_page(
+    request: HttpRequest,
+    pk: int,
+    embed: bool,
+) -> HttpResponse:
     viz = get_object_or_404(SCOTUSMap, pk=pk)
     increment_view_count(viz, request)
 
@@ -64,7 +69,7 @@ def render_visualization_page(request, pk, embed):
 
 
 @xframe_options_exempt
-def view_embedded_visualization(request, pk):
+def view_embedded_visualization(request: HttpRequest, pk: int) -> HttpResponse:
     """Return the embedded network page.
 
     Exempts the default xframe options, and allows standard caching.
@@ -73,14 +78,18 @@ def view_embedded_visualization(request, pk):
 
 
 @never_cache
-def view_visualization(request, pk, slug):
+def view_visualization(
+    request: HttpRequest,
+    pk: int,
+    slug: str,
+) -> HttpResponse:
     """Return the network page."""
     return render_visualization_page(request, pk, embed=False)
 
 
 @login_required
 @never_cache
-def new_visualization(request):
+def new_visualization(request: HttpRequest) -> HttpResponse:
     demo_viz = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
         .annotate(Count("clusters"))
@@ -140,7 +149,7 @@ def new_visualization(request):
 
 
 @login_required
-def edit_visualization(request, pk):
+def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
     # This could apparently also be done with formsets? But they seem awful.
     viz = get_object_or_404(SCOTUSMap, pk=pk, user=request.user)
     if request.method == "POST":
@@ -170,7 +179,7 @@ def edit_visualization(request, pk):
 
 @ensure_csrf_cookie
 @login_required
-def delete_visualization(request):
+def delete_visualization(request: HttpRequest) -> HttpResponse:
     if request.is_ajax():
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.deleted = True
@@ -184,7 +193,7 @@ def delete_visualization(request):
 
 @ensure_csrf_cookie
 @login_required
-def restore_visualization(request):
+def restore_visualization(request: HttpRequest) -> HttpResponse:
     if request.is_ajax():
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.deleted = False
@@ -199,7 +208,7 @@ def restore_visualization(request):
 
 @ensure_csrf_cookie
 @login_required
-def share_visualization(request):
+def share_visualization(request: HttpRequest) -> HttpResponse:
     if request.is_ajax():
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.published = True
@@ -213,7 +222,7 @@ def share_visualization(request):
 
 @ensure_csrf_cookie
 @login_required
-def privatize_visualization(request):
+def privatize_visualization(request: HttpRequest) -> HttpResponse:
     if request.is_ajax():
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.published = False
@@ -225,7 +234,7 @@ def privatize_visualization(request):
         )
 
 
-def mapper_homepage(request):
+def mapper_homepage(request: HttpRequest) -> HttpResponse:
     if not is_bot(request):
         tally_stat("visualization.scotus_homepage_loaded")
 
@@ -247,7 +256,7 @@ def mapper_homepage(request):
 
 
 @never_cache
-def gallery(request):
+def gallery(request: HttpRequest) -> HttpResponse:
     visualizations = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
         .annotate(Count("clusters"))
