@@ -2,7 +2,7 @@ import os
 from datetime import timedelta
 
 from django.conf import settings
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
@@ -20,6 +20,9 @@ from cl.scrapers.tasks import (
     process_audio_file,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
+from cl.scrapers.transformer_extractor_utils import (
+    convert_and_clean_audio,
+)
 from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 
@@ -457,4 +460,14 @@ class AudioFileTaskTest(TestCase):
             delta=5,
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
+        )
+
+    def test_BTE_audio_conversion(self):
+        """Can we convert wav to audio and update the metadata"""
+        audio_obj = Audio.objects.get(pk=1)
+        bte_respone_obj = convert_and_clean_audio(audio_obj)
+        self.assertEqual(
+            bte_respone_obj.status_code,
+            200,
+            msg="Unsuccessful audio conversion",
         )

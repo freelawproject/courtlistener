@@ -603,3 +603,14 @@ if DEVELOPMENT:
     AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
 
 CLOUDFRONT_DOMAIN = ""
+
+
+####################################
+# Binary Transformers & Extractors #
+####################################
+
+BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
+BTE_URLS = {
+    "convert_audio": f"{BTE_HOST}/convert/audio",
+    "heartbeat": f"{BTE_HOST}",
+}
