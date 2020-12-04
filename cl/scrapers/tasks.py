@@ -22,7 +22,6 @@ from django.utils.timezone import now
 from juriscraper.pacer import PacerSession, CaseQuery
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
-from sentry_sdk import capture_exception
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -481,7 +480,7 @@ def extract_by_ocr(path: str) -> (bool, str):
     return True, txt
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(bind=True, max_retries=1, countdown=2)
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
@@ -490,20 +489,17 @@ def process_audio_file(self, pk) -> None:
     :param pk: Audio file pk
     :return: None
     """
-    try:
-        af = Audio.objects.get(pk=pk)
-        bte_audio_response = convert_and_clean_audio(af)
-        bte_audio_response.raise_for_status()
-        audio_obj = bte_audio_response.json()
-        cf = ContentFile(base64.b64decode(audio_obj["audio_b64"]))
-        file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
-        af.file_with_date = af.docket.date_argued
-        af.local_path_mp3.save(file_name, cf, save=False)
-        af.duration = audio_obj["duration"]
-        af.processing_complete = True
-        af.save()
-    except Exception as e:
-        raise self.retry(exc=e, countdown=2)
+    af = Audio.objects.get(pk=pk)
+    bte_audio_response = convert_and_clean_audio(af)
+    bte_audio_response.raise_for_status()
+    audio_obj = bte_audio_response.json()
+    cf = ContentFile(base64.b64decode(audio_obj["audio_b64"]))
+    file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
+    af.file_with_date = af.docket.date_argued
+    af.local_path_mp3.save(file_name, cf, save=False)
+    af.duration = audio_obj["duration"]
+    af.processing_complete = True
+    af.save()
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
