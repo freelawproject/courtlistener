@@ -428,9 +428,9 @@ MATOMO_SITE_ID = "1"
 SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 
 
-######################
-# Various and Sundry #
-######################
+############
+# Security #
+############
 RATELIMIT_VIEW = "cl.simple_pages.views.ratelimited"
 if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
@@ -445,12 +445,28 @@ if DEVELOPMENT:
         db["ENCODING"] = "UTF8"
         db["TEST_ENCODING"] = "UTF8"
         db["CONN_MAX_AGE"] = 0
-
-
 else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 9,
+        },
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
 
 ########################
 # Logging Machinations #

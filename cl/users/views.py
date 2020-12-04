@@ -12,7 +12,12 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.urls import reverse
 from django.db.models import Count
-from django.http import HttpResponseRedirect, QueryDict, HttpResponse
+from django.http import (
+    HttpResponseRedirect,
+    QueryDict,
+    HttpResponse,
+    HttpRequest,
+)
 from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.utils.timezone import now
@@ -51,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 @login_required
 @never_cache
-def view_alerts(request):
+def view_alerts(request: HttpRequest) -> HttpResponse:
     search_alerts = request.user.alerts.all()
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
@@ -71,7 +76,7 @@ def view_alerts(request):
 
 @login_required
 @never_cache
-def view_favorites(request):
+def view_favorites(request: HttpRequest) -> HttpResponse:
     favorites = request.user.favorites.all().order_by("pk")
     favorite_forms = OrderedDict()
     favorite_forms["Dockets"] = []
@@ -139,13 +144,13 @@ def view_favorites(request):
 
 @login_required
 @never_cache
-def view_donations(request):
+def view_donations(request: HttpRequest) -> HttpResponse:
     return render(request, "profile/donations.html", {"private": True})
 
 
 @login_required
 @never_cache
-def view_visualizations(request):
+def view_visualizations(request: HttpRequest) -> HttpResponse:
     visualizations = (
         SCOTUSMap.objects.filter(user=request.user, deleted=False)
         .annotate(Count("clusters"))
@@ -168,7 +173,7 @@ def view_visualizations(request):
 
 @login_required
 @never_cache
-def view_deleted_visualizations(request):
+def view_deleted_visualizations(request: HttpRequest) -> HttpResponse:
     thirty_days_ago = now() - timedelta(days=30)
     visualizations = (
         SCOTUSMap.objects.filter(
@@ -195,7 +200,7 @@ def view_deleted_visualizations(request):
 
 @login_required
 @never_cache
-def view_api(request):
+def view_api(request: HttpRequest) -> HttpResponse:
     return render(request, "profile/api.html", {"private": True})
 
 
@@ -207,7 +212,7 @@ def view_api(request):
 )
 @login_required
 @never_cache
-def view_settings(request):
+def view_settings(request: HttpRequest) -> HttpResponse:
     old_email = request.user.email  # this line has to be at the top to work.
     old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
@@ -280,7 +285,7 @@ def view_settings(request):
 
 
 @login_required
-def delete_account(request):
+def delete_account(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
             email = emails["account_deleted"]
@@ -296,7 +301,8 @@ def delete_account(request):
             request.user.scotus_maps.all().update(
                 date_modified=now(), deleted=True
             )
-            convert_to_stub_account(request.user)
+            user = convert_to_stub_account(request.user)
+            update_session_auth_hash(request, user)
             logout(request)
             update_mailchimp.delay(request.user.email, "unsubscribed")
 
@@ -315,12 +321,12 @@ def delete_account(request):
     )
 
 
-def delete_profile_done(request):
+def delete_profile_done(request: HttpRequest) -> HttpResponse:
     return render(request, "profile/deleted.html", {"private": True})
 
 
 @login_required
-def take_out(request):
+def take_out(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         email = emails["take_out_requested"]
         send_mail(
@@ -335,7 +341,7 @@ def take_out(request):
     return render(request, "profile/take_out.html", {"private": True})
 
 
-def take_out_done(request):
+def take_out_done(request: HttpRequest) -> HttpResponse:
     return render(request, "profile/take_out_done.html", {"private": True})
 
 
@@ -348,7 +354,7 @@ def take_out_done(request):
 )
 @check_honeypot(field_name="skip_me_if_alive")
 @never_cache
-def register(request):
+def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
     redirect_to = sanitize_redirection(request)
     if request.user.is_anonymous:
@@ -437,7 +443,7 @@ def register(request):
 
 
 @never_cache
-def register_success(request):
+def register_success(request: HttpRequest) -> HttpResponse:
     """Tell the user they have been registered and allow them to continue where
     they left off."""
     redirect_to = sanitize_redirection(request)
@@ -513,7 +519,7 @@ def confirm_email(request, activation_key):
     "email",
 )
 @check_honeypot(field_name="skip_me_if_alive")
-def request_email_confirmation(request):
+def request_email_confirmation(request: HttpRequest) -> HttpResponse:
     """Send an email confirmation email"""
     if request.method == "POST":
         form = EmailConfirmationForm(request.POST)
@@ -563,7 +569,7 @@ def request_email_confirmation(request):
 
 
 @never_cache
-def email_confirm_success(request):
+def email_confirm_success(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "register/request_email_confirmation_success.html",
@@ -574,7 +580,7 @@ def email_confirm_success(request):
 @sensitive_post_parameters("old_password", "new_password1", "new_password2")
 @login_required
 @never_cache
-def password_change(request):
+def password_change(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
@@ -591,7 +597,7 @@ def password_change(request):
 
 
 @csrf_exempt
-def mailchimp_webhook(request):
+def mailchimp_webhook(request: HttpRequest) -> HttpResponse:
     """Respond to changes to our mailing list"""
     logger.info("Got mailchimp webhook with %s method.", request.method)
     if request.method == "POST":

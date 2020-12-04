@@ -1,5 +1,5 @@
 from django.urls import reverse
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.template import loader
 from django.utils.encoding import smart_str
 
@@ -12,7 +12,7 @@ def make_url_dict(view_name, changefreq="yearly", priority=0.5):
     }
 
 
-def sitemap_maker(request):
+def sitemap_maker(request: HttpRequest) -> HttpResponse:
 
     urls = [
         # API

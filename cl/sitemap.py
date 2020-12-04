@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.urls import reverse
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.template import loader
 from django.utils.encoding import smart_str
 from django.views.decorators.cache import cache_page
@@ -93,7 +93,7 @@ def make_solr_sitemap(
 
 
 @cache_page(60 * 60 * 24 * 7, cache="db_cache")  # One week
-def index_sitemap_maker(request):
+def index_sitemap_maker(request: HttpRequest) -> HttpResponse:
     """Generate a sitemap index page
 
     Counts the number of cases in the site, divides by `items_per_sitemap` and
