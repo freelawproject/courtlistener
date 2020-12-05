@@ -3,6 +3,7 @@ from http.client import ResponseNotReady
 from collections import Counter
 from typing import List, Union, Tuple, Set
 
+from django.db import transaction
 from django.db.models import F
 
 from cl.celery_init import app
@@ -138,7 +139,7 @@ def find_citations_for_opinion_by_pks(
             continue
 
         # Match all those different Citation objects to Opinion objects, using
-        # a variety of hueristics.
+        # a variety of heuristics.
         try:
             citation_matches = match_citations.get_citation_matches(
                 opinion, citations
@@ -165,40 +166,43 @@ def find_citations_for_opinion_by_pks(
             if matched_opinion.pk not in all_cited_opinions:
                 opinion_ids_to_update.add(matched_opinion.pk)
 
-        # Then, increment the citation_count fields for those matched clusters
-        # all at once. Trigger a single Solr update as well, if required.
-        opinion_clusters_to_update = OpinionCluster.objects.filter(
-            sub_opinions__pk__in=opinion_ids_to_update
-        )
-        opinion_clusters_to_update.update(
-            citation_count=F("citation_count") + 1
-        )
-        if index:
-            add_items_to_solr.delay(
-                opinion_clusters_to_update.values_list("pk", flat=True),
-                "search.OpinionCluster",
+        with transaction.atomic():
+            # Then, increment the citation_count fields for those matched
+            # clusters all at once. Trigger a single Solr update as well, if
+            # required.
+            opinion_clusters_to_update = OpinionCluster.objects.filter(
+                sub_opinions__pk__in=opinion_ids_to_update
+            )
+            opinion_clusters_to_update.update(
+                citation_count=F("citation_count") + 1
+            )
+            if index:
+                add_items_to_solr.delay(
+                    opinion_clusters_to_update.values_list("pk", flat=True),
+                    "search.OpinionCluster",
+                )
+
+            # Generate the citing opinion's new HTML
+            # (with inline citation links)
+            opinion.html_with_citations = create_cited_html(opinion, citations)
+
+            # Nuke existing citations
+            OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+
+            # Create the new ones.
+            OpinionsCited.objects.bulk_create(
+                [
+                    OpinionsCited(
+                        citing_opinion_id=opinion.pk,
+                        cited_opinion_id=matched_opinion.pk,
+                        depth=grouped_matches[matched_opinion],
+                    )
+                    for matched_opinion in grouped_matches
+                ]
             )
 
-        # Generate the citing opinion's new HTML (with inline citation links)
-        opinion.html_with_citations = create_cited_html(opinion, citations)
-
-        # Nuke existing citations
-        OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
-
-        # Create the new ones.
-        OpinionsCited.objects.bulk_create(
-            [
-                OpinionsCited(
-                    citing_opinion_id=opinion.pk,
-                    cited_opinion_id=matched_opinion.pk,
-                    depth=grouped_matches[matched_opinion],
-                )
-                for matched_opinion in grouped_matches
-            ]
-        )
-
-        # Save all the changes to the citing opinion
-        opinion.save()
+            # Save all the changes to the citing opinion
+            opinion.save()
 
     # If a Solr update was requested, do a single one at the end with all the
     # pks of the passed opinions
