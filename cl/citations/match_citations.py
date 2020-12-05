@@ -2,6 +2,7 @@
 # encoding utf-8
 
 from datetime import date, datetime
+from typing import List, Union
 
 from django.conf import settings
 from reporters_db import REPORTERS
@@ -12,6 +13,7 @@ from cl.citations.models import (
     ShortformCitation,
     IdCitation,
     NonopinionCitation,
+    Citation,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion
@@ -150,7 +152,10 @@ def match_citation(citation, citing_doc=None):
     return []
 
 
-def get_citation_matches(citing_opinion, citations):
+def get_citation_matches(
+    citing_opinion: Opinion,
+    citations: List[Union[NonopinionCitation, Citation]],
+) -> List[Opinion]:
     """For a list of Citation objects (e.g., FullCitations, SupraCitations,
     IdCitations, etc.), try to match them to Opinion objects in the database
     using a variety of heuristics.
