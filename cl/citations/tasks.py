@@ -67,7 +67,9 @@ def get_document_citations(
     """Identify and return citations from the html or plain text of the
     opinion.
     """
-    if opinion.html_columbia:
+    if opinion.html_anon_2020:
+        citations = find_citations.get_citations(opinion.html_anon_2020)
+    elif opinion.html_columbia:
         citations = find_citations.get_citations(opinion.html_columbia)
     elif opinion.html_lawbox:
         citations = find_citations.get_citations(opinion.html_lawbox)
@@ -95,8 +97,20 @@ def create_cited_html(opinion: Opinion, citations: List[Citation]) -> str:
         citation for citation in citations if isinstance(citation, Citation)
     ]
     citations = remove_duplicate_citations_by_regex(citations)
-    if any([opinion.html_columbia, opinion.html_lawbox, opinion.html]):
-        new_html = opinion.html_columbia or opinion.html_lawbox or opinion.html
+    html_fields = [
+        opinion.html_anon_2020,
+        opinion.html_columbia,
+        opinion.html_lawbox,
+        opinion.html,
+    ]
+    if any(html_fields):
+        new_html = (
+            opinion.html_anon_2020
+            or opinion.html_columbia
+            or opinion.html_lawbox
+            or opinion.html
+        )
+
         for citation in citations:
             citation_regex = citation.as_regex()
             match = re.search(citation_regex, new_html)
