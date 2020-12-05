@@ -16,9 +16,9 @@ from cl.citations.utils import (
     remove_duplicate_citations_by_regex,
 )
 
-# This is the distance two reporter abbreviations can be from each other if they
-# are considered parallel reporters. For example, "22 U.S. 44, 46 (13 Atl. 33)"
-# would have a distance of 4.
+# This is the distance two reporter abbreviations can be from each other if
+# they are considered parallel reporters. For example,
+# "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 4.
 PARALLEL_DISTANCE = 4
 
 
@@ -201,8 +201,8 @@ def find_citations_for_opinion_by_pks(
                 ]
             )
 
-            # Save all the changes to the citing opinion
-            opinion.save()
+            # Save all the changes to the citing opinion (send to solr later)
+            opinion.save(index=False)
 
     # If a Solr update was requested, do a single one at the end with all the
     # pks of the passed opinions
