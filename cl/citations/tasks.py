@@ -1,6 +1,7 @@
 import re
 from http.client import ResponseNotReady
 from collections import Counter
+from typing import List, Union, Tuple, Set
 
 from django.db.models import F
 
@@ -8,7 +9,7 @@ from cl.celery_init import app
 from cl.citations import find_citations, match_citations
 from cl.search.models import Opinion, OpinionsCited, OpinionCluster
 from cl.search.tasks import add_items_to_solr
-from cl.citations.models import Citation
+from cl.citations.models import Citation, NonopinionCitation
 from cl.citations.utils import (
     is_balanced_html,
     remove_duplicate_citations_by_regex,
@@ -21,11 +22,13 @@ PARALLEL_DISTANCE = 4
 
 
 @app.task
-def identify_parallel_citations(citations):
+def identify_parallel_citations(
+    citations: List[Citation],
+) -> Set[Tuple[Citation]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
-    Return a list of tuples. Each tuple represents a series of parallel
+    Return a set of tuples. Each tuple represents a series of parallel
     citations. These will usually be length two, but not necessarily.
     """
     if len(citations) == 0:
@@ -57,7 +60,9 @@ def identify_parallel_citations(citations):
 
 
 @app.task
-def get_document_citations(opinion):
+def get_document_citations(
+    opinion: Opinion,
+) -> List[Union[NonopinionCitation, Citation]]:
     """Identify and return citations from the html or plain text of the
     opinion.
     """
@@ -76,7 +81,15 @@ def get_document_citations(opinion):
     return citations
 
 
-def create_cited_html(opinion, citations):
+def create_cited_html(opinion: Opinion, citations: List[Citation]) -> str:
+    """Add citation links to opinion text
+
+    Using the opinion itself and a list of citations found within it, make the
+    citations into links to the correct citations.
+    :param opinion: The opinion to enhance
+    :param citations: A list of citations in the opinion
+    :return The new HTML containing citations
+    """
     citations = [
         citation for citation in citations if isinstance(citation, Citation)
     ]
@@ -102,7 +115,11 @@ def create_cited_html(opinion, citations):
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def find_citations_for_opinion_by_pks(self, opinion_pks, index=True):
+def find_citations_for_opinion_by_pks(
+    self,
+    opinion_pks: List[int],
+    index: bool = True,
+) -> None:
     """Find citations for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
