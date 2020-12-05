@@ -10,7 +10,7 @@ PRIORITY_SEP = "\x06\x16"
 DEFAULT_PRIORITY_STEPS = [0, 3, 6, 9]
 
 
-def make_queue_name_for_pri(queue, pri):
+def make_queue_name_for_pri(queue: str, pri: int) -> str:
     """Make a queue name for redis
 
     Celery uses PRIORITY_SEP to separate different priorities of tasks into
@@ -39,7 +39,7 @@ def make_queue_name_for_pri(queue, pri):
     )
 
 
-def get_queue_length(queue_name="celery"):
+def get_queue_length(queue_name: str = "celery") -> int:
     """Get the number of tasks in a celery queue.
 
     :param queue_name: The name of the queue you want to inspect.
@@ -57,8 +57,12 @@ class CeleryThrottle(object):
     """A class for throttling celery."""
 
     def __init__(
-        self, min_items=100, min_wait=0, max_wait=1, queue_name="celery"
-    ):
+        self,
+        min_items: int = 100,
+        min_wait: int = 0,
+        max_wait: int = 1,
+        queue_name: str = "celery",
+    ) -> None:
         """Create a throttle to prevent celery run aways.
 
         :param min_items: The minimum number of items that should be enqueued.
@@ -89,10 +93,10 @@ class CeleryThrottle(object):
         # For inspections
         self.queue_name = queue_name
 
-    def _calculate_avg(self):
+    def _calculate_avg(self) -> float:
         return float(sum(self.rates)) / (len(self.rates) or 1)
 
-    def _add_latest_rate(self):
+    def _add_latest_rate(self) -> None:
         """Calculate the rate that the queue is processing items."""
         right_now = now()
         elapsed_seconds = (right_now - self.last_measurement).total_seconds()
@@ -101,8 +105,8 @@ class CeleryThrottle(object):
         self.last_processed_count = 0
         self.avg_rate = self._calculate_avg()
 
-    def maybe_wait(self):
-        """Stall the calling function or let it proceed, depending on the queue.
+    def maybe_wait(self) -> None:
+        """Stall the calling function or let it proceed, depending on the queue
 
         The idea here is to check the length of the queue as infrequently as
         possible while keeping the number of items in the queue as closely
@@ -110,7 +114,8 @@ class CeleryThrottle(object):
 
         We do this by immediately enqueueing self.max items. After that, we
         monitor the queue to determine how quickly it is processing items. Using
-        that rate we wait an appropriate amount of time or immediately press on.
+        that rate we wait an appropriate amount of time or immediately press
+        on.
         """
         self.last_processed_count += 1
         if self.count_to_do > 0:
