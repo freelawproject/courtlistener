@@ -164,11 +164,11 @@ class Command(VerboseCommand):
         processed_count = 0
         throttle = CeleryThrottle(queue_name=queue_name)
         for opinion_pk in opinion_pks:
+            throttle.maybe_wait()
             processed_count += 1
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
-                throttle.maybe_wait()
                 find_citations_for_opinion_by_pks.apply_async(
                     args=(chunk, index_during_subtask),
                     queue=queue_name,
