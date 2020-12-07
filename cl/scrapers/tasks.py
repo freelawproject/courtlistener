@@ -141,6 +141,7 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     content = content.decode()
     if do_ocr:
         success, content = extract_by_ocr(path)
+        opinion.extracted_by_ocr = True
     elif content.strip() == "":
         success, content = extract_by_ocr(path)
         if success:
