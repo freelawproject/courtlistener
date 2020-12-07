@@ -16,14 +16,14 @@ from cl.lib.model_helpers import (
     validate_exactly_n,
     validate_not_all,
     validate_at_most_n,
-    validate_supervisor,
+    validate_supervisor, make_pdf_path,
 )
 from cl.lib.search_index_utils import (
     solr_list,
     null_map,
     normalize_search_dicts,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import IncrementingFileSystemStorage, AWSMediaStorage
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
@@ -1387,6 +1387,20 @@ class ABARating(models.Model):
 class FinancialDisclosure(models.Model):
     """A simple table to hold references to financial disclosure forms"""
 
+    NOMINATION = 0
+    INITIAL = 1
+    ANNUAL = 2
+    FINAL = 3
+    AMENDED = 4
+
+    FILING = (
+        (NOMINATION, "Nomination"),
+        (INITIAL, "Initial"),
+        (ANNUAL, "Annual"),
+        (FINAL, "Final"),
+        (AMENDED, "Amended"),
+    )
+
     person = models.ForeignKey(
         Person,
         help_text="The person that the document is associated with.",
@@ -1401,12 +1415,16 @@ class FinancialDisclosure(models.Model):
         help_text="The disclosure report itself",
         upload_to="financial-disclosures/",
         storage=IncrementingFileSystemStorage(),
+        # upload_to=make_pdf_path,
+        # storage=AWSMediaStorage(),
         db_index=True,
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form",
         upload_to="financial-disclosures/thumbnails/",
         storage=IncrementingFileSystemStorage(),
+        # upload_to=make_pdf_path,
+        # storage=AWSMediaStorage(),
         null=True,
         blank=True,
     )
@@ -1418,6 +1436,25 @@ class FinancialDisclosure(models.Model):
     page_count = models.SmallIntegerField(
         help_text="The number of pages in the disclosure report",
     )
+    # sha1 = models.CharField(
+    #     help_text="Unique ID for the document, as generated via SHA1 of the "
+    #     "binary file",
+    #     max_length=40,
+    #     db_index=True,
+    #     blank=True,
+    # )
+    #
+    # disclosure_type = models.SmallIntegerField(
+    #     help_text="Financial Disclosure filing option",
+    #     choices=FILING,
+    # )
+    #
+    # addendum_content_raw = models.TextField(
+    #     help_text="Addendum to disclosure content"
+    # )
+    # addendum_redacted = models.BooleanField(
+    #     help_text="Is the adendum partially or completely redacted?"
+    # )
 
     class Meta:
         ordering = ("-year",)
@@ -1430,6 +1467,277 @@ class FinancialDisclosure(models.Model):
             )
 
             make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
+#
+#
+# class Investment(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="investment",
+#         on_delete=models.CASCADE,
+#     )
+#
+#     # Investment Value code
+#     A = "A"  # 1 - 1000
+#     B = "B"
+#     C = "C"
+#     D = "D"
+#     E = "E"
+#     F = "F"
+#     G = "G"
+#     H1 = "H1"
+#     H2 = "H2"
+#     J = "J"
+#     K = "K"
+#     L = "L"
+#     M = "M"
+#     N = "N"
+#     O = "O"
+#     P1 = "P1"
+#     P2 = "P2"
+#     P3 = "P3"
+#     P4 = "P4"  # $50,000,001 and up
+#
+#     # Value method calculations
+#     Q = "Appraisal"
+#     R = "Cost (Real Estate Only)"
+#     S = "Assessment"
+#     T = "Cash Market"
+#     U = "Book Value"
+#     V = "Other"
+#
+#     # Failed Extraction
+#     X = "Failed Extraction"
+#
+#     VALUATION_METHODS = (
+#         (Q, "Appraisal"),
+#         (R, "Cost (Real Estate Only)"),
+#         (S, "Assessment"),
+#         (T, "Cash Market"),
+#         (U, "Book Value"),
+#         (V, "Other"),
+#     )
+#     CODES = (
+#         (A, "< 1,000"),
+#         (B, "1,0001 - 2,500"),
+#         (C, "2,501, 5,000"),
+#         (D, "5,001 - 15,000"),
+#         (E, "15,001- 50,000"),
+#         (F, "15,001- 50,000"),
+#         (G, "15,001- 50,000"),
+#         (H1, "15,001- 50,000"),
+#         (H2, "15,001- 50,000"),
+#         (J, "15,001- 50,000"),
+#         (K, "15,001- 50,000"),
+#         (L, "15,001- 50,000"),
+#         (M, "15,001- 50,000"),
+#         (N, "15,001- 50,000"),
+#         (O, "15,001- 50,000"),
+#         (P1, "15,001- 50,000"),
+#         (P2, "15,001- 50,000"),
+#         (P3, "15,001- 50,000"),
+#         (P4, "50,000,001 +"),
+#
+#         (X, "Failed Extraction"),
+#     )
+#
+#     description = models.TextField(help_text="Addendum to disclosure content")
+#
+#     redacted = models.BooleanField(
+#         help_text="Is the the investment partially or completely redacted?"
+#     )
+#
+#     income_during_reporting_period_code = models.TextField(
+#         help_text="Value code ",
+#         choices=CODES,
+#     )
+#     income_during_reporting_period_type = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     gross_value_code = models.SmallIntegerField(
+#         help_text="Financial Disclosure filing option",
+#         choices=CODES,
+#     )
+#     gross_value_method = models.SmallIntegerField(
+#         help_text="Financial Disclosure filing option",
+#         choices=VALUATION_METHODS,
+#     )
+#
+#     # Transactions indicate if the investment was bought sold etc.
+#     # during the reporting period
+#     transaction_during_reporting_period = models.BooleanField(
+#         help_text="Is the the investment partially or completely redacted?"
+#     )
+#     transaction_date_raw = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#     transaction_type_code = models.SmallIntegerField(
+#         help_text="Financial Disclosure filing option",
+#         choices=CODES,
+#     )
+#     transaction_value_code = models.SmallIntegerField(
+#         help_text="Financial Disclosure filing option",
+#         choices=VALUATION_METHODS,
+#     )
+#     transaction_gain_code = models.SmallIntegerField(
+#         help_text="Financial Disclosure filing option",
+#         choices=CODES,
+#     )
+#     transaction_partner = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class Positions(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="investment",
+#         on_delete=models.CASCADE,
+#     )
+#
+#     position = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     organization_name = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class Agreements(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="agreements",
+#         on_delete=models.CASCADE,
+#     )
+#     date = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     parties_and_terms = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class JudgeIncome(models.Model):
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="judge_income",
+#         on_delete=models.CASCADE,
+#     )
+#     date = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     source_type = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     income = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class SpouseIncome(models.Model):
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="spouse_income",
+#         on_delete=models.CASCADE,
+#     )
+#     source_type = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     date = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class Reimbursement(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="reimbursement",
+#         on_delete=models.CASCADE,
+#     )
+#     source = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     dates = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     location = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     purpose = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     items_paid_or_provided = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class Gift(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="gift",
+#         on_delete=models.CASCADE,
+#     )
+#     name = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     description = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     value_code = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#
+#
+# class Debt(models.Model):
+#
+#     financial_disclosure = models.ForeignKey(
+#         FinancialDisclosure,
+#         help_text="The financial disclosure associated with this investment.",
+#         related_name="debt",
+#         on_delete=models.CASCADE,
+#     )
+#     name = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     description = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     value_code = models.TextField(
+#         help_text="Financial Disclosure filing option",
+#     )
+#     redacted = models.BooleanField(
+#         help_text="Financial Disclosure filing option",
+#     )
 
 
 class PartyType(models.Model):
