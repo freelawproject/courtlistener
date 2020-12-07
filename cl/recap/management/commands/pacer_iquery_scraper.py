@@ -50,7 +50,11 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
         try:
             r.raise_for_status()
             j = r.json()
-        except (RequestException, JSONDecodeError) as e:
+        except (
+            ConnectionRefusedError,
+            JSONDecodeError,
+            RequestException,
+        ) as e:
             logger.warning(
                 "iQuery scraper was unable to get results from Matomo. Got "
                 "exception: %s" % e
