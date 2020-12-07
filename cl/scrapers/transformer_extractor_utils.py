@@ -35,7 +35,7 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
         audio_file = {"audio_file": ("", af.read())}
 
     bte_audio_response = requests.post(
-        settings.BTE_URLS["convert_audio"],
+        settings.BTE_URLS["convert-audio"],
         params={"audio_data": json.dumps(audio_data)},
         files=audio_file,
         timeout=60 * 60,
