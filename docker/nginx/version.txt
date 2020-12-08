@@ -1,3 +1,4 @@
-0.0.12
+0.0.13
 
+0.0.13: Fix bug in HSTS config
 0.0.12: Remove X-Frame-Option header and add security headers to location block
