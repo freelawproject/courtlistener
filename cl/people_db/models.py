@@ -1387,6 +1387,7 @@ class ABARating(models.Model):
 class FinancialDisclosure(models.Model):
     """A simple table to hold references to financial disclosure forms"""
 
+    APPOINTMENT = -1
     NOMINATION = 0
     INITIAL = 1
     ANNUAL = 2
@@ -1394,6 +1395,7 @@ class FinancialDisclosure(models.Model):
     AMENDED = 4
 
     FILING = (
+        (APPOINTMENT, "Appointment"),
         (NOMINATION, "Nomination"),
         (INITIAL, "Initial"),
         (ANNUAL, "Annual"),
@@ -1413,9 +1415,8 @@ class FinancialDisclosure(models.Model):
     )
     filepath = models.FileField(
         help_text="The disclosure report itself",
-        upload_to="financial-disclosures/",
         storage=IncrementingFileSystemStorage(),
-        # upload_to=make_pdf_path,
+        upload_to=make_pdf_path,
         # storage=AWSMediaStorage(),
         db_index=True,
     )
@@ -1436,13 +1437,12 @@ class FinancialDisclosure(models.Model):
     page_count = models.SmallIntegerField(
         help_text="The number of pages in the disclosure report",
     )
-    # sha1 = models.CharField(
-    #     help_text="Unique ID for the document, as generated via SHA1 of the "
-    #     "binary file",
-    #     max_length=40,
-    #     db_index=True,
-    #     blank=True,
-    # )
+    pdf_hash = models.CharField(
+        help_text="PDF hash, used to idenitify duplicate PDFs",
+        max_length=40,
+        db_index=True,
+        blank=True,
+    )
     #
     # disclosure_type = models.SmallIntegerField(
     #     help_text="Financial Disclosure filing option",
