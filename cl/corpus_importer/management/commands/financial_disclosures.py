@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import pprint
 from typing import Dict
 
@@ -18,43 +17,43 @@ def split_tiffs(options: Dict) -> None:
     :return:
     """
     filepath = options["filepath"]
+    filepath = "/opt/courtlistener/samples/sample_all_pages.json"
 
-    disclosures = [
-        {
-            "paths": [
-                "Armstrong-SB J3. 09. CAN_R_11_Page_1.tiff",
-                "Armstrong-SB J3. 09. CAN_R_11_Page_2.tiff",
-                "Armstrong-SB J3. 09. CAN_R_11_Page_3.tiff",
-                "Armstrong-SB J3. 09. CAN_R_11_Page_4.tiff",
-                "Armstrong-SB J3. 09. CAN_R_11_Page_5.tiff",
-                "Armstrong-SB J3. 09. CAN_R_11_Page_6.tiff"
-            ],
-            "key": "financial-disclosures/2011/A-E/Armstrong-SB J3. 09. CAN_R_11",
-            "person_id": "126"
-        }
-    ]
+    with open(filepath) as f:
+        disclosures = json.load(f)
 
     for data in disclosures:
         bucket = "storage.courtlistener.com"
-        path = data['key']
-        urls = [f"https://{bucket}/{path}/{p}" for p in data['paths']]
+        path = data["key"]
+        urls = [f"https://{bucket}/{path}/{p}" for p in data["paths"]]
 
-        logger.info(f"Processing images")
+        logger.info(f"\nProcessing images")
 
         pdf_response = requests.post(
             settings.BTE_URLS["urls-to-pdf"],
             json=json.dumps({"urls": urls}),
         )
-        logger.info(f"Conversion completed. \n Beginning Extraction")
+
+        if pdf_response.status_code is not 200:
+            logger.info(f"\nConversion failed")
+            continue
+
+        logger.info(f"\nConversion completed. \nBeginning extraction.")
 
         extractor_response = requests.post(
             settings.BTE_URLS["extract-disclosure"],
             files={"file": ("", pdf_response.content)},
             timeout=60 * 60,
         )
+        if extractor_response.status_code is not 200:
+            logger.info(f"\nExtraction failed")
+            continue
 
-        logger.info("Processing extracted data")
-        pprint.pprint(extractor_response.json())
+        logger.info("\nProcessing extracted data")
+        print(extractor_response)
+        print(extractor_response.json())
+
+        break
 
 
 def single_tiff(options: Dict) -> None:
@@ -72,11 +71,16 @@ def single_tiff(options: Dict) -> None:
             "person_id": "3289",
         }
     ]
+
+    filepath = "/opt/courtlistener/samples/sample_single.json"
+    with open(filepath) as f:
+        disclosures = json.load(f)
+
     # https://storage.courtlistener.com/financial-disclosures/2018/Urbanski-MF.%20J3.%2004.%20VAW%20_SPE_R_18.tiff
     for data in disclosures:
         person_id = data["person_id"]
         bucket = "com-courtlistener-storage.s3-us-west-2.amazonaws.com"
-        path = data['key']
+        path = data["key"]
         tiff_url = f"https://{bucket}/{path}/{data['path']}"
 
         logger.info(f"Preparing to process url: {tiff_url}")
@@ -95,6 +99,7 @@ def single_tiff(options: Dict) -> None:
         logger.info("Processing extracted data")
         pprint.pprint(extractor_response.json())
 
+        break
 
 
 def judicial_watch(options: Dict) -> None:
@@ -111,12 +116,11 @@ def judicial_watch(options: Dict) -> None:
 
     # -------------- ** ** ** *--------------
     # Temporary data
-    disclosures = [
-        {
-            "path": "financial-disclosures/judicial-watch/Adalberto%20J%20Jordan%20Financial%20Disclosure%20Report%20for%202010.pdf",
-            "person_id": "1905",
-        }
-    ]
+
+    filepath = "/opt/courtlistener/samples/sample_jw.json"
+    with open(filepath) as f:
+        disclosures = json.load(f)
+
     # -------------- ******* --------------
 
     for data in disclosures:
@@ -131,6 +135,8 @@ def judicial_watch(options: Dict) -> None:
         )
         # print(extractor_response.json())
         pprint.pprint(extractor_response.json())
+
+        break
 
 
 class Command(VerboseCommand):
