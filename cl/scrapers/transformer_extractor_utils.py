@@ -1,4 +1,5 @@
 import json
+from typing import AnyStr
 
 import requests
 from django.conf import settings
@@ -41,3 +42,17 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
         timeout=60 * 60,
     )
     return bte_audio_response
+
+
+def get_page_count(pdf_bytes) -> int:
+    """Extract page count from PDF content.
+
+    :param pdf_bytes: PDF bytes
+    :return: Page count
+    """
+    response = requests.post(
+        settings.BTE_URLS["page-count"],
+        files={"file": ("file.pdf", pdf_bytes)},
+    )
+    if response.status_code == 200:
+        return response.json()["pg_count"]
