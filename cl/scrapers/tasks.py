@@ -6,7 +6,7 @@ import re
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
-from typing import AnyStr
+from typing import Tuple
 
 import requests
 from PyPDF2 import PdfFileReader
@@ -130,21 +130,24 @@ def make_pdftotext_process(path):
     )
 
 
-def check_pdf_for_images(path: AnyStr):
-    """Check raw PDF for embedded images
+def check_pdf_for_images(path: str) -> bool:
+    """Check raw PDF for embedded images.
 
     We need to check if a PDF contains any images.  If a PDF contains images it
     likely has content that needs to be scanned.
 
-    :param path:Location of PDF to process.
-    :return: The match or None.
+    :param path: Location of PDF to process.
+    :return: Does the PDF contain images?
+    :type: bool
     """
     with open(path, "rb") as pdf_file:
         pdf_bytes = pdf_file.read()
-        return re.search(rb"\/Image ?\/", pdf_bytes)
+        return True if re.search(rb"\/Image ?\/", pdf_bytes) else False
 
 
-def extract_from_pdf(path, opinion, do_ocr=False):
+def extract_from_pdf(
+    path: str, opinion: Opinion, do_ocr: bool = False
+) -> Tuple[str, bytes]:
     """Extract text from pdfs.
 
     Start with pdftotext.  If we we enabled OCR - and the the content is empty
@@ -158,10 +161,14 @@ def extract_from_pdf(path, opinion, do_ocr=False):
     content, err = process.communicate()
     content = content.decode()
 
-    if (content.strip() == "" or check_pdf_for_images(path)) and do_ocr:
-        success, content = extract_by_ocr(path)
+    has_images = check_pdf_for_images(path)
+    if (content.strip() == "" or has_images) and do_ocr:
+        success, ocr_content = extract_by_ocr(path)
         if success:
             opinion.extracted_by_ocr = True
+            # Check content length and take the longer of the two
+            if len(ocr_content) > len(content):
+                content = ocr_content
         elif content == "" or not success:
             content = "Unable to extract document content."
     elif "e" not in content:
