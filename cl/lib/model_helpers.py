@@ -107,7 +107,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         return os.path.join(root, file_name)
     elif type(instance) == FinancialDisclosure:
         root = (
-            "/us/federal/judicial/financial-disclosures/%s/"
+            "us/federal/judicial/financial-disclosures/%s/" #Add slash back in for AWS pathway
             % instance.person.id
         )
         file_name = "%s-%s-disclosure.%s.pdf" % (
