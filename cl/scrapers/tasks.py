@@ -2,9 +2,11 @@
 import base64
 import logging
 import random
+import re
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
+from typing import AnyStr
 
 import requests
 from PyPDF2 import PdfFileReader
@@ -128,21 +130,35 @@ def make_pdftotext_process(path):
     )
 
 
+def check_pdf_for_images(path: AnyStr):
+    """Check raw PDF for embedded images
+
+    We need to check if a PDF contains any images.  If a PDF contains images it
+    likely has content that needs to be scanned.
+
+    :param path:Location of PDF to process.
+    :return: The match or None.
+    """
+    with open(path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        return re.search(rb"\/Image ?\/", pdf_bytes)
+
+
 def extract_from_pdf(path, opinion, do_ocr=False):
     """Extract text from pdfs.
 
-    Here, we use pdftotext. If that fails, try to use tesseract under the
-    assumption it's an image-based PDF. Once that is complete, we check for the
-    letter e in our content. If it's not there, we try to fix the mojibake
-    that ca9 sometimes creates.
+    Start with pdftotext.  If we we enabled OCR - and the the content is empty
+    or the PDF contains images use tesseract.  This pattern occurs because
+    PDFs can be images, text-based and a mix of the two.  We check for images
+    to avoid not OCRing mix type PDFs.
+
+    If a text-based PDF we fix corrupt PDFs from ca9.
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     content = content.decode()
-    if do_ocr:
-        success, content = extract_by_ocr(path)
-        opinion.extracted_by_ocr = True
-    elif content.strip() == "":
+
+    if (content.strip() == "" or check_pdf_for_images(path)) and do_ocr:
         success, content = extract_by_ocr(path)
         if success:
             opinion.extracted_by_ocr = True
