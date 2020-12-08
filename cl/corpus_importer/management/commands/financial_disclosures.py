@@ -1,12 +1,17 @@
 import argparse
 import json
 import pprint
+import re
 from typing import Dict
 
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.crypto import sha1
+from cl.people_db.models import FinancialDisclosure, Person
+from cl.scrapers.transformer_extractor_utils import get_page_count
 
 
 def split_tiffs(options: Dict) -> None:
@@ -26,6 +31,7 @@ def split_tiffs(options: Dict) -> None:
         bucket = "storage.courtlistener.com"
         path = data["key"]
         urls = [f"https://{bucket}/{path}/{p}" for p in data["paths"]]
+        year = re.findall("20[1,2][0-9]", path)[0]
 
         logger.info(f"\nProcessing images")
 
@@ -38,7 +44,31 @@ def split_tiffs(options: Dict) -> None:
             logger.info(f"\nConversion failed")
             continue
 
-        logger.info(f"\nConversion completed. \nBeginning extraction.")
+        sha1_hash = sha1(pdf_response.content)
+        logger.info(f"\nConversion to PDF completed. \nBeginning extraction.")
+
+        # Check if file exists
+        disclsoures = FinancialDisclosure.objects.filter(pdf_hash=sha1_hash)
+        if len(disclsoures) > 0:
+            logger.info("PDF already in system")
+            continue
+
+        # Save and upload PDF to AWS (currently local machine)
+        fd = FinancialDisclosure(
+            year=year,
+            page_count=get_page_count(pdf_response.content),
+            person=Person.objects.get(id=1), # Will save to the same folder beacuse weve idenitifeid same year and same single person in our database.
+            pdf_hash=sha1_hash,
+        )
+        print(fd.filepath)
+        fd.filepath.save("", ContentFile(pdf_response.content))
+
+        logger.info(
+            "Uploading disclosure to https://%s/%s"
+            % (settings.AWS_S3_CUSTOM_DOMAIN, fd.filepath)
+        )
+
+        continue
 
         extractor_response = requests.post(
             settings.BTE_URLS["extract-disclosure"],
