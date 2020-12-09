@@ -31,6 +31,7 @@ from django.views.decorators.debug import (
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
+from cl.lib.ratelimiter import ratelimiter_unsafe_methods
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -580,6 +581,7 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @sensitive_post_parameters("old_password", "new_password1", "new_password2")
 @login_required
 @never_cache
+@ratelimiter_unsafe_methods
 def password_change(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
