@@ -1440,6 +1440,8 @@ class FinancialDisclosure(models.Model):
         (T, "Cash Market"),
         (U, "Book Value"),
         (V, "Other"),
+        (X, "Failed Extraction"),
+
     )
 
     # INCOME GAIN CODES
