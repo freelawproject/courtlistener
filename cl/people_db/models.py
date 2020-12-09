@@ -1517,7 +1517,10 @@ class FinancialDisclosure(models.Model):
         blank=True,
         null=True,
     )
-    is_amended = models.BooleanField(help_text="Is disclsoure amended?")
+    is_amended = models.BooleanField(
+        help_text="Is disclsoure amended?",
+        default=False,
+    )
     addendum_content_raw = models.TextField(
         help_text="Raw content of addendum.",
         blank=True,
