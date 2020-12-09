@@ -16,7 +16,8 @@ from cl.lib.model_helpers import (
     validate_exactly_n,
     validate_not_all,
     validate_at_most_n,
-    validate_supervisor, make_pdf_path,
+    validate_supervisor,
+    make_pdf_path,
 )
 from cl.lib.search_index_utils import (
     solr_list,
@@ -1387,20 +1388,86 @@ class ABARating(models.Model):
 class FinancialDisclosure(models.Model):
     """A simple table to hold references to financial disclosure forms"""
 
-    APPOINTMENT = -1
     NOMINATION = 0
     INITIAL = 1
     ANNUAL = 2
     FINAL = 3
     AMENDED = 4
 
-    FILING = (
-        (APPOINTMENT, "Appointment"),
+    REPORT_TYPES = (
         (NOMINATION, "Nomination"),
         (INITIAL, "Initial"),
         (ANNUAL, "Annual"),
         (FINAL, "Final"),
-        (AMENDED, "Amended"),
+    )
+
+    # FORM CODES
+    A = "A"  # 1 - 1000
+    B = "B"
+    C = "C"
+    D = "D"
+    E = "E"
+    F = "F"
+    G = "G"
+    H1 = "H1"
+    H2 = "H2"
+    J = "J"
+    K = "K"
+    L = "L"
+    M = "M"
+    N = "N"
+    O = "O"
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+    P4 = "P4"  # $50,000,001 and up
+
+    # Value method calculations
+    Q = "Appraisal"
+    R = "Cost (Real Estate Only)"
+    S = "Assessment"
+    T = "Cash Market"
+    U = "Book Value"
+    V = "Other"
+
+    # Failed Extraction
+    X = "Failed Extraction"
+
+    VALUE_METHOD_CODES = (
+        (Q, "Appraisal"),
+        (R, "Cost (Real Estate Only)"),
+        (S, "Assessment"),
+        (T, "Cash Market"),
+        (U, "Book Value"),
+        (V, "Other"),
+    )
+
+    # INCOME GAIN CODES
+    INCOME_GAIN_CODES = (
+        (A, "1 - 1,000"),
+        (B, "1,001 - 2,500"),
+        (C, "2,501 - 5,000"),
+        (D, "5,001 - 15,000"),
+        (E, "15,001 - 50,000"),
+        (F, "50,001 - 100,000"),
+        (G, "100,001 - 1,000,000"),
+        (H1, "1,000,001 - 5,000,000"),
+        (H2, "5,000,001 +"),
+        (X, "Failed Extraction"),
+    )
+
+    GROSS_VALUE_CODES = (
+        (J, "1 - 15,000"),
+        (K, "15,001 - 50,000"),
+        (L, "50,001 - 100,000"),
+        (M, "100,001 - 250,000"),
+        (N, "250,001 - 500,000"),
+        (O, "500,001 - 1,000,000"),
+        (P1, "1,000,001 - 5,000,000"),
+        (P2, "5,000,001 - 25,000,000"),
+        (P3, "25,000,001 - 50,000,000"),
+        (P4, "50,000,001 +"),
+        (X, "Failed Extraction"),
     )
 
     person = models.ForeignKey(
@@ -1443,18 +1510,20 @@ class FinancialDisclosure(models.Model):
         db_index=True,
         blank=True,
     )
-    #
-    # disclosure_type = models.SmallIntegerField(
-    #     help_text="Financial Disclosure filing option",
-    #     choices=FILING,
-    # )
-    #
-    # addendum_content_raw = models.TextField(
-    #     help_text="Addendum to disclosure content"
-    # )
-    # addendum_redacted = models.BooleanField(
-    #     help_text="Is the adendum partially or completely redacted?"
-    # )
+    report_type = models.TextField(
+        help_text="Financial Disclosure report type",
+        choices=REPORT_TYPES,
+        blank=True,
+        null=True,
+    )
+    is_amended = models.BooleanField(help_text="Is disclsoure amended?")
+    addendum_content_raw = models.TextField(
+        help_text="Raw content of addendum.",
+        blank=True,
+    )
+    addendum_redacted = models.BooleanField(
+        help_text="Is the adendum partially or completely redacted?"
+    )
 
     class Meta:
         ordering = ("-year",)
@@ -1467,277 +1536,247 @@ class FinancialDisclosure(models.Model):
             )
 
             make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
-#
-#
-# class Investment(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="investment",
-#         on_delete=models.CASCADE,
-#     )
-#
-#     # Investment Value code
-#     A = "A"  # 1 - 1000
-#     B = "B"
-#     C = "C"
-#     D = "D"
-#     E = "E"
-#     F = "F"
-#     G = "G"
-#     H1 = "H1"
-#     H2 = "H2"
-#     J = "J"
-#     K = "K"
-#     L = "L"
-#     M = "M"
-#     N = "N"
-#     O = "O"
-#     P1 = "P1"
-#     P2 = "P2"
-#     P3 = "P3"
-#     P4 = "P4"  # $50,000,001 and up
-#
-#     # Value method calculations
-#     Q = "Appraisal"
-#     R = "Cost (Real Estate Only)"
-#     S = "Assessment"
-#     T = "Cash Market"
-#     U = "Book Value"
-#     V = "Other"
-#
-#     # Failed Extraction
-#     X = "Failed Extraction"
-#
-#     VALUATION_METHODS = (
-#         (Q, "Appraisal"),
-#         (R, "Cost (Real Estate Only)"),
-#         (S, "Assessment"),
-#         (T, "Cash Market"),
-#         (U, "Book Value"),
-#         (V, "Other"),
-#     )
-#     CODES = (
-#         (A, "< 1,000"),
-#         (B, "1,0001 - 2,500"),
-#         (C, "2,501, 5,000"),
-#         (D, "5,001 - 15,000"),
-#         (E, "15,001- 50,000"),
-#         (F, "15,001- 50,000"),
-#         (G, "15,001- 50,000"),
-#         (H1, "15,001- 50,000"),
-#         (H2, "15,001- 50,000"),
-#         (J, "15,001- 50,000"),
-#         (K, "15,001- 50,000"),
-#         (L, "15,001- 50,000"),
-#         (M, "15,001- 50,000"),
-#         (N, "15,001- 50,000"),
-#         (O, "15,001- 50,000"),
-#         (P1, "15,001- 50,000"),
-#         (P2, "15,001- 50,000"),
-#         (P3, "15,001- 50,000"),
-#         (P4, "50,000,001 +"),
-#
-#         (X, "Failed Extraction"),
-#     )
-#
-#     description = models.TextField(help_text="Addendum to disclosure content")
-#
-#     redacted = models.BooleanField(
-#         help_text="Is the the investment partially or completely redacted?"
-#     )
-#
-#     income_during_reporting_period_code = models.TextField(
-#         help_text="Value code ",
-#         choices=CODES,
-#     )
-#     income_during_reporting_period_type = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     gross_value_code = models.SmallIntegerField(
-#         help_text="Financial Disclosure filing option",
-#         choices=CODES,
-#     )
-#     gross_value_method = models.SmallIntegerField(
-#         help_text="Financial Disclosure filing option",
-#         choices=VALUATION_METHODS,
-#     )
-#
-#     # Transactions indicate if the investment was bought sold etc.
-#     # during the reporting period
-#     transaction_during_reporting_period = models.BooleanField(
-#         help_text="Is the the investment partially or completely redacted?"
-#     )
-#     transaction_date_raw = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#     transaction_type_code = models.SmallIntegerField(
-#         help_text="Financial Disclosure filing option",
-#         choices=CODES,
-#     )
-#     transaction_value_code = models.SmallIntegerField(
-#         help_text="Financial Disclosure filing option",
-#         choices=VALUATION_METHODS,
-#     )
-#     transaction_gain_code = models.SmallIntegerField(
-#         help_text="Financial Disclosure filing option",
-#         choices=CODES,
-#     )
-#     transaction_partner = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class Positions(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="investment",
-#         on_delete=models.CASCADE,
-#     )
-#
-#     position = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     organization_name = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class Agreements(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="agreements",
-#         on_delete=models.CASCADE,
-#     )
-#     date = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     parties_and_terms = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class JudgeIncome(models.Model):
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="judge_income",
-#         on_delete=models.CASCADE,
-#     )
-#     date = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     source_type = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     income = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class SpouseIncome(models.Model):
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="spouse_income",
-#         on_delete=models.CASCADE,
-#     )
-#     source_type = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     date = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class Reimbursement(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="reimbursement",
-#         on_delete=models.CASCADE,
-#     )
-#     source = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     dates = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     location = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     purpose = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     items_paid_or_provided = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class Gift(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="gift",
-#         on_delete=models.CASCADE,
-#     )
-#     name = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     description = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     value_code = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#
-#
-# class Debt(models.Model):
-#
-#     financial_disclosure = models.ForeignKey(
-#         FinancialDisclosure,
-#         help_text="The financial disclosure associated with this investment.",
-#         related_name="debt",
-#         on_delete=models.CASCADE,
-#     )
-#     name = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     description = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     value_code = models.TextField(
-#         help_text="Financial Disclosure filing option",
-#     )
-#     redacted = models.BooleanField(
-#         help_text="Financial Disclosure filing option",
-#     )
+
+
+class Investment(models.Model):
+    """ Financial Disclosure Investments Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="investment",
+        on_delete=models.CASCADE,
+    )
+
+    description = models.TextField(help_text="Name of investment", blank=True)
+
+    redacted = models.BooleanField(
+        help_text="Whether investment contains redactions."
+    )
+    income_during_reporting_period_code = models.TextField(
+        help_text="Increase in investment value - as a form code",
+        choices=FinancialDisclosure.INCOME_GAIN_CODES,
+        blank=True,
+    )
+    income_during_reporting_period_type = models.TextField(
+        help_text="Type of investment ex. Rent, Dividend.  Typically "
+        "standardized but not universally",
+        blank=True,
+    )
+    gross_value_code = models.TextField(
+        help_text="Investment total value code at end of reporting period as code",
+        choices=FinancialDisclosure.GROSS_VALUE_CODES,
+        blank=True,
+    )
+    gross_value_method = models.TextField(
+        help_text="Investment valuation method code",
+        choices=FinancialDisclosure.VALUE_METHOD_CODES,
+        blank=True,
+    )
+
+    # Transactions indicate if the investment was bought sold etc.
+    # during the reporting period
+    transaction_during_reporting_period = models.TextField(
+        help_text="Transaction of investment during reporting period ex. Buy Sold etc.",
+        blank=True,
+    )
+    transaction_date_raw = models.TextField(
+        help_text="Date of the transaction, if any", blank=True
+    )
+    transaction_value_code = models.TextField(
+        help_text="Transaction value amount, as form code",
+        choices=FinancialDisclosure.GROSS_VALUE_CODES,
+        blank=True,
+    )
+    transaction_gain_code = models.TextField(
+        help_text="Gain from investment transaction if any",
+        choices=FinancialDisclosure.INCOME_GAIN_CODES,
+        blank=True,
+    )
+    transaction_partner = models.TextField(
+        help_text="Identity of the transaction partner", blank=True
+    )
+
+
+class Positions(models.Model):
+    """ Financial Disclosure Position Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="investment",
+        on_delete=models.CASCADE,
+    )
+
+    position = models.TextField(
+        help_text="Financial Disclosure filing option",
+        blank=True,
+    )
+    organization_name = models.TextField(
+        help_text="Financial Disclosure filing option",
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Financial Disclosure filing option",
+    )
+
+
+class Agreements(models.Model):
+    """ Financial Disclosure Agreements Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="agreements",
+        on_delete=models.CASCADE,
+    )
+    date = models.TextField(
+        help_text="Dates of judicial agreements.",
+        blank=True,
+    )
+    parties_and_terms = models.TextField(
+        help_text="Parties and terms of agreement.",
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Is the agreement redacted?",
+    )
+
+
+class NonInvestmentIncome(models.Model):
+    """Financial Disclosure Non Investment Income Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="judge_income",
+        on_delete=models.CASCADE,
+    )
+    date = models.TextField(
+        help_text="Date of non-investment income (ex. 2011).",
+        blank=True,
+    )
+    source_type = models.TextField(
+        help_text="Source and type of non-investment income for the judge "
+        "(ex. Teaching a class at U. Miami).",
+        blank=True,
+    )
+    income_amount = models.TextField(
+        help_text="Amount earned by judge.",
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Is non-investment income redacted?",
+    )
+
+
+class SpouseIncome(models.Model):
+    """ Financial Disclosure Judge Spouse Income Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="spouse_income",
+        on_delete=models.CASCADE,
+    )
+    source_type = models.TextField(
+        help_text="Source and Type of income of judicial spouse",
+        blank=True,
+    )
+    date = models.TextField(
+        help_text="Date of spousal income (ex. 2011).",
+        blank=True,
+    )
+    redacted = models.TextField(
+        help_text="Is judicial spousal income redacted?",
+    )
+
+
+class Reimbursement(models.Model):
+    """Reimbursements listed in judicial disclosure"""
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="reimbursement",
+        on_delete=models.CASCADE,
+    )
+    source = models.TextField(
+        help_text="Source of the reimbursement (ex. FSU Law School).",
+        blank=True,
+    )
+    dates = models.TextField(
+        help_text="Dates as a text string for the date of reimbursements."
+        "This is often conference dates (ex. June 2-6, 2011).",
+        blank=True,
+    )
+    location = models.TextField(
+        help_text="Location of the reimbursement "
+        "(ex. Harvard Law School, Cambridge, MA).",
+        blank=True,
+    )
+    purpose = models.TextField(
+        help_text="Purpose of the reimbursement (ex. Baseball announcer).",
+        blank=True,
+    )
+    items_paid_or_provided = models.TextField(
+        help_text="Items reimbursed (ex. Room, Airfare).",
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Does the reimbursement contain redactions?",
+    )
+
+
+class Gift(models.Model):
+    """ Financial Disclosure Gifts Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="gift",
+        on_delete=models.CASCADE,
+    )
+    source = models.TextField(
+        help_text="Source of the judicial gift.",
+        blank=True,
+    )
+    description = models.TextField(
+        help_text="Description of the gift.",
+        blank=True,
+    )
+    value_code = models.TextField(
+        help_text="Value of the judicial gift, as Value Code.",
+        choices=FinancialDisclosure.GROSS_VALUE_CODES,
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Is the gift redacted?",
+    )
+
+
+class Debt(models.Model):
+    """ Financial Disclosure Judicial Debts/Liabilities Table"""
+
+    financial_disclosure = models.ForeignKey(
+        FinancialDisclosure,
+        help_text="The financial disclosure associated with this investment.",
+        related_name="debt",
+        on_delete=models.CASCADE,
+    )
+    creditor_name = models.TextField(
+        help_text="Liability/Debt creditor", blank=True
+    )
+    description = models.TextField(
+        help_text="Description of the debt", blank=True
+    )
+    value_code = models.TextField(
+        help_text="Form code for the value of the judicial debt.",
+        choices=FinancialDisclosure.GROSS_VALUE_CODES,
+        blank=True,
+    )
+    redacted = models.BooleanField(
+        help_text="Is the debt redacted?",
+    )
 
 
 class PartyType(models.Model):
