@@ -1523,7 +1523,8 @@ class FinancialDisclosure(models.Model):
         blank=True,
     )
     addendum_redacted = models.BooleanField(
-        help_text="Is the adendum partially or completely redacted?"
+        help_text="Is the adendum partially or completely redacted?",
+        default=False,
     )
 
     class Meta:
@@ -1552,7 +1553,8 @@ class Investment(models.Model):
     description = models.TextField(help_text="Name of investment", blank=True)
 
     redacted = models.BooleanField(
-        help_text="Whether investment contains redactions."
+        help_text="Whether investment contains redactions.",
+        default=False,
     )
     income_during_reporting_period_code = models.TextField(
         help_text="Increase in investment value - as a form code",
@@ -1619,6 +1621,7 @@ class Positions(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Financial Disclosure filing option",
+        default=False,
     )
 
 
@@ -1641,6 +1644,7 @@ class Agreements(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Is the agreement redacted?",
+        default=False,
     )
 
 
@@ -1668,6 +1672,7 @@ class NonInvestmentIncome(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Is non-investment income redacted?",
+        default=False,
     )
 
 
@@ -1690,6 +1695,7 @@ class SpouseIncome(models.Model):
     )
     redacted = models.TextField(
         help_text="Is judicial spousal income redacted?",
+        default=False,
     )
 
 
@@ -1726,6 +1732,7 @@ class Reimbursement(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Does the reimbursement contain redactions?",
+        default=False,
     )
 
 
@@ -1753,6 +1760,7 @@ class Gift(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Is the gift redacted?",
+        default=False,
     )
 
 
@@ -1778,6 +1786,7 @@ class Debt(models.Model):
     )
     redacted = models.BooleanField(
         help_text="Is the debt redacted?",
+        default=False,
     )
 
 
