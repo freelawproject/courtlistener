@@ -1441,7 +1441,6 @@ class FinancialDisclosure(models.Model):
         (U, "Book Value"),
         (V, "Other"),
         (X, "Failed Extraction"),
-
     )
 
     # INCOME GAIN CODES
@@ -1606,7 +1605,7 @@ class Positions(models.Model):
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated with this investment.",
-        related_name="investment",
+        related_name="positions",
         on_delete=models.CASCADE,
     )
 
@@ -1651,7 +1650,7 @@ class NonInvestmentIncome(models.Model):
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated with this investment.",
-        related_name="judge_income",
+        related_name="non_investment_income",
         on_delete=models.CASCADE,
     )
     date = models.TextField(
@@ -1696,6 +1695,7 @@ class SpouseIncome(models.Model):
 
 class Reimbursement(models.Model):
     """Reimbursements listed in judicial disclosure"""
+
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated with this investment.",
