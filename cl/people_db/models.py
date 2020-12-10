@@ -1392,7 +1392,6 @@ class FinancialDisclosure(models.Model):
     INITIAL = 1
     ANNUAL = 2
     FINAL = 3
-    AMENDED = 4
 
     REPORT_TYPES = (
         (NOMINATION, "Nomination"),
@@ -1603,6 +1602,11 @@ class Investment(models.Model):
         help_text="Identity of the transaction partner", blank=True
     )
 
+    has_inferred_values = models.BooleanField(
+        help_text="The investment name was inferred during extraction",
+        default=False,
+    )
+
 
 class Positions(models.Model):
     """ Financial Disclosure Position Table"""
@@ -1615,11 +1619,11 @@ class Positions(models.Model):
     )
 
     position = models.TextField(
-        help_text="Financial Disclosure filing option",
+        help_text="Position title.",
         blank=True,
     )
     organization_name = models.TextField(
-        help_text="Financial Disclosure filing option",
+        help_text="Name of orgnization or entity.",
         blank=True,
     )
     redacted = models.BooleanField(
