@@ -5,7 +5,6 @@ from cl.audio.feeds import (
     SearchPodcast,
     JurisdictionPodcast,
 )
-from cl.audio.sitemap import oral_argument_sitemap_maker
 from cl.audio.views import view_audio_file
 
 urlpatterns = [
@@ -22,10 +21,4 @@ urlpatterns = [
         name="jurisdiction_podcast",
     ),
     url(r"^podcast/(search)/", SearchPodcast(), name="search_podcast"),
-    # Sitemap
-    url(
-        r"^sitemap-oral-arguments\.xml",
-        oral_argument_sitemap_maker,
-        name="oral_argument_sitemap",
-    ),
 ]

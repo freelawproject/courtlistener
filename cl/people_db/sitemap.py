@@ -1,17 +1,18 @@
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
-from django.views.decorators.cache import cache_page
+from datetime import datetime
 
-from cl.sitemap import make_sitemap_solr_params, make_solr_sitemap
+from django.contrib import sitemaps
+from django.db.models import QuerySet
+
+from cl.people_db.models import Person
 
 
-@cache_page(60 * 60 * 24 * 14, cache="db_cache")  # two weeks
-def people_sitemap_maker(request: HttpRequest) -> HttpResponse:
-    return make_solr_sitemap(
-        request,
-        settings.SOLR_PEOPLE_URL,
-        make_sitemap_solr_params("dob asc,name_reverse asc", "p_sitemap"),
-        "monthly",
-        [],
-        "absolute_url",
-    )
+class PersonSitemap(sitemaps.Sitemap):
+    changefreq = "monthly"
+    limit = 10_000
+    priority = 0.5
+
+    def items(self) -> QuerySet:
+        return Person.objects.filter(is_alias_of=None).order_by("pk")
+
+    def lastmod(self, obj: Person) -> datetime:
+        return obj.date_modified
