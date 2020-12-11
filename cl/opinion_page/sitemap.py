@@ -1,29 +1,51 @@
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
-from django.views.decorators.cache import cache_page
+from datetime import datetime
 
-from cl.sitemap import make_sitemap_solr_params, make_solr_sitemap
+from django.contrib import sitemaps
+from django.db.models import QuerySet
 
-
-@cache_page(60 * 60 * 24 * 14, cache="db_cache")  # two weeks
-def opinion_sitemap_maker(request: HttpRequest) -> HttpResponse:
-    return make_solr_sitemap(
-        request,
-        settings.SOLR_OPINION_URL,
-        make_sitemap_solr_params("dateFiled asc", "o_sitemap"),
-        "monthly",
-        ["pdf", "doc", "wpd"],
-        "absolute_url",
-    )
+from cl.search.models import OpinionCluster, Docket
 
 
-@cache_page(60 * 60 * 24 * 14, cache="db_cache")  # two weeks
-def recap_sitemap_maker(request: HttpRequest) -> HttpResponse:
-    return make_solr_sitemap(
-        request,
-        settings.SOLR_RECAP_URL,
-        make_sitemap_solr_params("docket_id asc", "r_sitemap"),
-        "weekly",
-        [],
-        "docket_absolute_url",
-    )
+class OpinionSitemap(sitemaps.Sitemap):
+    changefreq = "yearly"
+    priority = 0.5
+    limit = 10_000
+
+    def items(self) -> QuerySet:
+        return OpinionCluster.objects.only(
+            "date_modified", "pk", "slug"
+        ).order_by("pk")
+
+    def lastmod(self, obj: OpinionCluster) -> datetime:
+        return obj.date_modified
+
+
+class DocketSitemap(sitemaps.Sitemap):
+    changefreq = "weekly"
+    limit = 10_000
+
+    def items(self) -> QuerySet:
+        # XXX Remove extra fields here
+        return (
+            Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
+            .order_by("pk")
+            .only("view_count", "date_modified", "pk", "slug")
+        )
+
+    def lastmod(self, obj: Docket) -> datetime:
+        return obj.date_modified
+
+    def priority(self, obj: Docket) -> float:
+        view_count = obj.view_count
+        priority = 0.5
+        if view_count <= 1:
+            priority = 0.3
+        elif 1 < view_count <= 10:
+            priority = 0.4
+        elif 10 < view_count <= 100:
+            priority = 0.5
+        elif 100 < view_count <= 1_000:
+            priority = 0.55
+        elif view_count > 1_000:
+            priority = 0.65
+        return priority

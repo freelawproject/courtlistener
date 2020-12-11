@@ -63,10 +63,4 @@ urlpatterns = [
         name="view_visualization",
     ),
     url(r"^visualizations/gallery/$", gallery, name="viz_gallery"),
-    url(
-        r"^sitemap-visualizations\.xml$",
-        sitemap,
-        {"sitemaps": {"visualizations": VizSitemap}},
-        name="django.contrib.sitemaps.views.sitemap",
-    ),
 ]
