@@ -1,7 +1,6 @@
 from django.conf.urls import url
 from django.views.generic import RedirectView
 
-from cl.simple_pages.sitemap import sitemap_maker
 from cl.simple_pages.views import (
     advanced_search,
     alert_help,
@@ -47,12 +46,6 @@ urlpatterns = [
     url(r"^terms/$", latest_terms, name="terms"),
     # Robots
     url(r"^robots\.txt$", robots, name="robots"),
-    # Sitemap:
-    url(
-        r"^sitemap-simple-pages\.xml$",
-        sitemap_maker,
-        name="simple_pages_sitemap",
-    ),
     # SEO-related stuff
     url(r"^mywot8f5568174e171ff0acff.html$", validate_for_wot),
 ]
