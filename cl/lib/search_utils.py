@@ -931,7 +931,7 @@ def build_alert_estimation_query(cd, day_count):
     return params
 
 
-def build_court_count_query(group=False):
+def build_court_count_query(group: bool = False) -> Dict[str, str]:
     """Build a query that returns the count of cases for all courts
 
     :param group: Should the results be grouped? Note that grouped facets have

@@ -1,3 +1,5 @@
+from typing import Dict, List
+
 from django.conf import settings
 from django.urls import reverse
 from django.http import HttpResponse, HttpRequest
@@ -8,17 +10,18 @@ from django.views.decorators.cache import cache_page
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_court_count_query
 
-items_per_sitemap = 10000
+items_per_sitemap = 10_000  # max per spec: 50_000
 
 
-def make_sitemap_solr_params(sort, caller):
+def make_sitemap_solr_params(sort: str, caller: str) -> Dict[str, str]:
     params = {
         "q": "*",
         "rows": items_per_sitemap,
         "start": 0,
         "fl": ",".join(
             [
-                # Not all indexes have all these fields, but it causes no errors.
+                # Not all indexes have all these fields,
+                # but it causes no errors.
                 "absolute_url",
                 "docket_absolute_url",
                 "local_path",
@@ -56,8 +59,13 @@ def normalize_grouping(result):
 
 
 def make_solr_sitemap(
-    request, solr_url, params, changefreq, low_priority_pages, url_field
-):
+    request: HttpRequest,
+    solr_url: str,
+    params: Dict[str, str],
+    changefreq: str,
+    low_priority_pages: List[str],
+    url_field: str,
+) -> HttpResponse:
     solr = ExtraSolrInterface(solr_url)
     page = int(request.GET.get("p", 1))
     court = request.GET["court"]
@@ -97,7 +105,7 @@ def index_sitemap_maker(request: HttpRequest) -> HttpResponse:
     """Generate a sitemap index page
 
     Counts the number of cases in the site, divides by `items_per_sitemap` and
-    provides links items.
+    provides links to items.
     """
     connection_string_sitemap_path_pairs = (
         (settings.SOLR_OPINION_URL, reverse("opinion_sitemap"), False),
