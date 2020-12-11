@@ -1,5 +1,6 @@
 from django.urls import reverse
 
+from cl.audio.models import Audio
 from cl.search.models import SEARCH_TYPES
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from lxml import etree
@@ -64,13 +65,10 @@ class PodcastTest(IndexedSolrTestCase):
 class AudioSitemapTest(SitemapTest):
     def __init__(self, *args, **kwargs):
         super(AudioSitemapTest, self).__init__(*args, **kwargs)
-        # We expect 2X the number of items in the fixture b/c there are nodes
-        # for the mp3 file and for the page on CourtListener.
-        self.expected_item_count = 4
-        self.sitemap_url = "%s?court=%s" % (
-            reverse("oral_argument_sitemap"),
-            "test",
+        self.expected_item_count = Audio.objects.all().count()
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": SEARCH_TYPES.ORAL_ARGUMENT}
         )
 
-    def test_does_the_sitemap_have_content(self):
-        super(AudioSitemapTest, self).does_the_sitemap_have_content()
+    def test_does_the_sitemap_have_content(self) -> None:
+        super(AudioSitemapTest, self).assert_sitemap_has_content()
