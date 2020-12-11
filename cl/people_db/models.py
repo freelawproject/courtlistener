@@ -1528,6 +1528,10 @@ class FinancialDisclosure(models.Model):
         help_text="Is the adendum partially or completely redacted?",
         default=False,
     )
+    has_been_extracted = models.BooleanField(
+        help_text="Have we successfully extracted the data from PDF?",
+        default=False,
+    )
 
     class Meta:
         ordering = ("-year",)
