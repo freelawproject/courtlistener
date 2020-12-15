@@ -214,7 +214,7 @@ def get_pdfs(options):
             )
 
 
-def do_ocr(options):
+def ocr_available(options):
     """Do the OCR for any items that need it, then save to the solr index."""
     q = options["queue"]
     rds = (
@@ -243,7 +243,7 @@ def do_everything(options):
     logger.info("Getting PDFs from free document reports")
     get_pdfs(options)
     logger.info("Doing OCR and saving items to Solr.")
-    do_ocr(options)
+    ocr_available(options)
 
 
 class Command(VerboseCommand):
@@ -286,5 +286,5 @@ class Command(VerboseCommand):
         "do-everything": do_everything,
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,
-        "do-ocr": do_ocr,
+        "ocr-available": ocr_available,
     }

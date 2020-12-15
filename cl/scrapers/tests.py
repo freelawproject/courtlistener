@@ -70,42 +70,42 @@ class IngestionTest(IndexedSolrTestCase):
     def test_doc_content_extraction(self):
         """Can we ingest a doc file?"""
         image_opinion = Opinion.objects.get(pk=1)
-        extract_doc_content(image_opinion.pk, do_ocr=False)
+        extract_doc_content(image_opinion.pk, ocr_available=False)
         image_opinion.refresh_from_db()
         self.assertIn("indiana", image_opinion.plain_text.lower())
 
     def test_image_based_pdf(self):
         """Can we ingest an image based pdf file?"""
         image_opinion = Opinion.objects.get(pk=2)
-        extract_doc_content(image_opinion.pk, do_ocr=True)
+        extract_doc_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
     def test_text_based_pdf(self):
         """Can we ingest a text based pdf file?"""
         txt_opinion = Opinion.objects.get(pk=3)
-        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("tarrant", txt_opinion.plain_text.lower())
 
     def test_html_content_extraction(self):
         """Can we ingest an html file?"""
         html_opinion = Opinion.objects.get(pk=4)
-        extract_doc_content(html_opinion.pk, do_ocr=False)
+        extract_doc_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
     def test_wpd_content_extraction(self):
         """Can we ingest a wpd file?"""
         wpd_opinion = Opinion.objects.get(pk=5)
-        extract_doc_content(wpd_opinion.pk, do_ocr=False)
+        extract_doc_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
     def test_txt_content_extraction(self):
         """Can we ingest a txt file?"""
         txt_opinion = Opinion.objects.get(pk=6)
-        extract_doc_content(txt_opinion.pk, do_ocr=False)
+        extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
 
@@ -141,7 +141,7 @@ class ExtractionTest(TestCase):
             msg="Citation should not exist at beginning of test",
         )
 
-        extract_doc_content(pk=o.pk, do_ocr=False)
+        extract_doc_content(pk=o.pk, ocr_available=False)
         self.assertTrue(
             o.cluster.citations.exists(),
             msg="Expected citation was not created in db",
@@ -156,7 +156,7 @@ class ExtractionTest(TestCase):
             o.cluster.docket.docket_number,
             msg="Docket number should be none.",
         )
-        extract_doc_content(pk=76, do_ocr=False)
+        extract_doc_content(pk=76, ocr_available=False)
         o.cluster.docket.refresh_from_db()
         self.assertEqual(
             "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number
