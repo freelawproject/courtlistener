@@ -25,7 +25,6 @@ class DocketSitemap(sitemaps.Sitemap):
     limit = 10_000
 
     def items(self) -> QuerySet:
-        # XXX Remove extra fields here
         return (
             Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
             .order_by("pk")
