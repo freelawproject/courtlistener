@@ -298,7 +298,7 @@ def update_document_from_text(opinion):
 
 
 @app.task
-def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
+def extract_doc_content(pk, ocr_available=False, citation_jitter=False):
     """
     Given an opinion PK, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
@@ -307,7 +307,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     This implementation uses local paths.
 
     :param pk: The opinion primary key to work on
-    :param do_ocr: Whether the PDF converting function should use OCR
+    :param ocr_available: Whether the PDF converting function should use OCR
     :param citation_jitter: Whether to apply jitter before running the citation
     parsing code. This can be useful do spread these tasks out when doing a
     larger scrape.
@@ -324,7 +324,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     elif extension == "html":
         content, err = extract_from_html(path)
     elif extension == "pdf":
-        content, err = extract_from_pdf(path, opinion, do_ocr)
+        content, err = extract_from_pdf(path, opinion, ocr_available)
     elif extension == "txt":
         content, err = extract_from_txt(path)
     elif extension == "wpd":
