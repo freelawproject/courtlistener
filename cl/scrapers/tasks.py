@@ -2,6 +2,7 @@
 import base64
 import logging
 import random
+import re
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
@@ -141,21 +142,30 @@ def make_pdftotext_process(path):
     )
 
 
-def extract_from_pdf(path, opinion, do_ocr=False):
+def extract_from_pdf(
+    path: str, opinion: Opinion, ocr_available: bool = False
+) -> Tuple[str, bytes]:
     """Extract text from pdfs.
 
-    Here, we use pdftotext. If that fails, try to use tesseract under the
-    assumption it's an image-based PDF. Once that is complete, we check for the
-    letter e in our content. If it's not there, we try to fix the mojibake
-    that ca9 sometimes creates.
+    Start with pdftotext.  If we we enabled OCR - and the the content is empty
+    or the PDF contains images use tesseract.  This pattern occurs because
+    PDFs can be images, text-based and a mix of the two.  We check for images
+    to avoid not OCRing mix type PDFs.
+
+    If a text-based PDF we fix corrupt PDFs from ca9.
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     content = content.decode()
-    if content.strip() == "" and do_ocr:
-        success, content = extract_by_ocr(path)
+
+    has_images = check_pdf_for_images(path)
+    if (content.strip() == "" or has_images) and ocr_available:
+        success, ocr_content = extract_by_ocr(path)
         if success:
             opinion.extracted_by_ocr = True
+            # Check content length and take the longer of the two
+            if len(ocr_content) > len(content):
+                content = ocr_content
         elif content == "" or not success:
             content = "Unable to extract document content."
     elif "e" not in content:
