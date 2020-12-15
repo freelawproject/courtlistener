@@ -5,6 +5,7 @@ import random
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
+from typing import Tuple
 
 import requests
 from PyPDF2 import PdfFileReader
@@ -113,6 +114,21 @@ def extract_from_html(path):
         return "", True
     except:
         return "", True
+
+
+def check_pdf_for_images(path: str) -> bool:
+    """Check raw PDF for embedded images.
+
+    We need to check if a PDF contains any images.  If a PDF contains images it
+    likely has content that needs to be scanned.
+
+    :param path: Location of PDF to process.
+    :return: Does the PDF contain images?
+    :type: bool
+    """
+    with open(path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        return True if re.search(rb"\/Image ?\/", pdf_bytes) else False
 
 
 def make_pdftotext_process(path):
