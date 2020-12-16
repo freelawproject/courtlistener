@@ -191,7 +191,7 @@ class OpinionSitemapTest(SitemapTest):
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
-        self.expected_item_count = OpinionCluster.objects.all().count()
+        self.item_qs = OpinionCluster.objects.all()
 
     def test_does_the_sitemap_have_content(self) -> None:
         super(OpinionSitemapTest, self).assert_sitemap_has_content()

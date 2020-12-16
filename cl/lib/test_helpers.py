@@ -104,9 +104,9 @@ class IndexedSolrTestCase(SolrTestCase):
 
 
 class SitemapTest(TestCase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super(SitemapTest, self).__init__(*args, **kwargs)
-        self.expected_item_count = None
+        self.item_qs = None
         self.sitemap_url = None
 
     def assert_sitemap_has_content(self) -> None:
@@ -124,10 +124,11 @@ class SitemapTest(TestCase):
                 },
             )
         )
+        expected_item_count = self.item_qs.count()
         self.assertEqual(
             node_count,
-            self.expected_item_count,
+            expected_item_count,
             msg="Did not get the right number of items in the sitemap.\n"
             "\tCounted:\t%s\n"
-            "\tExpected:\t%s" % (node_count, self.expected_item_count),
+            "\tExpected:\t%s" % (node_count, expected_item_count),
         )
