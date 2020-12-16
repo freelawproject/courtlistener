@@ -65,7 +65,7 @@ class PodcastTest(IndexedSolrTestCase):
 class AudioSitemapTest(SitemapTest):
     def __init__(self, *args, **kwargs):
         super(AudioSitemapTest, self).__init__(*args, **kwargs)
-        self.expected_item_count = Audio.objects.all().count()
+        self.item_qs = Audio.objects.all()
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.ORAL_ARGUMENT}
         )

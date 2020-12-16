@@ -8,7 +8,7 @@ from cl.people_db.models import Person
 
 class PersonSitemap(sitemaps.Sitemap):
     changefreq = "monthly"
-    limit = 10_000
+    limit = 50_000
     priority = 0.5
 
     def items(self) -> QuerySet:
