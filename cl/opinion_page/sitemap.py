@@ -9,7 +9,7 @@ from cl.search.models import OpinionCluster, Docket
 class OpinionSitemap(sitemaps.Sitemap):
     changefreq = "yearly"
     priority = 0.5
-    limit = 10_000
+    limit = 50_000
 
     def items(self) -> QuerySet:
         return OpinionCluster.objects.only(
@@ -22,10 +22,9 @@ class OpinionSitemap(sitemaps.Sitemap):
 
 class DocketSitemap(sitemaps.Sitemap):
     changefreq = "weekly"
-    limit = 10_000
+    limit = 50_000
 
     def items(self) -> QuerySet:
-        # XXX Remove extra fields here
         return (
             Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
             .order_by("pk")

@@ -12,6 +12,7 @@ from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.simple_pages.views import serve_static_file
+from cl.sitemap import cached_sitemap
 from cl.visualizations.sitemap import VizSitemap
 
 sitemaps = {
@@ -46,9 +47,7 @@ urlpatterns = [
     ),
     url(
         r"^sitemap-(?P<section>.+)\.xml$",
-        cache_page(60 * 60 * 24 * 14, cache="db_cache")(
-            sitemaps_views.sitemap
-        ),
+        cached_sitemap,
         {"sitemaps": sitemaps},
         name="sitemaps",
     ),
