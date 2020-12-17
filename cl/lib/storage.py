@@ -67,7 +67,7 @@ class AWSMediaStorage(S3Boto3Storage):
     file_overwrite = True
     custom_domain = False
 
-    def get_available_name(self, name: str) -> str:
+    def get_available_name(self, name, max_length=None):
         """Generate usable file name for storage itearting if needed
 
         Returns a filename that's free on the target storage system, and
