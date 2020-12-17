@@ -25,9 +25,9 @@ from cl.scrapers.transformer_extractor_utils import get_page_count
 
 
 def check_if_in_system(sha1_hash: str) -> bool:
-    """Check if PDF in db already.
+    """Check if pdf bytes hash sha1 in cl db.
 
-    :param sha1_hash: PDF sha1 hash
+    :param sha1_hash: Sha1 hash
     :return: Whether PDF is in db.
     """
     disclosures = FinancialDisclosure.objects.filter(pdf_hash=sha1_hash)
@@ -43,9 +43,8 @@ def extract_content(pdf_bytes: bytes) -> Dict:
     Attempt extraction using multiple methods if necessary.
 
     :param pdf_bytes: The byte array of the PDF
-    :return:The OCR'd PDF content
+    :return:The extracted content
     """
-
     logger.info("Beginning Extraction")
 
     # Extraction takes between 7 seconds and 80 minutes for super
@@ -217,11 +216,6 @@ def save_disclosure(
                 source_type=spouse_income["Source and Type"]["text"],
             )
 
-        logger.info(
-            f"Upload to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosure.filepath}"
-        )
-
 
 def extract_pdf(data: dict) -> requests.Response:
     """Download or generate PDF content from images or urls.
@@ -273,9 +267,15 @@ def import_financial_disclosures(options):
 
     for data in disclosures:
         # Generate PDF content from our three paths
+        if options["skip_until"]:
+            if data["id"] < int(options["skip_until"]):
+                continue
+
         year = data["year"]
         person_id = data["person_id"]
-        logger.info(f"Processing {person_id} for year {year}")
+        logger.info(
+            f"Processing id:{person_id} " f"year:{year}, with id:{data['id']}"
+        )
 
         pdf_response = extract_pdf(data)
         pdf_bytes = pdf_response.content
@@ -303,15 +303,16 @@ def import_financial_disclosures(options):
         disclosure = FinancialDisclosure(
             year=year,
             page_count=pg_count,
-            person=Person.objects.get(
-                id=1  # person_id
-            ),  # Will save to the same folder because we've identified same
-            # year and same single person in our database.
+            person=Person.objects.get(id=person_id),
             pdf_hash=sha1_hash,
             has_been_extracted=False,
         )
+        # Save and upload PDF
         disclosure.filepath.save("", ContentFile(pdf_bytes))
-
+        logger.info(
+            f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+            f"{disclosure.filepath}"
+        )
         # Extract content from PDF
         content = extract_content(pdf_bytes=pdf_bytes)
         if not content:
@@ -329,6 +330,12 @@ class Command(VerboseCommand):
             "--filepath",
             required=True,
             help="Filepath to json identify documents to process.",
+        )
+
+        parser.add_argument(
+            "--skip-until",
+            required=False,
+            help="Skip until, uses an id to skip processes",
         )
 
     def handle(self, *args, **options):
