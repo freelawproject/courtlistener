@@ -325,34 +325,13 @@ def import_financial_disclosures(options):
 class Command(VerboseCommand):
     help = "Add financial disclosures to CL database."
 
-    def valid_actions(self, s):
-        if s.lower() not in self.VALID_ACTIONS:
-            raise argparse.ArgumentTypeError(
-                "Unable to parse action. Valid actions are: %s"
-                % (", ".join(self.VALID_ACTIONS.keys()))
-            )
-        return self.VALID_ACTIONS[s]
-
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--action",
-            type=self.valid_actions,
-            required=True,
-            help="The action you wish to take. Valid choices are: %s"
-            % (", ".join(self.VALID_ACTIONS.keys())),
-        )
         parser.add_argument(
             "--filepath",
             required=True,
-            help="Filepath to json identifiy documents to process",
+            help="Filepath to json identify documents to process.",
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        options["action"](options)
-
-    VALID_ACTIONS = {
-        "split-tiffs": split_tiffs,
-        "single-tiff": single_tiff,
-        "judicial-watch": judicial_watch,
-    }
+        import_financial_disclosures(options)
