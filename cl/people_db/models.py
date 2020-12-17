@@ -1,3 +1,5 @@
+import re
+
 from django.urls import reverse
 from django.db import models
 from django.template import loader
@@ -1469,7 +1471,16 @@ class FinancialDisclosure(models.Model):
         (P4, "50,000,001 +"),
         (X, "Failed Extraction"),
     )
-
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     person = models.ForeignKey(
         Person,
         help_text="The person that the document is associated with.",
@@ -1554,7 +1565,16 @@ class Investment(models.Model):
         related_name="investment",
         on_delete=models.CASCADE,
     )
-
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     description = models.TextField(help_text="Name of investment", blank=True)
 
     redacted = models.BooleanField(
@@ -1620,7 +1640,16 @@ class Positions(models.Model):
         related_name="positions",
         on_delete=models.CASCADE,
     )
-
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     position = models.TextField(
         help_text="Position title.",
         blank=True,
@@ -1644,6 +1673,16 @@ class Agreements(models.Model):
         related_name="agreements",
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     date = models.TextField(
         help_text="Dates of judicial agreements.",
         blank=True,
@@ -1666,6 +1705,16 @@ class NonInvestmentIncome(models.Model):
         help_text="The financial disclosure associated with this investment.",
         related_name="non_investment_income",
         on_delete=models.CASCADE,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
     )
     date = models.TextField(
         help_text="Date of non-investment income (ex. 2011).",
@@ -1695,6 +1744,16 @@ class SpouseIncome(models.Model):
         related_name="spouse_income",
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
     source_type = models.TextField(
         help_text="Source and Type of income of judicial spouse",
         blank=True,
@@ -1717,6 +1776,16 @@ class Reimbursement(models.Model):
         help_text="The financial disclosure associated with this investment.",
         related_name="reimbursement",
         on_delete=models.CASCADE,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
     )
     source = models.TextField(
         help_text="Source of the reimbursement (ex. FSU Law School).",
@@ -1755,6 +1824,17 @@ class Gift(models.Model):
         related_name="gift",
         on_delete=models.CASCADE,
     )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
+    )
+
     source = models.TextField(
         help_text="Source of the judicial gift.",
         blank=True,
@@ -1782,6 +1862,16 @@ class Debt(models.Model):
         help_text="The financial disclosure associated with this investment.",
         related_name="debt",
         on_delete=models.CASCADE,
+    )
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified.",
+        auto_now=True,
+        db_index=True,
     )
     creditor_name = models.TextField(
         help_text="Liability/Debt creditor", blank=True
