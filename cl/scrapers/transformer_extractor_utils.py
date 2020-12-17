@@ -50,9 +50,10 @@ def get_page_count(pdf_bytes) -> int:
     :param pdf_bytes: PDF bytes
     :return: Page count
     """
-    response = requests.post(
+    bte_response = requests.post(
         settings.BTE_URLS["page-count"],
         files={"file": ("file.pdf", pdf_bytes)},
     )
-    if response.status_code == 200:
-        return response.json()["pg_count"]
+    if bte_response.status_code == 200:
+        return int(bte_response.content)
+    return None
