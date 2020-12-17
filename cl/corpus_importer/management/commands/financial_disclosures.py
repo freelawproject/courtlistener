@@ -312,11 +312,10 @@ def import_financial_disclosures(options):
         )
         disclosure.filepath.save("", ContentFile(pdf_bytes))
 
-        print(disclosure.filepath)
         # Extract content from PDF
         content = extract_content(pdf_bytes=pdf_bytes)
         if not content:
-            logger.info("Failed Extraction")
+            logger.info("\x1b[6;30;41m" + "Failed extraction!" + "\x1b[0m")
 
         # Save PDF content
         save_disclosure(extracted_data=content, disclosure=disclosure)
