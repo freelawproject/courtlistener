@@ -1482,9 +1482,8 @@ class FinancialDisclosure(models.Model):
     )
     filepath = models.FileField(
         help_text="The disclosure report itself",
-        storage=IncrementingFileSystemStorage(),
         upload_to=make_pdf_path,
-        # storage=AWSMediaStorage(),
+        storage=AWSMediaStorage(),
         db_index=True,
     )
     thumbnail = models.FileField(
