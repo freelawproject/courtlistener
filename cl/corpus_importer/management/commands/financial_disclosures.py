@@ -261,42 +261,65 @@ def extract_pdf(data: dict) -> requests.Response:
     return pdf_response
 
 
+def import_financial_disclosures(options):
+    """Import financial documents into www.courtlistener.com
 
-def judicial_watch(options: Dict) -> None:
-    """
-
-    :param options:
-    :type options: Dict
-    :return:
+    :param options: argparse
+    :return:None
     """
     filepath = options["filepath"]
-
-    # url = ""
-    # j = json.load(filepath)
-
-    # -------------- ** ** ** *--------------
-    # Temporary data
-
-    filepath = "/opt/courtlistener/samples/sample_jw.json"
     with open(filepath) as f:
         disclosures = json.load(f)
 
-    # -------------- ******* --------------
-
     for data in disclosures:
+        # Generate PDF content from our three paths
+        year = data["year"]
         person_id = data["person_id"]
-        bucket = "com-courtlistener-storage.s3-us-west-2.amazonaws.com"
-        aws_url = f"https://{bucket}/{data['path']}"
-        pdf_bytes = requests.get(aws_url).content
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure"],
-            files={"file": ("", pdf_bytes)},
-            timeout=60 * 60,
-        )
-        # print(extractor_response.json())
-        pprint.pprint(extractor_response.json())
+        logger.info(f"Processing {person_id} for year {year}")
 
-        break
+        pdf_response = extract_pdf(data)
+        pdf_bytes = pdf_response.content
+
+        if pdf_response.status_code != 200:
+            logger.info("PDF generation failed.")
+            continue
+
+        logger.info("PDF content generated. Extracting content now.")
+
+        # Sha1 - check for duplicates
+        sha1_hash = sha1(pdf_bytes)
+        in_system = check_if_in_system(sha1_hash)
+        if in_system:
+            logger.info("\x1b[6;30;41m" + "PDF already in system." + "\x1b[0m")
+            continue
+
+        # Return page count - 0 indicates a failure of some kind.
+        pg_count = get_page_count(pdf_bytes)
+        if pg_count == 0:
+            logger.info("\x1b[6;30;41m" + "PDF failed!" + "\x1b[0m")
+            return
+
+        # Save Financial Disclosure here to AWS and move onward
+        disclosure = FinancialDisclosure(
+            year=year,
+            page_count=pg_count,
+            person=Person.objects.get(
+                id=1  # person_id
+            ),  # Will save to the same folder because we've identified same
+            # year and same single person in our database.
+            pdf_hash=sha1_hash,
+            has_been_extracted=False,
+        )
+        disclosure.filepath.save("", ContentFile(pdf_bytes))
+
+        print(disclosure.filepath)
+        # Extract content from PDF
+        content = extract_content(pdf_bytes=pdf_bytes)
+        if not content:
+            logger.info("Failed Extraction")
+
+        # Save PDF content
+        save_disclosure(extracted_data=content, disclosure=disclosure)
 
 
 class Command(VerboseCommand):
