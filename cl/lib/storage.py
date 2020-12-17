@@ -66,3 +66,22 @@ class AWSMediaStorage(S3Boto3Storage):
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
     custom_domain = False
+
+    def get_available_name(self, name: str) -> str:
+        """Generate usable file name for storage itearting if needed
+
+        Returns a filename that's free on the target storage system, and
+        available for new content to be written to.
+
+        :param name: File name
+        :return: Iterated file path
+        """
+        dir_name, file_name = os.path.split(name)
+        file_root, file_ext = os.path.splitext(file_name)
+        count = itertools.count(1)
+        while self.exists(name):
+            # file_ext includes the dot.
+            name = os.path.join(
+                dir_name, "%s_%s%s" % (file_root, next(count), file_ext)
+            )
+        return name
