@@ -1,57 +1,41 @@
-import argparse
 import json
-import pprint
-import re
 from typing import Dict
+from urllib.parse import quote
 
 import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import transaction
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
-from cl.people_db.models import FinancialDisclosure, Person
+from cl.people_db.models import (
+    FinancialDisclosure,
+    Person,
+    Investment,
+    Agreements,
+    Debt,
+    Gift,
+    Reimbursement,
+    NonInvestmentIncome,
+    SpouseIncome,
+    Positions,
+)
 from cl.scrapers.transformer_extractor_utils import get_page_count
 
 
-def split_tiffs(options: Dict) -> None:
-    """Combine multiple page tiffs in a directory into one single PDF and extract the content.
+def check_if_in_system(sha1_hash: str) -> bool:
+    """Check if PDF in db already.
 
-    :param options:
-    :type options: Dict
-    :return:
+    :param sha1_hash: PDF sha1 hash
+    :return: Whether PDF is in db.
     """
-    filepath = options["filepath"]
-    filepath = "/opt/courtlistener/samples/sample_all_pages.json"
+    disclosures = FinancialDisclosure.objects.filter(pdf_hash=sha1_hash)
+    if len(disclosures) > 0:
+        logger.info("PDF already in system")
+        return True
+    return False
 
-    with open(filepath) as f:
-        disclosures = json.load(f)
-
-    for data in disclosures:
-        bucket = "storage.courtlistener.com"
-        path = data["key"]
-        urls = [f"https://{bucket}/{path}/{p}" for p in data["paths"]]
-        year = re.findall("20[1,2][0-9]", path)[0]
-
-        logger.info(f"\nProcessing images")
-
-        pdf_response = requests.post(
-            settings.BTE_URLS["urls-to-pdf"],
-            json=json.dumps({"urls": urls}),
-        )
-
-        if pdf_response.status_code is not 200:
-            logger.info(f"\nConversion failed")
-            continue
-
-        sha1_hash = sha1(pdf_response.content)
-        logger.info(f"\nConversion to PDF completed. \nBeginning extraction.")
-
-        # Check if file exists
-        disclsoures = FinancialDisclosure.objects.filter(pdf_hash=sha1_hash)
-        if len(disclsoures) > 0:
-            logger.info("PDF already in system")
-            continue
 
         # Save and upload PDF to AWS (currently local machine)
         fd = FinancialDisclosure(
