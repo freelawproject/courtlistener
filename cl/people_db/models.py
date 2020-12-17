@@ -1468,7 +1468,7 @@ class FinancialDisclosure(models.Model):
         (P1, "1,000,001 - 5,000,000"),
         (P2, "5,000,001 - 25,000,000"),
         (P3, "25,000,001 - 50,000,000"),
-        (P4, "50,000,001 +"),
+        (P4, "50,000,001 - "),
         (X, "Failed Extraction"),
     )
     date_created = models.DateTimeField(
