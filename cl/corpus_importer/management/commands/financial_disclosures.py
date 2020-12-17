@@ -222,50 +222,44 @@ def save_disclosure(
             f"{disclosure.filepath}"
         )
 
-def single_tiff(options: Dict) -> None:
+
+def extract_pdf(data: dict) -> requests.Response:
+    """Download or generate PDF content from images or urls.
+
+    :param data: Data to process.
+    :return: Response containing PDF
     """
+    if data["disclosure_type"] == "jw":
+        # Download the PDFs in the judicial watch collection
+        logger.info(
+            f"Preparing to process JW url: {quote(data['url'], safe=':/')}"
+        )
 
-    :param options:
-    :type options: Dict
-    :return:
-    """
-    filepath = options["filepath"]
-    disclosures = [
-        {
-            "path": "Urbanski-MF.%20J3.%2004.%20VAW%20_SPE_R_18.tiff",
-            "key": "financial-disclosures/2018",
-            "person_id": "3289",
-        }
-    ]
+        pdf_response = requests.get(data["url"], timeout=60 * 20)
 
-    filepath = "/opt/courtlistener/samples/sample_single.json"
-    with open(filepath) as f:
-        disclosures = json.load(f)
-
-    # https://storage.courtlistener.com/financial-disclosures/2018/Urbanski-MF.%20J3.%2004.%20VAW%20_SPE_R_18.tiff
-    for data in disclosures:
-        person_id = data["person_id"]
-        bucket = "com-courtlistener-storage.s3-us-west-2.amazonaws.com"
-        path = data["key"]
-        tiff_url = f"https://{bucket}/{path}/{data['path']}"
-
-        logger.info(f"Preparing to process url: {tiff_url}")
+    elif data["disclosure_type"] == "single":
+        # Split single long tiff into multiple tiffs and combine into PDF
+        logger.info(
+            f"Preparing to process url: {quote(data['url'], safe=':/')}"
+        )
         pdf_response = requests.post(
             settings.BTE_URLS["image-to-pdf"],
-            params={"tiff_url": tiff_url},
-            timeout=5 * 60,
+            params={"tiff_url": data["url"]},
+            timeout=10 * 60,
         )
-        logger.info(f"Conversion completed. \n Beginning Extraction")
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure"],
-            files={"file": ("", pdf_response.content)},
-            timeout=60 * 60,
+    else:
+        # Combine split tiffs into one single PDF
+        logger.info(
+            f"Preparing to process split urls: "
+            f"{quote(data['urls'][0], safe=':/')}"
         )
 
-        logger.info("Processing extracted data")
-        pprint.pprint(extractor_response.json())
+        pdf_response = requests.post(
+            settings.BTE_URLS["urls-to-pdf"],
+            json=json.dumps({"urls": data["urls"]}),
+        )
+    return pdf_response
 
-        break
 
 
 def judicial_watch(options: Dict) -> None:
