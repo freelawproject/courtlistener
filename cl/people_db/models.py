@@ -1546,6 +1546,42 @@ class FinancialDisclosure(models.Model):
     class Meta:
         ordering = ("-year",)
 
+    def calculate(self, field_name):
+        """Calculate gross value of all investments in disclosure
+
+        We can calculate the total investment for four fields
+
+        ** gross_value_code - Gross Value total for the invesments
+        ** income_during_reporting_period_code - Gross Income
+        ** transaction_gain_code  - Total Income gain
+        ** transaction_value_code - Total Transaction values
+
+        :param disclosure: Financial Disclosure
+        :return: Wealth calculated
+        """
+        wealth = {}
+        min_max = (0, 0)
+        investments = (
+            Investment.objects.filter(financial_disclosure=self)
+            .exclude(**{field_name: "•"})
+            .exclude(**{field_name: ""})
+        )
+        wealth["miss_count"] = (
+            Investment.objects.filter(financial_disclosure=self)
+            .filter(**{field_name: "•"})
+            .count()
+        )
+        for investment in investments:
+            id = getattr(investment, f"get_{field_name}_display")()
+            if id is None:
+                wealth["msg"] = "Field not recognized"
+                return wealth
+            new_min_max = re.findall(r"([0-9,]{1,12})", id)
+            new_min_max = [int(x.replace(",", "")) for x in new_min_max]
+            min_max = [i + j for i, j in zip(min_max, new_min_max)]
+        wealth["min"], wealth["max"] = min_max
+        return wealth
+
     def save(self, *args, **kwargs):
         super(FinancialDisclosure, self).save(*args, **kwargs)
         if not self.pk:
