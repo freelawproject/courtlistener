@@ -630,4 +630,3 @@ BTE_URLS = {
     "extract-disclosure": f"{BTE_HOST}/financial_disclosure/extract_record",
     "extract-disclosure-jw": f"{BTE_HOST}/financial_disclosure/extract_jw",
 }
-
