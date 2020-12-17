@@ -286,14 +286,15 @@ def import_financial_disclosures(options):
 
         logger.info("PDF content generated. Extracting content now.")
 
-        # Sha1 - check for duplicates
+        # Sha1 hash - Check for duplicates
         sha1_hash = sha1(pdf_bytes)
         in_system = check_if_in_system(sha1_hash)
         if in_system:
             logger.info("\x1b[6;30;41m" + "PDF already in system." + "\x1b[0m")
             continue
 
-        # Return page count - 0 indicates a failure of some kind.
+        # Return page count - 0 indicates a failure of some kind.  Like PDF
+        # Not actually present on aws.
         pg_count = get_page_count(pdf_bytes)
         if pg_count == 0:
             logger.info("\x1b[6;30;41m" + "PDF failed!" + "\x1b[0m")
