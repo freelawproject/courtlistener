@@ -37,38 +37,133 @@ def check_if_in_system(sha1_hash: str) -> bool:
     return False
 
 
-        # Save and upload PDF to AWS (currently local machine)
-        fd = FinancialDisclosure(
-            year=year,
-            page_count=get_page_count(pdf_response.content),
-            person=Person.objects.get(id=1), # Will save to the same folder beacuse weve idenitifeid same year and same single person in our database.
-            pdf_hash=sha1_hash,
-        )
-        print(fd.filepath)
-        fd.filepath.save("", ContentFile(pdf_response.content))
+
+def save_disclosure(
+    extracted_data: dict, disclosure: FinancialDisclosure
+) -> None:
+    """Save financial data to system.
+
+    Wrapped in a transaction, we fail if anything fails.
+
+    :param disclosure: Financial disclosure
+    :param extracted_data: disclosure
+    :return:None
+    """
+    addendum = "Additional Information or Explanations"
+
+    # Process and save our data into the system.
+    with transaction.atomic():
+        disclosure.has_been_extracted = True
+        disclosure.addendum_content_raw = extracted_data[addendum]["text"]
+        disclosure.addendum_redacted = extracted_data[addendum]["is_redacted"]
+        disclosure.is_amended = extracted_data.get("amended") or False
+        disclosure.report_type = get_report_type(extracted_data)
+        disclosure.save()
+
+        for investment in extracted_data["sections"]["Investments and Trusts"][
+            "rows"
+        ]:
+            Investment.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [v["is_redacted"] for _, v in investment.items()],
+                description=investment["A"]["text"],
+                has_inferred_values=investment["A"]["inferred_value"],
+                income_during_reporting_period_code=investment["B1"]["text"],
+                income_during_reporting_period_type=investment["B2"]["text"],
+                gross_value_code=investment["C1"]["text"],
+                gross_value_method=investment["C2"]["text"],
+                transaction_during_reporting_period=investment["D1"]["text"],
+                transaction_date_raw=investment["D2"]["text"],
+                transaction_value_code=investment["D3"]["text"],
+                transaction_gain_code=investment["D4"]["text"],
+                transaction_partner=investment["D5"]["text"],
+            )
+
+        for agreement in extracted_data["sections"]["Agreements"]["rows"]:
+            Agreements.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [v["is_redacted"] for _, v in agreement.items()],
+                date=agreement["Date"]["text"],
+                parties_and_terms=agreement["Parties and Terms"]["text"],
+            )
+
+        for debt in extracted_data["sections"]["Liabilities"]["rows"]:
+            Debt.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True in [v["is_redacted"] for _, v in debt.items()],
+                creditor_name=debt["Creditor"]["text"],
+                description=debt["Description"]["text"],
+                value_code=debt["Value Code"]["text"],
+            )
+
+        for position in extracted_data["sections"]["Positions"]["rows"]:
+            Positions.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [v["is_redacted"] for _, v in position.items()],
+                position=position["Position"]["text"].replace("LL. ", ""),
+                organization_name=position["Name of Organization"]["text"],
+            )
+
+        for gift in extracted_data["sections"]["Gifts"]["rows"]:
+            Gift.objects.create(
+                financial_disclosure=disclosure,
+                source=gift["Source"]["text"],
+                description=gift["Description"]["text"],
+                value_code=gift["Value"]["text"],
+                redacted=True in [v["is_redacted"] for _, v in gift.items()],
+            )
+
+        for reimbursement in extracted_data["sections"]["Reimbursements"][
+            "rows"
+        ]:
+            if 5 != len(reimbursement.items()):
+                # Just in case - probably not needed
+                continue
+            Reimbursement.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [v["is_redacted"] for _, v in reimbursement.items()],
+                source=reimbursement["Source"]["text"],
+                dates=reimbursement["Dates"]["text"],
+                location=reimbursement["Locations"]["text"],
+                purpose=reimbursement["Purpose"]["text"],
+                items_paid_or_provided=reimbursement["Items Paid or Provided"][
+                    "text"
+                ],
+            )
+
+        for non_investment_income in extracted_data["sections"][
+            "Non-Investment Income"
+        ]["rows"]:
+            NonInvestmentIncome.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [
+                    v["is_redacted"] for _, v in non_investment_income.items()
+                ],
+                date=non_investment_income["Date"]["text"],
+                source_type=non_investment_income["Source and Type"]["text"],
+                income_amount=non_investment_income["Income"]["text"],
+            )
+
+        for spouse_income in extracted_data["sections"][
+            "Non Investment Income Spouse"
+        ]["rows"]:
+            SpouseIncome.objects.create(
+                financial_disclosure=disclosure,
+                redacted=True
+                in [v["is_redacted"] for _, v in spouse_income.items()],
+                date=spouse_income["Date"]["text"],
+                source_type=spouse_income["Source and Type"]["text"],
+            )
 
         logger.info(
-            "Uploading disclosure to https://%s/%s"
-            % (settings.AWS_S3_CUSTOM_DOMAIN, fd.filepath)
+            f"Upload to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+            f"{disclosure.filepath}"
         )
-
-        continue
-
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure"],
-            files={"file": ("", pdf_response.content)},
-            timeout=60 * 60,
-        )
-        if extractor_response.status_code is not 200:
-            logger.info(f"\nExtraction failed")
-            continue
-
-        logger.info("\nProcessing extracted data")
-        print(extractor_response)
-        print(extractor_response.json())
-
-        break
-
 
 def single_tiff(options: Dict) -> None:
     """
