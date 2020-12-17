@@ -37,6 +37,48 @@ def check_if_in_system(sha1_hash: str) -> bool:
     return False
 
 
+def extract_content(pdf_bytes: bytes) -> Dict:
+    """Extract the content of the PDF.
+
+    Attempt extraction using multiple methods if necessary.
+
+    :param pdf_bytes: The byte array of the PDF
+    :return:The OCR'd PDF content
+    """
+
+    logger.info("Beginning Extraction")
+
+    # Extraction takes between 7 seconds and 80 minutes for super
+    # long Trump extraction with ~5k investments
+    extractor_response = requests.post(
+        settings.BTE_URLS["extract-disclosure"],
+        files={"pdf_document": ("file", pdf_bytes)},
+        timeout=60 * 120,
+    )
+
+    if (
+        extractor_response.status_code != 200
+        or extractor_response.json()["success"] is False
+    ):
+        # Try second method
+        logger.info("Attempting second extraction")
+        extractor_response = requests.post(
+            settings.BTE_URLS["extract-disclosure-jw"],
+            files={"file": ("file", pdf_bytes)},
+            timeout=60 * 60,
+        )
+
+        if (
+            extractor_response.status_code != 200
+            or extractor_response.json()["success"] is False
+        ):
+            logger.info("Could not extract data from this document")
+            return {}
+
+    logger.info("Processing extracted data")
+    return extractor_response.json()
+
+
 
 def save_disclosure(
     extracted_data: dict, disclosure: FinancialDisclosure
