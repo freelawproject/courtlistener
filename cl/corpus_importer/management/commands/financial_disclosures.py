@@ -79,6 +79,21 @@ def extract_content(pdf_bytes: bytes) -> Dict:
     return extractor_response.json()
 
 
+def get_report_type(extracted_data: dict) -> int:
+    """Get report type if available
+
+    :param extracted_data: Document information
+    :return: Disclosure type
+    """
+    if extracted_data.get("initial"):
+        return FinancialDisclosure.INITIAL
+    elif extracted_data.get("nomination"):
+        return FinancialDisclosure.NOMINATION
+    elif extracted_data.get("annual"):
+        return FinancialDisclosure.ANNUAL
+    elif extracted_data.get("final"):
+        return FinancialDisclosure.FINAL
+
 
 def save_disclosure(
     extracted_data: dict, disclosure: FinancialDisclosure
