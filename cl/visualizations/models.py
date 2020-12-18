@@ -8,6 +8,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
 
+from cl.lib.models import Base
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
 from cl.visualizations.network_utils import (
@@ -18,7 +19,7 @@ from cl.visualizations.network_utils import (
 from cl.visualizations.exceptions import TooManyNodes
 
 
-class SCOTUSMap(models.Model):
+class SCOTUSMap(Base):
     user = models.ForeignKey(
         User,
         help_text="The user that owns the visualization",
@@ -43,16 +44,6 @@ class SCOTUSMap(models.Model):
         "start and end clusters.",
         related_name="visualizations",
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_published = models.DateTimeField(
         help_text="The moment when the visualization was first shared",
@@ -376,7 +367,7 @@ class SCOTUSMap(models.Model):
         self.__original_deleted = self.deleted
 
 
-class Referer(models.Model):
+class Referer(Base):
     """Holds the referer domains where embedded maps are placed"""
 
     map = models.ForeignKey(
@@ -385,16 +376,6 @@ class Referer(models.Model):
         "referer",
         related_name="referers",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The time when this item was modified",
-        auto_now=True,
-        db_index=True,
     )
     url = models.URLField(
         help_text="The URL where this item was embedded.",
@@ -422,7 +403,7 @@ class Referer(models.Model):
         unique_together = (("map", "url"),)
 
 
-class JSONVersion(models.Model):
+class JSONVersion(Base):
     """Used for holding a variety of versions of the data."""
 
     map = models.ForeignKey(
@@ -430,16 +411,6 @@ class JSONVersion(models.Model):
         help_text="The visualization that the json is affiliated with.",
         related_name="json_versions",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     json_data = models.TextField(
         help_text="The JSON data for a particular version of the visualization.",
