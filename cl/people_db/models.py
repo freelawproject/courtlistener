@@ -1599,7 +1599,7 @@ class Investment(models.Model):
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
         help_text="The financial disclosure associated with this investment.",
-        related_name="investment",
+        related_name="investments",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -1739,8 +1739,8 @@ class NonInvestmentIncome(models.Model):
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="non_investment_income",
+        help_text="The financial disclosure associated with this non-investment income.",
+        related_name="non_investment_incomes",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -1777,8 +1777,8 @@ class SpouseIncome(models.Model):
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="spouse_income",
+        help_text="The financial disclosure associated with this spouse income.",
+        related_name="spouse_incomes",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -1810,8 +1810,8 @@ class Reimbursement(models.Model):
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="reimbursement",
+        help_text="The financial disclosure associated with this reimbursement.",
+        related_name="reimbursements",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -1857,8 +1857,8 @@ class Gift(models.Model):
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="gift",
+        help_text="The financial disclosure associated with this gift.",
+        related_name="gifts",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
@@ -1896,8 +1896,8 @@ class Debt(models.Model):
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="debt",
+        help_text="The financial disclosure associated with this debt.",
+        related_name="debts",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
