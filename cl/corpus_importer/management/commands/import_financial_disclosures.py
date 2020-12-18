@@ -175,9 +175,6 @@ def save_disclosure(
         for reimbursement in extracted_data["sections"]["Reimbursements"][
             "rows"
         ]:
-            if 5 != len(reimbursement.items()):
-                # Just in case - probably not needed
-                continue
             Reimbursement.objects.create(
                 financial_disclosure=disclosure,
                 redacted=True
