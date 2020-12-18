@@ -1,17 +1,17 @@
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
-from django.views.decorators.cache import cache_page
+from datetime import datetime
 
-from cl.sitemap import make_solr_sitemap, make_sitemap_solr_params
+from django.contrib import sitemaps
+from django.db.models import QuerySet
+from cl.audio.models import Audio
 
 
-@cache_page(60 * 60 * 24 * 14, cache="db_cache")  # two weeks
-def oral_argument_sitemap_maker(request: HttpRequest) -> HttpResponse:
-    return make_solr_sitemap(
-        request,
-        settings.SOLR_AUDIO_URL,
-        make_sitemap_solr_params("dateArgued asc", "oa_sitemap"),
-        "monthly",
-        ["mp3"],
-        "absolute_url",
-    )
+class AudioSitemap(sitemaps.Sitemap):
+    changefreq = "monthly"
+    priority = 0.4
+    limit = 50_000
+
+    def items(self) -> QuerySet:
+        return Audio.objects.order_by("pk")
+
+    def lastmod(self, obj: Audio) -> datetime:
+        return obj.date_modified

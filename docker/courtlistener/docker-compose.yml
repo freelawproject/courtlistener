@@ -122,13 +122,13 @@ services:
         condition: none
 
   cl-binary-transformers-and-extractors:
-      image: freelawproject/binary-transformers-and-extractors:latest
-      container_name: "cl-binary-transformers-and-extractors"
-      depends_on:
-        - cl-seal-rookery
-      ports:
-        - "5050:5050"
-      networks:
-        - cl_net_overlay
-      volumes:
-        - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+    image: freelawproject/binary-transformers-and-extractors:latest
+    container_name: "cl-binary-transformers-and-extractors"
+    depends_on:
+      - cl-seal-rookery
+    ports:
+      - "5050:5050"
+    networks:
+      - cl_net_overlay
+    volumes:
+      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery

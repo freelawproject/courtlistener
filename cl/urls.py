@@ -2,9 +2,27 @@ from django.conf import settings
 from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps import views as sitemaps_views
+from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
-from cl.sitemap import index_sitemap_maker
+
+from cl.audio.sitemap import AudioSitemap
+from cl.opinion_page.sitemap import OpinionSitemap, DocketSitemap
+from cl.people_db.sitemap import PersonSitemap
+from cl.search.models import SEARCH_TYPES
+from cl.simple_pages.sitemap import SimpleSitemap
 from cl.simple_pages.views import serve_static_file
+from cl.sitemap import cached_sitemap
+from cl.visualizations.sitemap import VizSitemap
+
+sitemaps = {
+    SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
+    SEARCH_TYPES.OPINION: OpinionSitemap,
+    SEARCH_TYPES.RECAP: DocketSitemap,
+    SEARCH_TYPES.PEOPLE: PersonSitemap,
+    "visualizations": VizSitemap,
+    "simple": SimpleSitemap,
+}
 
 urlpatterns = [
     # Admin docs and site
@@ -22,7 +40,17 @@ urlpatterns = [
     url("", include("cl.visualizations.urls")),
     url("", include("cl.stats.urls")),
     # Sitemaps
-    url(r"^sitemap\.xml$", index_sitemap_maker),
+    url(
+        r"^sitemap\.xml$",
+        cache_page(60 * 60 * 24 * 14, cache="db_cache")(sitemaps_views.index),
+        {"sitemaps": sitemaps, "sitemap_url_name": "sitemaps"},
+    ),
+    url(
+        r"^sitemap-(?P<section>.+)\.xml$",
+        cached_sitemap,
+        {"sitemaps": sitemaps},
+        name="sitemaps",
+    ),
     # Redirects
     url(
         r"^privacy/$",
