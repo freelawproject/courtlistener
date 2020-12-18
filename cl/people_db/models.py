@@ -1642,7 +1642,7 @@ class Investment(models.Model):
     # Transactions indicate if the investment was bought sold etc.
     # during the reporting period
     transaction_during_reporting_period = models.TextField(
-        help_text="Transaction of investment during reporting period ex. Buy Sold etc.",
+        help_text="Transaction of investment during reporting period (ex. Buy, Sold)",
         blank=True,
     )
     transaction_date_raw = models.TextField(
