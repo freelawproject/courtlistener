@@ -1668,13 +1668,13 @@ class Investment(models.Model):
     )
 
 
-class Positions(models.Model):
+class FinancialPosition(models.Model):
     """ Financial Disclosure Position Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
-        related_name="positions",
+        help_text="The financial disclosure associated with this financial position.",
+        related_name="financial_positions",
         on_delete=models.CASCADE,
     )
     date_created = models.DateTimeField(
