@@ -1,4 +1,5 @@
 import re
+from typing import Dict, Union
 
 from django.urls import reverse
 from django.db import models
@@ -1546,18 +1547,18 @@ class FinancialDisclosure(models.Model):
     class Meta:
         ordering = ("-year",)
 
-    def calculate(self, field_name):
+    def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
         """Calculate gross value of all investments in disclosure
 
         We can calculate the total investment for four fields
 
-        ** gross_value_code - Gross Value total for the invesments
+        ** gross_value_code - Gross Value total for the investments
         ** income_during_reporting_period_code - Gross Income
         ** transaction_gain_code  - Total Income gain
         ** transaction_value_code - Total Transaction values
 
-        :param disclosure: Financial Disclosure
-        :return: Wealth calculated
+        :param field_name: The field to process for the disclosure
+        :return: Total value of investments for supplied field.
         """
         wealth = {}
         min_max = (0, 0)
