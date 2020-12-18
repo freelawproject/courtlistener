@@ -52,7 +52,7 @@ def extract_content(pdf_bytes: bytes) -> Dict:
     extractor_response = requests.post(
         settings.BTE_URLS["extract-disclosure"],
         files={"pdf_document": ("file", pdf_bytes)},
-        timeout=60 * 120,
+        timeout=60 * 60 * 2,
     )
 
     if (
