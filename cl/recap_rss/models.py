@@ -4,12 +4,13 @@ from django.db import models
 from juriscraper.pacer import PacerRssFeed
 
 from cl.lib.model_helpers import make_path
+from cl.lib.models import Base
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.search.models import Court
 
 
-class RssFeedStatus(models.Model):
+class RssFeedStatus(Base):
     """Keep track of PACER RSS feed parsing.
 
     We use this class to determine whether we should crawl RSS at a given court
@@ -27,16 +28,6 @@ class RssFeedStatus(models.Model):
         (PROCESSING_FAILED, "Feed encountered an error while processing."),
         (PROCESSING_IN_PROGRESS, "Feed is currently being processed."),
         (QUEUED_FOR_RETRY, "Feed failed processing, but will be retried."),
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     court = models.ForeignKey(
         Court,
@@ -85,19 +76,9 @@ def make_rss_feed_path(instance, filename):
     return make_path("pacer-rss-feeds", filename)
 
 
-class RssFeedData(models.Model):
+class RssFeedData(Base):
     """Store all old RSS data to disk for future analysis."""
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     court = models.ForeignKey(
         Court,
         help_text="The court where the RSS feed was found",

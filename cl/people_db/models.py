@@ -24,7 +24,7 @@ from cl.lib.search_index_utils import (
     normalize_search_dicts,
 )
 from cl.lib.storage import IncrementingFileSystemStorage
-from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.models import THUMBNAIL_STATUSES, Base
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -51,7 +51,7 @@ DATE_GRANULARITIES = (
 )
 
 
-class Person(models.Model):
+class Person(Base):
     RELIGIONS = (
         ("ca", "Catholic"),
         ("pr", "Protestant"),
@@ -76,16 +76,6 @@ class Person(models.Model):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_completed = models.DateTimeField(
         help_text="Whenever an editor last decided that a profile was "
@@ -396,23 +386,13 @@ class Person(models.Model):
         return normalize_search_dicts(out)
 
 
-class School(models.Model):
+class School(Base):
     is_alias_of = models.ForeignKey(
         "self",
         help_text="Any alternate names that a school may have",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
     )
     name = models.CharField(
         help_text="The name of the school or alias",
@@ -450,7 +430,7 @@ class School(models.Model):
         super(School, self).clean_fields(*args, **kwargs)
 
 
-class Position(models.Model):
+class Position(Base):
     """A role held by a person, and the details about it."""
 
     JUDGE = "jud"
@@ -768,16 +748,6 @@ class Position(models.Model):
         blank=True,
         null=True,
     )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     date_nominated = models.DateField(
         help_text="The date recorded in the Senate Executive Journal when a "
         "federal judge was nominated for their position or the date "
@@ -1048,7 +1018,7 @@ class Position(models.Model):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
-class RetentionEvent(models.Model):
+class RetentionEvent(Base):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
         ("reapp_leg", "Legislative Reappointment"),
@@ -1063,16 +1033,6 @@ class RetentionEvent(models.Model):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     retention_type = models.CharField(
         help_text="The method through which this position was retained.",
@@ -1129,7 +1089,7 @@ class RetentionEvent(models.Model):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
-class Education(models.Model):
+class Education(Base):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
         ("ma", "Master's (e.g. M.A.)"),
@@ -1143,16 +1103,6 @@ class Education(models.Model):
         ("mba", "Master of Business Administration (M.B.A.)"),
         ("cfa", "Accounting Certification (C.P.A., C.M.A., C.F.A.)"),
         ("cert", "Certificate"),
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     person = models.ForeignKey(
         Person,
@@ -1223,7 +1173,7 @@ class Race(models.Model):
         return "{race}".format(race=self.race)
 
 
-class PoliticalAffiliation(models.Model):
+class PoliticalAffiliation(Base):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
         ("a", "Appointer"),
@@ -1239,16 +1189,6 @@ class PoliticalAffiliation(models.Model):
         ("w", "Whig"),
         ("j", "Jeffersonian Republican"),
         ("u", "National Union"),
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     person = models.ForeignKey(
         Person,
@@ -1301,23 +1241,13 @@ class PoliticalAffiliation(models.Model):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
-class Source(models.Model):
+class Source(Base):
     person = models.ForeignKey(
         Person,
         related_name="sources",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
     )
     url = models.URLField(
         help_text="The URL where this data was gathered.",
@@ -1336,7 +1266,7 @@ class Source(models.Model):
     )
 
 
-class ABARating(models.Model):
+class ABARating(Base):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),
         ("wq", "Well Qualified"),
@@ -1351,16 +1281,6 @@ class ABARating(models.Model):
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     year_rated = models.PositiveSmallIntegerField(
         help_text="The year of the rating.", null=True
@@ -1551,17 +1471,7 @@ class CriminalComplaint(models.Model):
     )
 
 
-class Party(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
+class Party(Base):
     attorneys = models.ManyToManyField(
         "Attorney",
         help_text="The attorneys involved with the party.",
@@ -1668,17 +1578,7 @@ class Role(models.Model):
         )
 
 
-class Attorney(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
+class Attorney(Base):
     organizations = models.ManyToManyField(
         "AttorneyOrganization",
         help_text="The organizations that the attorney is affiliated with",
@@ -1748,17 +1648,7 @@ class AttorneyOrganizationAssociation(models.Model):
         )
 
 
-class AttorneyOrganization(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
+class AttorneyOrganization(Base):
     lookup_key = models.TextField(
         help_text="A trimmed version of the address for duplicate matching.",
         db_index=True,
