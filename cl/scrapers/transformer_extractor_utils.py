@@ -1,5 +1,5 @@
 import json
-from typing import AnyStr
+from typing import Optional
 
 import requests
 from django.conf import settings
@@ -44,7 +44,7 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
     return bte_audio_response
 
 
-def get_page_count(pdf_bytes) -> int:
+def get_page_count(pdf_bytes: str) -> Optional[int]:
     """Extract page count from PDF content.
 
     :param pdf_bytes: PDF bytes
