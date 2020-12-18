@@ -36,9 +36,9 @@ class Base(models.Model):
         auto_now=True,
         db_index=True,
     )
+
     class Meta:
         abstract = True
-
 
 
 class AbstractPDF(Base):

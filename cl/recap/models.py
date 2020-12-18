@@ -226,6 +226,7 @@ class REQUEST_TYPE:
 
 class PacerFetchQueue(Base):
     """The queue of requests being made of PACER."""
+
     date_completed = models.DateTimeField(
         help_text="When the item was completed or errored out.",
         db_index=True,
