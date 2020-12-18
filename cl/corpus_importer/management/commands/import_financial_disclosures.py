@@ -1,5 +1,5 @@
 import json
-from typing import Dict
+from typing import Dict, Union
 from urllib.parse import quote
 
 import requests
@@ -217,8 +217,10 @@ def save_disclosure(
             )
 
 
-def extract_pdf(data: dict) -> requests.Response:
-    """Download or generate PDF content from images or urls.
+def generate_or_download_disclosure_as_pdf(
+    data: Dict[str : Union[str, int, list]]
+) -> requests.Response:
+    """Generate or download PDF content from images or urls.
 
     :param data: Data to process.
     :return: Response containing PDF
@@ -228,7 +230,6 @@ def extract_pdf(data: dict) -> requests.Response:
         logger.info(
             f"Preparing to process JW url: {quote(data['url'], safe=':/')}"
         )
-
         pdf_response = requests.get(data["url"], timeout=60 * 20)
 
     elif data["disclosure_type"] == "single":
@@ -247,7 +248,6 @@ def extract_pdf(data: dict) -> requests.Response:
             f"Preparing to process split urls: "
             f"{quote(data['urls'][0], safe=':/')}"
         )
-
         pdf_response = requests.post(
             settings.BTE_URLS["urls-to-pdf"],
             json=json.dumps({"urls": data["urls"]}),
@@ -277,7 +277,7 @@ def import_financial_disclosures(options):
             f"Processing id:{person_id} " f"year:{year}, with id:{data['id']}"
         )
 
-        pdf_response = extract_pdf(data)
+        pdf_response = generate_or_download_disclosure_as_pdf(data)
         pdf_bytes = pdf_response.content
 
         if pdf_response.status_code != 200:
