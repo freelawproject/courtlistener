@@ -2,10 +2,11 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
 
+from cl.lib.models import Base
 from cl.search.models import Docket, SEARCH_TYPES
 
 
-class Alert(models.Model):
+class Alert(Base):
     REAL_TIME = "rt"
     DAILY = "dly"
     WEEKLY = "wly"
@@ -24,17 +25,6 @@ class Alert(models.Model):
         help_text="The user that created the item",
         related_name="alerts",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in year"
-        " 1750 indicates the value is unknown",
-        auto_now=True,
-        db_index=True,
     )
     date_last_hit = models.DateTimeField(
         verbose_name="time of last trigger", blank=True, null=True

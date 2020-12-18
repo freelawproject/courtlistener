@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from cl.lib.models import Base
+
 
 class PAYMENT_TYPES(object):
     DONATION = "donation"
@@ -40,7 +42,7 @@ class PROVIDERS(object):
     )
 
 
-class Donation(models.Model):
+class Donation(Base):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
     UNKNOWN_ERROR = 1
@@ -73,8 +75,6 @@ class Donation(models.Model):
         related_name="donations",
         on_delete=models.CASCADE,
     )
-    date_modified = models.DateTimeField(auto_now=True, db_index=True)
-    date_created = models.DateTimeField(auto_now_add=True, db_index=True)
     clearing_date = models.DateTimeField(null=True, blank=True)
     send_annual_reminder = models.BooleanField(
         "Send me a reminder to donate again in one year",
@@ -120,7 +120,7 @@ class Donation(models.Model):
         ordering = ["-date_created"]
 
 
-class MonthlyDonation(models.Model):
+class MonthlyDonation(Base):
     """The metadata needed to associate a monthly donation with a user."""
 
     donor = models.ForeignKey(
@@ -129,8 +129,6 @@ class MonthlyDonation(models.Model):
         related_name="monthly_donations",
         on_delete=models.CASCADE,
     )
-    date_modified = models.DateTimeField(auto_now=True, db_index=True)
-    date_created = models.DateTimeField(auto_now_add=True, db_index=True)
     enabled = models.BooleanField(
         help_text="Is this monthly donation enabled?", default=True
     )
