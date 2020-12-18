@@ -1,147 +1,103 @@
-from typing import Dict, List
+import hashlib
+from calendar import timegm
+from datetime import datetime
+from typing import Dict, Optional
 
-from django.conf import settings
-from django.urls import reverse
-from django.http import HttpResponse, HttpRequest
-from django.template import loader
-from django.utils.encoding import smart_str
-from django.views.decorators.cache import cache_page
-
-from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import build_court_count_query
-
-items_per_sitemap = 10_000  # max per spec: 50_000
-
-
-def make_sitemap_solr_params(sort: str, caller: str) -> Dict[str, str]:
-    params = {
-        "q": "*",
-        "rows": items_per_sitemap,
-        "start": 0,
-        "fl": ",".join(
-            [
-                # Not all indexes have all these fields,
-                # but it causes no errors.
-                "absolute_url",
-                "docket_absolute_url",
-                "local_path",
-                "timestamp",
-            ]
-        ),
-        "sort": sort,
-        "caller": caller,
-    }
-    if caller == "r_sitemap":
-        params.update(
-            {
-                # Use groups so we only get one result per docket,
-                # not one per document.
-                "group": "true",
-                "group.ngroups": "true",
-                "group.field": "docket_id",
-                # Smaller groups for performance
-                "group.limit": 1,
-            }
-        )
-    return params
+from django.contrib.sitemaps import Sitemap
+from django.contrib.sitemaps.views import x_robots_tag
+from django.contrib.sites.shortcuts import get_current_site
+from django.core.cache import caches
+from django.core.paginator import EmptyPage, PageNotAnInteger
+from django.http import HttpRequest, HttpResponse, Http404
+from django.template.response import TemplateResponse
+from django.utils.encoding import force_bytes, iri_to_uri
+from django.utils.http import http_date
 
 
-def normalize_grouping(result):
-    """If a grouped result item, normalize it to look like a regular one.
+def make_cache_key(request: HttpRequest, section: str) -> str:
+    """Make a cache key for a URL
 
-    If a regular result, do nothing.
+    This is a simplified version of django's get_cache_key method, which
+    factors in additional things like the method and the headers that were
+    received, but it adds a section parameter to make the key slightly more
+    readable.
+
+    Note that the full URL will include the various GET parameters.
+
+    :param request: The HttpRequest from the client
+    :param section: The section of the sitemap that is loaded
+    :return a key that can be used to cache the request
     """
-    if result.get("doclist") is not None:
-        # Grouped result, normalize it.
-        return result["doclist"]["docs"][0]
-    else:
-        return result
+    url = hashlib.md5(force_bytes(iri_to_uri(request.build_absolute_uri())))
+    return "sitemap.%s.%s" % (section, url.hexdigest())
 
 
-def make_solr_sitemap(
+@x_robots_tag
+def cached_sitemap(
     request: HttpRequest,
-    solr_url: str,
-    params: Dict[str, str],
-    changefreq: str,
-    low_priority_pages: List[str],
-    url_field: str,
+    sitemaps: Dict[str, Sitemap],
+    section: Optional[str] = None,
+    template_name: str = "sitemap.xml",
+    content_type: str = "application/xml",
 ) -> HttpResponse:
-    solr = ExtraSolrInterface(solr_url)
-    page = int(request.GET.get("p", 1))
-    court = request.GET["court"]
-    params["start"] = (page - 1) * items_per_sitemap
-    params["fq"] = ["court_exact:%s" % court]
-    results = solr.query().add_extra(**params).execute()
-    solr.conn.http_connection.close()
-    urls = []
-    cl = "https://www.courtlistener.com"
-    for result in results:
-        result = normalize_grouping(result)
-        url_strs = ["%s%s" % (cl, result[url_field])]
-        if result.get("local_path") and not result["local_path"].endswith(
-            ".xml"
-        ):
-            url_strs.append("%s/%s" % (cl, result["local_path"]))
 
-        item = {}
-        for url_str in url_strs:
-            item["location"] = url_str
-            item["changefreq"] = changefreq
-            item["lastmod"] = result["timestamp"]
-            if any(s in url_str for s in low_priority_pages):
-                item["priority"] = "0.3"
-            else:
-                item["priority"] = "0.5"
-            urls.append(item.copy())
+    """Copy the django sitemap code, but cache URLs
 
-    xml = smart_str(loader.render_to_string("sitemap.xml", {"urlset": urls}))
-    response = HttpResponse(xml, content_type="application/xml")
-    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
-    return response
-
-
-@cache_page(60 * 60 * 24 * 7, cache="db_cache")  # One week
-def index_sitemap_maker(request: HttpRequest) -> HttpResponse:
-    """Generate a sitemap index page
-
-    Counts the number of cases in the site, divides by `items_per_sitemap` and
-    provides links to items.
+    See Django documentation for parameter details.
     """
-    connection_string_sitemap_path_pairs = (
-        (settings.SOLR_OPINION_URL, reverse("opinion_sitemap"), False),
-        (settings.SOLR_RECAP_URL, reverse("recap_sitemap"), True),
-        (settings.SOLR_AUDIO_URL, reverse("oral_argument_sitemap"), False),
-        (settings.SOLR_PEOPLE_URL, reverse("people_sitemap"), False),
+
+    req_protocol = request.scheme
+    req_site = get_current_site(request)
+
+    if section not in sitemaps:
+        raise Http404("No sitemap available for section: %r" % section)
+    site = sitemaps[section]
+    page = request.GET.get("p", 1)
+
+    cache = caches["db_cache"]
+    cache_key = make_cache_key(request, section)
+    urls = cache.get(cache_key, [])
+    if not urls:
+        try:
+            if callable(site):
+                site = site()
+            urls = site.get_urls(
+                page=page, site=req_site, protocol=req_protocol
+            )
+        except EmptyPage:
+            raise Http404("Page %s empty" % page)
+        except PageNotAnInteger:
+            raise Http404("No page '%s'" % page)
+
+        if len(urls) == site.limit:
+            # Full sitemap. Cache it a long time.
+            cache_length = 60 * 60 * 24 * 180
+        else:
+            # Partial sitemap. Short cache.
+            cache_length = 60 * 60 * 24
+        cache.set(cache_key, urls, cache_length)
+
+    lastmod = None
+    all_sites_lastmod = True
+    if all_sites_lastmod:
+        site_lastmod = getattr(site, "latest_lastmod", None)
+        if site_lastmod is not None:
+            site_lastmod = (
+                site_lastmod.utctimetuple()
+                if isinstance(site_lastmod, datetime)
+                else site_lastmod.timetuple()
+            )
+            lastmod = (
+                site_lastmod if lastmod is None else max(lastmod, site_lastmod)
+            )
+        else:
+            all_sites_lastmod = False
+
+    response = TemplateResponse(
+        request, template_name, {"urlset": urls}, content_type=content_type
     )
-    sites = []
-    for connection_string, path, group in connection_string_sitemap_path_pairs:
-        conn = ExtraSolrInterface(connection_string)
-        response = (
-            conn.query().add_extra(**build_court_count_query(group)).execute()
-        )
-        conn.conn.http_connection.close()
-        court_count_tuples = response.facet_counts.facet_fields["court_exact"]
-        for court, count in court_count_tuples:
-            num_pages = count // items_per_sitemap + 1
-            for page in range(1, num_pages + 1):
-                sites.append(
-                    "https://www.courtlistener.com%s?p=%s&court=%s"
-                    % (path, page, court)
-                )
-
-    # Random additional sitemaps.
-    sites.extend(
-        [
-            "https://www.courtlistener.com%s"
-            % reverse("simple_pages_sitemap"),
-            "https://www.courtlistener.com/sitemap-visualizations.xml",
-        ]
-    )
-
-    xml = loader.render_to_string("sitemap_index.xml", {"sitemaps": sites})
-
-    # These links contain case names, so they should get crawled but not
-    # indexed
-    response = HttpResponse(xml, content_type="application/xml")
-    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
+    if all_sites_lastmod and lastmod is not None:
+        # if lastmod is defined for all sites, set header so as
+        # ConditionalGetMiddleware is able to send 304 NOT MODIFIED
+        response["Last-Modified"] = http_date(timegm(lastmod))
     return response

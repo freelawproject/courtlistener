@@ -22,8 +22,13 @@ from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.models import Person
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
-from cl.sitemap import make_sitemap_solr_params, items_per_sitemap
+from cl.search.models import (
+    Citation,
+    Docket,
+    Opinion,
+    OpinionCluster,
+    SEARCH_TYPES,
+)
 
 
 class TitleTest(TestCase):
@@ -180,46 +185,16 @@ class NewDocketAlertTest(TestCase):
         self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
-@override_settings(
-    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
-    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
-)
 class OpinionSitemapTest(SitemapTest):
     def __init__(self, *args, **kwargs):
         super(OpinionSitemapTest, self).__init__(*args, **kwargs)
-        self.court_id = "test"
-        self.sitemap_url = "%s?court=%s" % (
-            reverse("opinion_sitemap"),
-            self.court_id,
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
+        self.item_qs = OpinionCluster.objects.all()
 
-    def get_expected_item_count(self):
-        # OpinionsSitemap uses the solr index to generate the page, so the only
-        # accurate count comes from the index itself which will also be based
-        # on the fixtures.
-        conn = ExtraSolrInterface(settings.SOLR_OPINION_URL)
-        params = make_sitemap_solr_params("dateFiled asc", "o_sitemap")
-        params["rows"] = items_per_sitemap
-        params["fq"] = ["court_exact:%s" % self.court_id]
-
-        r = conn.query().add_extra(**params).execute()
-        conn.conn.http_connection.close()
-        # the underlying SitemapTest relies on counting url elements in the xml
-        # response...this logic mimics the creation of the xml, so we at least
-        # know what we *should* get getting for a count if the SiteMapTest's
-        # HTTP client-based test gets an HTTP 200
-        count = 0
-        for result in r:
-            if result.get("local_path"):
-                count += 2
-            else:
-                count += 1
-        return count
-
-    def test_does_the_sitemap_have_content(self):
-        # Class attributes are set, just run the test in super.
-        self.expected_item_count = self.get_expected_item_count()
-        super(OpinionSitemapTest, self).does_the_sitemap_have_content()
+    def test_does_the_sitemap_have_content(self) -> None:
+        super(OpinionSitemapTest, self).assert_sitemap_has_content()
 
 
 @override_settings(

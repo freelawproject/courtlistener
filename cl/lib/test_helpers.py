@@ -103,13 +103,13 @@ class IndexedSolrTestCase(SolrTestCase):
             call_command("cl_update_index", *args)
 
 
-class SitemapTest(IndexedSolrTestCase):
-    def __init__(self, *args, **kwargs):
+class SitemapTest(TestCase):
+    def __init__(self, *args, **kwargs) -> None:
         super(SitemapTest, self).__init__(*args, **kwargs)
-        self.expected_item_count = None
+        self.item_qs = None
         self.sitemap_url = None
 
-    def does_the_sitemap_have_content(self):
+    def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
         response = self.client.get(self.sitemap_url)
         self.assertEqual(
@@ -124,10 +124,11 @@ class SitemapTest(IndexedSolrTestCase):
                 },
             )
         )
+        expected_item_count = self.item_qs.count()
         self.assertEqual(
             node_count,
-            self.expected_item_count,
+            expected_item_count,
             msg="Did not get the right number of items in the sitemap.\n"
             "\tCounted:\t%s\n"
-            "\tExpected:\t%s" % (node_count, self.expected_item_count),
+            "\tExpected:\t%s" % (node_count, expected_item_count),
         )
