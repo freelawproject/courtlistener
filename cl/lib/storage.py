@@ -70,11 +70,12 @@ class AWSMediaStorage(S3Boto3Storage):
     def get_available_name(self, name, max_length=None):
         """Generate usable file name for storage iterating if needed.
 
-        Returns a filename that's free on the target storage system, and
-        available for new content to be written to.
+        Returns a filename that is available in the storage mechanism,
+        possibly taking the provided filename into account
 
-        :param name: File name
-        :return: Iterated file path
+        :param max_length: The name will not exceed max_length, if provided
+        :param name: File name of the object being saved.
+        :return: The filepath
         """
         dir_name, file_name = os.path.split(name)
         file_root, file_ext = os.path.splitext(file_name)
