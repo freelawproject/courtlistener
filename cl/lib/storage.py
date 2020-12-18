@@ -59,7 +59,7 @@ class UUIDFileSystemStorage(FileSystemStorage):
 class AWSMediaStorage(S3Boto3Storage):
     """Implements AWS file system storage.
 
-    We use AWSMediaStorage to upload LASC PDF files to AWS.
+    We use AWSMediaStorage to upload Financial disclosure PDF files to AWS.
     """
 
     location = ""
@@ -68,7 +68,7 @@ class AWSMediaStorage(S3Boto3Storage):
     custom_domain = False
 
     def get_available_name(self, name, max_length=None):
-        """Generate usable file name for storage itearting if needed
+        """Generate usable file name for storage iterating if needed.
 
         Returns a filename that's free on the target storage system, and
         available for new content to be written to.
