@@ -1701,12 +1701,12 @@ class FinancialPosition(models.Model):
     )
 
 
-class Agreements(models.Model):
+class Agreement(models.Model):
     """ Financial Disclosure Agreements Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
-        help_text="The financial disclosure associated with this investment.",
+        help_text="The financial disclosure associated with this agreement.",
         related_name="agreements",
         on_delete=models.CASCADE,
     )
@@ -1721,7 +1721,7 @@ class Agreements(models.Model):
         db_index=True,
     )
     date = models.TextField(
-        help_text="Dates of judicial agreements.",
+        help_text="Date of judicial agreements.",
         blank=True,
     )
     parties_and_terms = models.TextField(
