@@ -3,11 +3,12 @@ import logging
 import os
 import shutil
 from datetime import date
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union, Tuple
 
 from celery import Task
 
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
+from cl.audio.models import Audio
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.crypto import sha1
 from cl.people_db.models import Attorney, Role
@@ -28,7 +29,7 @@ from django.db.models.query import prefetch_related_objects
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import ParsingException, PacerLoginException
-from juriscraper.lib.string_utils import harmonize
+from juriscraper.lib.string_utils import harmonize, CaseNameTweaker
 from juriscraper.pacer import (
     AppellateDocketReport,
     AttachmentPage,
@@ -95,7 +96,7 @@ from cl.search.tasks import add_items_to_solr
 logger = logging.getLogger(__name__)
 
 
-def increment_failure_count(obj):
+def increment_failure_count(obj: Union[Audio, Docket, RECAPDocument]) -> None:
     if obj.ia_upload_failure_count is None:
         obj.ia_upload_failure_count = 1
     else:
@@ -103,7 +104,10 @@ def increment_failure_count(obj):
     obj.save()
 
 
-def generate_ia_json(d_pk, database="default"):
+def generate_ia_json(
+    d_pk: int,
+    database: str = "default",
+) -> Tuple[Docket, str]:
     """Generate JSON for upload to Internet Archive
 
     :param d_pk: The PK of the docket to generate JSON for
@@ -182,7 +186,7 @@ def generate_ia_json(d_pk, database="default"):
 
 
 @app.task(bind=True, ignore_result=True)
-def save_ia_docket_to_disk(self, d_pk, output_directory):
+def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
     """For each docket given, save it to disk.
 
     :param d_pk: The PK of the docket to serialize to disk
@@ -194,7 +198,7 @@ def save_ia_docket_to_disk(self, d_pk, output_directory):
 
 
 @app.task(bind=True, ignore_result=True)
-def upload_recap_json(self, pk, database="default"):
+def upload_recap_json(self, pk: int, database: str = "default") -> None:
     """Make a JSON object for a RECAP docket and upload it to IA"""
     d, json_str = generate_ia_json(pk, database=database)
 
@@ -234,7 +238,12 @@ def upload_recap_json(self, pk, database="default"):
 
 
 @app.task(bind=True, max_retries=5)
-def download_recap_item(self, url, filename, clobber=False):
+def download_recap_item(
+    self,
+    url: str,
+    filename: str,
+    clobber: bool = False,
+) -> None:
     logger.info("  Getting item at: %s" % url)
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
@@ -358,7 +367,11 @@ def get_and_save_free_document_report(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def process_free_opinion_result(self, row_pk, cnt):
+def process_free_opinion_result(
+    self,
+    row_pk: int,
+    cnt: CaseNameTweaker,
+) -> Optional[Dict[str, Union[PACERFreeDocumentRow, str, int]]]:
     """Process a single result from the free opinion report"""
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
