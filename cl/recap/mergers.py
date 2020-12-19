@@ -1,7 +1,8 @@
 # Code for merging PACER content into the DB
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Dict, Optional, List, Union, Tuple
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -1172,14 +1173,14 @@ def merge_pacer_docket_into_cl_docket(
 
 @transaction.atomic
 def merge_attachment_page_data(
-    court,
-    pacer_case_id,
-    pacer_doc_id,
-    document_number,
-    text,
-    attachment_dicts,
-    debug=False,
-):
+    court: Court,
+    pacer_case_id: int,
+    pacer_doc_id: int,
+    document_number: int,
+    text: str,
+    attachment_dicts: List[Dict[str : Union[int, str]]],
+    debug: bool = False,
+) -> Tuple[List[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
     :param court: The court object we're working with
@@ -1285,7 +1286,46 @@ def merge_attachment_page_data(
     return rds_affected, de
 
 
-def process_orphan_documents(rds_created, court_id, docket_date):
+def save_iquery_to_docket(
+    self,
+    iquery_data: Dict[str, str],
+    d: Docket,
+    tag_names: Optional[List[str]],
+    add_to_solr: bool = False,
+) -> Optional[int]:
+    """Merge iquery results into a docket
+
+    :param self: The celery task calling this function
+    :param iquery_data: The data from a successful iquery response
+    :param d: A docket object to work with
+    :param tag_names: Tags to add to the items
+    :param add_to_solr: Whether to save the completed docket to solr
+    :return: The pk of the docket if successful. Else, None.
+    """
+    d = update_docket_metadata(d, iquery_data)
+    try:
+        d.save()
+        add_bankruptcy_data_to_docket(d, iquery_data)
+    except IntegrityError as exc:
+        msg = "Integrity error while saving iquery response."
+        if self.request.retries == self.max_retries:
+            logger.warning(msg)
+            return
+        logger.info("%s Retrying.", msg)
+        raise self.retry(exc=exc)
+
+    add_tags_to_objs(tag_names, [d])
+    if add_to_solr:
+        add_items_to_solr([d.pk], "search.Docket")
+    logger.info("Created/updated docket: %s" % d)
+    return d.pk
+
+
+def process_orphan_documents(
+    rds_created: List[RECAPDocument],
+    court_id: int,
+    docket_date: date,
+) -> None:
     """After we finish processing a docket upload add any PDFs we already had
     for that docket that were lingering in our processing queue. This addresses
     the issue that arises when somebody (somehow) uploads a PDF without first

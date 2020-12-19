@@ -80,6 +80,7 @@ from cl.recap.mergers import (
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
     update_docket_metadata,
+    save_iquery_to_docket,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
@@ -1017,20 +1018,31 @@ def filter_docket_by_tags(self, data, tags, court_id):
     ignore_result=True,
 )
 def make_docket_by_iquery(
-    self, court_id, pacer_case_id, cookies, tag_names=None
-):
+    self,
+    court_id: str,
+    pacer_case_id: int,
+    tag_names: Optional[List[str]] = None,
+) -> Optional[int]:
     """
     Using the iquery endpoint, create or update a docket
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up
     :param pacer_case_id: The pacer_case_id to use to look up the case
-    :param cookies: Cookies for a logged-in PACER session
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :return: None if failed, else the ID of the created/updated docket
     """
-    s = PacerSession(cookies=cookies)
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    s = PacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id)
@@ -1043,33 +1055,31 @@ def make_docket_by_iquery(
             return
         raise self.retry(exc=exc)
 
-    logging_id = "%s.%s" % (court_id, pacer_case_id)
     if not report.data:
-        logger.info("No valid data found in iquery page for %s", logging_id)
+        logger.info(
+            "No valid data found in iquery page for %s.%s",
+            court_id,
+            pacer_case_id,
+        )
         return
 
     d, count = find_docket_object(
-        court_id, str(pacer_case_id), report.data["docket_number"]
+        court_id,
+        str(pacer_case_id),
+        report.data["docket_number"],
     )
     if count > 1:
         d = d.earliest("date_created")
 
     d.pacer_case_id = pacer_case_id
     d.add_recap_source()
-    d = update_docket_metadata(d, report.data)
-    try:
-        d.save()
-    except IntegrityError as exc:
-        msg = "Integrity error while saving iquery response."
-        if self.request.retries == self.max_retries:
-            logger.warn(msg)
-            return
-        logger.info(msg=" Retrying.")
-        raise self.retry(exc=exc)
-
-    add_tags_to_objs(tag_names, [d])
-    logger.info("Created/updated docket: %s" % d)
-    return d.pk
+    return save_iquery_to_docket(
+        self,
+        report.data,
+        d,
+        tag_names,
+        add_to_solr=True,
+    )
 
 
 # Retry 10 times. First one after 1m, then again every 5 minutes.
