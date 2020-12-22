@@ -12,7 +12,6 @@ from PyPDF2.utils import PdfReadError
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db import IntegrityError
 from django.utils.encoding import (
     smart_text,
     DjangoUnicodeDecodeError,
@@ -35,10 +34,8 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import (
-    update_docket_metadata,
-    add_bankruptcy_data_to_docket,
+    save_iquery_to_docket,
 )
-from cl.scrapers.models import ErrorLog
 from cl.scrapers.transformer_extractor_utils import (
     convert_and_clean_audio,
 )
@@ -503,7 +500,7 @@ def process_audio_file(self, pk) -> None:
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
-def update_docket_info_iquery(self, d_pk):
+def update_docket_info_iquery(self, d_pk: int) -> None:
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -529,15 +526,10 @@ def update_docket_info_iquery(self, d_pk):
     if not report.data:
         return
 
-    d = update_docket_metadata(d, report.data)
-    try:
-        d.save()
-        add_bankruptcy_data_to_docket(d, report.data)
-    except IntegrityError as exc:
-        msg = "Integrity error while saving iquery response."
-        if self.request.retries == self.max_retries:
-            logger.warn(msg)
-            return
-        logger.info(msg=" Retrying.")
-        raise self.retry(exc=exc)
-    add_items_to_solr([d.pk], "search.Docket")
+    save_iquery_to_docket(
+        self,
+        report.data,
+        d,
+        tag_names=None,
+        add_to_solr=True,
+    )

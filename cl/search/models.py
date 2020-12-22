@@ -1583,10 +1583,10 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF):
 
 
 class FederalCourtsQuerySet(models.QuerySet):
-    def all(self):
+    def all(self) -> models.QuerySet:
         return self.filter(jurisdiction__in=Court.FEDERAL_JURISDICTIONS)
 
-    def all_pacer_courts(self):
+    def all_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1599,7 +1599,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         ).exclude(pk="scotus")
 
-    def district_pacer_courts(self):
+    def district_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -1611,7 +1611,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_pacer_courts(self):
+    def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
             # Court of Appeals for Veterans Claims uses appellate PACER
@@ -1619,18 +1619,18 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         ).exclude(pk="scotus")
 
-    def bankruptcy_pacer_courts(self):
+    def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             jurisdiction=Court.FEDERAL_BANKRUPTCY, end_date__isnull=True
         )
 
-    def district_courts(self):
+    def district_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_DISTRICT)
 
-    def bankruptcy_courts(self):
+    def bankruptcy_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.BANKRUPTCY_JURISDICTIONS)
 
-    def appellate_courts(self):
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
 
