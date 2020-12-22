@@ -41,9 +41,10 @@ def add_all_cases_to_cl(
                     args=(court.pk, pacer_case_id),
                     queue=q,
                 )
-            finally:
+            except Exception as e:
                 # Cleanup
                 r.hincrby("iquery_status", court.pk, -1)
+                raise e
 
         iterations_completed += 1
         remaining_iterations = options["iterations"] - iterations_completed
