@@ -1,13 +1,24 @@
 from collections import deque
 
 import time
+from typing import List
 
 from django.utils.timezone import now
 
 from cl.lib.redis_utils import make_redis_interface
 
-PRIORITY_SEP = "\x06\x16"
-DEFAULT_PRIORITY_STEPS = [0, 3, 6, 9]
+PRIORITY_SEP: str = "\x06\x16"
+DEFAULT_PRIORITY_STEPS: List[int] = [0, 3, 6, 9]
+
+
+def clear_queue(queue_name: str):
+    """Empty out a queue, nuking the tasks in it."""
+    priority_names = [
+        make_queue_name_for_pri(queue_name, pri)
+        for pri in DEFAULT_PRIORITY_STEPS
+    ]
+    r = make_redis_interface("CELERY")
+    return sum([r.delete(x) for x in priority_names])
 
 
 def make_queue_name_for_pri(queue: str, pri: int) -> str:
