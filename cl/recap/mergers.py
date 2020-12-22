@@ -1178,7 +1178,7 @@ def merge_attachment_page_data(
     pacer_doc_id: int,
     document_number: int,
     text: str,
-    attachment_dicts: List[Dict[str : Union[int, str]]],
+    attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
 ) -> Tuple[List[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
