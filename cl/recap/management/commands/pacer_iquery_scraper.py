@@ -34,20 +34,20 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
     """
     docket_ids = set()
     if hasattr(settings, "MATOMO_TOKEN"):
-        r = requests.get(
-            settings.MATOMO_REPORT_URL,
-            timeout=10,
-            params={
-                "idSite": settings.MATOMO_SITE_ID,
-                "module": "API",
-                "method": "Live.getLastVisitsDetails",
-                "period": "day",
-                "format": "json",
-                "date": "last%s" % last_x_days,
-                "token_auth": settings.MATOMO_TOKEN,
-            },
-        )
         try:
+            r = requests.get(
+                settings.MATOMO_REPORT_URL,
+                timeout=10,
+                params={
+                    "idSite": settings.MATOMO_SITE_ID,
+                    "module": "API",
+                    "method": "Live.getLastVisitsDetails",
+                    "period": "day",
+                    "format": "json",
+                    "date": "last%s" % last_x_days,
+                    "token_auth": settings.MATOMO_TOKEN,
+                },
+            )
             r.raise_for_status()
             j = r.json()
         except (
