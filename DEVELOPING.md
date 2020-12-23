@@ -23,76 +23,77 @@ On with the show.
 The major components of CourtListener are:
 
  - Postgresql - For database storage. We used to use MySQL long ago, but it caused endless weird and surprising problems. Postgresql is great.
- 
+
  - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great.
- 
+
  - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried. 
- 
+
  - Tesseract - For OCR. It's getting good lately, which is nice since we convert hundreds of thousands of pages.
- 
+
  - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose Sphinx early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times, and that logic might have been sound).
- 
+
  - Python/Django/et al - And their associated bits and pieces.
 
 
 ### Pulling Everything Together
 
-We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely. To use it, you need do a few things:
+We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely.
 
- - Create the bridge network it relies on:
- 
-        docker network create -d bridge --attachable cl_net_overlay
-        
+To set up a development server, do the following:
+
+1. Clone the [courtlistener](https://github.com/freelawproject/courtlistener) and [courtlistener-solr-server](https://github.com/freelawproject/courtlistener-solr-server) repositories so that they are side-by-side in the same folder.
+
+2. Next, you'll need to update the group permissions for the Solr server. `cd` into the courtlistener-solr-server directory, and run the following commands:
+
+    ```bash
+    sudo chown -R :1024 data
+    sudo chown -R :1024 solr
+    sudo find data -type d -exec chmod g+s {} \;
+    sudo find solr -type d -exec chmod g+s {} \;
+    sudo find data -type d -exec chmod 775 {} \;
+    sudo find solr -type d -exec chmod 775 {} \;
+    sudo find data -type f -exec chmod 664 {} \;
+    sudo find solr -type f -exec chmod 664 {} \;
+    ```
+
+3. Create a personal settings file. To do that, `cd` into courtlistener/cl/settings and run the following:
+
+    `cp 05-private.example 05-private.py`
+
+    See [below](#how-settings-work-in-courtlistener) for more information about settings files.
+
+4. Next, create the bridge network that the docker relies on:
+
+    `docker network create -d bridge --attachable cl_net_overlay`
+
     This is important so that each service in the compose file can have a hostname.
 
-- Initialize the docker swarm:
-       
-       docker swarm init
+5. Initialize the docker swarm:
 
- - Make sure that in your CourtListener settings, you've set up the following (these should all be defaults):
- 
-     - `REDIS_HOST` should be `cl-redis`.
-     - `SOLR_HOST` should be `http://cl-solr:8983`. 
-     - `DOCKER_SELENIUM_HOST` should be `http://cl-selenium:4444/wd/hub`
-     - `DOCKER_DJANGO_HOST` should be `cl-django`
-     - The `default` database should not have host or port parameters (it uses unix sockets), and it should have a `USER` of `postgres` and a password of `postgres`.
+    `docker swarm init`
 
-    See below if you need an explanation of how settings work in CourtListener.
+6. `cd` into courtlistener/docker/courtlistener, then launch the server by running:
 
- - Update the group permissions of the solr repository so it can be mounted into the solr container and then accessed from within it. This is wonky, but I can't find a way around this. For the commands to run, see the README.md file in the solr repository.
+    `docker-compose up`
 
-Change to docker/courtlistener directory then:
+7. Finally, finish setting up the Django database. While the server is running:
 
-The final command you'll run is:
-    
-      docker-compose up
-         
-(Make sure you're in the same directory as the docker-compose.yml file and it should work.)
+    - Migrate the models by running:
 
-There are a few optional variables that you can see if you peek inside the compose file. These give you a few opportunities to tweak things at runtime:
+        `docker exec -it cl-django python /opt/courtlistener/manage.py migrate`
 
- - `CL_SOLR_CODE_DIR` is a path to the [`courtlistener-solr-server` repository's code][cl-solr]. This will default to a directory called `courtlistener-solr-server` that is next to the `courtlistener` repository on your file system, but if you put the solr repo somewhere else, you might set it to something like `/some/weird/location/courtlistener-solr-server`.
+    - Finally, create a new super user login by running this command, and entering the required information:
 
-If that goes smoothly, it'll launch Solr, PostgreSQL, Redis, Celery (with access to Tesseract), Django, and a Selenium test server. Whew! 
+        `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
 
-You then need to do a few first time set ups:
-
-1. Set up the DB. The first time you run this, it'll create the database for you, but you'll need to migrate it. To do so, you need to have the context of the CourtListener virtualenv and computer. You just launched those when you ran the docker compose file. To reach inside the correct docker image and migrate the models, run:
-
-        docker exec -it cl-django python /opt/courtlistener/manage.py migrate
-    
-    That will run the command in the right place in the right way.
-
-1. Whenever you create a new Django db, you need to create a super user. Do so with:
-
-        docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser
- 
 So that should be it! You should now be able to access the following URLs:
 
  - <http://127.0.0.1:8000> - Your dev homepage
  - <http://127.0.0.1:8000/admin> - The Django admin page (try the super user)
  - <http://127.0.0.1:8983/solr> - Solr admin page
  - 127.0.0.1:5900 - A VNC server to the selenium machine (it doesn't serve http though)
+ 
+ A good next step is to [run the test suite](#testing) to verify that your development server is configured correctly.
 
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
 
@@ -102,7 +103,7 @@ So that should be it! You should now be able to access the following URLs:
 You can see most of the logs via docker when you start it. CourtListener also keeps a log in the `cl-django` image that you can tail with:
 
     docker exec -it cl-django tail -f /var/log/courtlistener/django.log
-    
+
 But usually you won't need to look at these logs.
 
 
@@ -119,13 +120,13 @@ You can find an example file to use for `05-private.py` in `cl/settings`. It sho
 Files that are read later (with higher numbered file names) have access to the 
 context of files that are read earlier. For example, if `01-some-name.py` 
 contains:
- 
+
     SOME_VAR = {'some-key': 'some-value'}
-    
+
 You could create a file called `02-my-overrides.py` that contained:
 
     SOME_VAR['some-key'] = 'some-other-value'
-    
+
 That is, you can assume that `SOME_VAR` exists because it was declared in an 
 earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't 
 exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the 
@@ -211,7 +212,7 @@ The `cl` parameter is the name of the Python package to search for tests. It's n
 Other useful flags are:
 
  - `--failfast`: This makes the test suite crash as soon as one test fails, instead of running the whole suite to completion.
- 
+
  - `--keepdb`: Whenever tests are run, they generate a little DB on the side to run within by running all of your migrations. Using this flag keeps the DB between test runs, which can save some time.  
 
 For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener.
@@ -283,7 +284,7 @@ export SELENIUM_DEBUG=1
 That will create screenshots at the end of every test as part of the `tearDown` method. If you want screenshots at other times, you can always add a line like:
 
     self.browser.save_screenshot('/tmp/' + filename)
-    
+
 Screenshots will be saved into the `cl-django` container. To grab them, [you can use][cp] `docker cp`. On GitHub, *if* the tests fail, these are stored as an "artifact" of the build, and you can download them to inspect them.
 
 [cp]: https://stackoverflow.com/a/22050116/64911
