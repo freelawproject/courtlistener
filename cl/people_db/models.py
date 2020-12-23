@@ -24,7 +24,7 @@ from cl.lib.search_index_utils import (
     normalize_search_dicts,
 )
 from cl.lib.storage import IncrementingFileSystemStorage
-from cl.lib.models import THUMBNAIL_STATUSES, Base
+from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -51,7 +51,7 @@ DATE_GRANULARITIES = (
 )
 
 
-class Person(Base):
+class Person(AbstractDateTimeModel):
     RELIGIONS = (
         ("ca", "Catholic"),
         ("pr", "Protestant"),
@@ -386,7 +386,7 @@ class Person(Base):
         return normalize_search_dicts(out)
 
 
-class School(Base):
+class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
         help_text="Any alternate names that a school may have",
@@ -430,7 +430,7 @@ class School(Base):
         super(School, self).clean_fields(*args, **kwargs)
 
 
-class Position(Base):
+class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
     JUDGE = "jud"
@@ -1018,7 +1018,7 @@ class Position(Base):
         super(Position, self).clean_fields(*args, **kwargs)
 
 
-class RetentionEvent(Base):
+class RetentionEvent(AbstractDateTimeModel):
     RETENTION_TYPES = (
         ("reapp_gov", "Governor Reappointment"),
         ("reapp_leg", "Legislative Reappointment"),
@@ -1089,7 +1089,7 @@ class RetentionEvent(Base):
         super(RetentionEvent, self).clean_fields(*args, **kwargs)
 
 
-class Education(Base):
+class Education(AbstractDateTimeModel):
     DEGREE_LEVELS = (
         ("ba", "Bachelor's (e.g. B.A.)"),
         ("ma", "Master's (e.g. M.A.)"),
@@ -1173,7 +1173,7 @@ class Race(models.Model):
         return "{race}".format(race=self.race)
 
 
-class PoliticalAffiliation(Base):
+class PoliticalAffiliation(AbstractDateTimeModel):
     POLITICAL_AFFILIATION_SOURCE = (
         ("b", "Ballot"),
         ("a", "Appointer"),
@@ -1241,7 +1241,7 @@ class PoliticalAffiliation(Base):
         super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
 
 
-class Source(Base):
+class Source(AbstractDateTimeModel):
     person = models.ForeignKey(
         Person,
         related_name="sources",
@@ -1266,7 +1266,7 @@ class Source(Base):
     )
 
 
-class ABARating(Base):
+class ABARating(AbstractDateTimeModel):
     ABA_RATINGS = (
         ("ewq", "Exceptionally Well Qualified"),
         ("wq", "Well Qualified"),
@@ -1471,7 +1471,7 @@ class CriminalComplaint(models.Model):
     )
 
 
-class Party(Base):
+class Party(AbstractDateTimeModel):
     attorneys = models.ManyToManyField(
         "Attorney",
         help_text="The attorneys involved with the party.",
@@ -1578,7 +1578,7 @@ class Role(models.Model):
         )
 
 
-class Attorney(Base):
+class Attorney(AbstractDateTimeModel):
     organizations = models.ManyToManyField(
         "AttorneyOrganization",
         help_text="The organizations that the attorney is affiliated with",
@@ -1648,7 +1648,7 @@ class AttorneyOrganizationAssociation(models.Model):
         )
 
 
-class AttorneyOrganization(Base):
+class AttorneyOrganization(AbstractDateTimeModel):
     lookup_key = models.TextField(
         help_text="A trimmed version of the address for duplicate matching.",
         db_index=True,

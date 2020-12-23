@@ -2,11 +2,11 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.crypto import get_random_string
 
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Docket, SEARCH_TYPES
 
 
-class Alert(Base):
+class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
     WEEKLY = "wly"

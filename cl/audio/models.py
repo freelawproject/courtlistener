@@ -7,7 +7,7 @@ from django.template import loader
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     null_map,
@@ -19,7 +19,7 @@ from cl.people_db.models import Person
 from cl.search.models import Docket, SOURCES
 
 
-class Audio(Base):
+class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
     STT_NEEDED = 0

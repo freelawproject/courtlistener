@@ -5,11 +5,19 @@ from django.core.validators import MaxLengthValidator
 from django.db import models
 
 from cl.audio.models import Audio
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import OpinionCluster, Docket, RECAPDocument
 
 
-class Favorite(Base):
+class Favorite(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        auto_now=True, db_index=True, null=True
+    )
     user = models.ForeignKey(
         User,
         help_text="The user that owns the favorite",
@@ -80,7 +88,7 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-class UserTag(Base):
+class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
     user = models.ForeignKey(

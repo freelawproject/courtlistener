@@ -1,6 +1,6 @@
 from django.db import models
 
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Court, Docket
 
 
@@ -105,7 +105,7 @@ class PACERFreeDocumentRow(models.Model):
     error_msg = models.TextField()
 
 
-class PACERMobilePageData(Base):
+class PACERMobilePageData(AbstractDateTimeModel):
     """Status information about crawling the PACER Mobile UI for a docket"""
 
     docket = models.OneToOneField(

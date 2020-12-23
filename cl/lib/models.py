@@ -2,13 +2,12 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from cl.lib.storage import IncrementingFileSystemStorage, UUIDFileSystemStorage
 from cl.lib.model_helpers import (
-    make_json_path,
     make_pdf_path,
     make_pdf_thumb_path,
     make_lasc_json_path,
 )
+from cl.lib.storage import IncrementingFileSystemStorage
 
 
 class THUMBNAIL_STATUSES(object):
@@ -22,7 +21,7 @@ class THUMBNAIL_STATUSES(object):
     )
 
 
-class Base(models.Model):
+class AbstractDateTimeModel(models.Model):
     """An abstract base class for most models"""
 
     date_created = models.DateTimeField(
@@ -41,7 +40,7 @@ class Base(models.Model):
         abstract = True
 
 
-class AbstractPDF(Base):
+class AbstractPDF(models.Model):
     """An abstract model to hold PDF-related information"""
 
     OCR_COMPLETE = 1
@@ -115,7 +114,7 @@ class AbstractPDF(Base):
         abstract = True
 
 
-class AbstractFile(Base):
+class AbstractFile(models.Model):
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -144,7 +143,7 @@ class AbstractJSON(AbstractFile):
         abstract = True
 
 
-class Note(Base):
+class Note(AbstractDateTimeModel):
     """An polymorphic field that can be used to add notes to most objects"""
 
     date_entered = models.DateTimeField(

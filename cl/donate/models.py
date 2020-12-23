@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 
 
 class PAYMENT_TYPES(object):
@@ -42,7 +42,7 @@ class PROVIDERS(object):
     )
 
 
-class Donation(Base):
+class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
     UNKNOWN_ERROR = 1
@@ -120,7 +120,7 @@ class Donation(Base):
         ordering = ["-date_created"]
 
 
-class MonthlyDonation(Base):
+class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
     donor = models.ForeignKey(

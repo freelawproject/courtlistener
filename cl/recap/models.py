@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from cl.lib.model_helpers import make_path
-from cl.lib.models import AbstractFile, Base
+from cl.lib.models import AbstractFile, AbstractDateTimeModel
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
@@ -42,7 +42,7 @@ def make_recap_data_path(instance, filename):
     return make_path("recap-data", filename)
 
 
-class PacerHtmlFiles(AbstractFile):
+class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
     """This is a simple object for holding original HTML content from PACER
 
     We use this object to make sure that for every item we receive from users,
@@ -82,7 +82,7 @@ class PROCESSING_STATUS:
     )
 
 
-class ProcessingQueue(Base):
+class ProcessingQueue(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
@@ -224,7 +224,7 @@ class REQUEST_TYPE:
     )
 
 
-class PacerFetchQueue(Base):
+class PacerFetchQueue(AbstractDateTimeModel):
     """The queue of requests being made of PACER."""
 
     date_completed = models.DateTimeField(
@@ -352,7 +352,7 @@ class PacerFetchQueue(Base):
         )
 
 
-class FjcIntegratedDatabase(Base):
+class FjcIntegratedDatabase(AbstractDateTimeModel):
     """The Integrated Database of PACER data as described here:
 
     https://www.fjc.gov/research/idb
