@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import re
-import sys
+from datetime import datetime
 from functools import lru_cache
+from typing import List, Union, Optional, Dict
 
 from django.db.models import QuerySet
 from django.utils.timezone import now
@@ -42,7 +43,7 @@ STOP_TOKENS = [
 
 
 # Adapted from nltk Penn Treebank tokenizer
-def strip_punct(text):
+def strip_punct(text: str) -> str:
     # starting quotes
     text = re.sub(r"^[\"\']", r"", text)
     text = re.sub(r"(``)", r"", text)
@@ -67,7 +68,7 @@ def strip_punct(text):
     return text.strip()
 
 
-def is_scotus_reporter(citation):
+def is_scotus_reporter(citation: Citation) -> bool:
     try:
         reporter = REPORTERS[citation.canonical_reporter][
             citation.lookup_index
@@ -90,7 +91,7 @@ def is_scotus_reporter(citation):
         return False
 
 
-def is_neutral_tc_reporter(reporter):
+def is_neutral_tc_reporter(reporter: str) -> bool:
     """Test whether the reporter is a neutral Tax Court reporter.
 
     These take the format of T.C. Memo YEAR-SERIAL
@@ -111,7 +112,7 @@ def get_cached_courts() -> QuerySet:
     return Court.objects.all().values("citation_string", "pk")
 
 
-def get_court_by_paren(paren_string, citation):
+def get_court_by_paren(paren_string: str, citation: Citation) -> str:
     """Takes the citation string, usually something like "2d Cir", and maps
     that back to the court code.
 
@@ -142,7 +143,7 @@ def get_court_by_paren(paren_string, citation):
     return court_code
 
 
-def get_year(token):
+def get_year(token: str) -> Optional[int]:
     """Given a string token, look for a valid 4-digit number at the start and
     return its value.
     """
@@ -160,7 +161,7 @@ def get_year(token):
     return year
 
 
-def add_post_citation(citation, words):
+def add_post_citation(citation: Citation, words: List[str]) -> None:
     """Add to a citation object any additional information found after the base
     citation, including court, year, and possibly page range.
 
@@ -205,7 +206,7 @@ def add_post_citation(citation, words):
             break
 
 
-def add_defendant(citation, words):
+def add_defendant(citation: Citation, words: List[str]) -> None:
     """Scan backwards from 2 tokens before reporter until you find v., in re,
     etc. If no known stop-token is found, no defendant name is stored.  In the
     future, this could be improved.
@@ -231,7 +232,7 @@ def add_defendant(citation, words):
         )
 
 
-def parse_page(page):
+def parse_page(page: Union[str, int]) -> Optional[str]:
     page = strip_punct(page)
 
     if page.isdigit():
@@ -258,7 +259,10 @@ def parse_page(page):
             return None
 
 
-def extract_full_citation(words, reporter_index):
+def extract_full_citation(
+    words: List[str],
+    reporter_index: int,
+) -> Optional[FullCitation]:
     """Given a list of words and the index of a federal reporter, look before
     and after for volume and page. If found, construct and return a
     FullCitation object.
@@ -307,7 +311,10 @@ def extract_full_citation(words, reporter_index):
     )
 
 
-def extract_shortform_citation(words, reporter_index):
+def extract_shortform_citation(
+    words: List[str],
+    reporter_index: int,
+) -> Optional[ShortformCitation]:
     """Given a list of words and the index of a federal reporter, look before
     and after to see if this is a short form citation. If found, construct
     and return a ShortformCitation object.
@@ -358,7 +365,10 @@ def extract_shortform_citation(words, reporter_index):
     )
 
 
-def extract_supra_citation(words, supra_index):
+def extract_supra_citation(
+    words: List[str],
+    supra_index: int,
+) -> Optional[SupraCitation]:
     """Given a list of words and the index of a supra token, look before
     and after to see if this is a supra citation. If found, construct
     and return a SupraCitation object.
@@ -393,7 +403,10 @@ def extract_supra_citation(words, supra_index):
     return SupraCitation(antecedent_guess, page=page, volume=volume)
 
 
-def extract_id_citation(words, id_index):
+def extract_id_citation(
+    words: List[str],
+    id_index: int,
+) -> Optional[IdCitation]:
     """Given a list of words and the index of an id token, gather the
     immediately succeeding tokens to construct and return an IdCitation
     object.
@@ -433,7 +446,10 @@ def extract_id_citation(words, id_index):
     )
 
 
-def is_date_in_reporter(editions, year):
+def is_date_in_reporter(
+    editions: Dict[str, Dict[str, Optional[datetime]]],
+    year: int,
+) -> bool:
     """Checks whether a year falls within the range of 1 to n editions of a
     reporter
 
@@ -597,7 +613,7 @@ def disambiguate_reporters(citations: List[Citation]) -> List[Citation]:
     return unambiguous_citations
 
 
-def remove_address_citations(citations):
+def remove_address_citations(citations: List[Citation]) -> List[Citation]:
     """Some addresses look like citations, but they're not. Remove them.
 
     An example might be 111 S.W. 23st St.
