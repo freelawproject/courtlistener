@@ -2,8 +2,9 @@
 # encoding: utf-8
 import re
 import sys
-from typing import List, Union
+from functools import lru_cache
 
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
@@ -38,18 +39,6 @@ STOP_TOKENS = [
     "granted",
     "dismissed",
 ]
-
-# Store court values to avoid repeated DB queries
-if not set(sys.argv).isdisjoint(["test", "syncdb", "shell", "migrate"]) or any(
-    "pytest" in s for s in set(sys.argv)
-):
-    # If it's a test, we can't count on the database being prepped, so we have
-    # to load lazily
-    ALL_COURTS = Court.objects.all().values("citation_string", "pk")
-else:
-    # list() forces early evaluation of the queryset so we don't have issues
-    # with closed cursors.
-    ALL_COURTS = list(Court.objects.all().values("citation_string", "pk"))
 
 
 # Adapted from nltk Penn Treebank tokenizer
@@ -114,6 +103,14 @@ def is_neutral_tc_reporter(reporter):
     return False
 
 
+@lru_cache
+def get_cached_courts() -> QuerySet:
+    """Provide a cached queryset so that we only have to get these results
+    once.
+    """
+    return Court.objects.all().values("citation_string", "pk")
+
+
 def get_court_by_paren(paren_string, citation):
     """Takes the citation string, usually something like "2d Cir", and maps
     that back to the court code.
@@ -121,6 +118,9 @@ def get_court_by_paren(paren_string, citation):
     Does not work on SCOTUS, since that court lacks parentheticals, and
     needs to be handled after disambiguation has been completed.
     """
+    # Cache the ALL_COURTS value the first time it's needed.
+    all_courts = get_cached_courts()
+
     if citation.year is None:
         court_str = strip_punct(paren_string)
     else:
@@ -132,7 +132,7 @@ def get_court_by_paren(paren_string, citation):
         court_code = None
     else:
         # Map the string to a court, if possible.
-        for court in ALL_COURTS:
+        for court in all_courts:
             # Use startswith because citations are often missing final period,
             # e.g. "2d Cir"
             if court["citation_string"].startswith(court_str):
