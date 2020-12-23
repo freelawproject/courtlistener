@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "cl.cleanup",
     "cl.corpus_importer",
     "cl.custom_filters",
+    "cl.disclosures",
     "cl.donate",
     "cl.favorites",
     "cl.people_db",
