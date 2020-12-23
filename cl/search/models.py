@@ -19,7 +19,7 @@ from cl.lib.model_helpers import (
     make_recap_path,
     make_docket_number_core,
 )
-from cl.lib.models import AbstractPDF, Base
+from cl.lib.models import AbstractPDF, AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     null_map,
@@ -64,7 +64,7 @@ SOURCES = (
 )
 
 
-class OriginatingCourtInformation(Base):
+class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
     For example, if you appeal from a district court to a circuit court, the
@@ -169,7 +169,7 @@ class OriginatingCourtInformation(Base):
         verbose_name_plural = "Originating Court Information"
 
 
-class Docket(Base):
+class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
     """
@@ -869,7 +869,7 @@ class Docket(Base):
             process_docket_data(self, html.filepath.path, html.upload_type)
 
 
-class DocketEntry(Base):
+class DocketEntry(AbstractDateTimeModel):
 
     docket = models.ForeignKey(
         Docket,
@@ -1012,7 +1012,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-class RECAPDocument(AbstractPacerDocument, AbstractPDF):
+class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1366,7 +1366,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         return normalize_search_dicts(out)
 
 
-class BankruptcyInformation(Base):
+class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
         help_text="The docket that the bankruptcy info is associated with.",
@@ -1408,7 +1408,7 @@ class BankruptcyInformation(Base):
         return "Bankruptcy Info for docket %s" % self.docket_id
 
 
-class Claim(Base):
+class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the claim is associated with.",
@@ -1522,7 +1522,7 @@ class Claim(Base):
         )
 
 
-class ClaimHistory(AbstractPacerDocument, AbstractPDF):
+class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
     CLAIM_TYPES = (
@@ -1863,7 +1863,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-class OpinionCluster(Base):
+class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
     SCDB_DECISION_DIRECTIONS = (
@@ -2482,7 +2482,7 @@ def sort_cites(c):
         return 8
 
 
-class Opinion(Base):
+class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
     LEAD = "020lead"
@@ -2796,7 +2796,7 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
-class Tag(Base):
+class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",
         max_length=50,

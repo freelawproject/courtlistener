@@ -4,13 +4,13 @@ from django.db import models
 from juriscraper.pacer import PacerRssFeed
 
 from cl.lib.model_helpers import make_path
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.search.models import Court
 
 
-class RssFeedStatus(Base):
+class RssFeedStatus(AbstractDateTimeModel):
     """Keep track of PACER RSS feed parsing.
 
     We use this class to determine whether we should crawl RSS at a given court
@@ -76,7 +76,7 @@ def make_rss_feed_path(instance, filename):
     return make_path("pacer-rss-feeds", filename)
 
 
-class RssFeedData(Base):
+class RssFeedData(AbstractDateTimeModel):
     """Store all old RSS data to disk for future analysis."""
 
     court = models.ForeignKey(

@@ -8,7 +8,7 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
 
-from cl.lib.models import Base
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
 from cl.visualizations.network_utils import (
@@ -19,7 +19,7 @@ from cl.visualizations.network_utils import (
 from cl.visualizations.exceptions import TooManyNodes
 
 
-class SCOTUSMap(Base):
+class SCOTUSMap(AbstractDateTimeModel):
     user = models.ForeignKey(
         User,
         help_text="The user that owns the visualization",
@@ -367,7 +367,7 @@ class SCOTUSMap(Base):
         self.__original_deleted = self.deleted
 
 
-class Referer(Base):
+class Referer(AbstractDateTimeModel):
     """Holds the referer domains where embedded maps are placed"""
 
     map = models.ForeignKey(
@@ -403,7 +403,7 @@ class Referer(Base):
         unique_together = (("map", "url"),)
 
 
-class JSONVersion(Base):
+class JSONVersion(AbstractDateTimeModel):
     """Used for holding a variety of versions of the data."""
 
     map = models.ForeignKey(

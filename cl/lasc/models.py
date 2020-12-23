@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import (
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from cl.lib.models import AbstractJSON, AbstractPDF, Base
+from cl.lib.models import AbstractJSON, AbstractPDF, AbstractDateTimeModel
 from cl.lib.model_helpers import make_pdf_path
 
 from cl.lib.storage import AWSMediaStorage
@@ -17,7 +17,7 @@ class UPLOAD_TYPE:
     NAMES = ((DOCKET, "JSON Docket"),)
 
 
-class LASCJSON(AbstractJSON):
+class LASCJSON(AbstractJSON, AbstractDateTimeModel):
     """Store the original JSON content from LASC's API.
 
     Keep the original data in case we ever need to reparse it.
@@ -37,7 +37,7 @@ class LASCJSON(AbstractJSON):
         verbose_name = "LASC JSON File"
 
 
-class LASCPDF(AbstractPDF):
+class LASCPDF(AbstractPDF, AbstractDateTimeModel):
     """Use the content framework to associate PDFs with our dockets"""
 
     content_type = models.ForeignKey(ContentType)
@@ -71,7 +71,7 @@ class LASCPDF(AbstractPDF):
         verbose_name = "LASC PDF"
 
 
-class QueuedCase(Base):
+class QueuedCase(AbstractDateTimeModel):
     """Cases we have yet to fetch
 
     This table is populated by crawling the date search interface.
@@ -143,7 +143,7 @@ class CaseIDQuerySet(models.query.QuerySet):
         return clone
 
 
-class Docket(Base):
+class Docket(AbstractDateTimeModel):
     """High-level table to contain all other LASC-related data"""
 
     json_document = GenericRelation(
@@ -250,7 +250,7 @@ class Docket(Base):
         return "%s" % self.case_id
 
 
-class QueuedPDF(Base):
+class QueuedPDF(AbstractDateTimeModel):
     """PDFs we have yet to download."""
 
     docket = models.ForeignKey(
@@ -287,7 +287,7 @@ class QueuedPDF(Base):
         verbose_name = "Queued PDF"
 
 
-class DocumentImage(Base):
+class DocumentImage(AbstractDateTimeModel):
     """Represents documents that are filed and scanned into the online system,
     most of which are available to us.
     """
@@ -426,7 +426,7 @@ class DocumentImage(Base):
         verbose_name_plural = "Document Images"
 
 
-class DocumentFiled(Base):
+class DocumentFiled(AbstractDateTimeModel):
     """Filings on the docket whether or not they're digitally available to
     anyone accessing the system.
     """
@@ -467,7 +467,7 @@ class DocumentFiled(Base):
         return "%s for %s" % (self.document_type, self.docket.docket_number)
 
 
-class Action(Base):
+class Action(AbstractDateTimeModel):
     """Actions registered on a docket"""
 
     """
@@ -511,7 +511,7 @@ class Action(Base):
         return "Action for %s" % self.docket.docket_number
 
 
-class CrossReference(Base):
+class CrossReference(AbstractDateTimeModel):
     """Relations between cases.
 
     Unfortunately, these cannot be normalized b/c they may refer to cases in
@@ -555,7 +555,7 @@ class CrossReference(Base):
         verbose_name_plural = "Cross References"
 
 
-class Party(Base):
+class Party(AbstractDateTimeModel):
 
     """
     # "EntityNumber": "3",
@@ -637,7 +637,7 @@ class FutureProceedingManager(models.Manager):
         return super_qs.filter(past_or_future=TIME_CHOICES.FUTURE)
 
 
-class Proceeding(Base):
+class Proceeding(AbstractDateTimeModel):
 
     """
     "ProceedingDateString": "08/24/2018",
@@ -720,7 +720,7 @@ class Proceeding(Base):
         return "%s for %s" % (self.event, self.docket.docket_number)
 
 
-class TentativeRuling(Base):
+class TentativeRuling(AbstractDateTimeModel):
     """
     Sample data taken from random cases.
 
