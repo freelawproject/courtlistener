@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from cl.lib.model_helpers import make_path
-from cl.lib.models import AbstractFile
+from cl.lib.models import AbstractFile, AbstractDateTimeModel
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
@@ -42,7 +42,7 @@ def make_recap_data_path(instance, filename):
     return make_path("recap-data", filename)
 
 
-class PacerHtmlFiles(AbstractFile):
+class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
     """This is a simple object for holding original HTML content from PACER
 
     We use this object to make sure that for every item we receive from users,
@@ -82,17 +82,7 @@ class PROCESSING_STATUS:
     )
 
 
-class ProcessingQueue(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
+class ProcessingQueue(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
@@ -234,19 +224,9 @@ class REQUEST_TYPE:
     )
 
 
-class PacerFetchQueue(models.Model):
+class PacerFetchQueue(AbstractDateTimeModel):
     """The queue of requests being made of PACER."""
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     date_completed = models.DateTimeField(
         help_text="When the item was completed or errored out.",
         db_index=True,
@@ -372,7 +352,7 @@ class PacerFetchQueue(models.Model):
         )
 
 
-class FjcIntegratedDatabase(models.Model):
+class FjcIntegratedDatabase(AbstractDateTimeModel):
     """The Integrated Database of PACER data as described here:
 
     https://www.fjc.gov/research/idb
@@ -609,16 +589,6 @@ class FjcIntegratedDatabase(models.Model):
         help_text="IDB has several source datafiles. This field helps keep "
         "track of where a row came from originally.",
         choices=DATASET_SOURCES,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     circuit = models.ForeignKey(
         Court,

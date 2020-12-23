@@ -7,6 +7,7 @@ from django.template import loader
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     null_map,
@@ -18,7 +19,7 @@ from cl.people_db.models import Person
 from cl.search.models import Docket, SOURCES
 
 
-class Audio(models.Model):
+class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 
     STT_NEEDED = 0
@@ -68,17 +69,6 @@ class Audio(models.Model):
         "be placed into the panel field.",
         blank=True,
         null=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified. A value in year"
-        " 1750 indicates the value is unknown",
-        auto_now=True,
-        db_index=True,
     )
     sha1 = models.CharField(
         help_text="unique ID for the document, as generated via SHA1 of the "

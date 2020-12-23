@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import (
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from cl.lib.models import AbstractJSON, AbstractPDF
+from cl.lib.models import AbstractJSON, AbstractPDF, AbstractDateTimeModel
 from cl.lib.model_helpers import make_pdf_path
 
 from cl.lib.storage import AWSMediaStorage
@@ -17,7 +17,7 @@ class UPLOAD_TYPE:
     NAMES = ((DOCKET, "JSON Docket"),)
 
 
-class LASCJSON(AbstractJSON):
+class LASCJSON(AbstractJSON, AbstractDateTimeModel):
     """Store the original JSON content from LASC's API.
 
     Keep the original data in case we ever need to reparse it.
@@ -37,7 +37,7 @@ class LASCJSON(AbstractJSON):
         verbose_name = "LASC JSON File"
 
 
-class LASCPDF(AbstractPDF):
+class LASCPDF(AbstractPDF, AbstractDateTimeModel):
     """Use the content framework to associate PDFs with our dockets"""
 
     content_type = models.ForeignKey(ContentType)
@@ -71,22 +71,12 @@ class LASCPDF(AbstractPDF):
         verbose_name = "LASC PDF"
 
 
-class QueuedCase(models.Model):
+class QueuedCase(AbstractDateTimeModel):
     """Cases we have yet to fetch
 
     This table is populated by crawling the date search interface.
     """
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
-    )
     internal_case_id = models.CharField(
         help_text="Internal case ID. Typically a combination of the docket "
         "number, district, and division code.",
@@ -153,7 +143,7 @@ class CaseIDQuerySet(models.query.QuerySet):
         return clone
 
 
-class Docket(models.Model):
+class Docket(AbstractDateTimeModel):
     """High-level table to contain all other LASC-related data"""
 
     json_document = GenericRelation(
@@ -162,16 +152,6 @@ class Docket(models.Model):
         related_name="dockets",
         null=True,
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
     )
     date_checked = models.DateTimeField(
         help_text="Datetime case was last pulled or checked from LASC",
@@ -270,24 +250,13 @@ class Docket(models.Model):
         return "%s" % self.case_id
 
 
-class QueuedPDF(models.Model):
+class QueuedPDF(AbstractDateTimeModel):
     """PDFs we have yet to download."""
 
     docket = models.ForeignKey(
         Docket,
         related_name="queued_pdfs",
         on_delete=models.CASCADE,
-    )
-
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
     )
     internal_case_id = models.CharField(
         help_text="Internal case ID. Typically a combination of the docket "
@@ -318,7 +287,7 @@ class QueuedPDF(models.Model):
         verbose_name = "Queued PDF"
 
 
-class DocumentImage(models.Model):
+class DocumentImage(AbstractDateTimeModel):
     """Represents documents that are filed and scanned into the online system,
     most of which are available to us.
     """
@@ -360,16 +329,6 @@ class DocumentImage(models.Model):
         related_name="document_images",
         null=True,
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     # Corresponds with create_date in docket JSON
     date_processed = models.DateTimeField(
@@ -467,7 +426,7 @@ class DocumentImage(models.Model):
         verbose_name_plural = "Document Images"
 
 
-class DocumentFiled(models.Model):
+class DocumentFiled(AbstractDateTimeModel):
     """Filings on the docket whether or not they're digitally available to
     anyone accessing the system.
     """
@@ -484,16 +443,6 @@ class DocumentFiled(models.Model):
         Docket,
         related_name="documents_filed",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_filed = models.DateTimeField(
         help_text="Date a document was filed",
@@ -518,7 +467,7 @@ class DocumentFiled(models.Model):
         return "%s for %s" % (self.document_type, self.docket.docket_number)
 
 
-class Action(models.Model):
+class Action(AbstractDateTimeModel):
     """Actions registered on a docket"""
 
     """
@@ -542,16 +491,6 @@ class Action(models.Model):
         related_name="actions",
         on_delete=models.CASCADE,
     )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     date_of_action = models.DateTimeField(
         help_text="Date of the action entry",
     )
@@ -572,7 +511,7 @@ class Action(models.Model):
         return "Action for %s" % self.docket.docket_number
 
 
-class CrossReference(models.Model):
+class CrossReference(AbstractDateTimeModel):
     """Relations between cases.
 
     Unfortunately, these cannot be normalized b/c they may refer to cases in
@@ -590,16 +529,6 @@ class CrossReference(models.Model):
         Docket,
         related_name="cross_references",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_cross_reference = models.DateTimeField(
         help_text="Cross reference date",
@@ -626,7 +555,7 @@ class CrossReference(models.Model):
         verbose_name_plural = "Cross References"
 
 
-class Party(models.Model):
+class Party(AbstractDateTimeModel):
 
     """
     # "EntityNumber": "3",
@@ -650,16 +579,6 @@ class Party(models.Model):
         Docket,
         related_name="parties",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     attorney_name = models.TextField(
         help_text="Attorney name",
@@ -718,7 +637,7 @@ class FutureProceedingManager(models.Manager):
         return super_qs.filter(past_or_future=TIME_CHOICES.FUTURE)
 
 
-class Proceeding(models.Model):
+class Proceeding(AbstractDateTimeModel):
 
     """
     "ProceedingDateString": "08/24/2018",
@@ -742,16 +661,6 @@ class Proceeding(models.Model):
         Docket,
         related_name="proceedings",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     past_or_future = models.SmallIntegerField(
         help_text="Is this event in the past or future?",
@@ -811,7 +720,7 @@ class Proceeding(models.Model):
         return "%s for %s" % (self.event, self.docket.docket_number)
 
 
-class TentativeRuling(models.Model):
+class TentativeRuling(AbstractDateTimeModel):
     """
     Sample data taken from random cases.
 
@@ -829,16 +738,6 @@ class TentativeRuling(models.Model):
         Docket,
         related_name="tentative_rulings",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_creation = models.DateTimeField(
         help_text="Still exploring possible meanings in LASC system.",

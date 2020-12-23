@@ -19,7 +19,7 @@ from cl.lib.model_helpers import (
     make_recap_path,
     make_docket_number_core,
 )
-from cl.lib.models import AbstractPDF
+from cl.lib.models import AbstractPDF, AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     null_map,
@@ -64,7 +64,7 @@ SOURCES = (
 )
 
 
-class OriginatingCourtInformation(models.Model):
+class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
     For example, if you appeal from a district court to a circuit court, the
@@ -92,16 +92,6 @@ class OriginatingCourtInformation(models.Model):
            than, Docket.ogc_field.
     """
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
@@ -179,7 +169,7 @@ class OriginatingCourtInformation(models.Model):
         verbose_name_plural = "Originating Court Information"
 
 
-class Docket(models.Model):
+class Docket(AbstractDateTimeModel):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
     """
@@ -382,19 +372,6 @@ class Docket(models.Model):
         related_name="dockets",
         through="people_db.PartyType",
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text=(
-            "The last moment when the item was modified. A value in "
-            "year 1750 indicates the value is unknown"
-        ),
-        auto_now=True,
-        db_index=True,
     )
     date_last_index = models.DateTimeField(
         help_text="The last moment that the item was indexed in Solr.",
@@ -892,7 +869,7 @@ class Docket(models.Model):
             process_docket_data(self, html.filepath.path, html.upload_type)
 
 
-class DocketEntry(models.Model):
+class DocketEntry(AbstractDateTimeModel):
 
     docket = models.ForeignKey(
         Docket,
@@ -916,16 +893,6 @@ class DocketEntry(models.Model):
         related_query_name="docket_entries",
         null=True,
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created.",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_filed = models.DateField(
         help_text="The created date of the Docket Entry.",
@@ -1045,7 +1012,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-class RECAPDocument(AbstractPacerDocument, AbstractPDF):
+class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1399,20 +1366,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF):
         return normalize_search_dicts(out)
 
 
-class BankruptcyInformation(models.Model):
+class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
         help_text="The docket that the bankruptcy info is associated with.",
         on_delete=models.CASCADE,
         related_name="bankruptcy_information",
-    )
-    date_created = models.DateTimeField(
-        help_text="The date time this item was created.",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_converted = models.DateTimeField(
         help_text=(
@@ -1449,7 +1408,7 @@ class BankruptcyInformation(models.Model):
         return "Bankruptcy Info for docket %s" % self.docket_id
 
 
-class Claim(models.Model):
+class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that the claim is associated with.",
@@ -1461,14 +1420,6 @@ class Claim(models.Model):
         help_text="The tags associated with the document.",
         related_name="claims",
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The date time this item was created.",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.", auto_now=True, db_index=True
     )
     date_claim_modified = models.DateTimeField(
         help_text="Date the claim was last modified to our knowledge.",
@@ -1571,7 +1522,7 @@ class Claim(models.Model):
         )
 
 
-class ClaimHistory(AbstractPacerDocument, AbstractPDF):
+class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
     CLAIM_TYPES = (
@@ -1912,7 +1863,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-class OpinionCluster(models.Model):
+class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
     SCDB_DECISION_DIRECTIONS = (
@@ -1946,19 +1897,6 @@ class OpinionCluster(models.Model):
             "cannot be placed into the panel field."
         ),
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text=(
-            "The last moment when the item was modified. A value in "
-            "year 1750 indicates the value is unknown"
-        ),
-        auto_now=True,
-        db_index=True,
     )
     date_filed = models.DateField(
         help_text="The date the cluster of opinions was filed by the court",
@@ -2544,7 +2482,7 @@ def sort_cites(c):
         return 8
 
 
-class Opinion(models.Model):
+class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
     LEAD = "020lead"
@@ -2620,19 +2558,6 @@ class Opinion(models.Model):
             "in this opinion str"
         ),
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text=(
-            "The last moment when the item was modified. A value in "
-            "year 1750 indicates the value is unknown"
-        ),
-        auto_now=True,
-        db_index=True,
     )
     type = models.CharField(max_length=20, choices=OPINION_TYPES)
     sha1 = models.CharField(
@@ -2871,20 +2796,7 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
-class Tag(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text=(
-            "The last moment when the item was modified. A value in "
-            "year 1750 indicates the value is unknown"
-        ),
-        auto_now=True,
-        db_index=True,
-    )
+class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",
         max_length=50,

@@ -5,10 +5,19 @@ from django.core.validators import MaxLengthValidator
 from django.db import models
 
 from cl.audio.models import Audio
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import OpinionCluster, Docket, RECAPDocument
 
 
 class Favorite(models.Model):
+    date_created = models.DateTimeField(
+        help_text="The original creation date for the item",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        auto_now=True, db_index=True, null=True
+    )
     user = models.ForeignKey(
         User,
         help_text="The user that owns the favorite",
@@ -42,14 +51,6 @@ class Favorite(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        auto_now=True, db_index=True, null=True
     )
     name = models.CharField("a name for the alert", max_length=100)
     notes = models.TextField(
@@ -87,19 +88,9 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-class UserTag(models.Model):
+class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     user = models.ForeignKey(
         User,
         help_text="The user that created the tag",
