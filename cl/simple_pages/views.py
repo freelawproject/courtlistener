@@ -3,13 +3,14 @@ import logging
 import os
 import re
 from datetime import timedelta
+from typing import Union, Dict, List, Optional
 from urllib.parse import quote
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.urls import reverse
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, QuerySet
 from django.http import HttpResponse, HttpRequest
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -124,7 +125,7 @@ def markdown_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/markdown_help.html", {"private": False})
 
 
-def build_court_dicts(courts):
+def build_court_dicts(courts: QuerySet) -> List[Dict[str, Union[str, int]]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
     court_dicts = [{"pk": "all", "short_name": "All Courts"}]
@@ -229,11 +230,11 @@ def contribute(request: HttpRequest) -> HttpResponse:
 @ratelimiter_unsafe_1_per_m
 @check_honeypot(field_name="skip_me_if_alive")
 def contact(
-    request,
-    template_path="contact_form.html",
-    template_data=None,
-    initial=None,
-):
+    request: HttpRequest,
+    template_path: str = "contact_form.html",
+    template_data: Optional[Dict[str, str]] = None,
+    initial: Optional[Dict[str, str]] = None,
+) -> HttpResponse:
     """This is a fairly run-of-the-mill contact form, except that it can be
     overridden in various ways so that its logic can be called from other
     functions.
@@ -293,13 +294,13 @@ def advanced_search(request: HttpRequest) -> HttpResponse:
     return render(request, "advanced_search.html", {"private": False})
 
 
-def old_terms(request, v):
+def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     return render(
         request,
         "terms/%s.html" % v,
         {
-            "title": "Archived Terms of Service and Policies, v%s – CourtListener.com"
-            % v,
+            "title": "Archived Terms of Service and Policies, v%s – "
+            "CourtListener.com" % v,
             "private": True,
         },
     )
@@ -347,7 +348,7 @@ def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
-def ratelimited(request, exception):
+def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
     return render(
         request,
         "429.html",
@@ -357,7 +358,10 @@ def ratelimited(request, exception):
 
 
 @track_in_matomo(timeout=0.01)
-def serve_static_file(request, file_path=""):
+def serve_static_file(
+    request: HttpRequest,
+    file_path: str = "",
+) -> HttpResponse:
     """Serve a recap file or redirect to HTML if it's a bot.
 
     Use nginx's X-Accel system to set headers without putting files in memory.
