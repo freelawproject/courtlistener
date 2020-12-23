@@ -9,6 +9,7 @@ from django.utils.timezone import now
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import trunc
+from django.apps import apps
 
 
 def make_docket_number_core(docket_number):
@@ -103,8 +104,16 @@ def make_pdf_path(instance, filename, thumbs=False):
             instance.document_id,
             slug,
         )
-
         return os.path.join(root, file_name)
+    elif type(instance) == apps.get_model(
+        "disclosures", "FinancialDisclosure"
+    ):
+        root = "us/federal/judicial/financial-disclosures"
+        if thumbs:
+            return f"{root}/{instance.person.id}/thumbnails/" \
+                   f"{instance.person.slug}-disclosure.{instance.year}.png"
+        return f"{root}/{instance.person.id}/" \
+               f"{instance.person.slug}-disclosure.{instance.year}.pdf"
     else:
         raise ValueError(
             "Unknown model type in make_pdf_path "
