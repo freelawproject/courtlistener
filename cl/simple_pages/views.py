@@ -22,7 +22,7 @@ from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_matomo
-from cl.lib.ratelimiter import ratelimiter_slow
+from cl.lib.ratelimiter import ratelimiter_unsafe_1_per_m
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
@@ -226,7 +226,7 @@ def contribute(request: HttpRequest) -> HttpResponse:
     return render(request, "contribute.html", {"private": False})
 
 
-@ratelimiter_slow
+@ratelimiter_unsafe_1_per_m
 @check_honeypot(field_name="skip_me_if_alive")
 def contact(
     request,

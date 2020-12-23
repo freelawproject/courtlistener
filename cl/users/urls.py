@@ -4,7 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.views.generic import RedirectView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
-from cl.lib.ratelimiter import ratelimiter_unsafe_methods
+from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import views
 from cl.users.forms import (
     CustomPasswordResetForm,
@@ -16,7 +16,7 @@ urlpatterns = [
     # Sign in/out and password pages
     url(
         r"^sign-in/$",
-        ratelimiter_unsafe_methods(auth_views.login),
+        ratelimiter_unsafe_10_per_m(auth_views.login),
         {
             "template_name": "register/login.html",
             "authentication_form": ConfirmedEmailAuthenticationForm,
@@ -34,7 +34,7 @@ urlpatterns = [
     ),
     url(
         r"^reset-password/$",
-        ratelimiter_unsafe_methods(
+        ratelimiter_unsafe_10_per_m(
             auth_views.PasswordResetView.as_view(
                 **{
                     "template_name": "register/password_reset_form.html",
@@ -109,7 +109,7 @@ urlpatterns = [
     ),
     url(
         r"^register/$",
-        ratelimiter_unsafe_methods(views.register),
+        ratelimiter_unsafe_10_per_m(views.register),
         name="register",
     ),
     url(
@@ -125,7 +125,7 @@ urlpatterns = [
     ),
     url(
         r"^email-confirmation/request/$",
-        ratelimiter_unsafe_methods(views.request_email_confirmation),
+        ratelimiter_unsafe_10_per_m(views.request_email_confirmation),
         name="email_confirmation_request",
     ),
     url(
