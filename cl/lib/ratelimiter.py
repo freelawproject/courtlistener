@@ -9,18 +9,22 @@ from ratelimit.decorators import ratelimit
 from ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
-ratelimiter_fast = ratelimit(key="header:x-real-ip", rate="250/h", block=True)
+ratelimiter_all_250_per_h = ratelimit(
+    key="header:x-real-ip", rate="250/h", block=True
+)
 # Decorators can't easily be mocked, and we need to not trigger this decorator
 # during tests or else the first test works and the rest are blocked. So,
 # check if we're doing a test and adjust the decorator accordingly.
 if "test" in sys.argv:
-    ratelimiter_slow = lambda func: func
-    ratelimiter_unsafe_methods = lambda func: func
+    ratelimiter_all_1_per_m = lambda func: func
+    ratelimiter_unsafe_1_per_m = lambda func: func
+    ratelimiter_unsafe_10_per_m = lambda func: func
+
 else:
-    ratelimiter_slow = ratelimit(
+    ratelimiter_unsafe_1_per_m = ratelimit(
         key="header:x-real-ip", rate="1/m", method=UNSAFE, block=True
     )
-    ratelimiter_unsafe_methods = ratelimit(
+    ratelimiter_unsafe_10_per_m = ratelimit(
         key="header:x-real-ip", rate="10/m", method=UNSAFE, block=True
     )
 
@@ -38,7 +42,7 @@ def ratelimit_if_not_whitelisted(view):
     """A wrapper for the ratelimit function that adds a whitelist for approved
     crawlers.
     """
-    ratelimited_view = ratelimiter_fast(view)
+    ratelimited_view = ratelimiter_all_250_per_h(view)
 
     @functools.wraps(view)
     def wrapper(request, *args, **kwargs):

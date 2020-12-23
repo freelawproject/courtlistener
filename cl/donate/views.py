@@ -27,7 +27,7 @@ from cl.donate.stripe_helpers import (
     create_stripe_customer,
 )
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
-from cl.lib.ratelimiter import ratelimiter_unsafe_methods
+from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
@@ -268,7 +268,7 @@ def process_donation_forms(
     return render(request, template_name, context)
 
 
-@ratelimiter_unsafe_methods
+@ratelimiter_unsafe_10_per_m
 def donate(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = False
@@ -281,7 +281,7 @@ def donate(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimiter_unsafe_methods
+@ratelimiter_unsafe_10_per_m
 def cc_payment(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = True
@@ -294,7 +294,7 @@ def cc_payment(request: HttpRequest) -> HttpResponse:
     )
 
 
-@ratelimiter_unsafe_methods
+@ratelimiter_unsafe_10_per_m
 def badge_signup(request: HttpRequest) -> HttpResponse:
     context = make_payment_page_context(request)
     context["private"] = True
