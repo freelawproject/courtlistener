@@ -5,7 +5,6 @@ from django.core.files.base import ContentFile
 from cl.celery_init import app
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.people_db.models import FinancialDisclosure
 from cl.search.models import RECAPDocument
 
 
@@ -56,15 +55,6 @@ def make_png_thumbnail_for_instance(
 
     return item.pk
 
-
-@app.task
-def make_financial_disclosure_thumbnail_from_pdf(pk):
-    make_png_thumbnail_for_instance(
-        pk=pk,
-        InstanceClass=FinancialDisclosure,
-        file_attr="filepath",
-        max_dimension=350,
-    )
 
 
 @app.task
