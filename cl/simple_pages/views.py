@@ -317,7 +317,7 @@ def latest_terms(request: HttpRequest) -> HttpResponse:
     )
 
 
-@cache_page(60 * 60 * 6)
+@cache_page(60 * 60 * 6, cache="db_cache")
 def robots(request: HttpRequest) -> HttpResponse:
     """Generate the robots.txt file"""
     response = HttpResponse(content_type="text/plain")
@@ -327,7 +327,9 @@ def robots(request: HttpRequest) -> HttpResponse:
     # here if we had a datetime in the DB instead, but we have to go a little
     # bigger here to make sure items are on robots.txt long enough.
     block_threshold = now() - timedelta(hours=24 * 5)
-    blocked_dockets = Docket.objects.filter(date_blocked__gt=block_threshold)
+    blocked_dockets = Docket.objects.filter(
+        date_blocked__gt=block_threshold
+    ).exclude(date_created__gt=block_threshold)
     blocked_opinions = OpinionCluster.objects.filter(
         date_blocked__gt=block_threshold
     )
