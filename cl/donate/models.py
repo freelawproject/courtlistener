@@ -109,7 +109,7 @@ class Donation(AbstractDateTimeModel):
     status = models.SmallIntegerField(choices=PAYMENT_STATUSES)
     referrer = models.TextField("GET or HTTP referrer", blank=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: $%s, %s" % (
             self.get_payment_provider_display(),
             self.amount,
@@ -151,7 +151,7 @@ class MonthlyDonation(AbstractDateTimeModel):
         default=0,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: $%s by %s" % (
             self.pk,
             self.monthly_donation_amount,

@@ -116,5 +116,5 @@ class ModelTypeError(TypeError):
     def __init__(self, model):
         self.model = model
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s is not a valid CourtListnener model" % (self.model,)

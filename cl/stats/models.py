@@ -8,7 +8,7 @@ class Stat(models.Model):
     date_logged = models.DateField(db_index=True)
     count = models.IntegerField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return force_str(
             "%s: %s on %s: %s"
             % (self.pk, self.name, self.date_logged, self.count)
@@ -34,5 +34,5 @@ class Event(models.Model):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Event Object" % self.pk

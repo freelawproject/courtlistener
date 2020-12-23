@@ -45,7 +45,7 @@ class Alert(AbstractDateTimeModel):
         max_length=40,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Alert %s: %s" % (self.pk, self.name)
 
     class Meta:
@@ -89,7 +89,7 @@ class DocketAlert(models.Model):
     class Meta:
         unique_together = ("docket", "user")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "DocketAlert %s: %s" % (self.pk, self.docket_id)
 
     def save(self, *args, **kwargs):

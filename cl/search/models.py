@@ -159,10 +159,10 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         null=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<OriginatingCourtInformation: %s>" % self.pk
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
 
     class Meta:
@@ -590,7 +590,7 @@ class Docket(AbstractDateTimeModel):
             ),
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.case_name:
             return force_str("%s: %s" % (self.pk, self.case_name))
         else:
@@ -612,7 +612,7 @@ class Docket(AbstractDateTimeModel):
 
         super(Docket, self).save(*args, **kwargs)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
 
     def add_recap_source(self):
@@ -952,7 +952,7 @@ class DocketEntry(AbstractDateTimeModel):
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<DocketEntry:%s ---> %s >" % (
             self.pk,
             trunc(self.description, 50, ellipsis="..."),
@@ -1062,7 +1062,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Docket_%s , document_number_%s , attachment_number_%s" % (
             self.pk,
             self.docket_entry.docket.docket_number,
@@ -1404,7 +1404,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Bankruptcy Information"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Bankruptcy Info for docket %s" % self.docket_id
 
 
@@ -1514,7 +1514,7 @@ class Claim(AbstractDateTimeModel):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Claim #%s on docket %s with pk %s" % (
             self.claim_number,
             self.docket_id,
@@ -1802,7 +1802,7 @@ class Court(models.Model):
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{name}".format(name=self.full_name)
 
     @property
@@ -2225,13 +2225,13 @@ class OpinionCluster(AbstractDateTimeModel):
             published=True, deleted=False
         ).order_by("-view_count")
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.case_name:
             return "%s: %s" % (self.pk, self.case_name)
         else:
             return "%s" % self.pk
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
     def save(self, index=True, force_commit=False, *args, **kwargs):
@@ -2421,11 +2421,11 @@ class Citation(models.Model):
         help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Note this representation is used in the front end.
         return "{volume} {reporter} {page}".format(**self.__dict__)
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return self.cluster.get_absolute_url()
 
     class Meta:
@@ -2638,7 +2638,7 @@ class Opinion(AbstractDateTimeModel):
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
-    def __str__(self):
+    def __str__(self) -> str:
         try:
             return "{pk} - {cn}".format(
                 pk=getattr(self, "pk", None), cn=self.cluster.case_name
@@ -2646,7 +2646,7 @@ class Opinion(AbstractDateTimeModel):
         except AttributeError:
             return "Orphan opinion with ID: %s" % self.pk
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
 
     def clean(self):
@@ -2785,7 +2785,7 @@ class OpinionsCited(models.Model):
     # treatment: positive, negative, etc.
     #
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s ⤜--cites⟶  %s" % (
             self.citing_opinion.id,
             self.cited_opinion.id,
@@ -2804,7 +2804,7 @@ class Tag(AbstractDateTimeModel):
         unique=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s" % (self.pk, self.name)
 
     def tag_object(self, thing):
@@ -2878,7 +2878,7 @@ class Tag(AbstractDateTimeModel):
 #         max_length=1,
 #         choices=REVIEW_STANDARDS,
 #     )
-#     def __str__(self):
+#     def __str__(self) -> str:
 #         return u'%s ⤜--reviewed by⟶  %s' % (self.lower_court.id,
 #                                         self.upper_court.id)
 #

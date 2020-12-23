@@ -106,7 +106,7 @@ class QueuedCase(AbstractDateTimeModel):
             ["https://media.lacourt.org/api/AzureApi", self.internal_case_id]
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s" % self.internal_case_id
 
     class Meta:
@@ -246,7 +246,7 @@ class Docket(AbstractDateTimeModel):
             [self.docket_number, self.district, self.division_code]
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s" % self.case_id
 
 
@@ -280,7 +280,7 @@ class QueuedPDF(AbstractDateTimeModel):
             ]
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s" % self.document_id
 
     class Meta:
@@ -415,7 +415,7 @@ class DocumentImage(AbstractDateTimeModel):
         path_template = "ViewDocument/%s/%s"
         return base_url + path_template % (self.docket.case_id, self.doc_id)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Scanned PDF  %s for %s" % (
             self.doc_id,
             self.docket.docket_number,
@@ -463,7 +463,7 @@ class DocumentFiled(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Documents Filed"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s for %s" % (self.document_type, self.docket.docket_number)
 
 
@@ -507,7 +507,7 @@ class Action(AbstractDateTimeModel):
         verbose_name = "Action Entry"
         verbose_name_plural = "Action Entries"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Action for %s" % self.docket.docket_number
 
 
@@ -544,7 +544,7 @@ class CrossReference(AbstractDateTimeModel):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s for %s" % (
             self.cross_reference_type,
             self.docket.docket_number,
@@ -612,7 +612,7 @@ class Party(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Parties"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s for %s" % (self.party_name, self.docket.docket_number)
 
 
@@ -716,7 +716,7 @@ class Proceeding(AbstractDateTimeModel):
     past_objects = PastProceedingManager()
     future_objects = FutureProceedingManager()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s for %s" % (self.event, self.docket.docket_number)
 
 
@@ -758,7 +758,7 @@ class TentativeRuling(AbstractDateTimeModel):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Tentative ruling for %s" % self.docket.docket_number
 
     class Meta:
