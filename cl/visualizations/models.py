@@ -312,12 +312,12 @@ class SCOTUSMap(AbstractDateTimeModel):
 
         return json.dumps(j, indent=2)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{pk}: {title}".format(
             pk=getattr(self, "pk", None), title=self.title
         )
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse(
             "view_visualization", kwargs={"pk": self.pk, "slug": self.slug}
         )
@@ -392,7 +392,7 @@ class Referer(AbstractDateTimeModel):
         default=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{pk}: Refers to {map}".format(
             pk=getattr(self, "pk", None),
             map=self.map,
@@ -416,7 +416,7 @@ class JSONVersion(AbstractDateTimeModel):
         help_text="The JSON data for a particular version of the visualization.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<JSONVersion {pk}> for <{map}>".format(
             pk=getattr(self, "pk", None),
             map=self.map,

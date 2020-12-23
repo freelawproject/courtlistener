@@ -1,6 +1,4 @@
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxLengthValidator
 from django.db import models
 
@@ -68,7 +66,7 @@ class Favorite(models.Model):
             ("recap_doc_id", "user"),
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Favorite %s" % self.id
 
 
@@ -122,7 +120,7 @@ class UserTag(AbstractDateTimeModel):
         default=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s by user %s" % (self.pk, self.name, self.user_id)
 
     class Meta:

@@ -55,7 +55,7 @@ class RssFeedStatus(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "RSS Feed Statuses"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "RssFeedStatus: %s, %s" % (self.pk, self.court_id)
 
 

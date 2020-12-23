@@ -170,7 +170,7 @@ class ProcessingQueue(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.upload_type in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
@@ -345,7 +345,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
         default=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "PacerFetchQueue: %s (%s)" % (
             self.pk,
             self.get_request_type_display(),
@@ -821,7 +821,7 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
 
     class Meta:

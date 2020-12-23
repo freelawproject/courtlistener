@@ -22,7 +22,7 @@ class BarMembership(models.Model):
         "the two letter state abbreviation of a bar membership"
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.get_barMembership_display()
 
     class Meta:
@@ -157,7 +157,7 @@ class UserProfile(models.Model):
         data = invert_user_logs(start, end, add_usernames=False)
         return data[self.user.pk]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "{name}".format(name=self.user.username)
 
     class Meta:

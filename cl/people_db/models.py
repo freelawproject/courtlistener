@@ -202,13 +202,13 @@ class Person(AbstractDateTimeModel):
         default=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s" % (self.pk, self.name_full)
 
     class Meta:
         verbose_name_plural = "people"
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("view_person", args=[self.pk, self.slug])
 
     def save(self, *args, **kwargs):
@@ -406,7 +406,7 @@ class School(AbstractDateTimeModel):
         db_index=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.is_alias_of:
             return "%s: %s (alias: %s)" % (
                 self.pk,
@@ -901,7 +901,7 @@ class Position(AbstractDateTimeModel):
         default=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s at %s" % (
             self.pk,
             self.person.name_full,
@@ -1135,7 +1135,7 @@ class Education(AbstractDateTimeModel):
         blank=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Degree in %s from %s in the year %s" % (
             self.pk,
             self.degree_detail,
@@ -1168,7 +1168,7 @@ class Race(models.Model):
         unique=True,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         # This is used in the API via the StringRelatedField. Do not cthange.
         return "{race}".format(race=self.race)
 
@@ -1399,7 +1399,7 @@ class PartyType(models.Model):
     class Meta:
         unique_together = ("docket", "party", "name")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Party %s is %s in Docket %s" % (
             self.pk,
             self.party_id,
@@ -1496,7 +1496,7 @@ class Party(AbstractDateTimeModel):
         verbose_name_plural = "Parties"
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s" % (self.pk, self.name)
 
 
@@ -1568,7 +1568,7 @@ class Role(models.Model):
             "date_action",
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Attorney %s is %s for Party %s in docket %s" % (
             self.pk,
             self.attorney_id,
@@ -1606,7 +1606,7 @@ class Attorney(AbstractDateTimeModel):
     class Meta:
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s" % (self.pk, self.name)
 
 
@@ -1639,7 +1639,7 @@ class AttorneyOrganizationAssociation(models.Model):
     class Meta:
         unique_together = ("attorney", "attorney_organization", "docket")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: Atty %s worked on docket %s while at org %s" % (
             self.pk,
             self.attorney_id,
@@ -1691,7 +1691,7 @@ class AttorneyOrganization(AbstractDateTimeModel):
             "zip_code",
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "%s: %s, %s, %s, %s, %s, %s" % (
             self.pk,
             self.name,
