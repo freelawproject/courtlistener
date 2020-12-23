@@ -16,7 +16,7 @@ ratelimiter_all_250_per_h = ratelimit(
 # during tests or else the first test works and the rest are blocked. So,
 # check if we're doing a test and adjust the decorator accordingly.
 if "test" in sys.argv:
-    ratelimiter_all_1_per_m = lambda func: func
+    ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_1_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
 else:
