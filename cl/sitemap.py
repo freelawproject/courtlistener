@@ -13,6 +13,8 @@ from django.template.response import TemplateResponse
 from django.utils.encoding import force_bytes, iri_to_uri
 from django.utils.http import http_date
 
+from cl.lib.ratelimiter import ratelimiter_all_2_per_m
+
 
 def make_cache_key(request: HttpRequest, section: str) -> str:
     """Make a cache key for a URL
@@ -32,6 +34,7 @@ def make_cache_key(request: HttpRequest, section: str) -> str:
     return "sitemap.%s.%s" % (section, url.hexdigest())
 
 
+@ratelimiter_all_2_per_m
 @x_robots_tag
 def cached_sitemap(
     request: HttpRequest,

@@ -19,8 +19,10 @@ if "test" in sys.argv:
     ratelimiter_all_1_per_m = lambda func: func
     ratelimiter_unsafe_1_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
-
 else:
+    ratelimiter_all_2_per_m = ratelimit(
+        key="header:x-real-ip", rate="2/m", block=True
+    )
     ratelimiter_unsafe_1_per_m = ratelimit(
         key="header:x-real-ip", rate="1/m", method=UNSAFE, block=True
     )
