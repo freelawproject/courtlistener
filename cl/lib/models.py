@@ -2,13 +2,12 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from cl.lib.storage import IncrementingFileSystemStorage, UUIDFileSystemStorage
 from cl.lib.model_helpers import (
-    make_json_path,
     make_pdf_path,
     make_pdf_thumb_path,
     make_lasc_json_path,
 )
+from cl.lib.storage import IncrementingFileSystemStorage
 
 
 class THUMBNAIL_STATUSES(object):
@@ -20,6 +19,25 @@ class THUMBNAIL_STATUSES(object):
         (COMPLETE, "Thumbnail completed successfully"),
         (FAILED, "Unable to generate thumbnail"),
     )
+
+
+class AbstractDateTimeModel(models.Model):
+    """An abstract base class for most models"""
+
+    date_created = models.DateTimeField(
+        help_text="The moment when the item was created.",
+        auto_now_add=True,
+        db_index=True,
+    )
+    date_modified = models.DateTimeField(
+        help_text="The last moment when the item was modified. A value in year"
+        " 1750 indicates the value is unknown",
+        auto_now=True,
+        db_index=True,
+    )
+
+    class Meta:
+        abstract = True
 
 
 class AbstractPDF(models.Model):
@@ -34,16 +52,6 @@ class AbstractPDF(models.Model):
         (OCR_UNNECESSARY, "OCR Not Necessary"),
         (OCR_FAILED, "OCR Failed"),
         (OCR_NEEDED, "OCR Needed"),
-    )
-    date_created = models.DateTimeField(
-        help_text="The date the file was imported to Local Storage.",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="Timestamp of last update.",
-        auto_now=True,
-        db_index=True,
     )
     sha1 = models.CharField(
         help_text="The ID used for a document in RECAP",
@@ -107,16 +115,6 @@ class AbstractPDF(models.Model):
 
 
 class AbstractFile(models.Model):
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
@@ -145,19 +143,9 @@ class AbstractJSON(AbstractFile):
         abstract = True
 
 
-class Note(models.Model):
+class Note(AbstractDateTimeModel):
     """An polymorphic field that can be used to add notes to most objects"""
 
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     date_entered = models.DateTimeField(
         help_text="The datetime when the note was entered",
         verbose_name="Note Creation Date",

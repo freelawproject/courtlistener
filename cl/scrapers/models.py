@@ -1,5 +1,6 @@
 from django.db import models
 
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Court, Docket
 
 
@@ -104,7 +105,7 @@ class PACERFreeDocumentRow(models.Model):
     error_msg = models.TextField()
 
 
-class PACERMobilePageData(models.Model):
+class PACERMobilePageData(AbstractDateTimeModel):
     """Status information about crawling the PACER Mobile UI for a docket"""
 
     docket = models.OneToOneField(
@@ -112,16 +113,6 @@ class PACERMobilePageData(models.Model):
         help_text="The docket we are tracking.",
         on_delete=models.CASCADE,
         related_name="mobile_crawl_statuses",
-    )
-    date_created = models.DateTimeField(
-        help_text="The time when this item was created",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date_last_mobile_crawl = models.DateTimeField(
         help_text="When the Mobile UI was last crawled",
