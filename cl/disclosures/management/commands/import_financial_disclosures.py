@@ -115,13 +115,12 @@ def get_date(text: str, year: int):
 
 
 def save_disclosure(
-    extracted_data: dict, disclosure: FinancialDisclosure, year: int
+    extracted_data: dict, disclosure: FinancialDisclosure
 ) -> None:
     """Save financial data to system.
 
     Wrapped in a transaction, we fail if anything fails.
 
-    :param year:
     :param disclosure: Financial disclosure
     :param extracted_data: disclosure
     :return:None
@@ -159,7 +158,9 @@ def save_disclosure(
                         "text"
                     ],
                     transaction_date_raw=investment["D2"]["text"],
-                    transaction_date=get_date(investment["D2"]["text"], year),
+                    transaction_date=get_date(
+                        investment["D2"]["text"], disclosure.year
+                    ),
                     transaction_value_code=investment["D3"]["text"],
                     transaction_gain_code=investment["D4"]["text"],
                     transaction_partner=investment["D5"]["text"],
@@ -325,6 +326,7 @@ def import_financial_disclosures(options):
     :return:None
     """
     filepath = options["filepath"]
+
     with open(filepath) as f:
         disclosures = json.load(f)
 
@@ -337,6 +339,7 @@ def import_financial_disclosures(options):
             # I've discovered inconsistency in the JW process and want
             # to test a little more on a larger variety of documents
             continue
+
         year = int(data["year"])
         person_id = data["person_id"]
         person_id = 1
@@ -354,9 +357,9 @@ def import_financial_disclosures(options):
         # Sha1 hash - Check for duplicates
         sha1_hash = sha1(pdf_bytes)
         in_system = check_if_in_system(sha1_hash)
-        # if in_system:
-        #     logger.info("PDF already in system.")
-        #     continue
+        if in_system:
+            logger.info("PDF already in system.")
+            continue
 
         # Return page count - 0 indicates a failure of some kind.  Like PDF
         # Not actually present on aws.
@@ -372,6 +375,9 @@ def import_financial_disclosures(options):
             person=Person.objects.get(id=person_id),
             sha1=sha1_hash,
             has_been_extracted=False,
+            download_filepath=data.get("url")
+            if data.get("url")
+            else data.get("urls")[0],
         )
         # Save and upload PDF
         disclosure.filepath.save("", ContentFile(pdf_bytes))

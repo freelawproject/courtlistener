@@ -124,6 +124,10 @@ class FinancialDisclosure(models.Model):
         help_text="The year that the disclosure corresponds with",
         db_index=True,
     )
+    download_filepath = models.FileField(
+        help_text="The path to the original file collected on aws. If "
+                  "split tiff, return url for page one of the disclosures",
+    )
     filepath = models.FileField(
         help_text="The disclosure report itself",
         upload_to=make_pdf_path,
