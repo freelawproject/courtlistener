@@ -297,6 +297,19 @@ def save_disclosure(
         )
 
 
+def already_downloaded(data: Dict[str, Union[str, int, list]]) -> bool:
+    """Already downloaded checks the original filepath for processing
+
+    :param data: File data
+    :return: Whether we have processed the file before.
+    """
+    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+        url = data["url"]
+    else:
+        url = data["urls"][0]
+    return FinancialDisclosure.objects.filter(download_filepath=url).exists()
+
+
 def generate_or_download_disclosure_as_pdf(
     data: Dict[str, Union[str, int, list]]
 ) -> requests.Response:
