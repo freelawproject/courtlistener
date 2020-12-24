@@ -10,7 +10,7 @@ CREATE TABLE "disclosures_debt" ("id" serial NOT NULL PRIMARY KEY, "date_created
 --
 -- Create model FinancialDisclosure
 --
-CREATE TABLE "disclosures_financialdisclosure" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "year" smallint NOT NULL, "download_filepath" varchar(100) NOT NULL, "filepath" varchar(100) NOT NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "page_count" smallint NOT NULL, "sha1" varchar(40) NOT NULL, "report_type" smallint NOT NULL, "is_amended" boolean NOT NULL, "addendum_content_raw" text NOT NULL, "addendum_redacted" boolean NOT NULL, "has_been_extracted" boolean NOT NULL, "person_id" integer NOT NULL);
+CREATE TABLE "disclosures_financialdisclosure" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "year" smallint NOT NULL, "download_filepath" text NOT NULL, "filepath" varchar(100) NOT NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "page_count" smallint NOT NULL, "sha1" varchar(40) NOT NULL, "report_type" smallint NOT NULL, "is_amended" boolean NOT NULL, "addendum_content_raw" text NOT NULL, "addendum_redacted" boolean NOT NULL, "has_been_extracted" boolean NOT NULL, "person_id" integer NOT NULL);
 --
 -- Create model Gift
 --
