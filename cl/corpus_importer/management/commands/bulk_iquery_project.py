@@ -21,7 +21,7 @@ def add_all_cases_to_cl(
     :return None
     """
     q = options["queue"]
-    throttle = CeleryThrottle(queue_name=q)
+    throttle = CeleryThrottle(queue_name=q, min_items=500)
     r = make_redis_interface("CACHE")
 
     courts = Court.federal_courts.district_pacer_courts()
