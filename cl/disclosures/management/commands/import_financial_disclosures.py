@@ -126,6 +126,8 @@ def get_date(text: str, year: int):
         return None
     except ChristmasError:
         return None
+    except:
+        return None
 
 
 def save_disclosure(
