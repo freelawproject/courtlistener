@@ -406,10 +406,7 @@ def import_financial_disclosures(options):
             return
 
         # Save PDF content
-        save_disclosure(
-            extracted_data=content, disclosure=disclosure, year=year
-        )
-        break
+        save_disclosure(extracted_data=content, disclosure=disclosure)
 
 
 class Command(VerboseCommand):
