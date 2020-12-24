@@ -129,13 +129,13 @@ class FinancialDisclosure(models.Model):
                   "split tiff, return url for page one of the disclosures",
     )
     filepath = models.FileField(
-        help_text="The disclosure report itself",
+        help_text="The filepath to the disclosure normalized to a PDF.",
         upload_to=make_pdf_path,
         storage=AWSMediaStorage(),
         db_index=True,
     )
     thumbnail = models.FileField(
-        help_text="A thumbnail of the first page of the disclosure form",
+        help_text="A thumbnail of the first page of the disclosure form.",
         upload_to=make_pdf_thumb_path,
         storage=AWSMediaStorage(),
         null=True,
