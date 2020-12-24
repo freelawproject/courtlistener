@@ -109,7 +109,7 @@ def find_docket_object(
 
     if using != "default":
         # Get the item from the default DB
-        d = Docket.objects.get(d.pk)
+        d = Docket.objects.get(pk=d.pk)
 
     return d
 
