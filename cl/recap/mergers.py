@@ -107,7 +107,11 @@ def find_docket_object(
             court_id=court_id,
         )
 
-    return d, 1
+    if using != "default":
+        # Get the item from the default DB
+        d = Docket.objects.get(d.pk)
+
+    return d
 
 
 def add_attorney(atty, p, d):
