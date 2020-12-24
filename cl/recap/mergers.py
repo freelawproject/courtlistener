@@ -982,7 +982,7 @@ def add_bankruptcy_data_to_docket(d: Docket, metadata: Dict[str, str]) -> None:
             setattr(bankr_data, field, metadata[field])
 
     if do_save:
-        bankr_data.save()
+        bankr_data.save(using="default")
 
 
 def add_claim_history_entry(new_history, claim):
@@ -1126,7 +1126,7 @@ def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
 
     tags = []
     for tag_name in tag_names:
-        tag, _ = Tag.objects.get_or_create(name=tag_name)
+        tag, _ = Tag.objects.using("default").get_or_create(name=tag_name)
         tags.append(tag)
 
     for tag in tags:
@@ -1310,7 +1310,7 @@ def save_iquery_to_docket(
     """
     d = update_docket_metadata(d, iquery_data)
     try:
-        d.save()
+        d.save(using="default")
         add_bankruptcy_data_to_docket(d, iquery_data)
     except IntegrityError as exc:
         msg = "Integrity error while saving iquery response."
