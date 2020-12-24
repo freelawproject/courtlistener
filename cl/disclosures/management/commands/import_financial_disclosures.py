@@ -1,6 +1,7 @@
 import datetime
 import json
-from typing import Dict, Union
+import pprint
+from typing import Dict, Union, Optional
 from urllib.parse import quote
 
 import requests
@@ -348,25 +349,26 @@ def generate_or_download_disclosure_as_pdf(
     return pdf_response
 
 
-def import_financial_disclosures(options):
-    """Import financial documents into www.courtlistener.com
+def import_financial_disclosures(
+    filepath: str, skip_until: Optional[str, None]
+):
+    """Import financial documents into courtlistener
 
-    :param options: argparse
+    :param filepath: Path to file data to import.
+    :param skip_until: ID if any to skip until.
     :return:None
     """
-    filepath = options["filepath"]
-
     with open(filepath) as f:
         disclosures = json.load(f)
 
     for data in disclosures:
-        # Check download_filepath
+        # Check download_filepath to see if it has been processed before.
         if already_downloaded(data):
             logger.info("Document already processed.")
             continue
         # Generate PDF content from our three paths
-        if options["skip_until"]:
-            if data["id"] < int(options["skip_until"]):
+        if skip_until:
+            if data["id"] < int(skip_until):
                 continue
         if data["disclosure_type"] == "jw":
             # I've discovered inconsistency in the JW process and want
@@ -375,7 +377,6 @@ def import_financial_disclosures(options):
 
         year = int(data["year"])
         person_id = data["person_id"]
-        person_id = 1
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
         pdf_response = generate_or_download_disclosure_as_pdf(data)
@@ -446,4 +447,6 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        import_financial_disclosures(options)
+        import_financial_disclosures(
+            filepath=options["filepath"], skip_until=options["skip_until"]
+        )
