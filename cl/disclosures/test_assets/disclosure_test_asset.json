@@ -1,0 +1,1324 @@
+{
+  "title": "Document title",
+  "url": "Document download url if applicable",
+  "type": "PDF",
+  "page_count": 8,
+  "sections": {
+    "Positions": {
+      "fields": [
+        "Position",
+        "Name of Organization"
+      ],
+      "rows": []
+    },
+    "Agreements": {
+      "fields": [
+        "Date",
+        "Parties and Terms"
+      ],
+      "rows": []
+    },
+    "Non-Investment Income": {
+      "fields": [
+        "Date",
+        "Source and Type",
+        "Income"
+      ],
+      "rows": [
+        {
+          "Date": {
+            "text": "85/2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Source and Type": {
+            "text": "Duquesne University School of Law - Teaching",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Income": {
+            "text": "$15,000.00",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        },
+        {
+          "Date": {
+            "text": "8/25/2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Source and Type": {
+            "text": "Duke Law School - Teaching",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Income": {
+            "text": "$11,955.00",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        }
+      ]
+    },
+    "Non Investment Income Spouse": {
+      "fields": [
+        "Date",
+        "Source and Type"
+      ],
+      "rows": []
+    },
+    "Reimbursements": {
+      "fields": [
+        "Source",
+        "Dates",
+        "Locations",
+        "Purpose",
+        "Items Paid or Provided"
+      ],
+      "rows": [
+        {
+          "Source": {
+            "text": "University of Hawaii",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Dates": {
+            "text": "January 22-30, 2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Locations": {
+            "text": "Honolulu, Hawai",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Purpose": {
+            "text": "Teaching",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Items Paid or Provided": {
+            "text": "Transportution, Meals, Lodging",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        },
+        {
+          "Source": {
+            "text": "Bar Association of Metropolitan St. Louis",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Dates": {
+            "text": "May 15-17, 2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Locations": {
+            "text": "St. Louis, Missouri",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Purpose": {
+            "text": "Speaking Engagement",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Items Paid or Provided": {
+            "text": "Transportation, Meals, Lodging",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        },
+        {
+          "Source": {
+            "text": "Duquesne University School of Law",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Dates": {
+            "text": "July 5-15, 2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Locations": {
+            "text": "Rome, Italy",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Purpose": {
+            "text": "Teaching",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Items Paid or Provided": {
+            "text": "Transportation, Meals, Lodging",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        },
+        {
+          "Source": {
+            "text": "Duke Law School",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Dates": {
+            "text": "September 12-16, 2011",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Locations": {
+            "text": "Durham, North Carolina",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Purpose": {
+            "text": "Teaching",
+            "is_redacted": false,
+            "page_number": 2
+          },
+          "Items Paid or Provided": {
+            "text": "Transportation, Meals, Lodging",
+            "is_redacted": false,
+            "page_number": 2
+          }
+        },
+        {
+          "Source": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 3
+          },
+          "Dates": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 3
+          },
+          "Locations": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 3
+          },
+          "Purpose": {
+            "text": "PS TOE ees ee ee eee ee with European Judges und Lawyers",
+            "is_redacted": false,
+            "page_number": 3
+          },
+          "Items Paid or Provided": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 3
+          }
+        }
+      ]
+    },
+    "Gifts": {
+      "fields": [
+        "Source",
+        "Description",
+        "Value"
+      ],
+      "rows": []
+    },
+    "Liabilities": {
+      "fields": [
+        "Creditor",
+        "Description",
+        "Value Code"
+      ],
+      "rows": []
+    },
+    "Investments and Trusts": {
+      "help": {
+        "A": "Description of Assets",
+        "B1": "Amount Code (A-H)",
+        "B2": "Type",
+        "C1": "Value Code 2",
+        "C2": "Value Method Code 3",
+        "D1": "Type",
+        "D2": "Date Month/Day",
+        "D3": "Value Code 2",
+        "D4": "Gain Code 1",
+        "D5": "Identity of Buyer/Seller (if private)"
+      },
+      "fields": [
+        "A",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5"
+      ],
+      "rows": [
+        {
+          "A": {
+            "text": "US Savings Bonds Series EE (Y)",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Tax Ex. Mny. Mkt. Fund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Inter. Term Tax Ex. Pund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. L. T. Tax Ex. Pund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Star Mut. Fund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "K",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Wellington Mut. Fund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "C",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "M",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Smith Bamey Money Funds Cash Port",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "PNC Bank Account",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "K",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Small Cap. Stock Fund",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "B",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "L",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Total Stock Mkt. Index F",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "B",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "M",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Windsor It",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "Sold (part)",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "6/14/11",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "B",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Fidelity Eq.-Inc. [I Pund (Y)",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Vang. Tax Ex. Muy Mkt",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Citibank Deposit Program",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "A",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Interest",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "BMY Common Stock (Y)",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "XOM Common Stock",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "B",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "Dividend",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "M",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "PNC Bank Account",
+            "is_redacted": false,
+            "page_number": 5,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "B2": {
+            "text": "None",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 5
+          }
+        },
+        {
+          "A": {
+            "text": "Edward Jones Investment (cash account)",
+            "is_redacted": false,
+            "page_number": 6,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "B2": {
+            "text": "None",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D1": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D2": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D3": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D5": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          }
+        },
+        {
+          "A": {
+            "text": "Vanguard Target Retirement Acct. 2015",
+            "is_redacted": false,
+            "page_number": 6,
+            "inferred_value": false
+          },
+          "B1": {
+            "text": "B",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "B2": {
+            "text": "Int/Div",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "C1": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "C2": {
+            "text": "T",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D1": {
+            "text": "Open",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D2": {
+            "text": "8/24/11",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D3": {
+            "text": "J",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D4": {
+            "text": "",
+            "is_redacted": false,
+            "page_number": 6
+          },
+          "D5": {
+            "text": "Part VIII",
+            "is_redacted": false,
+            "page_number": 6
+          }
+        }
+      ]
+    }
+  },
+  "Additional Information or Explanations": {
+    "is_redacted": false,
+    "text": "Part Vil:\n\n19, My interest in the Duke Retirement Plan (Vanguard Target Retirement Account 2015) is derived in its entirety from an employer contribution, which is not\nlisted as outside earned income on the ground that it is not taxable\n\nInformation on assets held by children who ure no longer dependents is omitted.\n\nMay 10, 2011 - A charitable contribution of $2,000 was made on my behalf by the Manhattan Institute for which | gave a speech in October 2010.\n\f"
+  },
+  "pdf_size": "",
+  "date_created": null,
+  "nomination": false,
+  "amended": false,
+  "initial": false,
+  "annual": true,
+  "final": false,
+  "first_four": [
+    [
+      1264,
+      342,
+      311,
+      171
+    ],
+    [
+      1264,
+      217,
+      310,
+      121
+    ],
+    [
+      713,
+      217,
+      546,
+      121
+    ],
+    [
+      81,
+      217,
+      628,
+      121
+    ]
+  ],
+  "found_count": 9,
+  "wealth": {
+    "investment_net_worth": [
+      380018,
+      1130000
+    ],
+    "income_gains": [
+      7515,
+      26500
+    ],
+    "liabilities": [
+      0,
+      0
+    ],
+    "salary_income": 26955.0
+  },
+  "success": true,
+  "msg": ""
+}
