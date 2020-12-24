@@ -2,7 +2,7 @@
 import logging
 import re
 from datetime import date, datetime, timedelta
-from typing import Dict, Optional, List, Union, Tuple
+from typing import Dict, Optional, List, Union, Tuple, Any
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -958,7 +958,7 @@ def add_parties_and_attorneys(d, parties):
 
 
 @transaction.atomic
-def add_bankruptcy_data_to_docket(d, metadata):
+def add_bankruptcy_data_to_docket(d: Docket, metadata: Dict[str, str]) -> None:
     """Add bankruptcy data to the docket from the claims data, RSS feeds, or
     another location.
     """
@@ -1112,7 +1112,7 @@ def get_data_from_att_report(text, court_id):
     return att_data
 
 
-def add_tags_to_objs(tag_names, objs):
+def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
