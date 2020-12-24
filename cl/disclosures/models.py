@@ -3,13 +3,14 @@ from typing import Dict, Union
 
 from django.db import models
 
-from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
-from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.storage import AWSMediaStorage
-from cl.people_db.models import Person
 from cl.disclosures.tasks import (
     make_financial_disclosure_thumbnail_from_pdf,
 )
+from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
+from cl.lib.models import AbstractDateTimeModel
+from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.storage import AWSMediaStorage
+from cl.people_db.models import Person
 
 
 class REPORT_TYPES(object):
@@ -101,19 +102,9 @@ class CODES(object):
     )
 
 
-class FinancialDisclosure(models.Model):
+class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
     person = models.ForeignKey(
         Person,
         help_text="The person that the document is associated with.",
@@ -222,7 +213,7 @@ class FinancialDisclosure(models.Model):
             make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
 
-class Investment(models.Model):
+class Investment(AbstractDateTimeModel):
     """ Financial Disclosure Investments Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -230,16 +221,6 @@ class Investment(models.Model):
         help_text="The financial disclosure associated with this investment.",
         related_name="investments",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     page_number = models.IntegerField(
         help_text="The page the investment is listed on",
@@ -309,7 +290,7 @@ class Investment(models.Model):
     )
 
 
-class Position(models.Model):
+class Position(AbstractDateTimeModel):
     """ Financial Disclosure Position Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -318,16 +299,6 @@ class Position(models.Model):
         "with this financial position.",
         related_name="financial_positions",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     position = models.TextField(
         help_text="Position title.",
@@ -343,7 +314,7 @@ class Position(models.Model):
     )
 
 
-class Agreement(models.Model):
+class Agreement(AbstractDateTimeModel):
     """ Financial Disclosure Agreements Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -351,16 +322,6 @@ class Agreement(models.Model):
         help_text="The financial disclosure associated with this agreement.",
         related_name="agreements",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date = models.TextField(
         help_text="Date of judicial agreement.",
@@ -376,7 +337,7 @@ class Agreement(models.Model):
     )
 
 
-class NonInvestmentIncome(models.Model):
+class NonInvestmentIncome(AbstractDateTimeModel):
     """Financial Disclosure Non Investment Income Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -385,16 +346,6 @@ class NonInvestmentIncome(models.Model):
         "with this non-investment income.",
         related_name="non_investment_incomes",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     date = models.TextField(
         help_text="Date of non-investment income (ex. 2011).",
@@ -415,7 +366,7 @@ class NonInvestmentIncome(models.Model):
     )
 
 
-class SpouseIncome(models.Model):
+class SpouseIncome(AbstractDateTimeModel):
     """ Financial Disclosure Judge Spouse Income Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -424,16 +375,6 @@ class SpouseIncome(models.Model):
         "with this spouse income.",
         related_name="spouse_incomes",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     source_type = models.TextField(
         help_text="Source and Type of income of judicial spouse",
@@ -449,7 +390,7 @@ class SpouseIncome(models.Model):
     )
 
 
-class Reimbursement(models.Model):
+class Reimbursement(AbstractDateTimeModel):
     """Reimbursements listed in judicial disclosure"""
 
     financial_disclosure = models.ForeignKey(
@@ -458,16 +399,6 @@ class Reimbursement(models.Model):
         "with this reimbursement.",
         related_name="reimbursements",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     source = models.TextField(
         help_text="Source of the reimbursement (ex. FSU Law School).",
@@ -497,7 +428,7 @@ class Reimbursement(models.Model):
     )
 
 
-class Gift(models.Model):
+class Gift(AbstractDateTimeModel):
     """ Financial Disclosure Gifts Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -506,17 +437,6 @@ class Gift(models.Model):
         related_name="gifts",
         on_delete=models.CASCADE,
     )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
-    )
-
     source = models.TextField(
         help_text="Source of the judicial gift.",
         blank=True,
@@ -536,7 +456,7 @@ class Gift(models.Model):
     )
 
 
-class Debt(models.Model):
+class Debt(AbstractDateTimeModel):
     """ Financial Disclosure Judicial Debts/Liabilities Table"""
 
     financial_disclosure = models.ForeignKey(
@@ -544,16 +464,6 @@ class Debt(models.Model):
         help_text="The financial disclosure associated with this debt.",
         related_name="debts",
         on_delete=models.CASCADE,
-    )
-    date_created = models.DateTimeField(
-        help_text="The original creation date for the item",
-        auto_now_add=True,
-        db_index=True,
-    )
-    date_modified = models.DateTimeField(
-        help_text="The last moment when the item was modified.",
-        auto_now=True,
-        db_index=True,
     )
     creditor_name = models.TextField(
         help_text="Liability/Debt creditor", blank=True
