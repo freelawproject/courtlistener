@@ -335,7 +335,8 @@ class Agreement(AbstractDateTimeModel):
         blank=True,
     )
     parties_and_terms = models.TextField(
-        help_text="Parties and terms of agreement (ex. Board Member NY Ballet)",
+        help_text="Parties and terms of agreement "
+        "(ex. Board Member NY Ballet)",
         blank=True,
     )
     redacted = models.BooleanField(
