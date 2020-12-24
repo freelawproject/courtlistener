@@ -1235,7 +1235,7 @@ def get_appellate_docket_by_docket_number(
         d = None
 
     if d is None:
-        d= find_docket_object(court_id, docket_number, docket_number)
+        d = find_docket_object(court_id, docket_number, docket_number)
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d,

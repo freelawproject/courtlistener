@@ -229,7 +229,7 @@ def update_case_names(d, new_case_name):
     return d
 
 
-def update_docket_metadata(d, docket_data):
+def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
     """Update the Docket object with the data from Juriscraper.
 
     Works on either docket history report or docket report (appellate
