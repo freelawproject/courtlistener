@@ -33,7 +33,7 @@ class REPORT_TYPES(object):
 class CODES(object):
 
     # FORM CODES - these are used in multiple fields in different sections
-    # of the disclosures.  For example liabilites/debts uses Gross Value
+    # of the disclosures.  For example liabilities/debts uses Gross Value
     # As well as investments.
     A = "A"
     B = "B"
