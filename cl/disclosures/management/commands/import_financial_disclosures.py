@@ -360,6 +360,10 @@ def import_financial_disclosures(options):
         disclosures = json.load(f)
 
     for data in disclosures:
+        # Check download_filepath
+        if already_downloaded(data):
+            logger.info("Document already processed.")
+            continue
         # Generate PDF content from our three paths
         if options["skip_until"]:
             if data["id"] < int(options["skip_until"]):
