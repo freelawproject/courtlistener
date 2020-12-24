@@ -1,9 +1,12 @@
 from datetime import date
+from typing import Optional
 
 from django.utils.timezone import now
 
+from cl.search.models import Docket
 
-def mark_ia_upload_needed(d, save_docket):
+
+def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
     The point here is that we need to know the first time an item was updated,
@@ -22,7 +25,7 @@ def mark_ia_upload_needed(d, save_docket):
         d.save()
 
 
-def get_start_of_quarter(d=None):
+def get_start_of_quarter(d: Optional[date] = None) -> date:
     """Get the start date of the  calendar quarter requested
 
     :param d: The date to get the start date for. If None, then use current

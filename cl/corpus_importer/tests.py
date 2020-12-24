@@ -314,9 +314,7 @@ class PacerDocketParserTest(TestCase):
     )
 
     def setUp(self):
-        self.docket = find_docket_object(
-            "akd", "41664", "3:11-cv-00064"
-        )
+        self.docket = find_docket_object("akd", "41664", "3:11-cv-00064")
         process_docket_data(
             self.docket, self.DOCKET_PATH, UPLOAD_TYPE.IA_XML_FILE
         )
