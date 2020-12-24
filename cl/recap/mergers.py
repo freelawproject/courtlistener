@@ -67,6 +67,7 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
     :param docket_number: The docket number to lookup.
+    :param using: The database to use for the lookup queries.
     :returns a tuple. The first item is either a QuerySet of all the items
     found if more than one is identified or just the docket found if only one
     is identified. The second item in the tuple is the count of items found
@@ -84,7 +85,7 @@ def find_docket_object(court_id, pacer_case_id, docket_number):
         {"pacer_case_id": pacer_case_id},
         {"pacer_case_id": None, "docket_number_core": docket_number_core},
     ]:
-        ds = Docket.objects.filter(court_id=court_id, **kwargs)
+        ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
         count = ds.count()
         if count == 0:
             continue  # Try a looser lookup.

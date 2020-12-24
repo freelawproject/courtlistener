@@ -1021,6 +1021,7 @@ def make_docket_by_iquery(
     self,
     court_id: str,
     pacer_case_id: int,
+    using: str = "default",
     tag_names: Optional[List[str]] = None,
 ) -> Optional[int]:
     """
@@ -1029,6 +1030,7 @@ def make_docket_by_iquery(
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up
     :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param using: The database to use for the docket lookup
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :return: None if failed, else the ID of the created/updated docket
@@ -1067,6 +1069,7 @@ def make_docket_by_iquery(
         court_id,
         str(pacer_case_id),
         report.data["docket_number"],
+        using=using,
     )
     if count > 1:
         d = d.earliest("date_created")
