@@ -112,8 +112,6 @@ class ABARatingInline(admin.TabularInline):
     extra = 1
 
 
-
-
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
     prepopulated_fields = {
