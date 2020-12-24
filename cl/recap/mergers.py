@@ -7,7 +7,7 @@ from typing import Dict, Optional, List, Union, Tuple
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AttachmentPage
@@ -60,7 +60,12 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def find_docket_object(court_id, pacer_case_id, docket_number):
+def find_docket_object(
+    court_id: str,
+    pacer_case_id: str,
+    docket_number: str,
+    using: str = "default",
+) -> Tuple[Union[QuerySet, Docket], int]:
     """Attempt to find the docket based on the parsed docket data. If cannot be
     found, create a new docket. If multiple are found, return all of them.
 
