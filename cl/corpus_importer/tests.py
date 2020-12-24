@@ -314,13 +314,9 @@ class PacerDocketParserTest(TestCase):
     )
 
     def setUp(self):
-        self.docket, count = find_docket_object(
+        self.docket = find_docket_object(
             "akd", "41664", "3:11-cv-00064"
         )
-        if count > 1:
-            raise Exception(
-                "Should not get more than one docket during " "this test!"
-            )
         process_docket_data(
             self.docket, self.DOCKET_PATH, UPLOAD_TYPE.IA_XML_FILE
         )

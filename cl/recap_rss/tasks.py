@@ -311,15 +311,9 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
                 # The item is already in the cache, ergo it's getting processed
                 # in another thread/process and we had a race condition.
                 continue
-            d, docket_count = find_docket_object(
+            d = find_docket_object(
                 court_pk, docket["pacer_case_id"], docket["docket_number"]
             )
-            if docket_count > 1:
-                logger.info(
-                    "Found %s dockets during lookup. Choosing "
-                    "oldest." % docket_count
-                )
-                d = d.earliest("date_created")
 
             d.add_recap_source()
             update_docket_metadata(d, docket)

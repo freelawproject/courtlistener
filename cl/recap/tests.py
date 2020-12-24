@@ -1146,12 +1146,11 @@ class RecapMinuteEntriesTest(TestCase):
             text = f.read().decode()
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
-        d, docket_count = find_docket_object(
+        d = find_docket_object(
             court_id, docket["pacer_case_id"], docket["docket_number"]
         )
         update_docket_metadata(d, docket)
         d.save()
-        self.assertTrue(docket_count == 0)
 
         expected_count = 1
         add_docket_entries(d, docket["docket_entries"])

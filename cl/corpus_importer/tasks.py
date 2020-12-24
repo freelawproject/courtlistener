@@ -943,11 +943,9 @@ def do_case_query_by_pacer_case_id(
 
     # Merge the contents into CL.
     if d is None:
-        d, count = find_docket_object(
+        d = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
         )
-        if count > 1:
-            d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, docket_data)
@@ -1065,14 +1063,12 @@ def make_docket_by_iquery(
         )
         return
 
-    d, count = find_docket_object(
+    d = find_docket_object(
         court_id,
         str(pacer_case_id),
         report.data["docket_number"],
         using=using,
     )
-    if count > 1:
-        d = d.earliest("date_created")
 
     d.pacer_case_id = pacer_case_id
     d.add_recap_source()
@@ -1168,11 +1164,9 @@ def get_docket_by_pacer_case_id(
         return
 
     if d is None:
-        d, count = find_docket_object(
+        d = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
         )
-        if count > 1:
-            d = d.earliest("date_created")
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d,
@@ -1241,9 +1235,7 @@ def get_appellate_docket_by_docket_number(
         d = None
 
     if d is None:
-        d, count = find_docket_object(court_id, docket_number, docket_number)
-        if count > 1:
-            d = d.earliest("date_created")
+        d= find_docket_object(court_id, docket_number, docket_number)
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d,
