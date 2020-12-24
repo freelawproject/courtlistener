@@ -118,7 +118,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         help_text="The year that the disclosure corresponds with",
         db_index=True,
     )
-    download_filepath = models.FileField(
+    download_filepath = models.TextField(
         help_text="The path to the original file collected on aws. If "
         "split tiff, return url for page one of the disclosures",
     )
