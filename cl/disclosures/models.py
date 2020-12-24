@@ -14,6 +14,7 @@ from cl.people_db.models import Person
 
 
 class REPORT_TYPES(object):
+    """If extracted, we identify what type of disclosure was reported."""
 
     UNKNOWN = -1
     NOMINATION = 0
@@ -117,7 +118,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     )
     download_filepath = models.FileField(
         help_text="The path to the original file collected on aws. If "
-                  "split tiff, return url for page one of the disclosures",
+        "split tiff, return url for page one of the disclosures",
     )
     filepath = models.FileField(
         help_text="The filepath to the disclosure normalized to a PDF.",
@@ -156,7 +157,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         default=False,
     )
     addendum_content_raw = models.TextField(
-        help_text="Raw content of addendum.",
+        help_text="Raw content of addendum with whitespace preserved.",
         blank=True,
     )
     addendum_redacted = models.BooleanField(
@@ -223,11 +224,14 @@ class Investment(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     page_number = models.IntegerField(
-        help_text="The page the investment is listed on",
+        help_text="The page number the investment is listed on.  This is used"
+        "to generate links directly to the PDF page.",
     )
-    description = models.TextField(help_text="Name of investment", blank=True)
+    description = models.TextField(
+        help_text="Name of investment (ex. APPL common stock).", blank=True
+    )
     redacted = models.BooleanField(
-        help_text="Whether investment contains redactions.",
+        help_text="Whether investment row contains redaction(s).",
         default=False,
     )
     income_during_reporting_period_code = models.CharField(
@@ -237,19 +241,19 @@ class Investment(AbstractDateTimeModel):
         blank=True,
     )
     income_during_reporting_period_type = models.TextField(
-        help_text="Type of investment ex. Rent, Dividend.  Typically "
-        "standardized but not universally",
+        help_text="Type of investment (ex. Rent, Dividend). Typically "
+        "standardized but not universally.",
         blank=True,
     )
     gross_value_code = models.CharField(
         help_text="Investment total value code at end "
-        "of reporting period as code",
+        "of reporting period as code (ex. J (1-15,000)).",
         choices=CODES.GROSS_VALUE,
         blank=True,
         max_length=5,
     )
     gross_value_method = models.CharField(
-        help_text="Investment valuation method code",
+        help_text="Investment valuation method code (ex. Q = Appraisal)",
         choices=CODES.VALUATION_METHODS,
         blank=True,
         max_length=5,
@@ -270,13 +274,13 @@ class Investment(AbstractDateTimeModel):
         help_text="Datetime value for if any (D2)", blank=True, null=True
     )
     transaction_value_code = models.CharField(
-        help_text="Transaction value amount, as form code",
+        help_text="Transaction value amount, as form code (ex. J (1-15,000)).",
         choices=CODES.GROSS_VALUE,
         blank=True,
         max_length=5,
     )
     transaction_gain_code = models.CharField(
-        help_text="Gain from investment transaction if any",
+        help_text="Gain from investment transaction if any (ex. A (1-1000)).",
         choices=CODES.INCOME_GAIN,
         max_length=5,
         blank=True,
@@ -285,7 +289,10 @@ class Investment(AbstractDateTimeModel):
         help_text="Identity of the transaction partner", blank=True
     )
     has_inferred_values = models.BooleanField(
-        help_text="The investment name was inferred during extraction",
+        help_text="Is the investment name was inferred during extraction."
+        "This is common because transactions usually list the first"
+        "purchase of a stock and leave the name value blank for "
+        "subsequent purchases or sales.",
         default=False,
     )
 
@@ -301,11 +308,11 @@ class Position(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     position = models.TextField(
-        help_text="Position title.",
+        help_text="Position title (ex. Trustee).",
         blank=True,
     )
     organization_name = models.TextField(
-        help_text="Name of organization or entity.",
+        help_text="Name of organization or entity (ex. Trust #1).",
         blank=True,
     )
     redacted = models.BooleanField(
@@ -328,7 +335,7 @@ class Agreement(AbstractDateTimeModel):
         blank=True,
     )
     parties_and_terms = models.TextField(
-        help_text="Parties and terms of agreement.",
+        help_text="Parties and terms of agreement (ex. Board Member NY Ballet)",
         blank=True,
     )
     redacted = models.BooleanField(
@@ -377,7 +384,8 @@ class SpouseIncome(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     source_type = models.TextField(
-        help_text="Source and Type of income of judicial spouse",
+        help_text="Source and type of income of judicial spouse "
+        "(ex. Salary from Bank job).",
         blank=True,
     )
     date = models.TextField(
@@ -438,20 +446,20 @@ class Gift(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     source = models.TextField(
-        help_text="Source of the judicial gift.",
+        help_text="Source of the judicial gift. (ex. WestLaw).",
         blank=True,
     )
     description = models.TextField(
-        help_text="Description of the gift.",
+        help_text="Description of the gift (ex. Alpine Ski Resort).",
         blank=True,
     )
     value_code = models.TextField(
-        help_text="Value of the judicial gift, as Value Code.",
+        help_text="Value of the judicial gift, (ex. A)",
         choices=CODES.GROSS_VALUE,
         blank=True,
     )
     redacted = models.BooleanField(
-        help_text="Is the gift redacted?",
+        help_text="Does the gift row contain redaction(s)?",
         default=False,
     )
 
