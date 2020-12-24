@@ -78,6 +78,13 @@ def extract_content(pdf_bytes: bytes) -> Dict:
     return extractor_response.json()
 
 
+class ChristmasError(Exception):
+    """Error class for representing a Christmas date being found."""
+
+    def __init__(self, message):
+        self.message = message
+
+
 def get_report_type(extracted_data: dict) -> int:
     """Get report type if available
 
@@ -105,12 +112,19 @@ def get_date(text: str, year: int):
     :return: Date object or None
     """
     try:
-        date_parsed = parse(text, fuzzy=True, default=datetime.datetime(year, 12, 25))
+        date_parsed = parse(
+            text, fuzzy=True, default=datetime.datetime(year, 12, 25)
+        )
         date_found = date_parsed.date()
+        if date_found.month == 12 and date_found.day == 25:
+            raise ChristmasError("Christmas error.")
+
         if int(date_found.year) == year:
             return date_found
         return None
     except ParserError:
+        return None
+    except ChristmasError:
         return None
 
 
