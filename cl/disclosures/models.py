@@ -23,16 +23,18 @@ class REPORT_TYPES(object):
     FINAL = 3
     NAMES = (
         (UNKNOWN, "Unknown"),
-        (NOMINATION, "Nomination"),
-        (INITIAL, "Initial"),
-        (ANNUAL, "Annual"),
-        (FINAL, "Final"),
+        (NOMINATION, "Nomination Report"),
+        (INITIAL, "Initial Report"),
+        (ANNUAL, "Annual Report"),
+        (FINAL, "Final Report"),
     )
 
 
 class CODES(object):
 
-    # FORM CODES
+    # FORM CODES - these are used in multiple fields in different sections
+    # of the disclosures.  For example liabilites/debts uses Gross Value
+    # As well as investments.
     A = "A"
     B = "B"
     C = "C"
