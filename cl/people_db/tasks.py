@@ -56,7 +56,6 @@ def make_png_thumbnail_for_instance(
     return item.pk
 
 
-
 @app.task
 def make_recap_document_thumbnail_from_pdf(pk):
     make_png_thumbnail_for_instance(

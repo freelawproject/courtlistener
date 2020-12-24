@@ -110,10 +110,14 @@ def make_pdf_path(instance, filename, thumbs=False):
     ):
         root = "us/federal/judicial/financial-disclosures"
         if thumbs:
-            return f"{root}/{instance.person.id}/thumbnails/" \
-                   f"{instance.person.slug}-disclosure.{instance.year}.png"
-        return f"{root}/{instance.person.id}/" \
-               f"{instance.person.slug}-disclosure.{instance.year}.pdf"
+            return (
+                f"{root}/{instance.person.id}/thumbnails/"
+                f"{instance.person.slug}-disclosure.{instance.year}.png"
+            )
+        return (
+            f"{root}/{instance.person.id}/"
+            f"{instance.person.slug}-disclosure.{instance.year}.pdf"
+        )
     else:
         raise ValueError(
             "Unknown model type in make_pdf_path "
