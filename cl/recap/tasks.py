@@ -483,14 +483,9 @@ def process_recap_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, docket_count = find_docket_object(
+    d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
-    if docket_count > 1:
-        logger.info(
-            "Found %s dockets during lookup. Choosing oldest." % docket_count
-        )
-        d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, data)
@@ -518,7 +513,7 @@ def process_recap_docket(self, pk):
     )
     add_parties_and_attorneys(d, data["parties"])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
-    if content_updated and docket_count > 0:
+    if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_docket_alert(d.pk, start_time)
@@ -643,14 +638,9 @@ def process_recap_claims_register(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, docket_count = find_docket_object(
+    d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
-    if docket_count > 1:
-        logger.info(
-            "Found %s dockets during lookup. Choosing oldest." % docket_count
-        )
-        d = d.earliest("date_created")
 
     # Merge the contents into CL
     d.add_recap_source()
@@ -695,6 +685,7 @@ def process_recap_claims_register(self, pk):
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
 def process_recap_docket_history_report(self, pk):
+
     """Process the docket history report.
 
     :param pk: The primary key of the processing queue item you want to work on
@@ -729,14 +720,9 @@ def process_recap_docket_history_report(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, docket_count = find_docket_object(
+    d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
-    if docket_count > 1:
-        logger.info(
-            "Found %s dockets during lookup. Choosing oldest." % docket_count
-        )
-        d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, data)
@@ -777,7 +763,7 @@ def process_recap_docket_history_report(self, pk):
         d, data["docket_entries"]
     )
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
-    if content_updated and docket_count > 0:
+    if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_docket_alert(d.pk, start_time)
@@ -841,14 +827,9 @@ def process_recap_appellate_docket(self, pk):
         return None
 
     # Merge the contents of the docket into CL.
-    d, docket_count = find_docket_object(
+    d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
-    if docket_count > 1:
-        logger.info(
-            "Found %s dockets during lookup. Choosing oldest." % docket_count
-        )
-        d = d.earliest("date_created")
 
     d.add_recap_source()
     update_docket_metadata(d, data)
@@ -880,7 +861,7 @@ def process_recap_appellate_docket(self, pk):
     )
     add_parties_and_attorneys(d, data["parties"])
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
-    if content_updated and docket_count > 0:
+    if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             send_docket_alert(d.pk, start_time)
@@ -1286,11 +1267,9 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
     if fq.docket_id:
         d = Docket.objects.get(pk=fq.docket_id)
     else:
-        d, count = find_docket_object(
+        d = find_docket_object(
             court_id, pacer_case_id, docket_data["docket_number"]
         )
-        if count > 1:
-            d = d.earliest("date_created")
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d, pacer_case_id, docket_data, report, appellate=False
     )

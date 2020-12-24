@@ -65,18 +65,15 @@ def find_docket_object(
     pacer_case_id: str,
     docket_number: str,
     using: str = "default",
-) -> Tuple[Union[QuerySet, Docket], int]:
+) -> Docket:
     """Attempt to find the docket based on the parsed docket data. If cannot be
-    found, create a new docket. If multiple are found, return all of them.
+    found, create a new docket. If multiple are found, return the oldest.
 
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
     :param docket_number: The docket number to lookup.
     :param using: The database to use for the lookup queries.
-    :returns a tuple. The first item is either a QuerySet of all the items
-    found if more than one is identified or just the docket found if only one
-    is identified. The second item in the tuple is the count of items found
-    (this number is zero if we had to create a new docket item).
+    :return The docket found or created.
     """
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
@@ -98,16 +95,17 @@ def find_docket_object(
             d = ds[0]
             break  # Nailed it!
         elif count > 1:
-            return ds, count  # Problems. Let caller decide what to do.
+            # Choose the oldest one and live with it.
+            d = ds.earliest("date_created")
+            break
 
     if d is None:
-        # Couldn't find a docket. Make a new one.
-        d = Docket(
+        # Couldn't find a docket. Return a new one.
+        return Docket(
             source=Docket.RECAP,
             pacer_case_id=pacer_case_id,
             court_id=court_id,
         )
-        return d, 0
 
     return d, 1
 
