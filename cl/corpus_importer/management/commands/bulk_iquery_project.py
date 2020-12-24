@@ -1,6 +1,8 @@
+import itertools
 import time
 from typing import Dict, Union, List
 
+from django.conf import settings
 from django.core.management import CommandParser
 
 from cl.lib.celery_utils import CeleryThrottle
@@ -29,6 +31,7 @@ def add_all_cases_to_cl(
         courts = courts.filter(pk__in=options["courts"])
 
     iterations_completed = 0
+    db_key_cycle = itertools.cycle(settings.DATABASES.keys())
     while (
         options["iterations"] == 0
         or iterations_completed < options["iterations"]
@@ -38,7 +41,7 @@ def add_all_cases_to_cl(
             try:
                 pacer_case_id = r.hincrby("iquery_status", court.pk, 1)
                 make_docket_by_iquery.apply_async(
-                    args=(court.pk, pacer_case_id),
+                    args=(court.pk, pacer_case_id, next(db_key_cycle)),
                     queue=q,
                 )
             except Exception as e:
