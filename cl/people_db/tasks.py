@@ -36,7 +36,7 @@ def make_png_thumbnail_for_instance(
         str(max_dimension),
     ]
 
-    # Note that pdftoppm adds things like -01.png to the end of whatever
+    # Note that pdftoppm adds things like -01.jpeg to the end of whatever
     # filename you give it, which makes using a temp file difficult. But,
     # if you don't give it an output file, it'll send the result to stdout,
     # so that's why we are capturing it here.
