@@ -128,6 +128,7 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         return None
 
 
+@transaction.atomic
 def save_disclosure(
     extracted_data: dict, disclosure: FinancialDisclosure
 ) -> None:
@@ -142,157 +143,139 @@ def save_disclosure(
     addendum = "Additional Information or Explanations"
 
     # Process and save our data into the system.
-    with transaction.atomic():
-        disclosure.has_been_extracted = True
-        disclosure.addendum_content_raw = extracted_data[addendum]["text"]
-        disclosure.addendum_redacted = extracted_data[addendum]["is_redacted"]
-        disclosure.is_amended = extracted_data.get("amended") or False
-        disclosure.report_type = get_report_type(extracted_data)
-        disclosure.save()
+    disclosure.has_been_extracted = True
+    disclosure.addendum_content_raw = extracted_data[addendum]["text"]
+    disclosure.addendum_redacted = extracted_data[addendum]["is_redacted"]
+    disclosure.is_amended = extracted_data.get("amended") or False
+    disclosure.report_type = get_report_type(extracted_data)
+    disclosure.save()
 
-        Investment.objects.bulk_create(
-            [
-                Investment(
-                    financial_disclosure=disclosure,
-                    redacted=any(
-                        v["is_redacted"] for v in investment.values()
-                    ),
-                    description=investment["A"]["text"],
-                    page_number=investment["A"]["page_number"],
-                    has_inferred_values=investment["A"]["inferred_value"],
-                    income_during_reporting_period_code=investment["B1"][
-                        "text"
-                    ],
-                    income_during_reporting_period_type=investment["B2"][
-                        "text"
-                    ],
-                    gross_value_code=investment["C1"]["text"],
-                    gross_value_method=investment["C2"]["text"],
-                    transaction_during_reporting_period=investment["D1"][
-                        "text"
-                    ],
-                    transaction_date_raw=investment["D2"]["text"],
-                    transaction_date=get_date(
-                        investment["D2"]["text"], disclosure.year
-                    ),
-                    transaction_value_code=investment["D3"]["text"],
-                    transaction_gain_code=investment["D4"]["text"],
-                    transaction_partner=investment["D5"]["text"],
-                )
-                for investment in extracted_data["sections"][
-                    "Investments and Trusts"
-                ]["rows"]
-            ]
-        )
+    Investment.objects.bulk_create(
+        [
+            Investment(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in investment.values()),
+                description=investment["A"]["text"],
+                page_number=investment["A"]["page_number"],
+                has_inferred_values=investment["A"]["inferred_value"],
+                income_during_reporting_period_code=investment["B1"]["text"],
+                income_during_reporting_period_type=investment["B2"]["text"],
+                gross_value_code=investment["C1"]["text"],
+                gross_value_method=investment["C2"]["text"],
+                transaction_during_reporting_period=investment["D1"]["text"],
+                transaction_date_raw=investment["D2"]["text"],
+                transaction_date=get_date(
+                    investment["D2"]["text"], disclosure.year
+                ),
+                transaction_value_code=investment["D3"]["text"],
+                transaction_gain_code=investment["D4"]["text"],
+                transaction_partner=investment["D5"]["text"],
+            )
+            for investment in extracted_data["sections"][
+                "Investments and Trusts"
+            ]["rows"]
+        ]
+    )
 
-        Agreement.objects.bulk_create(
-            [
-                Agreement(
-                    financial_disclosure=disclosure,
-                    redacted=any(v["is_redacted"] for v in agreement.values()),
-                    date=agreement["Date"]["text"],
-                    parties_and_terms=agreement["Parties and Terms"]["text"],
-                )
-                for agreement in extracted_data["sections"]["Agreements"][
-                    "rows"
-                ]
-            ]
-        )
+    Agreement.objects.bulk_create(
+        [
+            Agreement(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in agreement.values()),
+                date_raw=agreement["Date"]["text"],
+                parties_and_terms=agreement["Parties and Terms"]["text"],
+            )
+            for agreement in extracted_data["sections"]["Agreements"]["rows"]
+        ]
+    )
 
-        Debt.objects.bulk_create(
-            [
-                Debt(
-                    financial_disclosure=disclosure,
-                    redacted=any(v["is_redacted"] for v in debt.values()),
-                    creditor_name=debt["Creditor"]["text"],
-                    description=debt["Description"]["text"],
-                    value_code=debt["Value Code"]["text"],
-                )
-                for debt in extracted_data["sections"]["Liabilities"]["rows"]
-            ]
-        )
+    Debt.objects.bulk_create(
+        [
+            Debt(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in debt.values()),
+                creditor_name=debt["Creditor"]["text"],
+                description=debt["Description"]["text"],
+                value_code=debt["Value Code"]["text"],
+            )
+            for debt in extracted_data["sections"]["Liabilities"]["rows"]
+        ]
+    )
 
-        Position.objects.bulk_create(
-            [
-                Position(
-                    financial_disclosure=disclosure,
-                    redacted=any(v["is_redacted"] for v in position.values()),
-                    position=position["Position"]["text"],
-                    organization_name=position["Name of Organization"]["text"],
-                )
-                for position in extracted_data["sections"]["Positions"]["rows"]
-            ]
-        )
+    Position.objects.bulk_create(
+        [
+            Position(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in position.values()),
+                position=position["Position"]["text"],
+                organization_name=position["Name of Organization"]["text"],
+            )
+            for position in extracted_data["sections"]["Positions"]["rows"]
+        ]
+    )
 
-        Gift.objects.bulk_create(
-            [
-                Gift(
-                    financial_disclosure=disclosure,
-                    source=gift["Source"]["text"],
-                    description=gift["Description"]["text"],
-                    value_code=gift["Value"]["text"],
-                    redacted=any(v["is_redacted"] for v in gift.values()),
-                )
-                for gift in extracted_data["sections"]["Gifts"]["rows"]
-            ]
-        )
+    Gift.objects.bulk_create(
+        [
+            Gift(
+                financial_disclosure=disclosure,
+                source=gift["Source"]["text"],
+                description=gift["Description"]["text"],
+                value_code=gift["Value"]["text"],
+                redacted=any(v["is_redacted"] for v in gift.values()),
+            )
+            for gift in extracted_data["sections"]["Gifts"]["rows"]
+        ]
+    )
 
-        Reimbursement.objects.bulk_create(
-            [
-                Reimbursement(
-                    financial_disclosure=disclosure,
-                    redacted=any(
-                        v["is_redacted"] for v in reimbursement.values()
-                    ),
-                    source=reimbursement["Source"]["text"],
-                    dates=reimbursement["Dates"]["text"],
-                    location=reimbursement["Locations"]["text"],
-                    purpose=reimbursement["Purpose"]["text"],
-                    items_paid_or_provided=reimbursement[
-                        "Items Paid or Provided"
-                    ]["text"],
-                )
-                for reimbursement in extracted_data["sections"][
-                    "Reimbursements"
-                ]["rows"]
+    Reimbursement.objects.bulk_create(
+        [
+            Reimbursement(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in reimbursement.values()),
+                source=reimbursement["Source"]["text"],
+                date_raw=reimbursement["Dates"]["text"],
+                location=reimbursement["Locations"]["text"],
+                purpose=reimbursement["Purpose"]["text"],
+                items_paid_or_provided=reimbursement["Items Paid or Provided"][
+                    "text"
+                ],
+            )
+            for reimbursement in extracted_data["sections"]["Reimbursements"][
+                "rows"
             ]
-        )
+        ]
+    )
 
-        NonInvestmentIncome.objects.bulk_create(
-            [
-                NonInvestmentIncome(
-                    financial_disclosure=disclosure,
-                    redacted=any(
-                        v["is_redacted"]
-                        for v in non_investment_income.values()
-                    ),
-                    date=non_investment_income["Date"]["text"],
-                    source_type=non_investment_income["Source and Type"][
-                        "text"
-                    ],
-                    income_amount=non_investment_income["Income"]["text"],
-                )
-                for non_investment_income in extracted_data["sections"][
-                    "Non-Investment Income"
-                ]["rows"]
-            ]
-        )
+    NonInvestmentIncome.objects.bulk_create(
+        [
+            NonInvestmentIncome(
+                financial_disclosure=disclosure,
+                redacted=any(
+                    v["is_redacted"] for v in non_investment_income.values()
+                ),
+                date_raw=non_investment_income["Date"]["text"],
+                source_type=non_investment_income["Source and Type"]["text"],
+                income_amount=non_investment_income["Income"]["text"],
+            )
+            for non_investment_income in extracted_data["sections"][
+                "Non-Investment Income"
+            ]["rows"]
+        ]
+    )
 
-        SpouseIncome.objects.bulk_create(
-            [
-                SpouseIncome(
-                    financial_disclosure=disclosure,
-                    redacted=any(
-                        v["is_redacted"] for v in spouse_income.values()
-                    ),
-                    date=spouse_income["Date"]["text"],
-                    source_type=spouse_income["Source and Type"]["text"],
-                )
-                for spouse_income in extracted_data["sections"][
-                    "Non Investment Income Spouse"
-                ]["rows"]
-            ]
-        )
+    SpouseIncome.objects.bulk_create(
+        [
+            SpouseIncome(
+                financial_disclosure=disclosure,
+                redacted=any(v["is_redacted"] for v in spouse_income.values()),
+                date_raw=spouse_income["Date"]["text"],
+                source_type=spouse_income["Source and Type"]["text"],
+            )
+            for spouse_income in extracted_data["sections"][
+                "Non Investment Income Spouse"
+            ]["rows"]
+        ]
+    )
 
 
 def already_downloaded(data: Dict[str, Union[str, int, list]]) -> bool:
