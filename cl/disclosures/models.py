@@ -104,6 +104,28 @@ class CODES(object):
         (X, "Failed Extraction"),
     )
 
+    VALUES: Dict[str, Dict[str, Optional[int]]] = {
+        A: {"min": 1, "max": 1_000},
+        B: {"min": 1_001, "max": 2_500},
+        C: {"min": 2_501, "max": 5_000},
+        D: {"min": 5_001, "max": 15_000},
+        E: {"min": 15_001, "max": 50_000},
+        F: {"min": 50_001, "max": 100_000},
+        G: {"min": 100_001, "max": 1_000_000},
+        H1: {"min": 1_000_001, "max": 5_000_000},
+        H2: {"min": 5_000_001, "max": None},
+        J: {"min": 1, "max": 15_000},
+        K: {"min": 15_001, "max": 50_000},
+        L: {"min": 50_001, "max": 100_000},
+        M: {"min": 100_001, "max": 250_000},
+        N: {"min": 250_001, "max": 500_000},
+        O: {"min": 500_001, "max": 1_000_000},
+        P1: {"min": 1_000_001, "max": 5_000_000},
+        P2: {"min": 5_000_001, "max": 25_000_000},
+        P3: {"min": 25_000_001, "max": 50_000_000},
+        P4: {"min": 50_000_001, "max": None},
+    }
+
 
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
@@ -187,28 +209,21 @@ class FinancialDisclosure(AbstractDateTimeModel):
         :param field_name: The field to process for the disclosure
         :return: Total value of investments for supplied field.
         """
-        wealth = {}
-        min_max = (0, 0)
-        investments = (
-            Investment.objects.filter(financial_disclosure=self)
-            .exclude(**{field_name: "•"})
-            .exclude(**{field_name: ""})
-        )
-        wealth["miss_count"] = (
-            Investment.objects.filter(financial_disclosure=self)
-            .filter(**{field_name: "•"})
-            .count()
-        )
+        investments = self.investments.exclude(
+            **{field_name: CODES.X}
+        ).exclude(**{field_name: ""})
+
+        min_value, max_value = 0, 0
         for investment in investments:
-            get_display = getattr(investment, f"get_{field_name}_display")()
-            if get_display is None:
-                wealth["msg"] = "Field not recognized"
-                return wealth
-            new_min_max = re.findall(r"([0-9,]{1,12})", get_display)
-            new_min_max = [int(x.replace(",", "")) for x in new_min_max]
-            min_max = [i + j for i, j in zip(min_max, new_min_max)]
-        wealth["min"], wealth["max"] = min_max
-        return wealth
+            min_value += CODES.VALUES[getattr(investment, field_name)]["min"]
+            max_value += CODES.VALUES[getattr(investment, field_name)]["max"]
+        return {
+            "min": min_value,
+            "max": max_value,
+            "miss_count": self.investments.filter(
+                **{field_name: CODES.X}
+            ).count(),
+        }
 
     def save(self, *args, **kwargs):
         super(FinancialDisclosure, self).save(*args, **kwargs)
