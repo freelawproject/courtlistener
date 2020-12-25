@@ -348,9 +348,8 @@ def import_financial_disclosures(
             logger.info("Document already processed.")
             continue
         # Generate PDF content from our three paths
-        if skip_until:
-            if data["id"] < int(skip_until):
-                continue
+        if data["id"] < skip_until:
+            continue
         if data["disclosure_type"] == "jw":
             # I've discovered inconsistency in the JW process and want
             # to test a little more on a larger variety of documents
@@ -423,6 +422,8 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--skip-until",
             required=False,
+            type=int,
+            default=0,
             help="Skip until, uses an id to skip processes",
         )
 
