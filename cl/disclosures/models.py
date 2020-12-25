@@ -170,6 +170,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         max_length=40,
         db_index=True,
         blank=True,
+        unique=True,
     )
     report_type = models.SmallIntegerField(
         help_text="Financial Disclosure report type",
@@ -179,6 +180,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     is_amended = models.BooleanField(
         help_text="Is disclosure amended?",
         default=False,
+        null=True,
     )
     addendum_content_raw = models.TextField(
         help_text="Raw content of addendum with whitespace preserved.",
@@ -472,10 +474,11 @@ class Gift(AbstractDateTimeModel):
         help_text="Description of the gift (ex. Alpine Ski Resort).",
         blank=True,
     )
-    value_code = models.TextField(
+    value_code = models.CharField(
         help_text="Value of the judicial gift, (ex. A)",
         choices=CODES.GROSS_VALUE,
         blank=True,
+        max_length=5,
     )
     redacted = models.BooleanField(
         help_text="Does the gift row contain redaction(s)?",
