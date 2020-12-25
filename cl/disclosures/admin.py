@@ -97,18 +97,18 @@ class ReimbursementAdmin(admin.ModelAdmin):
 class AgreementAdmin(admin.ModelAdmin):
     raw_id_fields = ("financial_disclosure",)
 
-    list_display = ("date", "parties_and_terms")
+    list_display = ("date_raw", "parties_and_terms")
 
 
 @admin.register(NonInvestmentIncome)
 class NonInvestmentIncomeAdmin(admin.ModelAdmin):
     raw_id_fields = ("financial_disclosure",)
 
-    list_display = ("date", "source_type", "income_amount")
+    list_display = ("date_raw", "source_type", "income_amount")
 
 
 @admin.register(SpouseIncome)
 class SpouseIncomeAdmin(admin.ModelAdmin):
     raw_id_fields = ("financial_disclosure",)
 
-    list_display = ("date", "source_type", "redacted")
+    list_display = ("date_raw", "source_type", "redacted")
