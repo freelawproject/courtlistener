@@ -394,7 +394,11 @@ def import_financial_disclosures(
             else data.get("urls")[0],
         )
         # Save and upload PDF
-        disclosure.filepath.save("", ContentFile(pdf_bytes))
+        disclosure.filepath.save(
+            f"{disclosure.person.slug}-disclosure.{year}.pdf",
+            ContentFile(pdf_bytes),
+            save=False,
+        )
         logger.info(
             f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
             f"{disclosure.filepath}"
