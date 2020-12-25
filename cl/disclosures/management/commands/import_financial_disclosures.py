@@ -1,7 +1,6 @@
 import datetime
 import json
-import pprint
-from typing import Dict, Union, Optional
+from typing import Dict, Union, Optional, List
 from urllib.parse import quote
 
 import requests
@@ -35,13 +34,13 @@ def check_if_in_system(sha1_hash: str) -> bool:
     :return: Whether PDF is in db.
     """
     disclosures = FinancialDisclosure.objects.filter(sha1=sha1_hash)
-    if len(disclosures) > 0:
+    if disclosures.exists():
         logger.info("PDF already in system")
         return True
     return False
 
 
-def extract_content(pdf_bytes: bytes) -> Dict:
+def extract_content(pdf_bytes: bytes) -> Dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
     Attempt extraction using multiple methods if necessary.
@@ -61,7 +60,7 @@ def extract_content(pdf_bytes: bytes) -> Dict:
     status = extractor_response.status_code
     success = extractor_response.json()["success"]
     if status != 200 or success is False:
-        # Try second method
+        # Try less accurate and slower judicial watch endpoint.
         logger.info("Attempting second extraction")
         extractor_response = requests.post(
             settings.BTE_URLS["extract-disclosure-jw"],
@@ -77,13 +76,6 @@ def extract_content(pdf_bytes: bytes) -> Dict:
 
     logger.info("Processing extracted data")
     return extractor_response.json()
-
-
-class ChristmasError(Exception):
-    """Error class for representing a Christmas date being found."""
-
-    def __init__(self, message):
-        self.message = message
 
 
 def get_report_type(extracted_data: dict) -> int:
@@ -103,13 +95,20 @@ def get_report_type(extracted_data: dict) -> int:
     return REPORT_TYPES.UNKNOWN
 
 
-def get_date(text: str, year: int):
+class ChristmasError(Exception):
+    """Error class for representing a Christmas date being found."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
+def get_date(text: str, year: int) -> Optional[datetime.date]:
     """Extract date from date strings if possible
 
     Because we know year we can verify that the date is ... close.
 
-    :param year:
-    :param text:Date string
+    :param year: The year of the financial disclosure
+    :param text: The extracted string version of the date
     :return: Date object or None
     """
     try:
@@ -123,9 +122,7 @@ def get_date(text: str, year: int):
         if int(date_found.year) == year:
             return date_found
         return None
-    except ParserError:
-        return None
-    except ChristmasError:
+    except (ParserError, ChristmasError):
         return None
     except:
         return None
@@ -312,7 +309,7 @@ def already_downloaded(data: Dict[str, Union[str, int, list]]) -> bool:
 
 
 def generate_or_download_disclosure_as_pdf(
-    data: Dict[str, Union[str, int, list]]
+    data: Dict[str, Union[str, int, List[str]]]
 ) -> requests.Response:
     """Generate or download PDF content from images or urls.
 
@@ -350,7 +347,8 @@ def generate_or_download_disclosure_as_pdf(
 
 
 def import_financial_disclosures(
-    filepath: str, skip_until: Optional[str, None]
+    filepath: str,
+    skip_until: Optional[str],
 ):
     """Import financial documents into courtlistener
 
@@ -398,7 +396,7 @@ def import_financial_disclosures(
         # Return page count - 0 indicates a failure of some kind.  Like PDF
         # Not actually present on aws.
         pg_count = get_page_count(pdf_bytes)
-        if pg_count == 0:
+        if not pg_count:
             logger.info("PDF failed!")
             return
 
