@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Union
+from typing import Dict, Union, Optional
 
 from django.db import models
 
@@ -22,7 +22,7 @@ class REPORT_TYPES(object):
     ANNUAL = 2
     FINAL = 3
     NAMES = (
-        (UNKNOWN, "Unknown"),
+        (UNKNOWN, "Unknown Report"),
         (NOMINATION, "Nomination Report"),
         (INITIAL, "Initial Report"),
         (ANNUAL, "Annual Report"),
@@ -56,15 +56,15 @@ class CODES(object):
     P4 = "P4"  # $50,000,001 and up
 
     # Value method calculations
-    Q = "Appraisal"
-    R = "Cost (Real Estate Only)"
-    S = "Assessment"
-    T = "Cash Market"
-    U = "Book Value"
-    V = "Other"
+    Q = "Q"
+    R = "R"
+    S = "S"
+    T = "T"
+    U = "U"
+    V = "V"
 
     # Failed Extraction
-    X = "•"
+    X = "-1"
 
     VALUATION_METHODS = (
         (Q, "Appraisal"),
@@ -144,7 +144,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         help_text="The number of pages in the disclosure report",
     )
     sha1 = models.CharField(
-        help_text="PDF hash, used to identify duplicate PDFs",
+        help_text="SHA1 hash of the generated PDF",
         max_length=40,
         db_index=True,
         blank=True,
@@ -233,7 +233,7 @@ class Investment(AbstractDateTimeModel):
         help_text="Name of investment (ex. APPL common stock).", blank=True
     )
     redacted = models.BooleanField(
-        help_text="Whether investment row contains redaction(s).",
+        help_text="Does the investment row contains redaction(s)?",
         default=False,
     )
     income_during_reporting_period_code = models.CharField(
@@ -306,7 +306,7 @@ class Position(AbstractDateTimeModel):
         FinancialDisclosure,
         help_text="The financial disclosure associated "
         "with this financial position.",
-        related_name="financial_positions",
+        related_name="positions",
         on_delete=models.CASCADE,
     )
     position = models.TextField(
@@ -318,7 +318,7 @@ class Position(AbstractDateTimeModel):
         blank=True,
     )
     redacted = models.BooleanField(
-        help_text="Financial Disclosure filing option",
+        help_text="Does the position row contain redaction(s)?",
         default=False,
     )
 
@@ -332,7 +332,7 @@ class Agreement(AbstractDateTimeModel):
         related_name="agreements",
         on_delete=models.CASCADE,
     )
-    date = models.TextField(
+    date_raw = models.TextField(
         help_text="Date of judicial agreement.",
         blank=True,
     )
@@ -342,7 +342,7 @@ class Agreement(AbstractDateTimeModel):
         blank=True,
     )
     redacted = models.BooleanField(
-        help_text="Is the agreement redacted?",
+        help_text="Does the agreement row contain redaction(s)?",
         default=False,
     )
 
@@ -357,7 +357,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         related_name="non_investment_incomes",
         on_delete=models.CASCADE,
     )
-    date = models.TextField(
+    date_raw = models.TextField(
         help_text="Date of non-investment income (ex. 2011).",
         blank=True,
     )
@@ -367,11 +367,12 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         blank=True,
     )
     income_amount = models.TextField(
-        help_text="Amount earned by judge.",
+        help_text="Amount earned by judge, often a number, but sometimes with "
+        "explanatory text (e.g. 'Income at firm: $xyz').",
         blank=True,
     )
     redacted = models.BooleanField(
-        help_text="Is non-investment income redacted?",
+        help_text="Does the non-investment income row contain redaction(s)?",
         default=False,
     )
 
@@ -391,12 +392,12 @@ class SpouseIncome(AbstractDateTimeModel):
         "(ex. Salary from Bank job).",
         blank=True,
     )
-    date = models.TextField(
+    date_raw = models.TextField(
         help_text="Date of spousal income (ex. 2011).",
         blank=True,
     )
     redacted = models.TextField(
-        help_text="Is judicial spousal income redacted?",
+        help_text="Does the spousal-income row contain redaction(s)?",
         default=False,
     )
 
@@ -415,7 +416,7 @@ class Reimbursement(AbstractDateTimeModel):
         help_text="Source of the reimbursement (ex. FSU Law School).",
         blank=True,
     )
-    dates = models.TextField(
+    date_raw = models.TextField(
         help_text="Dates as a text string for the date of reimbursements."
         "This is often conference dates (ex. June 2-6, 2011).",
         blank=True,
@@ -434,7 +435,7 @@ class Reimbursement(AbstractDateTimeModel):
         blank=True,
     )
     redacted = models.BooleanField(
-        help_text="Does the reimbursement contain redactions?",
+        help_text="Does the reimbursement contain redaction(s)?",
         default=False,
     )
 
@@ -489,6 +490,6 @@ class Debt(AbstractDateTimeModel):
         max_length=5,
     )
     redacted = models.BooleanField(
-        help_text="Is the debt redacted?",
+        help_text="Does the debt row contain redaction(s)?",
         default=False,
     )
