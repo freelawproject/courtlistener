@@ -30,7 +30,7 @@ class DisclosureIngestionTests(TestCase):
 
         test_disclosure = FinancialDisclosure.objects.get(pk=1)
         with open(self.test_file, "r") as f:
-            extracted_data = json.loads(f.read())
+            extracted_data = json.load(f)
 
         save_disclosure(
             extracted_data=extracted_data,
