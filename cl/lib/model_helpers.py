@@ -1,6 +1,7 @@
 import contextlib
 import os
 import re
+from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -9,7 +10,6 @@ from django.utils.timezone import now
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import trunc
-from django.apps import apps
 
 
 def make_docket_number_core(docket_number):
@@ -84,40 +84,54 @@ def base_recap_path(instance, filename, base_dir):
     )
 
 
-def make_pdf_path(instance, filename, thumbs=False):
-    from cl.search.models import ClaimHistory, RECAPDocument
+def make_pdf_path(
+    instance: Any,
+    filename: str,
+    thumbs: bool = False,
+) -> str:
+    from cl.disclosures.models import FinancialDisclosure
     from cl.lasc.models import LASCPDF
+    from cl.search.models import ClaimHistory, RECAPDocument
 
+    parts = []
     if type(instance) == RECAPDocument:
         root = "recap"
         court_id = instance.docket_entry.docket.court_id
         pacer_case_id = instance.docket_entry.docket.pacer_case_id
+        parts.append(get_bucket_name(court_id, pacer_case_id))
     elif type(instance) == ClaimHistory:
         root = "claim"
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
+        parts.append(get_bucket_name(court_id, pacer_case_id))
     elif type(instance) == LASCPDF:
         slug = slugify(trunc(filename, 40))
         root = "/us/state/ca/lasc/%s/" % instance.docket_number
-        file_name = "gov.ca.lasc.%s.%s.%s.pdf" % (
+        filename = "gov.ca.lasc.%s.%s.%s.pdf" % (
             instance.docket_number,
             instance.document_id,
             slug,
         )
-        return os.path.join(root, file_name)
-    elif type(instance) == apps.get_model(
-        "disclosures", "FinancialDisclosure"
-    ):
-        root = "us/federal/judicial/financial-disclosures"
+    elif type(instance) == FinancialDisclosure:
+        root = (
+            f"us/federal/judicial/financial-disclosures/{instance.person.id}/"
+        )
+        filename = f"{instance.person.slug}-disclosure.{instance.year}.pdf"
+
+        # XXX how do we get the filename correct for thumbnails? Where is that
+        # being generated???
+
+        # /something/something/thumbnails/
+        # /something/something-thumbnails/
         if thumbs:
             return (
                 f"{root}/{instance.person.id}/thumbnails/"
                 f"{instance.person.slug}-disclosure.{instance.year}.png"
             )
-        return (
-            f"{root}/{instance.person.id}/"
-            f"{instance.person.slug}-disclosure.{instance.year}.pdf"
-        )
+        # return (
+        #     f"{root}/{instance.person.id}/"
+        #     f"{instance.person.slug}-disclosure.{instance.year}.pdf"
+        # )
     else:
         raise ValueError(
             "Unknown model type in make_pdf_path "
@@ -126,9 +140,7 @@ def make_pdf_path(instance, filename, thumbs=False):
 
     if thumbs:
         root = root + "-thumbnails"
-    return os.path.join(
-        root, get_bucket_name(court_id, pacer_case_id), filename
-    )
+    return os.path.join(root, *parts, filename)
 
 
 def make_json_path(instance, filename):
