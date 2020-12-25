@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.extras import granular_date
+from cl.disclosures.models import FinancialDisclosure
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
