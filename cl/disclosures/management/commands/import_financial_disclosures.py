@@ -285,21 +285,71 @@ def save_disclosure(
     )
 
 
-def already_downloaded(data: Dict[str, Union[str, int, list]]) -> bool:
-    """Already downloaded checks the original filepath for processing
+def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
+    """Has PDF been extracted
+
+    Method added to skip tiff to pdf conversion if
+    document has already been converted and saved but
+    not yet extracted.
 
     :param data: File data
-    :return: Whether we have processed the file before.
+    :return: Whether document has been extracted
     """
     if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
         url = data["url"]
     else:
         url = data["urls"][0]
-    return FinancialDisclosure.objects.filter(download_filepath=url).exists()
+
+    return FinancialDisclosure.objects.filter(
+        download_filepath=url, has_been_extracted=True
+    ).exists()
+
+
+def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
+    """Get URL saved to download filepath
+
+    :param data: File data
+    :return: URL or first URL on AWS
+    """
+    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+        url = data["url"]
+    else:
+        url = data["urls"][0]
+    return url
+
+
+def get_disclosure(
+    data: Dict[str, Union[str, int, list]]
+) -> FinancialDisclosure:
+    """Get disclosure from download filepath
+
+    This is a convenenience method.
+
+    :param data: File data
+    :return: Financial Disclosure object
+    """
+    return FinancialDisclosure.objects.get(download_filepath=get_aws_url(data))
+
+
+def has_been_pdfed(data: Dict[str, Union[str, int, list]]) -> Optional[str]:
+    """Has file been PDFd from tiff and saved to AWS.
+
+    :param data: File data
+    :return: Path to document or None
+    """
+
+    disclosures = FinancialDisclosure.objects.filter(
+        download_filepath=get_aws_url(data)
+    )
+    if disclosures.exists():
+        return (
+            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+            f"{disclosures[0].filepath}"
+        )
 
 
 def generate_or_download_disclosure_as_pdf(
-    data: Dict[str, Union[str, int, List[str]]]
+    data: Dict[str, Union[str, int, List[str]]], pdf_url: Optional[str]
 ) -> requests.Response:
     """Generate or download PDF content from images or urls.
 
@@ -350,13 +400,13 @@ def import_financial_disclosures(
         disclosures = json.load(f)
 
     for data in disclosures:
-        # Check download_filepath to see if it has been processed before.
-        if already_downloaded(data):
-            logger.info("Document already processed.")
-            continue
-        # Generate PDF content from our three paths
         if data["id"] < skip_until:
             continue
+        # Check download_filepath to see if it has been processed before.
+        if has_been_extracted(data):
+            logger.info("Document already extracted and saved.")
+            continue
+        # Generate PDF content from our three paths
         if data["disclosure_type"] == "jw":
             # I've discovered inconsistency in the JW process and want
             # to test a little more on a larger variety of documents
@@ -366,21 +416,28 @@ def import_financial_disclosures(
         person_id = data["person_id"]
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
-        pdf_response = generate_or_download_disclosure_as_pdf(data)
+        # Check if we've already extracted
+        was_previously_pdfed = has_been_pdfed(data)
+        pdf_response = generate_or_download_disclosure_as_pdf(
+            data, was_previously_pdfed
+        )
         pdf_bytes = pdf_response.content
 
         if pdf_response.status_code != 200:
             logger.info("PDF generation failed.")
             continue
 
-        logger.info("PDF generated successfully.")
+        if was_previously_pdfed:
+            disclosure = get_disclosure(data)
+        else:
+            logger.info("PDF generated successfully.")
 
-        # Sha1 hash - Check for duplicates
-        sha1_hash = sha1(pdf_bytes)
-        in_system = check_if_in_system(sha1_hash)
-        if in_system:
-            logger.info("PDF already in system.")
-            continue
+            # Sha1 hash - Check for duplicates
+            sha1_hash = sha1(pdf_bytes)
+            in_system = check_if_in_system(sha1_hash)
+            if in_system:
+                logger.info("PDF already in system.")
+                continue
 
         # Return page count - 0 indicates a failure of some kind.  Like PDF
         # Not actually present on aws.
