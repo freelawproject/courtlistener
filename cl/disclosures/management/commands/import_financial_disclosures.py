@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 from typing import Dict, Union, Optional, List
 from urllib.parse import quote
 
@@ -111,6 +112,12 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
     :param text: The extracted string version of the date
     :return: Date object or None
     """
+    if not text:
+        return None
+    if re.match(r"\d{4}\/(\d{2}|\d{4})", text):
+        text = f"{text[:2]}/{text[2:]}"
+    elif re.match(r"(\d{2})\/\d{4}", text):
+        text = f"{text[:5]}/{text[5:]}"
     try:
         date_parsed = parse(
             text, fuzzy=True, default=datetime.datetime(year, 12, 25)
@@ -122,7 +129,7 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         if int(date_found.year) == year:
             return date_found
         return None
-    except (ParserError, ChristmasError):
+    except (ParserError, ChristmasError, TypeError):
         return None
     except:
         return None
