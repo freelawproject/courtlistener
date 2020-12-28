@@ -354,34 +354,22 @@ def generate_or_download_disclosure_as_pdf(
     :param data: Data to process.
     :return: Response containing PDF
     """
-    if data["disclosure_type"] == "jw":
-        # Download the PDFs in the judicial watch collection
-        logger.info(
-            f"Preparing to download JW url: {quote(data['url'], safe=':/')}"
-        )
-        pdf_response = requests.get(data["url"], timeout=60 * 20)
-
+    if pdf_url:
+        logger.info(f"Downloading PDF: {pdf_url}")
+        return requests.get(pdf_url, timeout=60 * 20)
+    elif data["disclosure_type"] == "jw":
+        logger.info(f"Downloading JW PDF: {quote(data['url'], safe=':/')}")
+        return requests.get(data["url"], timeout=60 * 20)
     elif data["disclosure_type"] == "single":
-        # Split single long tiff into multiple tiffs and combine into PDF
-        logger.info(
-            f"Preparing to convert single: {quote(data['url'], safe=':/')}"
-        )
-        pdf_response = requests.post(
-            settings.BTE_URLS["image-to-pdf"],
-            params={"tiff_url": data["url"]},
-            timeout=10 * 60,
-        )
+        urls = [data["url"]]
     else:
-        # Combine split tiffs into one single PDF
-        logger.info(
-            f"Preparing to compile urls starting at: "
-            f"{quote(data['urls'][0], safe=':/')}"
-        )
-        pdf_response = requests.post(
-            settings.BTE_URLS["urls-to-pdf"],
-            json=json.dumps({"urls": data["urls"]}),
-        )
-    return pdf_response
+        urls = data["urls"]
+    logger.info(f"Processing url:{quote(urls[0], safe=':/')}")
+    return requests.post(
+        settings.BTE_URLS["images-to-pdf"],
+        json=json.dumps({"urls": urls}),
+        timeout=10 * 60,
+    )
 
 
 def import_financial_disclosures(
