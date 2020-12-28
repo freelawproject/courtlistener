@@ -49,7 +49,7 @@ def extract_content(pdf_bytes: bytes) -> Dict[str, Union[str, int]]:
     :param pdf_bytes: The byte array of the PDF
     :return:The extracted content
     """
-    logger.info("Beginning Extraction")
+    logger.info("Attempting extraction.")
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
