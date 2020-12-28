@@ -131,8 +131,6 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         return None
     except (ParserError, ChristmasError, TypeError):
         return None
-    except:
-        return None
 
 
 @transaction.atomic
