@@ -227,7 +227,7 @@ def save_disclosure(
                 financial_disclosure=disclosure,
                 source=gift["Source"]["text"],
                 description=gift["Description"]["text"],
-                value_code=gift["Value"]["text"],
+                value=gift["Value"]["text"],
                 redacted=any(v["is_redacted"] for v in gift.values()),
             )
             for gift in extracted_data["sections"]["Gifts"]["rows"]
