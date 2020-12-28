@@ -76,7 +76,7 @@ class PositionAdmin(admin.ModelAdmin):
 class GiftAdmin(admin.ModelAdmin):
     raw_id_fields = ("financial_disclosure",)
 
-    list_display = ("source", "description", "value_code")
+    list_display = ("source", "description", "value")
 
 
 @admin.register(Debt)
