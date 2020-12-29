@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 from typing import Dict, Union, Optional, List
 from urllib.parse import quote
 
@@ -48,7 +49,7 @@ def extract_content(pdf_bytes: bytes) -> Dict[str, Union[str, int]]:
     :param pdf_bytes: The byte array of the PDF
     :return:The extracted content
     """
-    logger.info("Beginning Extraction")
+    logger.info("Attempting extraction.")
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
@@ -122,9 +123,7 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         if int(date_found.year) == year:
             return date_found
         return None
-    except (ParserError, ChristmasError):
-        return None
-    except:
+    except (ParserError, ChristmasError, TypeError):
         return None
 
 
@@ -220,7 +219,7 @@ def save_disclosure(
                 financial_disclosure=disclosure,
                 source=gift["Source"]["text"],
                 description=gift["Description"]["text"],
-                value_code=gift["Value"]["text"],
+                value=gift["Value"]["text"],
                 redacted=any(v["is_redacted"] for v in gift.values()),
             )
             for gift in extracted_data["sections"]["Gifts"]["rows"]
@@ -278,55 +277,93 @@ def save_disclosure(
     )
 
 
-def already_downloaded(data: Dict[str, Union[str, int, list]]) -> bool:
-    """Already downloaded checks the original filepath for processing
+def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
+    """Has PDF been extracted
+
+    Method added to skip tiff to pdf conversion if
+    document has already been converted and saved but
+    not yet extracted.
 
     :param data: File data
-    :return: Whether we have processed the file before.
+    :return: Whether document has been extracted
     """
     if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
         url = data["url"]
     else:
         url = data["urls"][0]
-    return FinancialDisclosure.objects.filter(download_filepath=url).exists()
+
+    return FinancialDisclosure.objects.filter(
+        download_filepath=url, has_been_extracted=True
+    ).exists()
+
+
+def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
+    """Get URL saved to download filepath
+
+    :param data: File data
+    :return: URL or first URL on AWS
+    """
+    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+        url = data["url"]
+    else:
+        url = data["urls"][0]
+    return url
+
+
+def get_disclosure(
+    data: Dict[str, Union[str, int, list]]
+) -> FinancialDisclosure:
+    """Get disclosure from download filepath
+
+    This is a convenenience method.
+
+    :param data: File data
+    :return: Financial Disclosure object
+    """
+    return FinancialDisclosure.objects.get(download_filepath=get_aws_url(data))
+
+
+def has_been_pdfed(data: Dict[str, Union[str, int, list]]) -> Optional[str]:
+    """Has file been PDFd from tiff and saved to AWS.
+
+    :param data: File data
+    :return: Path to document or None
+    """
+
+    disclosures = FinancialDisclosure.objects.filter(
+        download_filepath=get_aws_url(data)
+    )
+    if disclosures.exists():
+        return (
+            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+            f"{disclosures[0].filepath}"
+        )
 
 
 def generate_or_download_disclosure_as_pdf(
-    data: Dict[str, Union[str, int, List[str]]]
+    data: Dict[str, Union[str, int, List[str]]], pdf_url: Optional[str]
 ) -> requests.Response:
     """Generate or download PDF content from images or urls.
 
     :param data: Data to process.
     :return: Response containing PDF
     """
-    if data["disclosure_type"] == "jw":
-        # Download the PDFs in the judicial watch collection
-        logger.info(
-            f"Preparing to download JW url: {quote(data['url'], safe=':/')}"
-        )
-        pdf_response = requests.get(data["url"], timeout=60 * 20)
-
+    if pdf_url:
+        logger.info(f"Downloading PDF: {pdf_url}")
+        return requests.get(pdf_url, timeout=60 * 20)
+    elif data["disclosure_type"] == "jw":
+        logger.info(f"Downloading JW PDF: {quote(data['url'], safe=':/')}")
+        return requests.get(data["url"], timeout=60 * 20)
     elif data["disclosure_type"] == "single":
-        # Split single long tiff into multiple tiffs and combine into PDF
-        logger.info(
-            f"Preparing to convert single: {quote(data['url'], safe=':/')}"
-        )
-        pdf_response = requests.post(
-            settings.BTE_URLS["image-to-pdf"],
-            params={"tiff_url": data["url"]},
-            timeout=10 * 60,
-        )
+        urls = [data["url"]]
     else:
-        # Combine split tiffs into one single PDF
-        logger.info(
-            f"Preparing to compile urls starting at: "
-            f"{quote(data['urls'][0], safe=':/')}"
-        )
-        pdf_response = requests.post(
-            settings.BTE_URLS["urls-to-pdf"],
-            json=json.dumps({"urls": data["urls"]}),
-        )
-    return pdf_response
+        urls = data["urls"]
+    logger.info(f"Processing url:{quote(urls[0], safe=':/')}")
+    return requests.post(
+        settings.BTE_URLS["images-to-pdf"],
+        json=json.dumps({"urls": urls}),
+        timeout=10 * 60,
+    )
 
 
 def import_financial_disclosures(
@@ -343,66 +380,74 @@ def import_financial_disclosures(
         disclosures = json.load(f)
 
     for data in disclosures:
-        # Check download_filepath to see if it has been processed before.
-        if already_downloaded(data):
-            logger.info("Document already processed.")
-            continue
-        # Generate PDF content from our three paths
         if data["id"] < skip_until:
             continue
+        # Check download_filepath to see if it has been processed before.
+        if has_been_extracted(data):
+            logger.info("Document already extracted and saved.")
+            continue
+        # Generate PDF content from our three paths
         if data["disclosure_type"] == "jw":
             # I've discovered inconsistency in the JW process and want
             # to test a little more on a larger variety of documents
-            continue
+            # continue
+            logger.info("Processing judicial watch... ")
 
         year = int(data["year"])
         person_id = data["person_id"]
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
-        pdf_response = generate_or_download_disclosure_as_pdf(data)
+        # Check if we've already extracted
+        was_previously_pdfed = has_been_pdfed(data)
+        pdf_response = generate_or_download_disclosure_as_pdf(
+            data, was_previously_pdfed
+        )
         pdf_bytes = pdf_response.content
 
         if pdf_response.status_code != 200:
             logger.info("PDF generation failed.")
             continue
 
-        logger.info("PDF generated successfully.")
+        if was_previously_pdfed:
+            disclosure = get_disclosure(data)
+        else:
+            logger.info("PDF generated successfully.")
 
-        # Sha1 hash - Check for duplicates
-        sha1_hash = sha1(pdf_bytes)
-        in_system = check_if_in_system(sha1_hash)
-        if in_system:
-            logger.info("PDF already in system.")
-            continue
+            # Sha1 hash - Check for duplicates
+            sha1_hash = sha1(pdf_bytes)
+            in_system = check_if_in_system(sha1_hash)
+            if in_system:
+                logger.info("PDF already in system.")
+                continue
 
-        # Return page count - 0 indicates a failure of some kind.  Like PDF
-        # Not actually present on aws.
-        pg_count = get_page_count(pdf_bytes)
-        if not pg_count:
-            logger.info("PDF failed!")
-            return
+            # Return page count - 0 indicates a failure of some kind.  Like PDF
+            # Not actually present on aws.
+            pg_count = get_page_count(pdf_bytes)
+            if not pg_count:
+                logger.info("PDF failed!")
+                return
 
-        # Save Financial Disclosure here to AWS and move onward
-        disclosure = FinancialDisclosure(
-            year=year,
-            page_count=pg_count,
-            person=Person.objects.get(id=person_id),
-            sha1=sha1_hash,
-            has_been_extracted=False,
-            download_filepath=data.get("url")
-            if data.get("url")
-            else data.get("urls")[0],
-        )
-        # Save and upload PDF
-        disclosure.filepath.save(
-            f"{disclosure.person.slug}-disclosure.{year}.pdf",
-            ContentFile(pdf_bytes),
-            save=False,
-        )
-        logger.info(
-            f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosure.filepath}"
-        )
+            # Save Financial Disclosure here to AWS and move onward
+            disclosure = FinancialDisclosure(
+                year=year,
+                page_count=pg_count,
+                person=Person.objects.get(id=person_id),
+                sha1=sha1_hash,
+                has_been_extracted=False,
+                download_filepath=data.get("url")
+                if data.get("url")
+                else data.get("urls")[0],
+            )
+            # Save and upload PDF
+            disclosure.filepath.save(
+                f"{disclosure.person.slug}-disclosure.{year}.pdf",
+                ContentFile(pdf_bytes),
+                save=False,
+            )
+            logger.info(
+                f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+                f"{disclosure.filepath}"
+            )
         # Extract content from PDF
         content = extract_content(pdf_bytes=pdf_bytes)
         if not content:
