@@ -33,7 +33,7 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        if self.thumbnail_status is THUMBNAIL_STATUSES.NEEDED:
+        if obj.thumbnail_status is THUMBNAIL_STATUSES.NEEDED:
             make_financial_disclosure_thumbnail_from_pdf.delay(obj.pk)
 
 
