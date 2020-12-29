@@ -5,8 +5,10 @@ from django.db import models
 from cl.disclosures.tasks import (
     make_financial_disclosure_thumbnail_from_pdf,
 )
-from cl.lib.model_helpers import make_pdf_path, \
-    make_financial_disclosure_thumbnail_path
+from cl.lib.model_helpers import (
+    make_pdf_path,
+    make_financial_disclosure_thumbnail_path,
+)
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import AWSMediaStorage
