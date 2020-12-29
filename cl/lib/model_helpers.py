@@ -117,21 +117,6 @@ def make_pdf_path(
             f"us/federal/judicial/financial-disclosures/{instance.person.id}/"
         )
         filename = f"{instance.person.slug}-disclosure.{instance.year}.pdf"
-
-        # XXX how do we get the filename correct for thumbnails? Where is that
-        # being generated???
-
-        # /something/something/thumbnails/
-        # /something/something-thumbnails/
-        if thumbs:
-            return (
-                f"{root}/{instance.person.id}/thumbnails/"
-                f"{instance.person.slug}-disclosure.{instance.year}.png"
-            )
-        # return (
-        #     f"{root}/{instance.person.id}/"
-        #     f"{instance.person.slug}-disclosure.{instance.year}.pdf"
-        # )
     else:
         raise ValueError(
             "Unknown model type in make_pdf_path "
@@ -157,6 +142,19 @@ def make_lasc_json_path(instance, filename):
 
 def make_pdf_thumb_path(instance, filename):
     return make_pdf_path(instance, filename, thumbs=True)
+
+
+def make_financial_disclosure_thumbnail_path(instance, filename=None):
+    """Generate thumbnail location for disclosures
+
+    :param instance: The disclosure
+    :param filename: An empty value - not sure why its needed
+    :return: Location to save thumbnail
+    """
+    return (
+        f"us/federal/judicial/financial-disclosures/{instance.person.id}/"
+        f"{instance.person.slug}-disclosure.{instance.year}-thumbnail.png"
+    )
 
 
 def make_upload_path(instance, filename):
