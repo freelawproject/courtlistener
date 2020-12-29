@@ -390,7 +390,8 @@ def import_financial_disclosures(
         if data["disclosure_type"] == "jw":
             # I've discovered inconsistency in the JW process and want
             # to test a little more on a larger variety of documents
-            continue
+            # continue
+            logger.info("Processing judicial watch... ")
 
         year = int(data["year"])
         person_id = data["person_id"]
