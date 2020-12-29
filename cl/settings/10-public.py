@@ -623,11 +623,9 @@ BTE_URLS = {
     "page-count": f"{BTE_HOST}/document/page_count",
     "thumbnail": f"{BTE_HOST}/document/thumbnail",
     "mime-type": f"{BTE_HOST}/document/mime_type",
+    # Image conversion
+    "images-to-pdf": f"{BTE_HOST}/financial_disclosure/images_to_pdf",
     # Financial Disclosures
-    # Image conversion and extraction
-    "image-to-pdf": f"{BTE_HOST}/financial_disclosure/tiff_to_pdf",
-    "images-to-pdf": f"{BTE_HOST}/financial_disclosure/tiffs_to_pdf",
-    "urls-to-pdf": f"{BTE_HOST}/financial_disclosure/urls_to_pdf",
     "extract-disclosure": f"{BTE_HOST}/financial_disclosure/extract_record",
     "extract-disclosure-jw": f"{BTE_HOST}/financial_disclosure/extract_jw",
 }

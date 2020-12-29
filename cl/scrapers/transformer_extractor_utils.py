@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Optional, ByteString
 
 import requests
 from django.conf import settings
@@ -57,3 +57,21 @@ def get_page_count(pdf_bytes: bytes) -> Optional[int]:
     if bte_response.status_code == 200:
         return int(bte_response.content)
     return None
+
+
+def generate_thumbnail(
+    pdf_content: ByteString, max_dimension: int = 350
+) -> Optional[ByteString]:
+    """Convert PDF bytes into Thumbnail of first page
+
+    :param pdf_content: PDF as bytes
+    :param max_dimension: Max dimension for thumbnail
+    :return: Generated thumbnail
+    """
+    thumbnail_response = requests.post(
+        settings.BTE_URLS["thumbnail"],
+        files={"file": ("thumbnail.png", pdf_content)},
+        params={"max_dimension": max_dimension},
+    )
+    if thumbnail_response.status_code == 200:
+        return thumbnail_response.content

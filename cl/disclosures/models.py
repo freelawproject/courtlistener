@@ -1,4 +1,3 @@
-import re
 from typing import Dict, Union, Optional
 
 from django.db import models
@@ -6,7 +5,10 @@ from django.db import models
 from cl.disclosures.tasks import (
     make_financial_disclosure_thumbnail_from_pdf,
 )
-from cl.lib.model_helpers import make_pdf_path, make_pdf_thumb_path
+from cl.lib.model_helpers import (
+    make_pdf_path,
+    make_financial_disclosure_thumbnail_path,
+)
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import AWSMediaStorage
@@ -152,7 +154,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form.",
-        upload_to=make_pdf_thumb_path,
+        upload_to=make_financial_disclosure_thumbnail_path,
         storage=AWSMediaStorage(),
         null=True,
         blank=True,
@@ -466,18 +468,16 @@ class Gift(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     source = models.TextField(
-        help_text="Source of the judicial gift. (ex. WestLaw).",
+        help_text="Source of the judicial gift. (ex. Alta Ski Area).",
         blank=True,
     )
     description = models.TextField(
-        help_text="Description of the gift (ex. Alpine Ski Resort).",
+        help_text="Description of the gift (ex. Season Pass).",
         blank=True,
     )
-    value_code = models.CharField(
-        help_text="Value of the judicial gift, (ex. A)",
-        choices=CODES.GROSS_VALUE,
+    value = models.TextField(
+        help_text="Value of the judicial gift, (ex. $1,199.00)",
         blank=True,
-        max_length=5,
     )
     redacted = models.BooleanField(
         help_text="Does the gift row contain redaction(s)?",
