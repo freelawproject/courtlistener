@@ -112,12 +112,6 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
     :param text: The extracted string version of the date
     :return: Date object or None
     """
-    if not text:
-        return None
-    if re.match(r"\d{4}\/(\d{2}|\d{4})", text):
-        text = f"{text[:2]}/{text[2:]}"
-    elif re.match(r"(\d{2})\/\d{4}", text):
-        text = f"{text[:5]}/{text[5:]}"
     try:
         date_parsed = parse(
             text, fuzzy=True, default=datetime.datetime(year, 12, 25)
@@ -425,34 +419,34 @@ def import_financial_disclosures(
                 logger.info("PDF already in system.")
                 continue
 
-        # Return page count - 0 indicates a failure of some kind.  Like PDF
-        # Not actually present on aws.
-        pg_count = get_page_count(pdf_bytes)
-        if not pg_count:
-            logger.info("PDF failed!")
-            return
+            # Return page count - 0 indicates a failure of some kind.  Like PDF
+            # Not actually present on aws.
+            pg_count = get_page_count(pdf_bytes)
+            if not pg_count:
+                logger.info("PDF failed!")
+                return
 
-        # Save Financial Disclosure here to AWS and move onward
-        disclosure = FinancialDisclosure(
-            year=year,
-            page_count=pg_count,
-            person=Person.objects.get(id=person_id),
-            sha1=sha1_hash,
-            has_been_extracted=False,
-            download_filepath=data.get("url")
-            if data.get("url")
-            else data.get("urls")[0],
-        )
-        # Save and upload PDF
-        disclosure.filepath.save(
-            f"{disclosure.person.slug}-disclosure.{year}.pdf",
-            ContentFile(pdf_bytes),
-            save=False,
-        )
-        logger.info(
-            f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosure.filepath}"
-        )
+            # Save Financial Disclosure here to AWS and move onward
+            disclosure = FinancialDisclosure(
+                year=year,
+                page_count=pg_count,
+                person=Person.objects.get(id=person_id),
+                sha1=sha1_hash,
+                has_been_extracted=False,
+                download_filepath=data.get("url")
+                if data.get("url")
+                else data.get("urls")[0],
+            )
+            # Save and upload PDF
+            disclosure.filepath.save(
+                f"{disclosure.person.slug}-disclosure.{year}.pdf",
+                ContentFile(pdf_bytes),
+                save=False,
+            )
+            logger.info(
+                f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+                f"{disclosure.filepath}"
+            )
         # Extract content from PDF
         content = extract_content(pdf_bytes=pdf_bytes)
         if not content:
