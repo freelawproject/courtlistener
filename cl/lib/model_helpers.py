@@ -1,7 +1,6 @@
 import contextlib
 import os
 import re
-from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -84,39 +83,28 @@ def base_recap_path(instance, filename, base_dir):
     )
 
 
-def make_pdf_path(
-    instance: Any,
-    filename: str,
-    thumbs: bool = False,
-) -> str:
-    from cl.disclosures.models import FinancialDisclosure
-    from cl.lasc.models import LASCPDF
+def make_pdf_path(instance, filename, thumbs=False):
     from cl.search.models import ClaimHistory, RECAPDocument
+    from cl.lasc.models import LASCPDF
 
-    parts = []
     if type(instance) == RECAPDocument:
         root = "recap"
         court_id = instance.docket_entry.docket.court_id
         pacer_case_id = instance.docket_entry.docket.pacer_case_id
-        parts.append(get_bucket_name(court_id, pacer_case_id))
     elif type(instance) == ClaimHistory:
         root = "claim"
         court_id = instance.claim.docket.court_id
         pacer_case_id = instance.pacer_case_id
-        parts.append(get_bucket_name(court_id, pacer_case_id))
     elif type(instance) == LASCPDF:
         slug = slugify(trunc(filename, 40))
         root = "/us/state/ca/lasc/%s/" % instance.docket_number
-        filename = "gov.ca.lasc.%s.%s.%s.pdf" % (
+        file_name = "gov.ca.lasc.%s.%s.%s.pdf" % (
             instance.docket_number,
             instance.document_id,
             slug,
         )
-    elif type(instance) == FinancialDisclosure:
-        root = (
-            f"us/federal/judicial/financial-disclosures/{instance.person.id}/"
-        )
-        filename = f"{instance.person.slug}-disclosure.{instance.year}.pdf"
+
+        return os.path.join(root, file_name)
     else:
         raise ValueError(
             "Unknown model type in make_pdf_path "
@@ -125,7 +113,9 @@ def make_pdf_path(
 
     if thumbs:
         root = root + "-thumbnails"
-    return os.path.join(root, *parts, filename)
+    return os.path.join(
+        root, get_bucket_name(court_id, pacer_case_id), filename
+    )
 
 
 def make_json_path(instance, filename):
