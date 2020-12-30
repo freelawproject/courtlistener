@@ -20,10 +20,10 @@ def make_financial_disclosure_thumbnail_from_pdf(pk: int) -> None:
 
     disclosure = FinancialDisclosure.objects.get(pk=pk)
     pdf_url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
-    pdf_content = requests.get(url=pdf_url).content
+    pdf_content = requests.get(url=pdf_url, timeout=2).content
 
     thumbnail_content = generate_thumbnail(pdf_content)
-    if thumbnail_content:
+    if thumbnail_content is not None:
         disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         disclosure.thumbnail.save(None, ContentFile(thumbnail_content))
     else:
