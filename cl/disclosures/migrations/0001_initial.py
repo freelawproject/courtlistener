@@ -67,7 +67,7 @@ class Migration(migrations.Migration):
                 ('person', models.ForeignKey(help_text='The person that the document is associated with.', on_delete=django.db.models.deletion.CASCADE, related_name='financial_disclosures', to='people_db.Person')),
             ],
             options={
-                'ordering': ('-year',),
+                'abstract': False,
             },
         ),
         migrations.CreateModel(
