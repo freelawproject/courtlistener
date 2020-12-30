@@ -5,10 +5,6 @@ from django.db import models
 from cl.disclosures.tasks import (
     make_financial_disclosure_thumbnail_from_pdf,
 )
-from cl.lib.model_helpers import (
-    make_pdf_path,
-    make_financial_disclosure_thumbnail_path,
-)
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.storage import AWSMediaStorage
@@ -129,6 +125,52 @@ class CODES(object):
     }
 
 
+S3_TEMPLATE = (
+    "us/federal/judicial/financial-disclosures/"
+    "{person_id}/{slug}-disclosure.{year}"
+)
+
+
+def thumbnail_path(
+    instance: "FinancialDisclosure",
+    filename: str = None,
+) -> str:
+    """Generate thumbnail location for disclosures
+
+    :param instance: The disclosure
+    :param filename: An empty value - not sure why its needed
+    :return: Location to save thumbnail
+    """
+    return (
+        S3_TEMPLATE.format(
+            person_id=instance.person.id,
+            slug=instance.person.slug,
+            year=instance.year,
+        )
+        + "-thumbnail.png"
+    )
+
+
+def pdf_path(
+    instance: "FinancialDisclosure",
+    filename: str = None,
+) -> str:
+    """Generate a path for the FD PDF
+
+    :param instance: The disclosure object
+    :param filename: The name of the file
+    :return: Location to save the PDF
+    """
+    return (
+        S3_TEMPLATE.format(
+            person_id=instance.person.id,
+            slug=instance.person.slug,
+            year=instance.year,
+        )
+        + ".pdf"
+    )
+
+
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -148,13 +190,13 @@ class FinancialDisclosure(AbstractDateTimeModel):
     )
     filepath = models.FileField(
         help_text="The filepath to the disclosure normalized to a PDF.",
-        upload_to=make_pdf_path,
+        upload_to=pdf_path,
         storage=AWSMediaStorage(),
         db_index=True,
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form.",
-        upload_to=make_financial_disclosure_thumbnail_path,
+        upload_to=thumbnail_path,
         storage=AWSMediaStorage(),
         null=True,
         blank=True,
