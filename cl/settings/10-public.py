@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "cl.cleanup",
     "cl.corpus_importer",
     "cl.custom_filters",
+    "cl.disclosures",
     "cl.donate",
     "cl.favorites",
     "cl.people_db",
@@ -611,6 +612,20 @@ CLOUDFRONT_DOMAIN = ""
 
 BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
 BTE_URLS = {
-    "convert_audio": f"{BTE_HOST}/convert/audio",
+    # Testing
     "heartbeat": f"{BTE_HOST}",
+    # Audio Processing
+    # this should change but currently in a PR so will alter later
+    "convert-audio": f"{BTE_HOST}/convert/audio",
+    # Document processing
+    "pdf-to-text": f"{BTE_HOST}/document/pdf_to_text",
+    "document-extract": f"{BTE_HOST}/document/extract_text",
+    "page-count": f"{BTE_HOST}/document/page_count",
+    "thumbnail": f"{BTE_HOST}/document/thumbnail",
+    "mime-type": f"{BTE_HOST}/document/mime_type",
+    # Image conversion
+    "images-to-pdf": f"{BTE_HOST}/financial_disclosure/images_to_pdf",
+    # Financial Disclosures
+    "extract-disclosure": f"{BTE_HOST}/financial_disclosure/extract_record",
+    "extract-disclosure-jw": f"{BTE_HOST}/financial_disclosure/extract_jw",
 }

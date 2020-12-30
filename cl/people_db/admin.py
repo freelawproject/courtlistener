@@ -13,7 +13,6 @@ from cl.people_db.models import (
     RetentionEvent,
     School,
     Source,
-    FinancialDisclosure,
 )
 
 # RECAP imports
@@ -111,20 +110,6 @@ class SourceInline(admin.TabularInline):
 class ABARatingInline(admin.TabularInline):
     model = ABARating
     extra = 1
-
-
-@admin.register(FinancialDisclosure)
-class FinancialDisclosureAdmin(admin.ModelAdmin):
-    raw_id_fields = ("person",)
-    inlines = (NotesInline,)
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.people_db.tasks import (
-            make_financial_disclosure_thumbnail_from_pdf,
-        )
-
-        make_financial_disclosure_thumbnail_from_pdf.delay(obj.pk)
 
 
 @admin.register(Person)
