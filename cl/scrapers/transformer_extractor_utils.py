@@ -53,6 +53,7 @@ def get_page_count(pdf_bytes: bytes) -> Optional[int]:
     bte_response = requests.post(
         settings.BTE_URLS["page-count"],
         files={"file": ("file.pdf", pdf_bytes)},
+        timeout=5,
     )
     if bte_response.status_code == 200:
         return int(bte_response.content)
@@ -60,7 +61,8 @@ def get_page_count(pdf_bytes: bytes) -> Optional[int]:
 
 
 def generate_thumbnail(
-    pdf_content: ByteString, max_dimension: int = 350
+    pdf_content: ByteString,
+    max_dimension: int = 350,
 ) -> Optional[ByteString]:
     """Convert PDF bytes into Thumbnail of first page
 
@@ -72,6 +74,7 @@ def generate_thumbnail(
         settings.BTE_URLS["thumbnail"],
         files={"file": ("thumbnail.png", pdf_content)},
         params={"max_dimension": max_dimension},
+        timeout=30,
     )
     if thumbnail_response.status_code == 200:
         return thumbnail_response.content
