@@ -310,28 +310,26 @@ def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
     return url
 
 
-def get_disclosure(
-    data: Dict[str, Union[str, int, list]]
-) -> FinancialDisclosure:
-    """Get disclosure from download filepath
+def get_disclosure_from_pdf_path(disclosure_url: str) -> FinancialDisclosure:
+    """Convenience method to get disclosure from download filepath
 
-    This is a convenenience method.
-
-    :param data: File data
+    :param disclosure_url: The URL of the first link (if there are more than
+    one) of the source FD tiff(s)/PDF
     :return: Financial Disclosure object
     """
-    return FinancialDisclosure.objects.get(download_filepath=get_aws_url(data))
+    return FinancialDisclosure.objects.get(download_filepath=disclosure_url)
 
 
-def has_been_pdfed(data: Dict[str, Union[str, int, list]]) -> Optional[str]:
+def has_been_pdfed(disclosure_url: str) -> Optional[str]:
     """Has file been PDFd from tiff and saved to AWS.
 
-    :param data: File data
+    :param disclosure_url: The URL of the first link (if there are more than
+    one) of the source FD tiff(s)/PDF
     :return: Path to document or None
     """
 
     disclosures = FinancialDisclosure.objects.filter(
-        download_filepath=get_aws_url(data)
+        download_filepath=disclosure_url
     )
     if disclosures.exists():
         return (
@@ -341,11 +339,13 @@ def has_been_pdfed(data: Dict[str, Union[str, int, list]]) -> Optional[str]:
 
 
 def generate_or_download_disclosure_as_pdf(
-    data: Dict[str, Union[str, int, List[str]]], pdf_url: Optional[str]
+    data: Dict[str, Union[str, int, List[str]]],
+    pdf_url: Optional[str],
 ) -> requests.Response:
     """Generate or download PDF content from images or urls.
 
     :param data: Data to process.
+    :param pdf_url: The URL of PDF in S3
     :return: Response containing PDF
     """
     if pdf_url:
@@ -398,7 +398,8 @@ def import_financial_disclosures(
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
         # Check if we've already extracted
-        was_previously_pdfed = has_been_pdfed(data)
+        disclosure_url = get_aws_url(data)
+        was_previously_pdfed = has_been_pdfed(disclosure_url)
         pdf_response = generate_or_download_disclosure_as_pdf(
             data, was_previously_pdfed
         )
@@ -409,7 +410,7 @@ def import_financial_disclosures(
             continue
 
         if was_previously_pdfed:
-            disclosure = get_disclosure(data)
+            disclosure = get_disclosure_from_pdf_path(disclosure_url)
         else:
             logger.info("PDF generated successfully.")
 
