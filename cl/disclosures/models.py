@@ -238,9 +238,6 @@ class FinancialDisclosure(AbstractDateTimeModel):
         default=False,
     )
 
-    class Meta:
-        ordering = ("-year",)
-
     def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
         """Calculate gross value of all investments in disclosure
 
