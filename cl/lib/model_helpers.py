@@ -134,19 +134,6 @@ def make_pdf_thumb_path(instance, filename):
     return make_pdf_path(instance, filename, thumbs=True)
 
 
-def make_financial_disclosure_thumbnail_path(instance, filename=None):
-    """Generate thumbnail location for disclosures
-
-    :param instance: The disclosure
-    :param filename: An empty value - not sure why its needed
-    :return: Location to save thumbnail
-    """
-    return (
-        f"us/federal/judicial/financial-disclosures/{instance.person.id}/"
-        f"{instance.person.slug}-disclosure.{instance.year}-thumbnail.png"
-    )
-
-
 def make_upload_path(instance, filename):
     """Return a string like pdf/2010/08/13/foo_v._var.pdf
 

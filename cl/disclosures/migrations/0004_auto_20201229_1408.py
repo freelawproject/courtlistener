@@ -17,6 +17,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='financialdisclosure',
             name='thumbnail',
-            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the disclosure form.', null=True, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_financial_disclosure_thumbnail_path),
+            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the disclosure form.', null=True, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.disclosures.models.thumbnail_path),
         ),
     ]

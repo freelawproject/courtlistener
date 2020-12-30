@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
                 ('year', models.SmallIntegerField(db_index=True, help_text='The year that the disclosure corresponds with')),
                 ('download_filepath', models.TextField(help_text='The path to the original file collected on aws. If split tiff, return url for page one of the disclosures')),
-                ('filepath', models.FileField(db_index=True, help_text='The filepath to the disclosure normalized to a PDF.', storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_pdf_path)),
+                ('filepath', models.FileField(db_index=True, help_text='The filepath to the disclosure normalized to a PDF.', storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.disclosures.models.pdf_path)),
                 ('thumbnail', models.FileField(blank=True, help_text='A thumbnail of the first page of the disclosure form.', null=True, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_pdf_thumb_path)),
                 ('thumbnail_status', models.SmallIntegerField(choices=[(0, 'Thumbnail needed'), (1, 'Thumbnail completed successfully'), (2, 'Unable to generate thumbnail')], default=0, help_text='The status of the thumbnail generation')),
                 ('page_count', models.SmallIntegerField(help_text='The number of pages in the disclosure report')),
