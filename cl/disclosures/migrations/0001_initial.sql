@@ -2,7 +2,7 @@ BEGIN;
 --
 -- Create model Agreement
 --
-CREATE TABLE "disclosures_agreement" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date" text NOT NULL, "parties_and_terms" text NOT NULL, "redacted" boolean NOT NULL);
+CREATE TABLE "disclosures_agreement" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date_raw" text NOT NULL, "parties_and_terms" text NOT NULL, "redacted" boolean NOT NULL);
 --
 -- Create model Debt
 --
@@ -10,11 +10,11 @@ CREATE TABLE "disclosures_debt" ("id" serial NOT NULL PRIMARY KEY, "date_created
 --
 -- Create model FinancialDisclosure
 --
-CREATE TABLE "disclosures_financialdisclosure" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "year" smallint NOT NULL, "download_filepath" text NOT NULL, "filepath" varchar(100) NOT NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "page_count" smallint NOT NULL, "sha1" varchar(40) NOT NULL, "report_type" smallint NOT NULL, "is_amended" boolean NOT NULL, "addendum_content_raw" text NOT NULL, "addendum_redacted" boolean NOT NULL, "has_been_extracted" boolean NOT NULL, "person_id" integer NOT NULL);
+CREATE TABLE "disclosures_financialdisclosure" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "year" smallint NOT NULL, "download_filepath" text NOT NULL, "filepath" varchar(100) NOT NULL, "thumbnail" varchar(100) NULL, "thumbnail_status" smallint NOT NULL, "page_count" smallint NOT NULL, "sha1" varchar(40) NOT NULL UNIQUE, "report_type" smallint NOT NULL, "is_amended" boolean NULL, "addendum_content_raw" text NOT NULL, "addendum_redacted" boolean NOT NULL, "has_been_extracted" boolean NOT NULL, "person_id" integer NOT NULL);
 --
 -- Create model Gift
 --
-CREATE TABLE "disclosures_gift" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source" text NOT NULL, "description" text NOT NULL, "value_code" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
+CREATE TABLE "disclosures_gift" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source" text NOT NULL, "description" text NOT NULL, "value" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
 --
 -- Create model Investment
 --
@@ -22,7 +22,7 @@ CREATE TABLE "disclosures_investment" ("id" serial NOT NULL PRIMARY KEY, "date_c
 --
 -- Create model NonInvestmentIncome
 --
-CREATE TABLE "disclosures_noninvestmentincome" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date" text NOT NULL, "source_type" text NOT NULL, "income_amount" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
+CREATE TABLE "disclosures_noninvestmentincome" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "date_raw" text NOT NULL, "source_type" text NOT NULL, "income_amount" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
 --
 -- Create model Position
 --
@@ -30,11 +30,11 @@ CREATE TABLE "disclosures_position" ("id" serial NOT NULL PRIMARY KEY, "date_cre
 --
 -- Create model Reimbursement
 --
-CREATE TABLE "disclosures_reimbursement" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source" text NOT NULL, "dates" text NOT NULL, "location" text NOT NULL, "purpose" text NOT NULL, "items_paid_or_provided" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
+CREATE TABLE "disclosures_reimbursement" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source" text NOT NULL, "date_raw" text NOT NULL, "location" text NOT NULL, "purpose" text NOT NULL, "items_paid_or_provided" text NOT NULL, "redacted" boolean NOT NULL, "financial_disclosure_id" integer NOT NULL);
 --
 -- Create model SpouseIncome
 --
-CREATE TABLE "disclosures_spouseincome" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source_type" text NOT NULL, "date" text NOT NULL, "redacted" text NOT NULL, "financial_disclosure_id" integer NOT NULL);
+CREATE TABLE "disclosures_spouseincome" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "source_type" text NOT NULL, "date_raw" text NOT NULL, "redacted" text NOT NULL, "financial_disclosure_id" integer NOT NULL);
 --
 -- Add field financial_disclosure to debt
 --
@@ -53,7 +53,6 @@ CREATE INDEX "disclosures_financialdisclosure_date_modified_717ae8fa" ON "disclo
 CREATE INDEX "disclosures_financialdisclosure_year_ee032263" ON "disclosures_financialdisclosure" ("year");
 CREATE INDEX "disclosures_financialdisclosure_filepath_8266edc6" ON "disclosures_financialdisclosure" ("filepath");
 CREATE INDEX "disclosures_financialdisclosure_filepath_8266edc6_like" ON "disclosures_financialdisclosure" ("filepath" varchar_pattern_ops);
-CREATE INDEX "disclosures_financialdisclosure_sha1_552f12ae" ON "disclosures_financialdisclosure" ("sha1");
 CREATE INDEX "disclosures_financialdisclosure_sha1_552f12ae_like" ON "disclosures_financialdisclosure" ("sha1" varchar_pattern_ops);
 CREATE INDEX "disclosures_financialdisclosure_person_id_83e04c6c" ON "disclosures_financialdisclosure" ("person_id");
 ALTER TABLE "disclosures_gift" ADD CONSTRAINT "disclosures_gift_financial_disclosure_67efabf6_fk_disclosur" FOREIGN KEY ("financial_disclosure_id") REFERENCES "disclosures_financialdisclosure" ("id") DEFERRABLE INITIALLY DEFERRED;
