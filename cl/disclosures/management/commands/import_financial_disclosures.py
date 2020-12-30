@@ -122,7 +122,10 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         if int(date_found.year) == year:
             return date_found
         return None
-    except (ParserError, ChristmasError, TypeError):
+    except (ParserError, ChristmasError):
+        return None
+    except TypeError:
+        # Dateutil sometimes goes sideways
         return None
 
 
