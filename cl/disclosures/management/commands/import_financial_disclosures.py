@@ -1,6 +1,5 @@
 import datetime
 import json
-import re
 from typing import Dict, Union, Optional, List
 from urllib.parse import quote
 
@@ -387,12 +386,6 @@ def import_financial_disclosures(
             logger.info("Document already extracted and saved.")
             continue
         # Generate PDF content from our three paths
-        if data["disclosure_type"] == "jw":
-            # I've discovered inconsistency in the JW process and want
-            # to test a little more on a larger variety of documents
-            # continue
-            logger.info("Processing judicial watch... ")
-
         year = int(data["year"])
         person_id = data["person_id"]
         logger.info(f"Processing id:{person_id} " f"year:{year}")
