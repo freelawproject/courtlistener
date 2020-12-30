@@ -1,6 +1,6 @@
-from django.urls import reverse
 from django.db import models
 from django.template import loader
+from django.urls import reverse
 from django.utils.text import slugify
 from localflavor.us import models as local_models
 
@@ -18,13 +18,12 @@ from cl.lib.model_helpers import (
     validate_at_most_n,
     validate_supervisor,
 )
+from cl.lib.models import AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     solr_list,
     null_map,
     normalize_search_dicts,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
-from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -1302,54 +1301,6 @@ class ABARating(AbstractDateTimeModel):
     def clean_fields(self, *args, **kwargs):
         validate_is_not_alias(self, ["person"])
         super(ABARating, self).clean_fields(*args, **kwargs)
-
-
-class FinancialDisclosure(models.Model):
-    """A simple table to hold references to financial disclosure forms"""
-
-    person = models.ForeignKey(
-        Person,
-        help_text="The person that the document is associated with.",
-        related_name="financial_disclosures",
-        on_delete=models.CASCADE,
-    )
-    year = models.SmallIntegerField(
-        help_text="The year that the disclosure corresponds with",
-        db_index=True,
-    )
-    filepath = models.FileField(
-        help_text="The disclosure report itself",
-        upload_to="financial-disclosures/",
-        storage=IncrementingFileSystemStorage(),
-        db_index=True,
-    )
-    thumbnail = models.FileField(
-        help_text="A thumbnail of the first page of the disclosure form",
-        upload_to="financial-disclosures/thumbnails/",
-        storage=IncrementingFileSystemStorage(),
-        null=True,
-        blank=True,
-    )
-    thumbnail_status = models.SmallIntegerField(
-        help_text="The status of the thumbnail generation",
-        choices=THUMBNAIL_STATUSES.NAMES,
-        default=THUMBNAIL_STATUSES.NEEDED,
-    )
-    page_count = models.SmallIntegerField(
-        help_text="The number of pages in the disclosure report",
-    )
-
-    class Meta:
-        ordering = ("-year",)
-
-    def save(self, *args, **kwargs):
-        super(FinancialDisclosure, self).save(*args, **kwargs)
-        if not self.pk:
-            from cl.people_db.tasks import (
-                make_financial_disclosure_thumbnail_from_pdf,
-            )
-
-            make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
 
 class PartyType(models.Model):

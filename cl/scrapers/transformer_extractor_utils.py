@@ -1,4 +1,5 @@
 import json
+from typing import Optional, ByteString
 
 import requests
 from django.conf import settings
@@ -35,9 +36,45 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
         audio_file = {"audio_file": ("", af.read())}
 
     bte_audio_response = requests.post(
-        settings.BTE_URLS["convert_audio"],
+        settings.BTE_URLS["convert-audio"],
         params={"audio_data": json.dumps(audio_data)},
         files=audio_file,
         timeout=60 * 60,
     )
     return bte_audio_response
+
+
+def get_page_count(pdf_bytes: bytes) -> Optional[int]:
+    """Extract page count from PDF content.
+
+    :param pdf_bytes: PDF bytes
+    :return: Page count
+    """
+    bte_response = requests.post(
+        settings.BTE_URLS["page-count"],
+        files={"file": ("file.pdf", pdf_bytes)},
+        timeout=5,
+    )
+    if bte_response.status_code == 200:
+        return int(bte_response.content)
+    return None
+
+
+def generate_thumbnail(
+    pdf_content: ByteString,
+    max_dimension: int = 350,
+) -> Optional[ByteString]:
+    """Convert PDF bytes into Thumbnail of first page
+
+    :param pdf_content: PDF as bytes
+    :param max_dimension: Max dimension for thumbnail
+    :return: Generated thumbnail
+    """
+    thumbnail_response = requests.post(
+        settings.BTE_URLS["thumbnail"],
+        files={"file": ("thumbnail.png", pdf_content)},
+        params={"max_dimension": max_dimension},
+        timeout=30,
+    )
+    if thumbnail_response.status_code == 200:
+        return thumbnail_response.content

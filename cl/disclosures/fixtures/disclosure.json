@@ -1,0 +1,24 @@
+[
+  {
+    "fields": {
+      "id": 1,
+      "date_created": "2020-12-23 23:37:33.681830",
+      "date_modified": "2020-12-23 23:37:33.681930",
+      "year": 2012,
+      "filepath": "us/federal/judicial/financial-disclosures/1/william-palin-disclosure.2012.pdf",
+      "thumbnail": "",
+      "thumbnail_status": 0,
+      "page_count": 6,
+      "sha1": "2710089cb41949187c4daf77fac3c3bf0cff555a",
+      "report_type": -1,
+      "is_amended": false,
+      "addendum_content_raw": "",
+      "addendum_redacted": false,
+      "has_been_extracted": false,
+      "person_id": 1
+    },
+    "model": "disclosures.financialdisclosure",
+    "pk": 1
+  }
+]
+

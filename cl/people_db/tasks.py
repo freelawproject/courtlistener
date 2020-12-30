@@ -5,7 +5,6 @@ from django.core.files.base import ContentFile
 from cl.celery_init import app
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.people_db.models import FinancialDisclosure
 from cl.search.models import RECAPDocument
 
 
@@ -37,7 +36,7 @@ def make_png_thumbnail_for_instance(
         str(max_dimension),
     ]
 
-    # Note that pdftoppm adds things like -01.png to the end of whatever
+    # Note that pdftoppm adds things like -01.jpeg to the end of whatever
     # filename you give it, which makes using a temp file difficult. But,
     # if you don't give it an output file, it'll send the result to stdout,
     # so that's why we are capturing it here.
@@ -55,16 +54,6 @@ def make_png_thumbnail_for_instance(
     item.thumbnail.save(filename, ContentFile(stdout))
 
     return item.pk
-
-
-@app.task
-def make_financial_disclosure_thumbnail_from_pdf(pk):
-    make_png_thumbnail_for_instance(
-        pk=pk,
-        InstanceClass=FinancialDisclosure,
-        file_attr="filepath",
-        max_dimension=350,
-    )
 
 
 @app.task
