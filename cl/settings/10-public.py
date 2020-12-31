@@ -609,8 +609,6 @@ CLOUDFRONT_DOMAIN = ""
 ####################################
 # Binary Transformers & Extractors #
 ####################################
-
-BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
 BTE_URLS = {
     # Testing
     "heartbeat": f"{BTE_HOST}",
