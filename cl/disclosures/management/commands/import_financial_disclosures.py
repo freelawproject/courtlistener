@@ -71,7 +71,6 @@ def extract_content(
     status = extractor_response.status_code
     success = extractor_response.json()["success"]
     if status != 200 or success is False:
-        # Try less accurate and slower judicial watch endpoint.
         logger.info("Could not extract data from this document")
         return {}
 
@@ -392,7 +391,7 @@ def import_financial_disclosures(
         # Generate PDF content from our three paths
         year = int(data["year"])
         person_id = data["person_id"]
-        disclosure_type = data["disclosure_type"]
+
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
         # Check if we've already extracted
@@ -449,7 +448,7 @@ def import_financial_disclosures(
             )
         # Extract content from PDF
         content = extract_content(
-            pdf_bytes=pdf_bytes, disclosure_type=disclosure_type
+            pdf_bytes=pdf_bytes, disclosure_type=data["disclosure_type"]
         )
         if not content:
             logger.info("Failed extraction!")
