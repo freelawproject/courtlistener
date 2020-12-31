@@ -43,7 +43,7 @@ class InvestmentAdmin(admin.ModelAdmin):
     raw_id_fields = ("financial_disclosure",)
 
     list_display = (
-        "description",
+        "description_or_blank",
         "gross_value_code",
         "transaction_value_code",
         "transaction_date",
@@ -54,6 +54,11 @@ class InvestmentAdmin(admin.ModelAdmin):
     ]
 
     readonly_fields = ["page_link"]
+
+    def description_or_blank(self, obj):
+        if len(obj.description):
+            return obj.description
+        return "[Blank]"
 
     def page_link(self, obj):
         return mark_safe(

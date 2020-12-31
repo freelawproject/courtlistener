@@ -40,39 +40,39 @@ def check_if_in_system(sha1_hash: str) -> bool:
     return False
 
 
-def extract_content(pdf_bytes: bytes) -> Dict[str, Union[str, int]]:
+def extract_content(
+    pdf_bytes: bytes,
+    disclosure_type: str,
+) -> Dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
     Attempt extraction using multiple methods if necessary.
 
     :param pdf_bytes: The byte array of the PDF
+    :param disclosure_type: Type of disclosure
     :return:The extracted content
     """
     logger.info("Attempting extraction.")
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
-    extractor_response = requests.post(
-        settings.BTE_URLS["extract-disclosure"],
-        files={"pdf_document": ("file", pdf_bytes)},
-        timeout=60 * 60 * 2,
-    )
-    status = extractor_response.status_code
-    success = extractor_response.json()["success"]
-    if status != 200 or success is False:
-        # Try less accurate and slower judicial watch endpoint.
-        logger.info("Attempting second extraction")
+    if disclosure_type == "jw":
         extractor_response = requests.post(
             settings.BTE_URLS["extract-disclosure-jw"],
             files={"file": ("file", pdf_bytes)},
             timeout=60 * 60,
         )
-        status = extractor_response.status_code
-        success = extractor_response.json()["success"]
-
-        if status != 200 or success is False:
-            logger.info("Could not extract data from this document")
-            return {}
+    else:
+        extractor_response = requests.post(
+            settings.BTE_URLS["extract-disclosure"],
+            files={"pdf_document": ("file", pdf_bytes)},
+            timeout=60 * 60 * 2,
+        )
+    status = extractor_response.status_code
+    success = extractor_response.json()["success"]
+    if status != 200 or success is False:
+        logger.info("Could not extract data from this document")
+        return {}
 
     logger.info("Processing extracted data")
     return extractor_response.json()
@@ -391,6 +391,7 @@ def import_financial_disclosures(
         # Generate PDF content from our three paths
         year = int(data["year"])
         person_id = data["person_id"]
+
         logger.info(f"Processing id:{person_id} " f"year:{year}")
 
         # Check if we've already extracted
@@ -446,7 +447,9 @@ def import_financial_disclosures(
                 f"{disclosure.filepath}"
             )
         # Extract content from PDF
-        content = extract_content(pdf_bytes=pdf_bytes)
+        content = extract_content(
+            pdf_bytes=pdf_bytes, disclosure_type=data["disclosure_type"]
+        )
         if not content:
             logger.info("Failed extraction!")
             return
