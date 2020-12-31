@@ -69,8 +69,7 @@ def extract_content(
             timeout=60 * 60 * 2,
         )
     status = extractor_response.status_code
-    success = extractor_response.json()["success"]
-    if status != 200 or success is False:
+    if status != 200 or extractor_response.json()["success"] is False:
         logger.info("Could not extract data from this document")
         return {}
 
@@ -423,7 +422,7 @@ def import_financial_disclosures(
             pg_count = get_page_count(pdf_bytes)
             if not pg_count:
                 logger.info("PDF failed!")
-                return
+                continue
 
             # Save Financial Disclosure here to AWS and move onward
             disclosure = FinancialDisclosure(
@@ -440,7 +439,6 @@ def import_financial_disclosures(
             disclosure.filepath.save(
                 f"{disclosure.person.slug}-disclosure.{year}.pdf",
                 ContentFile(pdf_bytes),
-                save=False,
             )
             logger.info(
                 f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
@@ -452,7 +450,7 @@ def import_financial_disclosures(
         )
         if not content:
             logger.info("Failed extraction!")
-            return
+            continue
 
         # Save PDF content
         save_disclosure(extracted_data=content, disclosure=disclosure)
