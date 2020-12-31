@@ -192,12 +192,14 @@ class FinancialDisclosure(AbstractDateTimeModel):
         help_text="The filepath to the disclosure normalized to a PDF.",
         upload_to=pdf_path,
         storage=AWSMediaStorage(),
+        max_length=300,
         db_index=True,
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form.",
         upload_to=thumbnail_path,
         storage=AWSMediaStorage(),
+        max_length=300,
         null=True,
         blank=True,
     )
