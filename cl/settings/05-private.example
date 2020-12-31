@@ -117,4 +117,4 @@ AWS_LAMBDA_PROXY_URL = 'https://xxx.execute-api.us-west-2.amazonaws.com/v1/get'
 
 # Development credentials available upon request
 
-
+BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
