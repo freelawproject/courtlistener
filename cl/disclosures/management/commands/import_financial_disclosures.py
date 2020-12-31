@@ -69,8 +69,7 @@ def extract_content(
             timeout=60 * 60 * 2,
         )
     status = extractor_response.status_code
-    success = extractor_response.json()["success"]
-    if status != 200 or success is False:
+    if status != 200 or extractor_response.json()["success"] is False:
         logger.info("Could not extract data from this document")
         return {}
 
