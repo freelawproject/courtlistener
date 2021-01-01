@@ -391,7 +391,10 @@ def import_financial_disclosures(
         year = int(data["year"])
         person_id = data["person_id"]
 
-        logger.info(f"Processing id:{person_id} " f"year:{year}")
+        logger.info(
+            f"Processing row {data['id']} for person {person_id} "
+            f"in year {year}"
+        )
 
         # Check if we've already extracted
         disclosure_url = get_aws_url(data)
