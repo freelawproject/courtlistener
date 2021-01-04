@@ -8,6 +8,7 @@ from dateutil.parser import parse, ParserError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
+from requests import ReadTimeout
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
@@ -56,18 +57,23 @@ def extract_content(
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
-    if disclosure_type == "jw":
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure-jw"],
-            files={"file": ("file", pdf_bytes)},
-            timeout=60 * 60,
-        )
-    else:
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure"],
-            files={"pdf_document": ("file", pdf_bytes)},
-            timeout=60 * 60 * 2,
-        )
+    try:
+        if disclosure_type == "jw":
+            extractor_response = requests.post(
+                settings.BTE_URLS["extract-disclosure-jw"]["url"],
+                files={"file": ("file", pdf_bytes)},
+                timeout=settings.BTE_URLS["extract-disclosure-jw"]["timeout"],
+            )
+        else:
+            extractor_response = requests.post(
+                settings.BTE_URLS["extract-disclosure"]["url"],
+                files={"pdf_document": ("file", pdf_bytes)},
+                timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
+            )
+    except ReadTimeout:
+        logger.info("Timeout occurred for PDF")
+        return {}
+
     status = extractor_response.status_code
     if status != 200 or extractor_response.json()["success"] is False:
         logger.info("Could not extract data from this document")
@@ -361,9 +367,9 @@ def generate_or_download_disclosure_as_pdf(
         urls = data["urls"]
     logger.info(f"Processing url:{quote(urls[0], safe=':/')}")
     return requests.post(
-        settings.BTE_URLS["images-to-pdf"],
+        settings.BTE_URLS["images-to-pdf"]["url"],
         json=json.dumps({"urls": urls}),
-        timeout=10 * 60,
+        timeout=settings.BTE_URLS["images-to-pdf"]["timeout"],
     )
 
 
