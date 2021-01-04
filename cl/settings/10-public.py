@@ -616,7 +616,10 @@ BTE_URLS = {
     # this should change but currently in a PR so will alter later
     "convert-audio": {"url": f"{BTE_HOST}/convert/audio", "timeout": 60 * 60},
     # Document processing
-    "pdf-to-text": {"url": f"{BTE_HOST}/document/pdf_to_text", "timeout": 60 * 5},
+    "pdf-to-text": {
+        "url": f"{BTE_HOST}/document/pdf_to_text",
+        "timeout": 60 * 5,
+    },
     "document-extract": {
         "url": f"{BTE_HOST}/document/extract_text",
         "timeout": 60 * 15,

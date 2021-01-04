@@ -36,10 +36,10 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
         audio_file = {"audio_file": ("", af.read())}
 
     bte_audio_response = requests.post(
-        settings.BTE_URLS["convert-audio"]['url'],
+        settings.BTE_URLS["convert-audio"]["url"],
         params={"audio_data": json.dumps(audio_data)},
         files=audio_file,
-        timeout=settings.BTE_URLS["convert-audio"]['timeout'],
+        timeout=settings.BTE_URLS["convert-audio"]["timeout"],
     )
     return bte_audio_response
 
@@ -51,9 +51,9 @@ def get_page_count(pdf_bytes: bytes) -> Optional[int]:
     :return: Page count
     """
     bte_response = requests.post(
-        settings.BTE_URLS["page-count"]['url'],
+        settings.BTE_URLS["page-count"]["url"],
         files={"file": ("file.pdf", pdf_bytes)},
-        timeout=settings.BTE_URLS["page-count"]['timeout'],
+        timeout=settings.BTE_URLS["page-count"]["timeout"],
     )
     if bte_response.status_code == 200:
         return int(bte_response.content)
@@ -71,10 +71,10 @@ def generate_thumbnail(
     :return: Generated thumbnail
     """
     thumbnail_response = requests.post(
-        settings.BTE_URLS["thumbnail"]['url'],
+        settings.BTE_URLS["thumbnail"]["url"],
         files={"file": ("thumbnail.png", pdf_content)},
         params={"max_dimension": max_dimension},
-        timeout=settings.BTE_URLS["thumbnail"]['timeout'],
+        timeout=settings.BTE_URLS["thumbnail"]["timeout"],
     )
     if thumbnail_response.status_code == 200:
         return thumbnail_response.content
