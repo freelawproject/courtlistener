@@ -1,4 +1,6 @@
 import logging
+from decimal import Decimal
+from typing import Dict, Union
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
@@ -12,6 +14,7 @@ from django.http import (
 )
 from django.shortcuts import render
 from django.utils.timezone import now
+from stripe import StripeObject
 
 from cl.donate.forms import DonationForm, UserForm, ProfileForm
 from cl.donate.models import (
@@ -95,7 +98,11 @@ def route_and_process_payment(
     return response, customer
 
 
-def add_monthly_donations(cd_donation_form, user, customer):
+def add_monthly_donations(
+    cd_donation_form: Dict[str, Union[str, Decimal]],
+    user: User,
+    customer: StripeObject,
+) -> None:
     """Sets things up for monthly donations to run properly."""
     monthly_donation = MonthlyDonation(
         donor=user,
@@ -108,7 +115,15 @@ def add_monthly_donations(cd_donation_form, user, customer):
     monthly_donation.save()
 
 
-def make_payment_page_context(request: HttpRequest) -> HttpResponse:
+PaymentContext = Dict[
+    str,
+    Union[DonationForm, UserForm, ProfileForm, str, bool],
+]
+
+
+def make_payment_page_context(
+    request: HttpRequest,
+) -> PaymentContext:
     """Load the donate page or process a submitted donation.
 
     This page has several branches. The logic is as follows:
@@ -203,8 +218,12 @@ def make_payment_page_context(request: HttpRequest) -> HttpResponse:
 
 
 def process_donation_forms(
-    request, template_name, stripe_redirect_url, context, payment_type
-):
+    request: HttpRequest,
+    template_name: str,
+    stripe_redirect_url: str,
+    context: PaymentContext,
+    payment_type: str,
+) -> Union[HttpResponseRedirect, HttpResponse]:
     donation_form = context["donation_form"]
     user_form = context["user_form"]
     profile_form = context["profile_form"]
@@ -269,7 +288,7 @@ def process_donation_forms(
 
 
 @ratelimiter_unsafe_10_per_m
-def donate(request: HttpRequest) -> HttpResponse:
+def donate(request: HttpRequest) -> Union[HttpResponseRedirect, HttpResponse]:
     context = make_payment_page_context(request)
     context["private"] = False
     return process_donation_forms(
@@ -282,7 +301,9 @@ def donate(request: HttpRequest) -> HttpResponse:
 
 
 @ratelimiter_unsafe_10_per_m
-def cc_payment(request: HttpRequest) -> HttpResponse:
+def cc_payment(
+    request: HttpRequest,
+) -> Union[HttpResponseRedirect, HttpResponse]:
     context = make_payment_page_context(request)
     context["private"] = True
     return process_donation_forms(
@@ -295,7 +316,9 @@ def cc_payment(request: HttpRequest) -> HttpResponse:
 
 
 @ratelimiter_unsafe_10_per_m
-def badge_signup(request: HttpRequest) -> HttpResponse:
+def badge_signup(
+    request: HttpRequest,
+) -> Union[HttpResponseRedirect, HttpResponse]:
     context = make_payment_page_context(request)
     context["private"] = True
     return process_donation_forms(
@@ -307,7 +330,10 @@ def badge_signup(request: HttpRequest) -> HttpResponse:
     )
 
 
-def payment_complete(request, template_name):
+def payment_complete(
+    request: HttpRequest,
+    template_name: str,
+) -> HttpResponse:
     error = None
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider

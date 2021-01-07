@@ -2,6 +2,7 @@ import io
 import re
 import sys
 from datetime import date
+from typing import Dict
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -20,7 +21,7 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
 
 
-def create_or_update_row(values):
+def create_or_update_row(values: Dict[str, str]) -> FjcIntegratedDatabase:
     fjc_filters = [
         {
             "district": values["district"],
@@ -96,7 +97,7 @@ class Command(VerboseCommand, CommandUtils):
         self.nullable_fields = None
 
     @staticmethod
-    def ensure_filetype_ok(filetype):
+    def ensure_filetype_ok(filetype: int) -> None:
         allowed_types = [d[0] for d in DATASET_SOURCES]
         if filetype not in allowed_types:
             raise CommandError(

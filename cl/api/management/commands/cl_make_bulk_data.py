@@ -1,6 +1,7 @@
 import os
 import shutil
 from os.path import join
+from typing import List, Any, Dict
 
 from django.conf import settings
 
@@ -37,7 +38,7 @@ from cl.search.models import Court, Docket, OpinionCluster, Opinion
 class Command(VerboseCommand):
     help = 'Create the bulk files for all jurisdictions and for "all".'
 
-    def handle(self, *args, **options):
+    def handle(self, *args: List[str], **options: Dict[str, Any]):
         super(Command, self).handle(*args, **options)
         courts = Court.objects.all()
 
@@ -136,7 +137,7 @@ class Command(VerboseCommand):
         logger.info("Done.\n")
 
     @staticmethod
-    def make_citation_data(tmp_destination):
+    def make_citation_data(tmp_destination: str) -> None:
         """Because citations are paginated and because as of this moment there
         are 11M citations in the database, we cannot provide users with a bulk
         data file containing the complete objects for every citation.

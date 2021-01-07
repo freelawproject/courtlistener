@@ -1,6 +1,7 @@
 import contextlib
 import os
 import re
+from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -11,7 +12,7 @@ from cl.lib.recap_utils import get_bucket_name
 from cl.lib.string_utils import trunc
 
 
-def make_docket_number_core(docket_number):
+def make_docket_number_core(docket_number: Optional[str]) -> str:
     """Make a core docket number from an existing docket number.
 
     Converts docket numbers like:
@@ -38,7 +39,7 @@ def make_docket_number_core(docket_number):
         return ""
 
 
-def make_path(root, filename):
+def make_path(root: str, filename: str) -> str:
     """Make a simple path for uploaded files.
 
     Start with the `root` node, and use the current date as the subdirectories.

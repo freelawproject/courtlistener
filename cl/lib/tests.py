@@ -34,7 +34,7 @@ from cl.search.models import Opinion, OpinionCluster, Docket, Court
 class TestPacerUtils(TestCase):
     fixtures = ["court_data.json"]
 
-    def test_auto_blocking_small_bankr_docket(self):
+    def test_auto_blocking_small_bankr_docket(self) -> None:
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
         d.court = Court.objects.get(pk="akb")
@@ -64,7 +64,7 @@ class TestDBTools(TestCase):
     # are wickedly simple objects.
     fixtures = ["test_queryset_generator.json"]
 
-    def test_queryset_generator(self):
+    def test_queryset_generator(self) -> None:
         """Does the generator work properly with a variety of queries?"""
         tests = [
             {"query": UrlHash.objects.filter(pk__in=["BAD ID"]), "count": 0},
@@ -83,7 +83,7 @@ class TestDBTools(TestCase):
             self.assertEqual(count, test["count"])
             print("✓")
 
-    def test_queryset_generator_values_query(self):
+    def test_queryset_generator_values_query(self) -> None:
         """Do values queries work?"""
         print(
             "Testing raising an error when we can't get a PK in a values "
@@ -104,7 +104,7 @@ class TestDBTools(TestCase):
         )
         print("✓")
 
-    def test_queryset_generator_chunking(self):
+    def test_queryset_generator_chunking(self) -> None:
         """Does chunking work properly without duplicates or omissions?"""
         print(
             "Testing if queryset_iterator chunking returns the right "
@@ -118,7 +118,7 @@ class TestDBTools(TestCase):
 
 
 class TestStringUtils(TestCase):
-    def test_trunc(self):
+    def test_trunc(self) -> None:
         """Does trunc give us the results we expect?"""
         s = "Henry wants apple."
         tests = (
@@ -158,7 +158,7 @@ class TestStringUtils(TestCase):
                 % (test_dict, result, test_dict["length"]),
             )
 
-    def test_anonymize(self):
+    def test_anonymize(self) -> None:
         """Can we properly anonymize SSNs, EINs, and A-Numbers?"""
         # Simple cases. Anonymize them.
         self.assertEqual(anonymize("111-11-1111"), ("XXX-XX-XXXX", True))
@@ -190,7 +190,7 @@ class TestStringUtils(TestCase):
 
 
 class TestMakeFQ(TestCase):
-    def test_make_fq(self):
+    def test_make_fq(self) -> None:
         test_pairs = (
             ("1 2", "1 AND 2"),
             ("1 and 2", "1 AND 2"),
@@ -214,7 +214,7 @@ class TestModelHelpers(TestCase):
 
     fixtures = ["test_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.court = Court.objects.get(pk="test")
         self.docket = Docket(case_name="Docket", court=self.court)
         self.opinioncluster = OpinionCluster(
@@ -226,13 +226,13 @@ class TestModelHelpers(TestCase):
             cluster=self.opinioncluster, type="Lead Opinion"
         )
 
-    def test_make_upload_path_works_with_opinions(self):
+    def test_make_upload_path_works_with_opinions(self) -> None:
         expected = "mp3/2015/12/14/hotline_bling.mp3"
         self.opinion.file_with_date = datetime.date(2015, 12, 14)
         path = make_upload_path(self.opinion, "hotline_bling.mp3")
         self.assertEqual(expected, path)
 
-    def test_making_docket_number_core(self):
+    def test_making_docket_number_core(self) -> None:
         expected = "1201032"
         self.assertEqual(
             make_docket_number_core("2:12-cv-01032-JKG-MJL"), expected
@@ -256,13 +256,13 @@ class UUIDFileSystemStorageTest(SimpleTestCase):
     # Borrows from https://github.com/django/django/blob/9cbf48693dcd8df6cb22c183dcc94e7ce62b2921/tests/file_storage/tests.py#L89
     allow_database_queries = True
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
         self.storage = UUIDFileSystemStorage(
             location=self.temp_dir, base_url="test_uuid_storage"
         )
 
-    def test_file_save_with_path(self):
+    def test_file_save_with_path(self) -> None:
         """Does saving a pathname create directories and filenames correctly?"""
         self.assertFalse(self.storage.exists("path/to"))
         file_name = "filename"
@@ -281,7 +281,7 @@ class UUIDFileSystemStorageTest(SimpleTestCase):
 class TestMimeLookup(TestCase):
     """ Test the Mime type lookup function(s)"""
 
-    def test_unsupported_extension_returns_octetstream(self):
+    def test_unsupported_extension_returns_octetstream(self) -> None:
         """ For a bad extension, do we return the proper default? """
         tests = [
             "/var/junk/filename.something.xyz",
@@ -293,7 +293,7 @@ class TestMimeLookup(TestCase):
                 "application/octet-stream", lookup_mime_type(test)
             )
 
-    def test_known_good_mimetypes(self):
+    def test_known_good_mimetypes(self) -> None:
         """ For known good mimetypes, make sure we return the right value """
         tests = {
             "mp3/2015/1/1/something_v._something_else.mp3": "audio/mpeg",
@@ -311,7 +311,7 @@ class TestMaintenanceMiddleware(TestCase):
 
     fixtures = ["authtest_data.json"]
 
-    def test_middleware_works_when_enabled(self):
+    def test_middleware_works_when_enabled(self) -> None:
         """ Does the middleware block users when enabled? """
         r = self.client.get(reverse("show_results"))
         self.assertEqual(
@@ -321,7 +321,7 @@ class TestMaintenanceMiddleware(TestCase):
             % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
         )
 
-    def test_staff_can_get_through(self):
+    def test_staff_can_get_through(self) -> None:
         """ Can staff get through when the middleware is enabled? """
         self.assertTrue(
             self.client.login(username="admin", password="password")
@@ -338,7 +338,7 @@ class TestMaintenanceMiddleware(TestCase):
 class TestPACERPartyParsing(TestCase):
     """Various tests for the PACER party parsers."""
 
-    def test_attorney_role_normalization(self):
+    def test_attorney_role_normalization(self) -> None:
         """Can we normalize the attorney roles into a small number of roles?"""
         pairs = [
             {
@@ -449,7 +449,7 @@ class TestPACERPartyParsing(TestCase):
             self.assertEqual(result, pair["a"])
             print("✓")
 
-    def test_state_normalization(self):
+    def test_state_normalization(self) -> None:
         pairs = [
             {"q": "CA", "a": "CA"},
             {"q": "ca", "a": "CA"},
@@ -466,7 +466,7 @@ class TestPACERPartyParsing(TestCase):
             self.assertEqual(result, pair["a"])
             print("✓")
 
-    def test_normalize_atty_contact(self):
+    def test_normalize_atty_contact(self) -> None:
         pairs = [
             {
                 # Email and phone number
@@ -775,7 +775,7 @@ class TestPACERPartyParsing(TestCase):
             self.assertEqual(result, pair["a"])
             print("✓")
 
-    def test_making_a_lookup_key(self):
+    def test_making_a_lookup_key(self) -> None:
         self.assertEqual(
             make_address_lookup_key(
                 {
@@ -798,7 +798,7 @@ class TestPACERPartyParsing(TestCase):
 
 
 class TestFilesizeConversions(TestCase):
-    def test_filesize_conversions(self):
+    def test_filesize_conversions(self) -> None:
         """Can we convert human filesizes to bytes?"""
         qa_pairs = [
             ("58 kb", 59392),

@@ -3,12 +3,14 @@ import os
 import shutil
 import tarfile
 from os.path import join
+from typing import Any, Dict
 
+from django.db.models import QuerySet
 from django.test import RequestFactory
 from rest_framework.renderers import JSONRenderer
 from rest_framework.versioning import URLPathVersioning
 
-from cl.api.utils import BulkJsonHistory
+from cl.api.utils import BulkJsonHistory, HyperlinkedModelSerializerWithId
 from cl.celery_init import app
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
@@ -17,7 +19,11 @@ from cl.lib.utils import deepgetattr, mkdir_p
 
 @app.task
 @print_timing
-def make_bulk_data_and_swap_it_in(courts, bulk_dir, kwargs):
+def make_bulk_data_and_swap_it_in(
+    courts: QuerySet,
+    bulk_dir: str,
+    kwargs: Dict[str, str],
+) -> None:
     """We can't wrap the handle() function, but we can wrap this one."""
     # Create a directory where we'll put temporary files
     tmp_bulk_dir = join(bulk_dir, "tmp")
@@ -40,7 +46,11 @@ def make_bulk_data_and_swap_it_in(courts, bulk_dir, kwargs):
         swap_archives(kwargs["obj_type_str"], bulk_dir, tmp_bulk_dir)
 
 
-def swap_archives(obj_type_str, bulk_dir, tmp_bulk_dir):
+def swap_archives(
+    obj_type_str: str,
+    bulk_dir: str,
+    tmp_bulk_dir: str,
+) -> None:
     """Swap out new archives, clobbering the old, if present"""
     tmp_gz_dir = join(tmp_bulk_dir, obj_type_str)
     final_gz_dir = join(bulk_dir, obj_type_str)
@@ -61,7 +71,12 @@ def swap_archives(obj_type_str, bulk_dir, tmp_bulk_dir):
             raise
 
 
-def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
+def targz_json_files(
+    courts: QuerySet,
+    bulk_dir: str,
+    obj_type_str: str,
+    court_attr: str,
+) -> None:
     """Create gz-compressed archives using the JSON on disk."""
 
     root_path = join(bulk_dir, obj_type_str)
@@ -81,8 +96,8 @@ def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
         tar.close()
 
     if court_attr is not None:
-        # Make the all.tar file by tarring up the other files. Non-court-centric
-        # objects already did this.
+        # Make the all.tar file by tarring up the other files.
+        # Non-court-centric objects already did this.
         tar = tarfile.open(join(root_path, "all.tar"), "w")
         for court in courts:
             targz = join(root_path, "%s.tar.gz" % court.pk)
@@ -91,8 +106,13 @@ def targz_json_files(courts, bulk_dir, obj_type_str, court_attr):
 
 
 def write_json_to_disk(
-    courts, obj_type_str, obj_class, court_attr, serializer, bulk_dir
-):
+    courts: QuerySet,
+    obj_type_str: str,
+    obj_class: Any,
+    court_attr: str,
+    serializer: HyperlinkedModelSerializerWithId,
+    bulk_dir: str,
+) -> int:
     """Write all items to disk as json files inside directories named by
     jurisdiction.
 
