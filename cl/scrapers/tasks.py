@@ -149,8 +149,7 @@ def ocr_needed(path: str, content: str) -> bool:
     :param content: The content extracted from the PDF.
     :return: Whether OCR should be run on the document.
     """
-    has_images = pdf_has_images(path)
-    if content.strip() == "" or has_images:
+    if content.strip() == "" or pdf_has_images(path):
         return True
     return False
 
