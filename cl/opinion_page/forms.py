@@ -345,7 +345,7 @@ class TennWorkersForm(forms.Form):
         )
 
         extract_doc_content.delay(
-            opinion.pk, do_ocr=True, citation_jitter=True
+            opinion.pk, ocr_available=True, citation_jitter=True
         )
 
         logging.info(

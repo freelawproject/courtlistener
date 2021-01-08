@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 import base64
 import logging
 import random
+import re
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
+from typing import List, Optional, Tuple, Union
 
 import requests
 from PyPDF2 import PdfFileReader
@@ -40,15 +41,16 @@ from cl.scrapers.transformer_extractor_utils import (
     convert_and_clean_audio,
 )
 from cl.search.models import Opinion, RECAPDocument, Docket
-from cl.search.tasks import add_items_to_solr
 
 DEVNULL = open("/dev/null", "w")
 
 logger = logging.getLogger(__name__)
 
+ExtractProcessResult = Tuple[str, Optional[str]]
 
-def get_clean_body_content(content):
-    """Parse out the body from an html string, clean it up, and send it along."""
+
+def get_clean_body_content(content: bytes) -> bytes:
+    """Parse out the body from an html string and clean it up"""
     cleaner = Cleaner(
         style=True, remove_tags=["a", "body", "font", "noscript", "img"]
     )
@@ -56,12 +58,12 @@ def get_clean_body_content(content):
         return cleaner.clean_html(content)
     except XMLSyntaxError:
         return (
-            "Unable to extract the content from this file. Please try "
-            "reading the original."
+            b"Unable to extract the content from this file. Please try "
+            b"reading the original."
         )
 
 
-def extract_from_doc(path):
+def extract_from_doc(path: str) -> ExtractProcessResult:
     """Extract text from docs.
 
     We use antiword to pull the text out of MS Doc files.
@@ -73,10 +75,12 @@ def extract_from_doc(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
+    if err is not None:
+        err = err.decode()
     return content.decode(), err
 
 
-def extract_from_docx(path):
+def extract_from_docx(path: str) -> ExtractProcessResult:
     """Extract text from docx files
 
     We use docx2txt to pull out the text. Pretty simple.
@@ -88,10 +92,12 @@ def extract_from_docx(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
+    if err is not None:
+        err = err.decode()
     return content.decode(), err
 
 
-def extract_from_html(path):
+def extract_from_html(path: str) -> Tuple[str, bool]:
     """Extract from html.
 
     A simple wrapper to go get content, and send it along.
@@ -115,7 +121,7 @@ def extract_from_html(path):
         return "", True
 
 
-def make_pdftotext_process(path):
+def make_pdftotext_process(path: str) -> subprocess.Popen:
     """Make a subprocess to hand to higher-level code."""
     return subprocess.Popen(
         ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
@@ -125,30 +131,79 @@ def make_pdftotext_process(path):
     )
 
 
-def extract_from_pdf(path, opinion, do_ocr=False):
+def pdf_has_images(path: str) -> bool:
+    """Check raw PDF for embedded images.
+
+    We need to check if a PDF contains any images.  If a PDF contains images it
+    likely has content that needs to be scanned.
+
+    :param path: Location of PDF to process.
+    :return: Does the PDF contain images?
+    :type: bool
+    """
+    with open(path, "rb") as pdf_file:
+        pdf_bytes = pdf_file.read()
+        return True if re.search(rb"/Image ?/", pdf_bytes) else False
+
+
+def ocr_needed(path: str, content: str) -> bool:
+    """Check if OCR is needed on a PDF
+
+    Check if images are in PDF or content is empty.
+
+    :param path: The path to the PDF
+    :param content: The content extracted from the PDF.
+    :return: Whether OCR should be run on the document.
+    """
+    if content.strip() == "" or pdf_has_images(path):
+        return True
+    return False
+
+
+def extract_from_pdf(
+    path: str,
+    opinion: Opinion,
+    ocr_available: bool = False,
+) -> ExtractProcessResult:
     """Extract text from pdfs.
 
-    Here, we use pdftotext. If that fails, try to use tesseract under the
-    assumption it's an image-based PDF. Once that is complete, we check for the
-    letter e in our content. If it's not there, we try to fix the mojibake
-    that ca9 sometimes creates.
+    Start with pdftotext. If we we enabled OCR - and the the content is empty
+    or the PDF contains images, use tesseract. This pattern occurs because PDFs
+    can be images, text-based and a mix of the two. We check for images to
+    make sure we do OCR on mix-type PDFs.
+
+    If a text-based PDF we fix corrupt PDFs from ca9.
+
+    :param path: The path to the PDF
+    :param opinion: The Opinion associated with the PDF
+    :param ocr_available: Whether we should do OCR stuff
+    :return Tuple of the content itself and any errors we received
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     content = content.decode()
-    if content.strip() == "" and do_ocr:
-        success, content = extract_by_ocr(path)
-        if success:
-            opinion.extracted_by_ocr = True
-        elif content == "" or not success:
-            content = "Unable to extract document content."
-    elif "e" not in content:
-        # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(content)
+    if err is not None:
+        err = err.decode()
+
+    if not ocr_available:
+        if "e" not in content:
+            # It's a corrupt PDF from ca9. Fix it.
+            content = fix_mojibake(content)
+    else:
+        if ocr_needed(path, content):
+            success, ocr_content = extract_by_ocr(path)
+            if success:
+                opinion.extracted_by_ocr = True
+                # Check content length and take the longer of the two
+                if len(ocr_content) > len(content):
+                    content = ocr_content
+            elif content == "" or not success:
+                content = "Unable to extract document content."
+
     return content, err
 
 
-def extract_from_txt(path):
+def extract_from_txt(path: str) -> Tuple[str, bool]:
     """Extract text from plain text files: A fool's errand.
 
     Unfortunately, plain text files lack encoding information, so we have to
@@ -174,7 +229,7 @@ def extract_from_txt(path):
     return content, err
 
 
-def extract_from_wpd(path, opinion):
+def extract_from_wpd(path: str, opinion: Opinion) -> ExtractProcessResult:
     """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
@@ -188,6 +243,8 @@ def extract_from_wpd(path, opinion):
 
     content = get_clean_body_content(content)
     content = content.decode()
+    if err is not None:
+        err = err.decode()
 
     if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
@@ -195,7 +252,7 @@ def extract_from_wpd(path, opinion):
     return content, err
 
 
-def convert_file_to_txt(path):
+def convert_file_to_txt(path: str) -> str:
     tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
     p = subprocess.Popen(
         tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -203,7 +260,7 @@ def convert_file_to_txt(path):
     return p.communicate()[0].decode()
 
 
-def get_page_count(path, extension):
+def get_page_count(path: str, extension: str) -> Optional[int]:
     """Get the number of pages, if appropriate mimetype.
 
     :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
@@ -238,7 +295,7 @@ def get_page_count(path, extension):
     return None
 
 
-def update_document_from_text(opinion):
+def update_document_from_text(opinion: Opinion) -> None:
     """Extract additional metadata from document text
 
     Use functions from Juriscraper to pull metadata out of opinion
@@ -272,7 +329,11 @@ def update_document_from_text(opinion):
 
 
 @app.task
-def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
+def extract_doc_content(
+    pk: int,
+    ocr_available: bool = False,
+    citation_jitter: bool = False,
+) -> None:
     """
     Given an opinion PK, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
@@ -281,7 +342,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     This implementation uses local paths.
 
     :param pk: The opinion primary key to work on
-    :param do_ocr: Whether the PDF converting function should use OCR
+    :param ocr_available: Whether the PDF converting function should use OCR
     :param citation_jitter: Whether to apply jitter before running the citation
     parsing code. This can be useful do spread these tasks out when doing a
     larger scrape.
@@ -298,7 +359,7 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
     elif extension == "html":
         content, err = extract_from_html(path)
     elif extension == "pdf":
-        content, err = extract_from_pdf(path, opinion, do_ocr)
+        content, err = extract_from_pdf(path, opinion, ocr_available)
     elif extension == "txt":
         content, err = extract_from_txt(path)
     elif extension == "wpd":
@@ -362,7 +423,11 @@ def extract_doc_content(pk, do_ocr=False, citation_jitter=False):
 
 
 @app.task
-def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
+def extract_recap_pdf(
+    pks: Union[int, List[int]],
+    skip_ocr: bool = False,
+    check_if_needed: bool = True,
+) -> List[int]:
     """Extract the contents from a RECAP PDF if necessary."""
     if not is_iter(pks):
         pks = [pks]
@@ -403,7 +468,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
     return processed
 
 
-def rasterize_pdf(path, destination):
+def rasterize_pdf(path: str, destination: str) -> Tuple[str, str, int]:
     """Convert the PDF into a multipage Tiff file.
 
     This function uses ghostscript for processing and borrows heavily from:
@@ -442,7 +507,7 @@ def rasterize_pdf(path, destination):
     return stdout, stderr, p.returncode
 
 
-def cleanup_ocr_text(txt):
+def cleanup_ocr_text(txt: str) -> str:
     """Do some basic cleanup to make OCR text better.
 
     Err on the side of safety. Don't make fixes that could cause other issues.
