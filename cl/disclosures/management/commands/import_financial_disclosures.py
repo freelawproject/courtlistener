@@ -28,14 +28,17 @@ def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
 
 
 def import_financial_disclosures(
-    filepath: str, skip_until: Optional[str], queue_name: str, min_size: int
+    filepath: str,
+    skip_until: int,
+    queue_name: str,
+    min_size: int,
 ) -> None:
     """Import financial documents into courtlistener.
 
     :param filepath: Path to file data to import.
     :param skip_until: ID if any to skip until.
-    :param queue_name: The celery queue name
-    :param min_size: The minimum items in a queue
+    :param queue_name: The celery queue name.
+    :param min_size: The minimum items in a queue.
     :return:None
     """
     throttle = CeleryThrottle(
