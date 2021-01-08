@@ -140,12 +140,12 @@ def make_pdftotext_process(path: str) -> subprocess.Popen:
     )
 
 
-def is_ocr_needed(has_images: bool, content: str) -> bool:
-    """Check if OCR is needed
+def ocr_needed(path: str, content: str) -> bool:
+    """Check if OCR is needed on a PDF
 
     Check if images are in PDF or content is empty.
 
-    :param has_images: Whether the PDF contains images.
+    :param path: The path to the PDF
     :param content: The content extracted from the PDF.
     :return: Whether OCR should be run on the document.
     """
@@ -176,9 +176,7 @@ def extract_from_pdf(
             # It's a corrupt PDF from ca9. Fix it.
             content = fix_mojibake(content)
     else:
-        has_images = check_pdf_for_images(path)
-        ocr_needed = is_ocr_needed(has_images, content)
-        if ocr_needed:
+        if ocr_needed(path, content):
             success, ocr_content = extract_by_ocr(path)
             if success:
                 opinion.extracted_by_ocr = True
