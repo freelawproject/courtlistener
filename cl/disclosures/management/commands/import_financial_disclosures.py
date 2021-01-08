@@ -46,7 +46,6 @@ def import_financial_disclosures(
         disclosures = json.load(f)
 
     for data in disclosures:
-        throttle.maybe_wait()
         if data["id"] < skip_until:
             continue
 
@@ -54,6 +53,8 @@ def import_financial_disclosures(
         if has_been_extracted(data):
             logger.info("Document already extracted and saved.")
             continue
+
+        throttle.maybe_wait()
 
         # Add disclosures to celery queue
         import_disclosure.apply_async(
