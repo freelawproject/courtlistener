@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import base64
 import logging
 import random
@@ -6,7 +5,7 @@ import re
 import subprocess
 import traceback
 from tempfile import NamedTemporaryFile
-from typing import Tuple
+from typing import List, Optional, Tuple, Union
 
 import requests
 from PyPDF2 import PdfFileReader
@@ -42,15 +41,14 @@ from cl.scrapers.transformer_extractor_utils import (
     convert_and_clean_audio,
 )
 from cl.search.models import Opinion, RECAPDocument, Docket
-from cl.search.tasks import add_items_to_solr
 
 DEVNULL = open("/dev/null", "w")
 
 logger = logging.getLogger(__name__)
 
 
-def get_clean_body_content(content):
-    """Parse out the body from an html string, clean it up, and send it along."""
+def get_clean_body_content(content: bytes) -> bytes:
+    """Parse out the body from an html string and clean it up"""
     cleaner = Cleaner(
         style=True, remove_tags=["a", "body", "font", "noscript", "img"]
     )
@@ -58,12 +56,12 @@ def get_clean_body_content(content):
         return cleaner.clean_html(content)
     except XMLSyntaxError:
         return (
-            "Unable to extract the content from this file. Please try "
-            "reading the original."
+            b"Unable to extract the content from this file. Please try "
+            b"reading the original."
         )
 
 
-def extract_from_doc(path):
+def extract_from_doc(path: str) -> Tuple[str, str]:
     """Extract text from docs.
 
     We use antiword to pull the text out of MS Doc files.
@@ -75,10 +73,10 @@ def extract_from_doc(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content.decode(), err
+    return content.decode(), err.decode()
 
 
-def extract_from_docx(path):
+def extract_from_docx(path: str) -> Tuple[str, str]:
     """Extract text from docx files
 
     We use docx2txt to pull out the text. Pretty simple.
@@ -90,10 +88,10 @@ def extract_from_docx(path):
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content.decode(), err
+    return content.decode(), err.decode()
 
 
-def extract_from_html(path):
+def extract_from_html(path: str) -> Tuple[str, bool]:
     """Extract from html.
 
     A simple wrapper to go get content, and send it along.
@@ -129,10 +127,10 @@ def check_pdf_for_images(path: str) -> bool:
     """
     with open(path, "rb") as pdf_file:
         pdf_bytes = pdf_file.read()
-        return True if re.search(rb"\/Image ?\/", pdf_bytes) else False
+        return True if re.search(rb"/Image ?/", pdf_bytes) else False
 
 
-def make_pdftotext_process(path):
+def make_pdftotext_process(path: str) -> subprocess.Popen:
     """Make a subprocess to hand to higher-level code."""
     return subprocess.Popen(
         ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
@@ -192,7 +190,7 @@ def extract_from_pdf(
     return content, err
 
 
-def extract_from_txt(path):
+def extract_from_txt(path: str) -> Tuple[str, bool]:
     """Extract text from plain text files: A fool's errand.
 
     Unfortunately, plain text files lack encoding information, so we have to
@@ -218,7 +216,7 @@ def extract_from_txt(path):
     return content, err
 
 
-def extract_from_wpd(path, opinion):
+def extract_from_wpd(path: str, opinion: Opinion) -> Tuple[str, str]:
     """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
@@ -236,10 +234,10 @@ def extract_from_wpd(path, opinion):
     if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
 
-    return content, err
+    return content, err.decode()
 
 
-def convert_file_to_txt(path):
+def convert_file_to_txt(path: str) -> str:
     tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
     p = subprocess.Popen(
         tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -247,7 +245,7 @@ def convert_file_to_txt(path):
     return p.communicate()[0].decode()
 
 
-def get_page_count(path, extension):
+def get_page_count(path: str, extension: str) -> Optional[int]:
     """Get the number of pages, if appropriate mimetype.
 
     :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
@@ -282,7 +280,7 @@ def get_page_count(path, extension):
     return None
 
 
-def update_document_from_text(opinion):
+def update_document_from_text(opinion: Opinion) -> None:
     """Extract additional metadata from document text
 
     Use functions from Juriscraper to pull metadata out of opinion
@@ -316,7 +314,11 @@ def update_document_from_text(opinion):
 
 
 @app.task
-def extract_doc_content(pk, ocr_available=False, citation_jitter=False):
+def extract_doc_content(
+    pk: int,
+    ocr_available: bool = False,
+    citation_jitter: bool = False,
+) -> None:
     """
     Given an opinion PK, we extract it, sniffing its extension, then store its
     contents in the database.  Finally, we asynchronously find citations in
@@ -406,7 +408,11 @@ def extract_doc_content(pk, ocr_available=False, citation_jitter=False):
 
 
 @app.task
-def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
+def extract_recap_pdf(
+    pks: Union[int, List[int]],
+    skip_ocr: bool = False,
+    check_if_needed: bool = True,
+) -> List[int]:
     """Extract the contents from a RECAP PDF if necessary."""
     if not is_iter(pks):
         pks = [pks]
@@ -447,7 +453,7 @@ def extract_recap_pdf(pks, skip_ocr=False, check_if_needed=True):
     return processed
 
 
-def rasterize_pdf(path, destination):
+def rasterize_pdf(path: str, destination: str) -> Tuple[str, str, int]:
     """Convert the PDF into a multipage Tiff file.
 
     This function uses ghostscript for processing and borrows heavily from:
@@ -486,7 +492,7 @@ def rasterize_pdf(path, destination):
     return stdout, stderr, p.returncode
 
 
-def cleanup_ocr_text(txt):
+def cleanup_ocr_text(txt: str) -> str:
     """Do some basic cleanup to make OCR text better.
 
     Err on the side of safety. Don't make fixes that could cause other issues.
