@@ -598,6 +598,7 @@ RELATED_FILTER_BY_STATUS = "Precedential"
 AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
 AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
 AWS_DEFAULT_ACL = "public-read"
+AWS_QUERYSTRING_AUTH = False
 
 if DEVELOPMENT:
     AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
@@ -611,19 +612,34 @@ CLOUDFRONT_DOMAIN = ""
 ####################################
 BTE_URLS = {
     # Testing
-    "heartbeat": f"{BTE_HOST}",
+    "heartbeat": {"url": f"{BTE_HOST}", "timeout": 5},
     # Audio Processing
     # this should change but currently in a PR so will alter later
-    "convert-audio": f"{BTE_HOST}/convert/audio",
+    "convert-audio": {"url": f"{BTE_HOST}/convert/audio", "timeout": 60 * 60},
     # Document processing
-    "pdf-to-text": f"{BTE_HOST}/document/pdf_to_text",
-    "document-extract": f"{BTE_HOST}/document/extract_text",
-    "page-count": f"{BTE_HOST}/document/page_count",
-    "thumbnail": f"{BTE_HOST}/document/thumbnail",
-    "mime-type": f"{BTE_HOST}/document/mime_type",
+    "pdf-to-text": {
+        "url": f"{BTE_HOST}/document/pdf_to_text",
+        "timeout": 60 * 5,
+    },
+    "document-extract": {
+        "url": f"{BTE_HOST}/document/extract_text",
+        "timeout": 60 * 15,
+    },
+    "page-count": {"url": f"{BTE_HOST}/document/page_count", "timeout": 30},
+    "thumbnail": {"url": f"{BTE_HOST}/document/thumbnail", "timeout": 30},
+    "mime-type": {"url": f"{BTE_HOST}/document/mime_type", "timeout": 30},
     # Image conversion
-    "images-to-pdf": f"{BTE_HOST}/financial_disclosure/images_to_pdf",
+    "images-to-pdf": {
+        "url": f"{BTE_HOST}/financial_disclosure/images_to_pdf",
+        "timeout": 60 * 10,
+    },
     # Financial Disclosures
-    "extract-disclosure": f"{BTE_HOST}/financial_disclosure/extract_record",
-    "extract-disclosure-jw": f"{BTE_HOST}/financial_disclosure/extract_jw",
+    "extract-disclosure": {
+        "url": f"{BTE_HOST}/financial_disclosure/extract_record",
+        "timeout": 60 * 60 * 2,
+    },
+    "extract-disclosure-jw": {
+        "url": f"{BTE_HOST}/financial_disclosure/extract_jw",
+        "timeout": 60 * 60 * 2,
+    },
 }
