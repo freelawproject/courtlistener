@@ -115,6 +115,16 @@ def extract_from_html(path: str) -> Tuple[str, bool]:
         return "", True
 
 
+def make_pdftotext_process(path: str) -> subprocess.Popen:
+    """Make a subprocess to hand to higher-level code."""
+    return subprocess.Popen(
+        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=DEVNULL,
+    )
+
+
 def pdf_has_images(path: str) -> bool:
     """Check raw PDF for embedded images.
 
@@ -128,16 +138,6 @@ def pdf_has_images(path: str) -> bool:
     with open(path, "rb") as pdf_file:
         pdf_bytes = pdf_file.read()
         return True if re.search(rb"/Image ?/", pdf_bytes) else False
-
-
-def make_pdftotext_process(path: str) -> subprocess.Popen:
-    """Make a subprocess to hand to higher-level code."""
-    return subprocess.Popen(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL,
-    )
 
 
 def ocr_needed(path: str, content: str) -> bool:
