@@ -156,20 +156,28 @@ def ocr_needed(path: str, content: str) -> bool:
 
 
 def extract_from_pdf(
-    path: str, opinion: Opinion, ocr_available: bool = False
-) -> Tuple[str, bytes]:
+    path: str,
+    opinion: Opinion,
+    ocr_available: bool = False,
+) -> Tuple[str, str]:
     """Extract text from pdfs.
 
-    Start with pdftotext.  If we we enabled OCR - and the the content is empty
-    or the PDF contains images use tesseract.  This pattern occurs because
-    PDFs can be images, text-based and a mix of the two.  We check for images
-    to avoid not OCRing mix type PDFs.
+    Start with pdftotext. If we we enabled OCR - and the the content is empty
+    or the PDF contains images, use tesseract. This pattern occurs because PDFs
+    can be images, text-based and a mix of the two. We check for images to
+    make sure we do OCR on mix-type PDFs.
 
     If a text-based PDF we fix corrupt PDFs from ca9.
+
+    :param path: The path to the PDF
+    :param opinion: The Opinion associated with the PDF
+    :param ocr_available: Whether we should do OCR stuff
+    :return Tuple of the content itself and any errors we received
     """
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     content = content.decode()
+    err = err.decode()
 
     if not ocr_available:
         if "e" not in content:
