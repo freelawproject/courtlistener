@@ -4,15 +4,13 @@ import os
 from django.conf import settings
 from django.test import TestCase
 
-from cl.disclosures.management.commands.import_financial_disclosures import (
-    save_disclosure,
-)
 from cl.disclosures.models import (
     FinancialDisclosure,
     Investment,
     Reimbursement,
     NonInvestmentIncome,
 )
+from cl.disclosures.tasks import save_disclosure
 
 
 class DisclosureIngestionTests(TestCase):
