@@ -130,7 +130,7 @@ def import_tn_corpus(log, skip_until, filepath):
 
         extract_doc_content.delay(
             opinion.pk,
-            do_ocr=True,
+            ocr_available=True,
             citation_jitter=True,
         )
         logging.info(
