@@ -90,7 +90,7 @@ class Command(VerboseCommand):
             "--min-size",
             default=1,
             type=int,
-            help="Number of co processes",
+            help="Minimum tasks in a queue (max = min x 2)",
         )
 
     def handle(self, *args, **options):
