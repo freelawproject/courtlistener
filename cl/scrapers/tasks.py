@@ -115,7 +115,7 @@ def extract_from_html(path: str) -> Tuple[str, bool]:
         return "", True
 
 
-def check_pdf_for_images(path: str) -> bool:
+def pdf_has_images(path: str) -> bool:
     """Check raw PDF for embedded images.
 
     We need to check if a PDF contains any images.  If a PDF contains images it
@@ -149,6 +149,7 @@ def is_ocr_needed(has_images: bool, content: str) -> bool:
     :param content: The content extracted from the PDF.
     :return: Whether OCR should be run on the document.
     """
+    has_images = pdf_has_images(path)
     if content.strip() == "" or has_images:
         return True
     return False
