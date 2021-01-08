@@ -46,6 +46,8 @@ DEVNULL = open("/dev/null", "w")
 
 logger = logging.getLogger(__name__)
 
+ExtractProcessResult = Tuple[str, Optional[str]]
+
 
 def get_clean_body_content(content: bytes) -> bytes:
     """Parse out the body from an html string and clean it up"""
@@ -61,7 +63,7 @@ def get_clean_body_content(content: bytes) -> bytes:
         )
 
 
-def extract_from_doc(path: str) -> Tuple[str, str]:
+def extract_from_doc(path: str) -> ExtractProcessResult:
     """Extract text from docs.
 
     We use antiword to pull the text out of MS Doc files.
@@ -73,10 +75,12 @@ def extract_from_doc(path: str) -> Tuple[str, str]:
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content.decode(), err.decode()
+    if err is not None:
+        err = err.decode()
+    return content.decode(), err
 
 
-def extract_from_docx(path: str) -> Tuple[str, str]:
+def extract_from_docx(path: str) -> ExtractProcessResult:
     """Extract text from docx files
 
     We use docx2txt to pull out the text. Pretty simple.
@@ -88,7 +92,9 @@ def extract_from_docx(path: str) -> Tuple[str, str]:
         stderr=DEVNULL,
     )
     content, err = process.communicate()
-    return content.decode(), err.decode()
+    if err is not None:
+        err = err.decode()
+    return content.decode(), err
 
 
 def extract_from_html(path: str) -> Tuple[str, bool]:
@@ -158,7 +164,7 @@ def extract_from_pdf(
     path: str,
     opinion: Opinion,
     ocr_available: bool = False,
-) -> Tuple[str, str]:
+) -> ExtractProcessResult:
     """Extract text from pdfs.
 
     Start with pdftotext. If we we enabled OCR - and the the content is empty
@@ -176,7 +182,8 @@ def extract_from_pdf(
     process = make_pdftotext_process(path)
     content, err = process.communicate()
     content = content.decode()
-    err = err.decode()
+    if err is not None:
+        err = err.decode()
 
     if not ocr_available:
         if "e" not in content:
@@ -222,7 +229,7 @@ def extract_from_txt(path: str) -> Tuple[str, bool]:
     return content, err
 
 
-def extract_from_wpd(path: str, opinion: Opinion) -> Tuple[str, str]:
+def extract_from_wpd(path: str, opinion: Opinion) -> ExtractProcessResult:
     """Extract text from a Word Perfect file
 
     Yes, courts still use these, so we extract their text using wpd2html. Once
@@ -236,11 +243,13 @@ def extract_from_wpd(path: str, opinion: Opinion) -> Tuple[str, str]:
 
     content = get_clean_body_content(content)
     content = content.decode()
+    if err is not None:
+        err = err.decode()
 
     if "not for publication" in content.lower():
         opinion.precedential_status = "Unpublished"
 
-    return content, err.decode()
+    return content, err
 
 
 def convert_file_to_txt(path: str) -> str:
