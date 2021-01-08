@@ -387,8 +387,12 @@ def generate_or_download_disclosure_as_pdf(
     )
 
 
-@app.task
-def import_disclosure(data: Dict[str, Union[str, int, list]]) -> None:
+@app.task(
+    bind=True,
+    max_retries=2,
+    interval_start=10,
+)
+def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     """Import disclosures into Courtlistener
 
     :param data: The disclosure information to process
