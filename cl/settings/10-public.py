@@ -483,6 +483,7 @@ if not DEVELOPMENT:
             DjangoIntegration(),
             RedisIntegration(),
         ],
+        ignore_errors=[KeyboardInterrupt],
     )
 
 
