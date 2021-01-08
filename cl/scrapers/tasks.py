@@ -142,6 +142,20 @@ def make_pdftotext_process(path):
     )
 
 
+def is_ocr_needed(has_images: bool, content: str) -> bool:
+    """Check if OCR is needed
+
+    Check if images are in PDF or content is empty.
+
+    :param has_images: Whether the PDF contains images.
+    :param content: The content extracted from the PDF.
+    :return: Whether OCR should be run on the document.
+    """
+    if content.strip() == "" or has_images:
+        return True
+    return False
+
+
 def extract_from_pdf(
     path: str, opinion: Opinion, ocr_available: bool = False
 ) -> Tuple[str, bytes]:
@@ -158,19 +172,23 @@ def extract_from_pdf(
     content, err = process.communicate()
     content = content.decode()
 
-    has_images = check_pdf_for_images(path)
-    if (content.strip() == "" or has_images) and ocr_available:
-        success, ocr_content = extract_by_ocr(path)
-        if success:
-            opinion.extracted_by_ocr = True
-            # Check content length and take the longer of the two
-            if len(ocr_content) > len(content):
-                content = ocr_content
-        elif content == "" or not success:
-            content = "Unable to extract document content."
-    elif "e" not in content:
-        # It's a corrupt PDF from ca9. Fix it.
-        content = fix_mojibake(content)
+    if not ocr_available:
+        if "e" not in content:
+            # It's a corrupt PDF from ca9. Fix it.
+            content = fix_mojibake(content)
+    else:
+        has_images = check_pdf_for_images(path)
+        ocr_needed = is_ocr_needed(has_images, content)
+        if ocr_needed:
+            success, ocr_content = extract_by_ocr(path)
+            if success:
+                opinion.extracted_by_ocr = True
+                # Check content length and take the longer of the two
+                if len(ocr_content) > len(content):
+                    content = ocr_content
+            elif content == "" or not success:
+                content = "Unable to extract document content."
+
     return content, err
 
 
