@@ -1,5 +1,6 @@
-0.0.17
+0.0.18
 
+0.0.18: Add no-index headers to /protected/ location
 0.0.17: Stop blocking Allen v. Chanel
 0.0.16: Remove HSTS header from HTTP response (it does nothing there).
 0.0.15: Redirect http to root https, then to www (Google's HSTS recommends
