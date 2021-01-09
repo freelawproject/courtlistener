@@ -62,7 +62,7 @@ def import_financial_disclosures(
         # Add disclosures to celery queue
         import_disclosure.apply_async(
             args=[data],
-            queue_name=queue_name,
+            queue=queue_name,
         )
 
 
