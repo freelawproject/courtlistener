@@ -1,12 +1,13 @@
 import os
 import re
+from typing import Any, Dict, List
 
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.urls import reverse, NoReverseMatch
 from django.db import models
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, QuerySet
 from django.template import loader
 from django.utils.encoding import force_str
 from django.utils.text import slugify
@@ -2634,7 +2635,7 @@ class Opinion(AbstractDateTimeModel):
     )
 
     @property
-    def siblings(self):
+    def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
         return self.cluster.sub_opinions
 
@@ -2649,18 +2650,24 @@ class Opinion(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
 
-    def clean(self):
+    def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        index: bool = True,
+        force_commit: bool = False,
+        *args: List,
+        **kwargs: Dict,
+    ) -> None:
         super(Opinion, self).save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 
             add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
 
-    def as_search_dict(self):
+    def as_search_dict(self) -> Dict[str, Any]:
         """Create a dict that can be ingested by Solr."""
         # IDs
         out = {
