@@ -20,7 +20,7 @@ from cl.scrapers.transformer_extractor_utils import (
 )
 
 
-@app.task(bind=True, max_retries=2)
+@app.task(bind=True, max_retries=2, ignore_result=True)
 def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     """Generate Thumbnail and save to AWS
 
@@ -397,11 +397,7 @@ def generate_or_download_disclosure_as_pdf(
     )
 
 
-@app.task(
-    bind=True,
-    max_retries=2,
-    interval_start=10,
-)
+@app.task(bind=True, max_retries=2, interval_start=10, ignore_result=True)
 def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     """Import disclosures into Courtlistener
 
