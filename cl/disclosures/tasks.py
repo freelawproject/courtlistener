@@ -20,12 +20,13 @@ from cl.scrapers.transformer_extractor_utils import (
 )
 
 
-@app.task
-def make_financial_disclosure_thumbnail_from_pdf(pk: int) -> None:
+@app.task(bind=True, max_retries=2)
+def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     """Generate Thumbnail and save to AWS
 
     Attempt to generate thumbnail from PDF and save to AWS.
 
+    :param self: The celery task
     :param pk: PK of disclosure in database
     :return: None
     """
@@ -35,7 +36,16 @@ def make_financial_disclosure_thumbnail_from_pdf(pk: int) -> None:
     pdf_url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
     pdf_content = requests.get(url=pdf_url, timeout=2).content
 
-    thumbnail_content = generate_thumbnail(pdf_content)
+    try:
+        thumbnail_content = generate_thumbnail(pdf_content)
+    except ReadTimeout as exc:
+        if self.request.retries == self.max_retries:
+            disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
+            disclosure.save()
+            return
+        else:
+            raise self.retry(exc=exc)
+
     if thumbnail_content is not None:
         disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
         disclosure.thumbnail.save(None, ContentFile(thumbnail_content))
