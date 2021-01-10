@@ -54,7 +54,7 @@ def import_financial_disclosures(
 
         # Check download_filepath to see if it has been processed before.
         if has_been_extracted(data):
-            logger.info("Document already extracted and saved.")
+            logger.info(f"Document already extracted and saved: {data['id']}.")
             continue
 
         throttle.maybe_wait()
