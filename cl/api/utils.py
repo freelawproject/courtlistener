@@ -360,6 +360,22 @@ class RECAPUploaders(DjangoModelPermissions):
         "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
+class DisclosureAPIUsers(DjangoModelPermissions):
+    """Provides some users upload permissions in RECAP
+
+    Such users must have the has_recap_upload_access flag set on their account
+    """
+
+    perms_map = {
+        "GET": ["%(app_label)s.has_disclosure_api_access"],
+        "OPTIONS": ["%(app_label)s.has_disclosure_api_access"],
+        "HEAD": ["%(app_label)s.has_disclosure_api_access"],
+        "POST": ["%(app_label)s.has_disclosure_api_access"],
+        "PUT": ["%(app_label)s.has_disclosure_api_access"],
+        "PATCH": ["%(app_label)s.has_disclosure_api_access"],
+        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
+    }
+
 
 class BigPagination(PageNumberPagination):
     page_size = 300
