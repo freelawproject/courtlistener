@@ -74,6 +74,7 @@ class InvestmentFilter(FilterSet):
             "date_modified": DATETIME_LOOKUPS,
         }
 
+
 class NonInvestmentIncomeFilter(FilterSet):
     class Meta:
         model = NonInvestmentIncome
@@ -83,6 +84,7 @@ class NonInvestmentIncomeFilter(FilterSet):
             "date_modified": DATETIME_LOOKUPS,
             "redacted": BOOLEAN_LOOKUPS,
         }
+
 
 class PositionFilter(FilterSet):
     class Meta:
@@ -94,6 +96,7 @@ class PositionFilter(FilterSet):
             "redacted": BOOLEAN_LOOKUPS,
         }
 
+
 class ReimbursementFilter(FilterSet):
     class Meta:
         model = Reimbursement
@@ -103,6 +106,7 @@ class ReimbursementFilter(FilterSet):
             "date_modified": DATETIME_LOOKUPS,
             "redacted": BOOLEAN_LOOKUPS,
         }
+
 
 class SpouseIncomeFilter(FilterSet):
     class Meta:
