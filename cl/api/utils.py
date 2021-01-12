@@ -360,6 +360,7 @@ class RECAPUploaders(DjangoModelPermissions):
         "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
+
 class DisclosureAPIUsers(DjangoModelPermissions):
     """Provides some users upload permissions in RECAP
 
