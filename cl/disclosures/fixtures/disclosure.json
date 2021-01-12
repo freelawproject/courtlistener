@@ -1,24 +1,300 @@
 [
+   {
+        "fields": {
+            "id": 2,
+            "date_created": "2020-12-23 23:37:33.681830",
+            "date_modified": "2020-12-23 23:37:33.681930",
+            "year": 2021,
+            "filepath": "us/federal/judicial/financial-disclosures/1/william-palin-disclosure.2012.pdf",
+            "thumbnail": "",
+            "thumbnail_status": 0,
+            "page_count": 6,
+            "sha1": "b41949187c4daf77fac3c32710089cbf0cff555a",
+            "report_type": -1,
+            "is_amended": false,
+            "addendum_content_raw": "",
+            "addendum_redacted": false,
+            "has_been_extracted": false,
+            "person_id": 2
+        },
+        "model": "disclosures.financialdisclosure",
+        "pk": 2
+    },
+    {
+        "fields": {
+            "id": 1,
+            "date_created": "2020-12-23 23:37:33.681830",
+            "date_modified": "2020-12-23 23:37:33.681930",
+            "year": 2012,
+            "filepath": "us/federal/judicial/financial-disclosures/1/william-palin-disclosure.2012.pdf",
+            "thumbnail": "",
+            "thumbnail_status": 0,
+            "page_count": 6,
+            "sha1": "2710089cb41949187c4daf77fac3c3bf0cff555a",
+            "report_type": -1,
+            "is_amended": false,
+            "addendum_content_raw": "",
+            "addendum_redacted": false,
+            "has_been_extracted": false,
+            "person_id": 1
+        },
+        "model": "disclosures.financialdisclosure",
+        "pk": 1
+    },
+    {
+        "fields": {
+            "id": 1,
+            "date_created": "2021-01-11 19:02:12.370206",
+            "date_modified": "2021-01-11 19:02:12.370248",
+            "source": "Alta Ski Area",
+            "description": "Season Pass",
+            "value": "1,199.00",
+            "redacted": true,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.gift",
+        "pk": 1
+    },
+    {
+        "fields": {
+            "id": 878,
+            "date_created": "2021-01-08 17:58:45.769664",
+            "date_modified": "2021-01-08 17:58:45.769696",
+            "page_number": 4,
+            "description": "Harris Bank - IRA - Non-Stock Acct",
+            "redacted": false,
+            "income_during_reporting_period_code": "A",
+            "income_during_reporting_period_type": "Interest",
+            "gross_value_code": "K",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+          "model": "disclosures.investment",
+          "pk": 878
+    },
+    {
+        "fields": {
+            "id": 879,
+            "date_created": "2021-01-08 17:58:45.770048",
+            "date_modified": "2021-01-08 17:58:45.770063",
+            "page_number": 4,
+            "description": "Harris Bank - IRA Non-Stock Acct. iT TT",
+            "redacted": false,
+            "income_during_reporting_period_code": "A",
+            "income_during_reporting_period_type": "Interest",
+            "gross_value_code": "K",
+            "gross_value_method": "T",
+            "transaction_during_reporting_period": "",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 879
+    },
+    {
+        "fields": {
+            "id": 880,
+            "date_created": "2021-01-08 17:59:11.739840",
+            "date_modified": "2021-01-08 17:59:11.739867",
+            "page_number": 4,
+            "description": "Vanguard Institutional Index Mutual Fund",
+            "redacted": false,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 880
+    },
+    {
+        "fields": {
+            "id": 881,
+            "date_created": "2021-01-08 17:59:11.739966",
+            "date_modified": "2021-01-08 17:59:11.739981",
+            "page_number": 4,
+            "description": "Harbor Cap Apprec Mutual Fund",
+            "redacted": false,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 881
+    },
+    {
+        "fields": {
+            "id": 882,
+            "date_created": "2021-01-08 17:59:11.740065",
+            "date_modified": "2021-01-08 17:59:11.740078",
+            "page_number": 4,
+            "description": "Fidelity Small Cap Stock Mutual Fund (Sce J Footnote #2)",
+            "redacted": false,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "Buy (add'l)",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 882
+    },
+    {
+        "fields": {
+            "id": 883,
+            "date_created": "2021-01-08 17:59:11.740178",
+            "date_modified": "2021-01-08 17:59:11.740196",
+            "page_number": 4,
+            "description": "Fidelity Small Cap Stock Mutual Fund (Sce J Footnote #2)",
+            "redacted": true,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "Sod",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "M",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": true,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 883
+    },
+    {
+        "fields": {
+            "id": 884,
+            "date_created": "2021-01-08 17:59:11.740277",
+            "date_modified": "2021-01-08 17:59:11.740290",
+            "page_number": 4,
+            "description": "William Blair Intl Gr",
+            "redacted": true,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "Buy (add'l)",
+            "transaction_date_raw": "01/22/09",
+            "transaction_date": "2009-01-22",
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 884
+    },
+    {
+        "fields": {
+            "id": 885,
+            "date_created": "2021-01-08 17:59:11.740564",
+            "date_modified": "2021-01-08 17:59:11.740600",
+            "page_number": 4,
+            "description": "William Blair Intl Gr",
+            "redacted": true,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "Buy (add'l)",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": true,
+            "financial_disclosure_id": 1
+        },
+        "model": "disclosures.investment",
+        "pk": 885
+    },
+    {
+        "fields": {
+            "id": 886,
+            "date_created": "2021-01-08 17:59:11.740765",
+            "date_modified": "2021-01-08 17:59:11.740785",
+            "page_number": 4,
+            "description": "Templeton Inst Forgn Eq",
+            "redacted": false,
+            "income_during_reporting_period_code": "",
+            "income_during_reporting_period_type": "",
+            "gross_value_code": "",
+            "gross_value_method": "",
+            "transaction_during_reporting_period": "Buy (add'l)",
+            "transaction_date_raw": "",
+            "transaction_date": null,
+            "transaction_value_code": "",
+            "transaction_gain_code": "",
+            "transaction_partner": "",
+            "has_inferred_values": false,
+            "financial_disclosure_id": 2
+        },
+        "model": "disclosures.investment",
+        "pk": 886
+    },
   {
     "fields": {
       "id": 1,
-      "date_created": "2020-12-23 23:37:33.681830",
-      "date_modified": "2020-12-23 23:37:33.681930",
-      "year": 2012,
-      "filepath": "us/federal/judicial/financial-disclosures/1/william-palin-disclosure.2012.pdf",
-      "thumbnail": "",
-      "thumbnail_status": 0,
-      "page_count": 6,
-      "sha1": "2710089cb41949187c4daf77fac3c3bf0cff555a",
-      "report_type": -1,
-      "is_amended": false,
-      "addendum_content_raw": "",
-      "addendum_redacted": false,
-      "has_been_extracted": false,
-      "person_id": 1
+      "date_created": "2021-01-08 17:58:45.773724",
+      "date_modified": "2021-01-08 17:58:45.773765",
+      "position": "Director",
+      "organization_name": "Chicago Bar Foundation",
+      "redacted": false,
+      "financial_disclosure_id": 2
     },
-    "model": "disclosures.financialdisclosure",
-    "pk": 1
+     "model": "disclosures.position",
+      "pk": 1
+  },
+  {
+    "fields": {
+      "id": 2,
+      "date_created": "2021-01-08 17:58:45.773837",
+      "date_modified": "2021-01-08 17:58:45.773858",
+      "position": "Director",
+      "organization_name": "Constitutional Rights Foundation",
+      "redacted": false,
+      "financial_disclosure_id": 2
+    },
+     "model": "disclosures.position",
+     "pk": 2
   }
 ]
-
