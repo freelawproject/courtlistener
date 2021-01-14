@@ -168,6 +168,11 @@ def pdf_path(
     )
 
 
+disclosure_permissions = (
+    ("has_disclosure_api_access", "Can work with Disclosure API"),
+)
+
+
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -272,9 +277,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
             make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Investment(AbstractDateTimeModel):
@@ -360,9 +363,7 @@ class Investment(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Position(AbstractDateTimeModel):
@@ -389,9 +390,7 @@ class Position(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Agreement(AbstractDateTimeModel):
@@ -418,9 +417,7 @@ class Agreement(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class NonInvestmentIncome(AbstractDateTimeModel):
@@ -453,9 +450,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class SpouseIncome(AbstractDateTimeModel):
@@ -483,9 +478,7 @@ class SpouseIncome(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Reimbursement(AbstractDateTimeModel):
@@ -526,9 +519,7 @@ class Reimbursement(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Gift(AbstractDateTimeModel):
@@ -558,9 +549,7 @@ class Gift(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
 
 
 class Debt(AbstractDateTimeModel):
@@ -590,6 +579,4 @@ class Debt(AbstractDateTimeModel):
     )
 
     class Meta:
-        permissions = (
-            ("has_disclosure_api_access", "Can work with Disclosure API"),
-        )
+        permissions = disclosure_permissions
