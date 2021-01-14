@@ -364,7 +364,8 @@ class RECAPUploaders(DjangoModelPermissions):
 class DisclosureAPIUsers(DjangoModelPermissions):
     """Provides some users upload permissions in RECAP
 
-    Such users must have the has_recap_upload_access flag set on their account
+    Such users must have the has_disclosure_api_access flag set on their
+    account
     """
 
     perms_map = {
