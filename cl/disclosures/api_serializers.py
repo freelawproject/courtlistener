@@ -15,49 +15,59 @@ from cl.disclosures.models import (
 )
 
 
-class AgreementSerializer(serializers.ModelSerializer):
+class AgreementSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = Agreement
         fields = "__all__"
 
 
-class DebtSerializer(serializers.ModelSerializer):
+class DebtSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Debt
         fields = "__all__"
 
 
-class InvestmentSerializer(serializers.ModelSerializer):
+class InvestmentSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = Investment
         fields = "__all__"
 
 
-class GiftSerializer(serializers.ModelSerializer):
+class GiftSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Gift
         fields = "__all__"
 
 
-class NonInvestmentIncomeSerializer(serializers.ModelSerializer):
+class NonInvestmentIncomeSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = NonInvestmentIncome
         fields = "__all__"
 
 
-class PositionSerializer(serializers.ModelSerializer):
+class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Position
         fields = "__all__"
 
 
-class ReimbursementSerializer(serializers.ModelSerializer):
+class ReimbursementSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = Reimbursement
         fields = "__all__"
 
 
-class SpouseIncomeSerializer(serializers.ModelSerializer):
+class SpouseIncomeSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = SpouseIncome
         fields = "__all__"
