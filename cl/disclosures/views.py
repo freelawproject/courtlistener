@@ -1,15 +1,9 @@
-import os
-
-import magic
-from django.conf import settings
 from django.http import HttpResponse, HttpRequest
 from django.shortcuts import render, get_object_or_404
 
 from cl.disclosures.models import FinancialDisclosure
-from cl.lib.bot_detector import is_bot
 from cl.people_db.models import Person
 from cl.people_db.views import make_title_str
-from cl.stats.utils import tally_stat
 
 
 def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
@@ -50,27 +44,3 @@ def financial_disclosures_for_somebody(
         "financial_disclosures_for_somebody.html",
         {"person": person, "title": title, "private": False},
     )
-
-
-def financial_disclosures_fileserver(
-    request: HttpRequest,
-    pk: int,
-    slug: str,
-    filepath: str,
-) -> HttpResponse:
-    """Serve up the financial disclosure files."""
-    response = HttpResponse()
-    file_loc = os.path.join(settings.MEDIA_ROOT, filepath.encode())
-    if settings.DEVELOPMENT:
-        # X-Sendfile will only confuse you in a dev env.
-        response.content = open(file_loc, "rb").read()
-    else:
-        response["X-Sendfile"] = file_loc
-    filename = filepath.split("/")[-1]
-    response["Content-Disposition"] = (
-        'inline; filename="%s"' % filename.encode()
-    )
-    response["Content-Type"] = magic.from_file(file_loc, mime=True)
-    if not is_bot(request):
-        tally_stat("financial_reports.static_file.served")
-    return response
