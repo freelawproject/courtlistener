@@ -242,7 +242,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 password=attrs.pop("pacer_password"),
             )
         except PacerLoginException as e:
-            raise ValidationError("PacerLoginException: %s" % e.message)
+            raise ValidationError("PacerLoginException: %s" % e)
 
         return attrs
 

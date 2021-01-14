@@ -208,7 +208,7 @@ class LoggingMixin(object):
                 self._handle_events(results, request.user)
             except Exception as e:
                 logger.exception(
-                    "Unable to log API response timing info: %s", e.message
+                    "Unable to log API response timing info: %s", e
                 )
         return response
 
