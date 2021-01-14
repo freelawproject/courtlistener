@@ -637,10 +637,10 @@ BTE_URLS = {
     # Financial Disclosures
     "extract-disclosure": {
         "url": f"{BTE_HOST}/financial_disclosure/extract_record",
-        "timeout": 60 * 60 * 2,
+        "timeout": 60 * 60 * 12,
     },
     "extract-disclosure-jw": {
         "url": f"{BTE_HOST}/financial_disclosure/extract_jw",
-        "timeout": 60 * 60 * 2,
+        "timeout": 60 * 60 * 12,
     },
 }
