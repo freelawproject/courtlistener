@@ -1546,12 +1546,15 @@ class Attorney(AbstractDateTimeModel):
     )
     phone = local_models.PhoneNumberField(
         help_text="The phone number of the attorney.",
+        blank=True,
     )
     fax = local_models.PhoneNumberField(
         help_text="The fax number of the attorney.",
+        blank=True,
     )
     email = models.EmailField(
         help_text="The email address of the attorney.",
+        blank=True,
     )
 
     class Meta:

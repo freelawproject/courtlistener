@@ -1,0 +1,23 @@
+--
+-- This is a classicly bad django migration. It sets the default to blank, and
+-- then immediately removes it. I've completely commented out the migration b/c
+-- we need it to exist so django is happy, but it does nothing.
+--
+
+--BEGIN;
+--
+-- Alter field email on attorney
+--
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "email" SET DEFAULT '';
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "email" DROP DEFAULT;
+--
+-- Alter field fax on attorney
+--
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "fax" SET DEFAULT '';
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "fax" DROP DEFAULT;
+--
+-- Alter field phone on attorney
+--
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "phone" SET DEFAULT '';
+-- ALTER TABLE "people_db_attorney" ALTER COLUMN "phone" DROP DEFAULT;
+--COMMIT;
