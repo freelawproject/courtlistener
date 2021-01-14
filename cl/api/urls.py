@@ -94,7 +94,7 @@ router.register(r"debts", disclosure_views.DebtViewSet, basename="debt")
 router.register(
     r"financial-disclosures",
     disclosure_views.FinancialDisclosureViewSet,
-    basename="financial-disclosure",
+    basename="financialdisclosure",
 )
 router.register(r"gifts", disclosure_views.GiftViewSet, basename="gift")
 router.register(
@@ -103,12 +103,12 @@ router.register(
 router.register(
     r"non-investment-incomes",
     disclosure_views.NonInvestmentIncomeViewSet,
-    basename="non-investment-income",
+    basename="noninvestmentincome",
 )
 router.register(
     r"disclosure-positions",
     disclosure_views.PositionViewSet,
-    basename="disclosure-position",
+    basename="disclosureposition",
 )
 router.register(
     r"reimbursements",
@@ -118,7 +118,7 @@ router.register(
 router.register(
     r"spouse-incomes",
     disclosure_views.SpouseIncomeViewSet,
-    basename="spouse-income",
+    basename="spouseincome",
 )
 
 API_TITLE = "CourtListener Legal Data API"
