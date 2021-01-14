@@ -104,6 +104,7 @@ def process_stripe_callback(request):
                     if event["type"] in [
                         "charge.dispute.created",
                         "charge.dispute.funds_withdrawn",
+                        "charge.dispute.closed",
                     ]:
                         # I don't know why stripe doesn't use the "id" field on
                         # disputes like they do everything else.
