@@ -38,14 +38,14 @@ class DebtFilter(FilterSet):
 class FinancialDisclosureFilter(FilterSet):
     class Meta:
         model = FinancialDisclosure
-        fields = disclosure_fields.copy()
-        fields.update(
-            {
-                "person": ["exact"],
-                "addendum_content_raw": ALL_TEXT_LOOKUPS,
-                "has_been_extracted": BOOLEAN_LOOKUPS,
-            }
-        )
+        fields = {
+            "id": ["exact"],
+            "person": ["exact"],
+            "date_created": DATETIME_LOOKUPS,
+            "date_modified": DATETIME_LOOKUPS,
+            "addendum_content_raw": ALL_TEXT_LOOKUPS,
+            "has_been_extracted": BOOLEAN_LOOKUPS,
+        }
 
 
 class GiftFilter(FilterSet):
