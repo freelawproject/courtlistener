@@ -79,14 +79,28 @@ def find_docket_object(
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
     docket_number_core = make_docket_number_core(docket_number)
-    for kwargs in [
+    lookups = [
         {
             "pacer_case_id": pacer_case_id,
             "docket_number_core": docket_number_core,
         },
         {"pacer_case_id": pacer_case_id},
-        {"pacer_case_id": None, "docket_number_core": docket_number_core},
-    ]:
+    ]
+    if docket_number_core:
+        # Sometimes we don't know how to make core docket numbers. If that's
+        # the case, we will have a blank value for the field. We must not do
+        # lookups by blank values. See: freelawproject/courtlistener#1531
+        lookups.append(
+            {"pacer_case_id": None, "docket_number_core": docket_number_core},
+        )
+    else:
+        # Finally, as a last resort, we can try the docket number. It might not
+        # match b/c of punctuation or whatever, but we can try.
+        lookups.append(
+            {"pacer_case_id": None, "docket_number": docket_number},
+        )
+
+    for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
         count = ds.count()
         if count == 0:
