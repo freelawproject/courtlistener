@@ -9,7 +9,7 @@ from django.utils.timezone import now
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import normalize_dashes, trunc
 
 
 def make_docket_number_core(docket_number: Optional[str]) -> str:
@@ -19,6 +19,7 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
 
         2:12-cv-01032
         12-cv-01032
+        12-332
 
     Into:
 
@@ -32,11 +33,18 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
     if docket_number is None:
         return ""
 
-    m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", docket_number)
-    if m:
-        return m.group(1) + "{:05d}".format(int(m.group(2)))
-    else:
-        return ""
+    docket_number = normalize_dashes(docket_number)
+
+    district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", docket_number)
+    if district_m:
+        return district_m.group(1) + "{:05d}".format(int(district_m.group(2)))
+
+    bankr_m = re.search(r"(\d\d)-(\d+)", docket_number)
+    if bankr_m:
+        # Pad to six characters because some courts have a LOT of bankruptcies
+        return bankr_m.group(1) + "{:06d}".format(int(bankr_m.group(2)))
+
+    return ""
 
 
 def make_path(root: str, filename: str) -> str:
