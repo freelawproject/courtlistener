@@ -16,6 +16,10 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
-          python-version: "2.7"
+          python-version: "3.8"
+
       - name: Black Code Formatter
         uses: psf/black@stable
+
+      - name: isort Import Sorter
+        uses: isort/isort-action@v0.1.0
