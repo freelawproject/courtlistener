@@ -11,8 +11,8 @@ from django.conf import settings
 from cl.cleanup.management.commands.fix_tax_court import (
     find_tax_court_citation,
     get_tax_docket_numbers,
-    remove_en_em_dash,
 )
+from cl.lib.string_utils import normalize_dashes
 
 
 class CitationTaxCleanup(TestCase):
@@ -292,7 +292,7 @@ with Virginia Historic Tax Credit Fund""",
             "dash -": "dash -",  # Regular dash
         }
         for test, answer in tests.items():
-            computed = remove_en_em_dash(test)
+            computed = normalize_dashes(test)
             self.assertEqual(computed, answer)
 
     def test_tax_court_citation_extractor(self):

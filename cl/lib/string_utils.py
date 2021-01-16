@@ -125,3 +125,25 @@ def removeDuplicateLines(s):
             previous_line = line
 
     return "\n".join(lines_out)
+
+
+def normalize_dashes(text: str) -> str:
+    """Convert en & em dash(es) to hyphen(s)
+
+    :param text: The text to convert
+    :return: the better text
+    """
+    # Simple variables b/c in monospace code, you can't see the difference
+    # othewise.
+    normal_dash = "-"
+    en_dash = "–"
+    em_dash = "—"
+    hyphen = "‐"
+    non_breaking_hyphen = "‑"
+    figure_dash = "‒"
+    horizontal_bar = "―"
+    return re.sub(
+        rf"[{en_dash}{em_dash}{hyphen}{non_breaking_hyphen}{figure_dash}{horizontal_bar}]",
+        normal_dash,
+        text,
+    )

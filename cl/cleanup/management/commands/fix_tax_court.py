@@ -6,17 +6,8 @@ import argparse
 
 from cl.citations import find_citations
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import Opinion, OpinionCluster, Docket, Citation
-
-
-def remove_en_em_dash(opinion_text):
-    """Convert en & em dash(es) to hyphen(s) in opinion text
-
-    :param opinion_text:
-    :return: opinion_text
-    """
-    opinion_text = re.sub(r"[–—]", "-", opinion_text)
-    return opinion_text
+from cl.lib.string_utils import normalize_dashes
+from cl.search.models import OpinionCluster, Citation
 
 
 def get_tax_docket_numbers(opinion_text):
@@ -30,7 +21,7 @@ def get_tax_docket_numbers(opinion_text):
     :param opinion_text: is the opinions plain_text
     :return docket_string: as string of docket numbers Ex. (18710-94, 12321-95)
     """
-    opinion_text = remove_en_em_dash(opinion_text)
+    opinion_text = normalize_dashes(opinion_text)
     parsed_text = ""
     docket_no_re = r"Docket.? Nos?.? .*[0-9]{3,5}"
     matches = re.finditer(docket_no_re, opinion_text)
