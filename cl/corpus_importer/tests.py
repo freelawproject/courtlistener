@@ -2,39 +2,37 @@ import json
 import os
 import unittest
 from datetime import date, datetime
-from unittest import mock
 from glob import iglob
+from unittest import mock
 
 import pytest
 from django.conf import settings
 from django.test import TestCase
 
+from cl.citations.find_citations import get_citations
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
-from cl.corpus_importer.management.commands.import_tn import import_tn_corpus
-from cl.corpus_importer.tasks import generate_ia_json
-from cl.corpus_importer.utils import get_start_of_quarter
 from cl.corpus_importer.management.commands.harvard_opinions import (
     parse_harvard_opinions,
     validate_dt,
 )
-
+from cl.corpus_importer.management.commands.import_tn import import_tn_corpus
+from cl.corpus_importer.tasks import generate_ia_json
+from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.models import UPLOAD_TYPE
 from cl.recap.mergers import find_docket_object
+from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import (
-    Docket,
-    RECAPDocument,
-    OpinionCluster,
     Citation,
+    Docket,
     Opinion,
+    OpinionCluster,
+    RECAPDocument,
 )
-
-from cl.citations.find_citations import get_citations
 
 
 class JudgeExtractionTest(unittest.TestCase):

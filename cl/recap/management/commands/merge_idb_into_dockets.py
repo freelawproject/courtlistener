@@ -6,17 +6,17 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
-    make_fjc_idb_lookup_params,
     get_pacer_case_id_and_title,
+    make_fjc_idb_lookup_params,
 )
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
+from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
 from cl.lib.utils import chunks
 from cl.recap.constants import CV_2017, CV_2020
 from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import (
-    update_docket_from_hidden_api,
     create_or_merge_from_idb_chunk,
+    update_docket_from_hidden_api,
 )
 from cl.search.models import Docket
 

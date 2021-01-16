@@ -6,7 +6,7 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
-from cl.people_db.models import Person, PartyType
+from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.models import (
     Citation,
@@ -14,8 +14,8 @@ from cl.search.models import (
     Docket,
     DocketEntry,
     Opinion,
-    OpinionsCited,
     OpinionCluster,
+    OpinionsCited,
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,

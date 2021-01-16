@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.crypto import get_random_string
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.search.models import Docket, SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket
 
 
 class Alert(AbstractDateTimeModel):

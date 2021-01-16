@@ -1,8 +1,8 @@
 import logging
 
 from django.conf import settings
-from django.http import JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.template import TemplateDoesNotExist
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
@@ -10,10 +10,10 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 from cl.api.utils import get_replication_statuses
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
-    build_coverage_query,
-    build_court_count_query,
-    get_solr_interface,
     build_alert_estimation_query,
+    build_court_count_query,
+    build_coverage_query,
+    get_solr_interface,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import Court

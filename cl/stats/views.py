@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpRequest
+from django.http import HttpRequest, HttpResponse
 
 from cl.celery_init import fail_task
 from cl.lib.redis_utils import make_redis_interface

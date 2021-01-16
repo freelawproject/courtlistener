@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
-from django.db import migrations, models
 import localflavor.us.models
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):

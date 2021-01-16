@@ -6,8 +6,8 @@ This results in the following concept:
  - any overrides to public settings can go in 20-private.py (you'll need to create this)
 """
 
-import os
 import glob
+import os
 
 conf_files = glob.glob(
     os.path.join(os.path.dirname(__file__), "settings", "*.py")

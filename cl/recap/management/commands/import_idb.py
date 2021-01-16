@@ -8,13 +8,13 @@ from dateutil import parser
 from django.core.management import CommandError
 from django.utils.timezone import now
 
-from cl.lib.command_utils import VerboseCommand, CommandUtils, logger
+from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
 from cl.recap.constants import (
-    DATASET_SOURCES,
+    BANKR_2017,
+    CR_2017,
     CV_2017,
     CV_2020,
-    CR_2017,
-    BANKR_2017,
+    DATASET_SOURCES,
     IDB_FIELD_DATA,
 )
 from cl.recap.models import FjcIntegratedDatabase

@@ -1,4 +1,5 @@
 import pickle
+
 from juriscraper.pacer import PacerSession
 
 from cl.lib.redis_utils import make_redis_interface

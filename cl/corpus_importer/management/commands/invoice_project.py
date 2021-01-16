@@ -7,10 +7,10 @@ from django.core.paginator import Paginator
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
-    make_attachment_pq_object,
+    add_tags,
     get_attachment_page_by_rd,
     get_pacer_doc_by_rd,
-    add_tags,
+    make_attachment_pq_object,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger

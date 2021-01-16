@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from functools import lru_cache
-from typing import List, Union, Optional, Dict
+from typing import Dict, List, Optional, Union
 
 from django.db.models import QuerySet
 from django.utils.timezone import now
@@ -11,17 +11,16 @@ from juriscraper.lib.html_utils import get_visible_text
 from reporters_db import EDITIONS, REPORTERS, VARIATIONS_ONLY
 
 from cl.citations import reporter_tokenizer
-from cl.lib.roman import isroman
-from cl.search.models import Court
 from cl.citations.models import (
     Citation,
     FullCitation,
     IdCitation,
-    SupraCitation,
-    ShortformCitation,
     NonopinionCitation,
+    ShortformCitation,
+    SupraCitation,
 )
-
+from cl.lib.roman import isroman
+from cl.search.models import Court
 
 FORWARD_SEEK = 20
 

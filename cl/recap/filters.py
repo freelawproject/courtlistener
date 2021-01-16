@@ -1,10 +1,10 @@
 from rest_framework_filters import FilterSet
 
-from cl.api.utils import DATETIME_LOOKUPS, BASIC_TEXT_LOOKUPS, DATE_LOOKUPS
+from cl.api.utils import BASIC_TEXT_LOOKUPS, DATE_LOOKUPS, DATETIME_LOOKUPS
 from cl.recap.models import (
-    ProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
+    ProcessingQueue,
 )
 
 

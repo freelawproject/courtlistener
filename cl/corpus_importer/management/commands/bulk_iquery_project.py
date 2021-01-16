@@ -1,15 +1,13 @@
 import itertools
 import time
-from typing import Dict, Union, List
+from typing import Dict, List, Union
 
 from django.conf import settings
 from django.core.management import CommandParser
 
+from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.corpus_importer.tasks import (
-    make_docket_by_iquery,
-)
 from cl.lib.redis_utils import make_redis_interface
 from cl.search.models import Court
 

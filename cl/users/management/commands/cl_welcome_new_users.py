@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import loader
-from django.utils.timezone import utc, make_aware
+from django.utils.timezone import make_aware, utc
 
 from cl.lib.command_utils import VerboseCommand, logger
 

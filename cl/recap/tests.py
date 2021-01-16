@@ -1,8 +1,8 @@
 import json
 import os
 from datetime import date
-
 from unittest import mock
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
@@ -32,26 +32,26 @@ from cl.recap.mergers import (
     add_attorney,
     add_docket_entries,
     add_parties_and_attorneys,
+    find_docket_object,
     normalize_long_description,
     update_case_names,
     update_docket_metadata,
 )
-from cl.recap.mergers import find_docket_object
 from cl.recap.models import (
-    PacerFetchQueue,
     PROCESSING_STATUS,
-    ProcessingQueue,
-    UPLOAD_TYPE,
     REQUEST_TYPE,
+    UPLOAD_TYPE,
+    PacerFetchQueue,
+    ProcessingQueue,
 )
 from cl.recap.tasks import (
+    do_pacer_fetch,
     process_recap_appellate_docket,
     process_recap_attachment,
+    process_recap_claims_register,
     process_recap_docket,
     process_recap_pdf,
     process_recap_zip,
-    process_recap_claims_register,
-    do_pacer_fetch,
 )
 from cl.search.models import (
     Docket,

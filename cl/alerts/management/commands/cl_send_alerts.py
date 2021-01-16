@@ -15,8 +15,8 @@ from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
-from cl.search.models import SEARCH_TYPES
 from cl.search.forms import SearchForm
+from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 # Only do this number of RT items at a time. If there are more, they will be

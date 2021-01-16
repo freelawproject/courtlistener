@@ -3,14 +3,14 @@ import errno
 import json
 import logging
 import re
-from calendar import SUNDAY, SATURDAY
+from calendar import SATURDAY, SUNDAY
 from datetime import timedelta
 
 import requests
 from dateutil import parser
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
-from django.db import transaction, IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
@@ -21,12 +21,12 @@ from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.mergers import (
+    add_bankruptcy_data_to_docket,
     add_docket_entries,
     find_docket_object,
     update_docket_metadata,
-    add_bankruptcy_data_to_docket,
 )
-from cl.recap_rss.models import RssFeedStatus, RssItemCache, RssFeedData
+from cl.recap_rss.models import RssFeedData, RssFeedStatus, RssItemCache
 from cl.recap_rss.utils import emails
 from cl.search.models import Court
 

@@ -1,18 +1,15 @@
 import argparse
+from datetime import date, timedelta
 from glob import glob
-
-from datetime import date
-from datetime import timedelta
 
 from juriscraper.lib.date_utils import make_date_range_tuples
 
 from cl.lasc import tasks
+from cl.lasc.models import QueuedCase, QueuedPDF
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
-
-from cl.lasc.models import QueuedCase, QueuedPDF
 
 
 def date_search(options):

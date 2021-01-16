@@ -1,8 +1,8 @@
 import json
 
-from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.template import loader
+from django.urls import NoReverseMatch, reverse
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
@@ -10,13 +10,13 @@ from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
-    null_map,
     normalize_search_dicts,
+    null_map,
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
-from cl.search.models import Docket, SOURCES
+from cl.search.models import SOURCES, Docket
 
 
 class Audio(AbstractDateTimeModel):

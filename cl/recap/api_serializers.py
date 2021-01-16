@@ -1,18 +1,17 @@
 from django.db.models import Q
-
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
+    REQUEST_TYPE,
+    UPLOAD_TYPE,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     ProcessingQueue,
-    REQUEST_TYPE,
-    UPLOAD_TYPE,
 )
-from cl.search.models import Court, RECAPDocument, Docket
+from cl.search.models import Court, Docket, RECAPDocument
 
 
 class ProcessingQueueSerializer(serializers.ModelSerializer):

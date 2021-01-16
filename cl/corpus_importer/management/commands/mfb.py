@@ -1,7 +1,7 @@
 from cl.corpus_importer.bulk_utils import docket_pks_for_query
+from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.corpus_importer.tasks import save_ia_docket_to_disk
 
 BULK_OUTPUT_DIRECTORY = "/sata/sample-data/mfb"
 QUERY = "q=document_number:([50 TO 50000]) AND firm:(cravath OR wachtell OR skadden OR sullivan OR latham OR kirkland OR polk OR thacher OR gibson OR (paul AND weiss) OR weil OR sidley OR quinn OR cleary OR covington OR (jones AND day) OR (white AND case) OR debevoise OR (williams AND connolly) OR (ropes AND gray) OR (paul AND hastings) OR wilmer OR wilmerhale OR morrison OR boies OR milbank OR melveny OR hogan OR cooley OR proskauer OR akin OR (arnold AND porter) OR kaye OR baker OR (dla AND piper) OR orrick OR mayer OR (morgan AND lewis) OR goodwin OR sonsini OR spalding OR gates OR clifford OR munger OR winston OR shearman OR linklaters OR overy OR fried OR perkins OR dechert OR willkie OR cadwalader OR susman OR alston OR dentons OR traurig OR mcdermott OR freshfields OR cahill OR jenner OR (reed AND smith) OR vinson OR holland OR (norton AND rose) OR irell OR nixon OR crowell OR venable OR foley OR squire ro fish OR sheppard OR steptoe OR mcguire OR mcguirewoods OR arent OR fenwick OR locke OR schulte OR katten OR cave OR seyfarth OR pepper OR fox OR hughes OR duane OR haynes OR kramer OR tremaine OR troutman OR (blank AND rome) OR kilpatrick OR ballard OR drinker OR mintz OR kellog OR foley OR littler OR cozen) AND is_available:(true) AND dateFiled:[2010-01-01T00:00:00Z TO 2020-01-01T00:00:00Z]&type=r&order_by=score+desc"

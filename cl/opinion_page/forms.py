@@ -14,11 +14,8 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     save_everything,
 )
 from cl.scrapers.tasks import extract_doc_content
-from cl.search.fields import (
-    CeilingDateField,
-    FloorDateField,
-)
-from cl.search.models import Court, Citation, Docket, Opinion
+from cl.search.fields import CeilingDateField, FloorDateField
+from cl.search.models import Citation, Court, Docket, Opinion
 
 
 class CitationRedirectorForm(forms.Form):

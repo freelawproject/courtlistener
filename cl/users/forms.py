@@ -1,10 +1,10 @@
 from disposable_email_domains import blocklist
 from django import forms
 from django.contrib.auth.forms import (
-    UserCreationForm,
     PasswordChangeForm,
     PasswordResetForm,
     SetPasswordForm,
+    UserCreationForm,
 )
 from django.contrib.auth.models import User
 from django.core.mail import send_mail

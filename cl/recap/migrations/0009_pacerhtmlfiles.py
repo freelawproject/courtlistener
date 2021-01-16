@@ -2,8 +2,9 @@
 
 
 from django.db import migrations, models
-import cl.recap.models
+
 import cl.lib.storage
+import cl.recap.models
 
 
 class Migration(migrations.Migration):

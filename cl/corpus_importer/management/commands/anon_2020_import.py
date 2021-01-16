@@ -2,7 +2,7 @@ import json
 import re
 from datetime import datetime
 from glob import iglob
-from typing import Optional, Dict, List, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
@@ -14,7 +14,7 @@ from cl.citations.models import Citation as FoundCitation
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
-from cl.search.models import Opinion, OpinionCluster, Docket, Citation
+from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()

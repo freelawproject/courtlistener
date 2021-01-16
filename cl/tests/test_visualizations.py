@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.users.models import UserProfile
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 

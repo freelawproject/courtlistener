@@ -2,7 +2,7 @@
 import logging
 import re
 from datetime import date, datetime, timedelta
-from typing import Dict, Optional, List, Union, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -19,10 +19,10 @@ from cl.lib.import_lib import get_candidate_judges
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import (
     get_blocked_status,
+    map_cl_to_pacer_id,
     map_pacer_to_cl_id,
     normalize_attorney_contact,
     normalize_attorney_role,
-    map_cl_to_pacer_id,
 )
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
@@ -37,21 +37,21 @@ from cl.people_db.models import (
     Role,
 )
 from cl.recap.models import (
-    ProcessingQueue,
-    UPLOAD_TYPE,
     PROCESSING_STATUS,
+    UPLOAD_TYPE,
     PacerHtmlFiles,
+    ProcessingQueue,
 )
 from cl.search.models import (
     BankruptcyInformation,
     Claim,
     ClaimHistory,
     Court,
+    Docket,
     DocketEntry,
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
-    Docket,
 )
 from cl.search.tasks import add_items_to_solr
 

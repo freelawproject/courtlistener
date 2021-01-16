@@ -13,9 +13,9 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
+    ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
-    ClaimsRegister,
     PacerSession,
     PossibleCaseNumberApi,
 )
@@ -52,17 +52,17 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_STATUS,
+    REQUEST_TYPE,
+    UPLOAD_TYPE,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
-    PROCESSING_STATUS,
-    REQUEST_TYPE,
-    UPLOAD_TYPE,
 )
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
+from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()

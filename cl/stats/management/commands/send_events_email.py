@@ -5,8 +5,8 @@ from django.core.mail import send_mail
 from django.template import loader
 from django.utils.timezone import now
 
-from cl.stats.models import Event
 from cl.lib.command_utils import VerboseCommand
+from cl.stats.models import Event
 
 
 class Command(VerboseCommand):

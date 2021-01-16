@@ -1,32 +1,29 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
-import json
 import difflib
 import itertools
-
-from glob import glob
+import json
+import os
 from datetime import datetime
+from glob import glob
+
 from bs4 import BeautifulSoup
-from juriscraper.lib.diff_tools import normalize_phrase
-
-from cl.citations.utils import map_reporter_db_cite_type
-from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.string_utils import trunc
-from cl.search.models import Opinion, OpinionCluster, Docket, Citation
-from cl.search.tasks import add_items_to_solr
-from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
-from cl.corpus_importer.court_regexes import match_court_string
-from cl.citations.find_citations import get_citations
-
 from django.conf import settings
 from django.db import transaction
 from django.db.utils import OperationalError
-
-from juriscraper.lib.string_utils import titlecase, CaseNameTweaker, harmonize
-
+from juriscraper.lib.diff_tools import normalize_phrase
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from reporters_db import REPORTERS
+
+from cl.citations.find_citations import get_citations
+from cl.citations.utils import map_reporter_db_cite_type
+from cl.corpus_importer.court_regexes import match_court_string
+from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.string_utils import trunc
+from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()
 

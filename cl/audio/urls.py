@@ -2,8 +2,8 @@ from django.conf.urls import url
 
 from cl.audio.feeds import (
     AllJurisdictionsPodcast,
-    SearchPodcast,
     JurisdictionPodcast,
+    SearchPodcast,
 )
 from cl.audio.views import view_audio_file
 

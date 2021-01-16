@@ -1,23 +1,22 @@
+from django.conf import settings
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 
-from cl.disclosures.tasks import (
-    make_financial_disclosure_thumbnail_from_pdf,
-)
-from .models import (
-    FinancialDisclosure,
-    Debt,
-    Investment,
-    Agreement,
-    Gift,
-    Reimbursement,
-    NonInvestmentIncome,
-    SpouseIncome,
-    Position,
-)
-from django.conf import settings
+from cl.disclosures.tasks import make_financial_disclosure_thumbnail_from_pdf
+
 from ..lib.admin import NotesInline
 from ..lib.models import THUMBNAIL_STATUSES
+from .models import (
+    Agreement,
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Position,
+    Reimbursement,
+    SpouseIncome,
+)
 
 
 @admin.register(FinancialDisclosure)

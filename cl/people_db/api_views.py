@@ -2,40 +2,40 @@ from rest_framework import viewsets
 
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.people_db.api_serializers import (
+    ABARatingSerializer,
+    AttorneySerializer,
+    EducationSerializer,
+    PartySerializer,
     PersonSerializer,
+    PoliticalAffiliationSerializer,
     PositionSerializer,
     RetentionEventSerializer,
-    EducationSerializer,
     SchoolSerializer,
-    PoliticalAffiliationSerializer,
-    ABARatingSerializer,
     SourceSerializer,
-    PartySerializer,
-    AttorneySerializer,
 )
 from cl.people_db.filters import (
+    ABARatingFilter,
+    AttorneyFilter,
+    EducationFilter,
+    PartyFilter,
     PersonFilter,
+    PoliticalAffiliationFilter,
     PositionFilter,
     RetentionEventFilter,
-    EducationFilter,
     SchoolFilter,
-    PoliticalAffiliationFilter,
-    ABARatingFilter,
     SourceFilter,
-    PartyFilter,
-    AttorneyFilter,
 )
 from cl.people_db.models import (
+    ABARating,
+    Attorney,
+    Education,
+    Party,
     Person,
+    PoliticalAffiliation,
     Position,
     RetentionEvent,
-    Education,
     School,
-    PoliticalAffiliation,
     Source,
-    ABARating,
-    Party,
-    Attorney,
 )
 
 

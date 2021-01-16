@@ -3,20 +3,20 @@ from rest_framework import serializers
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.people_db.models import (
+    ABARating,
+    Attorney,
+    CriminalComplaint,
+    CriminalCount,
+    Education,
+    Party,
+    PartyType,
     Person,
+    PoliticalAffiliation,
     Position,
     RetentionEvent,
-    Education,
-    School,
-    PoliticalAffiliation,
-    Source,
-    ABARating,
-    Party,
-    Attorney,
     Role,
-    PartyType,
-    CriminalCount,
-    CriminalComplaint,
+    School,
+    Source,
 )
 from cl.search.api_serializers import CourtSerializer
 

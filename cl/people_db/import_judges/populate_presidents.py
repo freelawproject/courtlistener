@@ -5,12 +5,12 @@ from datetime import date
 import pandas as pd
 
 from cl.people_db.models import (
-    Person,
-    Position,
-    Race,
-    PoliticalAffiliation,
     GRANULARITY_DAY,
     GRANULARITY_YEAR,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
 )
 
 

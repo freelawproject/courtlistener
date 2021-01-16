@@ -5,30 +5,30 @@ from typing import Any, Dict, List
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
-from django.urls import reverse, NoReverseMatch
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
 from django.template import loader
+from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 
+from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
-    make_upload_path,
-    make_recap_path,
     make_docket_number_core,
+    make_recap_path,
+    make_upload_path,
 )
-from cl.lib.models import AbstractPDF, AbstractDateTimeModel
+from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
-    null_map,
     normalize_search_dicts,
+    null_map,
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
-from cl.citations.utils import get_citation_depth_between_clusters
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),

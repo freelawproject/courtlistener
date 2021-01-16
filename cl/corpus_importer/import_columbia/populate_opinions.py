@@ -9,10 +9,11 @@ from datetime import date
 from django.conf import settings
 
 from cl.citations.find_citations import get_citations
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.import_lib import find_person
+from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
+
 from .convert_columbia_html import convert_columbia_html
 
 # only make a solr connection once

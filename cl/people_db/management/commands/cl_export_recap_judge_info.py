@@ -2,10 +2,9 @@ from collections import Counter, OrderedDict
 
 import pandas
 from django.db.models import Q
-
+from juriscraper.lib.judge_parsers import normalize_judge_string
 from pandas import to_pickle
 from unidecode import unidecode
-from juriscraper.lib.judge_parsers import normalize_judge_string
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Court, Docket

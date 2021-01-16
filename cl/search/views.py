@@ -10,11 +10,11 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Sum, Count
+from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import HttpResponseRedirect, render, get_object_or_404
+from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
-from django.utils.timezone import utc, make_aware
+from django.utils.timezone import make_aware, utc
 from django.views.decorators.cache import never_cache
 from requests import RequestException
 from scorched.exc import SolrError
@@ -27,19 +27,19 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
+    add_depth_counts,
     build_main_query,
+    get_mlt_query,
     get_query_citation,
+    get_solr_interface,
+    make_get_string,
     make_stats_variable,
     merge_form_with_courts,
-    make_get_string,
     regroup_snippets,
-    get_mlt_query,
-    add_depth_counts,
-    get_solr_interface,
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import Court, Opinion, SEARCH_TYPES, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap

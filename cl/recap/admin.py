@@ -1,9 +1,9 @@
 from django.contrib import admin
 
 from cl.recap.models import (
-    ProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
+    ProcessingQueue,
 )
 
 

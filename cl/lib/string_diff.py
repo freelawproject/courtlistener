@@ -1,8 +1,7 @@
 import difflib
 import math
-import string
 import re
-
+import string
 from collections import Counter
 
 

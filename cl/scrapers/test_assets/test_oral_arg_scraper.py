@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
+from os.path import join
+
 from django.conf import settings
 from juriscraper.OralArgumentSite import OralArgumentSite
-from os.path import join
 
 
 class Site(OralArgumentSite):

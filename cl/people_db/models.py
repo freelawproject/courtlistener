@@ -8,21 +8,21 @@ from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
+    validate_all_or_none,
+    validate_at_most_n,
+    validate_exactly_n,
     validate_has_full_name,
     validate_is_not_alias,
-    validate_partial_date,
     validate_nomination_fields_ok,
-    validate_all_or_none,
-    validate_exactly_n,
     validate_not_all,
-    validate_at_most_n,
+    validate_partial_date,
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.search_index_utils import (
-    solr_list,
-    null_map,
     normalize_search_dicts,
+    null_map,
+    solr_list,
 )
 from cl.lib.string_utils import trunc
 from cl.search.models import Court

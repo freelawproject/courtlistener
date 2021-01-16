@@ -7,28 +7,27 @@ import re
 import tempfile
 
 from django.core.files.base import ContentFile
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
-from django.test import TestCase, SimpleTestCase
-from django.test import override_settings
-from rest_framework.status import HTTP_503_SERVICE_UNAVAILABLE, HTTP_200_OK
+from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.db_tools import queryset_generator
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
-from cl.lib.model_helpers import make_upload_path, make_docket_number_core
+from cl.lib.model_helpers import make_docket_number_core, make_upload_path
 from cl.lib.pacer import (
-    normalize_attorney_role,
-    normalize_attorney_contact,
-    normalize_us_state,
-    make_address_lookup_key,
     get_blocked_status,
+    make_address_lookup_key,
+    normalize_attorney_contact,
+    normalize_attorney_role,
+    normalize_us_state,
 )
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.lib.string_utils import trunc, anonymize
+from cl.lib.string_utils import anonymize, trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
-from cl.search.models import Opinion, OpinionCluster, Docket, Court
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 
 class TestPacerUtils(TestCase):

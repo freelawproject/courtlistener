@@ -9,15 +9,15 @@ from reporters_db import REPORTERS
 
 from cl.citations.find_citations import strip_punct
 from cl.citations.models import (
-    SupraCitation,
-    ShortformCitation,
+    Citation,
     IdCitation,
     NonopinionCitation,
-    Citation,
+    ShortformCitation,
+    SupraCitation,
 )
+from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion
-from cl.custom_filters.templatetags.text_filters import best_case_name
 
 DEBUG = True
 

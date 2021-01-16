@@ -4,7 +4,7 @@ from celery.canvas import chain
 from django.conf import settings
 from juriscraper.pacer import PacerSession
 
-from cl.corpus_importer.tasks import get_pacer_doc_by_rd, add_tags
+from cl.corpus_importer.tasks import add_tags, get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface

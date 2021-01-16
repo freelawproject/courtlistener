@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.stats.models import Stat, Event
+from cl.stats.models import Event, Stat
 
 
 @admin.register(Stat)

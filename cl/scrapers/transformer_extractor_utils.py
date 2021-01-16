@@ -1,5 +1,5 @@
 import json
-from typing import Optional, ByteString
+from typing import ByteString, Optional
 
 import requests
 from django.conf import settings

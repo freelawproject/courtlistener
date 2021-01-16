@@ -1,9 +1,9 @@
+import itertools
+import os
 import uuid
 
-import os
-from django.core.files.storage import FileSystemStorage
-import itertools
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from storages.backends.s3boto3 import S3Boto3Storage
 
 

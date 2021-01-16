@@ -11,10 +11,10 @@ from datetime import date, datetime
 import pandas as pd
 
 from cl.people_db.models import (
-    School,
-    GRANULARITY_YEAR,
-    GRANULARITY_MONTH,
     GRANULARITY_DAY,
+    GRANULARITY_MONTH,
+    GRANULARITY_YEAR,
+    School,
 )
 
 

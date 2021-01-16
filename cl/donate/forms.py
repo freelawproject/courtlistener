@@ -5,7 +5,7 @@ from django.forms import ModelForm
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
-from cl.donate.models import Donation, PROVIDERS, FREQUENCIES
+from cl.donate.models import FREQUENCIES, PROVIDERS, Donation
 from cl.users.models import UserProfile
 
 AMOUNTS = (

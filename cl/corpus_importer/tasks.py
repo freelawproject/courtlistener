@@ -3,44 +3,36 @@ import logging
 import os
 import shutil
 from datetime import date
-from typing import Dict, Any, Optional, List, Union, Tuple
-
-from celery import Task
-
-from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
-from cl.audio.models import Audio
-from cl.corpus_importer.utils import mark_ia_upload_needed
-from cl.lib.crypto import sha1
-from cl.people_db.models import Attorney, Role
-
 from io import BytesIO
-from pyexpat import ExpatError
 from tempfile import NamedTemporaryFile
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import internetarchive as ia
 import requests
+from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, transaction, DatabaseError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.encoding import force_bytes
 from django.utils.timezone import now
-from juriscraper.lib.exceptions import ParsingException, PacerLoginException
-from juriscraper.lib.string_utils import harmonize, CaseNameTweaker
+from juriscraper.lib.exceptions import PacerLoginException, ParsingException
+from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
+    ClaimsRegister,
     DocketReport,
     FreeOpinionReport,
     PacerSession,
     PossibleCaseNumberApi,
     ShowCaseDocApi,
-    ClaimsRegister,
 )
+from pyexpat import ExpatError
 from requests.exceptions import HTTPError, RequestException
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
@@ -51,46 +43,51 @@ from rest_framework.status import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
+from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
+from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
+from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.crypto import sha1
 from cl.lib.pacer import (
-    lookup_and_save,
     get_blocked_status,
-    map_pacer_to_cl_id,
-    map_cl_to_pacer_id,
     get_first_missing_de_date,
+    lookup_and_save,
+    map_cl_to_pacer_id,
+    map_pacer_to_cl_id,
 )
 from cl.lib.pacer_session import (
-    get_pacer_cookie_from_cache,
     get_or_cache_pacer_cookies,
+    get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import (
-    get_document_filename,
     get_bucket_name,
     get_docket_filename,
+    get_document_filename,
 )
-from cl.recap.constants import CR_OLD, CR_2017, CV_2017, CV_OLD, CV_2020
-from cl.recap.models import PacerHtmlFiles, UPLOAD_TYPE, ProcessingQueue
+from cl.people_db.models import Attorney, Role
+from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
-    add_claims_to_docket,
     add_bankruptcy_data_to_docket,
+    add_claims_to_docket,
     add_tags_to_objs,
     find_docket_object,
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
-    update_docket_metadata,
     save_iquery_to_docket,
+    update_docket_metadata,
 )
+from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles, ProcessingQueue
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import (
-    DocketEntry,
-    RECAPDocument,
+    ClaimHistory,
     Court,
     Docket,
+    DocketEntry,
+    RECAPDocument,
     Tag,
-    ClaimHistory,
 )
 from cl.search.tasks import add_items_to_solr
 

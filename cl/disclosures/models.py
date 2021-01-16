@@ -1,12 +1,9 @@
-from typing import Dict, Union, Optional
+from typing import Dict, Optional, Union
 
 from django.db import models
 
-from cl.disclosures.tasks import (
-    make_financial_disclosure_thumbnail_from_pdf,
-)
-from cl.lib.models import AbstractDateTimeModel
-from cl.lib.models import THUMBNAIL_STATUSES
+from cl.disclosures.tasks import make_financial_disclosure_thumbnail_from_pdf
+from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
 from cl.lib.storage import AWSMediaStorage
 from cl.people_db.models import Person
 

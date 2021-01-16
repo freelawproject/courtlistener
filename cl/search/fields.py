@@ -5,10 +5,9 @@ from calendar import monthrange
 
 from django.core import validators
 from django.core.exceptions import ValidationError
-from django.utils import formats
-from django.utils import six
+from django.forms import ChoiceField, DateField
+from django.utils import formats, six
 from django.utils.encoding import force_text
-from django.forms import DateField, ChoiceField
 
 INPUT_FORMATS = [
     "%Y%m%d",  # '20061025'

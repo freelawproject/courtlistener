@@ -1,9 +1,9 @@
 from django.urls import reverse
+from lxml import etree
 
 from cl.audio.models import Audio
-from cl.search.models import SEARCH_TYPES
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
-from lxml import etree
+from cl.search.models import SEARCH_TYPES
 
 
 class PodcastTest(IndexedSolrTestCase):

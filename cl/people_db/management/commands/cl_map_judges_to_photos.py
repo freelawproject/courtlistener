@@ -4,9 +4,9 @@ from django.utils.text import slugify
 from django.utils.timezone import now
 from judge_pics import judge_root
 
+from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.models import Person
-from cl.custom_filters.templatetags.extras import granular_date
 
 
 class Command(VerboseCommand):

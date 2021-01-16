@@ -1,6 +1,6 @@
 from django.core import mail
-from django.urls import reverse
 from django.test import TestCase
+from django.urls import reverse
 from lxml.html import fromstring
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 

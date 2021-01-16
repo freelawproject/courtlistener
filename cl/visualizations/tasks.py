@@ -7,8 +7,8 @@ from requests.exceptions import HTTPError, MissingSchema, TooManyRedirects
 
 from cl.celery_init import app
 from cl.visualizations.models import Referer
-from cl.visualizations.utils import emails
 from cl.visualizations.network_utils import new_title_for_viz
+from cl.visualizations.utils import emails
 
 
 def blacklisted_url(url):

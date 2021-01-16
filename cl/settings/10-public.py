@@ -10,8 +10,8 @@ from django.http import UnreadablePostError
 from judge_pics import judge_root
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.redis import RedisIntegration
 
 from cl.lib.redis_utils import make_redis_interface
 

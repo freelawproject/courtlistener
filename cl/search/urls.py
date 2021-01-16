@@ -1,8 +1,7 @@
 from django.conf.urls import url
 
+from cl.search.feeds import AllJurisdictionsFeed, JurisdictionFeed, SearchFeed
 from cl.search.views import advanced, show_results
-
-from cl.search.feeds import JurisdictionFeed, AllJurisdictionsFeed, SearchFeed
 
 urlpatterns = [
     # Search pages

@@ -3,18 +3,17 @@ import logging
 import os
 import re
 from datetime import timedelta
-from typing import Union, Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from urllib.parse import quote
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import EmailMessage
-from django.urls import reverse
-from django.db.models import Count, Sum, QuerySet
-from django.http import HttpResponse, HttpRequest
-from django.http import HttpResponseRedirect
+from django.db.models import Count, QuerySet, Sum
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
@@ -29,10 +28,10 @@ from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import (
     Court,
-    OpinionCluster,
-    Opinion,
-    RECAPDocument,
     Docket,
+    Opinion,
+    OpinionCluster,
+    RECAPDocument,
 )
 from cl.simple_pages.forms import ContactForm
 

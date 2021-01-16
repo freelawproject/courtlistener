@@ -1,6 +1,7 @@
-from cl.scrapers.management.commands import cl_scrape_opinions
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
+
+from cl.scrapers.management.commands import cl_scrape_opinions
 
 
 class Command(cl_scrape_opinions.Command):

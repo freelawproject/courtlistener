@@ -3,8 +3,8 @@ from django.utils.timezone import now
 from cl.api.tasks import write_json_to_disk
 from cl.lib.argparse_types import readable_dir
 from cl.lib.command_utils import VerboseCommand
-from cl.people_db.api_serializers import PartySerializer, AttorneySerializer
-from cl.people_db.models import Party, Attorney
+from cl.people_db.api_serializers import AttorneySerializer, PartySerializer
+from cl.people_db.models import Attorney, Party
 from cl.search.api_serializers import FullDocketSerializer
 from cl.search.models import Court, Docket
 

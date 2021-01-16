@@ -1,10 +1,10 @@
 import datetime
 import json
-from typing import Dict, Union, Optional, List
+from typing import Dict, List, Optional, Union
 from urllib.parse import quote
 
 import requests
-from dateutil.parser import parse, ParserError
+from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -117,9 +117,7 @@ def get_report_type(extracted_data: dict) -> int:
     :param extracted_data: Document information
     :return: Disclosure type
     """
-    from cl.disclosures.models import (
-        REPORT_TYPES,
-    )
+    from cl.disclosures.models import REPORT_TYPES
 
     if extracted_data.get("initial"):
         return REPORT_TYPES.INITIAL
@@ -177,14 +175,14 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
     :return:None
     """
     from cl.disclosures.models import (
-        Investment,
         Agreement,
         Debt,
         Gift,
-        Reimbursement,
+        Investment,
         NonInvestmentIncome,
-        SpouseIncome,
         Position,
+        Reimbursement,
+        SpouseIncome,
     )
 
     addendum = "Additional Information or Explanations"

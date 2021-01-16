@@ -5,21 +5,21 @@ from email.utils import parseaddr
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import update_session_auth_hash, logout
+from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.urls import reverse
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
 from django.http import (
+    HttpRequest,
+    HttpResponse,
     HttpResponseRedirect,
     QueryDict,
-    HttpResponse,
-    HttpRequest,
 )
 from django.shortcuts import render
 from django.template.defaultfilters import urlencode
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -35,12 +35,12 @@ from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
-    ProfileForm,
-    UserForm,
-    UserCreationFormExtended,
-    EmailConfirmationForm,
     CustomPasswordChangeForm,
+    EmailConfirmationForm,
     OptInConsentForm,
+    ProfileForm,
+    UserCreationFormExtended,
+    UserForm,
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp

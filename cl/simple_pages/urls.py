@@ -12,13 +12,13 @@ from cl.simple_pages.views import (
     donation_help,
     faq,
     feeds,
+    help_home,
     latest_terms,
     markdown_help,
     old_terms,
     podcasts,
     robots,
     validate_for_wot,
-    help_home,
 )
 
 urlpatterns = [

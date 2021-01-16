@@ -2,7 +2,8 @@
 
 
 import sys
-from django.db import models, migrations
+
+from django.db import migrations, models
 
 from cl.lib.migration_utils import load_migration_fixture
 

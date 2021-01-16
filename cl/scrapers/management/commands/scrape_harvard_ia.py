@@ -1,15 +1,15 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
-import internetarchive as ia
 import json
+import os
+
+import internetarchive as ia
 import requests
+from django.conf import settings
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
-
-from django.conf import settings
 
 
 def get_from_ia(reporter, volume):

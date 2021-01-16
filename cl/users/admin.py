@@ -6,7 +6,7 @@ from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline
 from cl.lib.admin import AdminTweaksMixin
-from cl.users.models import UserProfile, BarMembership
+from cl.users.models import BarMembership, UserProfile
 
 
 def get_email_confirmed(obj):

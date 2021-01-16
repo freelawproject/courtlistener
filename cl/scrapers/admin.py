@@ -1,10 +1,10 @@
 from django.contrib import admin
 
 from cl.scrapers.models import (
-    UrlHash,
     ErrorLog,
     PACERFreeDocumentLog,
     PACERFreeDocumentRow,
+    UrlHash,
 )
 
 

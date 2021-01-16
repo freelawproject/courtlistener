@@ -1,14 +1,14 @@
 from django.conf.urls import url
 
-from cl.donate.paypal import process_paypal_callback, donate_paypal_cancel
+from cl.donate.paypal import donate_paypal_cancel, process_paypal_callback
 from cl.donate.stripe_helpers import process_stripe_callback
 from cl.donate.views import (
-    donate,
-    payment_complete,
-    make_check_donation,
-    toggle_monthly_donation,
-    cc_payment,
     badge_signup,
+    cc_payment,
+    donate,
+    make_check_donation,
+    payment_complete,
+    toggle_monthly_donation,
 )
 from cl.users.views import view_donations
 

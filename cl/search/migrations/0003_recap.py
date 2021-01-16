@@ -2,6 +2,7 @@
 
 
 from django.db import migrations, models
+
 import cl.lib.model_helpers
 import cl.lib.storage
 

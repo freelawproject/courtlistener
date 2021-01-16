@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
 
-from django.db import migrations, models
 from django.conf import settings
-import cl.recap.models
+from django.db import migrations, models
+
 import cl.lib.storage
+import cl.recap.models
 
 
 class Migration(migrations.Migration):

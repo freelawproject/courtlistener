@@ -12,7 +12,7 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
 from cl.people_db.models import Person
 from cl.search.models import Docket
-from cl.search.tasks import delete_items, add_items_to_solr
+from cl.search.tasks import add_items_to_solr, delete_items
 
 VALID_OBJ_TYPES = (
     "audio.Audio",

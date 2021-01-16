@@ -1,5 +1,6 @@
-from cl.visualizations.models import SCOTUSMap, JSONVersion, Referer
 from django.contrib import admin
+
+from cl.visualizations.models import JSONVersion, Referer, SCOTUSMap
 
 
 @admin.register(JSONVersion)

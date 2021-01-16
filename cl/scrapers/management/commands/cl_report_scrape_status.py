@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import pkg_resources
 from datetime import date, timedelta
 from operator import itemgetter
+
+import pkg_resources
 from django.conf import settings
 from django.core import mail
 from django.core.mail import EmailMessage

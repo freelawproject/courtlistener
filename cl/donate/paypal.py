@@ -1,18 +1,18 @@
 import logging
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
 import simplejson as json  # This is needed to handle Decimal objects.
 from django.conf import settings
-from django.urls import reverse
-from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.status import HTTP_201_CREATED, HTTP_200_OK
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
 
-from cl.donate.models import Donation, PAYMENT_TYPES
-from cl.donate.utils import send_thank_you_email, PaymentFailureException
+from cl.donate.models import PAYMENT_TYPES, Donation
+from cl.donate.utils import PaymentFailureException, send_thank_you_email
 
 logger = logging.getLogger(__name__)
 

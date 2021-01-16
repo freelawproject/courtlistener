@@ -6,13 +6,13 @@ import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.urls import reverse
 from django.test import Client, TestCase
+from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 from cl.donate.management.commands.cl_send_donation_reminders import Command
-from cl.donate.models import Donation, FREQUENCIES, PROVIDERS, MonthlyDonation
+from cl.donate.models import FREQUENCIES, PROVIDERS, Donation, MonthlyDonation
 
 # From: https://stripe.com/docs/testing#cards
 from cl.donate.utils import emails

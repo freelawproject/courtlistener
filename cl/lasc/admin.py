@@ -1,5 +1,5 @@
 from django.contrib import admin
-from cl.lib.admin import AdminTweaksMixin
+
 from cl.lasc.models import (
     Action,
     CrossReference,
@@ -12,6 +12,7 @@ from cl.lasc.models import (
     QueuedPDF,
     TentativeRuling,
 )
+from cl.lib.admin import AdminTweaksMixin
 
 
 class Base(admin.ModelAdmin, AdminTweaksMixin):

@@ -10,7 +10,7 @@ Created on Thu Jun 16 14:31:21 2016
 """
 
 import os
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
 os.chdir("/home/elliott/freelawmachine/flp/columbia_data/logs/2")
 currfile = ""

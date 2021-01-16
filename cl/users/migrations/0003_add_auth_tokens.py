@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
 
-from django.db import models, migrations
-from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
+from django.db import migrations, models
+from rest_framework.authtoken.models import Token
+
 
 def add_tokens(apps, schema_editor):
     print("Adding auth tokens for the API...")

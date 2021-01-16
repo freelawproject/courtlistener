@@ -2,6 +2,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+from django.core.exceptions import ValidationError
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.lib.command_utils import VerboseCommand, logger
@@ -11,18 +12,16 @@ from cl.people_db.import_judges.assign_authors import (
 )
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import (
-    make_federal_judge,
     add_positions_from_row,
-    update_bankruptcy_and_magistrate,
+    make_federal_judge,
     make_mag_bk_judge,
+    update_bankruptcy_and_magistrate,
 )
 from cl.people_db.import_judges.populate_presidents import make_president
 from cl.people_db.import_judges.populate_state_judges import make_state_judge
 from cl.people_db.models import Person, Position
 from cl.search.models import Court
 from cl.search.tasks import add_items_to_solr
-
-from django.core.exceptions import ValidationError
 
 
 class Command(VerboseCommand):

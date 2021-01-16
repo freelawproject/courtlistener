@@ -1,20 +1,20 @@
 import re
-from http.client import ResponseNotReady
 from collections import Counter
-from typing import List, Union, Tuple, Set
+from http.client import ResponseNotReady
+from typing import List, Set, Tuple, Union
 
 from django.db import transaction
 from django.db.models import F
 
 from cl.celery_init import app
 from cl.citations import find_citations, match_citations
-from cl.search.models import Opinion, OpinionsCited, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 from cl.citations.models import Citation, NonopinionCitation
 from cl.citations.utils import (
     is_balanced_html,
     remove_duplicate_citations_by_regex,
 )
+from cl.search.models import Opinion, OpinionCluster, OpinionsCited
+from cl.search.tasks import add_items_to_solr
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,

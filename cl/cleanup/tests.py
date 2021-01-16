@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
+import json
 import os
 import re
-from unittest import mock
 from glob import iglob
-import json
+from unittest import mock
 
-from django.test import TestCase
 from django.conf import settings
+from django.test import TestCase
 
 from cl.cleanup.management.commands.fix_tax_court import (
     find_tax_court_citation,

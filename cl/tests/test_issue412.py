@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
-from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 BLOCKED_MSG = "Blocked"
 

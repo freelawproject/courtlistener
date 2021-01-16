@@ -1,5 +1,5 @@
 import json
-from typing import Optional, Dict, Union
+from typing import Dict, Optional, Union
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.disclosures.tasks import import_disclosure

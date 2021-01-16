@@ -14,13 +14,14 @@ from requests import RequestException
 
 from cl.celery_init import app
 from cl.lasc.models import (
+    LASCJSON,
+    LASCPDF,
+    UPLOAD_TYPE,
     Docket,
     DocumentImage,
     QueuedCase,
     QueuedPDF,
-    UPLOAD_TYPE,
 )
-from cl.lasc.models import LASCJSON, LASCPDF
 from cl.lasc.utils import make_case_id
 from cl.lib.crypto import sha1_of_json_data
 from cl.lib.redis_utils import make_redis_interface

@@ -1,6 +1,7 @@
 import datetime
+
 from django.template import Context
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 
 from cl.custom_filters.templatetags.extras import get_full_host, granular_date
 from cl.custom_filters.templatetags.text_filters import (

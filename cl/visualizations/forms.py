@@ -1,5 +1,6 @@
-from cl.visualizations.models import SCOTUSMap
 from django import forms
+
+from cl.visualizations.models import SCOTUSMap
 
 
 class VizForm(forms.ModelForm):

@@ -3,9 +3,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from cl.lib.model_helpers import (
+    make_lasc_json_path,
     make_pdf_path,
     make_pdf_thumb_path,
-    make_lasc_json_path,
 )
 from cl.lib.storage import IncrementingFileSystemStorage
 

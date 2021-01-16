@@ -8,15 +8,14 @@ from juriscraper.pacer import PacerSession
 from cl.corpus_importer.management.commands.everything_project import (
     NOS_EXCLUSIONS,
 )
+from cl.corpus_importer.tasks import (
+    get_docket_by_pacer_case_id,
+    make_docket_by_iquery,
+)
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.corpus_importer.tasks import (
-    make_docket_by_iquery,
-    get_docket_by_pacer_case_id,
-)
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
-
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
