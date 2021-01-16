@@ -245,8 +245,13 @@ class TestModelHelpers(TestCase):
 
         # Do we automatically zero-pad short docket numbers?
         self.assertEqual(make_docket_number_core("12-cv-1032"), expected)
-        # Do we skip appellate courts?
-        self.assertEqual(make_docket_number_core("12-01032"), "")
+
+        # bankruptcy numbers
+        self.assertEqual(make_docket_number_core("12-33112"), "12033112")
+        self.assertEqual(make_docket_number_core("12-00001"), "12000001")
+        self.assertEqual(make_docket_number_core("12-0001"), "12000001")
+        self.assertEqual(make_docket_number_core("06-10672-DHW"), "06010672")
+
         # docket_number fields can be null. If so, the core value should be
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
