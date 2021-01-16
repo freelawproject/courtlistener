@@ -1,7 +1,7 @@
 import rest_framework_filters as filters
 from rest_framework_filters import FilterSet
 
-from cl.api.utils import DATETIME_LOOKUPS, DATE_LOOKUPS
+from cl.api.utils import DATE_LOOKUPS, DATETIME_LOOKUPS
 from cl.audio.models import Audio
 from cl.search.filters import DocketFilter
 from cl.search.models import SOURCES, Docket

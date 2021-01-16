@@ -8,7 +8,7 @@ from django.contrib.sitemaps.views import x_robots_tag
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, PageNotAnInteger
-from django.http import HttpRequest, HttpResponse, Http404
+from django.http import Http404, HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.encoding import force_bytes, iri_to_uri
 from django.utils.http import http_date

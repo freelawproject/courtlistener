@@ -6,7 +6,7 @@ from juriscraper.pacer.http import PacerSession
 from cl.corpus_importer.tasks import get_pacer_doc_id_with_show_case_doc_url
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import RECAPDocument, Court
+from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)

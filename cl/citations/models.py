@@ -3,6 +3,7 @@
 import re
 
 from reporters_db import REPORTERS
+
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.search.models import Citation as ModelCitation
 

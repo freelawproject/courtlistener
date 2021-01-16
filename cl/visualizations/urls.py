@@ -1,19 +1,19 @@
 from django.conf.urls import url
 from django.contrib.sitemaps.views import sitemap
 
+from cl.visualizations.sitemap import VizSitemap
 from cl.visualizations.views import (
     delete_visualization,
+    edit_visualization,
+    gallery,
+    mapper_homepage,
+    new_visualization,
+    privatize_visualization,
     restore_visualization,
     share_visualization,
-    privatize_visualization,
-    edit_visualization,
-    mapper_homepage,
-    gallery,
-    new_visualization,
     view_embedded_visualization,
     view_visualization,
 )
-from cl.visualizations.sitemap import VizSitemap
 
 urlpatterns = [
     url(

@@ -7,17 +7,18 @@ import xml.etree.cElementTree as ET
 
 import dateutil.parser as dparser
 from juriscraper.lib.string_utils import (
-    titlecase,
-    harmonize,
-    clean_string,
     CaseNameTweaker,
+    clean_string,
+    harmonize,
+    titlecase,
 )
 from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
+
 from .parse_judges import find_judge_names
-from .regexes_columbia import SPECIAL_REGEXES, FOLDER_DICT
+from .regexes_columbia import FOLDER_DICT, SPECIAL_REGEXES
 
 # initialized once since it takes resources
 CASE_NAME_TWEAKER = CaseNameTweaker()

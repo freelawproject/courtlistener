@@ -4,7 +4,7 @@ from django.db import models
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.search.models import OpinionCluster, Docket, RECAPDocument
+from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
 class Favorite(models.Model):

@@ -1,11 +1,11 @@
-from cl.people_db.views import (
-    financial_disclosures_for_somebody,
-    financial_disclosures_fileserver,
-    view_person,
-    financial_disclosures_home,
-)
 from django.conf.urls import url
 
+from cl.people_db.views import (
+    financial_disclosures_fileserver,
+    financial_disclosures_for_somebody,
+    financial_disclosures_home,
+    view_person,
+)
 
 urlpatterns = [
     url(

@@ -2,7 +2,7 @@ import signal
 import sys
 import time
 from datetime import date
-from typing import Tuple, List, Dict, Union, Any
+from typing import Any, Dict, List, Tuple, Union
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
@@ -21,11 +21,15 @@ from cl.lib.string_utils import trunc
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
-from cl.scrapers.utils import get_extension, get_binary_content, signal_handler
-from cl.search.models import Citation, Court, SEARCH_TYPES
-from cl.search.models import Docket
-from cl.search.models import Opinion
-from cl.search.models import OpinionCluster
+from cl.scrapers.utils import get_binary_content, get_extension, signal_handler
+from cl.search.models import (
+    SEARCH_TYPES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+    OpinionCluster,
+)
 
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False

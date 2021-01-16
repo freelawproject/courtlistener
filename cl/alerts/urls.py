@@ -6,8 +6,8 @@ from cl.alerts.views import (
     disable_alert,
     edit_alert_redirect,
     enable_alert,
-    toggle_docket_alert,
     new_docket_alert,
+    toggle_docket_alert,
 )
 
 urlpatterns = [

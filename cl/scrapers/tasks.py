@@ -8,20 +8,20 @@ from tempfile import NamedTemporaryFile
 from typing import List, Optional, Tuple, Union
 
 import requests
-from PyPDF2 import PdfFileReader
-from PyPDF2.utils import PdfReadError
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import (
-    smart_text,
     DjangoUnicodeDecodeError,
     force_text,
+    smart_text,
 )
 from django.utils.timezone import now
-from juriscraper.pacer import PacerSession, CaseQuery
+from juriscraper.pacer import CaseQuery, PacerSession
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
+from PyPDF2 import PdfFileReader
+from PyPDF2.utils import PdfReadError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -34,13 +34,9 @@ from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import anonymize, trunc
 from cl.lib.utils import is_iter
-from cl.recap.mergers import (
-    save_iquery_to_docket,
-)
-from cl.scrapers.transformer_extractor_utils import (
-    convert_and_clean_audio,
-)
-from cl.search.models import Opinion, RECAPDocument, Docket
+from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.transformer_extractor_utils import convert_and_clean_audio
+from cl.search.models import Docket, Opinion, RECAPDocument
 
 DEVNULL = open("/dev/null", "w")
 

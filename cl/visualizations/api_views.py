@@ -1,17 +1,17 @@
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.response import Response
+from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
 from cl.api.utils import LoggingMixin
 from cl.visualizations.api_permissions import IsParentVisualizationOwner
 from cl.visualizations.api_serializers import (
-    VisualizationSerializer,
     JSONVersionSerializer,
+    VisualizationSerializer,
 )
-from cl.visualizations.models import SCOTUSMap, JSONVersion
+from cl.visualizations.models import JSONVersion, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
 from cl.visualizations.utils import build_visualization
 

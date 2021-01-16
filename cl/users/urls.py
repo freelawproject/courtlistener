@@ -6,11 +6,7 @@ from django.views.generic import RedirectView
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import views
-from cl.users.forms import (
-    CustomPasswordResetForm,
-    CustomSetPasswordForm,
-)
-
+from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
 
 urlpatterns = [
     # Sign in/out and password pages

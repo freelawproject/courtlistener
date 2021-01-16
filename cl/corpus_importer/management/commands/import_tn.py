@@ -1,9 +1,9 @@
+import argparse
 import json
 import logging
 import os
 from glob import glob
 
-import argparse
 from dateutil import parser
 from django.utils.encoding import force_bytes
 

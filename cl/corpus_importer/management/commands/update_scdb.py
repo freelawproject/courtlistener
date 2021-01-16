@@ -27,8 +27,7 @@ from django.utils.encoding import force_bytes
 from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
-from cl.search.models import OpinionCluster, Citation
-
+from cl.search.models import Citation, OpinionCluster
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.

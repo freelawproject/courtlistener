@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from django.utils.timezone import now
 from datetime import date
+
+from django.utils.timezone import now
 
 from cl.people_db.models import Position
 

@@ -4,37 +4,37 @@ import re
 from datetime import date
 
 import pandas as pd
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from localflavor.us.us_states import STATES_NORMALIZED
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.people_db.import_judges.judge_utils import (
-    get_school,
-    process_date,
-    get_races,
-    get_party,
-    get_suffix,
     get_aba,
     get_degree_level,
     get_gender,
+    get_party,
+    get_races,
+    get_school,
+    get_suffix,
+    process_date,
     process_date_string,
-)
-from cl.people_db.models import (
-    Person,
-    Position,
-    Education,
-    Race,
-    PoliticalAffiliation,
-    ABARating,
-    GRANULARITY_DAY,
-    GRANULARITY_YEAR,
-    Source,
 )
 from cl.people_db.management.constants import (
     FJC_BANKRUPTCY_COURTS,
     FJC_DISTRICT_COURTS,
 )
-from django.core.exceptions import ValidationError
-from django.db import transaction
+from cl.people_db.models import (
+    GRANULARITY_DAY,
+    GRANULARITY_YEAR,
+    ABARating,
+    Education,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
+    Source,
+)
 
 
 def transform_employ(string):

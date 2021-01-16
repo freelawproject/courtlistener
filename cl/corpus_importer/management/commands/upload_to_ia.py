@@ -11,7 +11,7 @@ from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import make_redis_interface
-from cl.search.models import RECAPDocument, Docket
+from cl.search.models import Docket, RECAPDocument
 
 
 def upload_non_free_pdfs_to_internet_archive(options):

@@ -7,8 +7,8 @@ from django.test import TestCase
 from cl.disclosures.models import (
     FinancialDisclosure,
     Investment,
-    Reimbursement,
     NonInvestmentIncome,
+    Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
 

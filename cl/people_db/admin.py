@@ -2,29 +2,26 @@ from django.contrib import admin
 
 from cl.lib.admin import AdminTweaksMixin, NotesInline
 
+# RECAP imports
 # Judge DB imports
 from cl.people_db.models import (
     ABARating,
-    Education,
-    Person,
-    PoliticalAffiliation,
-    Position,
-    Race,
-    RetentionEvent,
-    School,
-    Source,
-)
-
-# RECAP imports
-from cl.people_db.models import (
     Attorney,
     AttorneyOrganization,
     AttorneyOrganizationAssociation,
     CriminalComplaint,
     CriminalCount,
-    PartyType,
+    Education,
     Party,
+    PartyType,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
+    RetentionEvent,
     Role,
+    School,
+    Source,
 )
 
 

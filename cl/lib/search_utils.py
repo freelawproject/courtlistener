@@ -1,13 +1,11 @@
 import re
-from datetime import date
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
-from django.core.cache import cache
-from django.core.cache import caches
-from django.http import QueryDict, HttpRequest
+from django.core.cache import cache, caches
+from django.http import HttpRequest, QueryDict
 from scorched.response import SolrResponse
 
 from cl.citations.find_citations import get_citations
@@ -18,16 +16,16 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.constants import (
     SOLR_OPINION_HL_FIELDS,
-    SOLR_RECAP_HL_FIELDS,
     SOLR_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
+    SOLR_RECAP_HL_FIELDS,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
+    DOCUMENT_STATUSES,
+    SEARCH_TYPES,
     Court,
     OpinionCluster,
-    SEARCH_TYPES,
-    DOCUMENT_STATUSES,
 )
 
 recap_boosts_qf = {

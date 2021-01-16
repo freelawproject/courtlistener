@@ -1,25 +1,25 @@
 import json
 import shutil
-from datetime import timedelta, date
+from datetime import date, timedelta
 
 from django.conf import settings
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import Permission, User
 from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
-from django.urls import reverse, ResolverMatch
 from django.http import HttpRequest, JsonResponse
 from django.test import (
     Client,
-    override_settings,
     RequestFactory,
     TestCase,
     TransactionTestCase,
+    override_settings,
 )
+from django.urls import ResolverMatch, reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
-from cl.api.utils import BulkJsonHistory, SEND_API_WELCOME_EMAIL_COUNT
+from cl.api.utils import SEND_API_WELCOME_EMAIL_COUNT, BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
@@ -30,8 +30,8 @@ from cl.scrapers.management.commands.cl_scrape_oral_arguments import (
 )
 from cl.scrapers.test_assets import test_oral_arg_scraper
 from cl.search.models import (
-    Docket,
     Court,
+    Docket,
     Opinion,
     OpinionCluster,
     OpinionsCited,

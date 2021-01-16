@@ -1,9 +1,8 @@
-from lxml import etree
-
-from django.db.models import Sum
-from django.apps import (
+from django.apps import (  # Must use apps.get_model() to avoid circular import issue
     apps,
-)  # Must use apps.get_model() to avoid circular import issue
+)
+from django.db.models import Sum
+from lxml import etree
 
 
 def map_reporter_db_cite_type(citation_type):

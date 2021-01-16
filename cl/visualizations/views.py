@@ -1,16 +1,16 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.urls import reverse
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
 from django.http import (
-    HttpResponseRedirect,
+    HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
-    HttpRequest,
+    HttpResponseRedirect,
 )
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -19,11 +19,11 @@ from rest_framework import status as statuses
 from cl.lib.bot_detector import is_bot
 from cl.lib.view_utils import increment_view_count
 from cl.stats.utils import tally_stat
-from cl.visualizations.forms import VizForm, VizEditForm
-from cl.visualizations.models import SCOTUSMap, Referer
-from cl.visualizations.tasks import get_title
-from cl.visualizations.utils import message_dict, build_visualization
+from cl.visualizations.forms import VizEditForm, VizForm
+from cl.visualizations.models import Referer, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
+from cl.visualizations.tasks import get_title
+from cl.visualizations.utils import build_visualization, message_dict
 
 
 def render_visualization_page(

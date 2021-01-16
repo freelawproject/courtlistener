@@ -2,27 +2,27 @@ import rest_framework_filters as filters
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
-    DATETIME_LOOKUPS,
-    DATE_LOOKUPS,
-    BASIC_TEXT_LOOKUPS,
-    INTEGER_LOOKUPS,
     ALL_TEXT_LOOKUPS,
+    BASIC_TEXT_LOOKUPS,
+    DATE_LOOKUPS,
+    DATETIME_LOOKUPS,
+    INTEGER_LOOKUPS,
 )
 from cl.people_db.models import (
-    Person,
-    Position,
-    RetentionEvent,
-    Education,
-    School,
-    PoliticalAffiliation,
-    Source,
     ABARating,
-    Race,
-    Party,
     Attorney,
+    Education,
+    Party,
+    Person,
+    PoliticalAffiliation,
+    Position,
+    Race,
+    RetentionEvent,
+    School,
+    Source,
 )
 from cl.search.filters import CourtFilter
-from cl.search.models import Docket, Court, OpinionCluster, Opinion
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 
 class SourceFilter(FilterSet):

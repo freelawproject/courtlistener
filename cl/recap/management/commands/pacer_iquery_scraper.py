@@ -12,7 +12,7 @@ from cl.favorites.models import Favorite
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
-from cl.search.models import Docket, Court
+from cl.search.models import Court, Docket
 
 
 def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:

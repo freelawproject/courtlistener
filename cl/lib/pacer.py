@@ -10,16 +10,16 @@ from django.core.validators import validate_email
 from juriscraper.lib.string_utils import titlecase
 from juriscraper.pacer import (
     AppellateDocketReport,
-    DocketReport,
-    DocketHistoryReport,
-    InternetArchive,
     CaseQuery,
     ClaimsRegister,
+    DocketHistoryReport,
+    DocketReport,
+    InternetArchive,
 )
 from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.people_db.models import Role, AttorneyOrganization
+from cl.people_db.models import AttorneyOrganization, Role
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Court, Docket
 
@@ -207,12 +207,12 @@ def process_docket_data(d, filepath, report_type):
     :param report_type: Whether it's a docket or a docket history report.
     """
     from cl.recap.mergers import (
+        add_bankruptcy_data_to_docket,
+        add_claims_to_docket,
         add_docket_entries,
         add_parties_and_attorneys,
         update_docket_appellate_metadata,
         update_docket_metadata,
-        add_bankruptcy_data_to_docket,
-        add_claims_to_docket,
     )
 
     court_id = map_cl_to_pacer_id(d.court_id)

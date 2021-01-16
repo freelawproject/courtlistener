@@ -3,7 +3,7 @@ from datetime import datetime
 from django.contrib import sitemaps
 from django.db.models import QuerySet
 
-from cl.search.models import OpinionCluster, Docket
+from cl.search.models import Docket, OpinionCluster
 
 
 class OpinionSitemap(sitemaps.Sitemap):

@@ -1,6 +1,7 @@
-import pkgutil
-import juriscraper
 import importlib
+import pkgutil
+
+import juriscraper
 
 
 def get_scraper_object_by_name(court_id):

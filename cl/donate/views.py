@@ -5,29 +5,29 @@ from typing import Dict, Union
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
-from django.urls import reverse
 from django.http import (
-    HttpResponseRedirect,
-    HttpResponseNotAllowed,
-    HttpResponse,
     HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseRedirect,
 )
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.timezone import now
 from stripe import StripeObject
 
-from cl.donate.forms import DonationForm, UserForm, ProfileForm
+from cl.donate.forms import DonationForm, ProfileForm, UserForm
 from cl.donate.models import (
+    FREQUENCIES,
+    PAYMENT_TYPES,
+    PROVIDERS,
     Donation,
     MonthlyDonation,
-    PROVIDERS,
-    PAYMENT_TYPES,
-    FREQUENCIES,
 )
 from cl.donate.paypal import process_paypal_payment
 from cl.donate.stripe_helpers import (
-    process_stripe_payment,
     create_stripe_customer,
+    process_stripe_payment,
 )
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m

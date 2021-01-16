@@ -3,28 +3,28 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import (
-    RECAPUploaders,
-    LoggingMixin,
-    RECAPUsersReadOnly,
     BigPagination,
+    LoggingMixin,
+    RECAPUploaders,
+    RECAPUsersReadOnly,
 )
 from cl.recap.api_serializers import (
-    ProcessingQueueSerializer,
-    PacerDocIdLookUpSerializer,
     FjcIntegratedDatabaseSerializer,
+    PacerDocIdLookUpSerializer,
     PacerFetchQueueSerializer,
+    ProcessingQueueSerializer,
 )
 from cl.recap.filters import (
-    ProcessingQueueFilter,
     FjcIntegratedDatabaseFilter,
     PacerFetchQueueFilter,
+    ProcessingQueueFilter,
 )
 from cl.recap.models import (
-    ProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
+    ProcessingQueue,
 )
-from cl.recap.tasks import process_recap_upload, do_pacer_fetch
+from cl.recap.tasks import do_pacer_fetch, process_recap_upload
 from cl.search.filters import RECAPDocumentFilter
 from cl.search.models import RECAPDocument
 

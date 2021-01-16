@@ -5,11 +5,10 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.urls import reverse
+from django.utils.http import is_safe_url
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
-
-from django.utils.http import is_safe_url
 
 
 def sanitize_redirection(request):

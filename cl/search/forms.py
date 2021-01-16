@@ -3,18 +3,18 @@ from collections import OrderedDict
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms import DateField, ChoiceField
+from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.model_helpers import flatten_choices
-from cl.people_db.models import Position, PoliticalAffiliation
+from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
     CeilingDateField,
     FloorDateField,
     RandomChoiceField,
 )
-from cl.search.models import Court, SEARCH_TYPES, DOCUMENT_STATUSES
+from cl.search.models import DOCUMENT_STATUSES, SEARCH_TYPES, Court
 
 OPINION_ORDER_BY_CHOICES = (
     ("score desc", "Relevance"),

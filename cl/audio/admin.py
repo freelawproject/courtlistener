@@ -1,5 +1,6 @@
-from cl.audio.models import Audio
 from django.contrib import admin
+
+from cl.audio.models import Audio
 
 
 @admin.register(Audio)

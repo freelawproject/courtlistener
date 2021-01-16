@@ -2,8 +2,8 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
-from cl.visualizations.models import SCOTUSMap, JSONVersion
 from cl.search.models import OpinionCluster
+from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
 class JSONVersionSerializer(

@@ -2,6 +2,7 @@
 Unit tests for validating Fixture loading works with model logic
 """
 from django.test import TestCase
+
 from cl.people_db.models import Person
 
 

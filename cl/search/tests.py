@@ -9,40 +9,38 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
-from django.test import RequestFactory
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
 from cl.lib.solr_core_admin import get_data_dir
 from cl.lib.test_helpers import (
-    SolrTestCase,
-    IndexedSolrTestCase,
     EmptySolrTestCase,
+    IndexedSolrTestCase,
+    SolrTestCase,
 )
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
+    DOCUMENT_STATUSES,
+    SEARCH_TYPES,
+    Citation,
     Court,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     RECAPDocument,
-    DocketEntry,
-    Citation,
     sort_cites,
-    SEARCH_TYPES,
-    DOCUMENT_STATUSES,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
-from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
-
-from selenium.common.exceptions import NoSuchElementException
+from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 
 class SetupException(Exception):

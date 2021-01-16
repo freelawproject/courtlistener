@@ -1,7 +1,7 @@
 import os
 import shutil
 from os.path import join
-from typing import List, Any, Dict
+from typing import Any, Dict, List
 
 from django.conf import settings
 
@@ -11,28 +11,28 @@ from cl.audio.models import Audio
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.utils import mkdir_p
 from cl.people_db.api_serializers import (
+    EducationSerializer,
     PersonSerializer,
+    PoliticalAffiliationSerializer,
     PositionSerializer,
     RetentionEventSerializer,
-    EducationSerializer,
     SchoolSerializer,
-    PoliticalAffiliationSerializer,
 )
 from cl.people_db.models import (
+    Education,
     Person,
+    PoliticalAffiliation,
     Position,
     RetentionEvent,
-    Education,
     School,
-    PoliticalAffiliation,
 )
 from cl.search.api_serializers import (
+    CourtSerializer,
+    DocketSerializer,
     OpinionClusterSerializer,
     OpinionSerializer,
-    DocketSerializer,
-    CourtSerializer,
 )
-from cl.search.models import Court, Docket, OpinionCluster, Opinion
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 
 class Command(VerboseCommand):

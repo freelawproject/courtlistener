@@ -3,8 +3,7 @@ from unittest import TestCase
 import pytest
 
 from cl.stats.models import Stat
-from cl.stats.utils import get_milestone_range
-from cl.stats.utils import tally_stat
+from cl.stats.utils import get_milestone_range, tally_stat
 
 
 class MilestoneTests(TestCase):

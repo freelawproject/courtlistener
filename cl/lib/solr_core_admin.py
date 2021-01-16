@@ -1,6 +1,6 @@
 import io
 import json
-from typing import Dict, Union, List
+from typing import Dict, List, Union
 
 import lxml
 import requests

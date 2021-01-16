@@ -93,8 +93,8 @@ def base_recap_path(instance, filename, base_dir):
 
 
 def make_pdf_path(instance, filename, thumbs=False):
-    from cl.search.models import ClaimHistory, RECAPDocument
     from cl.lasc.models import LASCPDF
+    from cl.search.models import ClaimHistory, RECAPDocument
 
     if type(instance) == RECAPDocument:
         root = "recap"

@@ -1,22 +1,21 @@
 import json
 
 import networkx
-
 from django.contrib.auth.models import User
-from django.urls import reverse
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 from django.utils.timezone import now
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.string_utils import trunc
 from cl.search.models import OpinionCluster
+from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.network_utils import (
-    set_shortest_path_to_end,
     graphs_intersect,
+    set_shortest_path_to_end,
     within_max_hops,
 )
-from cl.visualizations.exceptions import TooManyNodes
 
 
 class SCOTUSMap(AbstractDateTimeModel):

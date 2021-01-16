@@ -1,6 +1,5 @@
-from collections import deque
-
 import time
+from collections import deque
 from typing import List
 
 from django.utils.timezone import now

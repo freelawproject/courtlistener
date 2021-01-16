@@ -1,19 +1,19 @@
 import time
 
-from django.urls import reverse
 from django.test import Client, TestCase
+from django.urls import reverse
 from rest_framework.status import (
+    HTTP_200_OK,
     HTTP_201_CREATED,
     HTTP_400_BAD_REQUEST,
-    HTTP_200_OK,
 )
 from rest_framework.test import APITestCase
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.favorites.models import Favorite, DocketTag, UserTag
+from cl.favorites.models import DocketTag, Favorite, UserTag
 from cl.search.views import get_homepage_stats
-from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.utils import make_client
 
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.alerts.models import Alert, RealTimeQueue, DocketAlert
+from cl.alerts.models import Alert, DocketAlert, RealTimeQueue
 
 
 @admin.register(Alert)

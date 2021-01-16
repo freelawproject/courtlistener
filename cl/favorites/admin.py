@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.favorites.models import Favorite, UserTag, DocketTag
+from cl.favorites.models import DocketTag, Favorite, UserTag
 
 
 class FavoriteInline(admin.TabularInline):

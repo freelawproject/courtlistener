@@ -2,7 +2,7 @@ from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from cl.favorites.models import UserTag, DocketTag
+from cl.favorites.models import DocketTag, UserTag
 from cl.search.models import Docket
 
 

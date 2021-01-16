@@ -5,11 +5,12 @@ import calendar
 import random
 import time
 import traceback
+
 from django.core import serializers
 from django.db.models.query_utils import Q
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import Docket, OpinionCluster, Opinion, OpinionsCited
+from cl.search.models import Docket, Opinion, OpinionCluster, OpinionsCited
 
 SUPPORTED_MODELS = (Docket, OpinionCluster, Opinion, OpinionsCited)
 

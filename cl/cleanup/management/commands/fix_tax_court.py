@@ -1,13 +1,13 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import re
 import argparse
+import re
 
 from cl.citations import find_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import normalize_dashes
-from cl.search.models import OpinionCluster, Citation
+from cl.search.models import Citation, OpinionCluster
 
 
 def get_tax_docket_numbers(opinion_text):

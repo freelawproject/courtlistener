@@ -1,6 +1,6 @@
 import random
 from datetime import date
-from typing import Dict, Any, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -17,8 +17,8 @@ from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
-from cl.scrapers.utils import get_extension, get_binary_content
-from cl.search.models import Court, Docket, SEARCH_TYPES
+from cl.scrapers.utils import get_binary_content, get_extension
+from cl.search.models import SEARCH_TYPES, Court, Docket
 
 cnt = CaseNameTweaker()
 

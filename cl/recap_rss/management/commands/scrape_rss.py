@@ -1,18 +1,18 @@
 import fcntl
 import sys
 import time
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
 from celery.canvas import chain
-from django.utils.timezone import now, make_aware
+from django.utils.timezone import make_aware, now
 
 from cl.alerts.tasks import send_docket_alerts
 from cl.lib.command_utils import VerboseCommand
 from cl.recap_rss.models import RssFeedStatus
 from cl.recap_rss.tasks import (
     check_if_feed_changed,
-    merge_rss_feed_contents,
     mark_status_successful,
+    merge_rss_feed_contents,
     trim_rss_data,
 )
 from cl.search.models import Court

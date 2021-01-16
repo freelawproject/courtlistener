@@ -1,6 +1,7 @@
-from cl.scrapers.management.commands import cl_scrape_oral_arguments
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
+
+from cl.scrapers.management.commands import cl_scrape_oral_arguments
 
 
 class Command(cl_scrape_oral_arguments.Command):

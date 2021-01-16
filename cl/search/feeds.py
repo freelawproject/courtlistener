@@ -10,7 +10,7 @@ from cl.lib.date_time import midnight_pst
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.forms import SearchForm
-from cl.search.models import Court, SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Court
 
 
 def get_item(item):

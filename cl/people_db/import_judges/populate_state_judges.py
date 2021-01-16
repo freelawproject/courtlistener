@@ -8,14 +8,14 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
 )
 from cl.people_db.import_judges.judge_utils import (
     get_school,
-    process_date,
     get_suffix,
+    process_date,
 )
 from cl.people_db.models import (
-    Person,
-    Position,
     Education,
+    Person,
     PoliticalAffiliation,
+    Position,
     Source,
 )
 

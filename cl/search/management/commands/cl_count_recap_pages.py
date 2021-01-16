@@ -1,6 +1,5 @@
 from collections import Counter
 
-
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import get_page_count
 from cl.search.models import RECAPDocument

@@ -1,7 +1,5 @@
 from datetime import date
-
 from unittest.mock import MagicMock
-
 
 DOCKET_NUMBER = "5:18-cr-00227"
 CASE_NAME = "United States v. Maldonado-Passage"

@@ -1,8 +1,9 @@
-from django.conf.urls import url, include
+from django.conf.urls import include, url
+from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
-from rest_framework.renderers import JSONOpenAPIRenderer
+
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.favorites import api_views as favorite_views

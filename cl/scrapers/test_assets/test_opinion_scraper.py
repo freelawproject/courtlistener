@@ -1,7 +1,8 @@
 from datetime import datetime
+from os.path import join
+
 from django.conf import settings
 from juriscraper.OpinionSite import OpinionSite
-from os.path import join
 
 
 class Site(OpinionSite):

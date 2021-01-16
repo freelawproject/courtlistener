@@ -1,15 +1,15 @@
-import time
 import sys
+import time
 from typing import Iterable
+
+from django.conf import settings
+from django.core.management import CommandError, call_command
 
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.search.models import Opinion
-from django.conf import settings
-from django.core.management import call_command
-from django.core.management import CommandError
 
 
 class Command(VerboseCommand):

@@ -1,6 +1,6 @@
-from cl.scrapers.models import UrlHash
-
 from juriscraper.AbstractSite import logger
+
+from cl.scrapers.models import UrlHash
 
 
 class DupChecker(dict):

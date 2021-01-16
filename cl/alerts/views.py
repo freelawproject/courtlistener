@@ -1,9 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
-from django.http import HttpResponseNotAllowed, HttpResponse, HttpRequest
-from django.shortcuts import get_object_or_404, HttpResponseRedirect, render
-from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import Alert, DocketAlert
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted

@@ -7,15 +7,15 @@ from django.conf import settings
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
-    get_pacer_case_id_and_title,
     get_docket_by_pacer_case_id,
+    get_pacer_case_id_and_title,
     get_pacer_doc_by_rd,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import RECAPDocument, DocketEntry
-from cl.search.tasks import add_or_update_recap_docket, add_items_to_solr
+from cl.search.models import DocketEntry, RECAPDocument
+from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
-from django.forms.widgets import HiddenInput, TextInput, Select
+from django.forms.widgets import HiddenInput, Select, TextInput
 
 from cl.alerts.models import Alert
 

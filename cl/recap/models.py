@@ -2,9 +2,9 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from cl.lib.model_helpers import make_path
-from cl.lib.models import AbstractFile, AbstractDateTimeModel
+from cl.lib.models import AbstractDateTimeModel, AbstractFile
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.recap.constants import NOS_CODES, DATASET_SOURCES, NOO_CODES
+from cl.recap.constants import DATASET_SOURCES, NOO_CODES, NOS_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
 

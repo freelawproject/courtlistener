@@ -1,7 +1,8 @@
 from django.conf.urls import url
+
 from cl.favorites.views import (
-    save_or_update_favorite,
     delete_favorite,
+    save_or_update_favorite,
     view_tag,
 )
 

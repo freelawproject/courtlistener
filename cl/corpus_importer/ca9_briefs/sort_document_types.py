@@ -12,7 +12,6 @@ This is a TDD method for finding and sorting doc types.
 import re
 from pprint import pprint
 
-
 doc_types = {
     "apostles": [],
     "brief": [],

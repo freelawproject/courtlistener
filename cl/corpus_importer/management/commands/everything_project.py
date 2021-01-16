@@ -13,22 +13,22 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.recap.constants import (
-    CIVIL_RIGHTS_OTHER,
-    CIVIL_RIGHTS_VOTING,
-    CIVIL_RIGHTS_JOBS,
     CIVIL_RIGHTS_ACCOMMODATIONS,
-    CIVIL_RIGHTS_WELFARE,
     CIVIL_RIGHTS_ADA_EMPLOYMENT,
     CIVIL_RIGHTS_ADA_OTHER,
-    PRISONER_PETITIONS_VACATE_SENTENCE,
-    PRISONER_PETITIONS_HABEAS_CORPUS,
-    PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
-    PRISONER_CIVIL_RIGHTS,
-    PRISONER_PRISON_CONDITION,
-    PATENT,
-    SOCIAL_SECURITY,
+    CIVIL_RIGHTS_JOBS,
+    CIVIL_RIGHTS_OTHER,
+    CIVIL_RIGHTS_VOTING,
+    CIVIL_RIGHTS_WELFARE,
     CV_2017,
     CV_2020,
+    PATENT,
+    PRISONER_CIVIL_RIGHTS,
+    PRISONER_PETITIONS_HABEAS_CORPUS,
+    PRISONER_PETITIONS_MANDAMUS_AND_OTHER,
+    PRISONER_PETITIONS_VACATE_SENTENCE,
+    PRISONER_PRISON_CONDITION,
+    SOCIAL_SECURITY,
 )
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.tasks import add_or_update_recap_docket

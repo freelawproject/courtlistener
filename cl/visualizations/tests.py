@@ -1,8 +1,8 @@
 """
 Unit tests for Visualizations
 """
-from django.test import TestCase, RequestFactory
 from django.contrib.auth.models import User
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework.status import (
     HTTP_200_OK,
@@ -13,13 +13,13 @@ from rest_framework.status import (
 )
 from rest_framework.test import APITestCase
 
-from cl.tests.utils import make_client
-from cl.visualizations.forms import VizForm
-from cl.visualizations.models import SCOTUSMap, JSONVersion
-from cl.visualizations import views
-from cl.visualizations.network_utils import reverse_endpoints_if_needed
-from cl.users.models import UserProfile
 from cl.search.models import OpinionCluster
+from cl.tests.utils import make_client
+from cl.users.models import UserProfile
+from cl.visualizations import views
+from cl.visualizations.forms import VizForm
+from cl.visualizations.models import JSONVersion, SCOTUSMap
+from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 
 class TestVizUtils(TestCase):

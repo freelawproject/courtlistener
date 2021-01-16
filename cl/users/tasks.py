@@ -5,8 +5,8 @@ import requests
 from django.conf import settings
 from rest_framework.status import (
     HTTP_200_OK,
-    HTTP_404_NOT_FOUND,
     HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
 )
 
 from cl.celery_init import app

@@ -3,18 +3,17 @@ import os
 import shutil
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.urls import reverse
-
 from rest_framework.status import (
     HTTP_200_OK,
-    HTTP_404_NOT_FOUND,
-    HTTP_302_FOUND,
     HTTP_300_MULTIPLE_CHOICES,
+    HTTP_302_FOUND,
     HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
 )
 
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -23,11 +22,11 @@ from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.models import Person
 from cl.search.models import (
+    SEARCH_TYPES,
     Citation,
     Docket,
     Opinion,
     OpinionCluster,
-    SEARCH_TYPES,
 )
 
 

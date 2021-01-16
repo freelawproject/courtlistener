@@ -1,7 +1,7 @@
 import pandas as pd
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import OpinionsCited, Opinion
+from cl.search.models import Opinion, OpinionsCited
 from cl.search.tasks import add_items_to_solr
 
 

@@ -2,17 +2,17 @@ from django.conf.urls import url
 
 from cl.opinion_page.views import (
     block_item,
+    citation_redirector,
     cluster_visualizations,
     court_homepage,
     court_publish_page,
-    view_opinion,
-    citation_redirector,
+    docket_idb_data,
     redirect_docket_recap,
     view_authorities,
     view_docket,
+    view_opinion,
     view_parties,
     view_recap_document,
-    docket_idb_data,
 )
 
 urlpatterns = [

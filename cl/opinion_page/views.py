@@ -1,20 +1,20 @@
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Optional, Dict
+from typing import Dict, Optional
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, Prefetch
-from django.http import HttpResponseRedirect, HttpRequest
-from django.http.response import HttpResponse, HttpResponseNotAllowed, Http404
+from django.http import HttpRequest, HttpResponseRedirect
+from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
-from django.views.decorators.cache import never_cache, cache_page
+from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.vary import vary_on_cookie
 from reporters_db import (
@@ -23,8 +23,7 @@ from reporters_db import (
     REPORTERS,
     VARIATIONS_ONLY,
 )
-
-from rest_framework.status import HTTP_404_NOT_FOUND, HTTP_300_MULTIPLE_CHOICES
+from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -35,8 +34,8 @@ from cl.lib.model_helpers import choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
-    make_get_string,
     get_related_clusters_with_cache,
+    make_get_string,
 )
 from cl.lib.string_utils import trunc
 from cl.lib.view_utils import increment_view_count
@@ -45,15 +44,15 @@ from cl.opinion_page.forms import (
     DocketEntryFilterForm,
     TennWorkersForm,
 )
-from cl.people_db.models import AttorneyOrganization, Role, CriminalCount
+from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import (
     Citation,
+    Court,
     Docket,
     OpinionCluster,
     RECAPDocument,
-    Court,
 )
 from cl.search.views import do_search
 

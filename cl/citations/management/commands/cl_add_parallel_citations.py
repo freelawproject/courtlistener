@@ -1,16 +1,16 @@
-import networkx as nx
 import sys
 
+import networkx as nx
 from celery.canvas import group
 from django.conf import settings
-from django.core.management import call_command, CommandError
+from django.core.management import CommandError, call_command
 from django.db import IntegrityError
 
-from cl.citations.models import Citation
 from cl.citations.match_citations import (
-    get_years_from_reporter,
     build_date_range,
+    get_years_from_reporter,
 )
+from cl.citations.models import Citation
 from cl.citations.tasks import (
     get_document_citations,
     identify_parallel_citations,

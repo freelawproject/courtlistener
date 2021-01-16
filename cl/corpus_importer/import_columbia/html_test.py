@@ -9,8 +9,8 @@ import dateutil.parser as dparser
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.corpus_importer.import_columbia.regexes_columbia import (
-    SPECIAL_REGEXES,
     FOLDER_DICT,
+    SPECIAL_REGEXES,
 )
 
 

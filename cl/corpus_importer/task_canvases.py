@@ -7,10 +7,10 @@ from django.contrib.auth.models import User
 
 from cl.corpus_importer.tasks import (
     get_attachment_page_by_rd,
-    make_attachment_pq_object,
+    get_bankr_claims_registry,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
-    get_bankr_claims_registry,
+    make_attachment_pq_object,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.recap.tasks import process_recap_attachment

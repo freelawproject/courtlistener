@@ -9,7 +9,7 @@ from scorched.exc import SolrError
 
 from cl.celery_init import app
 from cl.lib.search_index_utils import InvalidDocumentError
-from cl.search.models import OpinionCluster, RECAPDocument, Docket
+from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
 @app.task

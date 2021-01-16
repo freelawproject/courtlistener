@@ -1,7 +1,7 @@
 import collections
 import errno
 import os
-from itertools import tee, islice, chain
+from itertools import chain, islice, tee
 
 
 class _UNSPECIFIED(object):

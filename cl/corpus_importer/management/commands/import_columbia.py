@@ -8,10 +8,10 @@ from cl.corpus_importer.import_columbia.parse_opinions import parse_file
 from cl.corpus_importer.import_columbia.populate_opinions import make_and_save
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.import_lib import (
-    get_min_dates,
-    get_path_list,
-    get_min_nocite,
     get_courtdates,
+    get_min_dates,
+    get_min_nocite,
+    get_path_list,
 )
 
 

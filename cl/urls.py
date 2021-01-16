@@ -7,7 +7,7 @@ from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
 
 from cl.audio.sitemap import AudioSitemap
-from cl.opinion_page.sitemap import OpinionSitemap, DocketSitemap
+from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
 from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.sitemap import SimpleSitemap

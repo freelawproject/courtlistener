@@ -2,23 +2,23 @@ import rest_framework_filters as filters
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
-    INTEGER_LOOKUPS,
-    DATETIME_LOOKUPS,
-    DATE_LOOKUPS,
     ALL_TEXT_LOOKUPS,
+    DATE_LOOKUPS,
+    DATETIME_LOOKUPS,
+    INTEGER_LOOKUPS,
 )
 from cl.audio.models import Audio
-from cl.people_db.models import Person, Party
+from cl.people_db.models import Party, Person
 from cl.search.models import (
+    SOURCES,
     Citation,
     Court,
     Docket,
     DocketEntry,
     Opinion,
-    OpinionsCited,
     OpinionCluster,
+    OpinionsCited,
     RECAPDocument,
-    SOURCES,
     Tag,
 )
 

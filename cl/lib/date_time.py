@@ -1,7 +1,6 @@
-import pytz
-
 from datetime import datetime, time
 
+import pytz
 from django.conf import settings
 from django.utils.timezone import is_aware
 

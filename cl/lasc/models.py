@@ -1,14 +1,13 @@
-from django.db import models
 from django.contrib.contenttypes.fields import (
     GenericForeignKey,
     GenericRelation,
 )
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from django.db.models import Q
 
-from cl.lib.models import AbstractJSON, AbstractPDF, AbstractDateTimeModel
 from cl.lib.model_helpers import make_pdf_path
-
+from cl.lib.models import AbstractDateTimeModel, AbstractJSON, AbstractPDF
 from cl.lib.storage import AWSMediaStorage
 
 

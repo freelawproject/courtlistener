@@ -9,12 +9,12 @@ from juriscraper.pacer import PacerSession
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import (
     get_appellate_docket_by_docket_number,
-    get_pacer_case_id_and_title,
     get_docket_by_pacer_case_id,
+    get_pacer_case_id_and_title,
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import RECAPDocument, Court
+from cl.search.models import Court, RECAPDocument
 from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)

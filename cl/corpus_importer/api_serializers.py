@@ -1,5 +1,4 @@
-from rest_framework.serializers import CharField
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import CharField, ModelSerializer
 
 from cl.people_db.models import (
     Attorney,

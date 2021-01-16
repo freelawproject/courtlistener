@@ -5,9 +5,9 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.api_permissions import IsOwner
 from cl.api.utils import LoggingMixin
 from cl.favorites.api_permissions import IsTagOwner
-from cl.favorites.api_serializers import UserTagSerializer, DocketTagSerializer
+from cl.favorites.api_serializers import DocketTagSerializer, UserTagSerializer
 from cl.favorites.filters import UserTagFilter
-from cl.favorites.models import UserTag, DocketTag
+from cl.favorites.models import DocketTag, UserTag
 
 
 class UserTagViewSet(LoggingMixin, ModelViewSet):

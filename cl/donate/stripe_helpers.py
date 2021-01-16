@@ -6,12 +6,12 @@ from datetime import datetime
 import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.http import HttpResponseNotAllowed, HttpResponse
+from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
-from cl.donate.models import Donation, PROVIDERS
-from cl.donate.utils import send_thank_you_email, PaymentFailureException
+from cl.donate.models import PROVIDERS, Donation
+from cl.donate.utils import PaymentFailureException, send_thank_you_email
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)

@@ -1,33 +1,33 @@
 from datetime import date
 
 from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
-from django.test import TestCase, SimpleTestCase
 from django.utils.timezone import now
 from lxml import etree
 from reporters_db import REPORTERS
 
 from cl.citations.find_citations import get_citations, is_date_in_reporter
-from cl.citations.models import (
-    Citation,
-    FullCitation,
-    IdCitation,
-    ShortformCitation,
-    SupraCitation,
-    NonopinionCitation,
-)
 from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
-from cl.citations.match_citations import match_citation, get_citation_matches
+from cl.citations.match_citations import get_citation_matches, match_citation
+from cl.citations.models import (
+    Citation,
+    FullCitation,
+    IdCitation,
+    NonopinionCitation,
+    ShortformCitation,
+    SupraCitation,
+)
 from cl.citations.reporter_tokenizer import tokenize
 from cl.citations.tasks import (
-    find_citations_for_opinion_by_pks,
     create_cited_html,
+    find_citations_for_opinion_by_pks,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.search.models import Opinion, OpinionsCited, OpinionCluster
+from cl.search.models import Opinion, OpinionCluster, OpinionsCited
 
 
 def remove_citations_from_imported_fixtures():

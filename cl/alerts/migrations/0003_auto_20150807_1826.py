@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
 
-from django.db import models, migrations
 import datetime
+
+from django.db import migrations, models
 from django.utils.timezone import utc
 
 
