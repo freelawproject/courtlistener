@@ -15,7 +15,7 @@ from cl.disclosures.models import (
 from cl.disclosures.tasks import save_disclosure
 
 
-class DisclosureIngestionTests(TestCase):
+class DisclosureIngestionTest(TestCase):
     fixtures = ["judge_judy.json", "disclosure.json"]
     test_file = os.path.join(
         settings.INSTALL_ROOT,
@@ -73,7 +73,7 @@ class LoggedInDisclosureTestCase(TestCase):
         self.q = dict()
 
 
-class DisclosureAPIAccessTests(LoggedInDisclosureTestCase):
+class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
     def test_basic_disclosure_api_query(self):
         """Can we query the financial disclosures?"""
         url = reverse("financial-disclosure-list", kwargs={"version": "v3"})
@@ -114,7 +114,7 @@ class DisclosureAPIAccessTests(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="Admin lacking access.")
 
 
-class DisclosureAPITests(LoggedInDisclosureTestCase):
+class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_basic_disclosure_api_query(self):
         """Can we query the financial disclosure API?"""
         self.path = reverse("disclosure-list", kwargs={"version": "v3"})
