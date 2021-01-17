@@ -1,5 +1,4 @@
 from drf_dynamic_fields import DynamicFieldsMixin
-from rest_framework import serializers
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.disclosures.models import (
@@ -13,6 +12,7 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.people_db.api_serializers import PersonSerializer
 
 
 class AgreementSerializer(
@@ -87,18 +87,10 @@ class FinancialDisclosureSerializer(
     positions = PositionSerializer(many=True, read_only=True)
     reimbursements = ReimbursementSerializer(many=True, read_only=True)
     spouse_incomes = SpouseIncomeSerializer(many=True, read_only=True)
+    person = PersonSerializer(many=False, read_only=True)
 
     class Meta:
         model = FinancialDisclosure
-
-        fields = (
-            "agreements",
-            "debts",
-            "gifts",
-            "investments",
-            "non_investment_incomes",
-            "positions",
-            "reimbursements",
-            "spouse_incomes",
-            "person",
+        exclude = (
+            "download_filepath",
         )
