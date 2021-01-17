@@ -76,7 +76,7 @@ class LoggedInDisclosureTestCase(TestCase):
 class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
     def test_basic_disclosure_api_query(self):
         """Can we query the financial disclosures?"""
-        url = reverse("financial-disclosure-list", kwargs={"version": "v3"})
+        url = reverse("financialdisclosure-list", kwargs={"version": "v3"})
         # 4 of the queries are from the setup
         with self.assertNumQueries(13):
             r = self.client.get(url)
@@ -117,7 +117,7 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
 class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_basic_disclosure_api_query(self):
         """Can we query the financial disclosure API?"""
-        self.path = reverse("disclosure-list", kwargs={"version": "v3"})
+        self.path = reverse("financialdisclosure-list", kwargs={"version": "v3"})
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
@@ -125,7 +125,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_disclosure_position_api(self):
         """Can we query the financial disclosure API?"""
         self.path = reverse(
-            "disclosure-position-list", kwargs={"version": "v3"}
+            "disclosureposition-list", kwargs={"version": "v3"}
         )
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, 200, msg="API failed.")
@@ -170,7 +170,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_filter_disclosures_by_person_id(self):
         """Can we filter disclosures by person id?"""
         self.path = reverse(
-            "financial-disclosure-list", kwargs={"version": "v3"}
+            "financialdisclosure-list", kwargs={"version": "v3"}
         )
         self.q = {"person": 2}
         r = self.client.get(self.path, self.q)
