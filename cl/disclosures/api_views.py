@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin, DisclosureAPIUsers
+from cl.api.utils import DisclosureAPIUsers, LoggingMixin
 from cl.disclosures.api_serializers import (
     AgreementSerializer,
     DebtSerializer,
