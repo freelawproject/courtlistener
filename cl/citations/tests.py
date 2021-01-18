@@ -1,27 +1,21 @@
-from datetime import date
-
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
-from django.utils.timezone import now
-from lxml import etree
-from reporters_db import REPORTERS
-
-from cl.citations.find_citations import get_citations, is_date_in_reporter
-from cl.citations.management.commands.cl_add_parallel_citations import (
-    identify_parallel_citations,
-    make_edge_list,
-)
-from cl.citations.match_citations import get_citation_matches, match_citation
-from cl.citations.models import (
-    Citation,
+from eyecite.find_citations import get_citations
+from eyecite.models import (
     FullCitation,
     IdCitation,
     NonopinionCitation,
     ShortformCitation,
     SupraCitation,
 )
-from cl.citations.reporter_tokenizer import tokenize
+from lxml import etree
+
+from cl.citations.management.commands.cl_add_parallel_citations import (
+    identify_parallel_citations,
+    make_edge_list,
+)
+from cl.citations.match_citations import get_citation_matches, match_citation
 from cl.citations.tasks import (
     create_cited_html,
     find_citations_for_opinion_by_pks,
@@ -202,7 +196,7 @@ class CiteTest(TestCase):
         for s, expected_html in test_pairs:
             print("Testing html to html conversion for %s..." % s, end=" ")
             opinion = Opinion(html=s)
-            citations = get_citations(s)
+            citations = get_citations(s, clean=("html", "whitespace"))
             created_html = create_cited_html(opinion, citations)
             self.assertEqual(
                 created_html,
@@ -222,7 +216,7 @@ class CiteTest(TestCase):
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
              IdCitation(id_token='Id.,', after_tokens=['at', '123', '124'],
-                        should_linkify=True),
+                        has_page=True),
              '<pre class="inline">asdf</pre><span class="citation" data-id="'
              'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.,'
              '</span> at 123, 124</a></span><pre class="inline">. Lorem ipsum'
@@ -232,7 +226,7 @@ class CiteTest(TestCase):
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
              IdCitation(id_token='Id.',
                         after_tokens=['@', '123:1', '¶¶', '124'],
-                        should_linkify=True),
+                        has_page=True),
              '<pre class="inline">asdf</pre><span class="citation" data-id="'
              'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
              '</span> @ 123:1, ¶¶ 124</a></span><pre class="inline">. Lorem '
@@ -241,7 +235,7 @@ class CiteTest(TestCase):
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
              IdCitation(id_token='Id.', after_tokens=['Lorem', 'ipsum'],
-                        should_linkify=False),
+                        has_page=False),
              '<pre class="inline">asdf</pre><span class="citation" data-id='
              '"MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
              '</span></a> Lorem ipsum </span><pre class="inline">dolor sit '
