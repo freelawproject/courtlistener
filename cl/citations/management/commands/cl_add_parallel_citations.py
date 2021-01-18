@@ -10,7 +10,6 @@ from cl.citations.match_citations import (
     build_date_range,
     get_years_from_reporter,
 )
-from cl.citations.models import Citation
 from cl.citations.tasks import (
     get_document_citations,
     identify_parallel_citations,
@@ -80,10 +79,6 @@ class Command(VerboseCommand):
             nargs="*",
             help="ids of citing opinions",
         )
-
-    def monkey_patch_citation(self):
-        Citation.__eq__ = Citation.fuzzy_eq
-        Citation.__hash__ = Citation.fuzzy_hash
 
     def match_on_citation(self, citation):
         """Attempt to identify the item referred to by the citation."""
@@ -285,9 +280,6 @@ class Command(VerboseCommand):
                 "--update_database is not set. No changes will be made to the "
                 "database."
             )
-
-        # Update Citation object to consider similar objects equal.
-        self.monkey_patch_citation()
 
         logger.info(
             "## Entering phase one: Building a network object of "
