@@ -5,10 +5,11 @@ from typing import List, Set, Tuple, Union
 
 from django.db import transaction
 from django.db.models import F
+from eyecite.find_citations import get_citations
+from eyecite.models import Citation, NonopinionCitation
 
 from cl.celery_init import app
-from cl.citations import find_citations, match_citations
-from cl.citations.models import Citation, NonopinionCitation
+from cl.citations import match_citations
 from cl.citations.utils import (
     is_balanced_html,
     remove_duplicate_citations_by_regex,
@@ -68,16 +69,40 @@ def get_document_citations(
     opinion.
     """
     if opinion.html_anon_2020:
-        citations = find_citations.get_citations(opinion.html_anon_2020)
+        citations = get_citations(
+            text=opinion.html_anon_2020,
+            clean=(
+                "html",
+                "whitespace",
+            ),
+        )
     elif opinion.html_columbia:
-        citations = find_citations.get_citations(opinion.html_columbia)
+        citations = get_citations(
+            text=opinion.html_columbia,
+            clean=(
+                "html",
+                "whitespace",
+            ),
+        )
     elif opinion.html_lawbox:
-        citations = find_citations.get_citations(opinion.html_lawbox)
+        citations = get_citations(
+            text=opinion.html_lawbox,
+            clean=(
+                "html",
+                "whitespace",
+            ),
+        )
     elif opinion.html:
-        citations = find_citations.get_citations(opinion.html)
+        citations = get_citations(
+            text=opinion.html,
+            clean=(
+                "html",
+                "whitespace",
+            ),
+        )
     elif opinion.plain_text:
-        citations = find_citations.get_citations(
-            opinion.plain_text, html=False
+        citations = get_citations(
+            text=opinion.plain_text, clean=("whitespace",)
         )
     else:
         citations = []

@@ -12,11 +12,11 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
 from django.db.utils import OperationalError
+from eyecite.find_citations import get_citations
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from reporters_db import REPORTERS
 
-from cl.citations.find_citations import get_citations
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
@@ -239,7 +239,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
             logger.warning("Unknown error %s for: %s" % (e, ia_download_url))
             continue
 
-        cites = get_citations(data["citations"][0]["cite"], html=False)
+        cites = get_citations(data["citations"][0]["cite"])
         if not cites:
             logger.info(
                 "No citation found for %s." % data["citations"][0]["cite"]

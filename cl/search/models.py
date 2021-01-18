@@ -1837,11 +1837,10 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         citation_str = kwargs.pop("citation", None)
         if citation_str:
             try:
-                from cl.citations.find_citations import get_citations
+                from eyecite.find_citations import get_citations
 
                 c = get_citations(
                     citation_str,
-                    html=False,
                     do_post_citation=False,
                     do_defendant=False,
                     disambiguate=False,

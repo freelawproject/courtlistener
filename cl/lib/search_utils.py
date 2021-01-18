@@ -6,11 +6,11 @@ from urllib.parse import parse_qs, urlencode
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
+from eyecite.find_citations import get_citations
+from eyecite.models import Citation
 from scorched.response import SolrResponse
 
-from cl.citations.find_citations import get_citations
 from cl.citations.match_citations import match_citation
-from cl.citations.models import Citation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -113,7 +113,7 @@ def get_query_citation(cd: Dict[str, Any]) -> Optional[List[Citation]]:
     if not cd.get("q"):
         return None
     citations = get_citations(
-        cd["q"], html=False, do_post_citation=False, do_defendant=False
+        cd["q"], do_post_citation=False, do_defendant=False
     )
 
     citations = [c for c in citations if isinstance(c, Citation)]
