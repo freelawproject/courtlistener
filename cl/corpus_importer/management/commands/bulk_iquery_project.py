@@ -34,7 +34,7 @@ def add_all_cases_to_cl(
     )
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
-    court_ids = courts.values_list("pk", flat=True)
+    court_ids = list(courts.values_list("pk", flat=True))
 
     iterations_completed = 0
     db_key_cycle = itertools.cycle(settings.DATABASES.keys())
