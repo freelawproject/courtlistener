@@ -29,7 +29,9 @@ def add_all_cases_to_cl(
     # latest item in the DB by date_filed, and then using r.hmset to save it.
     max_ids = r.hgetall("iquery_max_ids")
 
-    courts = Court.federal_courts.district_pacer_courts()
+    courts = Court.federal_courts.district_pacer_courts().exclude(
+        pk__in=["uscfc", "arb", "cit"]
+    )
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
     court_ids = courts.values_list("pk", flat=True)
