@@ -23,10 +23,16 @@ def add_all_cases_to_cl(
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q, min_items=500)
     r = make_redis_interface("CACHE")
+    # This is a simple dictionary that's populated with the maximum
+    # pacer_case_id in the CL DB as of 2021-01-18. The idea is to use this to
+    # prevent the scraper from going forever. You can reset it by querying the
+    # latest item in the DB by date_filed, and then using r.hmset to save it.
+    max_ids = r.hgetall("iquery_max_ids")
 
     courts = Court.federal_courts.district_pacer_courts()
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
+    court_ids = courts.values_list("pk", flat=True)
 
     iterations_completed = 0
     db_key_cycle = itertools.cycle(settings.DATABASES.keys())
@@ -34,17 +40,25 @@ def add_all_cases_to_cl(
         options["iterations"] == 0
         or iterations_completed < options["iterations"]
     ):
-        for court in courts:
+        if len(court_ids) == 0:
+            # No more courts. Done!
+            break
+
+        for court_id in court_ids:
             throttle.maybe_wait()
             try:
-                pacer_case_id = r.hincrby("iquery_status", court.pk, 1)
+                pacer_case_id = r.hincrby("iquery_status", court_id, 1)
+                if pacer_case_id > int(max_ids[court_id]):
+                    # Enough scraping. Stop doing this court.
+                    court_ids.remove(court_id)
+                    continue
                 make_docket_by_iquery.apply_async(
-                    args=(court.pk, pacer_case_id, next(db_key_cycle)),
+                    args=(court_id, pacer_case_id, next(db_key_cycle)),
                     queue=q,
                 )
             except Exception as e:
                 # Cleanup
-                r.hincrby("iquery_status", court.pk, -1)
+                r.hincrby("iquery_status", court_id, -1)
                 raise e
 
         iterations_completed += 1
