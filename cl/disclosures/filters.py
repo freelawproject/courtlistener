@@ -49,23 +49,23 @@ class FinancialDisclosureFilter(FilterSet):
 
     agreements = filters.RelatedFilter(
         AgreementFilter,
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Agreement.objects.all(),
     )
     debts = filters.RelatedFilter(
         DebtFilter,
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Debt.objects.all(),
     )
     gifts = filters.RelatedFilter(
         "cl.disclosures.filters.GiftFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Gift.objects.all(),
     )
     investments = filters.RelatedFilter(
         "cl.disclosures.filters.InvestmentFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Investment.objects.all(),
     )
     non_investment_incomes = filters.RelatedFilter(
         "cl.disclosures.filters.NonInvestmentIncomeFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=NonInvestmentIncome.objects.all(),
     )
     person = filters.RelatedFilter(
         "cl.people_db.filters.PersonFilter",
@@ -73,15 +73,15 @@ class FinancialDisclosureFilter(FilterSet):
     )
     positions = filters.RelatedFilter(
         "cl.disclosures.filters.PositionFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Position.objects.all(),
     )
     reimbursements = filters.RelatedFilter(
         "cl.disclosures.filters.ReimbursementFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=Reimbursement.objects.all(),
     )
     spouse_incomes = filters.RelatedFilter(
         "cl.disclosures.filters.SpouseIncomeFilter",
-        queryset=FinancialDisclosure.objects.all(),
+        queryset=SpouseIncome.objects.all(),
     )
 
     class Meta:
