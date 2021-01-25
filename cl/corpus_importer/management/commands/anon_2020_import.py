@@ -17,6 +17,8 @@ from cl.lib.string_utils import trunc
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
+from courts_db import find_court
+
 cnt = CaseNameTweaker()
 
 
@@ -323,9 +325,7 @@ def find_court_id(court_str: str) -> str:
     :param court_str: The raw court name
     :return: The cl court id for associated tax court.
     """
-    if court_str == "United States Board of Tax Appeals":
-        return "bta"
-    return "tax"
+    return find_court(court_str)[0]
 
 
 def process_dates(data: Dict[str, Any]) -> Tuple[datetime.date, datetime.date]:
