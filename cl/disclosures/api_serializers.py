@@ -91,6 +91,4 @@ class FinancialDisclosureSerializer(
 
     class Meta:
         model = FinancialDisclosure
-        exclude = (
-            "download_filepath",
-        )
+        exclude = ("download_filepath",)
