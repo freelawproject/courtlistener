@@ -29,10 +29,10 @@ optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 
 [package.dependencies]
+cryptography = "*"
+jinja2 = "*"
 packaging = "*"
 PyYAML = "*"
-jinja2 = "*"
-cryptography = "*"
 
 [[package]]
 name = "appdirs"
@@ -88,10 +88,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
+dev = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface", "sphinx", "sphinx-rtd-theme", "pre-commit"]
 docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
 tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface"]
 tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
-dev = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface", "sphinx", "sphinx-rtd-theme", "pre-commit"]
 
 [[package]]
 name = "backcall"
@@ -113,8 +113,8 @@ python-versions = "*"
 soupsieve = ">=1.2"
 
 [package.extras]
-lxml = ["lxml"]
 html5lib = ["html5lib"]
+lxml = ["lxml"]
 
 [[package]]
 name = "billiard"
@@ -133,14 +133,14 @@ optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-regex = ">=2020.1.8"
-mypy-extensions = ">=0.4.3"
-typed-ast = ">=1.4.0"
-toml = ">=0.10.1"
-typing-extensions = ">=3.7.4"
-pathspec = ">=0.6,<1"
-click = ">=7.1.2"
 appdirs = "*"
+click = ">=7.1.2"
+mypy-extensions = ">=0.4.3"
+pathspec = ">=0.6,<1"
+regex = ">=2020.1.8"
+toml = ">=0.10.1"
+typed-ast = ">=1.4.0"
+typing-extensions = ">=3.7.4"
 
 [package.extras]
 colorama = ["colorama (>=0.4.3)"]
@@ -155,8 +155,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-jmespath = ">=0.7.1,<1.0.0"
 botocore = ">=1.18.18,<1.19.0"
+jmespath = ">=0.7.1,<1.0.0"
 s3transfer = ">=0.3.0,<0.4.0"
 
 [[package]]
@@ -168,8 +168,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-python-dateutil = ">=2.1,<3.0.0"
 jmespath = ">=0.7.1,<1.0.0"
+python-dateutil = ">=2.1,<3.0.0"
 urllib3 = {version = ">=1.20,<1.26", markers = "python_version != \"3.4\""}
 
 [[package]]
@@ -189,44 +189,44 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-pytz = ">0.0-dev"
 billiard = ">=3.6.3.0,<4.0"
-vine = "1.3.0"
 kombu = ">=4.6.10,<4.7"
+pytz = ">0.0-dev"
+vine = "1.3.0"
 
 [package.extras]
-redis = ["redis (>=3.2.0)"]
-consul = ["python-consul"]
-zookeeper = ["kazoo (>=1.3.1)"]
-brotli = ["brotli (>=1.0.0)", "brotlipy (>=0.7.0)"]
-gevent = ["gevent"]
-azureblockblob = ["azure-storage (0.36.0)", "azure-common (1.1.5)", "azure-storage-common (1.1.0)"]
-cassandra = ["cassandra-driver (<3.21.0)"]
-lzma = ["backports.lzma"]
-msgpack = ["msgpack"]
-eventlet = ["eventlet (>=0.24.1)"]
-s3 = ["boto3 (>=1.9.125)"]
-couchdb = ["pycouchdb"]
 arangodb = ["pyArango (>=1.3.2)"]
-dynamodb = ["boto3 (>=1.9.178)"]
-yaml = ["PyYAML (>=3.10)"]
-sqs = ["boto3 (>=1.9.125)", "pycurl (7.43.0.5)"]
-zstd = ["zstandard"]
-riak = ["riak (>=2.0)"]
-sqlalchemy = ["sqlalchemy"]
-librabbitmq = ["librabbitmq (>=1.5.0)"]
-mongodb = ["pymongo[srv] (>=3.3.0)"]
-pymemcache = ["python-memcached"]
 auth = ["cryptography"]
+azureblockblob = ["azure-storage (0.36.0)", "azure-common (1.1.5)", "azure-storage-common (1.1.0)"]
+brotli = ["brotli (>=1.0.0)", "brotlipy (>=0.7.0)"]
+cassandra = ["cassandra-driver (<3.21.0)"]
+consul = ["python-consul"]
+cosmosdbsql = ["pydocumentdb (2.3.2)"]
+couchbase = ["couchbase-cffi (<3.0.0)", "couchbase (<3.0.0)"]
+couchdb = ["pycouchdb"]
+django = ["Django (>=1.11)"]
+dynamodb = ["boto3 (>=1.9.178)"]
+elasticsearch = ["elasticsearch"]
+eventlet = ["eventlet (>=0.24.1)"]
+gevent = ["gevent"]
+librabbitmq = ["librabbitmq (>=1.5.0)"]
+lzma = ["backports.lzma"]
+memcache = ["pylibmc"]
+mongodb = ["pymongo[srv] (>=3.3.0)"]
+msgpack = ["msgpack"]
+pymemcache = ["python-memcached"]
+pyro = ["pyro4"]
+redis = ["redis (>=3.2.0)"]
+riak = ["riak (>=2.0)"]
+s3 = ["boto3 (>=1.9.125)"]
 slmq = ["softlayer-messaging (>=1.0.3)"]
 solar = ["ephem"]
-cosmosdbsql = ["pydocumentdb (2.3.2)"]
+sqlalchemy = ["sqlalchemy"]
+sqs = ["boto3 (>=1.9.125)", "pycurl (7.43.0.5)"]
 tblib = ["tblib (>=1.3.0)", "tblib (>=1.5.0)"]
-couchbase = ["couchbase-cffi (<3.0.0)", "couchbase (<3.0.0)"]
-django = ["Django (>=1.11)"]
-pyro = ["pyro4"]
-memcache = ["pylibmc"]
-elasticsearch = ["elasticsearch"]
+yaml = ["PyYAML (>=3.10)"]
+zookeeper = ["kazoo (>=1.3.1)"]
+zstd = ["zstandard"]
 
 [[package]]
 name = "certifi"
@@ -289,8 +289,8 @@ python-versions = "*"
 
 [package.dependencies]
 coreschema = "*"
-requests = "*"
 itypes = "*"
+requests = "*"
 uritemplate = "*"
 
 [[package]]
@@ -305,6 +305,17 @@ python-versions = "*"
 jinja2 = "*"
 
 [[package]]
+name = "courts-db"
+version = "0.9.11"
+description = "Database of Courts"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+six = "*"
+
+[[package]]
 name = "cryptography"
 version = "3.1.1"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
@@ -313,15 +324,15 @@ optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 
 [package.dependencies]
-six = ">=1.4.1"
 cffi = ">=1.8,<1.11.3 || >1.11.3"
+six = ">=1.4.1"
 
 [package.extras]
-test = ["pytest (>=3.6.0,<3.9.0 || >3.9.0,<3.9.1 || >3.9.1,<3.9.2 || >3.9.2)", "pretend", "iso8601", "pytz", "hypothesis (>=1.11.4,<3.79.2 || >3.79.2)"]
-pep8test = ["black", "flake8", "flake8-import-order", "pep8-naming"]
-docstest = ["doc8", "pyenchant (>=1.6.11)", "twine (>=1.12.0)", "sphinxcontrib-spelling (>=4.0.1)"]
-ssh = ["bcrypt (>=3.1.5)"]
 docs = ["sphinx (>=1.6.5,<1.8.0 || >1.8.0,<3.1.0 || >3.1.0,<3.1.1 || >3.1.1)", "sphinx-rtd-theme"]
+docstest = ["doc8", "pyenchant (>=1.6.11)", "twine (>=1.12.0)", "sphinxcontrib-spelling (>=4.0.1)"]
+pep8test = ["black", "flake8", "flake8-import-order", "pep8-naming"]
+ssh = ["bcrypt (>=3.1.5)"]
+test = ["pytest (>=3.6.0,<3.9.0 || >3.9.0,<3.9.1 || >3.9.1,<3.9.2 || >3.9.2)", "pretend", "iso8601", "pytz", "hypothesis (>=1.11.4,<3.79.2 || >3.79.2)"]
 
 [[package]]
 name = "cssselect"
@@ -487,8 +498,8 @@ python-versions = "*"
 
 [package.dependencies]
 coreapi = ">=2.3.0"
-openapi-codec = ">=1.3.1"
 djangorestframework = ">=3.5.4"
+openapi-codec = ">=1.3.1"
 simplejson = "*"
 
 [[package]]
@@ -503,13 +514,13 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 Django = ">=1.11"
 
 [package.extras]
-google = ["google-cloud-storage (>=0.22.0)"]
-boto = ["boto (>=2.32.0)"]
-sftp = ["paramiko"]
-boto3 = ["boto3 (>=1.4.4)"]
 azure = ["azure-storage-blob (>=1.3.1)"]
+boto = ["boto (>=2.32.0)"]
+boto3 = ["boto3 (>=1.4.4)"]
 dropbox = ["dropbox (>=7.2.1)"]
+google = ["google-cloud-storage (>=0.22.0)"]
 libcloud = ["apache-libcloud"]
+sftp = ["paramiko"]
 
 [[package]]
 name = "djangorestframework"
@@ -582,9 +593,9 @@ deprecation = "*"
 filetype = "*"
 
 [package.extras]
-yaml-plugin = ["ruamel.yaml"]
 art-plugin = ["pylast", "requests", "pillow"]
 display-plugin = ["grako"]
+yaml-plugin = ["ruamel.yaml"]
 
 [[package]]
 name = "feedparser"
@@ -640,10 +651,10 @@ optional = false
 python-versions = ">=3.4"
 
 [package.extras]
-tornado = ["tornado (>=0.2)"]
+eventlet = ["eventlet (>=0.9.7)"]
 gevent = ["gevent (>=0.13)"]
 setproctitle = ["setproctitle"]
-eventlet = ["eventlet (>=0.9.7)"]
+tornado = ["tornado (>=0.2)"]
 
 [[package]]
 name = "hiredis"
@@ -662,14 +673,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-webencodings = "*"
 six = ">=1.9"
+webencodings = "*"
 
 [package.extras]
 all = ["genshi", "chardet (>=2.2)", "lxml"]
-lxml = ["lxml"]
 chardet = ["chardet (>=2.2)"]
 genshi = ["genshi"]
+lxml = ["lxml"]
 
 [[package]]
 name = "httplib2"
@@ -696,12 +707,12 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-tqdm = ">=4.0.0"
-six = ">=1.0.0,<2.0.0"
+docopt = ">=0.6.0,<0.7.0"
 jsonpatch = ">=0.4"
 requests = ">=2.9.1,<3.0.0"
-docopt = ">=0.6.0,<0.7.0"
 schema = ">=0.4.0"
+six = ">=1.0.0,<2.0.0"
+tqdm = ">=4.0.0"
 
 [[package]]
 name = "ipaddress"
@@ -720,27 +731,27 @@ optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
-backcall = "*"
 appnope = {version = "*", markers = "sys_platform == \"darwin\""}
-pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
-traitlets = ">=4.2"
-jedi = ">=0.10"
-pygments = "*"
+backcall = "*"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-prompt-toolkit = ">=2.0.0,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.1.0"
-pickleshare = "*"
 decorator = "*"
+jedi = ">=0.10"
+pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
+pickleshare = "*"
+prompt-toolkit = ">=2.0.0,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.1.0"
+pygments = "*"
+traitlets = ">=4.2"
 
 [package.extras]
-nbformat = ["nbformat"]
 all = ["Sphinx (>=1.3)", "ipykernel", "ipyparallel", "ipywidgets", "nbconvert", "nbformat", "nose (>=0.10.1)", "notebook", "numpy (>=1.14)", "pygments", "qtconsole", "requests", "testpath"]
-kernel = ["ipykernel"]
 doc = ["Sphinx (>=1.3)"]
-notebook = ["notebook", "ipywidgets"]
+kernel = ["ipykernel"]
 nbconvert = ["nbconvert"]
+nbformat = ["nbformat"]
+notebook = ["notebook", "ipywidgets"]
+parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
 test = ["nose (>=0.10.1)", "requests", "testpath", "pygments", "nbformat", "ipykernel", "numpy (>=1.14)"]
-parallel = ["ipyparallel"]
 
 [[package]]
 name = "ipython-genutils"
@@ -759,9 +770,9 @@ optional = false
 python-versions = ">=3.6,<4.0"
 
 [package.extras]
-colors = ["colorama (>=0.4.3,<0.5.0)"]
 pipfile_deprecated_finder = ["pipreqs", "requirementslib"]
 requirements_deprecated_finder = ["pipreqs", "pip-api"]
+colors = ["colorama (>=0.4.3,<0.5.0)"]
 
 [[package]]
 name = "itypes"
@@ -837,19 +848,19 @@ python-versions = "*"
 
 [package.dependencies]
 argparse = "*"
-lxml = ">=4.0,<5.0"
-geonamescache = "0.20"
-six = "*"
-selenium = "4.0.0-alpha-6"
 cchardet = ">=1.1.2"
-feedparser = "5.2.1"
-chardet = ">=3.0.2,<3.1.0"
-tldextract = "*"
-python-dateutil = "2.8.1"
-cssselect = "*"
-requests = ">=2.20.0"
 certifi = ">=2017.4.17"
+chardet = ">=3.0.2,<3.1.0"
+cssselect = "*"
+feedparser = "5.2.1"
+geonamescache = "0.20"
 html5lib = "*"
+lxml = ">=4.0,<5.0"
+python-dateutil = "2.8.1"
+requests = ">=2.20.0"
+selenium = "4.0.0-alpha-6"
+six = "*"
+tldextract = "*"
 
 [[package]]
 name = "kombu"
@@ -863,20 +874,20 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 amqp = ">=2.6.0,<2.7"
 
 [package.extras]
-qpid = ["qpid-python (>=0.26)", "qpid-tools (>=0.26)"]
+azureservicebus = ["azure-servicebus (>=0.21.1)"]
 azurestoragequeues = ["azure-storage-queue"]
-msgpack = ["msgpack"]
+consul = ["python-consul (>=0.6.0)"]
 librabbitmq = ["librabbitmq (>=1.5.2)"]
 mongodb = ["pymongo (>=3.3.0)"]
-consul = ["python-consul (>=0.6.0)"]
-azureservicebus = ["azure-servicebus (>=0.21.1)"]
-redis = ["redis (>=3.3.11)"]
-zookeeper = ["kazoo (>=1.3.1)"]
+msgpack = ["msgpack"]
 pyro = ["pyro4"]
-yaml = ["PyYAML (>=3.10)"]
+qpid = ["qpid-python (>=0.26)", "qpid-tools (>=0.26)"]
+redis = ["redis (>=3.3.11)"]
 slmq = ["softlayer-messaging (>=1.0.3)"]
-sqs = ["boto3 (>=1.4.4)", "pycurl (7.43.0.2)"]
 sqlalchemy = ["sqlalchemy"]
+sqs = ["boto3 (>=1.4.4)", "pycurl (7.43.0.2)"]
+yaml = ["PyYAML (>=3.10)"]
+zookeeper = ["kazoo (>=1.3.1)"]
 
 [[package]]
 name = "lazy-object-proxy"
@@ -906,10 +917,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, != 3.4.*"
 
 [package.extras]
-source = ["Cython (>=0.29.7)"]
 cssselect = ["cssselect (>=0.7)"]
 html5 = ["html5lib"]
 htmlsoup = ["beautifulsoup4"]
+source = ["Cython (>=0.29.7)"]
 
 [[package]]
 name = "markdown"
@@ -987,8 +998,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-PyOpenSSL = "*"
 pyasn1 = ">=0.1.1"
+PyOpenSSL = "*"
 
 [[package]]
 name = "networkx"
@@ -1049,9 +1060,9 @@ optional = false
 python-versions = ">=3.6.1"
 
 [package.dependencies]
+numpy = ">=1.15.4"
 python-dateutil = ">=2.7.3"
 pytz = ">=2017.2"
-numpy = ">=1.15.4"
 
 [package.extras]
 test = ["pytest (>=4.0.2)", "pytest-xdist", "hypothesis (>=3.58)"]
@@ -1214,10 +1225,10 @@ python-versions = ">=3.5.*"
 
 [package.dependencies]
 astroid = ">=2.4.0,<=2.5"
-mccabe = ">=0.6,<0.7"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-toml = ">=0.7.1"
 isort = ">=4.2.5,<6"
+mccabe = ">=0.6,<0.7"
+toml = ">=0.7.1"
 
 [[package]]
 name = "pyopenssl"
@@ -1228,12 +1239,12 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-six = ">=1.5.2"
 cryptography = ">=2.8"
+six = ">=1.5.2"
 
 [package.extras]
-test = ["flaky", "pretend", "pytest (>=3.0.1)"]
 docs = ["sphinx", "sphinx-rtd-theme"]
+test = ["flaky", "pretend", "pytest (>=3.0.1)"]
 
 [[package]]
 name = "pyparsing"
@@ -1260,13 +1271,13 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
-more-itertools = {version = ">=4.0.0", markers = "python_version > \"2.7\""}
-six = ">=1.10.0"
-py = ">=1.5.0"
-colorama = {version = "*", markers = "sys_platform == \"win32\""}
-attrs = ">=17.4.0"
-pluggy = ">=0.11"
 atomicwrites = ">=1.0"
+attrs = ">=17.4.0"
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+more-itertools = {version = ">=4.0.0", markers = "python_version > \"2.7\""}
+pluggy = ">=0.11"
+py = ">=1.5.0"
+six = ">=1.10.0"
 
 [package.extras]
 testing = ["argcomplete", "hypothesis (>=3.56)", "nose", "requests", "mock"]
@@ -1390,9 +1401,9 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
-idna = ">=2.5,<2.8"
 certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<3.1.0"
+idna = ">=2.5,<2.8"
 urllib3 = ">=1.21.1,<1.25"
 
 [package.extras]
@@ -1442,8 +1453,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-requests = "*"
 pytz = "*"
+requests = "*"
 
 [package.extras]
 test = ["nose", "coverage", "mock"]
@@ -1478,20 +1489,20 @@ certifi = "*"
 urllib3 = ">=1.10.0"
 
 [package.extras]
-celery = ["celery (>=3)"]
-sqlalchemy = ["sqlalchemy (>=1.2)"]
-rq = ["rq (>=0.6)"]
 aiohttp = ["aiohttp (>=3.5)"]
-pyspark = ["pyspark (>=2.4.4)"]
+beam = ["apache-beam (>=2.12)"]
+bottle = ["bottle (>=0.12.13)"]
+celery = ["celery (>=3)"]
+chalice = ["chalice (>=1.16.0)"]
+django = ["django (>=1.8)"]
+falcon = ["falcon (>=1.4)"]
 flask = ["flask (>=0.11)", "blinker (>=1.1)"]
 pure_eval = ["pure-eval", "executing", "asttokens"]
-django = ["django (>=1.8)"]
-chalice = ["chalice (>=1.16.0)"]
-beam = ["apache-beam (>=2.12)"]
-tornado = ["tornado (>=5)"]
-bottle = ["bottle (>=0.12.13)"]
+pyspark = ["pyspark (>=2.4.4)"]
+rq = ["rq (>=0.6)"]
 sanic = ["sanic (>=0.8)"]
-falcon = ["falcon (>=1.4)"]
+sqlalchemy = ["sqlalchemy (>=1.2)"]
+tornado = ["tornado (>=5)"]
 
 [[package]]
 name = "simplejson"
@@ -1564,9 +1575,9 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-requests-file = ">=1.4"
-requests = ">=2.1.0"
 idna = "*"
+requests = ">=2.1.0"
+requests-file = ">=1.4"
 
 [[package]]
 name = "toml"
@@ -1642,11 +1653,11 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
 
 [package.dependencies]
-pyOpenSSL = {version = ">=0.14", optional = true, markers = "extra == \"secure\""}
-ipaddress = {version = "*", optional = true, markers = "extra == \"secure\""}
 certifi = {version = "*", optional = true, markers = "extra == \"secure\""}
-idna = {version = ">=2.0.0", optional = true, markers = "extra == \"secure\""}
 cryptography = {version = ">=1.3.4", optional = true, markers = "extra == \"secure\""}
+idna = {version = ">=2.0.0", optional = true, markers = "extra == \"secure\""}
+ipaddress = {version = "*", optional = true, markers = "extra == \"secure\""}
+pyOpenSSL = {version = ">=0.14", optional = true, markers = "extra == \"secure\""}
 
 [package.extras]
 secure = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "certifi", "ipaddress"]
@@ -1661,8 +1672,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-probableparsing = "*"
 future = ">=0.14"
+probableparsing = "*"
 python-crfsuite = ">=0.7"
 
 [[package]]
@@ -1703,7 +1714,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "15a58fd82ebb1086c59363512619277b4a0b62089b799da65c1e0e6eab4c6b29"
+content-hash = "0e367d0cc3996fc4f8f4bf15a048a0b8a48d09206164c69c91c8d0fc36145d44"
 
 [metadata.files]
 amqp = [
@@ -1864,6 +1875,10 @@ coreapi = [
 coreschema = [
     {file = "coreschema-0.0.4-py2-none-any.whl", hash = "sha256:5e6ef7bf38c1525d5e55a895934ab4273548629f16aed5c0a6caa74ebf45551f"},
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
+]
+courts-db = [
+    {file = "courts-db-0.9.7.tar.gz", hash = "sha256:abe01ee93ce26c458a411521a888a3ad920b8ed1d4f8c2f6410d35935bc6f058"},
+    {file = "courts_db-0.9.7-py2.py3-none-any.whl", hash = "sha256:cdfc3dbcee0b83aa9aa03a2c969611a7ea89b9c8a3dc7530be252c2538ef76e0"},
 ]
 cryptography = [
     {file = "cryptography-3.1.1-cp27-cp27m-macosx_10_10_x86_64.whl", hash = "sha256:65beb15e7f9c16e15934569d29fb4def74ea1469d8781f6b3507ab896d6d8719"},
@@ -2143,6 +2158,7 @@ lxml = [
     {file = "lxml-4.6.1-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:e65c221b2115a91035b55a593b6eb94aa1206fa3ab374f47c6dc10d364583ff9"},
     {file = "lxml-4.6.1-cp38-cp38-win32.whl", hash = "sha256:d6f8c23f65a4bfe4300b85f1f40f6c32569822d08901db3b6454ab785d9117cc"},
     {file = "lxml-4.6.1-cp38-cp38-win_amd64.whl", hash = "sha256:573b2f5496c7e9f4985de70b9bbb4719ffd293d5565513e04ac20e42e6e5583f"},
+    {file = "lxml-4.6.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:098fb713b31050463751dcc694878e1d39f316b86366fb9fe3fbbe5396ac9fab"},
     {file = "lxml-4.6.1-cp39-cp39-manylinux1_i686.whl", hash = "sha256:1d87936cb5801c557f3e981c9c193861264c01209cb3ad0964a16310ca1b3301"},
     {file = "lxml-4.6.1-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:2d5896ddf5389560257bbe89317ca7bcb4e54a02b53a3e572e1ce4226512b51b"},
     {file = "lxml-4.6.1-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:9b06690224258db5cd39a84e993882a6874676f5de582da57f3df3a82ead9174"},
@@ -2292,6 +2308,11 @@ pandas = [
     {file = "pandas-1.1.3-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:df43ea0e9fd9f9672b0de9cac26d01255ad50481994bf3cb4687c21eec2d7bbc"},
     {file = "pandas-1.1.3-cp38-cp38-win32.whl", hash = "sha256:a605054fbca71ed1d08bb2aef6f73c84a579bbac956bfe8f9718d5e84cb41248"},
     {file = "pandas-1.1.3-cp38-cp38-win_amd64.whl", hash = "sha256:84a4ffe668df357e31f98c829536e3a7142c3036c82f996e639f644c5d32eda1"},
+    {file = "pandas-1.1.3-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:147162568b1242355290341baf281926cfac66ada07e634f3fc521ac967e4653"},
+    {file = "pandas-1.1.3-cp39-cp39-manylinux1_i686.whl", hash = "sha256:2999adc6736f8cb4c69d65a6e2b25a11bcb395da5b048342b8e4d6fe055e57ae"},
+    {file = "pandas-1.1.3-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:f4cb8252ae71f093f4a6b847adf0bc9330f109c48f08363c2071f189f1c89c87"},
+    {file = "pandas-1.1.3-cp39-cp39-win32.whl", hash = "sha256:b026e913d88fad3a74eea8ed5a5f98e8823080ea02f8d9bb0ec19e92552daad6"},
+    {file = "pandas-1.1.3-cp39-cp39-win_amd64.whl", hash = "sha256:11c284769f41e95f7d16a327eb555989c5f29418aad075fa80c97ef3aa8fb885"},
     {file = "pandas-1.1.3.tar.gz", hash = "sha256:babbeda2f83b0686c9ad38d93b10516e68cdcd5771007eb80a763e98aaf44613"},
 ]
 parso = [
@@ -2366,6 +2387,8 @@ psycopg2 = [
     {file = "psycopg2-2.8.6-cp37-cp37m-win_amd64.whl", hash = "sha256:56fee7f818d032f802b8eed81ef0c1232b8b42390df189cab9cfa87573fe52c5"},
     {file = "psycopg2-2.8.6-cp38-cp38-win32.whl", hash = "sha256:ad2fe8a37be669082e61fb001c185ffb58867fdbb3e7a6b0b0d2ffe232353a3e"},
     {file = "psycopg2-2.8.6-cp38-cp38-win_amd64.whl", hash = "sha256:56007a226b8e95aa980ada7abdea6b40b75ce62a433bd27cec7a8178d57f4051"},
+    {file = "psycopg2-2.8.6-cp39-cp39-win32.whl", hash = "sha256:2c93d4d16933fea5bbacbe1aaf8fa8c1348740b2e50b3735d1b0bf8154cbf0f3"},
+    {file = "psycopg2-2.8.6-cp39-cp39-win_amd64.whl", hash = "sha256:d5062ae50b222da28253059880a871dc87e099c25cb68acf613d9d227413d6f7"},
     {file = "psycopg2-2.8.6.tar.gz", hash = "sha256:fb23f6c71107c37fd667cb4ea363ddeb936b348bbd6449278eb92c189699f543"},
 ]
 ptyprocess = [
@@ -2530,6 +2553,8 @@ pyyaml = [
     {file = "PyYAML-5.3.1-cp37-cp37m-win_amd64.whl", hash = "sha256:73f099454b799e05e5ab51423c7bcf361c58d3206fa7b0d555426b1f4d9a3eaf"},
     {file = "PyYAML-5.3.1-cp38-cp38-win32.whl", hash = "sha256:06a0d7ba600ce0b2d2fe2e78453a470b5a6e000a985dd4a4e54e436cc36b0e97"},
     {file = "PyYAML-5.3.1-cp38-cp38-win_amd64.whl", hash = "sha256:95f71d2af0ff4227885f7a6605c37fd53d3a106fcab511b8860ecca9fcf400ee"},
+    {file = "PyYAML-5.3.1-cp39-cp39-win32.whl", hash = "sha256:ad9c67312c84def58f3c04504727ca879cb0013b2517c85a9a253f0cb6380c0a"},
+    {file = "PyYAML-5.3.1-cp39-cp39-win_amd64.whl", hash = "sha256:6034f55dab5fea9e53f436aa68fa3ace2634918e8b5994d82f3621c04ff5ed2e"},
     {file = "PyYAML-5.3.1.tar.gz", hash = "sha256:b8eac752c5e14d3eca0e6dd9199cd627518cb5ec06add0de9d32baeee6fe645d"},
 ]
 redis = [
