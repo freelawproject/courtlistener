@@ -5,6 +5,7 @@ from glob import iglob
 from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup as bs4
+from courts_db import find_court
 from django.db import transaction
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
@@ -16,8 +17,6 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
-
-from courts_db import find_court
 
 cnt = CaseNameTweaker()
 
