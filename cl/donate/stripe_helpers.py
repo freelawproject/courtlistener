@@ -232,9 +232,13 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
     return response
 
 
-def create_stripe_customer(source, email):
+def create_stripe_customer(source: str, email: str) -> StripeObject:
     """Create a stripe customer so that we can charge this person more than
     once
+
+    :param source: The stripe token to use for the creation
+    :param email: The customer's email address
+    :return: A stripe customer object
     """
     stripe.api_key = settings.STRIPE_SECRET_KEY
     try:
