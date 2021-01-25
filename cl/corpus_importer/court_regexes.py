@@ -1,9 +1,6 @@
-import os
-import pickle
 import re
-from math import ceil
 
-from django.conf import settings
+from courts_db import find_court
 
 conn_counties = ")|(".join(
     [
@@ -732,33 +729,9 @@ def match_court_string(
 
     # Generally, we test these from most specific regex to least specific. The
     # order of the tests below should not be changed.
-    matches = []
-    if international:
-        for regex, value in international_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
-    if state:
-        for regex, value in state_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
-    if state_ag:
-        for regex, value in state_ag_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
-    if federal_appeals:
-        for regex, value in ca_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
-    if bankruptcy:
-        for regex, value in fb_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
-    # District go last because they've got some broad ones.
-    if federal_district:
-        for regex, value in fd_pairs:
-            if re.search(regex, court_str):
-                matches.append(value)
 
-    # Safety check. If we have more than one match, that's a problem
-    assert len(matches) >= 1, "Too many matches for %s" % court_str
+    matches = find_court(court_str, bankruptcy=bankruptcy)
+    if not matches:
+        return None
+    assert len(matches) >= 1, "No matches for %s" % court_str
     return matches[0] if matches else None
