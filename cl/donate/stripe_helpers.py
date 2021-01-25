@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
+from stripe import APIConnectionError, StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
@@ -245,3 +246,10 @@ def create_stripe_customer(source, email):
             "<strong>%s</strong>" % e.json_body["error"]["message"]
         )
         raise PaymentFailureException(message)
+    except APIConnectionError:
+        logger.warning("Unable to connect to stripe to create customer.")
+        raise PaymentFailureException(
+            "Oops. We were unable to connect to our payment provider. "
+            "Please try again. If this error continues, please try again "
+            "later."
+        )
