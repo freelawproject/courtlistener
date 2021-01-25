@@ -181,3 +181,13 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
             1,
             msg="Incorrect disclosures found.",
         )
+
+    def test_filter_related_object(self):
+        """Can we filter disclosures by transaction value code?"""
+        self.path = reverse(
+            "financialdisclosure-list", kwargs={"version": "v3"}
+        )
+        self.q["investments__transaction_value_code"] = "M"
+
+        r = self.client.get(self.path, self.q)
+        self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
