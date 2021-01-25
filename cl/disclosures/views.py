@@ -1,5 +1,5 @@
-from django.http import HttpResponse, HttpRequest
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, render
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.models import Person
