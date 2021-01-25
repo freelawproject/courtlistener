@@ -1,8 +1,6 @@
 from django.conf.urls import url
 
-from cl.people_db.views import (
-    view_person,
-)
+from cl.people_db.views import view_person
 
 urlpatterns = [
     url(
