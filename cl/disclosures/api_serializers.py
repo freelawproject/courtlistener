@@ -1,4 +1,5 @@
 from drf_dynamic_fields import DynamicFieldsMixin
+from rest_framework import serializers
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.disclosures.models import (
@@ -12,7 +13,7 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.people_db.api_serializers import PersonSerializer
+from cl.people_db.models import Person
 
 
 class AgreementSerializer(
@@ -87,7 +88,12 @@ class FinancialDisclosureSerializer(
     positions = PositionSerializer(many=True, read_only=True)
     reimbursements = ReimbursementSerializer(many=True, read_only=True)
     spouse_incomes = SpouseIncomeSerializer(many=True, read_only=True)
-    person = PersonSerializer(many=False, read_only=True)
+    person = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="person-detail",
+        queryset=Person.objects.all(),
+        style={"base_template": "input.html"},
+    )
 
     class Meta:
         model = FinancialDisclosure
