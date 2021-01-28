@@ -3,7 +3,6 @@ import sys
 
 from django.apps import apps
 from django.conf import settings
-from six.moves import input
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
