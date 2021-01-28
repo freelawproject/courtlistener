@@ -22,7 +22,9 @@ from cl.search.models import (
 )
 
 
-class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
+class PartyTypeSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     party_type = serializers.CharField(source="name")
 
     class Meta:
@@ -33,7 +35,9 @@ class PartyTypeSerializer(HyperlinkedModelSerializerWithId):
         )
 
 
-class OriginalCourtInformationSerializer(HyperlinkedModelSerializerWithId):
+class OriginalCourtInformationSerializer(
+    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+):
     class Meta:
         model = OriginatingCourtInformation
         fields = "__all__"

@@ -2,10 +2,10 @@ from django.conf.urls import include, url
 from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
-from rest_framework_swagger.renderers import OpenAPIRenderer, SwaggerUIRenderer
 
 from cl.api import views
 from cl.audio import api_views as audio_views
+from cl.disclosures import api_views as disclosure_views
 from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
@@ -82,6 +82,43 @@ router.register(
 )
 router.register(
     r"visualizations", viz_views.VisualizationViewSet, basename="scotusmap"
+)
+
+# Financial Disclosures
+router.register(
+    r"agreements",
+    disclosure_views.AgreementViewSet,
+    basename="agreement",
+)
+router.register(r"debts", disclosure_views.DebtViewSet, basename="debt")
+router.register(
+    r"financial-disclosures",
+    disclosure_views.FinancialDisclosureViewSet,
+    basename="financialdisclosure",
+)
+router.register(r"gifts", disclosure_views.GiftViewSet, basename="gift")
+router.register(
+    r"investments", disclosure_views.InvestmentViewSet, basename="investment"
+)
+router.register(
+    r"non-investment-incomes",
+    disclosure_views.NonInvestmentIncomeViewSet,
+    basename="noninvestmentincome",
+)
+router.register(
+    r"disclosure-positions",
+    disclosure_views.PositionViewSet,
+    basename="disclosureposition",
+)
+router.register(
+    r"reimbursements",
+    disclosure_views.ReimbursementViewSet,
+    basename="reimbursement",
+)
+router.register(
+    r"spouse-incomes",
+    disclosure_views.SpouseIncomeViewSet,
+    basename="spouseincome",
 )
 
 API_TITLE = "CourtListener Legal Data API"
