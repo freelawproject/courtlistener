@@ -1,5 +1,6 @@
-1.0.18
+1.0.19
 
+1.0.19 - Add eyecite dependency
 1.0.18 - Remove fabric and update Juriscraper
 1.0.17 - Add fabric dependency
 1.0.16 - Upgrade redis-py and sentry dependencies

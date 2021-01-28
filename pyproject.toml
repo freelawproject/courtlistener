@@ -105,6 +105,7 @@ djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.18.1"
 gunicorn = "^20.0.4"
 Markdown = "^3.3.3"
+eyecite = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.6.0"
