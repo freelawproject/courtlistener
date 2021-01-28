@@ -1,6 +1,7 @@
+from urllib import parse
+
 import requests
 from django.conf import settings
-from six.moves.urllib import parse
 
 from cl.lib.command_utils import VerboseCommand
 
