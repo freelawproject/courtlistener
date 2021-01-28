@@ -168,6 +168,11 @@ def pdf_path(
     )
 
 
+disclosure_permissions = (
+    ("has_disclosure_api_access", "Can work with Disclosure API"),
+)
+
+
 class FinancialDisclosure(AbstractDateTimeModel):
     """A simple table to hold references to financial disclosure forms"""
 
@@ -271,6 +276,9 @@ class FinancialDisclosure(AbstractDateTimeModel):
         if self.thumbnail_status is THUMBNAIL_STATUSES.NEEDED:
             make_financial_disclosure_thumbnail_from_pdf.delay(self.pk)
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class Investment(AbstractDateTimeModel):
     """ Financial Disclosure Investments Table"""
@@ -354,6 +362,9 @@ class Investment(AbstractDateTimeModel):
         default=False,
     )
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class Position(AbstractDateTimeModel):
     """ Financial Disclosure Position Table"""
@@ -378,6 +389,9 @@ class Position(AbstractDateTimeModel):
         default=False,
     )
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class Agreement(AbstractDateTimeModel):
     """ Financial Disclosure Agreements Table"""
@@ -401,6 +415,9 @@ class Agreement(AbstractDateTimeModel):
         help_text="Does the agreement row contain redaction(s)?",
         default=False,
     )
+
+    class Meta:
+        permissions = disclosure_permissions
 
 
 class NonInvestmentIncome(AbstractDateTimeModel):
@@ -432,6 +449,9 @@ class NonInvestmentIncome(AbstractDateTimeModel):
         default=False,
     )
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class SpouseIncome(AbstractDateTimeModel):
     """ Financial Disclosure Judge Spouse Income Table"""
@@ -456,6 +476,9 @@ class SpouseIncome(AbstractDateTimeModel):
         help_text="Does the spousal-income row contain redaction(s)?",
         default=False,
     )
+
+    class Meta:
+        permissions = disclosure_permissions
 
 
 class Reimbursement(AbstractDateTimeModel):
@@ -495,6 +518,9 @@ class Reimbursement(AbstractDateTimeModel):
         default=False,
     )
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class Gift(AbstractDateTimeModel):
     """ Financial Disclosure Gifts Table"""
@@ -522,6 +548,9 @@ class Gift(AbstractDateTimeModel):
         default=False,
     )
 
+    class Meta:
+        permissions = disclosure_permissions
+
 
 class Debt(AbstractDateTimeModel):
     """ Financial Disclosure Judicial Debts/Liabilities Table"""
@@ -548,3 +577,6 @@ class Debt(AbstractDateTimeModel):
         help_text="Does the debt row contain redaction(s)?",
         default=False,
     )
+
+    class Meta:
+        permissions = disclosure_permissions

@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Dict, Union
+from typing import Dict, Tuple, Union
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
@@ -36,15 +36,19 @@ from cl.users.utils import create_stub_account
 logger = logging.getLogger(__name__)
 
 
+CleanedDonationFormType = Dict[str, Union[str, Decimal]]
+CleanedUserForm = Dict[str, str]
+
+
 def route_and_process_payment(
-    request,
-    cd_donation_form,
-    cd_user_form,
-    payment_provider,
-    frequency,
-    stripe_redirect_url,
-    payment_type,
-):
+    request: HttpRequest,
+    cd_donation_form: CleanedDonationFormType,
+    cd_user_form: CleanedUserForm,
+    payment_provider: str,
+    frequency: str,
+    stripe_redirect_url: str,
+    payment_type: str,
+) -> Tuple[HttpResponse, StripeObject]:
     """Routes the donation to the correct payment provider, then normalizes
     its response.
 
@@ -99,7 +103,7 @@ def route_and_process_payment(
 
 
 def add_monthly_donations(
-    cd_donation_form: Dict[str, Union[str, Decimal]],
+    cd_donation_form: CleanedDonationFormType,
     user: User,
     customer: StripeObject,
 ) -> None:

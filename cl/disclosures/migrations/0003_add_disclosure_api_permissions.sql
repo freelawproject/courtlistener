@@ -1,0 +1,32 @@
+-- This clearly makes no change to the database.
+-- But is added for consistency
+
+BEGIN;
+--
+-- Change Meta options on agreement
+--
+--
+-- Change Meta options on debt
+--
+--
+-- Change Meta options on financialdisclosure
+--
+--
+-- Change Meta options on gift
+--
+--
+-- Change Meta options on investment
+--
+--
+-- Change Meta options on noninvestmentincome
+--
+--
+-- Change Meta options on position
+--
+--
+-- Change Meta options on reimbursement
+--
+--
+-- Change Meta options on spouseincome
+--
+COMMIT;

@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
+from stripe import APIConnectionError, StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
@@ -231,9 +232,13 @@ def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
     return response
 
 
-def create_stripe_customer(source, email):
+def create_stripe_customer(source: str, email: str) -> StripeObject:
     """Create a stripe customer so that we can charge this person more than
     once
+
+    :param source: The stripe token to use for the creation
+    :param email: The customer's email address
+    :return: A stripe customer object
     """
     stripe.api_key = settings.STRIPE_SECRET_KEY
     try:
@@ -245,3 +250,10 @@ def create_stripe_customer(source, email):
             "<strong>%s</strong>" % e.json_body["error"]["message"]
         )
         raise PaymentFailureException(message)
+    except APIConnectionError:
+        logger.warning("Unable to connect to stripe to create customer.")
+        raise PaymentFailureException(
+            "Oops. We were unable to connect to our payment provider. "
+            "Please try again. If this error continues, please try again "
+            "later."
+        )
