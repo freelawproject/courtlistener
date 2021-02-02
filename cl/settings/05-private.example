@@ -1,4 +1,12 @@
+import os
 from datetime import date
+
+import sentry_sdk
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.redis import RedisIntegration
+
 
 ##################
 # Debug settings #
@@ -118,3 +126,25 @@ AWS_LAMBDA_PROXY_URL = 'https://xxx.execute-api.us-west-2.amazonaws.com/v1/get'
 # Development credentials available upon request
 
 BTE_HOST = "http://cl-binary-transformers-and-extractors:5050"
+
+
+##########
+# Sentry #
+##########
+# IA's library logs a lot of errors, which get sent to sentry unnecessarily
+# If you work closely with FLP, uncomment this to send your dev errors to
+# sentry. If you don't work closely with us, you won't have a Sentry username,
+# and you can send your dev errors to Sentry, but there's no point. This is
+# commented by default so that developers don't send things to Sentry that they
+# wouldn't expect to.
+#ignore_logger("internetarchive.session")
+#ignore_logger("internetarchive.item")
+#sentry_sdk.init(
+#    dsn="https://7743724ec68e4249a3fc48fc28fe312c@o399720.ingest.sentry.io/5620212",
+#    integrations=[
+#        CeleryIntegration(),
+#        DjangoIntegration(),
+#        RedisIntegration(),
+#    ],
+#    ignore_errors=[KeyboardInterrupt],
+#)

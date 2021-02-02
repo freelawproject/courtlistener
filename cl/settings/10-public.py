@@ -4,14 +4,9 @@ import re
 import sys
 from pathlib import Path
 
-import sentry_sdk
 from django.contrib.messages import constants as message_constants
 from django.http import UnreadablePostError
 from judge_pics import judge_root
-from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.redis import RedisIntegration
 
 from cl.lib.redis_utils import make_redis_interface
 
@@ -472,21 +467,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ########################
 # Logging Machinations #
 ########################
-if not DEVELOPMENT:
-    # IA's library logs a lot of errors, which get sent to sentry unnecessarily
-    ignore_logger("internetarchive.session")
-    ignore_logger("internetarchive.item")
-    sentry_sdk.init(
-        dsn="https://18f5941395e249f48e746dd7c6de84b1@o399720.ingest.sentry.io/5257254",
-        integrations=[
-            CeleryIntegration(),
-            DjangoIntegration(),
-            RedisIntegration(),
-        ],
-        ignore_errors=[KeyboardInterrupt],
-    )
-
-
 def skip_unreadable_post(record):
     if record.exc_info:
         exc_value = record.exc_info[1]
