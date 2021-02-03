@@ -476,3 +476,25 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
 
     # Save PDF content
     save_disclosure(extracted_data=content, disclosure=disclosure)
+
+
+def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
+    """Has PDF been extracted
+
+    Method added to skip tiff to pdf conversion if
+    document has already been converted and saved but
+    not yet extracted.
+
+    :param data: File data
+    :return: Whether document has been extracted
+    """
+    from cl.disclosures.models import FinancialDisclosure
+
+    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+        url = data["url"]
+    else:
+        url = data["urls"][0]
+
+    return FinancialDisclosure.objects.filter(
+        download_filepath=url, has_been_extracted=True
+    ).exists()
