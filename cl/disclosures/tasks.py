@@ -8,16 +8,50 @@ from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
+from redis import Redis
 from requests import ReadTimeout
 
 from cl.celery_init import app
+from cl.disclosures.utils import has_been_extracted, has_been_pdfed
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.redis_utils import make_redis_interface
 from cl.scrapers.transformer_extractor_utils import (
     generate_thumbnail,
     get_page_count,
 )
+
+
+def make_disclosure_key(data_id: str) -> str:
+    """Make disclosure key to use with redis
+
+    :param data_id: The ID of the document being processed
+    :return: Disclosure key
+    """
+    return f"disclosure.enqueued:fd-{data_id}"
+
+
+def enqueue_disclosure_process(interface: Redis, disclosure_key: str) -> bool:
+    """Enqueue a disclosure or punt it if there's already a task for it.
+
+    :param disclosure_key: The ID of the disclosure extracting.
+    :return: True if we enqueued the item, false if not.
+    """
+    # Create an expiring semaphor in redis or check if there's already one
+    # there.
+    # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
+    currently_enqueued = bool(interface.getset(disclosure_key, 1))
+    if currently_enqueued:
+        # We've got a task going for this alert.
+        return False
+
+    # We don't have a task for this yet. Set an expiration for the new key,
+    # and make a new async task. The expiration gives us a safety so that the
+    # semaphor *will* eventually go away even if our task or server crashes.
+    safety_expiration_timeout = 60 * 60 * 12
+    interface.expire(disclosure_key, safety_expiration_timeout)
+    return True
 
 
 @app.task(bind=True, max_retries=2, ignore_result=True)
@@ -348,25 +382,6 @@ def get_disclosure_from_pdf_path(disclosure_url: str):
     return FinancialDisclosure.objects.get(download_filepath=disclosure_url)
 
 
-def has_been_pdfed(disclosure_url: str) -> Optional[str]:
-    """Has file been PDFd from tiff and saved to AWS.
-
-    :param disclosure_url: The URL of the first link (if there are more than
-    one) of the source FD tiff(s)/PDF
-    :return: Path to document or None
-    """
-    from cl.disclosures.models import FinancialDisclosure
-
-    disclosures = FinancialDisclosure.objects.filter(
-        download_filepath=disclosure_url
-    )
-    if disclosures.exists():
-        return (
-            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosures[0].filepath}"
-        )
-
-
 def generate_or_download_disclosure_as_pdf(
     data: Dict[str, Union[str, int, List[str]]],
     pdf_url: Optional[str],
@@ -402,9 +417,21 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     :param data: The disclosure information to process
     :return: None
     """
-
     from cl.disclosures.models import FinancialDisclosure
     from cl.people_db.models import Person
+
+    # Check download_filepath to see if it has been processed before.
+    if has_been_extracted(data):
+        logger.info(f"Document already extracted and saved: {data['id']}.")
+        return
+
+    interface = make_redis_interface("CACHE")
+    disclosure_key = make_disclosure_key(data["id"])
+    newly_enqueued = enqueue_disclosure_process(interface, disclosure_key)
+
+    if not newly_enqueued:
+        logger.info(f"Process is already running {data['id']}.")
+        return
 
     # Generate PDF content from our three paths
     year = int(data["year"])
@@ -437,13 +464,15 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         in_system = check_if_in_system(sha1_hash)
         if in_system:
             logger.info("PDF already in system.")
+            interface.delete(disclosure_key)
             return
 
         # Return page count - 0 indicates a failure of some kind.  Like PDF
         # Not actually present on aws.
         pg_count = get_page_count(pdf_bytes)
         if not pg_count:
-            logger.info("PDF failed!")
+            logger.info(f"PDF failed for disclosure {data['id']}.")
+            interface.delete(disclosure_key)
             return
 
         # Save Financial Disclosure here to AWS and move onward
@@ -472,7 +501,10 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     )
     if not content:
         logger.info("Failed extraction!")
+        interface.delete(disclosure_key)
         return
 
     # Save PDF content
     save_disclosure(extracted_data=content, disclosure=disclosure)
+    # Remove disclosure ID in redis for completed disclosure
+    interface.delete(disclosure_key)
