@@ -23,8 +23,8 @@ from datetime import datetime
 from django.core.management import CommandError
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
+from eyecite.find_citations import get_citations
 
-from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import Citation, OpinionCluster
@@ -169,7 +169,6 @@ class Command(VerboseCommand):
             try:
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
-                    html=False,
                     do_post_citation=False,
                     do_defendant=False,
                     disambiguate=False,

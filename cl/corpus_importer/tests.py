@@ -9,7 +9,6 @@ import pytest
 from django.conf import settings
 from django.test import TestCase
 
-from cl.citations.find_citations import get_citations
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import (

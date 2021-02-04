@@ -8,12 +8,12 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
+from eyecite.find_citations import get_citations
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
-from cl.citations.find_citations import get_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_candidate_judges
