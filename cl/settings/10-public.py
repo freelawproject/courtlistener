@@ -314,6 +314,8 @@ REST_FRAMEWORK = {
         # Doing a background check service, we told them we didn't want to work
         # with them.
         "elios": "10/hour",
+        # Sent multiple emails, but no response.
+        "bchecker": "10/hour",
         "shreyngd": "100/hour",
         "leo": "100/hour",
         "miffy": "100/hour",
