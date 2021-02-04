@@ -2,8 +2,6 @@ from typing import Dict, Optional, Union
 
 from django.conf import settings
 
-from cl.disclosures.models import FinancialDisclosure
-
 
 def has_been_pdfed(disclosure_url: str) -> Optional[str]:
     """Has file been PDFd from tiff and saved to AWS.
@@ -12,6 +10,7 @@ def has_been_pdfed(disclosure_url: str) -> Optional[str]:
     one) of the source FD tiff(s)/PDF
     :return: Path to document or None
     """
+    from cl.disclosures.models import FinancialDisclosure
 
     disclosures = FinancialDisclosure.objects.filter(
         download_filepath=disclosure_url
@@ -33,6 +32,7 @@ def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
     :param data: File data
     :return: Whether document has been extracted
     """
+    from cl.disclosures.models import FinancialDisclosure
 
     if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
         url = data["url"]
