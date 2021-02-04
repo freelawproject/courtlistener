@@ -425,7 +425,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         logger.info(f"Document already extracted and saved: {data['id']}.")
         return
 
-    interface = make_redis_interface("DISCLOSURES")
+    interface = make_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
     newly_enqueued = enqueue_disclosure_process(interface, disclosure_key)
 
@@ -501,6 +501,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     )
     if not content:
         logger.info("Failed extraction!")
+        interface.delete(disclosure_key)
         return
 
     # Save PDF content
