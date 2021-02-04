@@ -12,6 +12,7 @@ from redis import Redis
 from requests import ReadTimeout
 
 from cl.celery_init import app
+from cl.disclosures.utils import has_been_extracted, has_been_pdfed
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -381,25 +382,6 @@ def get_disclosure_from_pdf_path(disclosure_url: str):
     return FinancialDisclosure.objects.get(download_filepath=disclosure_url)
 
 
-def has_been_pdfed(disclosure_url: str) -> Optional[str]:
-    """Has file been PDFd from tiff and saved to AWS.
-
-    :param disclosure_url: The URL of the first link (if there are more than
-    one) of the source FD tiff(s)/PDF
-    :return: Path to document or None
-    """
-    from cl.disclosures.models import FinancialDisclosure
-
-    disclosures = FinancialDisclosure.objects.filter(
-        download_filepath=disclosure_url
-    )
-    if disclosures.exists():
-        return (
-            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosures[0].filepath}"
-        )
-
-
 def generate_or_download_disclosure_as_pdf(
     data: Dict[str, Union[str, int, List[str]]],
     pdf_url: Optional[str],
@@ -525,25 +507,3 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     save_disclosure(extracted_data=content, disclosure=disclosure)
     # Remove disclosure ID in redis for completed disclosure
     interface.delete(disclosure_key)
-
-
-def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
-    """Has PDF been extracted
-
-    Method added to skip tiff to pdf conversion if
-    document has already been converted and saved but
-    not yet extracted.
-
-    :param data: File data
-    :return: Whether document has been extracted
-    """
-    from cl.disclosures.models import FinancialDisclosure
-
-    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
-        url = data["url"]
-    else:
-        url = data["urls"][0]
-
-    return FinancialDisclosure.objects.filter(
-        download_filepath=url, has_been_extracted=True
-    ).exists()
