@@ -1,9 +1,11 @@
 import argparse
 import os
-from datetime import timedelta
+from datetime import date, timedelta
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from celery.canvas import chain
 from django.conf import settings
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
@@ -26,8 +28,13 @@ from cl.search.tasks import add_docket_to_solr_by_rds, add_items_to_solr
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
+OptionsType = Dict[str, Union[str, Callable]]
 
-def get_next_date_range(court_id, span=7):
+
+def get_next_date_range(
+    court_id: str,
+    span: int = 7,
+) -> Tuple[Optional[date], Optional[date]]:
     """Get the next start and end query dates for a court.
 
     Check the DB for the last date for a court that was completed. Return the
@@ -64,7 +71,7 @@ def get_next_date_range(court_id, span=7):
     return last_complete_date, next_end_date
 
 
-def mark_court_in_progress(court_id, d):
+def mark_court_in_progress(court_id: str, d: date) -> QuerySet:
     log = PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
         date_queried=d,
@@ -73,7 +80,7 @@ def mark_court_in_progress(court_id, d):
     return log
 
 
-def get_and_save_free_document_reports(options):
+def get_and_save_free_document_reports(options: OptionsType) -> None:
     """Query the Free Doc Reports on PACER and get a list of all the free
     documents. Do not download those items, as that step is done later. For now
     just get the list.
@@ -173,7 +180,7 @@ def get_and_save_free_document_reports(options):
                 break
 
 
-def get_pdfs(options):
+def get_pdfs(options: OptionsType) -> None:
     """Get PDFs for the results of the Free Document Report queries.
 
     At this stage, we have rows in the PACERFreeDocumentRow table, each of
@@ -214,7 +221,7 @@ def get_pdfs(options):
             )
 
 
-def ocr_available(options):
+def ocr_available(options: OptionsType) -> None:
     """Do the OCR for any items that need it, then save to the solr index."""
     q = options["queue"]
     rds = (
@@ -237,7 +244,7 @@ def ocr_available(options):
             logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
 
 
-def do_everything(options):
+def do_everything(options: OptionsType):
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(options)
     logger.info("Getting PDFs from free document reports")
@@ -249,7 +256,7 @@ def do_everything(options):
 class Command(VerboseCommand):
     help = "Get all the free content from PACER."
 
-    def valid_actions(self, s):
+    def valid_actions(self, s: str) -> Callable:
         if s.lower() not in self.VALID_ACTIONS:
             raise argparse.ArgumentTypeError(
                 "Unable to parse action. Valid actions are: %s"
@@ -258,7 +265,7 @@ class Command(VerboseCommand):
 
         return self.VALID_ACTIONS[s]
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
             "--action",
             type=self.valid_actions,
@@ -278,7 +285,7 @@ class Command(VerboseCommand):
             help="Do we index as we go, or leave that to be done later?",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: List[str], **options: OptionsType) -> None:
         super(Command, self).handle(*args, **options)
         options["action"](options)
 
