@@ -4,7 +4,8 @@
 import argparse
 import re
 
-from cl.citations import find_citations
+from eyecite.find_citations import get_citations
+
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import normalize_dashes
 from cl.search.models import Citation, OpinionCluster
@@ -59,7 +60,7 @@ def find_tax_court_citation(opinion_text):
     :return: citation object or None
     """
     for line_of_text in opinion_text.split("\n")[:250]:
-        cites = find_citations.get_citations(line_of_text, html=False)
+        cites = get_citations(line_of_text)
         if not cites:
             continue
 

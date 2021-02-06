@@ -11,6 +11,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
+from eyecite.find_citations import get_citations
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -1837,11 +1838,8 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         citation_str = kwargs.pop("citation", None)
         if citation_str:
             try:
-                from cl.citations.find_citations import get_citations
-
                 c = get_citations(
                     citation_str,
-                    html=False,
                     do_post_citation=False,
                     do_defendant=False,
                     disambiguate=False,
