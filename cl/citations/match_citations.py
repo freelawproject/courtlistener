@@ -5,16 +5,16 @@ from datetime import date, datetime
 from typing import List, Union
 
 from django.conf import settings
-from reporters_db import REPORTERS
-
-from cl.citations.find_citations import strip_punct
-from cl.citations.models import (
+from eyecite.models import (
     Citation,
     IdCitation,
     NonopinionCitation,
     ShortformCitation,
     SupraCitation,
 )
+from eyecite.utils import strip_punct
+from reporters_db import REPORTERS
+
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion

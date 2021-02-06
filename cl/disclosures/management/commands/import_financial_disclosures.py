@@ -1,30 +1,8 @@
 import json
-from typing import Dict, Optional, Union
 
-from cl.disclosures.models import FinancialDisclosure
-from cl.disclosures.tasks import import_disclosure
+from cl.disclosures.tasks import has_been_extracted, import_disclosure
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-
-
-def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
-    """Has PDF been extracted
-
-    Method added to skip tiff to pdf conversion if
-    document has already been converted and saved but
-    not yet extracted.
-
-    :param data: File data
-    :return: Whether document has been extracted
-    """
-    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
-        url = data["url"]
-    else:
-        url = data["urls"][0]
-
-    return FinancialDisclosure.objects.filter(
-        download_filepath=url, has_been_extracted=True
-    ).exists()
 
 
 def import_financial_disclosures(
