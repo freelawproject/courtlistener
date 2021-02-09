@@ -18,7 +18,7 @@ The other thing we do is require a contributor license agreement from any non-em
 On with the show.
 
 
-## Set up
+## Architecture
 
 The major components of CourtListener are:
 
