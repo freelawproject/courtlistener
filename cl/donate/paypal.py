@@ -10,7 +10,11 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_503_SERVICE_UNAVAILABLE,
+)
 
 from cl.donate.models import PAYMENT_TYPES, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
@@ -34,9 +38,12 @@ def get_paypal_access_token() -> str:
     if r.status_code == HTTP_200_OK:
         logger.info("Got paypal token successfully.")
     else:
-        logger.critical(
+        logger.warning(
             "Problem getting paypal token status_code was: %s, "
             "with content: %s" % (r.status_code, r.text)
+        )
+        raise PaymentFailureException(
+            "Oops, sorry. PayPal had an error. Please try again."
         )
     return json.loads(r.content).get("access_token")
 
@@ -54,7 +61,12 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
     The other providers do this via a POST rather than a GET, so that's why
     this one is a bit of an oddball.
     """
-    access_token = get_paypal_access_token()
+    try:
+        access_token = get_paypal_access_token()
+    except PaymentFailureException as e:
+        logger.info(f"Unable to get PayPal access token. Message was: {e}")
+        return HttpResponse(status=HTTP_503_SERVICE_UNAVAILABLE)
+
     d = Donation.objects.get(transaction_id=request.GET["token"])
     r = requests.post(
         "%s/v1/payments/payment/%s/execute/"
