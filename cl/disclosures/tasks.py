@@ -12,11 +12,24 @@ from redis import Redis
 from requests import ReadTimeout
 
 from cl.celery_init import app
+from cl.disclosures.models import (
+    REPORT_TYPES,
+    Agreement,
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Position,
+    Reimbursement,
+    SpouseIncome,
+)
 from cl.disclosures.utils import has_been_extracted, has_been_pdfed
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import make_redis_interface
+from cl.people_db.models import Person
 from cl.scrapers.transformer_extractor_utils import (
     generate_thumbnail,
     get_page_count,
@@ -66,9 +79,7 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     :return: None
     """
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
-    pdf_url = (
-        f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
-    )
+    pdf_url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
     pdf_content = requests.get(url=pdf_url, timeout=2).content
 
     try:
@@ -95,8 +106,6 @@ def check_if_in_system(sha1_hash: str) -> bool:
     :param sha1_hash: Sha1 hash
     :return: Whether PDF is in db.
     """
-    from cl.disclosures.models import FinancialDisclosure
-
     disclosures = FinancialDisclosure.objects.filter(sha1=sha1_hash)
     if disclosures.exists():
         logger.info("PDF already in system")
@@ -152,8 +161,6 @@ def get_report_type(extracted_data: dict) -> int:
     :param extracted_data: Document information
     :return: Disclosure type
     """
-    from cl.disclosures.models import REPORT_TYPES
-
     if extracted_data.get("initial"):
         return REPORT_TYPES.INITIAL
     elif extracted_data.get("nomination"):
@@ -209,17 +216,6 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
     :param extracted_data: disclosure
     :return:None
     """
-    from cl.disclosures.models import (
-        Agreement,
-        Debt,
-        Gift,
-        Investment,
-        NonInvestmentIncome,
-        Position,
-        Reimbursement,
-        SpouseIncome,
-    )
-
     addendum = "Additional Information or Explanations"
 
     # Process and save our data into the system.
@@ -378,8 +374,6 @@ def get_disclosure_from_pdf_path(disclosure_url: str):
     one) of the source FD tiff(s)/PDF
     :return: Financial Disclosure object
     """
-    from cl.disclosures.models import FinancialDisclosure
-
     return FinancialDisclosure.objects.get(download_filepath=disclosure_url)
 
 
@@ -418,9 +412,6 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     :param data: The disclosure information to process
     :return: None
     """
-    from cl.disclosures.models import FinancialDisclosure
-    from cl.people_db.models import Person
-
     # Check download_filepath to see if it has been processed before.
     if has_been_extracted(data):
         logger.info(f"Document already extracted and saved: {data['id']}.")
