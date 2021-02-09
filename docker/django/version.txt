@@ -1,5 +1,6 @@
-1.0.20
+1.0.21
 
+1.0.21 - Bump deps.
 1.0.20 - Bump deps.
 1.0.19 - Add eyecite dependency
 1.0.18 - Remove fabric and update Juriscraper
