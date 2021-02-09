@@ -15,7 +15,7 @@ def has_been_pdfed(disclosure_url: str) -> Optional[str]:
     disclosures = FinancialDisclosure.objects.filter(
         download_filepath=disclosure_url
     )
-    if disclosures.exists() and not disclosures[0].filepath:
+    if disclosures.exists() and disclosures[0].filepath:
         return (
             f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
             f"{disclosures[0].filepath}"
