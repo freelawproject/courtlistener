@@ -54,6 +54,7 @@ def enqueue_disclosure_process(interface: Redis, disclosure_key: str) -> bool:
     return True
 
 
+@transaction.atomic
 @app.task(bind=True, max_retries=2, ignore_result=True)
 def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     """Generate Thumbnail and save to AWS
@@ -64,10 +65,10 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     :param pk: PK of disclosure in database
     :return: None
     """
-    from cl.disclosures.models import FinancialDisclosure
-
-    disclosure = FinancialDisclosure.objects.get(pk=pk)
-    pdf_url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
+    disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
+    pdf_url = (
+        f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
+    )
     pdf_content = requests.get(url=pdf_url, timeout=2).content
 
     try:
