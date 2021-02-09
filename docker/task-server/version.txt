@@ -1,3 +1,4 @@
-1.0.14
+1.0.15
 
+1.0.15 - Bump deps.
 1.0.14 - Add eyecite dependency
