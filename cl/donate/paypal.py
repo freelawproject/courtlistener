@@ -1,4 +1,5 @@
 import logging
+from typing import Dict
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -13,11 +14,12 @@ from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
 
 from cl.donate.models import PAYMENT_TYPES, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
+from cl.donate.views import CleanedDonationFormType
 
 logger = logging.getLogger(__name__)
 
 
-def get_paypal_access_token():
+def get_paypal_access_token() -> str:
     """Get a token for the PayPal API.
 
     Query the PayPal API to get an access token. This could be improved by
@@ -40,7 +42,7 @@ def get_paypal_access_token():
 
 
 @csrf_exempt
-def process_paypal_callback(request):
+def process_paypal_callback(request: HttpRequest) -> HttpResponse:
     """Process the GET request that PayPal uses.
 
     After a transaction is completed, PayPal sends the user back to a page on
@@ -84,7 +86,9 @@ def process_paypal_callback(request):
     return HttpResponseRedirect(reverse("donate_complete"))
 
 
-def process_paypal_payment(cd_donation_form):
+def process_paypal_payment(
+    cd_donation_form: CleanedDonationFormType,
+) -> Dict[str, str]:
     # https://developer.paypal.com/webapps/developer/docs/integration/web/accept-paypal-payment/
     access_token = get_paypal_access_token()
     if not access_token:
