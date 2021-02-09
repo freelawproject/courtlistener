@@ -1,9 +1,13 @@
 """
 Unit tests for Visualizations
 """
+from typing import Any, Callable, Dict
+
 from django.contrib.auth.models import User
+from django.core.handlers.wsgi import WSGIRequest
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from httplib2 import Response
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -27,7 +31,7 @@ class TestVizUtils(TestCase):
 
     fixtures = ["scotus_map_data.json"]
 
-    def test_reverse_endpoints_does_not_reverse_good_inputs(self):
+    def test_reverse_endpoints_does_not_reverse_good_inputs(self) -> None:
         """
         Test the utility function does not change the order of endpoints that
         are already in correct order
@@ -40,7 +44,7 @@ class TestVizUtils(TestCase):
         self.assertEqual(new_start, start)
         self.assertEqual(new_end, end)
 
-    def test_reverse_endpoints_reverses_backwards_inputs(self):
+    def test_reverse_endpoints_reverses_backwards_inputs(self) -> None:
         """
         Test the utility function for properly ordering visualization
         endpoints.
@@ -61,14 +65,14 @@ class TestVizModels(TestCase):
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.create_user("Joe", "joe@cl.com", "password")
         self.start = OpinionCluster.objects.get(case_name="Marsh v. Chambers")
         self.end = OpinionCluster.objects.get(
             case_name="Town of Greece v. Galloway"
         )
 
-    def test_SCOTUSMap_builds_nx_digraph(self):
+    def test_SCOTUSMap_builds_nx_digraph(self) -> None:
         """ Tests build_nx_digraph method to see how it works """
         viz = SCOTUSMap(
             user=self.user,
@@ -88,7 +92,7 @@ class TestVizModels(TestCase):
         g = viz.build_nx_digraph(**build_kwargs)
         self.assertTrue(len(g.edges()) > 0)
 
-    def test_SCOTUSMap_deletes_cascade(self):
+    def test_SCOTUSMap_deletes_cascade(self) -> None:
         """
         Make sure we delete JSONVersion instances when deleted SCOTUSMaps
         """
@@ -110,7 +114,7 @@ class TestViews(TestCase):
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.start = OpinionCluster.objects.get(
             case_name="Town of Greece v. Galloway"
         )
@@ -121,11 +125,11 @@ class TestViews(TestCase):
             user=self.user, email_confirmed=True
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
-    def test_new_visualization_view_provides_form(self):
+    def test_new_visualization_view_provides_form(self) -> None:
         """ Test a GET to the Visualization view provides a VizForm """
         self.assertTrue(
             self.client.login(username="user", password="password")
@@ -134,7 +138,7 @@ class TestViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.context["form"], VizForm)
 
-    def test_new_visualization_view_creates_map_on_post(self):
+    def test_new_visualization_view_creates_map_on_post(self) -> None:
         """ Test a valid POST creates a new ScotusMap object """
         SCOTUSMap.objects.all().delete()
 
@@ -155,7 +159,7 @@ class TestViews(TestCase):
         # Should not raise DoesNotExist exception.
         _ = SCOTUSMap.objects.get(title="Test Map Title")
 
-    def test_published_visualizations_show_in_gallery(self):
+    def test_published_visualizations_show_in_gallery(self) -> None:
         """ Test that a user can see published visualizations from others """
         self.assertTrue(
             self.client.login(username="user", password="password")
@@ -166,7 +170,7 @@ class TestViews(TestCase):
         self.assertIn("Shared by Admin", html)
         self.assertIn("FREE KESHA", html)
 
-    def test_cannot_view_anothers_private_visualization(self):
+    def test_cannot_view_anothers_private_visualization(self) -> None:
         """ Test unpublished visualizations cannot be seen by others """
         viz = SCOTUSMap.objects.get(pk=2)
         self.assertFalse(viz.published, "Test SCOTUSMap should be unpublished")
@@ -188,7 +192,7 @@ class TestViews(TestCase):
         self.assertNotEqual(response.status_code, 200)
         self.assertNotIn("My Private Visualization", response.content.decode())
 
-    def test_view_counts_increment_by_one(self):
+    def test_view_counts_increment_by_one(self) -> None:
         """Test the view count for a Visualization increments on page view
 
         Ensure that the date_modified does not change.
@@ -221,17 +225,22 @@ class TestVizAjaxCrud(TestCase):
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.live_viz = SCOTUSMap.objects.get(pk=1)
         self.private_viz = SCOTUSMap.objects.get(pk=2)
         self.deleted_viz = SCOTUSMap.objects.get(pk=3)
         self.factory = RequestFactory()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
-    def _build_post(self, url, username=None, data=None):
+    def _build_post(
+        self,
+        url: str,
+        username: str = None,
+        data: Dict[str, Any] = None,
+    ) -> WSGIRequest:
         """Helper method to build authenticated AJAX POST
         Args:
             url: url pattern to request
@@ -248,7 +257,12 @@ class TestVizAjaxCrud(TestCase):
         post.META["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
         return post
 
-    def post_ajax_view(self, view, pk, username="admin"):
+    def post_ajax_view(
+        self,
+        view: Callable,
+        pk: int,
+        username: str = "admin",
+    ) -> SCOTUSMap:
         """
         Generates a simple POST for the given view with the given
         private key as the POST data.
@@ -268,7 +282,7 @@ class TestVizAjaxCrud(TestCase):
         self.assertEqual(response.status_code, 200)
         return SCOTUSMap.objects.get(pk=pk)
 
-    def test_deletion_via_ajax_view(self):
+    def test_deletion_via_ajax_view(self) -> None:
         """
         Test deletion of visualization via view only sets deleted flag and
         doesn't actually delete the object yet
@@ -281,7 +295,7 @@ class TestVizAjaxCrud(TestCase):
         self.assertTrue(viz.deleted)
         self.assertIsNotNone(viz.date_deleted)
 
-    def test_restore_via_ajax_view(self):
+    def test_restore_via_ajax_view(self) -> None:
         """
         Tests restoration of deleted visualization from teh trash via a
         ajax POST
@@ -296,7 +310,7 @@ class TestVizAjaxCrud(TestCase):
         self.assertFalse(viz.deleted)
         self.assertIsNone(viz.date_deleted)
 
-    def test_privatizing_via_ajax_view(self):
+    def test_privatizing_via_ajax_view(self) -> None:
         """
         Tests setting a public visualization to private via an AJAX POST
         """
@@ -309,7 +323,7 @@ class TestVizAjaxCrud(TestCase):
 
         self.assertFalse(viz.published)
 
-    def test_sharing_via_ajax_view(self):
+    def test_sharing_via_ajax_view(self) -> None:
         """
         Tests sharing a public visualization via an AJAX POST
         """
@@ -333,16 +347,16 @@ class APIVisualizationTestCase(APITestCase):
         "authtest_data.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
         self.client = make_client(6)
         self.rando_client = make_client(1001)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
-    def make_good_visualization(self, title):
+    def make_good_visualization(self, title: str) -> Response:
         data = {
             "title": title,
             "cluster_start": reverse(
@@ -355,7 +369,7 @@ class APIVisualizationTestCase(APITestCase):
         response = self.client.post(self.path, data, format="json")
         return response
 
-    def test_no_title_visualization_post(self):
+    def test_no_title_visualization_post(self) -> None:
         data = {
             "title": "",
             "cluster_start": reverse(
@@ -370,7 +384,7 @@ class APIVisualizationTestCase(APITestCase):
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(res["title"][0], "This field may not be blank.")
 
-    def test_no_cluster_start_visualization_post(self):
+    def test_no_cluster_start_visualization_post(self) -> None:
         data = {
             "title": "My Invalid Visualization - No Cluster Start Provided",
             "cluster_start": "",
@@ -385,7 +399,7 @@ class APIVisualizationTestCase(APITestCase):
             res["cluster_start"][0], "This field may not be null."
         )
 
-    def test_no_cluster_end_visualization_post(self):
+    def test_no_cluster_end_visualization_post(self) -> None:
         data = {
             "title": "My Invalid Visualization - No Cluster End Provided",
             "cluster_start": reverse(
@@ -398,7 +412,7 @@ class APIVisualizationTestCase(APITestCase):
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(res["cluster_end"][0], "This field may not be null.")
 
-    def test_invalid_cluster_start_visualization_post(self):
+    def test_invalid_cluster_start_visualization_post(self) -> None:
         data = {
             "title": "My Invalid Visualization - No Cluster Exists",
             "cluster_start": reverse(
@@ -416,7 +430,7 @@ class APIVisualizationTestCase(APITestCase):
             "Invalid hyperlink - Object does not exist.",
         )
 
-    def test_valid_visualization_post(self):
+    def test_valid_visualization_post(self) -> None:
         title = "My Valid Visualization"
         response = self.make_good_visualization(title)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
@@ -439,7 +453,7 @@ class APIVisualizationTestCase(APITestCase):
             ),
         )
 
-    def test_visualization_permissions(self):
+    def test_visualization_permissions(self) -> None:
         """Are some non-owners rejected from editing visualizations?"""
         response = self.make_good_visualization("Some title")
 
@@ -455,7 +469,7 @@ class APIVisualizationTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
 
-    def test_json_data_permissions(self):
+    def test_json_data_permissions(self) -> None:
         """Are non-owners rejected from editing JSON data?"""
         response = self.make_good_visualization("some title")
 
