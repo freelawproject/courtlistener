@@ -219,8 +219,8 @@ class SCOTUSMap(AbstractDateTimeModel):
                         target_id=child_authority.pk,
                     )
                 elif child_authority.pk in good_nodes:
-                    # Parent links to a node already in the network. Check if we
-                    # could make it to the end in max_dod hops. Set
+                    # Parent links to a node already in the network. Check if
+                    # we could make it to the end in max_dod hops. Set
                     # shortest_path for the child_authority
                     if within_max_hops(
                         good_nodes, child_authority.pk, hops_taken, max_hops
