@@ -10,31 +10,6 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 vine = ">=1.1.3,<5.0.0a1"
 
 [[package]]
-name = "ansible"
-version = "2.10.1"
-description = "Radically simple IT automation"
-category = "main"
-optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
-
-[package.dependencies]
-ansible-base = ">=2.10.2,<2.11"
-
-[[package]]
-name = "ansible-base"
-version = "2.10.2"
-description = "Radically simple IT automation"
-category = "main"
-optional = false
-python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
-
-[package.dependencies]
-cryptography = "*"
-jinja2 = "*"
-packaging = "*"
-PyYAML = "*"
-
-[[package]]
 name = "appdirs"
 version = "1.4.4"
 description = "A small Python module for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
@@ -1757,12 +1732,6 @@ content-hash = "6de56308c35a4920758093368ecaa43316ece31f0977f5ef11a4c20d3f07852a
 amqp = [
     {file = "amqp-2.6.1-py2.py3-none-any.whl", hash = "sha256:aa7f313fb887c91f15474c1229907a04dac0b8135822d6603437803424c0aa59"},
     {file = "amqp-2.6.1.tar.gz", hash = "sha256:70cdb10628468ff14e57ec2f751c7aa9e48e7e3651cfd62d431213c0c4e58f21"},
-]
-ansible = [
-    {file = "ansible-2.10.1.tar.gz", hash = "sha256:75708c67e2ac926cea42856af72cbc9494bf8008197652f9609089f7b4c2515a"},
-]
-ansible-base = [
-    {file = "ansible-base-2.10.2.tar.gz", hash = "sha256:c79fe108e13b286bad21734208624aaef9dabb49bb4211b13bc96d88829e22ab"},
 ]
 appdirs = [
     {file = "appdirs-1.4.4-py2.py3-none-any.whl", hash = "sha256:a841dacd6b99318a741b166adb07e19ee71a274450e68237b4650ca1055ab128"},

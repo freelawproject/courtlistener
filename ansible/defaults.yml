@@ -1,5 +1,0 @@
----
-
-install_root: "/var/www/cl"
-virtualenv_root: "/var/www/.venv/cl"
-web_user: 'www-data'

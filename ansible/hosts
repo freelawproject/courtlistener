@@ -1,5 +1,0 @@
-[dev]
-localhost   ansible_connection=local
-
-[solr]
-localhost   ansible_connection=local
