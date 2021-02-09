@@ -6,13 +6,13 @@ Started [in 2009][yours-truly], CourtListener.com is the main initiative of [Fre
 
 This repository is organized in the following way:
 
- - ansible: ansible playbooks and inventories for setting up and updating your machine.
- - apache: configurations for the Apache webserver.
  - cl: the Django code for this project. 99% of everything is in this directory.
  - docker: Where to find compose files and docker files for various components.
- - cleaning_scripts: cleanup scripts that are used from time to time to fix data issues or errors.
- - OCR: code and files related to our Tesseract OCR configuration.
  - scripts: logrotate, systemd, etc, and init scripts for our various configurations and daemons.
+
+
+## Architecture
+
 
 
 ## Getting Involved
@@ -30,84 +30,6 @@ In general, we're looking for all kinds of help. Get in touch if you think you h
 ## Contributing code
 
 See the [developer guide][developing].
-
-
-## Upgrading On the Regular
-
-Each day, when you start working on CourtListener, you should make sure that you have the latest code and dependencies. There are a couple different ways to do this. 
- 
-The first thing you should do is:
-
-    ansible-playbook ansible/upgrade.yml -i ansible/hosts --ask-become-pass
-    
-This says to run the tasks in the playbook called `upgrade.yml` on the hosts described in `ansible/hosts` (which is localhost). Get the sudo password, since it may be needed to start/stop services. Pretty simple. 
-
-If you're using Vagrant, you also need to be sure to run any new playbooks that were pulled from git in the command above. These will appear in the `ansible` directory for the version of Free Law Machine that you have installed, and represent all the changes that have been made to it since it was created. So, for example, the first time you start up your Vagrant machine, you should run all of the playbooks in the 1.6.0 directory (assuming that's the version you're running):
-
-    ansible-playbook ansible/1.6.0/0001_update_solr.yml -i ansible/hosts --ask-become-pass
-    ansible-playbook ansible/1.6.0/0002_create_recap_core.yml -i ansible/hosts --ask-become-pass
-    # etc.
-
-You may want to override the default variables (in defaults.yml) if you have CourtListener installed in a "special" location. To do that you can add something like:
-
-    --extra-vars "install_root=/home/mlissner/Programming/intellij/courtlistener virtualenv_root=/home/mlissner/.virtualenvs/courtlistener"
-
-Just to pick some random examples. 
-
-Any time you see a new playbook come in when you pull code, you should run it in the same way.
-
-If you installed from the Wiki, you should watch for upgrades coming into these folders as well, and should apply them as you see them arrive.
-
-
-## Upgrading Production
-
-We usually use Ansible for this, but at the moment it's a bit of a mess due to our ongoing dockerization.
-
-The process now is:
-
- - Check MIGRATIONS.md for potentially critical optimizations to database migrations.
- - Celery:
-    - Pull latest docker image
-        - sudo docker pull freelawproject/task-server
-    - Stop celery:
-        - sudo docker service scale task-server_celery_prefork=0
-        - sudo docker service scale task-server_celery_prefork_bulk=0
-    - Update the image:
-       - sudo docker service update task-server_celery_prefork_bulk --image freelawproject/task-server:latest
-       - sudo docker service update task-server_celery_prefork --image freelawproject/task-server:latest
-    - Pull latest code (git):
-        - cd /opt/tasks && sudo git pull
-    - Restart services later, as below, once rest of system is updated
- - Solr:
-    - Pull latest docker image
-        - sudo docker pull freelawproject/solr:latest
-    - Pull latest code (git)
-        - cd /opt/solr && sudo git pull
-    - Restart solr:
-        - sudo docker restart solr
-        - NOTE: If you get an error like "network not found" just...wait a few minutes. After three minutes last time, this self resolved. From what I can tell, this is due to the previous image lingering for a minute or two and the network being unavailable until the other image is properly shut down.
- - Web:
-    - Run ansible scripts (they still work)
- - Database:
-    - default is migrated by ansible
-    - migrate replicated database on AWS via SQL
-    psql -h cl-replica.c3q1wkj3stig.us-west-2.rds.amazonaws.com -U django --dbname courtlistener -p 5432 <  /var/www/courtlistener/cl/lasc/migrations/0002_auto_20191004_1431.sql
- - Celery:
-    - Start:
-        - sudo docker service scale task-server_celery_prefork=5
-        - sudo docker service scale task-server_celery_prefork_bulk=5
-
-    - Monitor: 
-        - sudo docker service logs -f --since 1 task-server_celery_prefork
-    
-
-These things should happen by way of the above, I think:
- - git pull on all hosts
- - update python dependencies on all hosts
- - update seals if needed
- - collectstatic on any web hosts
-
-### Update
 
 
 ## Copyright
