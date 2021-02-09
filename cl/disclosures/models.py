@@ -272,7 +272,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         super(FinancialDisclosure, self).save(*args, **kwargs)
-        if self.thumbnail_status is THUMBNAIL_STATUSES.NEEDED:
+        if self.thumbnail_status == THUMBNAIL_STATUSES.NEEDED:
             from cl.disclosures.tasks import (
                 make_financial_disclosure_thumbnail_from_pdf,
             )
