@@ -608,8 +608,8 @@ BTE_URLS = {
         "url": f"{BTE_HOST}/document/extract_text",
         "timeout": 60 * 15,
     },
-    "page-count": {"url": f"{BTE_HOST}/document/page_count", "timeout": 30},
-    "thumbnail": {"url": f"{BTE_HOST}/document/thumbnail", "timeout": 30},
+    "page-count": {"url": f"{BTE_HOST}/document/page_count", "timeout": 60},
+    "thumbnail": {"url": f"{BTE_HOST}/document/thumbnail", "timeout": 60},
     "mime-type": {"url": f"{BTE_HOST}/document/mime_type", "timeout": 30},
     # Image conversion
     "images-to-pdf": {
