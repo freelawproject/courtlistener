@@ -16,9 +16,9 @@ from rest_framework.status import (
     HTTP_503_SERVICE_UNAVAILABLE,
 )
 
+from cl.donate.forms import CleanedDonationFormType
 from cl.donate.models import PAYMENT_TYPES, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
-from cl.donate.views import CleanedDonationFormType
 
 logger = logging.getLogger(__name__)
 

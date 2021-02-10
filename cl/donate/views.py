@@ -16,7 +16,13 @@ from django.urls import reverse
 from django.utils.timezone import now
 from stripe import StripeObject
 
-from cl.donate.forms import DonationForm, ProfileForm, UserForm
+from cl.donate.forms import (
+    CleanedDonationFormType,
+    CleanedUserFormType,
+    DonationForm,
+    ProfileForm,
+    UserForm,
+)
 from cl.donate.models import (
     FREQUENCIES,
     PAYMENT_TYPES,
@@ -36,14 +42,10 @@ from cl.users.utils import create_stub_account
 logger = logging.getLogger(__name__)
 
 
-CleanedDonationFormType = Dict[str, Union[str, Decimal]]
-CleanedUserForm = Dict[str, str]
-
-
 def route_and_process_payment(
     request: HttpRequest,
     cd_donation_form: CleanedDonationFormType,
-    cd_user_form: CleanedUserForm,
+    cd_user_form: CleanedUserFormType,
     payment_provider: str,
     frequency: str,
     stripe_redirect_url: str,
