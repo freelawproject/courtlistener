@@ -67,8 +67,8 @@ def enqueue_disclosure_process(interface: Redis, disclosure_key: str) -> bool:
     return True
 
 
-@transaction.atomic
 @app.task(bind=True, max_retries=2, ignore_result=True)
+@transaction.atomic
 def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     """Generate Thumbnail and save to AWS
 
