@@ -1,3 +1,6 @@
+from decimal import Decimal
+from typing import Dict, Union
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -18,6 +21,9 @@ AMOUNTS = (
     ("25", "$25"),
     ("other", "Other: $"),
 )
+
+CleanedDonationFormType = Dict[str, Union[str, Decimal]]
+CleanedUserFormType = Dict[str, str]
 
 
 class DecimalOrOtherChoiceField(forms.ChoiceField):
