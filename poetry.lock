@@ -473,7 +473,7 @@ redis = "<4.0"
 
 [[package]]
 name = "django-rest-swagger"
-version = "2.1.2"
+version = "2.2.0"
 description = "Swagger UI for Django REST Framework 3.5+"
 category = "main"
 optional = false
@@ -1739,7 +1739,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "66487e25e98442e4fa4068b48167666e9359e1f317663ff36328b0237e1af3e6"
+content-hash = "a276d5af147b3ea85fc38fa38891fa33a82bb818dfa557c3db72c68764e441c2"
 
 [metadata.files]
 amqp = [
@@ -1972,8 +1972,8 @@ django-redis-cache = [
     {file = "django_redis_cache-2.0.0-py2.7.egg", hash = "sha256:c9e3994a3622e85533275e73125c885f6fb4c5f7e584282af35b70b58c6dffa3"},
 ]
 django-rest-swagger = [
-    {file = "django-rest-swagger-2.1.2.tar.gz", hash = "sha256:ff889e2b339a9a57010dba7729d56471e05b77827f6dd36c0bcb983839882598"},
-    {file = "django_rest_swagger-2.1.2-py2.py3-none-any.whl", hash = "sha256:3471e6c21a3e97751fa6f7b81b66e916e40fa645cac36be1594c0efed810d247"},
+    {file = "django-rest-swagger-2.2.0.tar.gz", hash = "sha256:48f6aded9937e90ae7cbe9e6c932b9744b8af80cc4e010088b3278c700e0685b"},
+    {file = "django_rest_swagger-2.2.0-py2.py3-none-any.whl", hash = "sha256:b039b0288bab4665cd45dc5d16f94b13911bc4ad0ed55f74ad3b90aa31c87c17"},
 ]
 django-storages = [
     {file = "django-storages-1.7.2.tar.gz", hash = "sha256:f3b3def96493d3ccde37b864cea376472baf6e8a596504b209278801c510b807"},
