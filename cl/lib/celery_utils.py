@@ -173,6 +173,8 @@ class CeleryThrottle(object):
 def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
     """Keep a global throttle for tasks
 
+    Can be used via the `throttle_task` decorator above.
+
     This implements the timestamp-based algorithm detailed here:
 
         https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
@@ -214,19 +216,21 @@ def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
     key = f"celery_throttle:{task.name}"
 
     r = make_redis_interface("CACHE")
-    pipe = r.pipeline()
-    pipe.incr(key, 1)
-    pipe.ttl(key)
-    result: List[int, int] = pipe.execute()  # [current task hits, expiration]
 
     num_tasks, duration = parse_rate(rate)
 
-    # If a key has no expiration, ttl returns -1. If so, set it.
-    if result[1] < 0:
+    # Check the count in redis
+    count = r.get(key)
+    if count is None:
+        # No key. Set the value to 1 and set the ttl of the key.
+        r.set(key, 1)
         r.expire(key, duration)
-
-    # Tally the number of items in redis
-    if result[0] <= num_tasks:
         return True
     else:
-        return False
+        # Key found. Check it.
+        if int(count) <= num_tasks:
+            # We're OK, run it.
+            r.incr(key, 1)
+            return True
+        else:
+            return False
