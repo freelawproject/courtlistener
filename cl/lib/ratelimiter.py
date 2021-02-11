@@ -132,7 +132,7 @@ def is_whitelisted(request: HttpRequest) -> bool:
     return approved_crawler
 
 
-def parse_rate(rate: str) -> Tuple[float, float]:
+def parse_rate(rate: str) -> Tuple[int, int]:
     """
 
     Given the request rate string, return a two tuple of:
@@ -142,5 +142,13 @@ def parse_rate(rate: str) -> Tuple[float, float]:
     """
     num, period = rate.split("/")
     num_requests = int(num)
-    duration = {"s": 1, "m": 60, "h": 3600, "d": 86400}[period[0]]
+    if len(period) > 1:
+        # It takes the form of a 5d, or 10s, or whatever
+        duration_multiplier = int(period[0:-1])
+        duration_unit = period[-1]
+    else:
+        duration_multiplier = 1
+        duration_unit = period[-1]
+    duration_base = {"s": 1, "m": 60, "h": 3600, "d": 86400}[duration_unit]
+    duration = duration_base * duration_multiplier
     return num_requests, duration
