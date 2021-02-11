@@ -1,4 +1,5 @@
 import functools
+import inspect
 import random
 import time
 from collections import deque
@@ -176,6 +177,7 @@ class CeleryThrottle(object):
 def throttle_task(
     rate: str,
     jitter: Tuple[float, float] = (1, 10),
+    key: Any = None,
 ) -> Callable:
     """A decorator for throttling tasks to a given rate.
 
@@ -184,14 +186,32 @@ def throttle_task(
     :param jitter: A tuple of the range of backoff times you want for throttled
     tasks. If the task is throttled, it will wait a random amount of time
     between these values before being tried again.
-    :return:
+    :param key: An argument name whose value should be used as part of the
+    throttle key in redis. This allows you to create per-argument throttles by
+    simply passing the name of the argument you wish to key on.
+    :return: The decorated function
     """
 
     def decorator_func(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
-            task = args[0]
-            proceed = is_rate_okay(task, rate)
+            # Inspect the decorated function's parameters to get the task
+            # itself and the value of the parameter referenced by key.
+            sig = inspect.signature(func)
+            bound_args = sig.bind(*args, **kwargs)
+            task = bound_args.arguments["self"]
+            key_value = None
+            if key:
+                try:
+                    key_value = bound_args.arguments[key]
+                except KeyError:
+                    raise KeyError(
+                        f"Unknown parameter '{key}' in throttle_task "
+                        f"decorator of function {task.name}. "
+                        f"`key` parameter must match a parameter "
+                        f"name from function signature: '{sig}'"
+                    )
+            proceed = is_rate_okay(task, rate, key=key_value)
             if not proceed:
                 logger.info(
                     "Throttling task %s (%s) via decorator.",
@@ -212,7 +232,7 @@ def throttle_task(
     return decorator_func
 
 
-def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
+def is_rate_okay(task: Task, rate: str = "1/s", key=None) -> bool:
     """Keep a global throttle for tasks
 
     Can be used via the `throttle_task` decorator above.
@@ -253,9 +273,12 @@ def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
     :param task: The task that is being checked
     :param rate: How many times the task can be run during the time period.
     Something like, 1/s, 2/h or similar.
+    :param key: If given, add this to the key placed in Redis for the item.
+    Typically, this will correspond to the value of an argument passed to the
+    throttled task.
     :return: Whether the task should be throttled or not.
     """
-    key = f"celery_throttle:{task.name}"
+    key = f"celery_throttle:{task.name}{':' + str(key) if key else ''}"
 
     r = make_redis_interface("CACHE")
 
