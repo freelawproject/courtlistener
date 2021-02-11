@@ -49,6 +49,7 @@ from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.pacer import (
     get_blocked_status,
@@ -1012,6 +1013,7 @@ def filter_docket_by_tags(self, data, tags, court_id):
     interval_step=5 * 60,
     ignore_result=True,
 )
+@throttle_task("2/s", key="court_id", jitter=(2, 15))
 def make_docket_by_iquery(
     self,
     court_id: str,
