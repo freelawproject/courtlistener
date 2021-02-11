@@ -22,6 +22,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
     normalize_us_state,
 )
+from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
 from cl.lib.string_utils import anonymize, trunc
@@ -824,3 +825,16 @@ class TestFilesizeConversions(TestCase):
             print("Converting '%s' to bytes..." % qa[0], end="")
             self.assertEqual(convert_size_to_bytes(qa[0]), qa[1])
             print("✓")
+
+
+class TestRateLimiters(TestCase):
+    def test_parsing_rates(self) -> None:
+        qa_pairs = [
+            ("1/s", (1, 1)),
+            ("10/10s", (10, 10)),
+            ("1/m", (1, 60)),
+            ("1/5m", (1, 300)),
+        ]
+        for q, a in qa_pairs:
+            with self.subTest("Parsing rates...", rate=q):
+                self.assertEqual(parse_rate(q), a)
