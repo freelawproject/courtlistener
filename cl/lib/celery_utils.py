@@ -1,10 +1,13 @@
+import functools
+import random
 import time
 from collections import deque
-from typing import List
+from typing import Any, Callable, List, Tuple
 
 from celery import Task
 from django.utils.timezone import now
 
+from cl.lib.command_utils import logger
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import make_redis_interface
 
@@ -168,6 +171,45 @@ class CeleryThrottle(object):
             if self.min_wait > 0:
                 time.sleep(self.min_wait)
             return
+
+
+def throttle_task(
+    rate: str,
+    jitter: Tuple[float, float] = (1, 10),
+) -> Callable:
+    """A decorator for throttling tasks to a given rate.
+
+    :param rate: The maximum rate that you want your task to run. Takes the
+    form of '1/m', or '10/2h' or similar.
+    :param jitter: A tuple of the range of backoff times you want for throttled
+    tasks. If the task is throttled, it will wait a random amount of time
+    between these values before being tried again.
+    :return:
+    """
+
+    def decorator_func(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            task = args[0]
+            proceed = is_rate_okay(task, rate)
+            if not proceed:
+                logger.info(
+                    "Throttling task %s (%s) via decorator.",
+                    task.name,
+                    task.request.id,
+                )
+                # Decrement the number of times the task has retried. If you
+                # fail to do this, it gets auto-incremented, and you'll expend
+                # retries during the backoff.
+                task.request.retries = task.request.retries - 1
+                return task.retry(countdown=random.uniform(*jitter))
+            else:
+                # All set. Run the task.
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator_func
 
 
 def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
