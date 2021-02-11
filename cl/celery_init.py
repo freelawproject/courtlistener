@@ -19,11 +19,11 @@ app.autodiscover_tasks()
 
 
 @app.task(bind=True)
-def debug_task(self):
+def debug_task(self) -> None:
     print("Request: {0!r}".format(self.request))
 
 
 @app.task(bind=True)
-def fail_task(self):
+def fail_task(self) -> float:
     # Useful for things like sentry
     return 1 / 0
