@@ -2,8 +2,10 @@ import time
 from collections import deque
 from typing import List
 
+from celery import Task
 from django.utils.timezone import now
 
+from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import make_redis_interface
 
 PRIORITY_SEP: str = "\x06\x16"
@@ -166,3 +168,65 @@ class CeleryThrottle(object):
             if self.min_wait > 0:
                 time.sleep(self.min_wait)
             return
+
+
+def is_rate_okay(task: Task, rate: str = "1/s") -> bool:
+    """Keep a global throttle for tasks
+
+    This implements the timestamp-based algorithm detailed here:
+
+        https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
+
+    Basically, you keep track of the number of requests and use the key
+    expiration as a reset of the counter.
+
+    So you have a rate of 5/m, and your first task comes in. You create a key:
+
+        celery_throttle:task_name = 1
+        celery_throttle:task_name.expires = 60
+
+    Another task comes in a few seconds later:
+
+        celery_throttle:task_name = 2
+        Do not update the ttl, it now has 58s remaining
+
+    And so forth, until:
+
+        celery_throttle:task_name = 6
+        (10s remaining)
+
+    We're over the threshold. Re-queue the task for later. 10s later:
+
+        Key expires b/c no more ttl.
+
+    Another task comes in:
+
+        celery_throttle:task_name = 1
+        celery_throttle:task_name.expires = 60
+
+    And so forth.
+
+    :param task: The task that is being checked
+    :param rate: How many times the task can be run during the time period.
+    Something like, 1/s, 2/h or similar.
+    :return: Whether the task should be throttled or not.
+    """
+    key = f"celery_throttle:{task.name}"
+
+    r = make_redis_interface("CACHE")
+    pipe = r.pipeline()
+    pipe.incr(key, 1)
+    pipe.ttl(key)
+    result: List[int, int] = pipe.execute()  # [current task hits, expiration]
+
+    num_tasks, duration = parse_rate(rate)
+
+    # If a key has no expiration, ttl returns -1. If so, set it.
+    if result[1] < 0:
+        r.expire(key, duration)
+
+    # Tally the number of items in redis
+    if result[0] <= num_tasks:
+        return True
+    else:
+        return False
