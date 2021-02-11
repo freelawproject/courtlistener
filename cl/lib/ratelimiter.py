@@ -1,9 +1,11 @@
 import functools
 import socket
 import sys
+from typing import Tuple
 
 from django.conf import settings
 from django.core.cache import caches
+from django.http import HttpRequest
 from ratelimit import UNSAFE
 from ratelimit.decorators import ratelimit
 from ratelimit.exceptions import Ratelimited
@@ -62,19 +64,19 @@ def ratelimit_if_not_whitelisted(view):
     return wrapper
 
 
-def get_host_from_IP(ip_address):
+def get_host_from_IP(ip_address: str) -> str:
     """Get the host for an IP address by doing a reverse DNS lookup. Return
     the value as a string.
     """
     return socket.getfqdn(ip_address)
 
 
-def get_ip_from_host(host):
+def get_ip_from_host(host: str) -> str:
     """Do a forward DNS lookup of the host found in step one."""
     return socket.gethostbyname(host)
 
 
-def host_is_approved(host):
+def host_is_approved(host: str) -> bool:
     """Check whether the domain is in our approved whitelist."""
     return any(
         [
@@ -84,7 +86,7 @@ def host_is_approved(host):
     )
 
 
-def verify_ip_address(ip_address):
+def verify_ip_address(ip_address: str) -> bool:
     """Do authentication checks for the IP address requesting the page."""
     # First we do a rDNS lookup of the IP.
     host = get_host_from_IP(ip_address)
@@ -99,7 +101,7 @@ def verify_ip_address(ip_address):
     return False
 
 
-def is_whitelisted(request):
+def is_whitelisted(request: HttpRequest) -> bool:
     """Checks if the IP address is whitelisted due to belonging to an approved
     crawler.
 
