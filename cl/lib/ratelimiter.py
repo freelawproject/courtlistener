@@ -130,3 +130,17 @@ def is_whitelisted(request: HttpRequest) -> bool:
         cache.set(whitelist_key, ip_address, a_week)
 
     return approved_crawler
+
+
+def parse_rate(rate: str) -> Tuple[float, float]:
+    """
+
+    Given the request rate string, return a two tuple of:
+    <allowed number of requests>, <period of time in seconds>
+
+    (Stolen from Django Rest Framework.)
+    """
+    num, period = rate.split("/")
+    num_requests = int(num)
+    duration = {"s": 1, "m": 60, "h": 3600, "d": 86400}[period[0]]
+    return num_requests, duration
