@@ -648,14 +648,6 @@ setproctitle = ["setproctitle"]
 tornado = ["tornado (>=0.2)"]
 
 [[package]]
-name = "hiredis"
-version = "0.2.0"
-description = "Python wrapper for hiredis"
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "html5lib"
 version = "1.1"
 description = "HTML parser based on the WHATWG HTML specification"
@@ -1714,7 +1706,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e5cb5386a7e1b9fc64f8bf84f87c3002dfd176f33eb16698b0266a551388ae78"
+content-hash = "516928c928e6583af6dd356d8ee8baf0b1a0386c1ab885d1a2eb250fe2725239"
 
 [metadata.files]
 amqp = [
@@ -2009,21 +2001,6 @@ geonamescache = [
 gunicorn = [
     {file = "gunicorn-20.0.4-py2.py3-none-any.whl", hash = "sha256:cd4a810dd51bf497552cf3f863b575dabd73d6ad6a91075b65936b151cbf4f9c"},
     {file = "gunicorn-20.0.4.tar.gz", hash = "sha256:1904bb2b8a43658807108d59c3f3d56c2b6121a701161de0ddf9ad140073c626"},
-]
-hiredis = [
-    {file = "hiredis-0.2.0-cp27-cp27m-manylinux1_i686.whl", hash = "sha256:71303245ea72cd85e72705ad237eb9d3847cdeff45f4ec81b0fa08ef4941610f"},
-    {file = "hiredis-0.2.0-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:587f56d987cfa9397362d2f772b34ea69e61637fc0093807525e94cb919aa027"},
-    {file = "hiredis-0.2.0-cp27-cp27mu-manylinux1_i686.whl", hash = "sha256:0805bd9e98551bc904e487388c871c039878e5bf8fefed26b504dfe505ac91b4"},
-    {file = "hiredis-0.2.0-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:45887ded08a2e819123124b5cec4ec1c7e272a8c453d35fecb6d36e5b8c54717"},
-    {file = "hiredis-0.2.0-cp34-cp34m-manylinux1_i686.whl", hash = "sha256:824e223a0e5a3a7b81025aa35075b4be5eec7251cebb3d305b092bc6f0beacaa"},
-    {file = "hiredis-0.2.0-cp34-cp34m-manylinux1_x86_64.whl", hash = "sha256:bb2744c6026fa4dc4fb6b58d7b36d62ce3f669bb785956d1e3705b7bdbc23e3c"},
-    {file = "hiredis-0.2.0-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:7fd22790038ea983a5ecf8e77697906f59e9f781873cc8c9d6618bebeed7fb0c"},
-    {file = "hiredis-0.2.0-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:c8a2d8d874b1cf6fb104a777846cfa22224f44ce3bef451ec4ae5160082825f7"},
-    {file = "hiredis-0.2.0-cp36-cp36m-manylinux1_i686.whl", hash = "sha256:013c4e31be95bd5d9e45a0f830743458249012dc1691b45b1710976c280074a0"},
-    {file = "hiredis-0.2.0-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:3f8b334c59c474e2b92580d7f4fb6503a08c013ae8a877ffc5c252f899d90ac6"},
-    {file = "hiredis-0.2.0-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:09025bdda2a17294be015bccab7c1039ed41c95cdbef8915f27006c5204e656c"},
-    {file = "hiredis-0.2.0-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:f69bffe7c1ad38be95bbb2c3e5c3f6f4eecb28b2f431a3c3e1532509eea89c92"},
-    {file = "hiredis-0.2.0.tar.gz", hash = "sha256:ca958e13128e49674aa4a96f02746f5de5973f39b57297b84d59fd44d314d5b5"},
 ]
 html5lib = [
     {file = "html5lib-1.1-py2.py3-none-any.whl", hash = "sha256:0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d"},
