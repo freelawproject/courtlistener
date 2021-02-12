@@ -84,7 +84,6 @@ INSTALLED_APPS = [
     "mathfilters",
     "rest_framework",
     "rest_framework.authtoken",
-    "rest_framework_swagger",
     "django_filters",
     "storages",
     # CourtListener Apps
