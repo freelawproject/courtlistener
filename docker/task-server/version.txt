@@ -1,5 +1,6 @@
-1.0.17
+1.0.18
 
+1.0.18 - Remove hiredis
 1.0.17 - Remove swagger and markdown deps
 1.0.16 - Bump deps.
 1.0.15 - Bump deps.
