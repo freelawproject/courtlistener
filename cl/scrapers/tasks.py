@@ -27,6 +27,7 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.pacer import map_cl_to_pacer_id
@@ -561,7 +562,15 @@ def process_audio_file(self, pk) -> None:
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
-def update_docket_info_iquery(self, d_pk: int) -> None:
+@throttle_task("2/s", key="court_id", jitter=(2, 15))
+def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
+    """Update the docket info from iquery
+
+    :param self: The Celery task
+    :param d_pk: The ID of the docket
+    :param court_id: The court of the docket. Needed for throttling by court.
+    :return: None
+    """
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -572,7 +581,7 @@ def update_docket_info_iquery(self, d_pk: int) -> None:
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    d = Docket.objects.get(pk=d_pk)
+    d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
     try:
         report.query(d.pacer_case_id)

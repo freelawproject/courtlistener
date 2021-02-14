@@ -176,7 +176,7 @@ class Command(VerboseCommand):
                 continue
 
             update_docket_info_iquery.apply_async(
-                args=(docket_id,), queue=queue
+                args=(d.pk, d.court_id), queue=queue
             )
 
         logger.info("Done!")
