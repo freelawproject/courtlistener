@@ -22,7 +22,7 @@ from .models import (
 @admin.register(FinancialDisclosure)
 class FinancialDisclosureAdmin(admin.ModelAdmin):
 
-    list_display = ("get_name", "year", "filepath")
+    list_display = ("__str__", "get_name", "year", "filepath")
 
     def get_name(self, obj):
         return obj.person.name_full.title()
