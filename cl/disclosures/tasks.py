@@ -148,7 +148,9 @@ def extract_content(
 
     status = extractor_response.status_code
     if status != 200 or extractor_response.json()["success"] is False:
-        logger.info("Could not extract data from this document")
+        logger.info(
+            f"Could not extract data from this document, status: {status}"
+        )
         return {}
 
     logger.info("Processing extracted data")
