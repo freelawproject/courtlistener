@@ -1,13 +1,16 @@
 import pickle
+from typing import Union
 
 from juriscraper.pacer import PacerSession
+from redis import Redis
+from requests.cookies import RequestsCookieJar
 
 from cl.lib.redis_utils import make_redis_interface
 
 session_key = "session:pacer:cookies:user.%s"
 
 
-def log_into_pacer(username, password):
+def log_into_pacer(username: str, password: str) -> RequestsCookieJar:
     """Log into PACER and return the cookie jar
 
     :param username: A PACER username
@@ -19,7 +22,11 @@ def log_into_pacer(username, password):
     return s.cookies
 
 
-def get_or_cache_pacer_cookies(user_pk, username, password):
+def get_or_cache_pacer_cookies(
+    user_pk: Union[str, int],
+    username: str,
+    password: str,
+) -> RequestsCookieJar:
     """Get PACER cookies for a user or create and cache fresh ones
 
     For the PACER Fetch API, we store users' PACER cookies in Redis with a
@@ -48,9 +55,10 @@ def get_or_cache_pacer_cookies(user_pk, username, password):
     return cookies
 
 
-def get_pacer_cookie_from_cache(user_pk, r=None):
+def get_pacer_cookie_from_cache(user_pk: Union[str, int], r: Redis = None):
     """Get the cookie for a user from the cache.
 
+    :param user_pk: The ID of the user, can be a string or an ID
     :param r: A redis interface. If not provided, a fresh one is used. This is
     a performance enhancement.
     :return Either None if no cache cookies or the cookies if they're found.
