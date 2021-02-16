@@ -1,8 +1,10 @@
 import logging
 import os
+from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
 import requests
+from celery import Task
 from celery.canvas import chain
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -527,9 +529,14 @@ def process_recap_docket(self, pk):
 @app.task(
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
-def process_recap_attachment(self, pk, tag_names=None):
+def process_recap_attachment(
+    self: Task,
+    pk: int,
+    tag_names: Optional[List[str]] = None,
+) -> Optional[Tuple[int, str]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
+    :param self: The Celery teask
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
@@ -1143,12 +1150,13 @@ def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_attachment_page(self, fq_pk):
+def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     """Fetch a PACER attachment page by rd_pk
 
     This is very similar to process_recap_attachment, except that it manages
     status as it proceeds and it gets the cookie info from redis.
 
+    :param self: The celery task
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :return: None
     """

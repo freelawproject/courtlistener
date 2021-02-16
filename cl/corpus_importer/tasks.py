@@ -5,7 +5,7 @@ import shutil
 from datetime import date
 from io import BytesIO
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, re
 
 import internetarchive as ia
 import requests
@@ -33,6 +33,8 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from pyexpat import ExpatError
+from requests import Response
+from requests.cookies import RequestsCookieJar
 from requests.exceptions import HTTPError, RequestException
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
@@ -79,7 +81,12 @@ from cl.recap.mergers import (
     save_iquery_to_docket,
     update_docket_metadata,
 )
-from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles, ProcessingQueue
+from cl.recap.models import (
+    UPLOAD_TYPE,
+    FjcIntegratedDatabase,
+    PacerHtmlFiles,
+    ProcessingQueue,
+)
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf, get_page_count
 from cl.search.models import (
@@ -188,6 +195,7 @@ def generate_ia_json(
 def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
     """For each docket given, save it to disk.
 
+    :param self: The celery task
     :param d_pk: The PK of the docket to serialize to disk
     :param output_directory: The location to save the docket's JSON
     """
@@ -503,9 +511,14 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-def get_and_process_free_pdf(self, data, row_pk):
+def get_and_process_free_pdf(
+    self: Task,
+    data: Dict[str, Union[PACERFreeDocumentRow, int, str]],
+    row_pk: int,
+) -> Optional[Dict[str, Union[FreeOpinionReport, int]]]:
     """Get a PDF from a PACERFreeDocumentRow object
 
+    :param self: The celery task
     :param data: The returned results from the previous task, takes the form
     of:
         {'result': <PACERFreeDocumentRow> object,
@@ -574,7 +587,7 @@ class OverloadedException(Exception):
 
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
-def upload_pdf_to_ia(self, rd_pk):
+def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
     file_name = get_document_filename(
@@ -620,16 +633,16 @@ ia_session = ia.get_session(
 
 
 def upload_to_ia(
-    self,
-    identifier,
-    files,
-    title,
-    collection,
-    court_id,
-    source_url,
-    media_type,
-    description,
-):
+    self: Task,
+    identifier: str,
+    files: Union[str, List[str], List[BytesIO], Dict[str, BytesIO]],
+    title: str,
+    collection: str,
+    court_id: str,
+    source_url: str,
+    media_type: str,
+    description: str,
+) -> Optional[List[Response]]:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -643,6 +656,7 @@ def upload_to_ia(
     maximize the number of files uploaded to an Item at a time, rather
     than uploading each file in a separate go.
 
+    :param self: The celery task
     :param identifier: The global identifier within IA for the item you wish to
     work with.
     :param files: This is a weird parameter from the IA library. It can accept:
@@ -734,7 +748,9 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(status, court_id, d):
+def mark_court_done_on_date(
+    status: int, court_id: str, d: date
+) -> Optional[int]:
     court_id = map_pacer_to_cl_id(court_id)
     try:
         doc_log = PACERFreeDocumentLog.objects.filter(
@@ -752,7 +768,7 @@ def mark_court_done_on_date(status, court_id, d):
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(data, pk):
+def delete_pacer_row(data: Dict[str, int], pk: int) -> List[int]:
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -760,7 +776,9 @@ def delete_pacer_row(data, pk):
     return [data["rd_pk"]]
 
 
-def make_fjc_idb_lookup_params(item):
+def make_fjc_idb_lookup_params(
+    item: FjcIntegratedDatabase,
+) -> Dict[str, Optional[str]]:
     """Given an IDB row, generate good params for looking up that item in the
     PossibleCaseNumberApi.
 
@@ -801,7 +819,7 @@ def get_pacer_case_id_and_title(
     pass_through: Any,
     docket_number: str,
     court_id: str,
-    cookies: Optional[str] = None,
+    cookies: Optional[RequestsCookieJar] = None,
     user_pk: Optional[int] = None,
     case_name: Optional[str] = None,
     office_number: Optional[str] = None,
@@ -816,6 +834,7 @@ def get_pacer_case_id_and_title(
     have this data all separated out, so it helps not to try to recreate docket
     numbers from data that comes all pulled apart.
 
+    :param self: The celery task
     :param pass_through: This data will be passed through as a key to the
     returned dict for downstream tasks to receive.
     :param docket_number: The docket number to look up. This is a flexible
@@ -839,10 +858,10 @@ def get_pacer_case_id_and_title(
     :return: The dict formed by the PossibleCaseNumberApi lookup if a good
     value is identified, else None. The dict takes the form of:
         {
-            u'docket_number': force_unicode(node.xpath('./@number')[0]),
-            u'pacer_case_id': force_unicode(node.xpath('./@id')[0]),
-            u'title': force_unicode(node.xpath('./@title')[0]),
-            u'pass_through': pass_through,
+            'docket_number': force_unicode(node.xpath('./@number')[0]),
+            'pacer_case_id': force_unicode(node.xpath('./@id')[0]),
+            'title': force_unicode(node.xpath('./@title')[0]),
+            'pass_through': pass_through,
         }
     """
     logger.info(
@@ -898,10 +917,15 @@ def get_pacer_case_id_and_title(
     ignore_result=True,
 )
 def do_case_query_by_pacer_case_id(
-    self, data, court_id, cookies, tag_names=None
-):
+    self: Task,
+    data: Dict[str, str],
+    court_id: str,
+    cookies: RequestsCookieJar,
+    tag_names: List[str] = None,
+) -> Optional[Dict[str, Union[str, int]]]:
     """Run a case query (iquery.pl) query on a case and save the data
 
+    :param self: The celery task
     :param data: A dict containing at least the following: {
         'pacer_case_id': The internal pacer case ID for the item.
     }
@@ -968,12 +992,18 @@ def do_case_query_by_pacer_case_id(
 
 
 @app.task(bind=True, ignore_result=True)
-def filter_docket_by_tags(self, data, tags, court_id):
+def filter_docket_by_tags(
+    self: Task,
+    data: Optional[Dict[Any, Any]],
+    tags: Optional[List[str]],
+    court_id: str,
+) -> Optional[Dict[Any, Any]]:
     """Stop the chain if the docket that'll be updated is already tagged.
 
     This is useful for if you're running a bulk download a second time and want
     to avoid downloading items you already purchased in the previous run.
 
+    :param self: The celery task
     :param data: The data from the previous task in the chain
     :param tags: A list of tag names.
     :param court_id: The CL court ID for the item.
@@ -1089,19 +1119,20 @@ def make_docket_by_iquery(
     ignore_result=True,
 )
 def get_docket_by_pacer_case_id(
-    self,
-    data,
-    court_id,
-    cookies=None,
-    docket_pk=None,
-    tag_names=None,
-    **kwargs
-):
+    self: Task,
+    data: Dict[str, Union[str, int]],
+    court_id: str,
+    cookies: Optional[RequestsCookieJar] = None,
+    docket_pk: Optional[int] = None,
+    tag_names: Optional[str] = None,
+    **kwargs,
+) -> Optional[Dict[str, Union[int, bool]]]:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
     For details of acceptable parameters, see DocketReport.query()
 
+    :param self: The celery task
     :param data: A dict containing:
         Required: 'pacer_case_id': The internal case ID of the item in PACER.
         Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
@@ -1189,13 +1220,19 @@ def get_docket_by_pacer_case_id(
     ignore_result=True,
 )
 def get_appellate_docket_by_docket_number(
-    self, docket_number, court_id, cookies, tag_names=None, **kwargs
-):
+    self: Task,
+    docket_number: str,
+    court_id: str,
+    cookies: RequestsCookieJar,
+    tag_names: Optional[List[str]] = None,
+    **kwargs,
+) -> Optional[Dict[str, Union[int, bool]]]:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
     For details of acceptable parameters, see DocketReport.query()
 
+    :param self: The celery task
     :param docket_number: The docket number of the case.
     :param court_id: A courtlistener/PACER appellate court ID.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
@@ -1257,9 +1294,14 @@ def get_appellate_docket_by_docket_number(
     interval_step=5,
     ignore_result=True,
 )
-def get_attachment_page_by_rd(self, rd_pk, cookies):
+def get_attachment_page_by_rd(
+    self: Task,
+    rd_pk: int,
+    cookies: RequestsCookieJar,
+) -> Optional[AttachmentPage]:
     """Get the attachment page for the item in PACER.
 
+    :param self: The celery task
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-on PACER user.
@@ -1304,9 +1346,15 @@ def get_attachment_page_by_rd(self, rd_pk, cookies):
     interval_step=5 * 60,
     ignore_result=True,
 )
-def get_bankr_claims_registry(self, data, cookies, tag_names=None):
+def get_bankr_claims_registry(
+    self: Task,
+    data: Optional[Dict[str, int]],
+    cookies: RequestsCookieJar,
+    tag_names: Optional[List[str]] = None,
+) -> Optional[Dict[str, int]]:
     """Get the bankruptcy claims registry for a docket
 
+    :param self: The celery task
     :param data: A dict of data containing, primarily, a key to 'docket_pk' for
     the docket for which we want to get the registry. Other keys will be
     ignored.
@@ -1375,12 +1423,18 @@ def get_bankr_claims_registry(self, data, cookies, tag_names=None):
     interval_step=5,
     ignore_result=True,
 )
-def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
+def make_attachment_pq_object(
+    self: Task,
+    attachment_report: AttachmentPage,
+    rd_pk: int,
+    user_pk: int,
+) -> int:
     """Create an item in the processing queue for an attachment page.
 
     This is a helper shim to convert attachment page results into processing
     queue objects that can be processed by our standard pipeline.
 
+    :param self: The celery task
     :param attachment_report: An AttachmentPage object that's already queried
     a page and populated its data attribute.
     :param rd_pk: The RECAP document that the attachment page is associated
@@ -1412,11 +1466,16 @@ def make_attachment_pq_object(self, attachment_report, rd_pk, user_pk):
     ignore_result=True,
 )
 def download_pacer_pdf_by_rd(
-    self, rd_pk, pacer_case_id, pacer_doc_id, cookies
-):
+    self: Task,
+    rd_pk: int,
+    pacer_case_id: str,
+    pacer_doc_id: int,
+    cookies: RequestsCookieJar,
+) -> Optional[FreeOpinionReport]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
+    :param self: The celery task
     :param rd_pk: The PK of the RECAPDocument to download
     :param pacer_case_id: The internal PACER case ID number
     :param pacer_doc_id: The internal PACER document ID to download
@@ -1463,17 +1522,18 @@ def download_pacer_pdf_by_rd(
 
 
 def update_rd_metadata(
-    self,
-    rd_pk,
-    response,
-    court_id,
-    pacer_case_id,
-    pacer_doc_id,
-    document_number,
-    attachment_number,
-):
+    self: Task,
+    rd_pk: int,
+    response: Optional[Response],
+    court_id: str,
+    pacer_case_id: str,
+    pacer_doc_id: str,
+    document_number: str,
+    attachment_number: int,
+) -> Tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
+    :param self: The celery task
     :param rd_pk: The primary key of the RECAPDocument to work on
     :param response: A requests.Response object containing the PDF data.
     :param court_id: A CourtListener court ID to use for file names.
@@ -1517,12 +1577,13 @@ def update_rd_metadata(
     return True, "Saved item successfully"
 
 
-def add_tags(rd, tag_name):
+def add_tags(rd: RECAPDocument, tag_name: str) -> None:
     """Add tags to a tree of objects starting with the RECAPDocument
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
 
     :param rd: The RECAPDocument where we begin the chain
+    :param tag_name: The name of the tag to add
     :return None
     """
     if tag_name is not None:
@@ -1540,7 +1601,12 @@ def add_tags(rd, tag_name):
     ignore_result=True,
 )
 @transaction.atomic
-def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
+def get_pacer_doc_by_rd(
+    self: Task,
+    rd_pk: int,
+    cookies: RequestsCookieJar,
+    tag: Optional[str] = None,
+) -> Optional[int]:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
     :param self: The bound celery task
@@ -1588,14 +1654,20 @@ def get_pacer_doc_by_rd(self, rd_pk, cookies, tag=None):
     ignore_result=True,
 )
 def get_pacer_doc_by_rd_and_description(
-    self, rd_pk, description_re, cookies, fallback_to_main_doc=False, tag=None
-):
+    self: Task,
+    rd_pk: int,
+    description_re: re.Pattern,
+    cookies: RequestsCookieJar,
+    fallback_to_main_doc: bool = False,
+    tag: Optional[List[str]] = None,
+) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
 
     This function was originally meant to get civil cover sheets, but can be
     repurposed as needed.
 
+    :param self: The celery task
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
@@ -1687,9 +1759,14 @@ def get_pacer_doc_by_rd_and_description(
     interval_step=5,
     ignore_result=True,
 )
-def get_pacer_doc_id_with_show_case_doc_url(self, rd_pk, cookies):
+def get_pacer_doc_id_with_show_case_doc_url(
+    self: Task,
+    rd_pk: int,
+    cookies: RequestsCookieJar,
+) -> None:
     """use the show_case_doc URL to get pacer_doc_id values.
 
+    :param self: The celery task
     :param rd_pk: The pk of the RECAPDocument you want to get.
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
