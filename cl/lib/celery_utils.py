@@ -9,6 +9,7 @@ from celery import Task
 from django.utils.timezone import now
 
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import make_redis_interface
 
@@ -232,6 +233,7 @@ def throttle_task(
     return decorator_func
 
 
+@retry(ConnectionError, tries=4, delay=0.25, backoff=1.5)
 def is_rate_okay(task: Task, rate: str = "1/s", key=None) -> bool:
     """Keep a global throttle for tasks
 
