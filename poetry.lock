@@ -1519,14 +1519,6 @@ optional = false
 python-versions = ">=3.5"
 
 [[package]]
-name = "sqlparse"
-version = "0.1.19"
-description = "Non-validating SQL parser"
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "stripe"
 version = "1.84.2"
 description = "Python bindings for the Stripe API"
@@ -1706,7 +1698,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "516928c928e6583af6dd356d8ee8baf0b1a0386c1ab885d1a2eb250fe2725239"
+content-hash = "935d6450acbf06717b4be734bb21da2252ec41ffc19b276d645936faf66fd350"
 
 [metadata.files]
 amqp = [
@@ -2646,9 +2638,6 @@ six = [
 soupsieve = [
     {file = "soupsieve-2.1-py3-none-any.whl", hash = "sha256:4bb21a6ee4707bf43b61230e80740e71bfe56e55d1f1f50924b087bb2975c851"},
     {file = "soupsieve-2.1.tar.gz", hash = "sha256:6dc52924dc0bc710a5d16794e6b3480b2c7c08b07729505feab2b2c16661ff6e"},
-]
-sqlparse = [
-    {file = "sqlparse-0.1.19.tar.gz", hash = "sha256:d896be1a1c7f24bffe08d7a64e6f0176b260e281c5f3685afe7826f8bada4ee8"},
 ]
 stripe = [
     {file = "stripe-1.84.2-py2.py3-none-any.whl", hash = "sha256:86e291792c8825f07dcc77f662ee069bb453dc22d8f2c62d4c72b9e1541547f9"},
