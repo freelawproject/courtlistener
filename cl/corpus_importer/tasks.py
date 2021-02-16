@@ -135,9 +135,10 @@ def generate_ia_json(
             "panel",
             "parties",
             # Django appears to have a bug where you can't defer a field on a
-            # queryset where you prefetch the values. If you try to, it crashes.
-            # We should be able to just do the prefetch below like the ones above
-            # and then do the defer statement at the end, but that throws an error.
+            # queryset where you prefetch the values. If you try to, it
+            # crashes. We should be able to just do the prefetch below like
+            # the ones above and then do the defer statement at the end, but
+            # that throws an error.
             Prefetch(
                 "docket_entries__recap_documents",
                 queryset=RECAPDocument.objects.all().defer("plain_text"),
@@ -180,7 +181,7 @@ def generate_ia_json(
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
             attorney_prefetch,
-        ]
+        ],
     )
 
     renderer = JSONRenderer()
