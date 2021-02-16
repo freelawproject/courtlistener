@@ -2,21 +2,25 @@ import mimetypes
 import os
 import sys
 import traceback
+from typing import Optional, Tuple
 from urllib.parse import urljoin
 
 import magic
 import requests
 from django.conf import settings
+from django.db.models import QuerySet
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
+from requests import Response, Session
+from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
 
 
-def test_for_meta_redirections(r):
+def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
     mime = magic.from_buffer(r.content, mime=True)
     extension = mimetypes.guess_extension(mime)
     if extension == ".html":
@@ -40,7 +44,7 @@ def test_for_meta_redirections(r):
         return False, None
 
 
-def follow_redirections(r, s):
+def follow_redirections(r: Response, s: Session) -> Response:
     """
     Parse and recursively follow meta refresh redirections if they exist until
     there are no more.
@@ -52,7 +56,7 @@ def follow_redirections(r, s):
     return r
 
 
-def get_extension(content):
+def get_extension(content: str) -> str:
     """A handful of workarounds for getting extensions we can trust."""
     file_str = magic.from_buffer(content)
     if file_str.startswith("Composite Document File V2 Document"):
@@ -87,7 +91,11 @@ def get_extension(content):
     return fixes.get(extension, extension).lower()
 
 
-def get_binary_content(download_url, cookies, method="GET"):
+def get_binary_content(
+    download_url: str,
+    cookies: RequestsCookieJar,
+    method: str = "GET",
+) -> Tuple[str, Optional[Response]]:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
@@ -158,7 +166,12 @@ def signal_handler(signal, frame):
     die_now = True
 
 
-def extract_recap_documents(docs, skip_ocr=False, order_by=None, queue=None):
+def extract_recap_documents(
+    docs: QuerySet,
+    skip_ocr: bool = False,
+    order_by: Optional[str] = None,
+    queue: Optional[str] = None,
+) -> None:
     """Loop over RECAPDocuments and extract their contents. Use OCR if requested.
 
     :param docs: A queryset containing the RECAPDocuments to be processed.
