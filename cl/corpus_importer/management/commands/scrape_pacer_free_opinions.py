@@ -206,7 +206,11 @@ def get_pdfs(options: OptionsType) -> None:
     for row in rows.iterator():
         throttle.maybe_wait()
         c = chain(
-            process_free_opinion_result.si(row.pk, cnt).set(queue=q),
+            process_free_opinion_result.si(
+                row.pk,
+                row.court_id,
+                cnt,
+            ).set(queue=q),
             get_and_process_free_pdf.s(row.pk).set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
