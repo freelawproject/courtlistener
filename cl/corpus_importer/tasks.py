@@ -375,12 +375,21 @@ def get_and_save_free_document_report(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
+@throttle_task("2/s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
+    court_id: str,
     cnt: CaseNameTweaker,
 ) -> Optional[Dict[str, Union[PACERFreeDocumentRow, str, int]]]:
-    """Process a single result from the free opinion report"""
+    """Add data from a free opinion report to our DB
+
+    :param self: The celery task
+    :param row_pk: The pk of the PACERFreeDocumentRow to get
+    :param court_id: The court where the item was found, used for throttling
+    :param cnt: A case name tweaker, since they're expensive to initialize
+    :return a dict containing the free document row, the court id, etc.
+    """
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
     except PACERFreeDocumentRow.DoesNotExist:
