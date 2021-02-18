@@ -1,5 +1,6 @@
-1.0.24
+1.0.25
 
+1.0.25 - Remove logilab-common
 1.0.24 - Remove sqlparse
 1.0.23 - Remove hiredis
 1.0.22 - Remove swagger and markdown deps
