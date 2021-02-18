@@ -133,6 +133,7 @@ class SimplePagesTest(TestCase):
         reverse_params = [
             {"viewname": "faq"},
             {"viewname": "coverage"},
+            {"viewname": "coverage_fds"},
             {"viewname": "feeds_info"},
             {"viewname": "contribute"},
             {"viewname": "contact"},
@@ -147,7 +148,10 @@ class SimplePagesTest(TestCase):
             {"viewname": "robots"},
         ]
         for reverse_param in reverse_params:
-            self.assert_page_loads_ok(reverse_param)
+            with self.subTest(
+                "Checking simple pages", reverse_params=reverse_param
+            ):
+                self.assert_page_loads_ok(reverse_param)
 
     def test_profile_urls(self) -> None:
         """Do all of the profile URLs load properly?"""
