@@ -139,8 +139,9 @@
 
 
     <h2 id="enhancements">Our Enhancements</h2>
-    <p>We have dedicated considerable energy to develop <a href="https://github.com/freelawproject/disclosure-extractor">a parsing system</a> for these disclosures. This system takes the disclosure file, whether it’s a tiff or pdf, scanned or text, or collection of tiffs and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.</p>
-    <p>Once the parsing was completed, we ingested it into our database, where it is <a href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
+    <p>We have dedicated considerable energy to develop <a href="https://github.com/freelawproject/disclosure-extractor">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
+    </p>
+    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
     </p>
 
     <ul>
@@ -155,6 +156,34 @@
     </ul>
 
     <p>When combined with our detailed database of judges, this creates a one-of-a-kind resource for understanding the conflicts, resources, and entanglements of federal judges. We believe this brings our country closer to finally realizing the goals set out by the 1978 Ethics in Government Act.
+    </p>
+
+
+    <h2 id="gaps">What's Missing</h2>
+    <p>We have worked hard to parse all of the disclosures that we have collected, but there a few places where we were unable to make meaningful progress:
+    </p>
+    <ol>
+      <li>
+        <p>We have a basic parser for documents from Judicial Watch, but due to their age the disclosures in this collection vary considerably. We were able to parse many of them, but some were too difficult.
+        </p>
+      </li>
+      <li>
+        <p>Some disclosures were scanned incorrectly. <a href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/823/michael-james-davis-disclosure.2011.pdf">Here's a representative example</a>.
+        </p>
+      </li>
+      <li>
+        <p>Some disclosures had scanned and embedded spreadsheets, <a href="https://storage.courtlistener.com/us/federal/judicial/financial-disclosures/9641/david-e-jones-disclosure.2014.pdf">like this one</a>. These were too challenging to automate.
+        </p>
+      </li>
+      <li>
+        <p>A few disclosures were hand written. We were unable to parse those.</p>
+      </li>
+    </ol>
+
+    <p>Whenever possible, we work with the Office of Financial Disclosures to remedy badly processed disclosures and get them into our system, but this can be an overwhelming administrative effort for our small organization. As with everything we do, your support helps makes this project possible.
+    </p>
+    <p class="v-offset-above-3"><a href="{% url "donate" %}?referer=fd-coverage-page"
+                                   class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i>&nbsp;Please Donate to Support Our Work</a>
     </p>
   </div>
 {% endblock %}
