@@ -7,6 +7,7 @@ from cl.simple_pages.views import (
     contact,
     contact_thanks,
     contribute,
+    coverage_fds,
     coverage_graph,
     delete_help,
     donation_help,
@@ -25,6 +26,9 @@ urlpatterns = [
     # Footer stuff
     url(r"^faq/$", faq, name="faq"),
     url(r"^coverage/$", coverage_graph, name="coverage"),
+    url(
+        r"^coverage/financial-disclosures/$", coverage_fds, name="coverage_fds"
+    ),
     url(r"^feeds/$", feeds, name="feeds_info"),
     url(r"^podcasts/$", podcasts, name="podcasts"),
     url(r"^contribute/$", contribute, name="contribute"),

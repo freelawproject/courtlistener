@@ -20,19 +20,24 @@ from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.custom_filters.decorators import check_honeypot
+from cl.disclosures.models import (
+    Agreement,
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Position,
+    Reimbursement,
+    SpouseIncome,
+)
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import track_in_matomo
 from cl.lib.ratelimiter import ratelimiter_unsafe_1_per_m
 from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
-from cl.search.models import (
-    Court,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    RECAPDocument,
-)
+from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
 from cl.simple_pages.forms import ContactForm
 
 logger = logging.getLogger(__name__)
@@ -136,6 +141,33 @@ def build_court_dicts(courts: QuerySet) -> List[Dict[str, Union[str, int]]]:
         ]
     )
     return court_dicts
+
+
+def coverage_fds(request: HttpRequest) -> HttpResponse:
+    """The financial disclosure coverage page"""
+    coverage_key = "coverage-data.fd2"
+    coverage_data = cache.get(coverage_key)
+    if coverage_data is None:
+        coverage_data = {
+            "disclosures": FinancialDisclosure,
+            "investments": Investment,
+            "positions": Position,
+            "agreements": Agreement,
+            "non_investment_income": NonInvestmentIncome,
+            "spousal_income": SpouseIncome,
+            "reimbursements": Reimbursement,
+            "gifts": Gift,
+            "debts": Debt,
+        }
+        # Populate the models
+        for k, model in coverage_data.items():
+            coverage_data[k] = model.objects.all().count()
+
+        one_week = 60 * 60 * 24 * 7
+        cache.set(coverage_key, coverage_data, one_week)
+
+    coverage_data["private"] = False
+    return render(request, "coverage_fds.html", coverage_data)
 
 
 def coverage_graph(request: HttpRequest) -> HttpResponse:
