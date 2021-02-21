@@ -92,14 +92,13 @@ class CeleryThrottle(object):
         :param max_wait: The maximum amount of time that can be slept between
         loops. If min_wait is greater than max_wait, min_wait wins.
         """
-        self.min = min_items
-        self.max = self.min * 2
+        self.set_min(min_items)
         self.min_wait = min_wait
         self.max_wait = max_wait
 
         # Variables used to track the queue and wait-rate
         self.last_processed_count = 0
-        self.count_to_do = self.max
+        self.count_to_do = self._max
         self.last_measurement = None
         self.first_run = True
 
@@ -109,6 +108,10 @@ class CeleryThrottle(object):
 
         # For inspections
         self.queue_name = queue_name
+
+    def set_min(self, new_min: int) -> None:
+        self._min = new_min
+        self._max = new_min * 2
 
     def _calculate_avg(self) -> float:
         return float(sum(self.rates)) / (len(self.rates) or 1)
@@ -147,10 +150,10 @@ class CeleryThrottle(object):
 
         self._add_latest_rate()
         task_count = get_queue_length(self.queue_name)
-        if task_count > self.min:
+        if task_count > self._min:
             # Estimate how long the surplus will take to complete and wait that
             # long + 5% to ensure we're below self.min on next iteration.
-            surplus_task_count = task_count - self.min
+            surplus_task_count = task_count - self._min
             wait_time = (surplus_task_count / self.avg_rate) * 1.05
 
             if self.max_wait:
@@ -163,13 +166,13 @@ class CeleryThrottle(object):
             time.sleep(wait_time)
 
             # Assume we're below self.min due to waiting; max out the queue.
-            if task_count < self.max:
-                self.count_to_do = self.max - self.min
+            if task_count < self._max:
+                self.count_to_do = self._max - self._min
             return
 
-        elif task_count <= self.min:
+        elif task_count <= self._min:
             # Add more items.
-            self.count_to_do = self.max - task_count
+            self.count_to_do = self._max - task_count
             if self.min_wait > 0:
                 time.sleep(self.min_wait)
             return

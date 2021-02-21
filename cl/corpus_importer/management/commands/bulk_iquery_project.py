@@ -56,7 +56,7 @@ def add_all_cases_to_cl(
                     # Enough scraping. Stop doing this court.
                     court_ids.remove(court_id)
                     # Adjust the throttle queue to be shorter.
-                    throttle.min = len(court_ids * 2)
+                    throttle.set_min(len(court_ids * 2))
                     continue
                 make_docket_by_iquery.apply_async(
                     args=(court_id, pacer_case_id, next(db_key_cycle)),
