@@ -21,7 +21,6 @@ def add_all_cases_to_cl(
     :return None
     """
     q = options["queue"]
-    throttle = CeleryThrottle(queue_name=q, min_items=500)
     r = make_redis_interface("CACHE")
     # This is a simple dictionary that's populated with the maximum
     # pacer_case_id in the CL DB as of 2021-01-18. The idea is to use this to
@@ -35,6 +34,9 @@ def add_all_cases_to_cl(
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
     court_ids = list(courts.values_list("pk", flat=True))
+
+    # Create a queue that's a bit longer than the number of courts we're doing
+    throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids) * 2)
 
     iterations_completed = 0
     db_key_cycle = itertools.cycle(settings.DATABASES.keys())
