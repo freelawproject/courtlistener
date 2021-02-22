@@ -1,5 +1,4 @@
 import logging
-from decimal import Decimal
 from typing import Dict, Tuple, Union
 
 from django.conf import settings
@@ -14,7 +13,7 @@ from django.http import (
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.timezone import now
-from stripe import StripeObject
+from stripe.stripe_object import StripeObject
 
 from cl.donate.forms import (
     CleanedDonationFormType,
