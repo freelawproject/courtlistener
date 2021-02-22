@@ -1510,17 +1510,14 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "stripe"
-version = "1.84.2"
+version = "2.55.2"
 description = "Python bindings for the Stripe API"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
-requests = ">=0.8.8"
-
-[package.extras]
-testing = ["mock", "unittest2"]
+requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
 
 [[package]]
 name = "texttable"
@@ -1688,7 +1685,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d00a31a3bde9adae9003c46b11035c55474c3cf3ebcee4adbaa09ed3bf9857b3"
+content-hash = "e40cb854d240cae8c400570293d6b356f157e836fd5def1515e41e504859052a"
 
 [metadata.files]
 amqp = [
@@ -2648,8 +2645,8 @@ soupsieve = [
     {file = "soupsieve-2.1.tar.gz", hash = "sha256:6dc52924dc0bc710a5d16794e6b3480b2c7c08b07729505feab2b2c16661ff6e"},
 ]
 stripe = [
-    {file = "stripe-1.84.2-py2.py3-none-any.whl", hash = "sha256:86e291792c8825f07dcc77f662ee069bb453dc22d8f2c62d4c72b9e1541547f9"},
-    {file = "stripe-1.84.2.tar.gz", hash = "sha256:2faff6079079a0c5bdf97f0b30b5a40b55b1700b79f0d28855fd1be0a99dd235"},
+    {file = "stripe-2.55.2-py2.py3-none-any.whl", hash = "sha256:97431dbc6d25b94816816a3606f75045d79f101db4cf27e79ac4e039e4971d73"},
+    {file = "stripe-2.55.2.tar.gz", hash = "sha256:e32c68194a47522a10945eb893218e5cb5ee65e3a3c2c4df7efca117a6bf1902"},
 ]
 texttable = [
     {file = "texttable-1.6.3-py2.py3-none-any.whl", hash = "sha256:f802f2ef8459058736264210f716c757cbf85007a30886d8541aa8c3404f1dda"},

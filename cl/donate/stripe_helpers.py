@@ -9,7 +9,8 @@ from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
-from stripe import APIConnectionError, StripeObject
+from stripe.error import APIConnectionError
+from stripe.stripe_object import StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
