@@ -50,6 +50,13 @@ jobs:
         run: docker-compose logs
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
+      - name: Upgrade dependencies in docker if dependabot, ensuring tests are run on new deps
+        if: ${{ github.actor == 'dependabot' }}
+        # Git is required for poetry to install some deps; bash is required b/c
+        # `cd` isn't available otherwise.
+        run: |
+          docker exec cl-django apt install -y git
+          docker exec -i cl-django bash -c 'cd courtlistener && poetry install'
       - name: Run the tests!
         run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2
       - name: cp selenium results from docker to host
