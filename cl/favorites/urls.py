@@ -1,4 +1,4 @@
-from django.conf.urls import url
+from django.urls import path
 
 from cl.favorites.views import (
     delete_favorite,
@@ -8,15 +8,15 @@ from cl.favorites.views import (
 
 urlpatterns = [
     # Favorites pages
-    url(
-        r"^favorite/create-or-update/$",
+    path(
+        "favorite/create-or-update/",
         save_or_update_favorite,
         name="save_or_update_favorite",
     ),
-    url(r"^favorite/delete/$", delete_favorite, name="delete_favorite"),
+    path("favorite/delete/", delete_favorite, name="delete_favorite"),
     # Tag pages
-    url(
-        r"^tags/(?P<username>[^/]*)/(?P<tag_name>[^/]*)/",
+    path(
+        "tags/<str:username>/<slug:tag_name>/",
         view_tag,
         name="view_tag",
     ),

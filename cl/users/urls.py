@@ -1,6 +1,6 @@
 from django.conf import settings
-from django.conf.urls import url
 from django.contrib.auth import views as auth_views
+from django.urls import path, re_path
 from django.views.generic import RedirectView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
@@ -10,8 +10,8 @@ from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
 
 urlpatterns = [
     # Sign in/out and password pages
-    url(
-        r"^sign-in/$",
+    path(
+        "sign-in/",
         ratelimiter_unsafe_10_per_m(auth_views.login),
         {
             "template_name": "register/login.html",
@@ -20,16 +20,16 @@ urlpatterns = [
         },
         name="sign-in",
     ),
-    url(
-        r"^sign-out/$",
+    path(
+        "sign-out/",
         auth_views.logout,
         {
             "template_name": "register/logged_out.html",
             "extra_context": {"private": False},
         },
     ),
-    url(
-        r"^reset-password/$",
+    path(
+        "reset-password/",
         ratelimiter_unsafe_10_per_m(
             auth_views.PasswordResetView.as_view(
                 **{
@@ -42,8 +42,8 @@ urlpatterns = [
         ),
         name="password_reset",
     ),
-    url(
-        r"^reset-password/instructions-sent/$",
+    path(
+        "reset-password/instructions-sent/",
         auth_views.password_reset_done,
         {
             "template_name": "register/password_reset_done.html",
@@ -51,7 +51,7 @@ urlpatterns = [
         },
         name="password_reset_done",
     ),
-    url(
+    re_path(
         r"^confirm-password/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$",
         auth_views.password_reset_confirm,
         {
@@ -61,8 +61,8 @@ urlpatterns = [
         },
         name="confirm_password",
     ),
-    url(
-        r"^reset-password/complete/$",
+    path(
+        "reset-password/complete/",
         auth_views.password_reset_complete,
         {
             "template_name": "register/password_reset_complete.html",
@@ -71,67 +71,63 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     # Profile pages
-    url(r"^profile/settings/$", views.view_settings, name="view_settings"),
-    url(r"^profile/$", RedirectView.as_view(pattern_name="view_settings")),
-    url(
-        r"^profile/favorites/$", views.view_favorites, name="profile_favorites"
-    ),
-    url(r"^profile/alerts/$", views.view_alerts, name="profile_alerts"),
-    url(
-        r"^profile/visualizations/$",
+    path("profile/settings", views.view_settings, name="view_settings"),
+    path("profile", RedirectView.as_view(pattern_name="view_settings")),
+    path("profile/favorites/", views.view_favorites, name="profile_favorites"),
+    path("profile/alerts", views.view_alerts, name="profile_alerts"),
+    path(
+        "profile/visualizations/",
         views.view_visualizations,
         name="view_visualizations",
     ),
-    url(
-        r"^profile/visualizations/deleted/$",
+    path(
+        "profile/visualizations/deleted/",
         views.view_deleted_visualizations,
         name="view_deleted_visualizations",
     ),
-    url(r"^profile/api/$", views.view_api, name="view_api"),
-    url(
-        r"^profile/password/change/$",
+    path("profile/api", views.view_api, name="view_api"),
+    path(
+        "profile/password/change/",
         views.password_change,
         name="password_change",
     ),
-    url(r"^profile/delete/$", views.delete_account, name="delete_account"),
-    url(
-        r"^profile/delete/done/$",
+    path("profile/delete", views.delete_account, name="delete_account"),
+    path(
+        "profile/delete/done/",
         views.delete_profile_done,
         name="delete_profile_done",
     ),
-    url(r"^profile/take-out/$", views.take_out, name="take_out"),
-    url(
-        r"^profile/take-out/done/$", views.take_out_done, name="take_out_done"
-    ),
-    url(
-        r"^register/$",
+    path("profile/take-out", views.take_out, name="take_out"),
+    path("profile/take-out/done/", views.take_out_done, name="take_out_done"),
+    path(
+        "register/",
         ratelimiter_unsafe_10_per_m(views.register),
         name="register",
     ),
-    url(
-        r"^register/success/$",
+    path(
+        "register/success/",
         views.register_success,
         name="register_success",
     ),
     # Registration pages
-    url(
+    re_path(
         r"^email/confirm/([0-9a-f]{40})/$",
         views.confirm_email,
         name="email_confirm",
     ),
-    url(
-        r"^email-confirmation/request/$",
+    path(
+        "email-confirmation/request/",
         ratelimiter_unsafe_10_per_m(views.request_email_confirmation),
         name="email_confirmation_request",
     ),
-    url(
-        r"^email-confirmation/success/$",
+    path(
+        "email-confirmation/success/",
         views.email_confirm_success,
         name="email_confirm_success",
     ),
     # Webhooks
-    url(
-        r"^webhook/mailchimp/%s/$" % settings.MAILCHIMP_SECRET,
+    path(
+        "webhook/mailchimp/%s/" % settings.MAILCHIMP_SECRET,
         views.mailchimp_webhook,
     ),
 ]

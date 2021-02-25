@@ -1,4 +1,4 @@
-from django.conf.urls import url
+from django.urls import path, re_path
 
 from cl.audio.feeds import (
     AllJurisdictionsPodcast,
@@ -8,17 +8,17 @@ from cl.audio.feeds import (
 from cl.audio.views import view_audio_file
 
 urlpatterns = [
-    url(r"^audio/(\d+)/(.*)/$", view_audio_file, name="view_audio_file"),
+    path("audio/<int:pk>/<slug:_>/", view_audio_file, name="view_audio_file"),
     # Podcasts
-    url(
-        r"^podcast/court/all/$",
+    path(
+        "podcast/court/all/",
         AllJurisdictionsPodcast(),
         name="all_jurisdictions_podcast",
     ),
-    url(
-        r"^podcast/court/(?P<court>\w{1,15})/$",
+    path(
+        "podcast/court/<str:court>/",
         JurisdictionPodcast(),
         name="jurisdiction_podcast",
     ),
-    url(r"^podcast/(search)/", SearchPodcast(), name="search_podcast"),
+    re_path(r"^podcast/(search)/", SearchPodcast(), name="search_podcast"),
 ]
