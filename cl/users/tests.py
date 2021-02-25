@@ -58,10 +58,8 @@ class UserTest(LiveServerTestCase):
         )
         self.assertRedirects(
             response,
-            "{host}{path}?next=/&email=pan%40courtlistener.com".format(
-                host="http://testserver", path=reverse("register_success")
-            ),
-            host=self.live_server_url,
+            f"{reverse('register_success')}"
+            f"?next=/&email=pan%40courtlistener.com",
         )
 
     def test_redirects(self):
@@ -107,7 +105,7 @@ class UserTest(LiveServerTestCase):
             "password": "password",
         }
         r = self.client.post(reverse("sign-in"), params, follow=True)
-        self.assertRedirects(r, "http://testserver/")
+        self.assertRedirects(r, "/")
 
     def test_confirming_an_email_address(self):
         """Tests whether we can confirm the case where an email is associated
@@ -277,7 +275,9 @@ class LiveUserTest(BaseSeleniumTest):
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
+                    "uidb64": urlsafe_base64_encode(
+                        str(up.user.pk).encode()
+                    ).decode(),
                     "token": token,
                 },
             ),
