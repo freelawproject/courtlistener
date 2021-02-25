@@ -7,7 +7,6 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
-from phonenumber_field.modelfields import PhoneNumberField
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pst
@@ -1549,12 +1548,12 @@ class Attorney(AbstractDateTimeModel):
         help_text="The raw contents of the contact field",
         db_index=True,
     )
-    phone = PhoneNumberField(
+    phone = models.CharField(
         help_text="The phone number of the attorney.",
         blank=True,
         max_length=20,
     )
-    fax = PhoneNumberField(
+    fax = models.CharField(
         help_text="The fax number of the attorney.",
         blank=True,
         max_length=20,

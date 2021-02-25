@@ -3,7 +3,6 @@
 
 from django.db import migrations, models
 from localflavor.us.models import USPostalCodeField, USZipCodeField
-from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Migration(migrations.Migration):
@@ -23,8 +22,8 @@ class Migration(migrations.Migration):
                 ('date_sourced', models.DateField(help_text='The latest date on the source docket that populated this information. When information is in conflict use the latest data.', db_index=True)),
                 ('name', models.TextField(help_text='The name of the attorney.', db_index=True)),
                 ('contact_raw', models.TextField(help_text='The raw contents of the contact field', db_index=True)),
-                ('phone', PhoneNumberField(help_text='The phone number of the attorney.', max_length=20)),
-                ('fax', PhoneNumberField(help_text='The fax number of the attorney.', max_length=20)),
+                ('phone', models.CharField(help_text='The phone number of the attorney.', max_length=20)),
+                ('fax', models.CharField(help_text='The fax number of the attorney.', max_length=20)),
                 ('email', models.EmailField(help_text='The email address of the attorney.', max_length=254)),
             ],
         ),
