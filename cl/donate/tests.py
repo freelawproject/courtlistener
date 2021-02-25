@@ -82,7 +82,7 @@ def get_stripe_event(fingerprint):
     """Get the stripe event so we can post it to the webhook"""
     # We don't know the event ID, so we have to get the latest ones, then
     # filter...
-    events = stripe.Event.all()
+    events = stripe.Event.list()
     event = None
     for obj in events.data:
         if obj.data.object.card.fingerprint == fingerprint:
