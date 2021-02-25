@@ -10,7 +10,7 @@ class CharNullField(models.CharField):
 
     description = "CharField that stores NULL but returns ''."
 
-    def from_db_value(self, value, expression, connection, contex):
+    def from_db_value(self, value, expression, connection):
         """
         Gets value right out of the db and changes it if its ``None``.
         """
