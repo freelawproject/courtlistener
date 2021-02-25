@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Sum
 from django.utils.timezone import now
-from localflavor.us import models as local_models
+from localflavor.us.models import USStateField
 
 from cl.api.utils import invert_user_logs
 
@@ -18,7 +18,7 @@ donation_exclusion_codes = [
 
 
 class BarMembership(models.Model):
-    barMembership = local_models.USStateField(
+    barMembership = USStateField(
         "the two letter state abbreviation of a bar membership"
     )
 

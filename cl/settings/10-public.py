@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "markdown_deux",
     "mathfilters",
+    "phonenumber_field",
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
