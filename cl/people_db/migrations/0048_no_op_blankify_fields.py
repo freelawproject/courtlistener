@@ -6,7 +6,6 @@
 from __future__ import unicode_literals
 
 from django.db import migrations, models
-from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Migration(migrations.Migration):
@@ -24,11 +23,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='attorney',
             name='fax',
-            field=PhoneNumberField(blank=True, help_text='The fax number of the attorney.', max_length=20),
+            field=models.CharField(blank=True, help_text='The fax number of the attorney.', max_length=20),
         ),
         migrations.AlterField(
             model_name='attorney',
             name='phone',
-            field=PhoneNumberField(blank=True, help_text='The phone number of the attorney.', max_length=20),
+            field=models.CharField(blank=True, help_text='The phone number of the attorney.', max_length=20),
         ),
     ]

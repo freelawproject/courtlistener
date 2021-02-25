@@ -42,7 +42,6 @@ django-extensions = "==2.2.*,>=2.2.0"
 django-localflavor = "2.2"
 django-markdown-deux = "*"
 django-mathfilters = "*"
-django-phonenumber-field = {version = "2.4", extras = ["phonenumberslite"]}
 django-ratelimit = "==2.0.*,>=2.0.0"
 django-redis-cache = "==2.1.*"
 django-storages = "==1.7.*,>=1.7.0"
