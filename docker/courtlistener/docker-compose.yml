@@ -48,7 +48,7 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: freelawproject/task-server:latest
+    image: freelawproject/task-server:${CELERY_DOCKER_TAG:-latest}
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -66,7 +66,7 @@ services:
 
   cl-django:
     container_name: cl-django
-    image: freelawproject/courtlistener-django:latest
+    image: freelawproject/courtlistener-django:${DJANGO_DOCKER_TAG:-latest}
     depends_on:
       - cl-postgresql
       - cl-redis
