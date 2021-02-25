@@ -39,7 +39,7 @@ class LASCJSON(AbstractJSON, AbstractDateTimeModel):
 class LASCPDF(AbstractPDF, AbstractDateTimeModel):
     """Use the content framework to associate PDFs with our dockets"""
 
-    content_type = models.ForeignKey(ContentType)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 

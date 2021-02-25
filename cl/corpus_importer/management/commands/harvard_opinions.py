@@ -129,7 +129,7 @@ def skip_processing(citation, case_name, file_path):
     )
     if cite_search.count() > 0:
         case_data = OpinionCluster.objects.filter(
-            citations=cite_search
+            citations__in=cite_search
         ).values_list("case_name", "filepath_json_harvard")
         case_names = [s[0] for s in case_data]
         found_filepaths = [s[1] for s in case_data]

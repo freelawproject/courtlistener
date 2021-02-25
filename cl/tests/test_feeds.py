@@ -88,7 +88,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             link.click()
             print("clicked...", end=" ")
             self.assertIn(
-                'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
+                'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom"',
                 self.browser.page_source,
             )
             self.browser.back()
@@ -175,7 +175,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
 
         # She captures the URL and pops it into her RSS Reader
         self.assertIn(
-            'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
+            'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom"',
             self.browser.page_source,
         )
 

@@ -1,4 +1,4 @@
-from django.conf.urls import include, url
+from django.urls import include, path, re_path
 from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
@@ -130,41 +130,39 @@ schema_view = get_schema_view(
 
 
 urlpatterns = [
-    url(
-        r"^api-auth/",
+    path(
+        "api-auth/",
         include("rest_framework.urls", namespace="rest_framework"),
     ),
-    url(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
+    re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
     # Schemas
-    url(
-        "^api/schema/$",
+    path(
+        "api/schema/",
         views.deprecated_api,
         name="deprecated_core_api_schema",
     ),
-    url("^api/swagger/$", schema_view, name="swagger_schema"),
+    path("api/swagger/", schema_view, name="swagger_schema"),
     # Documentation
-    url(r"^api/$", views.api_index, name="api_index"),
-    url(r"^api/jurisdictions/$", views.court_index, name="court_index"),
-    url(
+    path("api/", views.api_index, name="api_index"),
+    path("api/jurisdictions/", views.court_index, name="court_index"),
+    re_path(
         r"^api/rest-info/(?P<version>v[123])?/?$",
         views.rest_docs,
         name="rest_docs",
     ),
-    url(r"^api/bulk-info/$", views.bulk_data_index, name="bulk_data_index"),
-    url(
-        r"^api/replication/$", views.replication_docs, name="replication_docs"
-    ),
-    url(
-        r"^api/replication/status/$",
+    path("api/bulk-info/", views.bulk_data_index, name="bulk_data_index"),
+    path("api/replication/", views.replication_docs, name="replication_docs"),
+    path(
+        "api/replication/status/",
         views.replication_status,
         name="replication_status",
     ),
-    url(
+    re_path(
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,
         name="coverage_data",
     ),
-    url(
+    re_path(
         r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",
         views.get_result_count,
         name="alert_frequency",
@@ -172,7 +170,7 @@ urlpatterns = [
     # Deprecation Dates:
     # v1: 2016-04-01
     # v2: 2016-04-01
-    url(
+    re_path(
         r"^api/rest/v(?P<v>[12])/.*",
         views.deprecated_api,
         name="deprecated_api",

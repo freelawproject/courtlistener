@@ -115,7 +115,7 @@ class AbstractPDF(models.Model):
 
 
 class AbstractFile(models.Model):
-    content_type = models.ForeignKey(ContentType)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
