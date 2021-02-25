@@ -2,11 +2,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps import views as sitemaps_views
-from django.urls import include, path, re_path
+from django.urls import include, path, re_path, register_converter
 from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
 
 from cl.audio.sitemap import AudioSitemap
+from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
 from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
@@ -14,6 +15,8 @@ from cl.simple_pages.sitemap import SimpleSitemap
 from cl.simple_pages.views import serve_static_file
 from cl.sitemap import cached_sitemap
 from cl.visualizations.sitemap import VizSitemap
+
+register_converter(BlankSlugConverter, "blank-slug")
 
 sitemaps = {
     SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
