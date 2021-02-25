@@ -1050,7 +1050,7 @@ class JurisdictionFeedTest(TestCase):
             feed = FakeFeed().get_feed(court, request)
             xml = feed.writeString("utf-8")
             self.assertIn(
-                'feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-us"',
+                'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom',
                 xml,
             )
             self.assertNotIn("enclosure", xml)
