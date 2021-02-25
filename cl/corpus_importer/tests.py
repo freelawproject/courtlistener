@@ -638,7 +638,7 @@ class HarvardTests(TestCase):
         """Did we find the authors and the list of judges."""
         self.assertSuccessfulParse(1)
         cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
-        ops = cite.cluster.sub_opinions.all()
+        ops = cite.cluster.sub_opinions.all().order_by("author_str")
 
         self.assertEqual(ops[0].author_str, "Stevens")
         self.assertEqual(ops[1].author_str, "Thomas")
@@ -654,11 +654,11 @@ class HarvardTests(TestCase):
         side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
     )
     def test_xml_harvard_extraction(self, mock):
-        """Did we succesfully not remove page citations while
+        """Did we successfully not remove page citations while
         processing other elements?"""
         self.assertSuccessfulParse(1)
         cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
-        opinions = cite.cluster.sub_opinions.all()
+        opinions = cite.cluster.sub_opinions.all().order_by("-pk")
         self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
         print("Success ✓")
 
