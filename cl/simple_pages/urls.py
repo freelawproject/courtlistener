@@ -1,4 +1,4 @@
-from django.conf.urls import url
+from django.urls import path
 from django.views.generic import RedirectView
 
 from cl.simple_pages.views import (
@@ -24,32 +24,30 @@ from cl.simple_pages.views import (
 
 urlpatterns = [
     # Footer stuff
-    url(r"^faq/$", faq, name="faq"),
-    url(r"^coverage/$", coverage_graph, name="coverage"),
-    url(
-        r"^coverage/financial-disclosures/$", coverage_fds, name="coverage_fds"
-    ),
-    url(r"^feeds/$", feeds, name="feeds_info"),
-    url(r"^podcasts/$", podcasts, name="podcasts"),
-    url(r"^contribute/$", contribute, name="contribute"),
-    url(r"^contact/$", contact, name="contact"),
-    url(r"^contact/thanks/$", contact_thanks, name="contact_thanks"),
+    path("faq/", faq, name="faq"),
+    path("coverage/", coverage_graph, name="coverage"),
+    path("coverage/financial-disclosures/", coverage_fds, name="coverage_fds"),
+    path("feeds/", feeds, name="feeds_info"),
+    path("podcasts/", podcasts, name="podcasts"),
+    path("contribute/", contribute, name="contribute"),
+    path("contact/", contact, name="contact"),
+    path("contact/thanks/", contact_thanks, name="contact_thanks"),
     # Help pages
-    url(r"^help/$", help_home, name="help_home"),
-    url(r"^help/markdown/$", markdown_help, name="markdown_help"),
-    url(r"^help/alerts/$", alert_help, name="alert_help"),
-    url(r"^help/donations/$", donation_help, name="donation_help"),
-    url(r"^help/delete-account/$", delete_help, name="delete_help"),
-    url(r"^help/search-operators/$", advanced_search, name="advanced_search"),
+    path("help/", help_home, name="help_home"),
+    path("help/markdown/", markdown_help, name="markdown_help"),
+    path("help/alerts/", alert_help, name="alert_help"),
+    path("help/donations/", donation_help, name="donation_help"),
+    path("help/delete-account/", delete_help, name="delete_help"),
+    path("help/search-operators/", advanced_search, name="advanced_search"),
     # Added 2018-10-23
-    url(
-        r"^search/advanced-techniques/$",
+    path(
+        "search/advanced-techniques/",
         RedirectView.as_view(pattern_name="advanced_search", permanent=True),
     ),
-    url(r"^terms/v/(\d{1,2})/$", old_terms, name="old_terms"),
-    url(r"^terms/$", latest_terms, name="terms"),
+    path("terms/v/<int:v>/", old_terms, name="old_terms"),
+    path("terms/", latest_terms, name="terms"),
     # Robots
-    url(r"^robots\.txt$", robots, name="robots"),
+    path("robots.txt", robots, name="robots"),
     # SEO-related stuff
-    url(r"^mywot8f5568174e171ff0acff.html$", validate_for_wot),
+    path("mywot8f5568174e171ff0acff.html", validate_for_wot),
 ]

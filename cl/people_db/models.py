@@ -2,7 +2,11 @@ from django.db import models
 from django.template import loader
 from django.urls import reverse
 from django.utils.text import slugify
-from localflavor.us import models as local_models
+from localflavor.us.models import (
+    USPostalCodeField,
+    USStateField,
+    USZipCodeField,
+)
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pst
@@ -147,7 +151,7 @@ class Person(AbstractDateTimeModel):
         max_length=50,
         blank=True,
     )
-    dob_state = local_models.USStateField(
+    dob_state = USStateField(
         help_text="The state where the person was born.",
         blank=True,
     )
@@ -162,7 +166,7 @@ class Person(AbstractDateTimeModel):
         max_length=50,
         blank=True,
     )
-    dod_state = local_models.USStateField(
+    dod_state = USStateField(
         help_text="The state where the person died.",
         blank=True,
     )
@@ -716,7 +720,7 @@ class Position(AbstractDateTimeModel):
         max_length=50,
         blank=True,
     )
-    location_state = local_models.USStateField(
+    location_state = USStateField(
         help_text="If not a court or school, the state where person worked.",
         blank=True,
     )
@@ -1544,13 +1548,15 @@ class Attorney(AbstractDateTimeModel):
         help_text="The raw contents of the contact field",
         db_index=True,
     )
-    phone = local_models.PhoneNumberField(
+    phone = models.CharField(
         help_text="The phone number of the attorney.",
         blank=True,
+        max_length=20,
     )
-    fax = local_models.PhoneNumberField(
+    fax = models.CharField(
         help_text="The fax number of the attorney.",
         blank=True,
+        max_length=20,
     )
     email = models.EmailField(
         help_text="The email address of the attorney.",
@@ -1624,12 +1630,12 @@ class AttorneyOrganization(AbstractDateTimeModel):
         help_text="The normalized city of the organization",
         db_index=True,
     )
-    state = local_models.USPostalCodeField(
+    state = USPostalCodeField(
         help_text="The two-letter USPS postal abbreviation for the "
         "organization",
         db_index=True,
     )
-    zip_code = local_models.USZipCodeField(
+    zip_code = USZipCodeField(
         help_text="The zip code for the organization, XXXXX or XXXXX-XXXX "
         "work.",
         db_index=True,
