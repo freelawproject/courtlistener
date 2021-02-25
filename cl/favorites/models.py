@@ -150,6 +150,7 @@ class Prayer(models.Model):
         RECAPDocument,
         help_text="The document you're praying for.",
         related_name="prayers",
+        on_delete=models.CASCADE,
     )
     status = models.SmallIntegerField(
         help_text="Whether the prayer has been granted or is still waiting.",
