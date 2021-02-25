@@ -8,7 +8,11 @@ from cl.audio.feeds import (
 from cl.audio.views import view_audio_file
 
 urlpatterns = [
-    path("audio/<int:pk>/<slug:_>/", view_audio_file, name="view_audio_file"),
+    path(
+        "audio/<int:pk>/<blank-slug:_>/",
+        view_audio_file,
+        name="view_audio_file",
+    ),
     # Podcasts
     path(
         "podcast/court/all/",

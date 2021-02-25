@@ -56,7 +56,7 @@ urlpatterns = [
         name="view_embedded_visualization",
     ),
     path(
-        "visualizations/scotus-mapper/<int:pk>/<slug:slug>/",
+        "visualizations/scotus-mapper/<int:pk>/<blank-slug:slug>/",
         view_visualization,
         name="view_visualization",
     ),

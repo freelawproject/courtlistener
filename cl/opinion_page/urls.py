@@ -25,39 +25,41 @@ urlpatterns = [
     ),
     # Opinion pages
     path(
-        "opinion/<int:pk>/<slug:slug>/authorities/",
+        "opinion/<int:pk>/<blank-slug:slug>/authorities/",
         view_authorities,
         name="view_authorities",
     ),
     path(
-        "opinion/<int:pk>/<slug:slug>/visualizations/",
+        "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
         cluster_visualizations,
         name="cluster_visualizations",
     ),
-    path("opinion/<int:pk>/<slug:_>/", view_opinion, name="view_case"),
-    path("docket/<int:pk>/<slug:slug>/", view_docket, name="view_docket"),
+    path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),
+    path(
+        "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"
+    ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
         redirect_docket_recap,
         name="redirect_docket_recap",
     ),
     path(
-        "docket/<int:docket_id>/parties/<slug:slug>/",
+        "docket/<int:docket_id>/parties/<blank-slug:slug>/",
         view_parties,
         name="docket_parties",
     ),
     path(
-        "docket/<int:docket_id>/idb/<slug:slug>/",
+        "docket/<int:docket_id>/idb/<blank-slug:slug>/",
         docket_idb_data,
         name="docket_idb_data",
     ),
     path(
-        "docket/<int:docket_id>/<str:doc_num>/<slug:slug>/",
+        "docket/<int:docket_id>/<str:doc_num>/<blank-slug:slug>/",
         view_recap_document,
         name="view_recap_document",
     ),
     path(
-        "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<slug:slug>/",
+        "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<blank-slug:slug>/",
         view_recap_document,
         name="view_recap_attachment",
     ),
