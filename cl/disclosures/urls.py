@@ -1,4 +1,4 @@
-from django.conf.urls import url
+from django.urls import path
 
 from cl.disclosures.views import (
     financial_disclosures_for_somebody,
@@ -6,13 +6,13 @@ from cl.disclosures.views import (
 )
 
 urlpatterns = [
-    url(
-        r"^person/(?P<pk>\d+)/(?P<slug>[^/]*)/financial-disclosures/$",
+    path(
+        "person/<int:pk>/<slug:slug>/financial-disclosures/",
         financial_disclosures_for_somebody,
         name="financial_disclosures_for_somebody",
     ),
-    url(
-        r"^financial-disclosures/$",
+    path(
+        "financial-disclosures/",
         financial_disclosures_home,
         name="financial_disclosures_home",
     ),
