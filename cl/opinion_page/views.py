@@ -1,6 +1,6 @@
 from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, Union
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -57,7 +57,7 @@ from cl.search.models import (
 from cl.search.views import do_search
 
 
-def court_homepage(request: HttpRequest, pk: int) -> HttpResponse:
+def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if pk not in ["tennworkcompcl", "tennworkcompapp"]:
         raise Http404("Court pages only implemented for Tennessee so far.")
 
@@ -154,7 +154,10 @@ def user_has_alert(user: User, docket: Docket) -> bool:
     return has_alert
 
 
-def core_docket_data(request: HttpRequest, pk: int) -> HttpResponse:
+def core_docket_data(
+    request: HttpRequest,
+    pk: int,
+) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, FavoriteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket = get_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
