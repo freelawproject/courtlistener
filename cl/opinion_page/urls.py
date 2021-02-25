@@ -52,12 +52,12 @@ urlpatterns = [
         name="docket_idb_data",
     ),
     path(
-        "docket/<int:docket_id>/<int:doc_num>/<slug:slug>/",
+        "docket/<int:docket_id>/<str:doc_num>/<slug:slug>/",
         view_recap_document,
         name="view_recap_document",
     ),
     path(
-        "docket/<int:docket_id>/<int:doc_num>/<int:att_num>/<slug:slug>/",
+        "docket/<int:docket_id>/<str:doc_num>/<int:att_num>/<slug:slug>/",
         view_recap_document,
         name="view_recap_attachment",
     ),
