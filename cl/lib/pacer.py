@@ -16,7 +16,6 @@ from juriscraper.pacer import (
     DocketReport,
     InternetArchive,
 )
-from localflavor.us.forms import phone_digits_re
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
 from cl.people_db.models import AttorneyOrganization, Role
@@ -36,6 +35,8 @@ pacer_to_cl_ids = {
 
 # Reverse dict of pacer_to_cl_ids
 cl_to_pacer_ids = {v: k for k, v in pacer_to_cl_ids.items()}
+
+phone_digits_re = re.compile(r"^(?:1-?)?(\d{3})[-.]?(\d{3})[-.]?(\d{4})$")
 
 
 def map_pacer_to_cl_id(pacer_id):

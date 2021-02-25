@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
 
-import localflavor.us.models
 from django.db import migrations, models
+from localflavor.us.models import USPostalCodeField, USZipCodeField
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Migration(migrations.Migration):
@@ -22,8 +23,8 @@ class Migration(migrations.Migration):
                 ('date_sourced', models.DateField(help_text='The latest date on the source docket that populated this information. When information is in conflict use the latest data.', db_index=True)),
                 ('name', models.TextField(help_text='The name of the attorney.', db_index=True)),
                 ('contact_raw', models.TextField(help_text='The raw contents of the contact field', db_index=True)),
-                ('phone', localflavor.us.models.PhoneNumberField(help_text='The phone number of the attorney.', max_length=20)),
-                ('fax', localflavor.us.models.PhoneNumberField(help_text='The fax number of the attorney.', max_length=20)),
+                ('phone', PhoneNumberField(help_text='The phone number of the attorney.', max_length=20)),
+                ('fax', PhoneNumberField(help_text='The fax number of the attorney.', max_length=20)),
                 ('email', models.EmailField(help_text='The email address of the attorney.', max_length=254)),
             ],
         ),
@@ -38,8 +39,8 @@ class Migration(migrations.Migration):
                 ('address1', models.TextField(help_text='The normalized address1 of the organization', db_index=True)),
                 ('address2', models.TextField(help_text='The normalized address2 of the organization', db_index=True)),
                 ('city', models.TextField(help_text='The normalized city of the organization', db_index=True)),
-                ('state', localflavor.us.models.USPostalCodeField(help_text='The two-letter USPS postal abbreviation for the organization', max_length=2, db_index=True, choices=[('AL', 'Alabama'), ('AK', 'Alaska'), ('AS', 'American Samoa'), ('AZ', 'Arizona'), ('AR', 'Arkansas'), ('AA', 'Armed Forces Americas'), ('AE', 'Armed Forces Europe'), ('AP', 'Armed Forces Pacific'), ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'), ('DC', 'District of Columbia'), ('FM', 'Federated States of Micronesia'), ('FL', 'Florida'), ('GA', 'Georgia'), ('GU', 'Guam'), ('HI', 'Hawaii'), ('ID', 'Idaho'), ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'), ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MH', 'Marshall Islands'), ('MD', 'Maryland'), ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'), ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'), ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'), ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('MP', 'Northern Mariana Islands'), ('OH', 'Ohio'), ('OK', 'Oklahoma'), ('OR', 'Oregon'), ('PW', 'Palau'), ('PA', 'Pennsylvania'), ('PR', 'Puerto Rico'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'), ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'), ('VT', 'Vermont'), ('VI', 'Virgin Islands'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'), ('WI', 'Wisconsin'), ('WY', 'Wyoming')])),
-                ('zip_code', localflavor.us.models.USZipCodeField(help_text='The zip code for the organization, XXXXX or XXXXX-XXXX work.', max_length=10, db_index=True)),
+                ('state', USPostalCodeField(help_text='The two-letter USPS postal abbreviation for the organization', max_length=2, db_index=True, choices=[('AL', 'Alabama'), ('AK', 'Alaska'), ('AS', 'American Samoa'), ('AZ', 'Arizona'), ('AR', 'Arkansas'), ('AA', 'Armed Forces Americas'), ('AE', 'Armed Forces Europe'), ('AP', 'Armed Forces Pacific'), ('CA', 'California'), ('CO', 'Colorado'), ('CT', 'Connecticut'), ('DE', 'Delaware'), ('DC', 'District of Columbia'), ('FM', 'Federated States of Micronesia'), ('FL', 'Florida'), ('GA', 'Georgia'), ('GU', 'Guam'), ('HI', 'Hawaii'), ('ID', 'Idaho'), ('IL', 'Illinois'), ('IN', 'Indiana'), ('IA', 'Iowa'), ('KS', 'Kansas'), ('KY', 'Kentucky'), ('LA', 'Louisiana'), ('ME', 'Maine'), ('MH', 'Marshall Islands'), ('MD', 'Maryland'), ('MA', 'Massachusetts'), ('MI', 'Michigan'), ('MN', 'Minnesota'), ('MS', 'Mississippi'), ('MO', 'Missouri'), ('MT', 'Montana'), ('NE', 'Nebraska'), ('NV', 'Nevada'), ('NH', 'New Hampshire'), ('NJ', 'New Jersey'), ('NM', 'New Mexico'), ('NY', 'New York'), ('NC', 'North Carolina'), ('ND', 'North Dakota'), ('MP', 'Northern Mariana Islands'), ('OH', 'Ohio'), ('OK', 'Oklahoma'), ('OR', 'Oregon'), ('PW', 'Palau'), ('PA', 'Pennsylvania'), ('PR', 'Puerto Rico'), ('RI', 'Rhode Island'), ('SC', 'South Carolina'), ('SD', 'South Dakota'), ('TN', 'Tennessee'), ('TX', 'Texas'), ('UT', 'Utah'), ('VT', 'Vermont'), ('VI', 'Virgin Islands'), ('VA', 'Virginia'), ('WA', 'Washington'), ('WV', 'West Virginia'), ('WI', 'Wisconsin'), ('WY', 'Wyoming')])),
+                ('zip_code', USZipCodeField(help_text='The zip code for the organization, XXXXX or XXXXX-XXXX work.', max_length=10, db_index=True)),
             ],
         ),
         migrations.CreateModel(
