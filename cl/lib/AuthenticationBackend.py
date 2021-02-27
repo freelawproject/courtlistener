@@ -1,12 +1,12 @@
 from django import forms
-from django.contrib.auth import authenticate
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
 from django.urls import reverse
 
 
 class ConfirmedEmailAuthenticationForm(AuthenticationForm):
-    """Your average form, but with an additional tweak to the clean method
-    which ensures that only users with confirmed email addresses can log in.
+    """Your average form, but with an additional tweak to ensure that only
+    users with confirmed email addresses can log in.
 
     This is needed because we create stub accounts for people that donate and
     don't already have accounts. Without this check, people could sign up for
@@ -14,38 +14,25 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     had a stub account.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super(ConfirmedEmailAuthenticationForm, self).__init__(*args, **kwargs)
 
-    def clean(self):
-        username = self.cleaned_data.get("username")
-        password = self.cleaned_data.get("password")
+    def confirm_login_allowed(self, user: User) -> None:
+        """Make sure the user is active and has a confirmed email address
 
-        if username and password:
-            self.user_cache = authenticate(
-                username=username, password=password
+        If the given user cannot log in, this method should raise a
+        ``forms.ValidationError``.
+
+        If the given user may log in, this method should return None.
+        """
+        if not user.is_active:
+            raise forms.ValidationError(
+                self.error_messages["inactive"],
+                code="inactive",
             )
-            if self.user_cache is None:
-                if "@" in username:
-                    raise forms.ValidationError(
-                        "Please enter a correct username and password. Note "
-                        "that both fields may be case-sensitive. Did you use "
-                        "your email address instead of your username?"
-                    )
-                else:
-                    raise forms.ValidationError(
-                        self.error_messages["invalid_login"],
-                        code="invalid_login",
-                        params={"username": self.username_field.verbose_name},
-                    )
-            elif not self.user_cache.is_active:
-                raise forms.ValidationError(
-                    self.error_messages["inactive"], code="inactive"
-                )
-            elif not self.user_cache.profile.email_confirmed:
-                raise forms.ValidationError(
-                    'Please <a href="%s">validate your email address</a> to '
-                    "log in." % reverse("email_confirmation_request")
-                )
 
-        return self.cleaned_data
+        if not user.profile.email_confirmed:
+            raise forms.ValidationError(
+                'Please <a href="%s">validate your email address</a> to '
+                "log in." % reverse("email_confirmation_request")
+            )
