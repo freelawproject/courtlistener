@@ -1,18 +1,13 @@
-import os
-
 from django.conf import settings
-from django.contrib.staticfiles.templatetags.staticfiles import static
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
+from django.templatetags.static import static
 from django.urls import reverse
 from django.utils.text import slugify
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.disclosures.models import FinancialDisclosure
-from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
-from cl.stats.utils import tally_stat
 
 
 def make_title_str(person):
