@@ -678,10 +678,11 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
-    class_action = models.NullBooleanField(
+    class_action = models.BooleanField(
         help_text="Involves an allegation by the plaintiff that the complaint "
         'meets the prerequisites of a "Class Action" as provided '
         "in Rule 23 - F.R.CV.P. ",
+        null=True,
     )
     monetary_demand = models.IntegerField(
         help_text="The monetary amount sought by plaintiff (in thousands). "

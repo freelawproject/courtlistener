@@ -61,7 +61,7 @@ class Migration(migrations.Migration):
                 ('page_count', models.SmallIntegerField(help_text='The number of pages in the disclosure report')),
                 ('sha1', models.CharField(blank=True, db_index=True, help_text='SHA1 hash of the generated PDF', max_length=40, unique=True)),
                 ('report_type', models.SmallIntegerField(choices=[(-1, 'Unknown Report'), (0, 'Nomination Report'), (1, 'Initial Report'), (2, 'Annual Report'), (3, 'Final Report')], default=-1, help_text='Financial Disclosure report type')),
-                ('is_amended', models.NullBooleanField(default=False, help_text='Is disclosure amended?')),
+                ('is_amended', models.BooleanField(default=False, null=True, help_text='Is disclosure amended?')),
                 ('addendum_content_raw', models.TextField(blank=True, help_text='Raw content of addendum with whitespace preserved.')),
                 ('addendum_redacted', models.BooleanField(default=False, help_text='Is the addendum partially or completely redacted?')),
                 ('has_been_extracted', models.BooleanField(default=False, help_text='Have we successfully extracted the data from PDF?')),

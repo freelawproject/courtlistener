@@ -862,9 +862,10 @@ class Position(AbstractDateTimeModel):
         max_length=2,
         blank=True,
     )
-    voice_vote = models.NullBooleanField(
+    voice_vote = models.BooleanField(
         help_text="Whether the Senate voted by voice vote for this position.",
         blank=True,
+        null=True,
     )
     votes_yes = models.PositiveIntegerField(
         help_text="If votes are an integer, this is the number of votes in "
@@ -1070,13 +1071,13 @@ class RetentionEvent(AbstractDateTimeModel):
         null=True,
         blank=True,
     )
-    unopposed = models.NullBooleanField(
+    unopposed = models.BooleanField(
         help_text="Whether the position was unopposed at the time of "
         "retention.",
         null=True,
         blank=True,
     )
-    won = models.NullBooleanField(
+    won = models.BooleanField(
         help_text="Whether the retention event was won.",
         null=True,
         blank=True,
