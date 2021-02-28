@@ -221,7 +221,7 @@ class UploadPublication(TestCase):
             content_type="application/pdf",
         )
         self.png = SimpleUploadedFile(
-            b"file.png", b"file_content", content_type="image/png"
+            "file.png", b"file_content", content_type="image/png"
         )
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
@@ -298,11 +298,12 @@ class UploadPublication(TestCase):
         form.fields["lead_author"].queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
-        self.assertEqual(form.is_valid(), False, form.errors)
+        self.assertFalse(form.is_valid(), form.errors)
         self.assertEqual(
             form.errors["pdf_upload"],
             [
-                "File extension 'b'png'' is not allowed. Allowed extensions are: 'pdf'."
+                "File extension 'png' is not allowed. Allowed "
+                "extensions are: 'pdf'."
             ],
         )
 
