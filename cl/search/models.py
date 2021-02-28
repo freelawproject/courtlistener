@@ -539,7 +539,7 @@ class Docket(AbstractDateTimeModel):
         null=True,
         blank=True,
     )
-    ia_needs_upload = models.NullBooleanField(
+    ia_needs_upload = models.BooleanField(
         help_text=(
             "Does this item need to be uploaded to the Internet "
             "Archive? I.e., has it changed? This field is important "
@@ -549,6 +549,7 @@ class Docket(AbstractDateTimeModel):
             "can't easily check that."
         ),
         blank=True,
+        null=True,
         db_index=True,
     )
     ia_date_first_change = models.DateTimeField(
@@ -995,19 +996,21 @@ class AbstractPacerDocument(models.Model):
         max_length=32,  # Same as in RECAP
         blank=True,
     )
-    is_available = models.NullBooleanField(
+    is_available = models.BooleanField(
         help_text="True if the item is available in RECAP",
         blank=True,
         null=True,
         default=False,
     )
-    is_free_on_pacer = models.NullBooleanField(
+    is_free_on_pacer = models.BooleanField(
         help_text="Is this item freely available as an opinion on PACER?",
         db_index=True,
+        null=True,
     )
-    is_sealed = models.NullBooleanField(
+    is_sealed = models.BooleanField(
         help_text="Is this item sealed or otherwise unavailable on PACER?",
         db_index=True,
+        null=True,
     )
 
     class Meta:
@@ -1704,12 +1707,13 @@ class Court(models.Model):
         null=True,
         blank=True,
     )
-    pacer_has_rss_feed = models.NullBooleanField(
+    pacer_has_rss_feed = models.BooleanField(
         help_text=(
             "Whether the court has a PACER RSS feed. If null, this "
             "doesn't apply to the given court."
         ),
         blank=True,
+        null=True,
     )
     pacer_rss_entry_types = models.TextField(
         help_text="The types of entries provided by the court's RSS feed.",

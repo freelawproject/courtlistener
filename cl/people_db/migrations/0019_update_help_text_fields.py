@@ -205,7 +205,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='position',
             name='voice_vote',
-            field=models.NullBooleanField(help_text='Whether the Senate voted by voice vote for this position.'),
+            field=models.BooleanField(help_text='Whether the Senate voted by voice vote for this position.', null=True, blank=True),
         ),
         migrations.AlterField(
             model_name='position',
@@ -251,7 +251,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='retentionevent',
             name='unopposed',
-            field=models.NullBooleanField(help_text='Whether the position was unopposed at the time of retention.'),
+            field=models.BooleanField(help_text='Whether the position was unopposed at the time of retention.', null=True, blank=True),
         ),
         migrations.AlterField(
             model_name='retentionevent',
@@ -276,7 +276,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='retentionevent',
             name='won',
-            field=models.NullBooleanField(help_text='Whether the retention event was won.'),
+            field=models.BooleanField(help_text='Whether the retention event was won.', null=True, blank=True),
         ),
         migrations.AlterField(
             model_name='school',

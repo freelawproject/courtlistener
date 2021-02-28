@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                 ('document_number', models.PositiveIntegerField(help_text='If the file is a document, the number is the document_number in RECAP docket.')),
                 ('attachment_number', models.SmallIntegerField(help_text='If the file is an attachment, the number is the attachment number in RECAP docket.', null=True, blank=True)),
                 ('pacer_doc_id', models.CharField(help_text='The ID of the document in PACER. This information is provided by RECAP.', unique=True, max_length=32)),
-                ('is_available', models.NullBooleanField(default=False, help_text='True if the item is available in RECAP')),
+                ('is_available', models.BooleanField(default=False, null=True, blank=True, help_text='True if the item is available in RECAP')),
                 ('sha1', models.CharField(help_text='The ID used for a document in RECAP', max_length=40, blank=True)),
                 ('filepath_local', models.FileField(help_text='The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_recap_path)),
                 ('filepath_ia', models.CharField(help_text='The URL of the file in IA', max_length=1000)),
