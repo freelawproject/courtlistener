@@ -12,21 +12,25 @@ urlpatterns = [
     # Sign in/out and password pages
     path(
         "sign-in/",
-        ratelimiter_unsafe_10_per_m(auth_views.login),
-        {
-            "template_name": "register/login.html",
-            "authentication_form": ConfirmedEmailAuthenticationForm,
-            "extra_context": {"private": False},
-        },
+        ratelimiter_unsafe_10_per_m(
+            auth_views.LoginView.as_view(
+                **{
+                    "template_name": "register/login.html",
+                    "authentication_form": ConfirmedEmailAuthenticationForm,
+                    "extra_context": {"private": False},
+                }
+            )
+        ),
         name="sign-in",
     ),
     path(
         "sign-out/",
-        auth_views.logout,
-        {
-            "template_name": "register/logged_out.html",
-            "extra_context": {"private": False},
-        },
+        auth_views.LogoutView.as_view(
+            **{
+                "template_name": "register/logged_out.html",
+                "extra_context": {"private": False},
+            },
+        ),
     ),
     path(
         "reset-password/",
@@ -44,30 +48,33 @@ urlpatterns = [
     ),
     path(
         "reset-password/instructions-sent/",
-        auth_views.password_reset_done,
-        {
-            "template_name": "register/password_reset_done.html",
-            "extra_context": {"private": True},
-        },
+        auth_views.PasswordResetDoneView.as_view(
+            **{
+                "template_name": "register/password_reset_done.html",
+                "extra_context": {"private": True},
+            },
+        ),
         name="password_reset_done",
     ),
     re_path(
         r"^confirm-password/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>.+)/$",
-        auth_views.password_reset_confirm,
-        {
-            "template_name": "register/password_reset_confirm.html",
-            "set_password_form": CustomSetPasswordForm,
-            "extra_context": {"private": True},
-        },
+        auth_views.PasswordResetConfirmView.as_view(
+            **{
+                "template_name": "register/password_reset_confirm.html",
+                "form_class": CustomSetPasswordForm,
+                "extra_context": {"private": True},
+            },
+        ),
         name="confirm_password",
     ),
     path(
         "reset-password/complete/",
-        auth_views.password_reset_complete,
-        {
-            "template_name": "register/password_reset_complete.html",
-            "extra_context": {"private": True},
-        },
+        auth_views.PasswordResetCompleteView.as_view(
+            **{
+                "template_name": "register/password_reset_complete.html",
+                "extra_context": {"private": True},
+            },
+        ),
         name="password_reset_complete",
     ),
     # Profile pages

@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='is_free_on_pacer',
-            field=models.NullBooleanField(help_text='Is this item freely available as an opinion on PACER?', db_index=True),
+            field=models.BooleanField(help_text='Is this item freely available as an opinion on PACER?', db_index=True, null=True),
         ),
         migrations.AlterField(
             model_name='recapdocument',

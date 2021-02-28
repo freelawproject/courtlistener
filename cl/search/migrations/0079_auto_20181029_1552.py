@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='recapdocument',
             name='is_sealed',
-            field=models.NullBooleanField(help_text='Is this item sealed or otherwise unavailable on PACER?', db_index=True),
+            field=models.BooleanField(help_text='Is this item sealed or otherwise unavailable on PACER?', db_index=True, null=True),
         ),
         migrations.AlterField(
             model_name='citation',

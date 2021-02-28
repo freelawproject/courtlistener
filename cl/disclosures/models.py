@@ -224,9 +224,10 @@ class FinancialDisclosure(AbstractDateTimeModel):
         choices=REPORT_TYPES.NAMES,
         default=REPORT_TYPES.UNKNOWN,
     )
-    is_amended = models.NullBooleanField(
+    is_amended = models.BooleanField(
         help_text="Is disclosure amended?",
         default=False,
+        null=True,
     )
     addendum_content_raw = models.TextField(
         help_text="Raw content of addendum with whitespace preserved.",
