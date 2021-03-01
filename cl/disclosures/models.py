@@ -243,10 +243,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return (
-            f"<Disclosure: {self.pk}, person: "
-            f"{self.person_id}, year: {self.year}>"
-        )
+        return f"{self.pk}, person: {self.person_id}, year: {self.year}"
 
     def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
         """Calculate gross value of all investments in disclosure
