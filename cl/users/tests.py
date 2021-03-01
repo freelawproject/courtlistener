@@ -275,9 +275,7 @@ class LiveUserTest(BaseSeleniumTest):
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(
-                        str(up.user.pk).encode()
-                    ).decode(),
+                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
                     "token": token,
                 },
             ),
