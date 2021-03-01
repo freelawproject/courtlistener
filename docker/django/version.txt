@@ -1,5 +1,6 @@
-1.0.27
+1.0.28
 
+1.0.28 - Upgrade to Django 2.2
 1.0.27 - Upgrade to Django 2.1
 1.0.26 - Upgrade stripe
 1.0.25 - Remove logilab-common
