@@ -1,0 +1,6 @@
+{
+  "ignore_dirs": [
+    ".mypy_cache",
+    "cl/node_modules"
+  ]
+}
