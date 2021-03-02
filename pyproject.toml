@@ -101,7 +101,7 @@ eyecite = "^1.1.0"
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.0"
 pytest = "==4.4.*,>=4.4.0"
-pytest-django = "==3.4.*,>=3.4.0"
+pytest-django = "==3.10.*"
 black = {version = "^20.8b1", allow-prereleases = true}
 flake8 = "^3.8.3"
 mypy = "^0.782"
