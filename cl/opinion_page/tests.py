@@ -201,7 +201,7 @@ class OpinionSitemapTest(SitemapTest):
 )
 class UploadPublication(TestCase):
 
-    fixtures = ["tenn_test_judges.json"]
+    fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
 
     def setUp(self):
         self.client = Client()
