@@ -259,7 +259,7 @@ class TestModelHelpers(TestCase):
 
 class UUIDFileSystemStorageTest(SimpleTestCase):
     # Borrows from https://github.com/django/django/blob/9cbf48693dcd8df6cb22c183dcc94e7ce62b2921/tests/file_storage/tests.py#L89
-    allow_database_queries = True
+    databases = "__all__"
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
