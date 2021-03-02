@@ -13,8 +13,8 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.encoding import (
     DjangoUnicodeDecodeError,
-    force_text,
-    smart_text,
+    force_str,
+    smart_str,
 )
 from django.utils.timezone import now
 from juriscraper.pacer import CaseQuery, PacerSession
@@ -106,7 +106,7 @@ def extract_from_html(path: str) -> Tuple[str, bool]:
         encodings = ["utf-8", "ISO8859", "cp1252"]
         for encoding in encodings:
             try:
-                content = force_text(content, encoding=encoding)
+                content = force_str(content, encoding=encoding)
             except DjangoUnicodeDecodeError:
                 continue
             else:
@@ -217,9 +217,9 @@ def extract_from_txt(path: str) -> Tuple[str, bool]:
             data = f.read()
         try:
             # Alas, cp1252 is probably still more popular than utf-8.
-            content = smart_text(data, encoding="cp1252")
+            content = smart_str(data, encoding="cp1252")
         except DjangoUnicodeDecodeError:
-            content = smart_text(data, encoding="utf-8", errors="ignore")
+            content = smart_str(data, encoding="utf-8", errors="ignore")
     except:
         err = True
         content = ""

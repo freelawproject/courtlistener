@@ -13,7 +13,7 @@ from django.core.mail import send_mail
 from django.db import connections
 from django.urls import resolve
 from django.utils.decorators import method_decorator
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
@@ -134,7 +134,7 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                 attrs["choices"] = [
                     {
                         "value": choice_value,
-                        "display_name": force_text(
+                        "display_name": force_str(
                             choice_name, strings_only=True
                         ),
                     }
