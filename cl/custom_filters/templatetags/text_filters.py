@@ -2,7 +2,7 @@ import re
 
 from django.template import Library
 from django.template.defaultfilters import stringfilter
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 
@@ -21,7 +21,7 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
     :param separator: The separator between the items. Typically a comma.
     :returns s: A string with the items in the list joined together.
     """
-    items = list(map(force_text, items))
+    items = list(map(force_str, items))
     if autoescape:
         items = list(map(conditional_escape, items))
 
