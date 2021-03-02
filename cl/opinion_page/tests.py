@@ -302,8 +302,8 @@ class UploadPublication(TestCase):
         self.assertEqual(
             form.errors["pdf_upload"],
             [
-                "File extension 'png' is not allowed. Allowed "
-                "extensions are: 'pdf'."
+                "File extension “png” is not allowed. Allowed "
+                "extensions are: pdf."
             ],
         )
 
