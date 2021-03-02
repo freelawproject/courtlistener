@@ -677,7 +677,7 @@ python-versions = "*"
 
 [[package]]
 name = "ipython"
-version = "7.20.0"
+version = "7.21.0"
 description = "IPython: Productive Interactive Computing"
 category = "main"
 optional = false
@@ -1655,7 +1655,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2c71aa79e1165fb0c6840d8be3b0f3c42532b25e9c5d5356481ff409a1effc76"
+content-hash = "8fa74781da06e7b138c2dbaf2a1f0fcc92ade7d33974904c314b90ebb89b18b0"
 
 [metadata.files]
 amqp = [
@@ -1966,8 +1966,8 @@ ipaddress = [
     {file = "ipaddress-1.0.23.tar.gz", hash = "sha256:b7f8e0369580bb4a24d5ba1d7cc29660a4a6987763faf1d8a8046830e020e7e2"},
 ]
 ipython = [
-    {file = "ipython-7.20.0-py3-none-any.whl", hash = "sha256:1918dea4bfdc5d1a830fcfce9a710d1d809cbed123e85eab0539259cb0f56640"},
-    {file = "ipython-7.20.0.tar.gz", hash = "sha256:1923af00820a8cf58e91d56b89efc59780a6e81363b94464a0f17c039dffff9e"},
+    {file = "ipython-7.21.0-py3-none-any.whl", hash = "sha256:34207ffb2f653bced2bc8e3756c1db86e7d93e44ed049daae9814fed66d408ec"},
+    {file = "ipython-7.21.0.tar.gz", hash = "sha256:04323f72d5b85b606330b6d7e2dc8d2683ad46c3905e955aa96ecc7a99388e70"},
 ]
 ipython-genutils = [
     {file = "ipython_genutils-0.2.0-py2.py3-none-any.whl", hash = "sha256:72dd37233799e619666c9f639a9da83c34013a73e8bbc79a7a6348d93c61fab8"},
