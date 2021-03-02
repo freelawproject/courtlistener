@@ -94,7 +94,7 @@ juriscraper = "^2.3.0"
 scorched = {git = "https://github.com/freelawproject/scorched.git"}
 django-filter = "2.2.0"
 djangorestframework-filters = "1.0.0.dev2"
-ipython = "^7.18.1"
+ipython = "^7.21.0"
 gunicorn = "^20.0.4"
 eyecite = "^1.1.0"
 
