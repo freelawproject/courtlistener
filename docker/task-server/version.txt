@@ -1,5 +1,9 @@
-1.0.23
+1.0.27
 
+1.0.27 - Upgrade djangorestframework-xml
+1.0.26 - Upgrade django-redis-cache
+1.0.25 - Upgrade boto3 and django-storages
+1.0.24 - Upgrade to Django 3.0
 1.0.23 - Upgrade to Django 2.2
 1.0.22 - Upgrade to Django 2.1
 1.0.21 - Upgrade stripe
