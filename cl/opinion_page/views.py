@@ -30,6 +30,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
+from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
@@ -738,7 +739,7 @@ def citation_redirector(
 @ensure_csrf_cookie
 def block_item(request: HttpRequest) -> HttpResponse:
     """Block an item from search results using AJAX"""
-    if request.is_ajax() and request.user.is_superuser:
+    if is_ajax(request) and request.user.is_superuser:
         obj_type = request.POST["type"]
         pk = request.POST["id"]
         if obj_type == "docket":

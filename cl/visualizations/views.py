@@ -17,6 +17,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
+from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizEditForm, VizForm
@@ -180,7 +181,7 @@ def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
 @ensure_csrf_cookie
 @login_required
 def delete_visualization(request: HttpRequest) -> HttpResponse:
-    if request.is_ajax():
+    if is_ajax(request):
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.deleted = True
         v.save()
@@ -194,7 +195,7 @@ def delete_visualization(request: HttpRequest) -> HttpResponse:
 @ensure_csrf_cookie
 @login_required
 def restore_visualization(request: HttpRequest) -> HttpResponse:
-    if request.is_ajax():
+    if is_ajax(request):
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.deleted = False
         v.date_deleted = None
@@ -209,7 +210,7 @@ def restore_visualization(request: HttpRequest) -> HttpResponse:
 @ensure_csrf_cookie
 @login_required
 def share_visualization(request: HttpRequest) -> HttpResponse:
-    if request.is_ajax():
+    if is_ajax(request):
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.published = True
         v.save()
@@ -223,7 +224,7 @@ def share_visualization(request: HttpRequest) -> HttpResponse:
 @ensure_csrf_cookie
 @login_required
 def privatize_visualization(request: HttpRequest) -> HttpResponse:
-    if request.is_ajax():
+    if is_ajax(request):
         v = SCOTUSMap.objects.get(pk=request.POST.get("pk"), user=request.user)
         v.published = False
         v.save()
