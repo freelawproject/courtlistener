@@ -35,6 +35,7 @@ from cl.donate.stripe_helpers import (
     process_stripe_payment,
 )
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
+from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users.utils import create_stub_account
 
@@ -365,7 +366,7 @@ def payment_complete(
 
 def toggle_monthly_donation(request: HttpRequest) -> HttpResponse:
     """Use Ajax to enable/disable monthly contributions"""
-    if request.is_ajax() and request.method == "POST":
+    if is_ajax(request) and request.method == "POST":
         monthly_pk = request.POST.get("id")
         m_donation = MonthlyDonation.objects.get(pk=monthly_pk)
         state = m_donation.enabled

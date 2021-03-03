@@ -6,6 +6,7 @@ from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import Alert, DocketAlert
+from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.opinion_page.views import make_docket_title, user_has_alert
 from cl.search.models import Docket
@@ -87,7 +88,7 @@ def enable_alert(request, secret_key):
 
 def toggle_docket_alert(request: HttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
-    if request.is_ajax() and request.method == "POST":
+    if is_ajax(request) and request.method == "POST":
         docket_pk = request.POST.get("id")
         existing_alert = DocketAlert.objects.filter(
             user=request.user, docket_id=docket_pk
