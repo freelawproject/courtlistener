@@ -14,6 +14,7 @@ from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite, UserTag
+from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 
 
@@ -60,7 +61,7 @@ def save_or_update_favorite(request: HttpRequest) -> HttpResponse:
     user already has the document favorited, it updates the favorite with the
     new information. If not, it creates a new favorite.
     """
-    if request.is_ajax():
+    if is_ajax(request):
         fave = get_favorite(request)
         if fave is None:
             return HttpResponseServerError(
@@ -93,7 +94,7 @@ def delete_favorite(request: HttpRequest) -> HttpResponse:
 
     Deletes a favorite for a user using an ajax call and post data.
     """
-    if request.is_ajax():
+    if is_ajax(request):
         fave = get_favorite(request)
         if fave is None:
             return HttpResponseServerError(
