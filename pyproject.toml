@@ -28,7 +28,7 @@ cl-manage = "manage:main"
 [tool.poetry.dependencies]
 argparse = "*"
 beautifulsoup4 = "==4.8.*,>=4.8.0"
-boto3 = "^1.17.18"
+boto3 = "^1.17.19"
 cchardet = "^2.1.1"
 celery = "^4.3.0"
 certifi = "^2020.12.5"
