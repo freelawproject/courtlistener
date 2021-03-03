@@ -61,7 +61,7 @@ def court_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-def rest_docs(request, version):
+def rest_docs(request, version=None):
     """Show the correct version of the rest docs"""
     courts = make_court_variable()
     court_count = len(courts)

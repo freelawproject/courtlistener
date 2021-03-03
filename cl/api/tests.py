@@ -42,7 +42,11 @@ from cl.stats.models import Event
 class BasicAPIPageTest(TestCase):
     """Test the basic views"""
 
-    fixtures = ["judge_judy.json", "test_objects_search.json"]
+    fixtures = [
+        "judge_judy.json",
+        "test_court.json",
+        "test_objects_search.json",
+    ]
 
     def setUp(self):
         self.client = Client()
