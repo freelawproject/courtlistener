@@ -201,7 +201,7 @@ class OpinionSitemapTest(SitemapTest):
 )
 class UploadPublication(TestCase):
 
-    fixtures = ["tenn_test_judges.json"]
+    fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
 
     def setUp(self):
         self.client = Client()
@@ -302,8 +302,8 @@ class UploadPublication(TestCase):
         self.assertEqual(
             form.errors["pdf_upload"],
             [
-                "File extension 'png' is not allowed. Allowed "
-                "extensions are: 'pdf'."
+                "File extension “png” is not allowed. Allowed "
+                "extensions are: pdf."
             ],
         )
 

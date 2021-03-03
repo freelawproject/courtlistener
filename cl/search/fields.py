@@ -7,7 +7,7 @@ from django.core import validators
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils import formats
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 
 INPUT_FORMATS = [
     "%Y%m%d",  # '20061025'
@@ -46,7 +46,7 @@ class FloorDateField(DateField):
         if isinstance(value, datetime.date):
             return value
 
-        unicode_value = force_text(value, strings_only=True)
+        unicode_value = force_str(value, strings_only=True)
         if isinstance(unicode_value, str):
             value = unicode_value.strip()
         # If unicode, try to strptime against each input format.
@@ -107,7 +107,7 @@ class CeilingDateField(DateField):
             return value.date()
         if isinstance(value, datetime.date):
             return value
-        unicode_value = force_text(value, strings_only=True)
+        unicode_value = force_str(value, strings_only=True)
         if isinstance(unicode_value, str):
             value = unicode_value.strip()
         # If unicode, try to strptime against each input format.

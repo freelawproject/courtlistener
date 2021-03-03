@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.urls import reverse
-from django.utils.http import is_safe_url
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
@@ -39,7 +39,7 @@ def sanitize_redirection(request):
     register_in_url = reverse("register") in redirect_to
     garbage_url = " " in redirect_to
     no_url = not redirect_to
-    not_safe_url = not is_safe_url(
+    not_safe_url = not url_has_allowed_host_and_scheme(
         redirect_to,
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
