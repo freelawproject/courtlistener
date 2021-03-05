@@ -88,6 +88,9 @@ def enable_alert(request, secret_key):
 
 def toggle_docket_alert(request: HttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
+    if request.user.is_anonymous:
+        return HttpResponse("Please log in to continue.")
+
     if is_ajax(request) and request.method == "POST":
         docket_pk = request.POST.get("id")
         existing_alert = DocketAlert.objects.filter(
