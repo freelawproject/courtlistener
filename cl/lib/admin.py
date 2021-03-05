@@ -8,7 +8,6 @@ class AdminTweaksMixin(object):
         css = {
             "all": ("css/admin.css",),
         }
-        js = ("js/admin.js",)
 
 
 class NotesInline(GenericTabularInline):
