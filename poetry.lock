@@ -381,11 +381,11 @@ bcrypt = ["bcrypt"]
 
 [[package]]
 name = "django-cache-memoize"
-version = "0.1.7"
+version = "0.1.8"
 description = "Django utility for a memoization decorator that uses the Django cache framework."
 category = "main"
 optional = false
-python-versions = ">=3.4"
+python-versions = ">=3.5"
 
 [package.extras]
 dev = ["flake8", "tox", "twine", "therapist", "black"]
@@ -1670,7 +1670,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "d7c963a800f6edc5c0adf315ebb60cbd416f9e8c2b947d546263852d9ad3451b"
+content-hash = "d0a2cf7fc8fb5e3c1a10dc599c9feb2a2d2958374c7fe7c32312626c530188d1"
 
 [metadata.files]
 amqp = [
@@ -1875,8 +1875,8 @@ django = [
     {file = "Django-3.1.7.tar.gz", hash = "sha256:32ce792ee9b6a0cbbec340123e229ac9f765dff8c2a4ae9247a14b2ba3a365a7"},
 ]
 django-cache-memoize = [
-    {file = "django-cache-memoize-0.1.7.tar.gz", hash = "sha256:5e96349b0159aec1eb79257199a1902ea3ed538231ce7b4fee12e563127ca657"},
-    {file = "django_cache_memoize-0.1.7-py2.py3-none-any.whl", hash = "sha256:bc7f53725558244af62197d0125732d7ec88ecc1281a3a2f37d77ae1a8c269d3"},
+    {file = "django-cache-memoize-0.1.8.tar.gz", hash = "sha256:f85ca71ddfe3d61d561d5a382736f83148fb75e542585e7028b65d6d3681ec85"},
+    {file = "django_cache_memoize-0.1.8-py3-none-any.whl", hash = "sha256:81b00714b50917431ce12a4544e0630a70c86fed27755a82186efc2945b8f8b3"},
 ]
 django-cors-headers = [
     {file = "django-cors-headers-3.2.1.tar.gz", hash = "sha256:a5960addecc04527ab26617e51b8ed42f0adab4594b24bb0f3c33e2bd3857c3f"},
