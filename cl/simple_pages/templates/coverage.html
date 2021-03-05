@@ -70,8 +70,23 @@
       <li><p><strong>Special Case Scrapers:</strong> Special cases get additional monitoring via a system of scrapers that regularly gathers data from PACER. Examples of "special" cases are those that have active <a href="{% url "alert_help" %}#recap-alerts">RECAP Alerts for PACER</a>, are marked as favorites, or are otherwise popular or important.
       </p></li>
       <li><p><strong>Our PACER Scraping Tools:</strong> We host <a href="https://free.law/2019/11/05/announcing-our-new-pacer-fetch-apis/">free APIs that many organizations use to gather cases and documents from PACER</a>. Every day, many organizations rely on these automated tools to add innumerable cases and documents to our system.</p></li>
-      <li><p><strong>Client Work:</strong> One way <a href="https://free.law">Free Law Project</a>, the non-profit sponsoring CourtListener and RECAP, remains sustainable is by working with organizations of all kinds to do bulk PACER downloads. In these arrangements, <a href="https://free.law/data-consulting/">we work with clients</a> to purchase thousands of dollars worth of PACER content, all of which we add to the RECAP Archive.
-      </p></li>
+      <p>
+        <p><strong>Client Work:</strong> One way <a href="https://free.law">Free Law Project</a>, the non-profit sponsoring CourtListener and RECAP, remains sustainable is by working with organizations of all kinds to do bulk PACER downloads. In these arrangements, <a href="https://free.law/data-consulting/">we work with clients</a> to purchase thousands of dollars worth of PACER content, all of which we add to the RECAP Archive.
+        </p>
+        <p>We are not typically able to talk about the content we gather for clients, but the following notable collections can be shared publicly:</p>
+        <p>
+          <ol>
+            <li>In May 2019, we downloaded nearly <strong>all civil district court dockets filed in from 2016-01-01 to 2018-11-09</strong>. Dockets with natures of suit related to civil rights, prisoner petitions or patent law were excluded.
+            </li>
+            <li>In 2020, we gathered <strong>$1.9M worth of dockets, initial petitions, and docket entries containing the word "final"</strong> from the Southern District of Illinois Bankruptcy Court from the years 2007 to 2017, approximately.
+            </li>
+            <li>We worked with an organization to create an extensive collection of <strong>labor-related dockets and initial complaints</strong>. The date range for this collection is from 2009 to 2017.</li>
+            <li>We have a large, random sample of <strong>dockets related to export-controlled technology</strong>.</li>
+            <li>We have a large collection of <strong>documents described by the word "invoice"</strong> that can be used for machine learning.</li>
+            <li>In early 2021, we scraped basic metadata from every unsealed bankruptcy, civil, and criminal case in the PACER system. This data included the case name, date filed, date terminated, and judge.</li>
+          </ol>
+        </p>
+      </li>
       <li><p><strong>PACER Judicial Opinion Scraper:</strong> When clerks upload documents to PACER, they must consider <a href="https://free.law/pacer-facts/#written-opinions-are-free-on-pacer-but-h">whether
         those documents are official opinions or orders of the court</a>. If they are, the clerks are supposed to mark them as such, and those documents become free to download from PACER. Each night <a href="https://free.law/2017/08/15/we-have-every-free-pacer-opinion-on-courtlistenercom/">we download all documents that clerks mark in this way</a> from district and bankruptcy courts across the country.
       </p></li>
