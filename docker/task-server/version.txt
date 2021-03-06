@@ -1,5 +1,6 @@
-1.0.27
+1.0.28
 
+1.0.28 - Bump juriscraper
 1.0.27 - Upgrade djangorestframework-xml
 1.0.26 - Upgrade django-redis-cache
 1.0.25 - Upgrade boto3 and django-storages
