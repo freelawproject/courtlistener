@@ -46,7 +46,7 @@ class Alert(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "Alert %s: %s" % (self.pk, self.name)
+        return f"{self.pk}: {self.name}"
 
     class Meta:
         ordering = ["rate", "query"]
@@ -90,7 +90,7 @@ class DocketAlert(models.Model):
         unique_together = ("docket", "user")
 
     def __str__(self) -> str:
-        return "DocketAlert %s: %s" % (self.pk, self.docket_id)
+        return f"{self.pk}: {self.docket_id}"
 
     def save(self, *args, **kwargs):
         """Ensure we get a token when we save the first time."""

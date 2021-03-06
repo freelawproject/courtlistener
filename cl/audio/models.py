@@ -163,7 +163,7 @@ class Audio(AbstractDateTimeModel):
         verbose_name_plural = "Audio Files"
 
     def __str__(self) -> str:
-        return "%s: %s" % (self.pk, self.case_name)
+        return f"{self.pk}: {self.case_name}"
 
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])

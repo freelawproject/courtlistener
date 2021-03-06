@@ -161,9 +161,6 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         null=True,
     )
 
-    def __str__(self) -> str:
-        return "<OriginatingCourtInformation: %s>" % self.pk
-
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
 
@@ -956,10 +953,7 @@ class DocketEntry(AbstractDateTimeModel):
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "<DocketEntry:%s ---> %s >" % (
-            self.pk,
-            trunc(self.description, 50, ellipsis="..."),
-        )
+        return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
 
 
 class AbstractPacerDocument(models.Model):

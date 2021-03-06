@@ -66,9 +66,6 @@ class Favorite(models.Model):
             ("recap_doc_id", "user"),
         )
 
-    def __str__(self) -> str:
-        return "Favorite %s" % self.id
-
 
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
