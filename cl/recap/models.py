@@ -346,7 +346,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "PacerFetchQueue: %s (%s)" % (
+        return "%s (%s)" % (
             self.pk,
             self.get_request_type_display(),
         )

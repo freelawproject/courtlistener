@@ -416,10 +416,7 @@ class JSONVersion(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "<JSONVersion {pk}> for <{map}>".format(
-            pk=getattr(self, "pk", None),
-            map=self.map,
-        )
+        return f"{getattr(self, 'pk', None)} for {self.map}"
 
     class Meta:
         ordering = ["-date_modified"]
