@@ -1121,7 +1121,7 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
             add_claim_history_entry(new_history, db_claim)
 
 
-def get_data_from_att_report(text, court_id):
+def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
     att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
     att_data = att_page.data
