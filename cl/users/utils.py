@@ -89,7 +89,7 @@ def create_stub_account(user_data, profile_data):
     return new_user, profile
 
 
-def convert_to_stub_account(user):
+def convert_to_stub_account(user: User) -> User:
     """Set all fields to as blank as possible.
 
     :param user: The user to operate on.
@@ -104,7 +104,6 @@ def convert_to_stub_account(user):
     profile = user.profile
     profile.address1 = None
     profile.address2 = None
-    profile.barmembership = []
     profile.city = None
     profile.employer = None
     profile.state = None
@@ -112,6 +111,8 @@ def convert_to_stub_account(user):
     profile.wants_newsletter = False
     profile.zip_code = None
     profile.save()
+
+    profile.barmembership.all().delete()
 
     return user
 
