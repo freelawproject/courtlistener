@@ -1,9 +1,10 @@
-import re
+from typing import Dict, Tuple
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -11,7 +12,7 @@ from cl.lib.crypto import md5
 from cl.users.models import UserProfile
 
 
-def sanitize_redirection(request):
+def sanitize_redirection(request: HttpRequest) -> str:
     """Security and sanity checks on redirections.
 
     Much of this code was grabbed from Django:
@@ -22,7 +23,7 @@ def sanitize_redirection(request):
       Body: Click here to continue: https://www.courtlistener.com/?next=https://cortlistener.com/evil/thing
 
     Without proper redirect sanitation, a user might click that link, and get
-    redirected to cortlistener.com, which could be a spoof of the real thing.
+    redirected to courtlistener.com, which could be a spoof of the real thing.
 
     1. Prevent illogical redirects. Like, don't let people redirect back to
     the sign-in or register page.
@@ -49,7 +50,10 @@ def sanitize_redirection(request):
     return redirect_to
 
 
-def create_stub_account(user_data, profile_data):
+def create_stub_account(
+    user_data: Dict[str, str],
+    profile_data: Dict[str, str],
+) -> Tuple[User, UserProfile]:
     """Create a minimal user account in CL
 
     This can be helpful when receiving anonymous donations, payments from
@@ -57,7 +61,7 @@ def create_stub_account(user_data, profile_data):
 
     :param user_data: Generally cleaned data from a cl.donate.forms.UserForm
     :type user_data: dict
-    :param profile_data: Generallly cleaned data from a
+    :param profile_data: Generally cleaned data from a
     cl.donate.forms.ProfileForm
     :type profile_data: dict
     :return: A tuple of a User and UserProfile objects
