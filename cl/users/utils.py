@@ -1,4 +1,5 @@
 from typing import Dict, Tuple
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -7,7 +8,6 @@ from django.db import transaction
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from urllib.parse import quote
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
