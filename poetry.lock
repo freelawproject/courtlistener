@@ -494,14 +494,14 @@ sftp = ["paramiko"]
 
 [[package]]
 name = "djangorestframework"
-version = "3.11.2"
+version = "3.12.2"
 description = "Web APIs for Django, made easy."
 category = "main"
 optional = false
 python-versions = ">=3.5"
 
 [package.dependencies]
-django = ">=1.11"
+django = ">=2.2"
 
 [[package]]
 name = "djangorestframework-filters"
@@ -1670,7 +1670,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "dad70a4978a5e2e0c64bab7e3763d8c158f51e5492b8e2252ab35c5c5295f0ad"
+content-hash = "b0c386ce20d58557de76feeb93c45cf37d75ac1b2b018883161be98833a06775"
 
 [metadata.files]
 amqp = [
@@ -1913,8 +1913,8 @@ django-storages = [
     {file = "django_storages-1.11.1-py3-none-any.whl", hash = "sha256:f28765826d507a0309cfaa849bd084894bc71d81bf0d09479168d44785396f80"},
 ]
 djangorestframework = [
-    {file = "djangorestframework-3.11.2-py3-none-any.whl", hash = "sha256:5cc724dc4b076463497837269107e1995b1fbc917468d1b92d188fd1af9ea789"},
-    {file = "djangorestframework-3.11.2.tar.gz", hash = "sha256:a5967b68a04e0d97d10f4df228e30f5a2d82ba63b9d03e1759f84993b7bf1b53"},
+    {file = "djangorestframework-3.12.2-py3-none-any.whl", hash = "sha256:0209bafcb7b5010fdfec784034f059d512256424de2a0f084cb82b096d6dd6a7"},
+    {file = "djangorestframework-3.12.2.tar.gz", hash = "sha256:0898182b4737a7b584a2c73735d89816343369f259fea932d90dc78e35d8ac33"},
 ]
 djangorestframework-filters = [
     {file = "djangorestframework-filters-1.0.0.dev2.tar.gz", hash = "sha256:ef84527e3427434d54228825b53a35098c8633c1e77b71d06b79597b749ea3f2"},
