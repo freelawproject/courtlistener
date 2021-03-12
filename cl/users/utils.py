@@ -1,4 +1,5 @@
 from typing import Dict, Tuple
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib import messages
@@ -36,6 +37,10 @@ def sanitize_redirection(request: HttpRequest) -> str:
     a sanity or security check failed.
     """
     redirect_to = request.GET.get("next", "")
+
+    # Fixes security vulnerability reported upstream to Django, where
+    # whitespace can be provided in the scheme like "java\nscript:alert(bad)"
+    redirect_to = quote(redirect_to)
     sign_in_url = reverse("sign-in") in redirect_to
     register_in_url = reverse("register") in redirect_to
     garbage_url = " " in redirect_to
