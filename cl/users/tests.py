@@ -73,6 +73,16 @@ class UserTest(LiveServerTestCase):
             ("/test test", True),
             # A safe redirect
             (reverse("faq"), False),
+            # CRLF injection attack
+            (
+                "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
+                True,
+            ),
+            # XSS vulnerabilities
+            (
+                "register/success/?next=java%0d%0ascript%0d%0a:alert(document.cookie)&email=Reflected+XSS+here",
+                True,
+            ),
         ]
         for next_param, is_evil in next_params:
             bad_url = "{host}{path}?next={next}".format(
