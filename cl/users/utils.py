@@ -7,6 +7,7 @@ from django.db import transaction
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from urllib.parse import quote
 
 from cl.lib.crypto import md5
 from cl.users.models import UserProfile
@@ -40,7 +41,8 @@ def sanitize_redirection(request: HttpRequest) -> str:
     a sanity or security check failed.
     """
     redirect_to = request.GET.get("next", "")
-    crlf_in_url = any(x in redirect_to for x in ["\n", "\r"])
+    redirect_to = quote(redirect_to)
+    crlf_in_url = any(x in redirect_to for x in ["%0D", "%0A"])
     sign_in_url = reverse("sign-in") in redirect_to
     register_in_url = reverse("register") in redirect_to
     garbage_url = " " in redirect_to
