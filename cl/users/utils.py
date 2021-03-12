@@ -32,10 +32,15 @@ def sanitize_redirection(request: HttpRequest) -> str:
 
     1. Prevent dangerous URLs (like JavaScript)
 
+    CRLF injection check added.
+    See link for Carriage Returns and Line Feed (CRLF Injection).
+    https://www.pyscoop.com/security-in-the-django-application/#crlf-injection
+
     :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
     a sanity or security check failed.
     """
     redirect_to = request.GET.get("next", "")
+    crlf_in_url = any(x in redirect_to for x in ["\n", "\r"])
     sign_in_url = reverse("sign-in") in redirect_to
     register_in_url = reverse("register") in redirect_to
     garbage_url = " " in redirect_to
@@ -45,7 +50,16 @@ def sanitize_redirection(request: HttpRequest) -> str:
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
     )
-    if any([sign_in_url, register_in_url, garbage_url, no_url, not_safe_url]):
+    if any(
+        [
+            sign_in_url,
+            register_in_url,
+            garbage_url,
+            no_url,
+            not_safe_url,
+            crlf_in_url,
+        ]
+    ):
         return settings.LOGIN_REDIRECT_URL
     return redirect_to
 
