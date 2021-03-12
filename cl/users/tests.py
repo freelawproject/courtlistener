@@ -71,6 +71,11 @@ class UserTest(LiveServerTestCase):
             ("javascript:confirm(document.domain)", True),
             # No spaces
             ("/test test", True),
+            # CRLF injection attack
+            (
+                "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
+                True,
+            ),
             # A safe redirect
             (reverse("faq"), False),
         ]
