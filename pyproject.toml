@@ -103,7 +103,7 @@ pylint = "^2.7.0"
 pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.10.*"
 black = {version = "^20.8b1", allow-prereleases = true}
-flake8 = "^3.8.3"
+flake8 = "^3.9.0"
 mypy = "^0.812"
 
 [tool.poetry.extras]
