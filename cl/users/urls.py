@@ -78,10 +78,10 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     # Profile pages
-    path("profile/settings", views.view_settings, name="view_settings"),
-    path("profile", RedirectView.as_view(pattern_name="view_settings")),
+    path("profile/settings/", views.view_settings, name="view_settings"),
+    path("profile/", RedirectView.as_view(pattern_name="view_settings")),
     path("profile/favorites/", views.view_favorites, name="profile_favorites"),
-    path("profile/alerts", views.view_alerts, name="profile_alerts"),
+    path("profile/alerts/", views.view_alerts, name="profile_alerts"),
     path(
         "profile/visualizations/",
         views.view_visualizations,
@@ -92,19 +92,19 @@ urlpatterns = [
         views.view_deleted_visualizations,
         name="view_deleted_visualizations",
     ),
-    path("profile/api", views.view_api, name="view_api"),
+    path("profile/api/", views.view_api, name="view_api"),
     path(
         "profile/password/change/",
         views.password_change,
         name="password_change",
     ),
-    path("profile/delete", views.delete_account, name="delete_account"),
+    path("profile/delete/", views.delete_account, name="delete_account"),
     path(
         "profile/delete/done/",
         views.delete_profile_done,
         name="delete_profile_done",
     ),
-    path("profile/take-out", views.take_out, name="take_out"),
+    path("profile/take-out/", views.take_out, name="take_out"),
     path("profile/take-out/done/", views.take_out_done, name="take_out_done"),
     path(
         "register/",
