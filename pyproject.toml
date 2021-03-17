@@ -99,7 +99,7 @@ gunicorn = "^20.0.4"
 eyecite = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
-pylint = "^2.7.0"
+pylint = "^2.7.2"
 pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.10.*"
 black = {version = "^20.8b1", allow-prereleases = true}
