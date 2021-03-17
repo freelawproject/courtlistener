@@ -368,7 +368,7 @@ def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
     :param data: File data
     :return: URL or first URL on AWS
     """
-    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+    if data["disclosure_type"] in ["jw", "single", "jef"]:
         url = data["url"]
     else:
         url = data["urls"][0]
@@ -400,6 +400,9 @@ def generate_or_download_disclosure_as_pdf(
         return requests.get(pdf_url, timeout=60 * 20)
     elif data["disclosure_type"] == "jw":
         logger.info(f"Downloading JW PDF: {quote(data['url'], safe=':/')}")
+        return requests.get(data["url"], timeout=60 * 20)
+    elif data["disclosure_type"] == "jef":
+        logger.info(f"Downloading JEF PDF: {quote(data['url'], safe=':/')}")
         return requests.get(data["url"], timeout=60 * 20)
     elif data["disclosure_type"] == "single":
         urls = [data["url"]]
