@@ -56,6 +56,7 @@ class CODES(object):
     T = "T"
     U = "U"
     V = "V"
+    W = "W"
 
     # Failed Extraction
     X = "-1"
@@ -67,6 +68,7 @@ class CODES(object):
         (T, "Cash Market"),
         (U, "Book Value"),
         (V, "Other"),
+        (W, "Estimated"),
         (X, "Failed Extraction"),
     )
 
