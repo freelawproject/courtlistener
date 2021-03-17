@@ -136,6 +136,12 @@ def extract_content(
                 files={"file": ("file", pdf_bytes)},
                 timeout=settings.BTE_URLS["extract-disclosure-jw"]["timeout"],
             )
+        elif disclosure_type == "jef":
+            extractor_response = requests.post(
+                settings.BTE_URLS["extract-disclosure-jef"]["url"],
+                files={"file": ("file", pdf_bytes)},
+                timeout=settings.BTE_URLS["extract-disclosure-jef"]["timeout"],
+            )
         else:
             extractor_response = requests.post(
                 settings.BTE_URLS["extract-disclosure"]["url"],
