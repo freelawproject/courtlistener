@@ -1,6 +1,7 @@
 import json
 import os
 
+import requests
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.test import TestCase
@@ -23,6 +24,13 @@ class DisclosureIngestionTest(TestCase):
         "disclosures",
         "test_assets",
         "disclosure_test_asset.json",
+    )
+    jef_pdf = os.path.join(
+        settings.INSTALL_ROOT,
+        "cl",
+        "disclosures",
+        "test_assets",
+        "JEF_format.pdf",
     )
 
     def test_financial_disclosure_ingestion(self):
@@ -53,6 +61,30 @@ class DisclosureIngestionTest(TestCase):
             non_investments.count() == 2,
             "Should have 2 ingested non-investments, not %s"
             % non_investments.count(),
+        )
+
+    def test_extraction_and_ingestion_jef(self):
+        """Can we successfully ingest disclosures from jef documents?"""
+        with open(self.jef_pdf, "rb") as f:
+            pdf_bytes = f.read()
+        Investment.objects.all().delete()
+        extractor_response = requests.post(
+            settings.BTE_URLS["extract-disclosure-jef"]["url"],
+            files={"file": ("file", pdf_bytes)},
+            timeout=settings.BTE_URLS["extract-disclosure-jef"]["timeout"],
+        )
+        extracted_data = extractor_response.json()
+        test_disclosure = FinancialDisclosure.objects.get(pk=1)
+        save_disclosure(
+            extracted_data=extracted_data,
+            disclosure=test_disclosure,
+        )
+        investments = Investment.objects.all()
+        investment_count = investments.count()
+        self.assertEqual(
+            investment_count,
+            84,
+            f"Should have 84 ingested investments",
         )
 
 
