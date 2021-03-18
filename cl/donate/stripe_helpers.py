@@ -204,7 +204,7 @@ def update_donation_for_event(
 
 
 @csrf_exempt
-def process_stripe_callback(request):
+def process_stripe_callback(request: HttpRequest) -> HttpResponse:
     """Always return 200 message or else the webhook will try again ~200 times
     and then send us an email.
     """
@@ -237,7 +237,12 @@ def process_stripe_callback(request):
         )
 
 
-def process_stripe_payment(amount, email, kwargs, stripe_redirect_url):
+def process_stripe_payment(
+    amount: int,
+    email: str,
+    kwargs: Dict[str, Union[str, bool, Dict[str, str]]],
+    stripe_redirect_url: str,
+) -> Dict[str, Union[str, int]]:
     """Process a stripe payment.
 
     :param amount: The amount, in pennies, that you wish to charge
