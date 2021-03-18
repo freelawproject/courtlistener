@@ -229,12 +229,11 @@ def process_stripe_callback(request: HttpRequest) -> HttpResponse:
             d = get_donation_with_retries(event, charge)
             return update_donation_for_event(d, event, charge)
         return HttpResponse("<h1>200: OK</h1>")
-    else:
-        return HttpResponseNotAllowed(
-            permitted_methods={"POST"},
-            content="<h1>405: This is a callback endpoint for a payment "
-            "provider. Only POST methods are allowed.</h1>",
-        )
+    return HttpResponseNotAllowed(
+        permitted_methods={"POST"},
+        content="<h1>405: This is a callback endpoint for a payment "
+        "provider. Only POST methods are allowed.</h1>",
+    )
 
 
 def process_stripe_payment(
