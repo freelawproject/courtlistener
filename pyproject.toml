@@ -33,7 +33,7 @@ cchardet = "^2.1.1"
 celery = "^4.3.0"
 certifi = "^2020.12.5"
 chardet = "^3.0.4"
-defusedxml = "^0.6.0"
+defusedxml = "^0.7.1"
 disposable-email-domains = "*"
 Django = "^3.1.0"
 django-cache-memoize = "==0.*"
@@ -99,7 +99,7 @@ gunicorn = "^20.0.4"
 eyecite = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
-pylint = "^2.7.0"
+pylint = "^2.7.2"
 pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.10.*"
 black = {version = "^20.8b1", allow-prereleases = true}
