@@ -1,10 +1,12 @@
 from django import template
 
+from cl.search.models import RECAPDocument
+
 register = template.Library()
 
 
 @register.filter
-def price(rd):
+def price(rd: RECAPDocument) -> str:
     if rd.is_free_on_pacer:
         return "0.00"
 
