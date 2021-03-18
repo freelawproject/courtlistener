@@ -1,39 +1,64 @@
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime as dt
+from typing import Dict, Optional, Union
 
 import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.http import HttpResponse, HttpResponseNotAllowed
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 from stripe.error import APIConnectionError
 from stripe.stripe_object import StripeObject
 
 from cl.donate.models import PROVIDERS, Donation
+from cl.donate.types import StripeChargeObject, StripeEventObject
 from cl.donate.utils import PaymentFailureException, send_thank_you_email
 from cl.users.utils import create_stub_account
 
 logger = logging.getLogger(__name__)
 
 
-def handle_xero_payment(charge):
-    """Gather data from a callback triggered by a payment in Xero
+def handle_external_payment_if_needed(charge: StripeChargeObject) -> None:
+    """Gather data from a callback triggered by an external payment source
 
     When we send invoices to folks via Xero, they now have the option to make
     a payment via Stripe. When they do, it triggers our callback, but when that
     happens we don't know anything about the charge.
 
-    To address this, gather data from the Stripe charge, add a user and a
-    donation to the database.
+    Similarly, some people can only pay with Amex, which our website doesn't
+    support, or only have an address outside the U.S. When this happens, we
+    send them an invoice directly from Stripe itself. Since we do that, they
+    lack a charge in our DB.
+
+    Inspect the charge to see if these things are happening. If so, use the
+    Stripe charge to add a user and a donation to the database.
 
     :param charge: A Stripe charge object: https://stripe.com/docs/api/charges
     :return: None
     """
+    # Folks paying Xero invoices:
+    xero_source = charge.get("application") == settings.XERO_APPLICATION_ID
+
+    # Folks paying via Stripe invoices (these are useful for Amex or people
+    # without an American address)
+    stripe_source = charge["metadata"].get("type") == "invoice"
+    if not any([xero_source, stripe_source]):
+        # Just an average payment. Do the regular thing.
+        return
+
+    #
+    # It's a weird source like xero.
+    # Add a user and donation if needed.
+    #
     billing_details = charge["billing_details"]
     email = billing_details["email"]
+    if not email and stripe_source:
+        # Webhooks triggered by Stripe invoices don't provide user information,
+        # so we just file these all under the same fake user. 🤮
+        email = "nobody@stripe.com"
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
@@ -58,14 +83,20 @@ def handle_xero_payment(charge):
         # Don't create a payment if we already have one.
         return
 
+    if xero_source:
+        invoice_number = charge["metadata"]["Invoice number"]
+        referrer = f"XERO invoice number: {invoice_number}"
+    elif stripe_source:
+        referrer = "Stripe invoice"
+    else:
+        raise NotImplementedError("Unknown source.")
     Donation.objects.create(
         donor=user,
         amount=float(charge["amount"]) / 100,  # Stripe does pennies.
         payment_provider=PROVIDERS.CREDIT_CARD,
         payment_id=charge["id"],
         status=Donation.AWAITING_PAYMENT,
-        referrer="XERO invoice number: %s"
-        % charge["metadata"]["Invoice number"],
+        referrer=referrer,
     )
 
 
