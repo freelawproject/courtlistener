@@ -80,10 +80,11 @@ class DisclosureIngestionTest(TestCase):
             disclosure=test_disclosure,
         )
         investments = Investment.objects.all()
-        self.assertTrue(
-            investments.count() == 84,
-            "Should have 19 ingested investments, not %s"
-            % investments.count(),
+        investment_count = investments.count()
+        self.assertEqual(
+            investment_count,
+            84,
+            f"Should have 84 ingested investments",
         )
 
 
