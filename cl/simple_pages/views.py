@@ -348,7 +348,7 @@ def latest_terms(request: HttpRequest) -> HttpResponse:
     )
 
 
-@cache_page(60 * 60 * 6, cache="db_cache")
+@cache_page(60 * 60 * 12, cache="db_cache")
 def robots(request: HttpRequest) -> HttpResponse:
     """Generate the robots.txt file"""
     response = HttpResponse(content_type="text/plain")
