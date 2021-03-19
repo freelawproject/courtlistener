@@ -624,4 +624,8 @@ BTE_URLS = {
         "url": f"{BTE_HOST}/financial_disclosure/extract_jw",
         "timeout": 60 * 60 * 12,
     },
+    "extract-disclosure-jef": {
+        "url": f"{BTE_HOST}/financial_disclosure/extract_jef",
+        "timeout": 60 * 60 * 5,
+    },
 }

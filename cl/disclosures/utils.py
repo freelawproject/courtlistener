@@ -34,7 +34,7 @@ def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
     """
     from cl.disclosures.models import FinancialDisclosure
 
-    if data["disclosure_type"] == "jw" or data["disclosure_type"] == "single":
+    if data["disclosure_type"] in ["jw", "single", "jef"]:
         url = data["url"]
     else:
         url = data["urls"][0]
