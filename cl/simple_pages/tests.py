@@ -16,7 +16,7 @@ class ContactTest(TestCase):
         "quiz": "blue",
     }
 
-    def test_multiple_requests_request(self):
+    def test_multiple_requests_request(self) -> None:
         """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
@@ -35,7 +35,7 @@ class ContactTest(TestCase):
         r = self.client.get(reverse("contact"))
         self.assertNotIn("pandora", r.content.decode())
 
-    def test_contact_logged_in(self):
+    def test_contact_logged_in(self) -> None:
         """Can we use the contact form to send a message when logged in?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -44,13 +44,13 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_logged_out(self):
+    def test_contact_logged_out(self) -> None:
         """Can we use the contact form to send a message when logged out?"""
         response = self.client.post(reverse("contact"), self.test_msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_unicode(self):
+    def test_contact_unicode(self) -> None:
         """Can unicode be used when contacting us?"""
         msg = self.test_msg.copy()
         msg["message"] = (
@@ -63,7 +63,7 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_spam_message_is_rejected(self):
+    def test_spam_message_is_rejected(self) -> None:
         """Do we reject it if people put a phone number in the phone_number
         field?
 
