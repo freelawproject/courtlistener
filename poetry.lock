@@ -559,6 +559,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "exrex"
+version = "0.10.5"
+description = "Irregular methods for regular expressions"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "eyecite"
 version = "1.1.0"
 description = "A citation extraction tool."
@@ -1674,7 +1682,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "3f455d9e78eac64b5e6ae54f20e80c9037bc3f471790182441342ef98734b9a9"
+content-hash = "a22007173b0c50911904f4e040f74ea18f5b4b0d64db7a6cc471009f2220fb74"
 
 [metadata.files]
 amqp = [
@@ -1932,6 +1940,9 @@ docutils = [
 drf-dynamic-fields = [
     {file = "drf_dynamic_fields-0.3.1-py2.py3-none-any.whl", hash = "sha256:fa5a7ea010476184d776b4b977d57d0090e651e8f897d83ed0c2f2bca9cbf704"},
     {file = "drf_dynamic_fields-0.3.1.tar.gz", hash = "sha256:de75969abff74332f339d082931f1815dc91c2ff1ed6e741bd33d1d5057dceb1"},
+]
+exrex = [
+    {file = "exrex-0.10.5.tar.gz", hash = "sha256:3fb8b18fd9832eaff8b13dc042a4f63b13c5d684ee069f70a23ddfc6bcb708f3"},
 ]
 eyecite = [
     {file = "eyecite-1.1.0-py3-none-any.whl", hash = "sha256:a2720a6dbb3cf15d412d1f8ed6a41935fe4e628555f46b83bda8d80e734da5e2"},
