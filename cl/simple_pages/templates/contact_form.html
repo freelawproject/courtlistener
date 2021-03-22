@@ -70,6 +70,19 @@
           </p>
         {% endif %}
       </div>
+
+      <div class="form-group">
+        <label for="id_quiz">What color is the sky during the day?</label>
+        {{ form.quiz }}
+        {% if form.quiz.errors %}
+          <p class="help-block">
+            {% for error in form.quiz.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+
       <button type="submit" class="btn btn-primary btn-lg pull-right">Send Message</button>
     </form>
   </div>
