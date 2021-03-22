@@ -48,7 +48,7 @@ class ContactForm(forms.Form):
             r"|no ?index|block (from)?search engines?|block pages",
             re.I,
         )
-        if re.match(regex, subject) and "http" not in message.lower():
+        if re.search(regex, subject) and "http" not in message.lower():
             msg = (
                 "This appears to be a removal request, but you did not "
                 "include a link. You must include a link for a request to be "
