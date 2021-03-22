@@ -104,6 +104,7 @@ pytest-django = "==3.10.*"
 black = {version = "^20.8b1", allow-prereleases = true}
 flake8 = "^3.9.0"
 mypy = "^0.812"
+exrex = "^0.10.5"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
