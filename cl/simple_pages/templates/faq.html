@@ -1,98 +1,97 @@
 {% extends "base.html" %}
-{% load honeypot %}
 {% load humanize %}
 
 {% block title %}Frequently Asked Questions – CourtListener.com{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
-    <div class="col-xs-12">
-        <h1 id="qs">Frequently Asked Questions</h1>
-    </div>
+  <div class="col-xs-12">
+    <h1 id="qs">Frequently Asked Questions</h1>
+  </div>
 
-    <div class="col-sm-5">
-        <h3 class="bottom">General</h3>
-        <p>
-            <a href="#who-and-what">What is this site? Who runs it?</a><br>
-            <a href="#legal-advice">Can you provide legal advice?</a><br>
-            <a href="#submit-documents">Can I send you documents from my case?</a><br>
-            <a href="#citing-flp">How can I cite something on CourtListener?</a>
-            <a href="#contact">How do I contact you?</a>
-        </p>
-
-
-        <h3 class="bottom">Features</h3>
-        <p>
-            <a href="#why-use">Why should I use this site (and not something
-                else)?</a><br>
-            <a href="#how-different">What makes this site different from other sites that put legal documents
-                online?</a><br>
-            <a href="#explain-alerts">What are alerts and how do they work?</a><br>
-            <a href="#explain-citations">How do you identify citations?</a><br>
-            <a href="#oral-args">How do you get the oral arguments you have?</a><br>
-        </p>
-
-        <h3 class="bottom">RECAP Archive and Extensions</h3>
-        <p>
-            <a href="#what-is-recap-pacer">What is RECAP and what's PACER?</a><br>
-            <a href="#where-recap">Where does the content in the RECAP Archive come from?</a><br>
-            <a href="#how-fast">How quickly does an item appear here?</a><br>
-            <a href="#recap-privacy">How do you handle privacy of RECAP content?</a><br>
-            <a href="#learn-more">Where can I learn more about PACER and RECAP?</a><br>
-        </p>
-
-        <h3 class="bottom">Supreme Court Citation Networks</h3>
-        <p>
-            <a href="#circles-change-size">Why do the case circles change size?</a><br>
-            <a href="#what-cases-mean">How can I find out what the cases in my network mean?</a><br>
-            <a href="#default-two-degree">Why did my network default to 2-degrees?</a><br>
-            <a href="#case-missing">Why is a case missing in my network?</a><br>
-            <a href="#embed-network">How do I embed a network in my blog?</a><br>
-            <a href="#dod">What do you mean by "Degree of Dissent"?</a>
-        </p>
-
-        <h3 class="bottom">Coverage and Content</h3>
-        <p>
-            <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
-                it?</a><br>
-            <a href="#why-many-copies">Why do some opinions show up more than once in search results?</a><br>
-            <a href="#why-my-case">Why is my case appearing on this site?</a><br>
-            <a href="#non-precedential">Why does this site contain documents that say "Not for Publication",
-                "Unpublished" etc?</a><br>
-            <a href="#explain-pin-cites">What are the gray numbers that appear in the middle of many opinions?</a><br>
-            <a href="#explain-neutral-citations">What are neutral citations and why do you promote them?</a><br>
-            <a href="#why-bulk">Why do you provide bulk data files?</a><br>
-            <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
-        </p>
+  <div class="col-sm-5">
+    <h3 class="bottom">General</h3>
+    <p>
+      <a href="#who-and-what">What is this site? Who runs it?</a><br>
+      <a href="#legal-advice">Can you provide legal advice?</a><br>
+      <a href="#submit-documents">Can I send you documents from my case?</a><br>
+      <a href="#citing-flp">How can I cite something on CourtListener?</a>
+      <a href="#contact">How do I contact you?</a>
+    </p>
 
 
-        <h3 class="bottom">Contributions</h3>
-        <p>
-            <a href="#kinds-of-help">What kinds of help do you need?</a><br>
-            <a href="#how-supported">How is the project supported?</a><br>
-            <a href="#can-i-contribute">Can I contribute to the project somehow?</a>
-        </p>
+    <h3 class="bottom">Features</h3>
+    <p>
+      <a href="#why-use">Why should I use this site (and not something
+          else)?</a><br>
+      <a href="#how-different">What makes this site different from other sites that put legal documents
+          online?</a><br>
+      <a href="#explain-alerts">What are alerts and how do they work?</a><br>
+      <a href="#explain-citations">How do you identify citations?</a><br>
+      <a href="#oral-args">How do you get the oral arguments you have?</a><br>
+    </p>
+
+    <h3 class="bottom">RECAP Archive and Extensions</h3>
+    <p>
+      <a href="#what-is-recap-pacer">What is RECAP and what's PACER?</a><br>
+      <a href="#where-recap">Where does the content in the RECAP Archive come from?</a><br>
+      <a href="#how-fast">How quickly does an item appear here?</a><br>
+      <a href="#recap-privacy">How do you handle privacy of RECAP content?</a><br>
+      <a href="#learn-more">Where can I learn more about PACER and RECAP?</a><br>
+    </p>
+
+    <h3 class="bottom">Supreme Court Citation Networks</h3>
+    <p>
+      <a href="#circles-change-size">Why do the case circles change size?</a><br>
+      <a href="#what-cases-mean">How can I find out what the cases in my network mean?</a><br>
+      <a href="#default-two-degree">Why did my network default to 2-degrees?</a><br>
+      <a href="#case-missing">Why is a case missing in my network?</a><br>
+      <a href="#embed-network">How do I embed a network in my blog?</a><br>
+      <a href="#dod">What do you mean by "Degree of Dissent"?</a>
+    </p>
+
+    <h3 class="bottom">Coverage and Content</h3>
+    <p>
+      <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
+          it?</a><br>
+      <a href="#why-many-copies">Why do some opinions show up more than once in search results?</a><br>
+      <a href="#why-my-case">Why is my case appearing on this site?</a><br>
+      <a href="#non-precedential">Why does this site contain documents that say "Not for Publication",
+          "Unpublished" etc?</a><br>
+      <a href="#explain-pin-cites">What are the gray numbers that appear in the middle of many opinions?</a><br>
+      <a href="#explain-neutral-citations">What are neutral citations and why do you promote them?</a><br>
+      <a href="#why-bulk">Why do you provide bulk data files?</a><br>
+      <a href="#explain-fingerprint">What is the "fingerprint" of the document?</a>
+    </p>
 
 
-        <h3 class="bottom">Past and Future</h3>
-        <p>
-            <a href="#orgin-story">What's the history of CourtListener?</a><br>
-            <a href="#future">What plans or features are in the works?</a>
-        </p>
+    <h3 class="bottom">Contributions</h3>
+    <p>
+      <a href="#kinds-of-help">What kinds of help do you need?</a><br>
+      <a href="#how-supported">How is the project supported?</a><br>
+      <a href="#can-i-contribute">Can I contribute to the project somehow?</a>
+    </p>
 
 
-        <h3 class="bottom">Something Else?</h3>
-        <p>
-            <a href="#other">Do you have a question that's not answered here?</a>
-        </p>
-    </div>
+    <h3 class="bottom">Past and Future</h3>
+    <p>
+      <a href="#orgin-story">What's the history of CourtListener?</a><br>
+      <a href="#future">What plans or features are in the works?</a>
+    </p>
 
-    <div class="col-sm-7">
+
+    <h3 class="bottom">Something Else?</h3>
+    <p>
+      <a href="#other">Do you have a question that's not answered here?</a>
+    </p>
+  </div>
+
+  <div class="col-sm-7">
     {% if form.errors %}
-        <div class="alert alert-danger">
-            <p class="bottom">There were errors with your submission. See <a
-                    href="#other">below</a> for details.</p>
-        </div>
+      <div class="alert alert-danger">
+        <p class="bottom">There were errors with your submission. See <a
+                href="#other">below</a> for details.</p>
+      </div>
     {% endif %}
 
 
@@ -101,10 +100,10 @@
     <h3 id="who-and-what">What Is This Site? Who Runs It?</h3>
     <p>CourtListener is a legal research website and data provider currently containing:</p>
     <ul>
-        <li><a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
-        <li>{{ total_recap_count|intcomma }} documents from the Federal PACER system.</li>
-        <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
-        <li>A database of {{ total_judge_count|intcomma }} judges.</li>
+      <li><a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
+      <li>{{ total_recap_count|intcomma }} documents from the Federal PACER system.</li>
+      <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
+      <li>A database of {{ total_judge_count|intcomma }} judges.</li>
     </ul>
     <p>CourtListener is operated by the non-profit <a href="https://free.law">Free Law Project</a>. Free Law Project seeks to provide free access to primary legal materials, develop legal research tools, and support academic research on legal corpora. CourtListener embodies all of these efforts, as the primary free repository of all the court opinions we have collected, as the platform on which we attempt to deploy legal research tools, and as the source of bulk downloads that enable academic researchers to study our collection.
     </p>
@@ -361,7 +360,7 @@
     </p>
 
     <h3 id="how-supported">How is the Project Supported?</h3>
-      <p>CourtListener, RECAP, and Free Law Project are supported by several sources of revenue including user donations, corporate sponsorships, grants that we join or author, <a href="https://free.law/data-consulting/">client work that aligns with our mission</a>, and API contributions, which some users of the APIs provide.
+    <p>CourtListener, RECAP, and Free Law Project are supported by several sources of revenue including user donations, corporate sponsorships, grants that we join or author, <a href="https://free.law/data-consulting/">client work that aligns with our mission</a>, and API contributions, which some users of the APIs provide.
     </p>
 
     <h3 id="can-i-contribute">Can I Contribute to the Project Somehow?</h3>
