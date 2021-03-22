@@ -95,7 +95,13 @@ class ContactTest(TestCase):
         msg = self.test_msg.copy()
 
         # Removal subject without link fails
-        msg["phone_number"] = "Removal"
+        msg["phone_number"] = "Removal request"
+        msg["message"] = "test in message with lots of long words"
+        response = self.client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+        msg["phone_number"] = "Please remove link!"
         msg["message"] = "test in message with lots of long words"
         response = self.client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_200_OK)
