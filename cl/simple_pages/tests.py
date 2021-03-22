@@ -13,6 +13,7 @@ class ContactTest(TestCase):
         "message": "123456789012345678901",
         "email": "pandora@box.com",
         "skip_me_if_alive": "",
+        "quiz": "blue",
     }
 
     def test_multiple_requests_request(self):
@@ -77,6 +78,37 @@ class ContactTest(TestCase):
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
+        response = self.client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_spam_message_sky_color(self) -> None:
+        """Do we block things that don't know the color of the sky?"""
+        msg = self.test_msg.copy()
+        msg["quiz"] = "yellow"
+        response = self.client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_removals_require_http(self) -> None:
+        """Do we ensure removals have an HTTP link?"""
+        msg = self.test_msg.copy()
+
+        # Removal subject without link fails
+        msg["phone_number"] = "Removal"
+        msg["message"] = "test in message with lots of long words"
+        response = self.client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Test regex matching on removals fails
+        msg["phone_number"] = "take down request"
+        response = self.client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Removal subject with link is OK!
+        msg["message"] = "test http in message"
         response = self.client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
