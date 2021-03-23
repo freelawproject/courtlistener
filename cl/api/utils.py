@@ -555,7 +555,32 @@ def invert_user_logs(
     return out
 
 
-def get_count_for_endpoint(endpoint, start, end):
+def get_user_ids_for_date_range(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+) -> Set[int]:
+    """Get a list of user IDs that used the API during a span of time
+
+    :param start: The beginning of when you want to find users (default: all
+    time). A str to be interpreted by dateparser.
+    :param end: The end of when you want to find users (default today).  A
+    str to be interpreted by dateparser.
+    :return Set of user IDs during a time period. Will not contain anonymous
+    users.
+    """
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+
+    date_strs = make_date_str_list(start, end)
+    for d in date_strs:
+        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1)
+
+    results: List[List[str]] = pipe.execute()
+    results: Set[str] = set().union(*results)
+    return {int(i) for i in results if i.isdigit()}
+
+
+def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
     """Get the count of hits for an endpoint by name, during a date range
 
     :param endpoint: The endpoint to get the count for. Typically something
