@@ -661,10 +661,10 @@
   <p>The Act enumerates the types of information required and prescribes the general format and procedures for the reports. </p>
     <ul>
       <li>
-        <code>Financial Disclosure</code> - The financial disclosure itself, containing fields <code>filepath</code>, <code>year</code>, <code>addendum</code>.
+        <code>Financial Disclosure</code>
       </li>
       <li>
-        <code>Positions</code> - Held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States
+        <code>Positions</code> - Positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States
       </li>
       <li>
         <code>Agreements</code> - Agreement or arrangement of the filer in existence at any time during the reporting period.
@@ -689,60 +689,47 @@
       </li>
     </ul>
 
-    <p>When combined with our judicial database one can query all reported gifts by the late Ruth Bader Ginsburg with the following curl.</p>
-    <pre class="pre-scrollable">curl {% get_full_host %}/financial-disclosures/?person__id=1213&fields=gifts</pre>
-
-    <p>Or for example, you could query for financial disclosures containing gross investments valued above $50,000,000.00.</p>
-    <pre class="pre-scrollable">curl {% get_full_host %}/investments/?gross_value_code=P1&fields=investments</pre>
 
   <h4 id="financialdisclosure-endpoint-notes">Endpoint-Level Notes</h4>
     <p>The endpoints for Financial disclosures and all data within are as follows:</p>
-    <ul>
-      <li><p><strong>{% url "financialdisclosure-list" version="v3" %} </strong></p>
-        <ul>
-          <li><code>year</code> The year the disclosure covers.</li>
-          <li><code>filepath</code> - URL path of the PDF version of the disclosure.</li>
-          <li><code>page_count</code> - Page count of the disclosure</li>
-          <li><code>report_type</code> - The report type, if available, indicates if this is a initial, annual, or final report.</li>
-          <li><code>is_amended</code> - A boolean indicating if this disclosure is an amended disclosure.</li>
-          <li><code>addendum_content_raw</code> - The raw extraction of the addendum and additional comments section of the disclosure.</li>
-          <li><code>addendum_redacted</code> - A boolean indicating whether the addendum section contains redactions</li>
-          <li><code>has_been_extracted</code> - A boolean indicating whether this document was extrated by OCR.</li>
-        </ul>
-      </li>
 
-      <li>
-        <p><strong>{% url "agreement-list" version="v3" %} </strong></p>
-        <p>Agreements contains <code>parties_and_terms</code> that a judge has entered into within the last three years.</p>
-      </li>
-      <li>
-        <p><strong>{% url "disclosureposition-list" version="v3" %}</strong> </p>
-        <p>Positions contains <code>organization_name</code> and <code>position</code> fields. Often includes trusts, board memberships and foundations.</p>
-      </li>
-      <li>
-        <p><strong>{% url "noninvestmentincome-list" version="v3" %}</strong>  </p>
-        <p>Non investment income, typically teaching salaries includes <code>date_raw</code>, <code>source_type</code> and <code>income_amount</code>.</p>
-      </li>
-      <li>
-        <p><strong>{% url "spouseincome-list" version="v3" %}</strong> </p>
-        <p>Fields include the following: <code>source_type</code>, <code>date_raw</code> and <code>redacted</code> fields.</p>
-      </li>
-      <li>
-        <p><strong>{% url "reimbursement-list" version="v3" %}</strong> </p>
-        <p>Fields include the following: <code>source</code>, <code>location</code>, <code>purpse</code> and <code>items_paid_or_provided</code> fields as well as <code>date_raw</code> and <code>redacted</code> fields. This is used primarily for conference attendance.</p>
+    <h4>{% url "financialdisclosure-list" version="v3" %} </h4>
+      <p>This endpoint contains the main document and is the link between the remaining financial disclosure endpoints. It contains the following fields:</p>
       <ul>
+        <li><code>year</code> The year the disclosure covers.</li>
+        <li><code>filepath</code> - URL path of the PDF version of the disclosure.</li>
+        <li><code>page_count</code> - Page count of the disclosure</li>
+        <li><code>report_type</code> - The report type, if available, indicates if this is a initial, annual, or final report.</li>
+        <li><code>is_amended</code> - A boolean indicating if this disclosure is an amended disclosure.</li>
+        <li><code>addendum_content_raw</code> - The raw extraction of the addendum and additional comments section of the disclosure.</li>
+        <li><code>addendum_redacted</code> - A boolean indicating whether the addendum section contains redactions</li>
+        <li><code>has_been_extracted</code> - A boolean indicating whether this document was extrated by OCR.</li>
       </ul>
-      </li>
-      <li>
-        <p><strong>{% url "debt-list" version="v3" %}</strong> </p>
+
+
+    <h4>{% url "agreement-list" version="v3" %} </h4>
+        <p>The endpoint contains the <code>parties_and_terms</code> in existence at any time during the reporting period.</p>
+
+      <h4>{% url "disclosureposition-list" version="v3" %} </h4>
+      <p>Endpoint includes <code>organization_name</code> and <code>position</code>.</p>
+
+      <h4>{% url "noninvestmentincome-list" version="v3" %} </h4>
+      <p>Non investment income, typically teaching salaries contains fields <code>date_raw</code>, <code>source_type</code> and <code>income_amount</code>.</p>
+
+        <h4>{% url "spouseincome-list" version="v3" %} </h4>
+        <p>Fields include the following: <code>source_type</code>, <code>date_raw</code> and <code>redacted</code> fields.</p>
+
+        <h4>{% url "reimbursement-list" version="v3" %} </h4>
+        <p>Fields include the following: <code>source</code>, <code>location</code>, <code>purpse</code> and <code>items_paid_or_provided</code> fields as well as <code>date_raw</code> and <code>redacted</code> fields. This is used primarily for conference attendance.</p>
+
+        <h4>{% url "debt-list" version="v3" %} </h4>
         <p>Debts includes <code>creditor_name</code>, <code>description</code> and <code>value_code</code> for debts, including mortgages, credit cards and other loans.</p>
-      </li>
-      <li>
-        <p><strong>{% url "gift-list" version="v3" %}</strong>  </p>
+
+      <h4>{% url "gift-list" version="v3" %} </h4>
         <p>Fields include <code>source</code>, <code>description</code> and <code>value</code> of gifts received over $450.00.</p>
-      </li>
-      <li>
-        <p><strong>{% url "investment-list" version="v3" %}</strong> </p>
+
+      <h4>{% url "investment-list" version="v3" %} </h4>
+
         <ul>
           <li><code>page_number</code> The page number the investment is listed on.  This is used"
         "to generate links directly to the PDF page</li>
@@ -758,18 +745,21 @@
           <li><code>transaction_gain_code</code> Gain from investment transaction if any (ex. A (1-1000)).</li>
           <li><code>transaction_partner</code> Identity of the transaction partner</li>
           <li><code>has_inferred_values</code> Whether the transaction contain inferred values?</li>
-
         </ul>
-      </li>
-    </ul>
+
+  <h4>Useful examples:</h4>
+    <p>One can query for investments by stock name, transaction dates and even gross values. For example, the following query is for financial disclosures with individual investments valued above $50,000,000.00.</p>
+    <pre class="pre-scrollable">curl {% get_full_host %}/investments/?gross_value_code=P1&fields=investments</pre>
+
+    <p>Additionally, one could pinpoint gifts of individual judges when combining the gift databse with our judicial database. The following query returns all reported gifts by the late Ruth Bader Ginsburg.</p>
+    <pre class="pre-scrollable">curl {% get_full_host %}/financial-disclosures/?person__id=1213&fields=gifts</pre>
 
     <h4>A few general notes:</h4>
-    <p>Financial disclosures of federal judges are not accessible beyond six years from filing. As such our database is not complete but does extend back to 2002.  Furthermore
-    many older disclosures were handwritten, typed with typewriters or low quality scans. These obstacles have kept
-    some disclosures from being extracted. These documents remain available and searchable by other criteria, including by judge and year.</p>
-    <p>Additionally, many older financial disclosures have not been parsed due to complications in OCRing handwritten, typed or low quality. </p>
-    <p>In addition to the data extracted we attempted to find and identify all redactions in the document.  Most entries contain a <code>redacted</code> field to indicate the presence of a redaction in a row.</p>
-    <p><code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use value_codes for value ranges.  </p>
+    <p>Financial disclosures of federal judges are not accessible beyond six years from filing. As such our database is not complete but does extend to 2004.  Furthermore
+    many older disclosures were handwritten, typed or are of low quality scans. These obstacles have kept
+    <p>Additionally, many older financial disclosures have not been parsed due to complications in OCRing handwritten, typed or low quality documents. They can be idenfied by the <code>has_been_extracted</code> field in the financial disclosure endpoint.</p>
+    <p>A note on redations: We attempted identify all redactions within disclosures and a <code>redacted</code> field is present in most tables.</p>
+    <p><code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use form based value_codes to indicate value ranges.</p>
     <p><code>Investments</code> contains the field <code>has_inferred_values</code>. This field indicates that we inferred
       an investment <code>description</code> based on the style of data entry.  For example, an investment could have been bought in Q1, while a dividend was paid out
       in Q2 before being sold in Q4. Often the investment <code>description</code> is blank, for the subsequent transactions, but is inferred to be the Q1 investment.
