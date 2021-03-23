@@ -652,6 +652,132 @@
       </li>
     </ul>
 
+
+    <h3 id="financialdisclosure-endpoint">Financial Disclosure Endpoints</h3>
+  <p>This endpoing provides an API for financial disclosures of current and former federal judges beginning in 2004.
+  </p>
+  <h4 id="financialdisclosure-background">Background on the data</h4>
+  <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by Title I of the Ethics in Government Act of 1978. The Act requires that designated federal officials disclose publicly their personal financial interests, to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.</p>
+  <p>The Act enumerates the types of information required and prescribes the general format and procedures for the reports. </p>
+    <ul>
+      <li>
+        <code>Financial Disclosure</code> - The financial disclosure itself, containing fields <code>filepath</code>, <code>year</code>, <code>addendum</code>.
+      </li>
+      <li>
+        <code>Positions</code> - Held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States
+      </li>
+      <li>
+        <code>Agreements</code> - Agreement or arrangement of the filer in existence at any time during the reporting period.
+      </li>
+      <li>
+        <code>Non-Investment income</code> - Source, type, and the actual amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received.
+      </li>
+      <li>
+        <code>Non-Investment income (Spouse)</code> - The source and type earned of non-investment income from the spouse of the filer of the financial disclosure.
+      </li>
+      <li>
+        <code>Reimbursements</code> - The identity of the source and a brief description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.
+      </li>
+      <li>
+        <code>Gifts</code> - The source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.
+      </li>
+      <li>
+        <code>Debts</code> - All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.
+      </li>
+      <li>
+        <code>Investments</code> - The source and type of investment income, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.
+      </li>
+    </ul>
+
+    <p>When combined with our judicial database one can query all reported gifts by the late Ruth Bader Ginsburg with the following curl.</p>
+    <pre class="pre-scrollable">curl {% get_full_host %}/financial-disclosures/?person__id=1213&fields=gifts</pre>
+
+    <p>Or for example, you could query for financial disclosures containing gross investments valued above $50,000,000.00.</p>
+    <pre class="pre-scrollable">curl {% get_full_host %}/investments/?gross_value_code=P1&fields=investments</pre>
+
+  <h4 id="financialdisclosure-endpoint-notes">Endpoint-Level Notes</h4>
+    <p>The endpoints for Financial disclosures and all data within are as follows:</p>
+    <ul>
+      <li><p><strong>{% url "financialdisclosure-list" version="v3" %} </strong></p>
+        <ul>
+          <li><code>year</code> The year the disclosure covers.</li>
+          <li><code>filepath</code> - URL path of the PDF version of the disclosure.</li>
+          <li><code>page_count</code> - Page count of the disclosure</li>
+          <li><code>report_type</code> - The report type, if available, indicates if this is a initial, annual, or final report.</li>
+          <li><code>is_amended</code> - A boolean indicating if this disclosure is an amended disclosure.</li>
+          <li><code>addendum_content_raw</code> - The raw extraction of the addendum and additional comments section of the disclosure.</li>
+          <li><code>addendum_redacted</code> - A boolean indicating whether the addendum section contains redactions</li>
+          <li><code>has_been_extracted</code> - A boolean indicating whether this document was extrated by OCR.</li>
+        </ul>
+      </li>
+
+      <li>
+        <p><strong>{% url "agreement-list" version="v3" %} </strong></p>
+        <p>Agreements contains <code>parties_and_terms</code> that a judge has entered into within the last three years.</p>
+      </li>
+      <li>
+        <p><strong>{% url "disclosureposition-list" version="v3" %}</strong> </p>
+        <p>Positions contains <code>organization_name</code> and <code>position</code> fields. Often includes trusts, board memberships and foundations.</p>
+      </li>
+      <li>
+        <p><strong>{% url "noninvestmentincome-list" version="v3" %}</strong>  </p>
+        <p>Non investment income, typically teaching salaries includes <code>date_raw</code>, <code>source_type</code> and <code>income_amount</code>.</p>
+      </li>
+      <li>
+        <p><strong>{% url "spouseincome-list" version="v3" %}</strong> </p>
+        <p>Fields include the following: <code>source_type</code>, <code>date_raw</code> and <code>redacted</code> fields.</p>
+      </li>
+      <li>
+        <p><strong>{% url "reimbursement-list" version="v3" %}</strong> </p>
+        <p>Fields include the following: <code>source</code>, <code>location</code>, <code>purpse</code> and <code>items_paid_or_provided</code> fields as well as <code>date_raw</code> and <code>redacted</code> fields. This is used primarily for conference attendance.</p>
+      <ul>
+      </ul>
+      </li>
+      <li>
+        <p><strong>{% url "debt-list" version="v3" %}</strong> </p>
+        <p>Debts includes <code>creditor_name</code>, <code>description</code> and <code>value_code</code> for debts, including mortgages, credit cards and other loans.</p>
+      </li>
+      <li>
+        <p><strong>{% url "gift-list" version="v3" %}</strong>  </p>
+        <p>Fields include <code>source</code>, <code>description</code> and <code>value</code> of gifts received over $450.00.</p>
+      </li>
+      <li>
+        <p><strong>{% url "investment-list" version="v3" %}</strong> </p>
+        <ul>
+          <li><code>page_number</code> The page number the investment is listed on.  This is used"
+        "to generate links directly to the PDF page</li>
+          <li><code>description</code> Name of investment (ex. APPL common stock).</li>
+          <li><code>income_during_reporting_period_code</code> Increase in investment value - as a form code</li>
+          <li><code>income_during_reporting_period_type</code> Type of investment (ex. Rent, Dividend). Typically standardized but not universally.</li>
+          <li><code>gross_value_code</code> Investment total value code at end of reporting period as code (ex. J (1-15,000)).</li>
+          <li><code>gross_value_method</code> Investment valuation method code (ex. Q = Appraisal)</li>
+          <li><code>transaction_during_reporting_period</code> Transaction of investment during reporting period (ex. Buy, Sold)</li>
+          <li><code>transaction_date_raw</code> Date of the transaction, as raw text</li>
+          <li><code>transaction_date</code> Datetime value for if any (D2)</li>
+          <li><code>transaction_value_code</code> Transaction value amount, as form code (ex. J (1-15,000))</li>
+          <li><code>transaction_gain_code</code> Gain from investment transaction if any (ex. A (1-1000)).</li>
+          <li><code>transaction_partner</code> Identity of the transaction partner</li>
+          <li><code>has_inferred_values</code> Whether the transaction contain inferred values?</li>
+
+        </ul>
+      </li>
+    </ul>
+
+    <h4>A few general notes:</h4>
+    <p>Financial disclosures of federal judges are not accessible beyond six years from filing. As such our database is not complete but does extend back to 2002.  Furthermore
+    many older disclosures were handwritten, typed with typewriters or low quality scans. These obstacles have kept
+    some disclosures from being extracted. These documents remain available and searchable by other criteria, including by judge and year.</p>
+    <p>Additionally, many older financial disclosures have not been parsed due to complications in OCRing handwritten, typed or low quality. </p>
+    <p>In addition to the data extracted we attempted to find and identify all redactions in the document.  Most entries contain a <code>redacted</code> field to indicate the presence of a redaction in a row.</p>
+    <p><code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use value_codes for value ranges.  </p>
+    <p><code>Investments</code> contains the field <code>has_inferred_values</code>. This field indicates that we inferred
+      an investment <code>description</code> based on the style of data entry.  For example, an investment could have been bought in Q1, while a dividend was paid out
+      in Q2 before being sold in Q4. Often the investment <code>description</code> is blank, for the subsequent transactions, but is inferred to be the Q1 investment.
+    </p>
+
+    <h4>Permissions:</h4>
+      <p>Financial disclosures currently requires authentication with a CourtListener account that has special permissions. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
+
     <h3 id="recap-endpoint">RECAP Endpoints</h3>
     <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
     </p>
