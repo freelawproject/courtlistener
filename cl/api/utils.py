@@ -462,7 +462,30 @@ class BulkJsonHistory(object):
         self.save_to_disk()
 
 
-def invert_user_logs(start, end, add_usernames=True):
+def make_date_str_list(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+) -> List[str]:
+    """Make a list of date strings for a date span
+
+    :param start: The beginning date, as a string or datetime object
+    :param end: The end date, as a string or datetime object
+    :returns: A list of dates in the ISO-8601 format
+    """
+    if isinstance(start, str):
+        start = parser.parse(start, fuzzy=False)
+    if isinstance(end, str):
+        end = parser.parse(end, fuzzy=False)
+    return [
+        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
+    ]
+
+
+def invert_user_logs(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+    add_usernames: bool = True,
+) -> Dict[str, Dict[str, int]]:
     """Invert the user logs for a period of time
 
     The user logs have the date in the key and the user as part of the set:
@@ -497,9 +520,7 @@ def invert_user_logs(start, end, add_usernames=True):
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
-    dates = [
-        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
-    ]
+    dates = make_date_str_list(start, end)
     for d in dates:
         pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
     results = pipe.execute()
@@ -542,23 +563,14 @@ def get_count_for_endpoint(endpoint, start, end):
 
     :param endpoint: The endpoint to get the count for. Typically something
     like 'docket-list' or 'docket-detail'
-    :param start: The beginning date (inclusive) you want the results for. A
-    string to be interpreted by dateparser
-    :param end: The end date (inclusive) you want the results for. A string to
-    be interpreted by dateparser.
+    :param start: The beginning date (inclusive) you want the results for.
+    :param end: The end date (inclusive) you want the results for.
     :return int: The count for that endpoint
     """
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
-    dates = [
-        d.date().isoformat()
-        for d in rrule(
-            DAILY,
-            dtstart=parser.parse(start, fuzzy=False),
-            until=parser.parse(end, fuzzy=False),
-        )
-    ]
+    dates = make_date_str_list(start, end)
     for d in dates:
         pipe.zscore("api:v3.endpoint.d:%s.counts" % d, endpoint)
     results = pipe.execute()
