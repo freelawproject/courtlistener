@@ -2,7 +2,8 @@ import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
-from datetime import date
+from datetime import date, datetime
+from typing import Dict, List, Set, Union
 
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -508,21 +509,17 @@ def invert_user_logs(
             }
         }
     :param start: The beginning date (inclusive) you want the results for. A
-    :type start: datetime.datetime
     :param end: The end date (inclusive) you want the results for.
-    :type end: datetime.datetime
     :param add_usernames: Stats are stored with the user ID. If this is True,
     add an alias in the returned dictionary that contains the username as well.
-    :type add_usernames: bool
     :return The inverted dictionary
-    :rtype: dict
     """
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
     for d in dates:
-        pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
+        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
     results = pipe.execute()
 
     # results is a list of results for each of the zrange queries above. Zip
@@ -572,12 +569,12 @@ def get_count_for_endpoint(endpoint, start, end):
 
     dates = make_date_str_list(start, end)
     for d in dates:
-        pipe.zscore("api:v3.endpoint.d:%s.counts" % d, endpoint)
+        pipe.zscore(f"api:v3.endpoint.d:{d}.counts", endpoint)
     results = pipe.execute()
     return sum(r for r in results if r)
 
 
-def get_avg_ms_for_endpoint(endpoint, d):
+def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     """
 
     :param endpoint: The endpoint to get the average timing for. Typically
@@ -596,7 +593,7 @@ def get_avg_ms_for_endpoint(endpoint, d):
     return results[0] / results[1]
 
 
-def get_replication_statuses():
+def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
     """Return the replication status information for all publishers
 
     The easiest way to detect a problem in a replication set up is to monitor
@@ -639,7 +636,7 @@ def get_replication_statuses():
     return statuses
 
 
-emails = {
+emails: Dict[str : Dict[str, str]] = {
     "new_api_user": {
         "subject": "Welcome to the CourtListener API from Free Law Project",
         "body": (
