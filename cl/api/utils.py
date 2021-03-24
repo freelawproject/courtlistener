@@ -661,7 +661,7 @@ def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
     return statuses
 
 
-emails: Dict[str : Dict[str, str]] = {
+emails: Dict[str, Dict[str, str]] = {
     "new_api_user": {
         "subject": "Welcome to the CourtListener API from Free Law Project",
         "body": (
