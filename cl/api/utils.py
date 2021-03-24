@@ -2,7 +2,8 @@ import json
 import logging
 import os
 from collections import OrderedDict, defaultdict
-from datetime import date
+from datetime import date, datetime
+from typing import Dict, List, Set, Union
 
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
@@ -462,7 +463,30 @@ class BulkJsonHistory(object):
         self.save_to_disk()
 
 
-def invert_user_logs(start, end, add_usernames=True):
+def make_date_str_list(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+) -> List[str]:
+    """Make a list of date strings for a date span
+
+    :param start: The beginning date, as a string or datetime object
+    :param end: The end date, as a string or datetime object
+    :returns: A list of dates in the ISO-8601 format
+    """
+    if isinstance(start, str):
+        start = parser.parse(start, fuzzy=False)
+    if isinstance(end, str):
+        end = parser.parse(end, fuzzy=False)
+    return [
+        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
+    ]
+
+
+def invert_user_logs(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+    add_usernames: bool = True,
+) -> Dict[str, Dict[str, int]]:
     """Invert the user logs for a period of time
 
     The user logs have the date in the key and the user as part of the set:
@@ -485,23 +509,17 @@ def invert_user_logs(start, end, add_usernames=True):
             }
         }
     :param start: The beginning date (inclusive) you want the results for. A
-    :type start: datetime.datetime
     :param end: The end date (inclusive) you want the results for.
-    :type end: datetime.datetime
     :param add_usernames: Stats are stored with the user ID. If this is True,
     add an alias in the returned dictionary that contains the username as well.
-    :type add_usernames: bool
     :return The inverted dictionary
-    :rtype: dict
     """
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
-    dates = [
-        d.date().isoformat() for d in rrule(DAILY, dtstart=start, until=end)
-    ]
+    dates = make_date_str_list(start, end)
     for d in dates:
-        pipe.zrange("api:v3.user.d:%s.counts" % d, 0, -1, withscores=True)
+        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
     results = pipe.execute()
 
     # results is a list of results for each of the zrange queries above. Zip
@@ -537,35 +555,51 @@ def invert_user_logs(start, end, add_usernames=True):
     return out
 
 
-def get_count_for_endpoint(endpoint, start, end):
+def get_user_ids_for_date_range(
+    start: Union[str, datetime],
+    end: Union[str, datetime],
+) -> Set[int]:
+    """Get a list of user IDs that used the API during a span of time
+
+    :param start: The beginning of when you want to find users (default: all
+    time). A str to be interpreted by dateparser.
+    :param end: The end of when you want to find users (default today).  A
+    str to be interpreted by dateparser.
+    :return Set of user IDs during a time period. Will not contain anonymous
+    users.
+    """
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+
+    date_strs = make_date_str_list(start, end)
+    for d in date_strs:
+        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1)
+
+    results: List[List[str]] = pipe.execute()
+    results: Set[str] = set().union(*results)
+    return {int(i) for i in results if i.isdigit()}
+
+
+def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
     """Get the count of hits for an endpoint by name, during a date range
 
     :param endpoint: The endpoint to get the count for. Typically something
     like 'docket-list' or 'docket-detail'
-    :param start: The beginning date (inclusive) you want the results for. A
-    string to be interpreted by dateparser
-    :param end: The end date (inclusive) you want the results for. A string to
-    be interpreted by dateparser.
+    :param start: The beginning date (inclusive) you want the results for.
+    :param end: The end date (inclusive) you want the results for.
     :return int: The count for that endpoint
     """
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
 
-    dates = [
-        d.date().isoformat()
-        for d in rrule(
-            DAILY,
-            dtstart=parser.parse(start, fuzzy=False),
-            until=parser.parse(end, fuzzy=False),
-        )
-    ]
+    dates = make_date_str_list(start, end)
     for d in dates:
-        pipe.zscore("api:v3.endpoint.d:%s.counts" % d, endpoint)
+        pipe.zscore(f"api:v3.endpoint.d:{d}.counts", endpoint)
     results = pipe.execute()
     return sum(r for r in results if r)
 
 
-def get_avg_ms_for_endpoint(endpoint, d):
+def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     """
 
     :param endpoint: The endpoint to get the average timing for. Typically
@@ -584,7 +618,7 @@ def get_avg_ms_for_endpoint(endpoint, d):
     return results[0] / results[1]
 
 
-def get_replication_statuses():
+def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
     """Return the replication status information for all publishers
 
     The easiest way to detect a problem in a replication set up is to monitor
@@ -627,7 +661,7 @@ def get_replication_statuses():
     return statuses
 
 
-emails = {
+emails: Dict[str, Dict[str, str]] = {
     "new_api_user": {
         "subject": "Welcome to the CourtListener API from Free Law Project",
         "body": (
