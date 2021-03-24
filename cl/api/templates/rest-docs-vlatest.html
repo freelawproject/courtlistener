@@ -638,9 +638,15 @@
     <p>The judicial REST API contains the following endpoints:</p>
     <ul>
       {% include "includes/judge-endpoints.html" %}
-      <li><strong>Sources</strong>: These are objects explaining the source of a piece of data. For example, it may provide a link or a text explanation of where something is from.
+      <li>
+        <p><strong>Sources</strong> &mdash; <code>{% url "source-list" version="v3" %}</code></p>
+        <p>These are objects explaining the source of a piece of data. For example, it may provide a link or a text explanation of where something is from.
+        </p>
       </li>
-      <li><strong>ABA Ratings</strong>: These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.
+      <li>
+        <p><strong>ABA Ratings</strong> &mdash; <code>{% url "abarating-list" version="v3" %}</code></p>
+        <p>These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.
+        </p>
       </li>
     </ul>
     <h4 id="judge-field-notes">Field-Level Notes</h4>
