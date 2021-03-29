@@ -107,6 +107,7 @@ mypy = "^0.812"
 exrex = "^0.10.5"
 djangorestframework-stubs = "^1.4.0"
 django-stubs = "^1.7.0"
+lxml-stubs = "^0.1.1"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
