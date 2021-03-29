@@ -48,22 +48,22 @@ jobs:
       - name: mypy Static Type Cheker (packages)
         run: >
           mypy
-            --follow-imports=skip
-            --exclude 'migrations/*'
-            -p cl.alerts
+          --follow-imports=skip
+          --exclude 'migrations/*'
+          -p cl.alerts
 
       # Add files here as they're ready
       - name: mypy Static Type Cheker (files)
         run: >
           mypy
-            --follow-imports=skip
-            --exclude 'migrations/*'
-            cl/api/api_permissions.py
-            cl/api/models.py
-            cl/api/routers.py
-            cl/api/tests.py
-            cl/api/views.py
-            cl/opinion_page/views.py
+          --follow-imports=skip
+          --exclude 'migrations/*'
+          cl/api/api_permissions.py
+          cl/api/models.py
+          cl/api/routers.py
+          cl/api/tests.py
+          cl/api/views.py
+          cl/opinion_page/views.py
 
 
       - name: Black Code Formatter
