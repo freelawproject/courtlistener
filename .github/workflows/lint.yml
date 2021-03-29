@@ -59,6 +59,8 @@ jobs:
           --exclude 'migrations/*'
           -p cl.alerts
           -p cl.audio
+          -p cl.opinion_page
+          -p cl.simple_pages
 
       # Add files here as they're ready
       - name: mypy Static Type Cheker (files)
