@@ -8,6 +8,7 @@ from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 from cl.alerts.models import Alert, DocketAlert
 from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.types import AuthenticatedHttpRequest
 from cl.opinion_page.views import make_docket_title, user_has_alert
 from cl.search.models import Docket
 
@@ -86,13 +87,17 @@ def enable_alert(request, secret_key):
     )
 
 
-def toggle_docket_alert(request: HttpRequest) -> HttpResponse:
+@login_required
+def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Use Ajax to create or delete an alert for a user."""
     if request.user.is_anonymous:
         return HttpResponse("Please log in to continue.")
 
     if is_ajax(request) and request.method == "POST":
         docket_pk = request.POST.get("id")
+        if not docket_pk:
+            msg = "Unable to alter alert. Please provide ID attribute"
+            return HttpResponse(msg)
         existing_alert = DocketAlert.objects.filter(
             user=request.user, docket_id=docket_pk
         )
@@ -109,7 +114,8 @@ def toggle_docket_alert(request: HttpRequest) -> HttpResponse:
         )
 
 
-def new_docket_alert(request: HttpRequest) -> HttpResponse:
+@login_required
+def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
