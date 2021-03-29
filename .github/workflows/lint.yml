@@ -23,3 +23,7 @@ jobs:
 
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0
+
+      - name: mypy Static Type Cheker
+        run: mypy --follow-imports=skip cl/opinion_page/views.py
+
