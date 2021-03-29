@@ -44,6 +44,10 @@ jobs:
           pwd
           ls -l
 
+      - name: Create the private settings file
+        working-directory: courtlistener/cl/settings
+        run: cp 05-private.example 05-private.py
+
       # Add modules here as they're ready
       - name: mypy Static Type Cheker (packages)
         run: >
@@ -51,6 +55,7 @@ jobs:
           --follow-imports=skip
           --exclude 'migrations/*'
           -p cl.alerts
+          -p cl.audio
 
       # Add files here as they're ready
       - name: mypy Static Type Cheker (files)

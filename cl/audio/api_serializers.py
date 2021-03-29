@@ -1,5 +1,5 @@
 from drf_dynamic_fields import DynamicFieldsMixin
-from rest_framework import serializers
+from rest_framework.serializers import CharField, HyperlinkedRelatedField
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio import models as audio_models
@@ -8,10 +8,8 @@ from cl.search.models import Docket
 
 
 class AudioSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    absolute_url = serializers.CharField(
-        source="get_absolute_url", read_only=True
-    )
-    panel = serializers.HyperlinkedRelatedField(
+    absolute_url = CharField(source="get_absolute_url", read_only=True)
+    panel: HyperlinkedRelatedField = HyperlinkedRelatedField(
         many=True,
         view_name="person-detail",
         queryset=Person.objects.all(),
@@ -19,7 +17,7 @@ class AudioSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     )
     # This seems unnecessary and it serializes the same data either way. But
     # when this is not here, the API does a query that pulls back ALL dockets.
-    docket = serializers.HyperlinkedRelatedField(
+    docket: HyperlinkedRelatedField = HyperlinkedRelatedField(
         many=False,
         view_name="docket-detail",
         queryset=Docket.objects.all(),
