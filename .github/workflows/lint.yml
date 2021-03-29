@@ -41,11 +41,14 @@ jobs:
           echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
           echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
           echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Debug paths
+        run: |
           pwd
-          ls -l
+          ls -al
 
       - name: Create the private settings file
-        working-directory: courtlistener/cl/settings
+        working-directory: cl/settings
         run: cp 05-private.example 05-private.py
 
       # Add modules here as they're ready
