@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2-beta
+
       - uses: actions/setup-python@v2
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
@@ -40,6 +41,8 @@ jobs:
           echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
           echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
           echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+          pwd
+          ls -l
 
       # Add modules here as they're ready
       - name: mypy Static Type Cheker (packages)
@@ -55,7 +58,13 @@ jobs:
           mypy
             --follow-imports=skip
             --exclude 'migrations/*'
+            cl/api/api_permissions.py
+            cl/api/models.py
+            cl/api/routers.py
+            cl/api/tests.py
+            cl/api/views.py
             cl/opinion_page/views.py
+
 
       - name: Black Code Formatter
         uses: psf/black@stable
