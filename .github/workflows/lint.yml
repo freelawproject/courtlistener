@@ -32,7 +32,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock')}}-v20210115
 
       - name: Install dependencies
-        run: poetry install --dev
+        run: poetry install
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
 
       - name: Activate venv
@@ -41,12 +41,21 @@ jobs:
           echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
           echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
 
-      - name: mypy Static Type Cheker
+      # Add modules here as they're ready
+      - name: mypy Static Type Cheker (packages)
         run: >
           mypy
             --follow-imports=skip
+            --exclude 'migrations/*'
+            -p cl.alerts
+
+      # Add files here as they're ready
+      - name: mypy Static Type Cheker (files)
+        run: >
+          mypy
+            --follow-imports=skip
+            --exclude 'migrations/*'
             cl/opinion_page/views.py
-            cl/alerts/views.py
 
       - name: Black Code Formatter
         uses: psf/black@stable
