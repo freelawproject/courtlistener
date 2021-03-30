@@ -161,6 +161,16 @@ your code. We recommend [integrating it into your editor][black-ed].
     the PR's become impossible to read and risky to merge. This is a big reason
     we use black. 
 
+1. We are beginning to use mypy to add type hints to our Python code. New code
+must include hints and updates to old code should add hints to the old code. 
+Our Github Action for mypy is in lint.yml, and should be updated to run against 
+any areas that have hints. This just takes a second once mypy is working 
+properly on a file or module.
+
+1. We use iSort to sort our imports. If your imports aren't sorted properly, 
+iSort will tell you so when you push your code to Github. Again, we recommend
+getting iSort integrated into your editor or workflow. 
+
 1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort. 
 It doesn't have to be done — it doesn't even have to work! — but it should be 
 clean and it should be your best effort at clean *progress*. PRs are both a way
@@ -171,7 +181,7 @@ monolithic one that is fully functional.
     Say you are developing a system that relies on regexes to do something. Why
     not submit the regexes (and their tests!) in one PR and the thing that uses
     those regexes in another? That'd be much easier to review than trying to 
-    see the whole thing at once. 
+    see the whole thing at once.
 
 1. We have an editorconfig, an eslint configuration, and a black configuration. 
 Please use them.
@@ -197,7 +207,7 @@ work done. That's the goal here.
 
 ## Testing
 
-Any time you're contributing to or hacking on code base, whether adding features or fixing issues, you should validate your changes don't break the core functionality of CourtListener by executing the test suite. This is also a great way to validate your development environment is properly configured. (You should probably also add your own tests as well for your new feature.)
+Any time you're contributing to or hacking on code base, whether adding features or fixing issues, you should validate your changes don't break the core functionality of CourtListener by executing the test suite. This is also a great way to validate your development environment is properly configured. You should also add new tests for your new feature or fix.
 
 In general, the easiest way to run the test suite is via Django's `test` command. In docker, that's:
 
@@ -292,7 +302,7 @@ Screenshots will be saved into the `cl-django` container. To grab them, [you can
 
 ### CI/CD
 
-We use Github Actions to run the full test suite and the `black` code formatter on every push. If the tests fail or your code is not formatted properly according to `black`, your code probably won't get merged. (See above for more details about Black.)
+We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
 
 
 
