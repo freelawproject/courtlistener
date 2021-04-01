@@ -58,11 +58,16 @@ class SimpleSitemap(sitemaps.Sitemap):
             make_url_dict("viz_gallery", priority=0.6, changefreq="hourly"),
         ]
 
-    def changefreq(self, obj: Dict[str, Union[str, float]]) -> str:
+    def changefreq(
+        self, obj: Dict[str, Union[str, float]]
+    ) -> Union[str, float]:
         return obj["changefreq"]
 
-    def priority(self, obj: Dict[str, Union[str, float]]) -> float:
-        return obj["priority"]
+    def priority(self, obj: Dict[str, Union[str, float]]) -> Union[str, float]:
+        return str(obj["priority"])
 
-    def location(self, obj: Dict[str, Union[str, float]]) -> str:
-        return reverse(obj["view_name"])
+    def location(  # type: ignore[override]
+        self,
+        obj: Dict[str, Union[str, float]],
+    ) -> str:
+        return reverse(str(obj["view_name"]))
