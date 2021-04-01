@@ -481,7 +481,7 @@ class SpouseIncome(AbstractDateTimeModel):
         help_text="Date of spousal income (ex. 2011).",
         blank=True,
     )
-    redacted = models.TextField(
+    redacted = models.BooleanField(
         help_text="Does the spousal-income row contain redaction(s)?",
         default=False,
     )

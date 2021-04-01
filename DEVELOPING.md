@@ -300,6 +300,18 @@ Screenshots will be saved into the `cl-django` container. To grab them, [you can
 [cp]: https://stackoverflow.com/a/22050116/64911
 
 
+### How to update a docker image.
+
+Once an amazing new feature has been added to CL or to an import dependency (ie Juriscraper) one might need to update the docker image.
+
+To do this:
+
+1) Update the version numbers and version logs in `docker/django/version.txt` & `docker/task-server/version.txt`.
+2) Push to `master`
+
+Docker hub, automatically builds new versions and will update `:latest`.
+
+
 ### CI/CD
 
 We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
