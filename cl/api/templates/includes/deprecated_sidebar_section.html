@@ -1,6 +1,11 @@
 <div class="sidebar-section">
   <h3><span>API Change Log</span></h3>
   <ul>
+     <li>
+      <p><strong>v3.13</strong> &mdash; This version adds data from newly added judicial financial disclosure documents. This data is now included in a series of new endpoints to explore financial disclosures. For example, you can filter by gifts received by a specific federal judge or district.</p>
+      <p>The new endpoints include <code>gifts</code>, <code>reimbursements</code>, <code>disclosure-positions</code>, <code>agreements</code>, <code>debts</code>, <code>investments</code>, <code>spouse-income</code>, <code>non-investment-incomes</code> and <code>financial-disclosures</code>. For an understanding of these fields, see the endpoint documentation.</p>
+    </li>
+
     <li>
       <p><strong>v3.12</strong> &mdash; This version deprecates the experimental Core API interface we tried previously. Swagger/OpenAPI has become the standard. Our support of OpenAPI remains experimental, but our toolkit should support it better than previously.</p>
       <p>Many endpoints can only be filtered by specific values. For example, to filter the <code>educations</code> endpoint to only bachelor's degrees, you'd use <code>degree_level=ba</code> as part of your GET request. In the past, if invalid filter values were used, zero results would be returned because zero items would match that query. This made sense, but did not help users identify their error. These values now return a <code>400</code> status code and an error message instead.</p>
