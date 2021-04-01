@@ -4,7 +4,7 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
 from django.db.models import Sum
 
 
-def map_reporter_db_cite_type(citation_type):
+def map_reporter_db_cite_type(citation_type: str) -> int:
     """Map a citation type from the reporters DB to CL Citation type
 
     :param citation_type: A value from REPORTERS['some-key']['cite_type']
@@ -21,10 +21,12 @@ def map_reporter_db_cite_type(citation_type):
         "specialty_west": Citation.WEST,
         "scotus_early": Citation.SCOTUS_EARLY,
     }
-    return citation_map.get(citation_type)
+    return citation_map[citation_type]
 
 
-def get_citation_depth_between_clusters(citing_cluster_pk, cited_cluster_pk):
+def get_citation_depth_between_clusters(
+    citing_cluster_pk: int, cited_cluster_pk: int
+) -> int:
     """OpinionsCited objects exist as relationships between Opinion objects,
     but we often want access to citation depth information between
     OpinionCluster objects. This helper method assists in doing the necessary
