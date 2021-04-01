@@ -2,7 +2,6 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
     apps,
 )
 from django.db.models import Sum
-from lxml import etree
 
 
 def map_reporter_db_cite_type(citation_type):
@@ -42,31 +41,3 @@ def get_citation_depth_between_clusters(citing_cluster_pk, cited_cluster_pk):
         citing_opinion__cluster__pk=citing_cluster_pk,
         cited_opinion__cluster__pk=cited_cluster_pk,
     ).aggregate(depth=Sum("depth"))["depth"]
-
-
-def is_balanced_html(text):
-    """Test whether a given string contains balanced HTML tags
-
-    :param text: The string to be tested
-    :return: Boolean
-    """
-    text = "<div>%s</div>" % text
-
-    # lxml will throw an error while parsing if the string is unbalanced
-    try:
-        etree.fromstring(text)
-        return True
-    except etree.XMLSyntaxError:
-        return False
-
-
-def remove_duplicate_citations_by_regex(citations):
-    """Given a list of Citation objects, remove duplicates according to each
-    citation's generated regex. Because each citation's regex matches every
-    instance of that citation in an opinion, we do not need to redundantly
-    match multiple citations with the same regexes."""
-    return list(
-        {
-            hash(citation.as_regex()): citation for citation in citations
-        }.values()
-    )

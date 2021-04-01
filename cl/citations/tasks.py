@@ -1,19 +1,18 @@
-import re
 from collections import Counter
 from http.client import ResponseNotReady
-from typing import List, Set, Tuple, Union
+from typing import List, Set, Tuple
 
 from django.db import transaction
 from django.db.models import F
-from eyecite.find_citations import get_citations
-from eyecite.models import Citation, NonopinionCitation
+from eyecite import get_citations
+from eyecite.models import CitationBase
 
 from cl.celery_init import app
-from cl.citations import match_citations
-from cl.citations.utils import (
-    is_balanced_html,
-    remove_duplicate_citations_by_regex,
+from cl.citations.annotate_citations import (
+    create_cited_html,
+    get_and_clean_opinion_text,
 )
+from cl.citations.match_citations import get_citation_matches
 from cl.search.models import Opinion, OpinionCluster, OpinionsCited
 from cl.search.tasks import add_items_to_solr
 
@@ -25,8 +24,8 @@ PARALLEL_DISTANCE = 4
 
 @app.task
 def identify_parallel_citations(
-    citations: List[Citation],
-) -> Set[Tuple[Citation]]:
+    citations: List[CitationBase],
+) -> Set[Tuple[CitationBase]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
@@ -35,7 +34,7 @@ def identify_parallel_citations(
     """
     if len(citations) == 0:
         return citations
-    citation_indexes = [c.reporter_index for c in citations]
+    citation_indexes = [c.index for c in citations]
     parallel_citation = [citations[0]]
     parallel_citations = set()
     for i, reporter_index in enumerate(citation_indexes[:-1]):
@@ -61,99 +60,6 @@ def identify_parallel_citations(
     return parallel_citations
 
 
-@app.task
-def get_document_citations(
-    opinion: Opinion,
-) -> List[Union[NonopinionCitation, Citation]]:
-    """Identify and return citations from the html or plain text of the
-    opinion.
-    """
-    if opinion.html_anon_2020:
-        citations = get_citations(
-            text=opinion.html_anon_2020,
-            clean=(
-                "html",
-                "whitespace",
-            ),
-        )
-    elif opinion.html_columbia:
-        citations = get_citations(
-            text=opinion.html_columbia,
-            clean=(
-                "html",
-                "whitespace",
-            ),
-        )
-    elif opinion.html_lawbox:
-        citations = get_citations(
-            text=opinion.html_lawbox,
-            clean=(
-                "html",
-                "whitespace",
-            ),
-        )
-    elif opinion.html:
-        citations = get_citations(
-            text=opinion.html,
-            clean=(
-                "html",
-                "whitespace",
-            ),
-        )
-    elif opinion.plain_text:
-        citations = get_citations(
-            text=opinion.plain_text, clean=("whitespace",)
-        )
-    else:
-        citations = []
-    return citations
-
-
-def create_cited_html(opinion: Opinion, citations: List[Citation]) -> str:
-    """Add citation links to opinion text
-
-    Using the opinion itself and a list of citations found within it, make the
-    citations into links to the correct citations.
-    :param opinion: The opinion to enhance
-    :param citations: A list of citations in the opinion
-    :return The new HTML containing citations
-    """
-    citations = [
-        citation for citation in citations if isinstance(citation, Citation)
-    ]
-    citations = remove_duplicate_citations_by_regex(citations)
-    html_fields = [
-        opinion.html_anon_2020,
-        opinion.html_columbia,
-        opinion.html_lawbox,
-        opinion.html,
-    ]
-    if any(html_fields):
-        new_html = (
-            opinion.html_anon_2020
-            or opinion.html_columbia
-            or opinion.html_lawbox
-            or opinion.html
-        )
-
-        for citation in citations:
-            citation_regex = citation.as_regex()
-            match = re.search(citation_regex, new_html)
-
-            # Only perform the string replacement if we're sure that the
-            # matched HTML is not unbalanced. (If it is, when we inject
-            # our own HTML, the DOM can get messed up.)
-            if match and is_balanced_html(match.group()):
-                new_html = re.sub(citation_regex, citation.as_html(), new_html)
-    elif opinion.plain_text:
-        inner_html = opinion.plain_text
-        for citation in citations:
-            repl = '</pre>%s<pre class="inline">' % citation.as_html()
-            inner_html = re.sub(citation.as_regex(), repl, inner_html)
-        new_html = '<pre class="inline">%s</pre>' % inner_html
-    return new_html
-
-
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def find_citations_for_opinion_by_pks(
     self,
@@ -168,21 +74,20 @@ def find_citations_for_opinion_by_pks(
     """
     opinions = Opinion.objects.filter(pk__in=opinion_pks)
     for opinion in opinions:
-        # Returns a list of Citation objects, i.e., something like
-        # [FullCitation, FullCitation, ShortformCitation, FullCitation,
-        #   SupraCitation, SupraCitation, ShortformCitation, FullCitation]
-        citations = get_document_citations(opinion)
+        # Memoize parsed versions of the opinion's text
+        get_and_clean_opinion_text(opinion)
+
+        # Extract the citations from the opinion's text
+        citations = get_citations(opinion.cleaned_text)
 
         # If no citations are found, continue
         if not citations:
             continue
 
-        # Match all those different Citation objects to Opinion objects, using
+        # Match all those different citation objects to Opinion objects, using
         # a variety of heuristics.
         try:
-            citation_matches = match_citations.get_citation_matches(
-                opinion, citations
-            )
+            citation_matches = get_citation_matches(opinion, citations)
         except ResponseNotReady as e:
             # Threading problem in httplib, which is used in the Solr query.
             raise self.retry(exc=e, countdown=2)
@@ -205,10 +110,13 @@ def find_citations_for_opinion_by_pks(
             if matched_opinion.pk not in all_cited_opinions:
                 opinion_ids_to_update.add(matched_opinion.pk)
 
+        # Generate the citing opinion's new HTML with inline citation links
+        opinion.html_with_citations = create_cited_html(opinion, citations)
+
+        # Finally, commit these changes to the database in a single
+        # transcation block. Trigger a single Solr update as well, if
+        # required.
         with transaction.atomic():
-            # Then, increment the citation_count fields for those matched
-            # clusters all at once. Trigger a single Solr update as well, if
-            # required.
             opinion_clusters_to_update = OpinionCluster.objects.filter(
                 sub_opinions__pk__in=opinion_ids_to_update
             )
@@ -220,10 +128,6 @@ def find_citations_for_opinion_by_pks(
                     opinion_clusters_to_update.values_list("pk", flat=True),
                     "search.OpinionCluster",
                 )
-
-            # Generate the citing opinion's new HTML
-            # (with inline citation links)
-            opinion.html_with_citations = create_cited_html(opinion, citations)
 
             # Nuke existing citations
             OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()

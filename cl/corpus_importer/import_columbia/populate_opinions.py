@@ -7,7 +7,7 @@ from collections import OrderedDict
 from datetime import date
 
 from django.conf import settings
-from eyecite.find_citations import get_citations
+from eyecite.find_citations import clean_text, get_citations
 
 from cl.lib.import_lib import find_person
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -335,7 +335,7 @@ def make_and_save(
     # get citation objects in a list for addition to the cluster
     found_citations = []
     for c in item["citations"]:
-        found = get_citations(c, clean=("html", "whitespace"))
+        found = get_citations(clean_text(c, ["html", "inline_whitespace"]))
         if not found:
             # if the docket number --is-- citation string, we're likely dealing
             # with a somewhat common triplet of (docket number, date,
