@@ -524,7 +524,7 @@ def invert_user_logs(
 
     # results is a list of results for each of the zrange queries above. Zip
     # those results with the date that created it, and invert the whole thing.
-    out = defaultdict(dict)
+    out: defaultdict = defaultdict(dict)
     for d, result in zip(dates, results):
         for user_id, count in result:
             if user_id == "None" or user_id == "AnonymousUser":
@@ -575,9 +575,9 @@ def get_user_ids_for_date_range(
     for d in date_strs:
         pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1)
 
-    results: List[List[str]] = pipe.execute()
-    results: Set[str] = set().union(*results)
-    return {int(i) for i in results if i.isdigit()}
+    results: list = pipe.execute()
+    result_set: set = set().union(*results)
+    return {int(i) for i in result_set if i.isdigit()}
 
 
 def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:

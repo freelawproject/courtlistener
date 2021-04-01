@@ -6,7 +6,13 @@ from pathlib import Path
 
 from django.contrib.messages import constants as message_constants
 from django.http import UnreadablePostError
-from judge_pics import judge_root
+
+try:
+    from judge_pics import judge_root
+except ImportError:
+    # When we're not in the full docker env, just fake it. Useful for e.g. mypy
+    # Use random phrase to prevent access to root!
+    judge_root = "/dummy-directory-john-stingily-granite/"
 
 from cl.lib.redis_utils import make_redis_interface
 

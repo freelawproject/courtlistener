@@ -1,3 +1,5 @@
+from typing import Any, Dict, List
+
 from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
@@ -168,7 +170,7 @@ class SimplePagesTest(TestCase):
 
     def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
-        reverse_params = [
+        reverse_params: List[Dict[str, Any]] = [
             {"viewname": "faq"},
             {"viewname": "coverage"},
             {"viewname": "coverage_fds"},
