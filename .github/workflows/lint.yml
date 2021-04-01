@@ -9,17 +9,76 @@ on:
       - 'master'
 
 jobs:
-  black:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2-beta
+
       - uses: actions/setup-python@v2
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.8"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1.1.0
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v2
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock')}}-v20210115
+
+      - name: Install dependencies
+        run: poetry install
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+
+      - name: Activate venv
+        run: |
+          echo "VIRTUAL_ENV=$GITHUB_WORKSPACE/.venv" >> $GITHUB_ENV
+          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Debug paths
+        run: |
+          pwd
+          ls -al
+
+      - name: Create the private settings file
+        working-directory: cl/settings
+        run: cp 05-private.example 05-private.py
+
+      # Add modules here as they're ready
+      - name: mypy Static Type Cheker (packages)
+        run: >
+          mypy
+          --follow-imports=skip
+          --exclude 'migrations/*'
+          -p cl.alerts
+          -p cl.audio
+          -p cl.opinion_page
+          -p cl.simple_pages
+
+      # Add files here as they're ready
+      - name: mypy Static Type Cheker (files)
+        run: >
+          mypy
+          --follow-imports=skip
+          --exclude 'migrations/*'
+          cl/api/api_permissions.py
+          cl/api/models.py
+          cl/api/routers.py
+          cl/api/tests.py
+          cl/api/views.py
+          cl/opinion_page/views.py
+
 
       - name: Black Code Formatter
         uses: psf/black@stable
 
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0
+

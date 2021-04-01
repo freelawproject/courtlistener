@@ -154,15 +154,15 @@ class DisableDocketAlertTest(TestCase):
             docket=self.docket, user=self.user
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
         DocketAlert.objects.all().delete()
 
-    def backdate_alert(self):
+    def backdate_alert(self) -> None:
         self.alert.date_created = self.now - timedelta(days=365)
         self.alert.save()
 
-    def test_alert_created_recently_termination_year_ago(self):
+    def test_alert_created_recently_termination_year_ago(self) -> None:
         self.docket.date_terminated = now() - timedelta(days=365)
         self.docket.save()
 
@@ -176,7 +176,7 @@ class DisableDocketAlertTest(TestCase):
             % report.__dict__,
         )
 
-    def test_old_alert_recent_termination(self):
+    def test_old_alert_recent_termination(self) -> None:
         """Flag it if alert is old and item was terminated 90-97 days ago"""
         self.backdate_alert()
         for i in range(90, 97):

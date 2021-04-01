@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Union
 from urllib.parse import quote
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.db.models import Count, QuerySet, Sum
@@ -129,7 +130,7 @@ def markdown_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/markdown_help.html", {"private": False})
 
 
-def build_court_dicts(courts: QuerySet) -> List[Dict[str, Union[str, int]]]:
+def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
     court_dicts = [{"pk": "all", "short_name": "All Courts"}]
@@ -263,7 +264,7 @@ def contribute(request: HttpRequest) -> HttpResponse:
 def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
-    template_data: Optional[Dict[str, str]] = None,
+    template_data: Optional[Dict[str, Union[ContactForm, str, bool]]] = None,
     initial: Optional[Dict[str, str]] = None,
 ) -> HttpResponse:
     """This is a fairly run-of-the-mill contact form, except that it can be
@@ -305,11 +306,11 @@ def contact(
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
-        try:
+        if isinstance(request.user, User):
             initial["email"] = request.user.email
             initial["name"] = request.user.get_full_name()
             form = ContactForm(initial=initial)
-        except AttributeError:
+        else:
             # for anonymous users, who lack full_names, and emails
             form = ContactForm(initial=initial)
 

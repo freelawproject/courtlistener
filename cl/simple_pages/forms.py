@@ -1,5 +1,5 @@
 import re
-from typing import Dict
+from typing import Any, Dict
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -39,10 +39,10 @@ class ContactForm(forms.Form):
             raise ValidationError("Please say the sky is blue.")
         return data
 
-    def clean(self) -> None:
+    def clean(self) -> Dict[str, Any]:
         cleaned_data = super().clean()
-        subject = cleaned_data["phone_number"]
-        message = cleaned_data["message"]
+        subject = cleaned_data.get("phone_number", "")
+        message = cleaned_data.get("message", "")
         regex = re.compile(
             r"remov(e|al)|take down request|opt out|de-index|delete link"
             r"|no ?index|block (from)?search engines?|block pages|ccpa",
@@ -55,3 +55,4 @@ class ContactForm(forms.Form):
                 "valid."
             )
             self.add_error("message", msg)
+        return cleaned_data
