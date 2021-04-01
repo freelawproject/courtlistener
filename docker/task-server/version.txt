@@ -1,5 +1,6 @@
-1.0.29
+1.0.30
 
+1.0.30 - Bump juriscraper
 1.0.29 - Add type stubs
 1.0.28 - Bump juriscraper
 1.0.27 - Upgrade djangorestframework-xml
