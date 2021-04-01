@@ -82,7 +82,7 @@ timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
 usaddress = "*"
-reporters-db = {version = "^2.0.5", optional = true}
+reporters-db = "<=2.0.5"
 
 
 # Currently this doesn't support py3, which blocks installation due to outdated dependencies.
@@ -91,7 +91,7 @@ scorched = {git = "https://github.com/freelawproject/scorched.git"}
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.21.0"
 gunicorn = "^20.0.4"
-eyecite = "^1.1.0"
+eyecite = "<2.0.0"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
