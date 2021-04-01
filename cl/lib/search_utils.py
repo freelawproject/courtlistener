@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
-from eyecite.models import CitationBase
+from eyecite.models import CaseCitation
 from scorched.response import SolrResponse
 
 from cl.citations.match_citations import match_citation
@@ -111,7 +111,7 @@ def make_get_string(
     return get_string
 
 
-def get_query_citation(cd: CleanData) -> Optional[List[CitationBase]]:
+def get_query_citation(cd: CleanData) -> Optional[List[CaseCitation]]:
     """Extract citations from the query string and return them, or return
     None
     """
@@ -121,7 +121,7 @@ def get_query_citation(cd: CleanData) -> Optional[List[CitationBase]]:
         cd["q"], do_post_citation=False, do_defendant=False
     )
 
-    citations = [c for c in citations if isinstance(c, CitationBase)]
+    citations = [c for c in citations if isinstance(c, CaseCitation)]
 
     matches = None
     if len(citations) == 1:
