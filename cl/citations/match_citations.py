@@ -2,18 +2,18 @@
 # encoding utf-8
 
 from datetime import date, datetime
-from typing import List, Union
+from typing import List
 
 from django.conf import settings
 from eyecite.models import (
-    Citation,
+    CitationBase,
+    FullCaseCitation,
     IdCitation,
     NonopinionCitation,
-    ShortformCitation,
+    ShortCaseCitation,
     SupraCitation,
 )
 from eyecite.utils import strip_punct
-from reporters_db import REPORTERS
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -87,18 +87,13 @@ def get_years_from_reporter(citation):
     """Given a citation object, try to look it its dates in the reporter DB"""
     start_year = 1750
     end_year = date.today().year
-    if citation.lookup_index is not None:
-        # Some cases can't be disambiguated.
-        # fmt: off
-        reporter_dates = (REPORTERS[citation.canonical_reporter]
-                          [citation.lookup_index]
-                          ['editions']
-                          [citation.reporter])
-        # fmt: on
-        if hasattr(reporter_dates["start"], "year"):
-            start_year = reporter_dates["start"].year
-        if hasattr(reporter_dates["end"], "year"):
-            end_year = reporter_dates["end"].year
+
+    edition_guess = citation.edition_guess
+    if edition_guess:
+        if hasattr(edition_guess.start, "year"):
+            start_year = edition_guess.start.year
+        if hasattr(edition_guess.end, "year"):
+            start_year = edition_guess.end.year
     return start_year, end_year
 
 
@@ -154,7 +149,7 @@ def match_citation(citation, citing_doc=None):
 
 def get_citation_matches(
     citing_opinion: Opinion,
-    citations: List[Union[NonopinionCitation, Citation]],
+    citations: List[CitationBase],
 ) -> List[Opinion]:
     """For a list of Citation objects (e.g., FullCitations, SupraCitations,
     IdCitations, etc.), try to match them to Opinion objects in the database
@@ -205,7 +200,7 @@ def get_citation_matches(
 
         # Likewise, if the citation is a short form citation, try to resolve it
         # to one of the citations that has already been matched
-        elif isinstance(citation, ShortformCitation):
+        elif isinstance(citation, ShortCaseCitation):
             # We first try to match by using the reporter and volume number.
             # However, because matches made using this heuristic may not be
             # unique, we then refine by using the antecedent guess and only
@@ -218,7 +213,7 @@ def get_citation_matches(
                 for c in cm.cluster.citations.all():
                     if (
                         citation.reporter == c.reporter
-                        and citation.volume == c.volume
+                        and citation.volume == str(c.volume)
                     ):
                         candidates.append(cm)
 
@@ -241,7 +236,7 @@ def get_citation_matches(
 
         # Otherwise, the citation is just a regular citation, so try to match
         # it directly to an opinion
-        else:
+        elif isinstance(citation, FullCaseCitation):
             matches = match_citation(citation, citing_doc=citing_opinion)
 
             if len(matches) == 1:
