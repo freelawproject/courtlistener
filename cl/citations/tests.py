@@ -1,25 +1,25 @@
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
-from eyecite.find_citations import get_citations
-from eyecite.models import (
-    FullCitation,
-    IdCitation,
-    NonopinionCitation,
-    ShortformCitation,
-    SupraCitation,
+from eyecite import get_citations
+from eyecite.test_factories import (
+    case_citation,
+    id_citation,
+    nonopinion_citation,
+    supra_citation,
 )
 from lxml import etree
 
+from cl.citations.annotate_citations import (
+    create_cited_html,
+    get_and_clean_opinion_text,
+)
 from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
 from cl.citations.match_citations import get_citation_matches, match_citation
-from cl.citations.tasks import (
-    create_cited_html,
-    find_citations_for_opinion_by_pks,
-)
+from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionCluster, OpinionsCited
 
@@ -37,106 +37,97 @@ class CiteTest(TestCase):
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
 
-        full_citation_html = ('<pre class="inline">asdf </pre><span class="'
-                              'citation no-link"><span class="volume">22'
-                              '</span> <span class="reporter">U.S.</span> '
-                              '<span class="page">33</span> </span><pre class='
-                              '"inline">asdf</pre>')
         test_pairs = [
             # Simple example for full citations
-            ('asdf 22 U.S. 33 asdf', full_citation_html),
+            ('asdf 22 U.S. 33 asdf',
+             '<pre class="inline">asdf </pre><span class="'
+             'citation no-link">22 U.S. 33</span><pre class="'
+             'inline"> asdf</pre>'),
 
             # Using a variant format for U.S. (Issue #409)
-            ('asdf 22 U. S. 33 asdf', full_citation_html),
+            ('asdf 22 U. S. 33 asdf',
+             '<pre class="inline">asdf </pre><span class="'
+             'citation no-link">22 U. S. 33</span><pre class="'
+             'inline"> asdf</pre>'),
 
             # Full citation across line break
             ('asdf John v. Doe, 123\nU.S. 456, upholding foo bar',
              '<pre class="inline">asdf John v. Doe, </pre><span class="'
-             'citation no-link"><span class="volume">123</span>\n<span class='
-             '"reporter">U.S.</span> <span class="page">456</span></span><pre'
-             ' class="inline">, upholding foo bar</pre>'),
+             'citation no-link">123\nU.S. 456</span><pre class="inline">, '
+             'upholding foo bar</pre>'),
 
             # Basic short form citation
             ('existing text asdf, 515 U.S., at 240. foobar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> <span '
-             'class="volume">515</span> <span class="reporter">U.S.</span>, '
-             'at <span class="page">240</span></span><pre class="inline">. '
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">515 U.S., at 240</span><pre class="inline">. '
              'foobar</pre>'),
 
             # Short form citation with no comma after reporter in original
             ('existing text asdf, 1 U. S. at 2. foobar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> <span class'
-             '="volume">1</span> <span class="reporter">U.S.</span> at <span '
-             'class="page">2</span></span><pre class="inline">. foobar</pre>'),
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">1 U. S. at 2</span><pre class="inline">. '
+             'foobar</pre>'),
 
             # Short form citation across line break
             ('asdf.’ ” 123 \n U.S., at 456. Foo bar foobar',
-             '<pre class="inline">asdf.’ </pre><span class="'
-             'citation no-link"><span class="antecedent_guess">”'
-             '</span> <span class="volume">123</span> \n <span class='
-             '"reporter">U.S.</span>, at <span class="page">456</span></span>'
-             '<pre class="inline">. Foo bar foobar</pre>'),
+             '<pre class="inline">asdf.’ ” </pre><span class="citation '
+             'no-link">123 \n U.S., at 456</span><pre class="inline">. Foo '
+             'bar foobar</pre>'),
 
             # First kind of supra citation (standard kind)
             ('existing text asdf, supra, at 2. foobar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> supra, at '
-             '<span class="page">2</span></span><pre class="inline">. foobar'
-             '</pre>'),
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">supra, at 2</span><pre class="inline">. '
+             'foobar</pre>'),
 
             # Second kind of supra citation (with volume)
             ('existing text asdf, 123 supra, at 2. foo bar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> <span '
-             'class="volume">123</span> supra, at <span class="page">2</span>'
-             '</span><pre class="inline">. foo bar</pre>'),
+             '<pre class="inline">existing text asdf, 123 </pre><span class="'
+             'citation no-link">supra, at 2</span><pre class="inline">. foo '
+             'bar</pre>'),
 
             # Third kind of supra citation (sans page)
             ('existing text asdf, supra, foo bar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> supra'
-             '</span><pre class="inline">, foo bar</pre>'),
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">supra,</span><pre class="inline"> foo bar'
+             '</pre>'),
 
             # Fourth kind of supra citation (with period)
             ('existing text asdf, supra. foo bar',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> supra'
-             '</span><pre class="inline">. foo bar</pre>'),
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">supra.</span><pre class="inline"> foo bar'
+             '</pre>'),
 
             # Supra citation across line break
             ('existing text asdf, supra, at\n99 (quoting foo)',
-             '<pre class="inline">existing text </pre><span class="citation '
-             'no-link"><span class="antecedent_guess">asdf,</span> supra, '
-             'at\n<span class="page">99</span> </span><pre class="inline">'
+             '<pre class="inline">existing text asdf, </pre><span class="'
+             'citation no-link">supra, at\n99</span><pre class="inline"> '
              '(quoting foo)</pre>'),
 
             # Id. citation ("Id., at 123")
             ('asdf, id., at 123. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf</pre><span class="citation no-link">, '
-             '<span class="id_token">id.,</span> at 123. </span><pre class="'
-             'inline">Lorem ipsum dolor sit amet</pre>'),
+             '<pre class="inline">asdf, </pre><span class="citation no-link">'
+             'id., at 123</span><pre class="inline">. Lorem ipsum dolor sit '
+             'amet</pre>'),
 
             # Duplicate Id. citation
             ('asd, id., at 123. Lo rem ip sum. asdf, id., at 123. Lo rem ip.',
-             '<pre class="inline">asd</pre><span class="citation no-link">, '
-             '<span class="id_token">id.,</span> at 123. </span><pre class="'
-             'inline">Lo rem ip sum. asdf</pre><span class="citation '
-             'no-link">, <span class="id_token">id.,</span> at 123. </span>'
-             '<pre class="inline">Lo rem ip.</pre>'),
+             '<pre class="inline">asd, </pre><span class="citation no-link">'
+             'id., at 123</span><pre class="inline">. Lo rem ip sum. asdf, '
+             '</pre><span class="citation no-link">id., at 123</span><pre '
+             'class="inline">. Lo rem ip.</pre>'),
 
             # Id. citation across line break
             ('asdf." Id., at 315.\n       Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf."</pre><span class="citation no-link"> '
-             '<span class="id_token">Id.,</span> at 315.\n</span><pre class="'
-             'inline">       Lorem ipsum dolor sit amet</pre>'),
+             '<pre class="inline">asdf." </pre><span class="citation '
+             'no-link">Id., at 315</span><pre class="inline">.\n       Lorem '
+             'ipsum dolor sit amet</pre>'),
 
             # Ibid. citation ("... Ibid.")
             ('asdf, Ibid. Lorem ipsum dolor sit amet',
-             '<pre class="inline">asdf</pre><span class="citation no-link">, '
-             '<span class="id_token">Ibid.</span> Lorem ipsum dolor </span>'
-             '<pre class="inline">sit amet</pre>'),
+             '<pre class="inline">asdf, </pre><span class="citation no-link">'
+             'Ibid.</span><pre class="inline"> Lorem ipsum dolor sit amet'
+             '</pre>'),
 
             # NonopinionCitation (currently nothing should happen here)
             ('Lorem ipsum dolor sit amet. U.S. Code §3617. Foo bar.',
@@ -150,8 +141,12 @@ class CiteTest(TestCase):
                 "Testing plain text to html conversion for %s..." % s, end=" "
             )
             opinion = Opinion(plain_text=s)
-            citations = get_citations(s)
-            created_html = create_cited_html(opinion, citations)
+            get_and_clean_opinion_text(opinion)
+            citations = get_citations(opinion.cleaned_text)
+            created_html = create_cited_html(
+                opinion=opinion,
+                citations=citations,
+            )
             self.assertEqual(
                 created_html,
                 expected_html,
@@ -165,11 +160,11 @@ class CiteTest(TestCase):
 
         test_pairs = [
             # Id. citation with HTML tags
-            ('<div><p>the improper views of the Legislature.\" 2 <i>id.,</i> '
-             'at 73.</p>\n<p>Nathaniel Gorham of Massachusetts</p></div>',
-             '<div><p>the improper views of the Legislature." 2<span class="'
-             'citation no-link"> <i><span class="id_token">id.,</span></i> at '
-             '73.</span></p>\n<p>Nathaniel Gorham of Massachusetts</p></div>'),
+            ('<div><p>the improper views of the Legislature.\" 2 <i>id., at '
+             '73.</i></p>\n<p>Nathaniel Gorham of Massachusetts</p></div>',
+             '<div><p>the improper views of the Legislature." 2 <i><span '
+             'class="citation no-link">id., at 73</span>.</i></p>\n<p>'
+             'Nathaniel Gorham of Massachusetts</p></div>'),
 
             # Id. citation with an intervening HTML tag
             #  (We expect the HTML to be unchanged, since it's too risky to
@@ -186,9 +181,8 @@ class CiteTest(TestCase):
              'public measures.\" <i>Ibid.</i> Gerry of Massachusetts '
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
-             'public measures."<span class="citation no-link"> <i><span class='
-             '"id_token">Ibid.</span></i> Gerry of Massachusetts </span>like'
-             '</p></div>'
+             'public measures." <i><span class="citation no-link">Ibid.'
+             '</span></i> Gerry of Massachusetts like</p></div>'
             ),
         ]
 
@@ -196,8 +190,12 @@ class CiteTest(TestCase):
         for s, expected_html in test_pairs:
             print("Testing html to html conversion for %s..." % s, end=" ")
             opinion = Opinion(html=s)
-            citations = get_citations(s, clean=("html", "whitespace"))
-            created_html = create_cited_html(opinion, citations)
+            get_and_clean_opinion_text(opinion)
+            citations = get_citations(opinion.cleaned_text)
+            created_html = create_cited_html(
+                opinion=opinion,
+                citations=citations,
+            )
             self.assertEqual(
                 created_html,
                 expected_html,
@@ -212,46 +210,42 @@ class CiteTest(TestCase):
         # matched. (No matching is performed in the previous cases.)
         # fmt: off
 
-        test_triples = [
+        test_pairs = [
             # Id. citation with page number ("Id., at 123, 124")
             ('asdf, Id., at 123, 124. Lorem ipsum dolor sit amet',
-             IdCitation(id_token='Id.,', after_tokens=['at', '123', '124'],
-                        has_page=True),
-             '<pre class="inline">asdf</pre><span class="citation" data-id="'
-             'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.,'
-             '</span> at 123, 124</a></span><pre class="inline">. Lorem ipsum'
-             ' dolor sit amet</pre>'),
+             '<pre class="inline">asdf, </pre><span class="citation" data-id="'
+             'MATCH_ID"><a href="MATCH_URL">Id., at 123, 124</a></span><pre '
+             'class="inline">. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation with complex page number ("Id. @ 123:1, ¶¶ 124")
             ('asdf, Id. @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet',
-             IdCitation(id_token='Id.',
-                        after_tokens=['@', '123:1', '¶¶', '124'],
-                        has_page=True),
-             '<pre class="inline">asdf</pre><span class="citation" data-id="'
-             'MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
-             '</span> @ 123:1, ¶¶ 124</a></span><pre class="inline">. Lorem '
-             'ipsum dolor sit amet</pre>'),
+             '<pre class="inline">asdf, </pre><span class="citation" data-id='
+             '"MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class='
+             '"inline"> @ 123:1, ¶¶ 124. Lorem ipsum dolor sit amet</pre>'),
 
             # Id. citation without page number ("Id. Something else")
             ('asdf, Id. Lorem ipsum dolor sit amet',
-             IdCitation(id_token='Id.', after_tokens=['Lorem', 'ipsum'],
-                        has_page=False),
-             '<pre class="inline">asdf</pre><span class="citation" data-id='
-             '"MATCH_ID">, <a href="MATCH_URL"><span class="id_token">Id.'
-             '</span></a> Lorem ipsum </span><pre class="inline">dolor sit '
-             'amet</pre>'),
+             '<pre class="inline">asdf, </pre><span class="citation" data-id="'
+             'MATCH_ID"><a href="MATCH_URL">Id.</a></span><pre class="inline">'
+             ' Lorem ipsum dolor sit amet</pre>'),
         ]
 
         # fmt: on
-        for plain_text, citation, expected_html in test_triples:
+        for s, expected_html in test_pairs:
             print(
-                "Testing object to HTML rendering for %s..." % plain_text,
+                "Testing object to HTML rendering for %s..." % s,
                 end=" ",
             )
-            citation.match_url = "MATCH_URL"
-            citation.match_id = "MATCH_ID"
-            opinion = Opinion(plain_text=plain_text)
-            created_html = create_cited_html(opinion, [citation])
+            opinion = Opinion(plain_text=s)
+            get_and_clean_opinion_text(opinion)
+            citations = get_citations(opinion.cleaned_text)
+            for c in citations:  # Fake correct matching for the citations
+                c.match_url = "MATCH_URL"
+                c.match_id = "MATCH_ID"
+            created_html = create_cited_html(
+                opinion=opinion,
+                citations=citations,
+            )
             self.assertEqual(
                 created_html,
                 expected_html,
@@ -282,24 +276,24 @@ class MatchingTest(IndexedSolrTestCase):
         test_pairs = [
             # Simple test for matching a single, full citation
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.')
             ], [
                 Opinion.objects.get(pk=7)
             ]),
 
             # Test matching multiple full citations to different documents
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=2, reporter='F.3d', page='2',
-                             canonical_reporter='F.', lookup_index=0,
-                             court='ca1', reporter_index=1,
-                             reporter_found='F.3d')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='2', reporter='F.3d', page='2',
+                              canonical_reporter='F.',
+                              court='ca1', index=1,
+                              reporter_found='F.3d')
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=8)
@@ -307,11 +301,12 @@ class MatchingTest(IndexedSolrTestCase):
 
             # Test resolving a supra citation
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                SupraCitation(antecedent_guess='Bar', page='99', volume=1)
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                supra_citation(index=1, antecedent_guess='Bar', pin_cite='99',
+                               volume='1')
                 ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=7)
@@ -321,15 +316,16 @@ class MatchingTest(IndexedSolrTestCase):
             # two possible candidates. We expect the supra citation to not
             # be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='50',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=1, reporter='U.S.', page='999',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                SupraCitation(antecedent_guess='Ipsum', page='99', volume=1)
+                case_citation(volume='1', reporter='U.S.', page='50',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='1', reporter='U.S.', page='999',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                supra_citation(index=1, antecedent_guess='Ipsum', pin_cite='99',
+                               volume='1')
                 ], [
                 Opinion.objects.get(pk=9),
                 Opinion.objects.get(pk=11)
@@ -337,12 +333,12 @@ class MatchingTest(IndexedSolrTestCase):
 
             # Test resolving a short form citation with a meaningful antecedent
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='U.S.', page='99', volume=1,
-                                  antecedent_guess='Bar,')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='U.S.', page='99', volume='1', index=1,
+                              antecedent_guess='Bar,', short=True)
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=7)
@@ -352,16 +348,16 @@ class MatchingTest(IndexedSolrTestCase):
             # volume match two possible candidates. We expect its antecedent
             # guess to provide the correct tiebreaker.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=1, reporter='U.S.', page='50',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='U.S.', page='99', volume=1,
-                                  antecedent_guess='Bar')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='1', reporter='U.S.', page='50',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='U.S.', page='99', volume='1', index=1,
+                              antecedent_guess='Bar', short=True)
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=9),
@@ -373,16 +369,16 @@ class MatchingTest(IndexedSolrTestCase):
             # meaningful antecedent.
             # We expect the short form citation to not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=1, reporter='U.S.', page='50',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='U.S.', page='99', volume=1,
-                                  antecedent_guess='somethingwrong')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='1', reporter='U.S.', page='50',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='U.S.', page='99', volume='1', index=1,
+                              antecedent_guess='somethingwrong', short=True)
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=9)
@@ -393,16 +389,16 @@ class MatchingTest(IndexedSolrTestCase):
             # guess also matches multiple possibilities.
             # We expect the short form citation to not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='50',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=1, reporter='U.S.', page='999',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='U.S.', page='99', volume=1,
-                                  antecedent_guess='Ipsum')
+                case_citation(volume='1', reporter='U.S.', page='50',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='1', reporter='U.S.', page='999',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='U.S.', page='99', volume='1', index=1,
+                              antecedent_guess='Ipsum', short=True)
             ], [
                 Opinion.objects.get(pk=9),
                 Opinion.objects.get(pk=11)
@@ -412,23 +408,23 @@ class MatchingTest(IndexedSolrTestCase):
             # volume are erroneous.
             # We expect the short form citation to not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='F.3d', page='99', volume=26,
-                                  antecedent_guess='somethingwrong')
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='F.3d', page='99', volume='1', index=1,
+                              antecedent_guess='somethingwrong', short=True)
             ], [
                 Opinion.objects.get(pk=7)
             ]),
 
             # Test resolving an Id. citation
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                id_citation(index=1)
             ], [
                 Opinion.objects.get(pk=7),
                 Opinion.objects.get(pk=7)
@@ -438,13 +434,13 @@ class MatchingTest(IndexedSolrTestCase):
             # failed because there is no clear antecedent. We expect the Id.
             # citation to also not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                ShortformCitation(reporter='F.3d', page='99', volume=26,
-                                  antecedent_guess='somethingwrong'),
-                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(reporter='F.3d', page='99', volume='1', index=1,
+                              antecedent_guess='somethingwrong', short=True),
+                id_citation(index=1)
             ], [
                 Opinion.objects.get(pk=7)
             ]),
@@ -453,15 +449,15 @@ class MatchingTest(IndexedSolrTestCase):
             # failed because a normal full citation lookup returned nothing.
             # We expect the Id. citation to also not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                FullCitation(volume=99, reporter='U.S.', page='99',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                case_citation(volume='1', reporter='U.S.', page='99',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                id_citation(index=1)
             ], [
                 Opinion.objects.get(pk=7)
             ]),
@@ -470,12 +466,12 @@ class MatchingTest(IndexedSolrTestCase):
             # non-opinion document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             ([
-                FullCitation(volume=1, reporter='U.S.', page='1',
-                             canonical_reporter='U.S.', lookup_index=0,
-                             court='scotus', reporter_index=1,
-                             reporter_found='U.S.'),
-                NonopinionCitation(match_token='§99'),
-                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                nonopinion_citation(index=1, source_text='§99'),
+                id_citation(index=1)
             ], [
                 Opinion.objects.get(pk=7)
             ]),
@@ -484,7 +480,7 @@ class MatchingTest(IndexedSolrTestCase):
             # found. Since there is nothing before it, we expect no matches to
             # be returned.
             ([
-                IdCitation(id_token='id.', after_tokens=['a', 'b', 'c'])
+                id_citation(index=1)
             ], [])
         ]
 
@@ -552,10 +548,10 @@ class UpdateTest(IndexedSolrTestCase):
         # to other mocked opinions, mixed about. It's hard to exhaustively
         # test all combinations, but this test case is made to be deliberately
         # complex, in an effort to "trick" the algorithm. Cited opinions:
-        # pk=7: 1 FullCitation, 1 ShortformCitation, 1 SupraCitation (depth=3)
-        # pk=8: 3 FullCitation (one normal, one Id., and one Ibid.),
-        #   1 ShortformCitation, 2 SupraCitation (depth=6)
-        # pk=9: 1 FullCitation, 1 ShortformCitation (depth=2)
+        # pk=7: 1 FullCaseCitation, 1 ShortCaseCitation, 1 SupraCitation (depth=3)
+        # pk=8: 1 FullCaseCitation, 2 IdCitation (one Id. and one Ibid.),
+        #   1 ShortCaseCitation, 2 SupraCitation (depth=6)
+        # pk=9: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2)
         remove_citations_from_imported_fixtures()
         citing = Opinion.objects.get(pk=10)
         find_citations_for_opinion_by_pks.delay([10])
@@ -693,7 +689,7 @@ class ParallelCitationTest(SimpleTestCase):
             # Too far apart
             ("1 U.S. 1 too many words 22 U.S. 33", 0, 0),
             # Three citations
-            ("1 U.S. 1, (44 U.S. 33, 99 U.S. 100)", 1, 3),
+            # ("1 U.S. 1, (44 U.S. 33, 99 U.S. 100)", 1, 3),
             # Parallel citation after a valid citation too early on
             ("1 U.S. 1 too many words, then 22 U.S. 33, 13 WL 33223", 1, 2),
         )
