@@ -25,7 +25,7 @@ PARALLEL_DISTANCE = 4
 @app.task
 def identify_parallel_citations(
     citations: List[CitationBase],
-) -> Set[Tuple[CitationBase]]:
+) -> Set[Tuple[CitationBase, ...]]:
     """Work through a list of citations and identify ones that are physically
     near each other in the document.
 
@@ -33,7 +33,7 @@ def identify_parallel_citations(
     citations. These will usually be length two, but not necessarily.
     """
     if len(citations) == 0:
-        return citations
+        return set()
     citation_indexes = [c.index for c in citations]
     parallel_citation = [citations[0]]
     parallel_citations = set()

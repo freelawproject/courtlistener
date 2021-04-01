@@ -2,7 +2,7 @@
 # encoding utf-8
 
 from datetime import date, datetime
-from typing import List
+from typing import Dict, List, Tuple, Union, cast
 
 from django.conf import settings
 from eyecite.models import (
@@ -16,7 +16,8 @@ from eyecite.models import (
 from eyecite.utils import strip_punct
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
+from cl.lib.types import SearchParam
 from cl.search.models import Opinion
 
 DEBUG = True
@@ -24,7 +25,7 @@ DEBUG = True
 QUERY_LENGTH = 10
 
 
-def build_date_range(start_year, end_year):
+def build_date_range(start_year: int, end_year: int) -> str:
     """Build a date range to be handed off to a solr query."""
     start = datetime(start_year, 1, 1)
     end = datetime(end_year, 12, 31)
@@ -32,7 +33,7 @@ def build_date_range(start_year, end_year):
     return date_range
 
 
-def make_name_param(defendant, plaintiff=None):
+def make_name_param(defendant: str, plaintiff: str = None) -> Tuple[str, int]:
     """Remove punctuation and return cleaned string plus its length in tokens."""
     token_list = defendant.split()
     if plaintiff:
@@ -42,11 +43,15 @@ def make_name_param(defendant, plaintiff=None):
     return " ".join(query_words), len(query_words)
 
 
-def reverse_match(conn, results, citing_doc):
+def reverse_match(
+    conn: ExtraSolrInterface,
+    results: List[ExtraSolrSearch],
+    citing_doc: Opinion,
+) -> List[ExtraSolrSearch]:
     """Uses the case name of the found document to verify that it is a match on
     the original.
     """
-    params = {"fq": ["id:%s" % citing_doc.pk]}
+    params: SearchParam = {"fq": ["id:%s" % citing_doc.pk]}
     for result in results:
         case_name, length = make_name_param(result["caseName"])
         # Avoid overly long queries
@@ -63,7 +68,12 @@ def reverse_match(conn, results, citing_doc):
     return []
 
 
-def case_name_query(conn, params, citation, citing_doc):
+def case_name_query(
+    conn: ExtraSolrInterface,
+    params: SearchParam,
+    citation: CitationBase,
+    citing_doc: Opinion,
+) -> List[ExtraSolrSearch]:
     query, length = make_name_param(citation.defendant, citation.plaintiff)
     params["q"] = "caseName:(%s)" % query
     params["caller"] = "match_citations"
@@ -83,7 +93,7 @@ def case_name_query(conn, params, citation, citing_doc):
     return results
 
 
-def get_years_from_reporter(citation):
+def get_years_from_reporter(citation: CitationBase) -> Tuple[int, int]:
     """Given a citation object, try to look it its dates in the reporter DB"""
     start_year = 1750
     end_year = date.today().year
@@ -97,7 +107,9 @@ def get_years_from_reporter(citation):
     return start_year, end_year
 
 
-def match_citation(citation, citing_doc=None):
+def match_citation(
+    citation: CitationBase, citing_doc: Opinion = None
+) -> List[ExtraSolrSearch]:
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
 
@@ -106,7 +118,7 @@ def match_citation(citation, citing_doc=None):
     """
     # TODO: Create shared solr connection for all queries
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    main_params = {
+    main_params: SearchParam = {
         "q": "*",
         "fq": [
             "status:Precedential",  # Non-precedential documents aren't cited
@@ -158,8 +170,10 @@ def get_citation_matches(
     Returns:
       - a list of Opinion objects, as matched to citations
     """
-    citation_matches = []  # List of matches to return
-    was_matched = False  # Whether the previous citation match was successful
+    citation_matches: List[Opinion] = []  # List of matches to return
+    was_matched: bool = (
+        False  # Whether the previous citation match was successful
+    )
 
     for citation in citations:
         matched_opinion = None
