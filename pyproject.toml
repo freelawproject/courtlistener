@@ -82,7 +82,7 @@ timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
 usaddress = "*"
-reporters-db = "<=2.0.5"
+reporters-db = "^3"
 
 
 # Currently this doesn't support py3, which blocks installation due to outdated dependencies.
@@ -91,7 +91,7 @@ scorched = {git = "https://github.com/freelawproject/scorched.git"}
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.21.0"
 gunicorn = "^20.0.4"
-eyecite = "<2.0.0"
+eyecite = "^2.1.0"
 django-hCaptcha = "^0.1.0"
 
 [tool.poetry.dev-dependencies]
