@@ -30,7 +30,8 @@ class Audio(AbstractDateTimeModel):
         (STT_COMPLETE, "Speech to Text Complete"),
         (STT_FAILED, "Speech to Text Failed"),
     )
-    docket = models.ForeignKey(
+    # Annotation required b/c this FK is nullable, which breaks absolute_url
+    docket: Docket = models.ForeignKey(
         Docket,
         help_text="The docket that the oral argument is a part of",
         related_name="audio_files",

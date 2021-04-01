@@ -4,7 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, Prefetch
@@ -146,7 +146,7 @@ def make_docket_title(docket: Docket) -> str:
     return title
 
 
-def user_has_alert(user: User, docket: Docket) -> bool:
+def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
     has_alert = False
     if user.is_authenticated:
         has_alert = DocketAlert.objects.filter(
@@ -216,7 +216,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             )
 
     paginator = Paginator(de_list, 200, orphans=10)
-    page = request.GET.get("page")
+    page = request.GET.get("page", 1)
     try:
         docket_entries = paginator.page(page)
     except PageNotAnInteger:
@@ -566,48 +566,48 @@ def reporter_or_volume_handler(
                 "private": False,
             },
         )
-    else:
-        # Show all the cases for a volume-reporter dyad
-        cases_in_volume = OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=volume
-        ).order_by("date_filed", "citations__page")
 
-        if not cases_in_volume:
-            return throw_404(
-                request,
-                {
-                    "no_cases": True,
-                    "reporter": reporter,
-                    "volume_names": volume_names,
-                    "volume": volume,
-                    "private": True,
-                },
-            )
+    # Show all the cases for a volume-reporter dyad
+    cases_in_volume = OpinionCluster.objects.filter(
+        citations__reporter=reporter, citations__volume=volume
+    ).order_by("date_filed", "citations__page")
 
-        paginator = Paginator(cases_in_volume, 250, orphans=5)
-        page = request.GET.get("page")
-        try:
-            cases = paginator.page(page)
-        except PageNotAnInteger:
-            cases = paginator.page(1)
-        except EmptyPage:
-            cases = paginator.page(paginator.num_pages)
-
-        return render(
+    if not cases_in_volume:
+        return throw_404(
             request,
-            "volumes_for_reporter.html",
             {
-                "cases": cases,
+                "no_cases": True,
                 "reporter": reporter,
-                "variation_names": variation_names,
-                "volume": volume,
                 "volume_names": volume_names,
+                "volume": volume,
                 "private": True,
             },
         )
 
+    paginator = Paginator(cases_in_volume, 250, orphans=5)
+    page = request.GET.get("page", 1)
+    try:
+        cases = paginator.page(page)
+    except PageNotAnInteger:
+        cases = paginator.page(1)
+    except EmptyPage:
+        cases = paginator.page(paginator.num_pages)
 
-def make_reporter_dict() -> OrderedDict:
+    return render(
+        request,
+        "volumes_for_reporter.html",
+        {
+            "cases": cases,
+            "reporter": reporter,
+            "variation_names": variation_names,
+            "volume": volume,
+            "volume_names": volume_names,
+            "private": True,
+        },
+    )
+
+
+def make_reporter_dict() -> Dict:
     """Make a dict of reporter names and abbreviations
 
     The format here is something like:
@@ -622,7 +622,7 @@ def make_reporter_dict() -> OrderedDict:
         .distinct()
     )
 
-    reporters = defaultdict(list)
+    reporters: Union[defaultdict, OrderedDict] = defaultdict(list)
     for name, abbrev_list in NAMES_TO_EDITIONS.items():
         for abbrev in abbrev_list:
             if abbrev in reporters_in_db:
@@ -662,11 +662,11 @@ def citation_handler(
             status=HTTP_404_NOT_FOUND,
         )
 
-    elif cluster_count == 1:
+    if cluster_count == 1:
         # Total success. Redirect to correct location.
         return HttpResponseRedirect(clusters[0].get_absolute_url())
 
-    elif cluster_count > 1:
+    if cluster_count > 1:
         # Multiple results. Show them.
         return HttpResponse(
             content=loader.render_to_string(
@@ -681,6 +681,7 @@ def citation_handler(
             ),
             status=HTTP_300_MULTIPLE_CHOICES,
         )
+    return HttpResponse(status=500)
 
 
 def citation_redirector(
@@ -710,30 +711,31 @@ def citation_redirector(
                 "citation_redirect_info_page.html",
                 {"show_homepage": True, "form": form, "private": True},
             )
-    else:
-        if all(_ is None for _ in (reporter, volume, page)):
-            # No parameters. Show the standard page.
-            form = CitationRedirectorForm()
-            reporter_dict = make_reporter_dict()
-            return render(
-                request,
-                "citation_redirect_info_page.html",
-                {
-                    "show_homepage": True,
-                    "reporter_dict": reporter_dict,
-                    "form": form,
-                    "private": False,
-                },
-            )
-        else:
-            # We have a reporter (show volumes in it), a volume (show cases in
-            # it), or a citation (show matching citation(s))
-            if reporter and volume and page:
-                return citation_handler(request, reporter, volume, page)
-            elif reporter and volume and page is None:
-                return reporter_or_volume_handler(request, reporter, volume)
-            elif reporter and volume is None and page is None:
-                return reporter_or_volume_handler(request, reporter)
+
+    if all(_ is None for _ in (reporter, volume, page)):
+        # No parameters. Show the standard page.
+        form = CitationRedirectorForm()
+        reporter_dict = make_reporter_dict()
+        return render(
+            request,
+            "citation_redirect_info_page.html",
+            {
+                "show_homepage": True,
+                "reporter_dict": reporter_dict,
+                "form": form,
+                "private": False,
+            },
+        )
+
+    # We have a reporter (show volumes in it), a volume (show cases in
+    # it), or a citation (show matching citation(s))
+    if reporter and volume and page:
+        return citation_handler(request, reporter, volume, page)
+    elif reporter and volume and page is None:
+        return reporter_or_volume_handler(request, reporter, volume)
+    elif reporter and volume is None and page is None:
+        return reporter_or_volume_handler(request, reporter)
+    return HttpResponse(status=500)
 
 
 @ensure_csrf_cookie

@@ -158,14 +158,20 @@ class NewDocketAlertTest(TestCase):
         "test_objects_search.json",
         "judge_judy.json",
         "test_court.json",
+        "authtest_data.json",
     ]
 
-    def test_bad_parameters(self):
+    def setUp(self) -> None:
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+
+    def test_bad_parameters(self) -> None:
         """If we omit the pacer_case_id and court_id params, do things fail?"""
         r = self.client.get(reverse("new_docket_alert"))
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_unknown_docket(self):
+    def test_unknown_docket(self) -> None:
         """What happens if no docket?"""
         r = self.client.get(
             reverse("new_docket_alert"),
@@ -174,7 +180,7 @@ class NewDocketAlertTest(TestCase):
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
         self.assertIn("Refresh this Page", r.content.decode())
 
-    def test_all_systems_go(self):
+    def test_all_systems_go(self) -> None:
         """Does everything work with good parameters and good data?"""
         r = self.client.get(
             reverse("new_docket_alert"),
