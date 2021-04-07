@@ -51,7 +51,8 @@ jobs:
         working-directory: cl/settings
         run: cp 05-private.example 05-private.py
 
-      # Add modules here as they're ready
+      # Add modules here as they're ready (remove them from the file-by-file
+      # checker below as you do so).
       - name: mypy Static Type Cheker (packages)
         run: >
           mypy
@@ -73,8 +74,7 @@ jobs:
           cl/api/routers.py
           cl/api/tests.py
           cl/api/views.py
-          cl/opinion_page/views.py
-
+          cl/lib/storage.py
 
       - name: Black Code Formatter
         uses: psf/black@stable
