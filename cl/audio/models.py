@@ -236,7 +236,7 @@ class Audio(AbstractDateTimeModel):
                 "duration": self.duration,
                 "source": self.source,
                 "download_url": self.download_url,
-                "local_path": str(getattr(self, "local_path_mp3", None)),
+                "local_path": deepgetattr(self, "local_path_mp3.name", None),
             }
         )
         try:
