@@ -27,7 +27,7 @@ class PodcastTest(IndexedSolrTestCase):
             ("//channel/item/enclosure/@url", 2),
         )
         for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test))
+            node_count = len(xml_tree.xpath(test))  # type: ignore
             self.assertEqual(
                 node_count,
                 count,
@@ -49,7 +49,7 @@ class PodcastTest(IndexedSolrTestCase):
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
         xml_tree = etree.fromstring(response.content)
-        node_count = len(xml_tree.xpath("//channel/item"))
+        node_count = len(xml_tree.xpath("//channel/item"))  # type: ignore
 
         expected_item_count = 2
         self.assertEqual(
