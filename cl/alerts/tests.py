@@ -20,7 +20,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 class AlertTest(TestCase):
     fixtures = ["test_court.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up some handy variables
         self.alert_params = {
             "query": "q=asdf",
@@ -29,10 +29,10 @@ class AlertTest(TestCase):
         }
         self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Alert.objects.all().delete()
 
-    def test_create_alert(self):
+    def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -44,7 +44,7 @@ class AlertTest(TestCase):
         self.assertIn("successfully", r.content.decode())
         self.client.logout()
 
-    def test_fail_gracefully(self):
+    def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid alert form is sent?"""
         # Use a copy to shield other tests from changes.
         bad_alert_params = self.alert_params.copy()
@@ -58,17 +58,17 @@ class AlertTest(TestCase):
         self.assertIn("error creating your alert", r.content.decode())
         self.client.logout()
 
-    def test_new_alert_gets_secret_key(self):
+    def test_new_alert_gets_secret_key(self) -> None:
         """When you create a new alert, does it get a secret key?"""
         self.assertTrue(self.alert.secret_key)
 
-    def test_are_alerts_disabled_when_the_link_is_visited(self):
+    def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         self.client.get(reverse("disable_alert", args=[self.alert.secret_key]))
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
-    def test_are_alerts_enabled_when_the_link_is_visited(self):
+    def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         self.alert.rate = "off"
         new_rate = "wly"
@@ -83,7 +83,7 @@ class DocketAlertTest(TestCase):
 
     fixtures = ["test_court.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.before = now()
         # Create a new docket
         self.docket = Docket.objects.create(
@@ -108,21 +108,21 @@ class DocketAlertTest(TestCase):
         )
         self.after = now()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
         DocketAlert.objects.all().delete()
         DocketEntry.objects.all().delete()
         # Clear the outbox
         mail.outbox = []
 
-    def test_triggering_docket_alert(self):
+    def test_triggering_docket_alert(self) -> None:
         """Does the alert trigger when it should?"""
         send_docket_alert(self.docket.pk, self.before)
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_nothing_happens_for_timers_after_de_creation(self):
+    def test_nothing_happens_for_timers_after_de_creation(self) -> None:
         """Do we avoid sending alerts for timers after the de was created?"""
         send_docket_alert(self.docket.pk, self.after)
 
@@ -135,7 +135,7 @@ class DisableDocketAlertTest(TestCase):
 
     fixtures = ["test_court.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.now = now()
 
         # Create a terminated docket
@@ -191,7 +191,7 @@ class DisableDocketAlertTest(TestCase):
 class AlertSeleniumTest(BaseSeleniumTest):
     fixtures = ["test_court.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up some handy variables
         self.client = Client()
         self.alert_params = {
@@ -202,7 +202,7 @@ class AlertSeleniumTest(BaseSeleniumTest):
         super(AlertSeleniumTest, self).setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_edit_alert(self):
+    def test_edit_alert(self) -> None:
         """Can we edit the alert and see the message about it being edited?"""
         user = User.objects.get(username="pandora")
         alert = Alert(

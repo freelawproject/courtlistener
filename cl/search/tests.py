@@ -58,7 +58,7 @@ class UpdateIndexCommandTest(SolrTestCase):
     def _get_result_count(self, results):
         return results.result.numFound
 
-    def test_updating_all_opinions(self):
+    def test_updating_all_opinions(self) -> None:
         """If we have items in the DB, can we add/delete them to/from Solr?
 
         This tests is rather long because we need to test adding and deleting,
@@ -155,7 +155,7 @@ class UpdateIndexCommandTest(SolrTestCase):
 class ModelTest(TestCase):
     fixtures = ["test_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.docket = Docket.objects.create(
             case_name="Blah", court_id="test", source=Docket.DEFAULT
         )
@@ -171,13 +171,13 @@ class ModelTest(TestCase):
             type=Citation.FEDERAL,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.docket.delete()
         self.oc.delete()
         self.o.delete()
         self.c.delete()
 
-    def test_save_old_opinion(self):
+    def test_save_old_opinion(self) -> None:
         """Can we save opinions older than 1900?"""
         docket = Docket(
             case_name="Blah", court_id="test", source=Docket.DEFAULT
@@ -197,7 +197,7 @@ class ModelTest(TestCase):
                 "try to use `strftime`...again?"
             )
 
-    def test_custom_manager_simple_filters(self):
+    def test_custom_manager_simple_filters(self) -> None:
         """Do simple queries on our custom manager work?"""
         expected_count = 1
         cluster_count = OpinionCluster.objects.filter(
@@ -211,7 +211,7 @@ class ModelTest(TestCase):
         ).count()
         self.assertEqual(cluster_count, expected_count)
 
-    def test_custom_manager_kwargs_filter(self):
+    def test_custom_manager_kwargs_filter(self) -> None:
         """Can we do filters that involve additional kwargs?"""
         expected_count = 1
         cluster_count = OpinionCluster.objects.filter(
@@ -219,7 +219,7 @@ class ModelTest(TestCase):
         ).count()
         self.assertEqual(cluster_count, expected_count)
 
-    def test_custom_manager_chained_filter(self):
+    def test_custom_manager_chained_filter(self) -> None:
         """Do chained filters work?"""
         expected_count = 1
         cluster_count = (
@@ -244,15 +244,15 @@ class ModelTest(TestCase):
 class DocketValidationTest(TestCase):
     fixtures = ["test_court.json"]
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def test_creating_a_recap_docket_with_blanks(self):
+    def test_creating_a_recap_docket_with_blanks(self) -> None:
         """Are blank values denied?"""
         with self.assertRaises(ValidationError):
             Docket.objects.create(source=Docket.RECAP)
 
-    def test_cannot_create_duplicate(self):
+    def test_cannot_create_duplicate(self) -> None:
         """Do duplicate values throw an error?"""
         Docket.objects.create(
             source=Docket.RECAP,
@@ -275,7 +275,7 @@ class IndexingTest(EmptySolrTestCase):
 
     fixtures = ["test_court.json"]
 
-    def test_issue_729_url_coalescing(self):
+    def test_issue_729_url_coalescing(self) -> None:
         """Are URL's coalesced properly?"""
         # Save a docket to the backend using coalescing
 
@@ -330,20 +330,20 @@ class SearchTest(IndexedSolrTestCase):
         """Get the article count in a query response"""
         return len(html.fromstring(r.content.decode()).xpath("//article"))
 
-    def test_a_simple_text_query(self):
+    def test_a_simple_text_query(self) -> None:
         """Does typing into the main query box work?"""
         r = self.client.get(reverse("show_results"), {"q": "supreme"})
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-    def test_a_case_name_query(self):
+    def test_a_case_name_query(self) -> None:
         """Does querying by case name work?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "case_name": "honda"}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_query_with_white_space_only(self):
+    def test_a_query_with_white_space_only(self) -> None:
         """Does everything work when whitespace is in various fields?"""
         r = self.client.get(
             reverse("show_results"), {"q": " ", "judge": " ", "case_name": " "}
@@ -351,7 +351,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertIn("Honda", r.content.decode())
         self.assertNotIn("an error", r.content.decode())
 
-    def test_a_query_with_a_date(self):
+    def test_a_query_with_a_date(self) -> None:
         """Does querying by date work?"""
         response = self.client.get(
             reverse("show_results"),
@@ -359,7 +359,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertIn("Honda", response.content.decode())
 
-    def test_faceted_queries(self):
+    def test_faceted_queries(self) -> None:
         """Does querying in a given court return the document? Does querying
         the wrong facets exclude it?
         """
@@ -373,7 +373,7 @@ class SearchTest(IndexedSolrTestCase):
         self.assertNotIn("Honda", r.content.decode())
         self.assertIn("Debbas", r.content.decode())
 
-    def test_a_docket_number_query(self):
+    def test_a_docket_number_query(self) -> None:
         """Can we query by docket number?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "docket_number": "2"}
@@ -382,21 +382,21 @@ class SearchTest(IndexedSolrTestCase):
             "Honda", r.content.decode(), "Result not found by docket number!"
         )
 
-    def test_a_west_citation_query(self):
+    def test_a_west_citation_query(self) -> None:
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
         for get_dict in get_dicts:
             r = self.client.get(reverse("show_results"), get_dict)
             self.assertIn("Honda", r.content.decode())
 
-    def test_a_neutral_citation_query(self):
+    def test_a_neutral_citation_query(self) -> None:
         """Can we query by neutral citation numbers?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "neutral_cite": "22"}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_query_with_a_old_date(self):
+    def test_a_query_with_a_old_date(self) -> None:
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
         r = self.client.get(
@@ -404,7 +404,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertEqual(200, r.status_code)
 
-    def test_a_judge_query(self):
+    def test_a_judge_query(self) -> None:
         """Can we query by judge name?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "judge": "david"}
@@ -413,14 +413,14 @@ class SearchTest(IndexedSolrTestCase):
         r = self.client.get(reverse("show_results"), {"q": "judge:david"})
         self.assertIn("Honda", r.content.decode())
 
-    def test_a_nature_of_suit_query(self):
+    def test_a_nature_of_suit_query(self) -> None:
         """Can we query by nature of suit?"""
         r = self.client.get(
             reverse("show_results"), {"q": 'suitNature:"copyright"'}
         )
         self.assertIn("Honda", r.content.decode())
 
-    def test_citation_filtering(self):
+    def test_citation_filtering(self) -> None:
         """Can we find Documents by citation filtering?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "cited_lt": 7, "cited_gt": 5}
@@ -437,7 +437,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="Got case back when filtering by crazy citation count.",
         )
 
-    def test_citation_ordering(self):
+    def test_citation_ordering(self) -> None:
         """Can the results be re-ordered by citation count?"""
         r = self.client.get(
             reverse("show_results"), {"q": "*", "order_by": "citeCount desc"}
@@ -459,7 +459,7 @@ class SearchTest(IndexedSolrTestCase):
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
-    def test_random_ordering(self):
+    def test_random_ordering(self) -> None:
         """Can the results be ordered randomly?
 
         This test is difficult since we can't check that things actually get
@@ -470,13 +470,13 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertNotIn("an error", r.content.decode())
 
-    def test_oa_results_basic(self):
+    def test_oa_results_basic(self) -> None:
         r = self.client.get(
             reverse("show_results"), {"type": SEARCH_TYPES.ORAL_ARGUMENT}
         )
         self.assertIn("Jose", r.content.decode())
 
-    def test_oa_results_date_argued_ordering(self):
+    def test_oa_results_date_argued_ordering(self) -> None:
         r = self.client.get(
             reverse("show_results"),
             {
@@ -498,7 +498,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="'Jose' should come AFTER 'SEC' when order_by asc.",
         )
 
-    def test_oa_case_name_filtering(self):
+    def test_oa_case_name_filtering(self) -> None:
         r = self.client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "case_name": "jose"},
@@ -512,7 +512,7 @@ class SearchTest(IndexedSolrTestCase):
             "case name. Expected %s, but got %s." % (expected, actual),
         )
 
-    def test_oa_jurisdiction_filtering(self):
+    def test_oa_jurisdiction_filtering(self) -> None:
         r = self.client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "court": "test"},
@@ -526,7 +526,7 @@ class SearchTest(IndexedSolrTestCase):
             "jurisdiction. Expected %s, but got %s." % (actual, expected),
         )
 
-    def test_oa_date_argued_filtering(self):
+    def test_oa_date_argued_filtering(self) -> None:
         r = self.client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.ORAL_ARGUMENT, "argued_after": "2014-10-01"},
@@ -537,7 +537,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="Got an error when doing a Date Argued filter.",
         )
 
-    def test_oa_search_api(self):
+    def test_oa_search_api(self) -> None:
         """Can we get oa results on the search endpoint?"""
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}),
@@ -549,7 +549,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="Did not get good status code from oral arguments API endpoint",
         )
 
-    def test_homepage(self):
+    def test_homepage(self) -> None:
         """Is the homepage loaded when no GET parameters are provided?"""
         response = self.client.get(reverse("show_results"))
         self.assertIn(
@@ -559,7 +559,7 @@ class SearchTest(IndexedSolrTestCase):
             "load the homepage",
         )
 
-    def test_fail_gracefully(self):
+    def test_fail_gracefully(self) -> None:
         """Do we fail gracefully when an invalid search is created?"""
         response = self.client.get(
             reverse("show_results"), {"neutral_cite": "-"}
@@ -571,7 +571,7 @@ class SearchTest(IndexedSolrTestCase):
             msg="Invalid search did not result in an error.",
         )
 
-    def test_issue_635_leading_zeros(self):
+    def test_issue_635_leading_zeros(self) -> None:
         """Do queries with leading zeros work equal to ones without?"""
         r = self.client.get(
             reverse("show_results"),
@@ -585,7 +585,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertEqual(expected, self.get_article_count(r))
 
-    def test_issue_1193_docket_numbers_as_phrase(self):
+    def test_issue_1193_docket_numbers_as_phrase(self) -> None:
         """Are docket numbers searched as a phrase?"""
         # Search for the full docket number. Does it work?
         r = self.client.get(
@@ -613,7 +613,7 @@ class SearchTest(IndexedSolrTestCase):
             "Got results for badly ordered docket number.",
         )
 
-    def test_issue_727_doc_att_numbers(self):
+    def test_issue_727_doc_att_numbers(self) -> None:
         """Can we send integers to the document number and attachment number
         fields?
         """
@@ -628,7 +628,7 @@ class SearchTest(IndexedSolrTestCase):
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_issue_1296_abnormal_citation_type_queries(self):
+    def test_issue_1296_abnormal_citation_type_queries(self) -> None:
         """Does search work OK when there are supra, id, or non-opinion
         citations in the query?
         """
@@ -655,13 +655,13 @@ class SearchTest(IndexedSolrTestCase):
     RELATED_MLT_MINWL=0,
 )
 class RelatedSearchTest(IndexedSolrTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Add additional user fixtures
         self.fixtures.append("authtest_data.json")
 
         super(RelatedSearchTest, self).setUp()
 
-    def test_more_like_this_opinion(self):
+    def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
         seed_pk = 1  # Paul Debbas v. Franklin
@@ -689,7 +689,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
 
-    def test_more_like_this_opinion_detail_detail(self):
+    def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
         seed_pk = 3  # case name cluster 3
         expected_first_pk = 2  # Howard v. Honda
@@ -713,7 +713,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
         self.client.logout()
 
     @override_settings(RELATED_FILTER_BY_STATUS=None)
-    def test_more_like_this_opinion_detail_no_filter(self):
+    def test_more_like_this_opinion_detail_no_filter(self) -> None:
         """MoreLikeThis query on opinion detail page (without filter)"""
         seed_pk = 1  # Paul Debbas v. Franklin
         expected_first_pk = 2  # Howard v. Honda
@@ -744,7 +744,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 class GroupedSearchTest(EmptySolrTestCase):
     fixtures = ["opinions-issue-550.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up some handy variables
         super(GroupedSearchTest, self).setUp()
         args = [
@@ -760,7 +760,7 @@ class GroupedSearchTest(EmptySolrTestCase):
         call_command("cl_update_index", *args)
         self.factory = RequestFactory()
 
-    def test_grouped_queries(self):
+    def test_grouped_queries(self) -> None:
         """When we have a cluster with multiple opinions, do results get
         grouped?
         """
@@ -777,7 +777,7 @@ class GroupedSearchTest(EmptySolrTestCase):
 
 
 class JudgeSearchTest(IndexedSolrTestCase):
-    def test_sorting(self):
+    def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
         sort_fields = [
             "name_reverse asc",
@@ -809,12 +809,12 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "Params were: %s" % (field_name, expected_count, got, params),
         )
 
-    def test_name_field(self):
+    def test_name_field(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}, 1, "name"
         )
 
-    def test_court_filter(self):
+    def test_court_filter(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}, 1, "court"
         )
@@ -825,7 +825,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}, 1, "court"
         )
 
-    def test_dob_filters(self):
+    def test_dob_filters(self) -> None:
         self._test_article_count(
             {
                 "type": SEARCH_TYPES.PEOPLE,
@@ -852,7 +852,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "born_{before|after}",
         )
 
-    def test_birth_location(self):
+    def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"},
@@ -883,7 +883,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "dob_city",
         )
 
-    def test_schools_filter(self):
+    def test_schools_filter(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "school": "american"}, 1, "school"
         )
@@ -891,7 +891,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}, 0, "school"
         )
 
-    def test_appointer_filter(self):
+    def test_appointer_filter(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"},
             1,
@@ -903,7 +903,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "appointer",
         )
 
-    def test_selection_method_filter(self):
+    def test_selection_method_filter(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"},
             1,
@@ -915,7 +915,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             "selection_method",
         )
 
-    def test_political_affiliation_filter(self):
+    def test_political_affiliation_filter(self) -> None:
         self._test_article_count(
             {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"},
             1,
@@ -929,7 +929,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
 
 
 class FeedTest(IndexedSolrTestCase):
-    def test_jurisdiction_feed(self):
+    def test_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
         response = self.client.get(
             reverse("jurisdiction_feed", kwargs={"court": "test"})
@@ -962,7 +962,7 @@ class FeedTest(IndexedSolrTestCase):
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
 class JurisdictionFeedTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.good_item = {
             "title": "Opinion Title",
             "court": "SCOTUS",
@@ -992,7 +992,7 @@ class JurisdictionFeedTest(TestCase):
         self.feed = JurisdictionFeed()
         super(JurisdictionFeedTest, self).setUp()
 
-    def test_proper_calculation_of_length(self):
+    def test_proper_calculation_of_length(self) -> None:
         """
         Does the item_enclosure_length method count the file size properly?
         """
@@ -1005,17 +1005,17 @@ class JurisdictionFeedTest(TestCase):
             "item %s should be zero bytes" % (self.zero_item["local_path"]),
         )
 
-    def test_enclosure_length_returns_none_on_bad_input(self):
+    def test_enclosure_length_returns_none_on_bad_input(self) -> None:
         """Given a bad path to a nonexistant file, do we safely return None?"""
         self.assertIsNone(self.feed.item_enclosure_length(self.bad_item))
 
-    def test_item_enclosure_mime_type(self):
+    def test_item_enclosure_mime_type(self) -> None:
         """Does the mime type detection work correctly?"""
         self.assertEqual(
             self.feed.item_enclosure_mime_type(self.good_item), "text/plain"
         )
 
-    def test_item_enclosure_mime_type_handles_bogus_files(self):
+    def test_item_enclosure_mime_type_handles_bogus_files(self) -> None:
         """
         Does the mime type detection safely return a good default value when
         given a file it can't detect the mime type for?
@@ -1029,7 +1029,7 @@ class JurisdictionFeedTest(TestCase):
             "application/octet-stream",
         )
 
-    def test_feed_renders_with_item_without_file_path(self):
+    def test_feed_renders_with_item_without_file_path(self) -> None:
         """
         For Opinions without local_path attributes (that is they don't have a
         corresponding original PDF/txt/doc file) can we render the feed without
@@ -1061,7 +1061,7 @@ class JurisdictionFeedTest(TestCase):
 class PagerankTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
-    def test_pagerank_calculation(self):
+    def test_pagerank_calculation(self) -> None:
         """Create a few items and fake citation relation among them, then
         run the pagerank algorithm. Check whether this simple case can get the
         correct result.
@@ -1107,7 +1107,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         result_count = self.browser.find_element(By.ID, "result-count")
         self.assertIn("Opinions", result_count.text)
 
-    def test_query_cleanup_function(self):
+    def test_query_cleanup_function(self) -> None:
         # Send string of search_query to the function and expect it
         # to be encoded properly
         q_a = (
@@ -1152,7 +1152,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
             self.assertEqual(cleanup_main_query(q), a)
 
-    def test_query_cleanup_integration(self):
+    def test_query_cleanup_integration(self) -> None:
         # Dora goes to CL and performs a Search using a numbered citation
         # (e.g. "12-9238" or "3:18-cv-2383")
         self.browser.get(self.live_server_url)
@@ -1170,7 +1170,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_toggle_to_oral_args_search_results(self):
+    def test_toggle_to_oral_args_search_results(self) -> None:
         # Dora navigates to the global SERP from the homepage
         self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
@@ -1189,7 +1189,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.browser.find_element(By.ID, "navbar-oa").click()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_search_and_facet_docket_numbers(self):
+    def test_search_and_facet_docket_numbers(self) -> None:
         # Dora goes to CL and performs an initial wildcard Search
         self.browser.get(self.live_server_url)
         self._perform_wildcard_search()
@@ -1217,7 +1217,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             self.assertIn("1337", result.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_opinion_search_result_detail_page(self):
+    def test_opinion_search_result_detail_page(self) -> None:
         # Dora navitages to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
         self.browser.find_element(By.ID, "id_q").send_keys("voutila")
@@ -1311,7 +1311,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_search_and_add_precedential_results(self):
+    def test_search_and_add_precedential_results(self) -> None:
         # Dora navigates to CL and just hits Search to just start with
         # a global result set
         self.browser.get(self.live_server_url)
@@ -1355,7 +1355,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertTrue(second_count > first_count)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_basic_homepage_search_and_signin_and_signout(self):
+    def test_basic_homepage_search_and_signin_and_signout(self) -> None:
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
@@ -1471,7 +1471,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 class CaptionTest(TestCase):
     """Can we make good looking captions?"""
 
-    def test_simple_caption(self):
+    def test_simple_caption(self) -> None:
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
@@ -1488,7 +1488,7 @@ class CaptionTest(TestCase):
             "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)", cluster.caption
         )
 
-    def test_scotus_caption(self):
+    def test_scotus_caption(self) -> None:
         c, _ = Court.objects.get_or_create(
             pk="scotus", defaults={"position": 2}
         )
@@ -1505,7 +1505,7 @@ class CaptionTest(TestCase):
         )
         self.assertEqual("foo, 22 U.S. 44", cluster.caption)
 
-    def test_neutral_cites(self):
+    def test_neutral_cites(self) -> None:
         c, _ = Court.objects.get_or_create(pk="ca1", defaults={"position": 1})
         d = Docket.objects.create(source=0, court=c)
         cluster = OpinionCluster.objects.create(
@@ -1520,7 +1520,7 @@ class CaptionTest(TestCase):
         )
         self.assertEqual("foo, 22 IL 44", cluster.caption)
 
-    def test_citation_sorting(self):
+    def test_citation_sorting(self) -> None:
         # A list of citations ordered properly
         cs = [
             Citation(

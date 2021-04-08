@@ -68,7 +68,7 @@ class RecapUploadsTest(TestCase):
 
     fixtures = ["canb_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
         token = "Token " + self.user.auth_token.key
@@ -259,10 +259,10 @@ class RecapDocketFetchApiTest(TestCase):
 
     COURT = "scotus"
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
-    def test_fetch_docket_by_docket_number(self):
+    def test_fetch_docket_by_docket_number(self) -> None:
         """Can we do a simple fetch of a docket from PACER?"""
         fq = PacerFetchQueue.objects.create(
             user=self.user,
@@ -277,7 +277,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-    def test_fetch_docket_by_pacer_case_id(self):
+    def test_fetch_docket_by_pacer_case_id(self) -> None:
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
@@ -289,7 +289,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-    def test_fetch_docket_by_docket_id(self):
+    def test_fetch_docket_by_docket_id(self) -> None:
         fq = PacerFetchQueue.objects.create(
             user=self.user, request_type=REQUEST_TYPE.DOCKET, docket_id=1
         )
@@ -312,7 +312,7 @@ class RecapPdfFetchApiTest(TestCase):
 
     fixtures = ["recap_docs.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.PDF,
@@ -320,7 +320,7 @@ class RecapPdfFetchApiTest(TestCase):
         )
         self.rd = self.fq.recap_document
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
 
@@ -355,7 +355,7 @@ class RecapPdfFetchApiTest(TestCase):
 class RecapAttPageFetchApiTest(TestCase):
     fixtures = ["recap_docs.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.fq = PacerFetchQueue.objects.create(
             user=User.objects.get(username="recap"),
             request_type=REQUEST_TYPE.ATTACHMENT_PAGE,
@@ -365,7 +365,7 @@ class RecapAttPageFetchApiTest(TestCase):
         self.rd.pacer_doc_id = "17711118263"
         self.rd.save()
 
-    def test_fetch_attachment_page_no_pacer_doc_id(self):
+    def test_fetch_attachment_page_no_pacer_doc_id(self) -> None:
         """Can we do a simple fetch of an attachment page from PACER?"""
         self.rd.pacer_doc_id = ""
         self.rd.save()
@@ -376,7 +376,7 @@ class RecapAttPageFetchApiTest(TestCase):
         self.fq.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.NEEDS_INFO)
 
-    def test_fetch_att_page_no_cookies(self):
+    def test_fetch_att_page_no_cookies(self) -> None:
         result = do_pacer_fetch(self.fq)
         result.get()
 
@@ -405,7 +405,7 @@ class RecapAttPageFetchApiTest(TestCase):
 
 
 class ProcessingQueueApiFilterTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
         token = "Token " + self.user.auth_token.key
@@ -426,7 +426,7 @@ class ProcessingQueueApiFilterTest(TestCase):
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
-    def test_filters(self):
+    def test_filters(self) -> None:
         """Can we filter with the status and upload_type filters?"""
         # Create two PQ objects with different values.
         ProcessingQueue.objects.create(**self.params)
@@ -456,7 +456,7 @@ class DebugRecapUploadtest(TestCase):
     problems?
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.pdf = SimpleUploadedFile("file.pdf", b"file content more content")
         test_dir = os.path.join(
@@ -472,7 +472,7 @@ class DebugRecapUploadtest(TestCase):
         with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         ProcessingQueue.objects.all().delete()
         Docket.objects.all().delete()
         DocketEntry.objects.all().delete()
@@ -543,7 +543,7 @@ class DebugRecapUploadtest(TestCase):
 
 
 class RecapPdfTaskTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "file.pdf"
         self.file_content = b"file content more content"
@@ -572,7 +572,7 @@ class RecapPdfTaskTest(TestCase):
             sha1=sha1,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
         try:
@@ -580,7 +580,7 @@ class RecapPdfTaskTest(TestCase):
         except (Docket.DoesNotExist, AssertionError):
             pass
 
-    def test_pq_has_default_status(self):
+    def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
@@ -612,7 +612,7 @@ class RecapPdfTaskTest(TestCase):
         # Did we correctly avoid running document extraction?
         mock.assert_not_called()
 
-    def test_only_the_docket_already_exists(self):
+    def test_only_the_docket_already_exists(self) -> None:
         """Never seen this docket entry before?
 
         Alas, we fail. In theory, this shouldn't happen.
@@ -647,7 +647,7 @@ class RecapPdfTaskTest(TestCase):
         )
         self.assertFalse(self.pq.filepath_local)
 
-    def test_nothing_already_exists(self):
+    def test_nothing_already_exists(self) -> None:
         """If a PDF is uploaded but there's no recap document and no docket do
         we fail?
 
@@ -670,7 +670,7 @@ class RecapZipTaskTest(TestCase):
         settings.INSTALL_ROOT, "cl", "recap", "test_assets"
     )
 
-    def setUp(self):
+    def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "1-20-cv-10189-FDS.zip"
         self.file_path = os.path.join(self.test_dir, self.filename)
@@ -709,7 +709,7 @@ class RecapZipTaskTest(TestCase):
         )
         self.docs = [self.doc12, self.doc12_att1]
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
@@ -761,7 +761,7 @@ class RecapZipTaskTest(TestCase):
 
 
 class RecapAddAttorneyTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.atty_org_name = "Lane Powell LLC"
         self.atty_phone = "907-276-2631"
         self.atty_email = "jamiesonb@lanepowell.com"
@@ -791,7 +791,7 @@ class RecapAddAttorneyTest(TestCase):
         )
         self.p = Party.objects.create(name="John Wesley Powell")
 
-    def test_new_atty_to_db(self):
+    def test_new_atty_to_db(self) -> None:
         """Can we add a new atty to the DB when none exist?"""
         a_pk = add_attorney(self.atty, self.p, self.d)
         a = Attorney.objects.get(pk=a_pk)
@@ -808,7 +808,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertEqual(a.email, self.atty_email)
         self.assertEqual(a.roles.all().count(), 2)
 
-    def test_no_contact_info(self):
+    def test_no_contact_info(self) -> None:
         """Do things work properly when we lack contact information?"""
         self.atty["contact"] = ""
         a_pk = add_attorney(self.atty, self.p, self.d)
@@ -818,7 +818,7 @@ class RecapAddAttorneyTest(TestCase):
         # But roles still get done.
         self.assertEqual(a.roles.all().count(), 2)
 
-    def test_no_contact_info_another_already_exists(self):
+    def test_no_contact_info_another_already_exists(self) -> None:
         """If we lack contact info, and such a atty already exists (without
         contact info), do we properly consider them different people?
         """
@@ -828,7 +828,7 @@ class RecapAddAttorneyTest(TestCase):
         a = Attorney.objects.get(pk=a_pk)
         self.assertNotEqual(a.pk, new_a.pk)
 
-    def test_existing_roles_get_overwritten(self):
+    def test_existing_roles_get_overwritten(self) -> None:
         """Do existing roles get overwritten with latest data?"""
         new_a = Attorney.objects.create(
             name=self.atty_name, email=self.atty_email
@@ -849,55 +849,55 @@ class DocketCaseNameUpdateTest(TestCase):
     information?
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.d = Docket()
         self.v_case_name = "x v. y"
         self.new_case_name = "x v. z"
         self.uct = "Unknown Case Title"
 
-    def test_new_v_old_v_updates(self):
+    def test_new_v_old_v_updates(self) -> None:
         """Do we update if new is different and old has a value?"""
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_v_old_uct_updates(self):
+    def test_new_v_old_uct_updates(self) -> None:
         """Do we update if new has a value and old is UCT"""
         self.d.case_name = self.uct
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_v_old_blank_updates(self):
+    def test_new_v_old_blank_updates(self) -> None:
         self.d.case_name = ""
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_uct_old_v_no_update(self):
+    def test_new_uct_old_v_no_update(self) -> None:
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.v_case_name)
 
-    def test_new_uct_old_uct_no_update(self):
+    def test_new_uct_old_uct_no_update(self) -> None:
         self.d.case_name = self.uct
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_uct_old_blank_updates(self):
+    def test_new_uct_old_blank_updates(self) -> None:
         self.d.case_name = ""
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_blank_old_v_no_update(self):
+    def test_new_blank_old_v_no_update(self) -> None:
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, self.v_case_name)
 
-    def test_new_blank_old_uct_no_update(self):
+    def test_new_blank_old_uct_no_update(self) -> None:
         self.d.case_name = self.uct
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_blank_old_blank_no_update(self):
+    def test_new_blank_old_blank_no_update(self) -> None:
         self.d.case_name = ""
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, "")
@@ -919,7 +919,7 @@ class TerminatedEntitiesTest(TestCase):
 
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Docket: self.d has...
         #   Party: self.p via PartyType, which has...
         #     Attorney self.a via Role, and...
@@ -990,7 +990,7 @@ class TerminatedEntitiesTest(TestCase):
         }
         self.new_party_data = [self.new_powell_data, self.new_mccarthy_data]
 
-    def test_new_has_terminated_entities(self):
+    def test_new_has_terminated_entities(self) -> None:
         """Do we update all existing data when scraped data has terminated
         entities?
         """
@@ -1003,7 +1003,7 @@ class TerminatedEntitiesTest(TestCase):
         role_count = Role.objects.filter(docket=self.d).count()
         self.assertEqual(role_count, 1)
 
-    def test_new_lacks_terminated_entities_old_lacks_too(self):
+    def test_new_lacks_terminated_entities_old_lacks_too(self) -> None:
         """Do we update all existing data when there aren't terminated entities
         at play?
         """
@@ -1018,7 +1018,7 @@ class TerminatedEntitiesTest(TestCase):
         role_count = Role.objects.filter(docket=self.d).count()
         self.assertEqual(role_count, 1)
 
-    def test_new_lacks_terminated_entities_old_has_them(self):
+    def test_new_lacks_terminated_entities_old_has_them(self) -> None:
         """Do we update things properly when old has terminated parties, but
         new lacks them?
 
@@ -1059,7 +1059,7 @@ class TerminatedEntitiesTest(TestCase):
         role_count = Role.objects.filter(docket=self.d).count()
         self.assertEqual(role_count, 2)
 
-    def test_no_parties(self):
+    def test_no_parties(self) -> None:
         """Do we keep the old parties when the new case has none?"""
         count_before = self.d.parties.count()
         add_parties_and_attorneys(self.d, [])
@@ -1088,17 +1088,17 @@ class RecapMinuteEntriesTest(TestCase):
             upload_type=upload_type,
         )
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         pqs = ProcessingQueue.objects.all()
         for pq in pqs:
             pq.filepath_local.delete()
             pq.delete()
         Docket.objects.all().delete()
 
-    def test_all_entries_ingested_without_duplicates(self):
+    def test_all_entries_ingested_without_duplicates(self) -> None:
         """Are all of the docket entries ingested?"""
         expected_entry_count = 23
 
@@ -1113,7 +1113,7 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_multiple_numberless_entries_multiple_times(self):
+    def test_multiple_numberless_entries_multiple_times(self) -> None:
         """Do we get the right number of entries when we add multiple
         numberless entries multiple times?
         """
@@ -1129,7 +1129,7 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_appellate_cases_ok(self):
+    def test_appellate_cases_ok(self) -> None:
         """Do appellate cases get ordered/handled properly?"""
         expected_entry_count = 16
         pq = self.make_pq("ca1.html", upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
@@ -1137,7 +1137,7 @@ class RecapMinuteEntriesTest(TestCase):
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
-    def test_rss_feed_ingestion(self):
+    def test_rss_feed_ingestion(self) -> None:
         """Can we ingest RSS feeds without creating duplicates?"""
         court_id = "scotus"
         rss_feed = PacerRssFeed(court_id)
@@ -1158,7 +1158,7 @@ class RecapMinuteEntriesTest(TestCase):
         add_docket_entries(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
-    def test_dhr_merges_separate_docket_entries(self):
+    def test_dhr_merges_separate_docket_entries(self) -> None:
         """Does the docket history report merge separate minute entries if
         one entry has a short description, and the other has a long
         description?
@@ -1211,19 +1211,19 @@ class RecapMinuteEntriesTest(TestCase):
 
 
 class DescriptionCleanupTest(TestCase):
-    def test_has_entered_date_at_end(self):
+    def test_has_entered_date_at_end(self) -> None:
         desc = "test (Entered: 01/01/2000)"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], "test")
 
-    def test_has_entered_date_in_middle(self):
+    def test_has_entered_date_in_middle(self) -> None:
         desc = "test (Entered: 01/01/2000) test"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], desc)
 
-    def test_has_entered_date_in_middle_and_end(self):
+    def test_has_entered_date_in_middle_and_end(self) -> None:
         desc = "test (Entered: 01/01/2000) and stuff (Entered: 01/01/2000)"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
@@ -1231,23 +1231,23 @@ class DescriptionCleanupTest(TestCase):
             docket_entry["description"], "test (Entered: 01/01/2000) and stuff"
         )
 
-    def test_has_no_entered_date(self):
+    def test_has_no_entered_date(self) -> None:
         desc = "test stuff"
         docket_entry = {"description": "test stuff"}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], desc)
 
-    def test_no_description(self):
+    def test_no_description(self) -> None:
         docket_entry = {}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry, {})
 
-    def test_removing_brackets(self):
+    def test_removing_brackets(self) -> None:
         docket_entry = {"description": "test [10] stuff"}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], "test 10 stuff")
 
-    def test_only_remove_brackets_on_numbers(self):
+    def test_only_remove_brackets_on_numbers(self) -> None:
         desc = "test [asdf 10] stuff"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
@@ -1255,7 +1255,7 @@ class DescriptionCleanupTest(TestCase):
 
 
 class RecapDocketTaskTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
         path = os.path.join(
@@ -1271,12 +1271,12 @@ class RecapDocketTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.DOCKET,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
 
-    def test_parsing_docket_does_not_exist(self):
+    def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
         returned_data = process_recap_docket(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
@@ -1284,7 +1284,7 @@ class RecapDocketTaskTest(TestCase):
         self.assertTrue(d.case_name)
         self.assertEqual(d.jury_demand, "None")
 
-    def test_parsing_docket_already_exists(self):
+    def test_parsing_docket_already_exists(self) -> None:
         """Can we parse an HTML docket for a docket we have in the DB?"""
         existing_d = Docket.objects.create(
             source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus"
@@ -1295,7 +1295,7 @@ class RecapDocketTaskTest(TestCase):
         self.assertTrue(d.case_name)
         self.assertEqual(existing_d.pacer_case_id, d.pacer_case_id)
 
-    def test_docket_and_de_already_exist(self):
+    def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
         existing_d = Docket.objects.create(
             source=Docket.DEFAULT, pacer_case_id="asdf", court_id="scotus"
@@ -1320,7 +1320,7 @@ class RecapDocketTaskTest(TestCase):
             msg="New docket entry didn't get created.",
         )
 
-    def test_orphan_documents_are_added(self):
+    def test_orphan_documents_are_added(self) -> None:
         """If there's a pq that exists but previously wasn't processed, do we
         clean it up after we finish adding the docket?
         """
@@ -1346,7 +1346,7 @@ class ClaimsRegistryTaskTest(TestCase):
 
     fixtures = ["canb_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "claims_registry_njb.html"
         path = os.path.join(
@@ -1362,12 +1362,12 @@ class ClaimsRegistryTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.CLAIMS_REGISTER,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
 
-    def test_parsing_docket_does_not_exist(self):
+    def test_parsing_docket_does_not_exist(self) -> None:
         """Can we parse the claims registry when the docket doesn't exist?"""
         returned_data = process_recap_claims_register(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
@@ -1376,7 +1376,7 @@ class ClaimsRegistryTaskTest(TestCase):
         expected_claims_count = 7
         self.assertEqual(d.claims.count(), expected_claims_count)
 
-    def test_parsing_bad_data(self):
+    def test_parsing_bad_data(self) -> None:
         """Can we handle it when there's no data to parse?"""
         filename = "claims_registry_empty.html"
         path = os.path.join(
@@ -1396,7 +1396,7 @@ class ClaimsRegistryTaskTest(TestCase):
 class RecapDocketAppellateTaskTest(TestCase):
     fixtures = ["hawaii_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "ca9.html"
         path = os.path.join(
@@ -1412,13 +1412,13 @@ class RecapDocketAppellateTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.APPELLATE_DOCKET,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
         OriginatingCourtInformation.objects.all().delete()
 
-    def test_parsing_appellate_docket(self):
+    def test_parsing_appellate_docket(self) -> None:
         """Can we parse an HTML docket we have never seen before?"""
         returned_data = process_recap_appellate_docket(self.pq.pk)
         d = Docket.objects.get(pk=returned_data["docket_pk"])
@@ -1440,7 +1440,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
     a docket?
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand_criminal.html"
         path = os.path.join(
@@ -1456,12 +1456,12 @@ class RecapCriminalDataUploadTaskTest(TestCase):
             upload_type=UPLOAD_TYPE.DOCKET,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
 
-    def test_criminal_data_gets_created(self):
+    def test_criminal_data_gets_created(self) -> None:
         """Does the criminal data appear in the DB properly when we process
         the docket?
         """
@@ -1479,7 +1479,7 @@ class RecapCriminalDataUploadTaskTest(TestCase):
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapAttachmentPageTaskTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
         test_dir = os.path.join(
@@ -1506,7 +1506,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             filepath_local=self.att,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         RECAPDocument.objects.filter(
             document_type=RECAPDocument.ATTACHMENT,
         ).delete()
@@ -1537,11 +1537,11 @@ class RecapAttachmentPageTaskTest(TestCase):
 
 
 class RecapUploadAuthenticationTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = APIClient()
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
 
-    def test_authentication(self):
+    def test_authentication(self) -> None:
         """Does POSTing and GETting fail when we send the wrong credentials?"""
         self.client.credentials(HTTP_AUTHORIZATION="Token asdf")  # Junk token.
         r = self.client.post(self.path)
@@ -1550,7 +1550,7 @@ class RecapUploadAuthenticationTest(TestCase):
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
-    def test_no_credentials(self):
+    def test_no_credentials(self) -> None:
         """Does POSTing and GETting fail if we lack credentials?"""
         self.client.credentials()
         r = self.client.post(self.path)
@@ -1565,7 +1565,7 @@ class IdbImportTest(TestCase):
 
     cmd = Command()
 
-    def test_csv_parsing(self):
+    def test_csv_parsing(self) -> None:
         # https://www.ietf.org/rfc/rfc4180.txt
         qa = (
             # Satisfies RFC 4180 rules 1 & 2 (simple values)
