@@ -13,7 +13,7 @@ from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
@@ -89,7 +89,7 @@ class Audio(AbstractDateTimeModel):
         help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
         "server, where encoded file is stored",
         upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=AWSMediaStorage(),
         blank=True,
         db_index=True,
     )
@@ -97,7 +97,7 @@ class Audio(AbstractDateTimeModel):
         help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
         "server, where the original file is stored",
         upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=AWSMediaStorage(),
         db_index=True,
     )
     filepath_ia = models.CharField(
