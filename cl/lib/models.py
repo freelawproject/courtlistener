@@ -160,6 +160,6 @@ class Note(AbstractDateTimeModel):
 
 s3_warning_note = (
     "Note that the field name is historical, from before when we used S3. To "
-    "find the location in S3, concatenate https://storage.courtlistener.com "
+    "find the location in S3, concatenate https://storage.courtlistener.com/ "
     "and the value of this field."
 )
