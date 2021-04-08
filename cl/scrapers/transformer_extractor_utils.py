@@ -32,8 +32,9 @@ def convert_and_clean_audio(audio_obj) -> requests.Response:
         "case_name_short": audio_obj.case_name_short,
         "download_url": audio_obj.download_url,
     }
-    with open(audio_obj.local_path_original_file.path, "rb") as af:
-        audio_file = {"audio_file": ("", af.read())}
+    audio_file = {
+        "audio_file": ("", audio_obj.local_path_original_file.read())
+    }
 
     bte_audio_response = requests.post(
         settings.BTE_URLS["convert-audio"]["url"],
