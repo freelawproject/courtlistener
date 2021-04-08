@@ -1,13 +1,13 @@
-import os
-
 import scorched
 from django.conf import settings
-from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
 from lxml import etree
 
-from cl.search.models import Court
+from cl.audio.models import Audio
+from cl.people_db.models import Person
+from cl.search.models import Court, Opinion
+from cl.search.tasks import add_items_to_solr
 
 
 @override_settings(
@@ -82,25 +82,20 @@ class SolrTestCase(EmptySolrTestCase):
 class IndexedSolrTestCase(SolrTestCase):
     """Similar to the SolrTestCase, but the data is indexed in Solr"""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super(IndexedSolrTestCase, self).setUp()
-        cores = {
-            "audio.Audio": self.core_name_audio,
-            "search.Opinion": self.core_name_opinion,
-            "people_db.Person": self.core_name_people,
+        obj_types = {
+            "audio.Audio": Audio,
+            "search.Opinion": Opinion,
+            "people_db.Person": Person,
         }
-        for obj_type, core_name in cores.items():
-            args = [
-                "--type",
-                obj_type,
-                "--solr-url",
-                "%s/solr/%s" % (settings.SOLR_HOST, core_name),
-                "--update",
-                "--everything",
-                "--do-commit",
-                "--noinput",
-            ]
-            call_command("cl_update_index", *args)
+        for obj_name, obj_type in obj_types.items():
+            if obj_name == "people_db.Person":
+                items = obj_type.objects.filter(is_alias_of=None)
+                ids = [item.pk for item in items if item.is_judge]
+            else:
+                ids = obj_type.objects.all().values_list("pk", flat=True)
+            add_items_to_solr(ids, obj_name, force_commit=True)
 
 
 class SitemapTest(TestCase):
