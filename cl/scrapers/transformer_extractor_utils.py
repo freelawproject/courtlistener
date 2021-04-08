@@ -4,8 +4,10 @@ from typing import ByteString, Optional
 import requests
 from django.conf import settings
 
+from cl.audio.models import Audio
 
-def convert_and_clean_audio(audio_obj) -> requests.Response:
+
+def convert_and_clean_audio(audio_obj: Audio) -> requests.Response:
     """Convert audio file to MP3 w/ metadata and image.
 
     :param audio_obj: Audio file object in db.

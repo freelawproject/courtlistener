@@ -24,7 +24,7 @@ class EmptySolrTestCase(TestCase):
     features.
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up testing cores in Solr and swap them in
         self.core_name_opinion = settings.SOLR_OPINION_TEST_CORE_NAME
         self.core_name_audio = settings.SOLR_AUDIO_TEST_CORE_NAME
@@ -50,7 +50,7 @@ class EmptySolrTestCase(TestCase):
             self.si_recap,
         ]
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         for si in self.all_sis:
             si.delete_all()
             si.commit()
@@ -70,7 +70,7 @@ class SolrTestCase(EmptySolrTestCase):
         "authtest_data.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up some handy variables
         super(SolrTestCase, self).setUp()
 
