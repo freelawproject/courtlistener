@@ -33,7 +33,7 @@ def get_name_by_incrementing(
 
     :param instance: The instance of the storage class being used
     :param max_length: The name will not exceed max_length, if provided
-    :param name: File name of the object being saved.
+    :param name: File name of the object being saved
     :return: The filepath
     """
     dir_name, file_name = os.path.split(name)
