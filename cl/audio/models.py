@@ -8,7 +8,7 @@ from django.urls import NoReverseMatch, reverse
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.models import AbstractDateTimeModel
+from cl.lib.models import AbstractDateTimeModel, s3_warning_note
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -87,16 +87,16 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
     local_path_mp3 = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-        "server, where encoded file is stored",
+        help_text=f"The location in AWS S3 where our enhanced copy of the "
+        f"original audio file is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=AWSMediaStorage(),
         blank=True,
         db_index=True,
     )
     local_path_original_file = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-        "server, where the original file is stored",
+        help_text=f"The location in AWS S3 where the original audio file "
+        f"downloaded from the court is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=AWSMediaStorage(),
         db_index=True,
