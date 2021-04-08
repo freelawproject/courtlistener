@@ -75,6 +75,7 @@ jobs:
           cl/api/tests.py
           cl/api/views.py
           cl/lib/storage.py
+          cl/opinion_page/views.py
 
       - name: Black Code Formatter
         uses: psf/black@stable
