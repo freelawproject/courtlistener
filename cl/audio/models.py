@@ -1,4 +1,5 @@
 import json
+from typing import Dict, List, Union
 
 from django.db import models
 from django.template import loader
@@ -144,7 +145,7 @@ class Audio(AbstractDateTimeModel):
     )
 
     @property
-    def transcript(self):
+    def transcript(self) -> str:
         j = json.loads(self.stt_google_response)
         # Find the alternative with the highest confidence for every utterance
         # in the results.
@@ -169,7 +170,13 @@ class Audio(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        index: bool = True,
+        force_commit: bool = False,
+        *args: List,
+        **kwargs: Dict,
+    ) -> None:
         """
         Overrides the normal save method, but provides integration with the
         bulk files and with Solr indexing.
@@ -184,7 +191,7 @@ class Audio(AbstractDateTimeModel):
 
             add_items_to_solr([self.pk], "audio.Audio", force_commit)
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args: List, **kwargs: Dict) -> None:
         """
         Update the index as items are deleted.
         """
@@ -194,7 +201,7 @@ class Audio(AbstractDateTimeModel):
 
         delete_items.delay([id_cache], "audio.Audio")
 
-    def as_search_dict(self):
+    def as_search_dict(self) -> Dict[str, Union[int, List[int], str]]:
         """Create a dict that can be ingested by Solr"""
         # IDs
         out = {
