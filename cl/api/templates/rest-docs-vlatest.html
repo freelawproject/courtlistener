@@ -365,6 +365,11 @@
       </li>
     </ol>
 
+    <h3 id="downloading-files">Downloading Files</h3>
+    <p>API responses will give you the URL path to a resource such a PDF or MP3, but not the domain. To download a resource, create a full URL by concatenating the path from the API response with either <code>https://www.courtlistener.com/</code> or <code>https://storage.courtlistener.com/</code>. Historically, we kept these resources on our own servers, and they were accessible at the <code>www</code> subdomain.
+    </p>
+    <p>Recently, we transitioned our content to AWS S3, which serves them from the <code>storage</code> subdomain. Prefer using the <code>storage</code> subdomain if you find that the <code>www</code> subdomain is redirecting you. If you are being redirected, that indicates that you are using a URL that is deprecated and that is being maintained <a href="https://www.w3.org/Provider/Style/URI">for backwards compatibility</a>.
+    </p>
 
     <h3 id="field-details">Field Details</h3>
     <h4 id="date-formats">Date Formats</h4>
