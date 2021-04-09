@@ -1,6 +1,7 @@
 import json
 import shutil
 from datetime import date, timedelta
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
@@ -285,7 +286,7 @@ class DRFOrderingTests(TestCase):
         "test_objects_search.json",
     ]
 
-    def test_position_ordering(self) -> None:
+    def test_position_ordering(self):
         path = reverse("position-list", kwargs={"version": "v3"})
         r = self.client.get(path, {"order_by": "date_start"})
         self.assertLess(
@@ -298,7 +299,7 @@ class DRFOrderingTests(TestCase):
             r.data["results"][-1]["date_start"],
         )
 
-    def test_opinion_ordering_by_id(self) -> None:
+    def test_opinion_ordering_by_id(self):
         path = reverse("opinion-list", kwargs={"version": "v3"})
         r = self.client.get(path, {"order_by": "id"})
         self.assertLess(
@@ -339,7 +340,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertTrue(
             self.client.login(username="pandora", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
     def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
@@ -536,7 +537,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
     def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
@@ -682,7 +683,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
     def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""
@@ -826,7 +827,7 @@ class DRFFieldSelectionTest(TestCase):
         "authtest_data.json",
     ]
 
-    def test_only_some_fields_returned(self) -> None:
+    def test_only_some_fields_returned(self):
         """Can we return only some of the fields?"""
 
         # First check the Judge endpoint, one of our more complicated ones.
