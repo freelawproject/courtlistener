@@ -47,7 +47,8 @@
                         From the court
                     </a>
                     &nbsp;&nbsp;|&nbsp;&nbsp;
-                    <a href="https://www.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                    {# Provide link to S3 for OA for now, for everything later. #}
+                    <a href="https://{% if type == "oa" %}storage{% else %}www{% endif %}.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
                         Our backup
                     </a>
                 </p>

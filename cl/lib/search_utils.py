@@ -1,6 +1,6 @@
 import re
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -929,7 +929,7 @@ def build_alert_estimation_query(cd, day_count):
     return params
 
 
-def build_court_count_query(group: bool = False) -> Dict[str, str]:
+def build_court_count_query(group: bool = False) -> Dict[str, Union[int, str]]:
     """Build a query that returns the count of cases for all courts
 
     :param group: Should the results be grouped? Note that grouped facets have
