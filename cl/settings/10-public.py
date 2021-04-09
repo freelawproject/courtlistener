@@ -584,7 +584,7 @@ RELATED_FILTER_BY_STATUS = "Precedential"
 # AWS #
 #######
 AWS_STORAGE_BUCKET_NAME = "com-courtlistener-storage"
-AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
+AWS_S3_CUSTOM_DOMAIN = "storage.courtlistener.com"
 AWS_DEFAULT_ACL = "public-read"
 AWS_QUERYSTRING_AUTH = False
 
