@@ -82,7 +82,6 @@ class AWSMediaStorage(S3Boto3Storage):
     location = ""
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
-    custom_domain = False
 
     def get_available_name(
         self,
