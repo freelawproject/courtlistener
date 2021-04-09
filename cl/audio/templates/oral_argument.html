@@ -11,8 +11,8 @@
 
 {% block head %}
     <meta property="og:audio:url"
-          content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
-    <meta property="og:audio:secure_url" content="https://www.courtlistener.com/{{ af.local_path_mp3 }}">
+          content="{{ af.local_path_mp3.url }}">
+    <meta property="og:audio:secure_url" content="{{ af.local_path_mp3.url }}">
     <meta property="og:audio:type" content="audio/mp3">
 
     <link type="text/css" href="{{ STATIC_URL }}skin/jplayer.blue.monday.css"
@@ -32,7 +32,7 @@
         ready: function (event) {
           $(this).jPlayer("setMedia", {
             title: "{{ af|best_case_name }}",
-            mp3: "/{{ af.local_path_mp3 }}"
+            mp3: "{{ af.local_path_mp3.url }}"
           });
         },
         swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
@@ -216,12 +216,12 @@
                        rel="nofollow"
                        class="btn btn-sm btn-primary">Download MP3</a>
                 {% elif not af.download_url and af.local_path_mp3 %}
-                    <a href="/{{ af.local_path_mp3 }}"
+                    <a href="{{ af.local_path_mp3.url }}"
                        class="btn btn-sm btn-primary">Download MP3</a>
                 {% elif af.download_url and af.local_path_mp3 %}
                     <div class="btn-group btn-group-sm" role="group"
                          aria-label="Download buttons">
-                        <a href="/{{ af.local_path_mp3 }}"
+                        <a href="{{ af.local_path_mp3.url }}"
                            class="btn btn-primary">Download MP3</a>
 
                         <div class="btn-group btn-group-sm" role="group">

@@ -209,7 +209,7 @@ class Command(VerboseCommand):
             help="Disable duplicate aborting.",
         )
 
-    def scrape_court(self, site, full_crawl=False):
+    def scrape_court(self, site, full_crawl=False, ocr_available=True):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -288,7 +288,7 @@ class Command(VerboseCommand):
                 index=False,
             )
             extract_doc_content.delay(
-                opinion.pk, ocr_available=True, citation_jitter=True
+                opinion.pk, ocr_available=ocr_available, citation_jitter=True
             )
 
             logger.info(
