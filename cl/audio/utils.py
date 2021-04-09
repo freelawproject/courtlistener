@@ -1,9 +1,10 @@
+import datetime
 from distutils.spawn import find_executable
 
 from django.utils.text import slugify
 
 
-def get_audio_binary():
+def get_audio_binary() -> str:
     """Get the path to the installed binary for doing audio conversions
 
     Ah, Linux. Land where ffmpeg can fork into avconv, where avconv can be the
@@ -34,7 +35,12 @@ def get_audio_binary():
     return path_to_binary
 
 
-def make_af_filename(court_id, docket_number, date_argued, extension):
+def make_af_filename(
+    court_id: str,
+    docket_number: str,
+    date_argued: datetime.date,
+    extension: str,
+) -> str:
     """Make a filename for the audio file for uploading to IA"""
     parts = [
         "gov",

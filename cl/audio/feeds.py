@@ -69,9 +69,8 @@ class JurisdictionPodcast(JurisdictionFeed):
         }
 
     def item_enclosure_url(self, item):
-        return (
-            "https://www.courtlistener.com/%s" % get_item(item)["local_path"]
-        )
+        path = get_item(item)["local_path"]
+        return f"https://storage.courtlistener.com/{path}"
 
     def item_enclosure_length(self, item):
         return get_item(item)["file_size_mp3"]

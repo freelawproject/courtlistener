@@ -26,12 +26,16 @@ from cl.search.models import Court, Opinion
 
 
 class ScraperIngestionTest(TestCase):
-    def test_ingest_opinions_from_scraper(self):
+    fixtures = ["test_court.json"]
+
+    def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
-        cl_scrape_opinions.Command().scrape_court(parsed_site, full_crawl=True)
+        cl_scrape_opinions.Command().scrape_court(
+            parsed_site, full_crawl=True, ocr_available=False
+        )
 
         opinions = Opinion.objects.all()
         count = opinions.count()
