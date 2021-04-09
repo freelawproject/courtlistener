@@ -1,4 +1,5 @@
 import json
+from typing import Dict, List, Union
 
 from django.db import models
 from django.template import loader
@@ -7,13 +8,13 @@ from django.urls import NoReverseMatch, reverse
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pst
 from cl.lib.model_helpers import make_upload_path
-from cl.lib.models import AbstractDateTimeModel
+from cl.lib.models import AbstractDateTimeModel, s3_warning_note
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
     null_map,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
@@ -86,18 +87,18 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
     local_path_mp3 = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-        "server, where encoded file is stored",
+        help_text=f"The location in AWS S3 where our enhanced copy of the "
+        f"original audio file is stored. {s3_warning_note}",
         upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=AWSMediaStorage(),
         blank=True,
         db_index=True,
     )
     local_path_original_file = models.FileField(
-        help_text="The location, relative to MEDIA_ROOT, on the CourtListener "
-        "server, where the original file is stored",
+        help_text=f"The location in AWS S3 where the original audio file "
+        f"downloaded from the court is stored. {s3_warning_note}",
         upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=AWSMediaStorage(),
         db_index=True,
     )
     filepath_ia = models.CharField(
@@ -144,7 +145,7 @@ class Audio(AbstractDateTimeModel):
     )
 
     @property
-    def transcript(self):
+    def transcript(self) -> str:
         j = json.loads(self.stt_google_response)
         # Find the alternative with the highest confidence for every utterance
         # in the results.
@@ -169,7 +170,13 @@ class Audio(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
-    def save(self, index=True, force_commit=False, *args, **kwargs):
+    def save(
+        self,
+        index: bool = True,
+        force_commit: bool = False,
+        *args: List,
+        **kwargs: Dict,
+    ) -> None:
         """
         Overrides the normal save method, but provides integration with the
         bulk files and with Solr indexing.
@@ -184,7 +191,7 @@ class Audio(AbstractDateTimeModel):
 
             add_items_to_solr([self.pk], "audio.Audio", force_commit)
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args: List, **kwargs: Dict) -> None:
         """
         Update the index as items are deleted.
         """
@@ -194,7 +201,7 @@ class Audio(AbstractDateTimeModel):
 
         delete_items.delay([id_cache], "audio.Audio")
 
-    def as_search_dict(self):
+    def as_search_dict(self) -> Dict[str, Union[int, List[int], str]]:
         """Create a dict that can be ingested by Solr"""
         # IDs
         out = {
@@ -236,7 +243,7 @@ class Audio(AbstractDateTimeModel):
                 "duration": self.duration,
                 "source": self.source,
                 "download_url": self.download_url,
-                "local_path": str(getattr(self, "local_path_mp3", None)),
+                "local_path": deepgetattr(self, "local_path_mp3.name", None),
             }
         )
         try:
