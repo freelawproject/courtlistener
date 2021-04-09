@@ -10,20 +10,20 @@ from cl.lib.recap_utils import get_bucket_name
 
 
 @app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
-def upload_audio_to_ia(self, af_pk):
+def upload_audio_to_ia(self, af_pk: int) -> None:
     af = Audio.objects.get(pk=af_pk)
     d = af.docket
     file_name = make_af_filename(
         d.court_id,
         d.docket_number,
         d.date_argued,
-        af.local_path_original_file.path.rsplit(".", 1)[1],
+        af.local_path_original_file.name.rsplit(".", 1)[1],
     )
     bucket_name = get_bucket_name(d.court_id, slugify(d.docket_number))
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
-        files={file_name: af.local_path_original_file.path},
+        files={file_name: af.local_path_original_file},
         title=best_case_name(d),
         collection=settings.IA_OA_COLLECTIONS,
         court_id=d.court_id,
