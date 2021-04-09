@@ -66,7 +66,7 @@ class CitationTaxCleanup(TestCase):
 
 
 class CleanupTest(TestCase):
-    def test_tax_court_cleanup_docket_numbers(self):
+    def test_tax_court_cleanup_docket_numbers(self) -> None:
         """Find docket numbers in tax court opinions"""
         # First set of docket numbers is split over two pages- very difficult
         test_pairs = (
@@ -284,7 +284,7 @@ with Virginia Historic Tax Credit Fund""",
             self.assertEqual(docket_numbers_found, a, msg="Success")
             print("✓")
 
-    def test_dash_handling(self):
+    def test_dash_handling(self) -> None:
         """Can we convert dashes nicely?"""
         tests = {
             "en dash –": "en dash -",  # En-dash
@@ -295,7 +295,7 @@ with Virginia Historic Tax Credit Fund""",
             computed = normalize_dashes(test)
             self.assertEqual(computed, answer)
 
-    def test_tax_court_citation_extractor(self):
+    def test_tax_court_citation_extractor(self) -> None:
         """Find Tax Court Citations """
 
         test_pairs = (

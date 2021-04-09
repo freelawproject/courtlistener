@@ -17,7 +17,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.user = User.objects.create_user("user", "user@cl.com", "password")
         self.user.save()
         self.user = UserProfile.objects.create(
@@ -25,12 +25,12 @@ class VisualizationCrudTests(BaseSeleniumTest):
         )
         super(VisualizationCrudTests, self).setUp()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_creating_new_visualization(self):
+    def test_creating_new_visualization(self) -> None:
         """ Test if a user can create a new Visualization """
         # Beth Beta-User logs into CL
         self.browser.get(self.live_server_url)

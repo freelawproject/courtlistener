@@ -33,7 +33,7 @@ class DisclosureIngestionTest(TestCase):
         "JEF_format.pdf",
     )
 
-    def test_financial_disclosure_ingestion(self):
+    def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
 
         test_disclosure = FinancialDisclosure.objects.get(pk=1)
@@ -64,7 +64,7 @@ class DisclosureIngestionTest(TestCase):
             % non_investments.count(),
         )
 
-    def test_extraction_and_ingestion_jef(self):
+    def test_extraction_and_ingestion_jef(self) -> None:
         """Can we successfully ingest disclosures from jef documents?"""
         with open(self.jef_pdf, "rb") as f:
             pdf_bytes = f.read()
@@ -96,7 +96,7 @@ class LoggedInDisclosureTestCase(TestCase):
         "judge_judy.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         u = User.objects.get(pk=1001)
         ps = Permission.objects.filter(codename="has_disclosure_api_access")
         u.user_permissions.add(*ps)
@@ -107,7 +107,7 @@ class LoggedInDisclosureTestCase(TestCase):
 
 
 class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
-    def test_basic_disclosure_api_query(self):
+    def test_basic_disclosure_api_query(self) -> None:
         """Can we query the financial disclosures?"""
         url = reverse("financialdisclosure-list", kwargs={"version": "v3"})
         # 4 of the queries are from the setup
@@ -116,21 +116,21 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count.")
 
-    def test_gift_disclosure_api(self):
+    def test_gift_disclosure_api(self) -> None:
         """Can we query the gifts?"""
         url = reverse("gift-list", kwargs={"version": "v3"})
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 1, msg="Wrong API count")
 
-    def test_investments_api(self):
+    def test_investments_api(self) -> None:
         """Can we query the investments?"""
         url = reverse("investment-list", kwargs={"version": "v3"})
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 9, msg="Wrong API count")
 
-    def test_unauthorized_user(self):
+    def test_unauthorized_user(self) -> None:
         """Can a regular user access forbidden content?"""
         self.client.logout()
         url = reverse("gift-list", kwargs={"version": "v3"})
@@ -139,7 +139,7 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
             r.status_code, 401, msg="Unauthorized content exposed."
         )
 
-    def test_access_to_content_outside_authorization(self):
+    def test_access_to_content_outside_authorization(self) -> None:
         """Can a admin user access forbidden content?"""
         self.client.login(username="admin", password="admin")
         url = reverse("gift-list", kwargs={"version": "v3"})
@@ -148,7 +148,7 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
 
 
 class DisclosureAPITest(LoggedInDisclosureTestCase):
-    def test_basic_disclosure_api_query(self):
+    def test_basic_disclosure_api_query(self) -> None:
         """Can we query the financial disclosure API?"""
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
@@ -157,7 +157,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
 
-    def test_disclosure_position_api(self):
+    def test_disclosure_position_api(self) -> None:
         """Can we query the financial disclosure API?"""
         self.path = reverse(
             "disclosureposition-list", kwargs={"version": "v3"}
@@ -166,14 +166,14 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
 
-    def test_investment_filtering(self):
+    def test_investment_filtering(self) -> None:
         """Can we filter investments by transaction value codes?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
         self.q = {"transaction_value_code": "M"}
         r = self.client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong Investment filter")
 
-    def test_exact_filtering_by_id(self):
+    def test_exact_filtering_by_id(self) -> None:
         """Can we filter investments by id?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
         self.q = {"id": 878}
@@ -182,7 +182,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
             r.json()["count"], 1, msg="Investment filtering by id failed."
         )
 
-    def test_filtering_description_by_text(self):
+    def test_filtering_description_by_text(self) -> None:
         """Can we filter by description partial text?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
         self.q = {"description__startswith": "Harris Bank"}
@@ -191,7 +191,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
             r.json()["count"], 2, msg="Investment filtering by id failed."
         )
 
-    def test_filter_investments_by_redaction(self):
+    def test_filter_investments_by_redaction(self) -> None:
         """Can we filter investments by redaction boolean?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
         self.q = {"redacted": True}
@@ -202,7 +202,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
             msg="Investment filtering by redactions failed.",
         )
 
-    def test_filter_disclosures_by_person_id(self):
+    def test_filter_disclosures_by_person_id(self) -> None:
         """Can we filter disclosures by person id?"""
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
@@ -215,7 +215,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
             msg="Incorrect disclosures found.",
         )
 
-    def test_filter_related_object(self):
+    def test_filter_related_object(self) -> None:
         """Can we filter disclosures by transaction value code?"""
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}

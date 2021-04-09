@@ -16,31 +16,31 @@ from cl.people_db.models import (
 
 
 class TestTextFilters(TestCase):
-    def test_oxford_zero_items(self):
+    def test_oxford_zero_items(self) -> None:
         self.assertEqual(oxford_join([]), "")
 
-    def test_oxford_one_item(self):
+    def test_oxford_one_item(self) -> None:
         self.assertEqual(oxford_join(["a"]), "a")
 
-    def test_oxford_two_items(self):
+    def test_oxford_two_items(self) -> None:
         self.assertEqual(oxford_join(["a", "b"]), "a and b")
 
-    def test_oxford_three_items(self):
+    def test_oxford_three_items(self) -> None:
         self.assertEqual(oxford_join(["a", "b", "c"]), "a, b, and c")
 
-    def test_oxford_separator(self):
+    def test_oxford_separator(self) -> None:
         self.assertEqual(
             oxford_join(["a", "b", "c"], separator=";"), "a; b; and c"
         )
 
-    def test_oxford_conjunction(self):
+    def test_oxford_conjunction(self) -> None:
         self.assertEqual(
             oxford_join(["a", "b", "c"], conjunction="or"), "a, b, or c"
         )
 
 
 class TestNaturalDuration(TestCase):
-    def test_conversion_to_strings(self):
+    def test_conversion_to_strings(self) -> None:
         """Can we get the str output right?"""
         test_cases = (
             ("01", "1"),
@@ -52,7 +52,7 @@ class TestNaturalDuration(TestCase):
         for test, result in test_cases:
             self.assertEqual(naturalduration(test), result)
 
-    def test_input_as_int_or_str(self):
+    def test_input_as_int_or_str(self) -> None:
         """Can we take input as either an int or a str?"""
         test_cases = (
             ("62", "1:02"),
@@ -61,7 +61,7 @@ class TestNaturalDuration(TestCase):
         for test, result in test_cases:
             self.assertEqual(naturalduration(test), result)
 
-    def test_conversion_to_dict(self):
+    def test_conversion_to_dict(self) -> None:
         """Can we get the numbers right when it's a dict?"""
         test_cases = (
             ("01", {"d": 0, "h": 0, "m": 0, "s": 1}),
@@ -80,7 +80,7 @@ class TestNaturalDuration(TestCase):
                 "  Expected: %s" % (test, actual_result, expected_result),
             )
 
-    def test_weird_values(self):
+    def test_weird_values(self) -> None:
         test_cases = (
             (None, "0"),  # None
             (0, "0"),  # Zero
@@ -105,7 +105,7 @@ class TestExtras(TestCase):
 
     factory = RequestFactory()
 
-    def test_get_full_host(self):
+    def test_get_full_host(self) -> None:
         """Does get_full_host return the right values"""
         c = Context({"request": self.factory.request()})
         self.assertEqual(get_full_host(c), "http://testserver")
@@ -115,7 +115,7 @@ class TestExtras(TestCase):
             "http://billy:crystal@testserver",
         )
 
-    def test_granular_dates(self):
+    def test_granular_dates(self) -> None:
         """Can we get the correct values for granular dates?"""
         q_a = (
             ((GRANULARITY_DAY, True), "1982-06-09"),
@@ -140,7 +140,7 @@ class TestExtras(TestCase):
                 ),
             )
 
-    def test_old_granular_dates(self):
+    def test_old_granular_dates(self) -> None:
         """Can we parse dates older than 1900 without strftime barfing?"""
         obj = DummyObject()
         d = datetime.date(year=1899, month=1, day=23)
@@ -152,7 +152,7 @@ class TestExtras(TestCase):
         except ValueError:
             self.fail("Granular date failed while parsing date prior to 1900.")
 
-    def test_granularity_missing_date(self):
+    def test_granularity_missing_date(self) -> None:
         """Does granularity code work with missing data?"""
         obj = DummyObject()
         d = ""
@@ -162,7 +162,7 @@ class TestExtras(TestCase):
         # Missing date value
         self.assertEqual(granular_date(obj, "date_start"), "Unknown")
 
-    def test_granularity_dict_or_obj(self):
+    def test_granularity_dict_or_obj(self) -> None:
         """Can you pass a dict or an object and will both work?
 
         This is important because some objects in Django templates are dicts...

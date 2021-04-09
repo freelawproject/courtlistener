@@ -33,7 +33,7 @@ def remove_citations_from_imported_fixtures():
 
 
 class CiteTest(TestCase):
-    def test_make_html_from_plain_text(self):
+    def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
 
@@ -159,7 +159,7 @@ class CiteTest(TestCase):
             )
             print("✓")
 
-    def test_make_html_from_html(self):
+    def test_make_html_from_html(self) -> None:
         """Can we convert the HTML of an opinion into modified HTML?"""
         # fmt: off
 
@@ -205,7 +205,7 @@ class CiteTest(TestCase):
             )
             print("✓")
 
-    def test_make_html_from_matched_citation_objects(self):
+    def test_make_html_from_matched_citation_objects(self) -> None:
         """Can we render matched citation objects as HTML?"""
         # This test case is similar to the two above, except it allows us to
         # test the rendering of citation objects that we assert are correctly
@@ -267,7 +267,7 @@ class MatchingTest(IndexedSolrTestCase):
         "opinions_matching_citations.json",
     ]
 
-    def test_citation_resolution(self):
+    def test_citation_resolution(self) -> None:
         """Tests whether different types of citations (i.e., full, short form,
         supra, id) resolve correctly to opinion matches.
         """
@@ -504,7 +504,7 @@ class MatchingTest(IndexedSolrTestCase):
             )
             print("✓")
 
-    def test_citation_matching_issue621(self):
+    def test_citation_matching_issue621(self) -> None:
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
         # The fixture contains a reference to 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
@@ -525,7 +525,7 @@ class UpdateTest(IndexedSolrTestCase):
         "opinions_matching_citations.json",
     ]
 
-    def test_citation_increment(self):
+    def test_citation_increment(self) -> None:
         """Make sure that found citations update the increment on the cited
         opinion's citation count"""
         remove_citations_from_imported_fixtures()
@@ -543,7 +543,7 @@ class UpdateTest(IndexedSolrTestCase):
             % (cited.cluster.citation_count, expected_count),
         )
 
-    def test_opinionscited_creation(self):
+    def test_opinionscited_creation(self) -> None:
         """Make sure that found citations are stored in the database as
         OpinionsCited objects with the appropriate references and depth.
         """
@@ -587,7 +587,7 @@ class CitationFeedTest(IndexedSolrTestCase):
         )
         self.assertEqual(count, expected_count)
 
-    def test_basic_cited_by_feed(self):
+    def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
         r = self.client.get(
             reverse("search_feed", args=["search"]), {"q": "cites:1"}
@@ -597,7 +597,7 @@ class CitationFeedTest(IndexedSolrTestCase):
         expected_count = 1
         self._tree_has_content(r.content, expected_count)
 
-    def test_unicode_content(self):
+    def test_unicode_content(self) -> None:
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
@@ -631,7 +631,7 @@ class CitationCommandTest(IndexedSolrTestCase):
             % (cited.cluster.citation_count, expected_count),
         )
 
-    def test_index_by_doc_id(self):
+    def test_index_by_doc_id(self) -> None:
         args = [
             "--doc-id",
             "3",
@@ -640,7 +640,7 @@ class CitationCommandTest(IndexedSolrTestCase):
         ]
         self.call_command_and_test_it(args)
 
-    def test_index_by_doc_ids(self):
+    def test_index_by_doc_ids(self) -> None:
         args = [
             "--doc-id",
             "3",
@@ -650,7 +650,7 @@ class CitationCommandTest(IndexedSolrTestCase):
         ]
         self.call_command_and_test_it(args)
 
-    def test_index_by_start_only(self):
+    def test_index_by_start_only(self) -> None:
         args = [
             "--start-id",
             "0",
@@ -659,7 +659,7 @@ class CitationCommandTest(IndexedSolrTestCase):
         ]
         self.call_command_and_test_it(args)
 
-    def test_index_by_start_and_end(self):
+    def test_index_by_start_and_end(self) -> None:
         args = [
             "--start-id",
             "0",
@@ -670,7 +670,7 @@ class CitationCommandTest(IndexedSolrTestCase):
         ]
         self.call_command_and_test_it(args)
 
-    def test_filed_after(self):
+    def test_filed_after(self) -> None:
         args = [
             "--filed-after",
             "2015-06-09",
@@ -683,7 +683,7 @@ class CitationCommandTest(IndexedSolrTestCase):
 class ParallelCitationTest(SimpleTestCase):
     databases = "__all__"
 
-    def test_identifying_parallel_citations(self):
+    def test_identifying_parallel_citations(self) -> None:
         """Given a string, can we identify parallel citations"""
         tests = (
             # A pair consisting of a test string and the number of parallel
@@ -728,7 +728,7 @@ class ParallelCitationTest(SimpleTestCase):
             )
             print("✓")
 
-    def test_making_edge_list(self):
+    def test_making_edge_list(self) -> None:
         """Can we make networkx-friendly edge lists?"""
         tests = [
             ([1, 2], [(1, 2)]),

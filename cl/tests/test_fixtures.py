@@ -12,7 +12,7 @@ class FixtureTest(TestCase):
 
     fixtures = ["judge_judy.json"]
 
-    def test_does_judge_judy_fixture_load(self):
+    def test_does_judge_judy_fixture_load(self) -> None:
         """Can we load Judge Judy from a fixture?"""
         judy = Person.objects.get(pk=2)
         self.assertEqual(judy.name_first, "Judith")

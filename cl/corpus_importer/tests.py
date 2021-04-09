@@ -35,7 +35,7 @@ from cl.search.models import (
 
 
 class JudgeExtractionTest(unittest.TestCase):
-    def test_get_judge_from_string_columbia(self):
+    def test_get_judge_from_string_columbia(self) -> None:
         """Can we cleanly get a judge value from a string?"""
         tests = (
             (
@@ -53,7 +53,7 @@ class JudgeExtractionTest(unittest.TestCase):
 class CourtMatchingTest(unittest.TestCase):
     """Tests related to converting court strings into court objects."""
 
-    def test_get_court_object_from_string(self):
+    def test_get_court_object_from_string(self) -> None:
         """Can we get a court object from a string and filename combo?
 
         When importing the Columbia corpus, we use a combination of regexes and
@@ -260,7 +260,7 @@ class CourtMatchingTest(unittest.TestCase):
                 "               Instead we got: '%s'" % (d["answer"], got),
             )
 
-    def test_get_fed_court_object_from_string(self):
+    def test_get_fed_court_object_from_string(self) -> None:
         """Can we get the correct federal courts?"""
 
         pairs = (
@@ -279,7 +279,7 @@ class CourtMatchingTest(unittest.TestCase):
             got = match_court_string(test["q"], federal_district=True)
             self.assertEqual(test["a"], got)
 
-    def test_get_appellate_court_object_from_string(self):
+    def test_get_appellate_court_object_from_string(self) -> None:
         """Can we get the correct federal appellate courts?"""
 
         pairs = (
@@ -310,19 +310,19 @@ class PacerDocketParserTest(TestCase):
         settings.MEDIA_ROOT, "test", "xml", "gov.uscourts.akd.41664.docket.xml"
     )
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.docket = find_docket_object("akd", "41664", "3:11-cv-00064")
         process_docket_data(
             self.docket, self.DOCKET_PATH, UPLOAD_TYPE.IA_XML_FILE
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
         Party.objects.all().delete()
         Attorney.objects.all().delete()
         AttorneyOrganization.objects.all().delete()
 
-    def test_docket_entry_parsing(self):
+    def test_docket_entry_parsing(self) -> None:
         """Do we get the docket entries we expected?"""
         # Total count is good?
         all_rds = RECAPDocument.objects.all()
@@ -359,7 +359,7 @@ class PacerDocketParserTest(TestCase):
         # Two documents under the docket entry?
         self.assertEqual(att_rd.docket_entry.recap_documents.all().count(), 2)
 
-    def test_party_parsing(self):
+    def test_party_parsing(self) -> None:
         """Can we parse an XML docket and get good results in the DB"""
         self.assertEqual(self.docket.parties.all().count(), self.NUM_PARTIES)
 
@@ -389,7 +389,7 @@ class GetQuarterTest(unittest.TestCase):
     began?
     """
 
-    def test_january(self):
+    def test_january(self) -> None:
         self.assertEqual(
             date(2018, 1, 1), get_start_of_quarter(date(2018, 1, 1))
         )
@@ -397,7 +397,7 @@ class GetQuarterTest(unittest.TestCase):
             date(2018, 1, 1), get_start_of_quarter(date(2018, 1, 10))
         )
 
-    def test_december(self):
+    def test_december(self) -> None:
         self.assertEqual(
             date(2018, 10, 1), get_start_of_quarter(date(2018, 12, 1))
         )
@@ -412,7 +412,7 @@ class IAUploaderTest(TestCase):
         "attorney_party_dup_roles.json",
     ]
 
-    def test_correct_json_generated(self):
+    def test_correct_json_generated(self) -> None:
         """Do we generate the correct JSON for a handful of tricky dockets?
 
         The most important thing here is that we don't screw up how we handle
@@ -448,7 +448,7 @@ class IAUploaderTest(TestCase):
             "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
-    def test_num_queries_ok(self):
+    def test_num_queries_ok(self) -> None:
         """Have we regressed the number of queries it takes to make the JSON
 
         It's very easy to use the DRF in a way that generates a LOT of queries.
@@ -473,10 +473,10 @@ class TNCorpusTests(TestCase):
         settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
     )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def test_import(self):
+    def test_import(self) -> None:
         """Can we import two cases successfully"""
         pre_install_count = OpinionCluster.objects.all().count()
         filepath = os.path.join(
@@ -491,7 +491,7 @@ class TNCorpusTests(TestCase):
             msg="Did not get two installs",
         )
 
-    def test_panel_selection(self):
+    def test_panel_selection(self) -> None:
         """Can we choose panelist correctly?"""
         filepath = os.path.join(
             self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
@@ -516,7 +516,7 @@ class HarvardTests(TestCase):
         settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
     )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Docket.objects.all().delete()
 
     def assertSuccessfulParse(self, expected_count_diff):
@@ -671,7 +671,7 @@ class HarvardTests(TestCase):
         self.assertSuccessfulParse(1)
         print("Success ✓")
 
-    def test_partial_dates(self):
+    def test_partial_dates(self) -> None:
         """Can we validate partial dates?"""
         pairs = (
             {"q": "2019-01-01", "a": ("2019-01-01", False)},

@@ -26,7 +26,7 @@ class FavoriteTest(TestCase):
         "test_objects_audio.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Set up some handy variables
         self.client = Client()
         self.fave_cluster_params = {
@@ -40,7 +40,7 @@ class FavoriteTest(TestCase):
             "notes": "testing notes",
         }
 
-    def test_create_fave(self):
+    def test_create_fave(self) -> None:
         """Can we create a fave by sending a post?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -82,12 +82,14 @@ class UserFavoritesTest(BaseSeleniumTest):
         "favorites.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         get_homepage_stats.invalidate()
         super(UserFavoritesTest, self).setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_anonymous_user_is_prompted_when_favoriting_an_opinion(self):
+    def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
+        self,
+    ) -> None:
         # Clean up favorites to start
         Favorite.objects.all().delete()
 
@@ -146,7 +148,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assertIn("Save Favorite", modal_title.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_logged_in_user_can_save_favorite(self):
+    def test_logged_in_user_can_save_favorite(self) -> None:
         # Meta: assure no Faves even if part of fixtures
         Favorite.objects.all().delete()
 
@@ -258,7 +260,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         self.assert_text_in_node(short_title, "body")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_user_can_change_favorites(self):
+    def test_user_can_change_favorites(self) -> None:
         # Dora already has some favorites and she logs in and pulls them up
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
@@ -340,7 +342,7 @@ class APITests(APITestCase):
         "test_objects_search.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client_id = 1001
@@ -364,7 +366,7 @@ class APITests(APITestCase):
         }
         return client.post(self.docket_path, data, format="json")
 
-    def test_make_a_tag(self):
+    def test_make_a_tag(self) -> None:
         # Make a simple tag
         response = self.make_a_good_tag(self.client)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
@@ -380,14 +382,14 @@ class APITests(APITestCase):
         tagged_dockets = tag.dockets.all()
         self.assertEqual(tagged_dockets[0].id, docket_to_tag_id)
 
-    def test_failing_slug(self):
+    def test_failing_slug(self) -> None:
         data = {
             "name": "tag with space",
         }
         response = self.client.post(self.tag_path, data, format="json")
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_rename_tag_via_put(self):
+    def test_rename_tag_via_put(self) -> None:
         response = self.make_a_good_tag(self.client)
         response_data = response.json()
         tag_id = response_data["id"]
@@ -407,7 +409,7 @@ class APITests(APITestCase):
         tag.refresh_from_db()
         self.assertEqual(tag.name, new_name)
 
-    def test_list_users_tags(self):
+    def test_list_users_tags(self) -> None:
         """Cam we get a user's tags (and not other users tags)?"""
         # make some tags for some users
         self.make_a_good_tag(self.client, tag_name="foo")
@@ -426,7 +428,7 @@ class APITests(APITestCase):
         response = self.client.get(self.tag_path, {"name__startswith": "foo2"})
         self.assertEqual(response.json()["count"], 1)
 
-    def test_can_users_only_see_own_tags_or_public_ones(self):
+    def test_can_users_only_see_own_tags_or_public_ones(self) -> None:
         # Use two users to create two tags
         self.make_a_good_tag(self.client, tag_name="foo")
         self.make_a_good_tag(self.client2, tag_name="foo2")
@@ -446,7 +448,7 @@ class APITests(APITestCase):
         response = self.client.get(self.tag_path, {"user": self.client_id})
         self.assertEqual(response.json()["count"], 1)
 
-    def test_use_a_tag_thats_not_yours(self):
+    def test_use_a_tag_thats_not_yours(self) -> None:
         # self.client makes a tag. self.client2 tries to use it
         response = self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
@@ -462,7 +464,7 @@ class APITests(APITestCase):
         response = self.tag_a_docket(self.client2, docket_to_tag_id, tag_id)
         self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_can_only_see_your_tag_associations(self):
+    def test_can_only_see_your_tag_associations(self) -> None:
         # Make a tag, and tag a docket with it
         response = self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
