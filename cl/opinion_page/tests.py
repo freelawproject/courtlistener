@@ -31,7 +31,7 @@ from cl.search.models import (
 
 
 class TitleTest(TestCase):
-    def test_make_title_no_docket_number(self):
+    def test_make_title_no_docket_number(self) -> None:
         """Can we make titles?"""
         # No docket number
         d = Docket(case_name="foo", docket_number=None)
@@ -41,7 +41,7 @@ class TitleTest(TestCase):
 class ViewDocumentTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
-    def test_simple_url_check_for_document(self):
+    def test_simple_url_check_for_document(self) -> None:
         """Does the page load properly?"""
         response = self.client.get("/opinion/1/asdf/")
         self.assertEqual(response.status_code, 200)
@@ -62,7 +62,7 @@ class CitationRedirectorTest(TestCase):
             "instead.".format(expected=status, got=r.status_code),
         )
 
-    def test_with_and_without_a_citation(self):
+    def test_with_and_without_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         r = self.client.get(reverse("citation_redirector"))
         self.assertStatus(r, HTTP_200_OK)
@@ -78,7 +78,7 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
-    def test_multiple_results(self):
+    def test_multiple_results(self) -> None:
         """Do we return a 300 status code when there are multiple results?"""
         # Duplicate the citation and add it to another cluster instead.
         f2_cite = Citation.objects.get(**self.citation)
@@ -91,7 +91,7 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
         f2_cite.delete()
 
-    def test_unknown_citation(self):
+    def test_unknown_citation(self) -> None:
         """Do we get a 404 message if we don't know the citation?"""
         r = self.client.get(
             reverse(
@@ -105,7 +105,7 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
-    def test_long_numbers(self):
+    def test_long_numbers(self) -> None:
         """Do really long WL citations work?"""
         r = self.client.get(
             reverse(
@@ -115,13 +115,13 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
-    def test_volume_page(self):
+    def test_volume_page(self) -> None:
         r = self.client.get(
             reverse("citation_redirector", kwargs={"reporter": "F.2d"})
         )
         self.assertStatus(r, HTTP_200_OK)
 
-    def test_case_page(self):
+    def test_case_page(self) -> None:
         r = self.client.get(
             reverse(
                 "citation_redirector",
@@ -134,12 +134,12 @@ class CitationRedirectorTest(TestCase):
 class ViewRecapDocketTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
-    def test_regular_docket_url(self):
+    def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
         r = self.client.get(reverse("view_docket", args=[1, "case-name"]))
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_recap_docket_url(self):
+    def test_recap_docket_url(self) -> None:
         """Can we redirect to a regular docket URL from a recap/uscourts.*
         URL?
         """
@@ -209,7 +209,7 @@ class UploadPublication(TestCase):
 
     fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
         tenn_group = Group.objects.get(name="tenn_work_uploaders")
         self.tenn_user = User.objects.create_user(
@@ -259,12 +259,12 @@ class UploadPublication(TestCase):
             "publication_date": datetime.date(2019, 4, 13),
         }
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
         Docket.objects.all().delete()
 
-    def test_access_upload_page(self):
+    def test_access_upload_page(self) -> None:
         """Can we successfully access upload page with access?"""
         self.client.login(username="learned", password="thehandofjustice")
         response = self.client.get(
@@ -272,7 +272,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_redirect_without_access(self):
+    def test_redirect_without_access(self) -> None:
         """Can we successfully redirect individuals without proper access?"""
         self.client.login(username="test_user", password="simplepassword")
         response = self.client.get(
@@ -280,7 +280,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_pdf_upload(self):
+    def test_pdf_upload(self) -> None:
         """Can we upload a PDF and form?"""
         form = TennWorkersForm(
             self.work_comp_data,
@@ -294,7 +294,7 @@ class UploadPublication(TestCase):
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
 
-    def test_pdf_validation_failure(self):
+    def test_pdf_validation_failure(self) -> None:
         """Can we fail upload documents that are not PDFs?"""
         form = TennWorkersForm(
             self.work_comp_data,
@@ -313,7 +313,7 @@ class UploadPublication(TestCase):
             ],
         )
 
-    def test_tn_wc_app_upload(self):
+    def test_tn_wc_app_upload(self) -> None:
         """Can we test appellate uplading?"""
         form = TennWorkersForm(
             self.work_comp_app_data,
@@ -329,7 +329,7 @@ class UploadPublication(TestCase):
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
 
-    def test_required_case_title(self):
+    def test_required_case_title(self) -> None:
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
@@ -347,7 +347,7 @@ class UploadPublication(TestCase):
             form.errors["case_title"], ["This field is required."]
         )
 
-    def test_form_save(self):
+    def test_form_save(self) -> None:
         """Can we saves successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -367,7 +367,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_handle_duplicate_pdf(self):
+    def test_handle_duplicate_pdf(self) -> None:
         """Can we validate PDF not in system?"""
         d = Docket.objects.create(
             source=Docket.DIRECT_INPUT,

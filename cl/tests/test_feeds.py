@@ -48,7 +48,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         super(FeedsFunctionalTest, cls).setUpClass()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_can_get_to_feeds_from_homepage(self):
+    def test_can_get_to_feeds_from_homepage(self) -> None:
         """Can we get to the feeds/podcasts page from the homepage?"""
         self.browser.get(self.live_server_url)
         link = self.browser.find_element(By.LINK_TEXT, "Feeds")
@@ -68,7 +68,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_node("Podcasts", "body")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_feeds_page_shows_jurisdiction_links(self):
+    def test_feeds_page_shows_jurisdiction_links(self) -> None:
         """
         Does the feeds page show all the proper links for each jurisdiction?
         """
@@ -94,7 +94,9 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             self.browser.back()
             print("✓")
 
-    def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(self):
+    def test_all_jurisdiction_opinion_rss_feeds_usable_in_rss_reader(
+        self,
+    ) -> None:
         """
         Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
         """
@@ -107,7 +109,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         # Per https://pythonhosted.org/feedparser/bozo.html
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
 
-    def test_court_opinion_rss_feeds_usable_in_rss_reader(self):
+    def test_court_opinion_rss_feeds_usable_in_rss_reader(self) -> None:
         """
         Can the RSS feeds be properly used in an RSS Reader?
         """
@@ -123,7 +125,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         # Per https://pythonhosted.org/feedparser/bozo.html
         self.assertEqual(f.bozo, 0, "Feed should be wellformed")
 
-    def test_opinion_rss_feeds_contain_valid_attachment_links(self):
+    def test_opinion_rss_feeds_contain_valid_attachment_links(self) -> None:
         """
         For Opinions with stored PDFs, does the feed provide valid links
         to the CourtListener copy of the original PDF?
@@ -137,7 +139,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertTrue(len(entry.enclosures[0].type) > 0)
                 self.assertTrue(int(entry.enclosures[0].length) > 1)
 
-    def test_oral_argument_feeds_contain_valid_mp3_links(self):
+    def test_oral_argument_feeds_contain_valid_mp3_links(self) -> None:
         """
         For Oral Arguments, does the feed provide valid links to MP3 content?
         """
@@ -150,7 +152,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 self.assertEqual(len(entry.enclosures), 1)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_search_based_opinion_feed(self):
+    def test_search_based_opinion_feed(self) -> None:
         """
         Can a user perform a search via CL and use the RSS feed feature?
         """

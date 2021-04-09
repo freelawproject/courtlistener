@@ -7,7 +7,7 @@ from cl.search.models import SEARCH_TYPES
 
 
 class PodcastTest(IndexedSolrTestCase):
-    def test_do_jurisdiction_podcasts_have_good_content(self):
+    def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
         response = self.client.get(
             reverse("jurisdiction_podcast", kwargs={"court": "test"})
@@ -35,7 +35,7 @@ class PodcastTest(IndexedSolrTestCase):
                 "Instead found: %s" % (count, test, node_count),
             )
 
-    def test_do_search_podcasts_have_content(self):
+    def test_do_search_podcasts_have_content(self) -> None:
         """Can we make a search podcast?
 
         Search podcasts are a subclass of the Jurisdiction podcasts, so a

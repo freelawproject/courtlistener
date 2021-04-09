@@ -26,7 +26,7 @@ stripe_test_numbers = {
 class EmailCommandTest(TestCase):
     fixtures = ["donate_test_data.json"]
 
-    def test_sending_an_email(self):
+    def test_sending_an_email(self) -> None:
         """Do we send emails correctly?"""
         # Set this value since the JSON will get stale and can't have dynamic
         # dates. Note that we need to get hours involved because this way we
@@ -49,7 +49,7 @@ class EmailCommandTest(TestCase):
     "Only run PayPal tests if we have an API key available.",
 )
 class DonationFormSubmissionTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
         self.params = {
             "address1": "123 Sesame St.",
@@ -65,13 +65,13 @@ class DonationFormSubmissionTest(TestCase):
             "frequency": "once",
         }
 
-    def test_paypal_with_other_value_as_anonymous(self):
+    def test_paypal_with_other_value_as_anonymous(self) -> None:
         """Can a paypal donation go through using the "Other" field?"""
         self.params.update({"amount": "other", "amount_other": "5"})
         r = self.client.post(reverse("donate"), self.params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
-    def test_paypal_with_regular_value_as_anonymous(self):
+    def test_paypal_with_regular_value_as_anonymous(self) -> None:
         """Can a stripe donation go through using the "Other" field?"""
         self.params.update({"amount": "25"})
         r = self.client.post(reverse("donate"), self.params, follow=True)
@@ -97,7 +97,7 @@ def get_stripe_event(fingerprint):
     "Only run Stripe tests if we have an API key available.",
 )
 class StripeTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
 
     def make_a_donation(
@@ -157,7 +157,7 @@ class StripeTest(TestCase):
         # Does it return properly?
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_making_a_donation_and_getting_the_callback(self):
+    def test_making_a_donation_and_getting_the_callback(self) -> None:
         """These two tests must live together because they need to be done
         sequentially.
 
@@ -173,7 +173,7 @@ class StripeTest(TestCase):
         )  # redirect after a post
         self.assertEventPostsCorrectly(token)
 
-    def test_making_a_donation_with_a_bad_card(self):
+    def test_making_a_donation_with_a_bad_card(self) -> None:
         """Do we do the right thing when bad credentials are provided?"""
         stripe.api_key = settings.STRIPE_SECRET_KEY
         # Create a stripe token (this would normally be done via javascript in
@@ -186,7 +186,7 @@ class StripeTest(TestCase):
         )
         self.assertEventPostsCorrectly(token)
 
-    def test_making_a_donation_with_a_decimal_value(self):
+    def test_making_a_donation_with_a_decimal_value(self) -> None:
         """Do things work when people choose to donate with a decimal instead
         of an int?
         """
@@ -201,7 +201,7 @@ class StripeTest(TestCase):
         )  # redirect after a post
         self.assertEventPostsCorrectly(token)
 
-    def test_making_a_donation_that_is_too_small(self):
+    def test_making_a_donation_that_is_too_small(self) -> None:
         """Donations less than $5 are no good."""
         stripe.api_key = settings.STRIPE_SECRET_KEY
         token, r = self.make_a_donation(
@@ -211,7 +211,7 @@ class StripeTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_making_a_monthly_donation(self):
+    def test_making_a_monthly_donation(self) -> None:
         """Can we make a monthly donation correctly?"""
         stripe.api_key = settings.STRIPE_SECRET_KEY
         token, r = self.make_a_donation(
@@ -245,7 +245,7 @@ class DonationIntegrationTest(TestCase):
         "password": "password",
     }
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
 
         self.params = {
@@ -268,7 +268,7 @@ class DonationIntegrationTest(TestCase):
 
         self.new_email = "some-user@free.law"
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Donation.objects.all().delete()
         MonthlyDonation.objects.all().delete()
         User.objects.filter(email=self.new_email).delete()
@@ -316,51 +316,55 @@ class DonationIntegrationTest(TestCase):
             content_type="application/json",
         )
 
-    def test_one_time_paypal_logged_in_donation(self):
+    def test_one_time_paypal_logged_in_donation(self) -> None:
         self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse("donate"))
 
-    def test_one_time_paypal_logged_out_donation_existing_account(self):
+    def test_one_time_paypal_logged_out_donation_existing_account(
+        self,
+    ) -> None:
         self.client.logout()
         self.do_post_and_assert(reverse("donate"))
 
-    def test_one_time_paypal_logged_out_donation_new_stub(self):
+    def test_one_time_paypal_logged_out_donation_new_stub(self) -> None:
         self.set_new_stub_params()
         self.do_post_and_assert(reverse("donate"))
         # Did we create an account?
         self.assertTrue(User.objects.filter(email=self.new_email).exists())
 
-    def test_one_time_stripe_logged_in_donation(self):
+    def test_one_time_stripe_logged_in_donation(self) -> None:
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse("donate"))
 
-    def test_one_time_stripe_logged_out_donation_existing_account(self):
+    def test_one_time_stripe_logged_out_donation_existing_account(
+        self,
+    ) -> None:
         self.set_stripe_params()
         self.client.logout()
         self.do_post_and_assert(reverse("donate"))
 
-    def test_one_time_stripe_logged_out_donation_new_stub(self):
+    def test_one_time_stripe_logged_out_donation_new_stub(self) -> None:
         self.set_stripe_params()
         self.client.logout()
         self.set_new_stub_params()
         self.do_post_and_assert(reverse("donate"))
 
-    def test_monthly_stripe_logged_in_donation(self):
+    def test_monthly_stripe_logged_in_donation(self) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
-    def test_monthly_stripe_logged_out_donation_existing_account(self):
+    def test_monthly_stripe_logged_out_donation_existing_account(self) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
         self.client.logout()
         self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
-    def test_monthly_stripe_logged_out_donation_new_stub(self):
+    def test_monthly_stripe_logged_out_donation_new_stub(self) -> None:
         self.set_monthly_params()
         self.set_stripe_params()
         self.client.logout()
@@ -368,17 +372,17 @@ class DonationIntegrationTest(TestCase):
         self.do_post_and_assert(reverse("donate"))
         self.check_monthly_donation_created()
 
-    def test_one_time_stripe_logged_in_payment(self):
+    def test_one_time_stripe_logged_in_payment(self) -> None:
         self.set_stripe_params()
         self.assertTrue(self.client.login(**self.credentials))
         self.do_post_and_assert(reverse("cc_payment"))
 
-    def test_one_time_stripe_logged_out_payment_existing_account(self):
+    def test_one_time_stripe_logged_out_payment_existing_account(self) -> None:
         self.set_stripe_params()
         self.client.logout()
         self.do_post_and_assert(reverse("cc_payment"))
 
-    def test_one_time_stripe_logged_out_payment_new_stub(self):
+    def test_one_time_stripe_logged_out_payment_new_stub(self) -> None:
         self.set_stripe_params()
         self.client.logout()
         self.set_new_stub_params()
@@ -391,7 +395,7 @@ class DonationIntegrationTest(TestCase):
     # makes it nearly impossible to test as we do Stripe. Below we should have
     # a test for email and redirection of paypal payments, but it just wasn't
     # possible without undue effort. This is why we like Stripe.
-    def test_email_and_redirection_regular_donation_stripe(self):
+    def test_email_and_redirection_regular_donation_stripe(self) -> None:
         self.set_stripe_params()
         self.client.logout()
         self.do_post_and_assert(
@@ -400,7 +404,7 @@ class DonationIntegrationTest(TestCase):
         self.do_stripe_callback()
         self.assertEmailSubject(emails["donation_thanks"]["subject"])
 
-    def test_email_and_redirection_monthly_donation(self):
+    def test_email_and_redirection_monthly_donation(self) -> None:
         self.client.logout()
         self.set_stripe_params()
         self.set_monthly_params()
@@ -411,7 +415,7 @@ class DonationIntegrationTest(TestCase):
         self.do_stripe_callback()
         self.assertEmailSubject(emails["donation_thanks_recurring"]["subject"])
 
-    def test_email_and_redirection_one_time_payment(self):
+    def test_email_and_redirection_one_time_payment(self) -> None:
         self.client.logout()
         self.set_stripe_params()
         self.do_post_and_assert(

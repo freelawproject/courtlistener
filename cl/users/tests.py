@@ -17,7 +17,7 @@ from cl.users.models import UserProfile
 class UserTest(LiveServerTestCase):
     fixtures = ["authtest_data.json"]
 
-    def test_simple_auth_urls_GET(self):
+    def test_simple_auth_urls_GET(self) -> None:
         """Can we at least GET all the basic auth URLs?"""
         reverse_names = [
             "sign-in",
@@ -37,7 +37,7 @@ class UserTest(LiveServerTestCase):
                 "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
-    def test_creating_a_new_user(self):
+    def test_creating_a_new_user(self) -> None:
         """Can we register a new user in the front end?"""
         params = {
             "username": "pan",
@@ -62,7 +62,7 @@ class UserTest(LiveServerTestCase):
             f"?next=/&email=pan%40courtlistener.com",
         )
 
-    def test_redirects(self):
+    def test_redirects(self) -> None:
         """Do we allow good redirects while banning bad ones?"""
         next_params = [
             # No open redirects (to a domain outside CL)
@@ -108,7 +108,7 @@ class UserTest(LiveServerTestCase):
                     "was sanitized when it should not have been." % next_param,
                 )
 
-    def test_signing_in(self):
+    def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
         params = {
             "username": "pandora",
@@ -117,7 +117,7 @@ class UserTest(LiveServerTestCase):
         r = self.client.post(reverse("sign-in"), params, follow=True)
         self.assertRedirects(r, "/")
 
-    def test_confirming_an_email_address(self):
+    def test_confirming_an_email_address(self) -> None:
         """Tests whether we can confirm the case where an email is associated
         with a single account.
         """
@@ -207,10 +207,10 @@ class DisposableEmailTest(TestCase):
     user = "Aamon"
     bad_email = "%s@%s" % (user, bad_domain)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
 
-    def test_can_i_create_account_with_bad_email_address(self):
+    def test_can_i_create_account_with_bad_email_address(self) -> None:
         """Is an error thrown if we try to use a banned email address?"""
         r = self.client.post(
             reverse("register"),
@@ -229,7 +229,7 @@ class DisposableEmailTest(TestCase):
             r.content.decode(),
         )
 
-    def test_can_i_change_to_bad_email_address(self):
+    def test_can_i_change_to_bad_email_address(self) -> None:
         """Is an error thrown if we try to change to a bad email address?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -249,7 +249,7 @@ class LiveUserTest(BaseSeleniumTest):
     fixtures = ["authtest_data.json"]
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_reset_password_using_the_HTML(self):
+    def test_reset_password_using_the_HTML(self) -> None:
         """Can we use the HTML form to send a reset email?
 
         This test checks that the email goes out and that the status code
@@ -275,7 +275,7 @@ class LiveUserTest(BaseSeleniumTest):
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_set_password_using_the_HTML(self):
+    def test_set_password_using_the_HTML(self) -> None:
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL
         up = UserProfile.objects.get(pk=1001)

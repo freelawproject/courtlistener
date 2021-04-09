@@ -7,7 +7,7 @@ from cl.stats.utils import get_milestone_range, tally_stat
 
 
 class MilestoneTests(TestCase):
-    def test_milestone_ranges(self):
+    def test_milestone_ranges(self) -> None:
         numbers = get_milestone_range("XS", "SM")
         self.assertEqual(numbers[0], 1e1)
         self.assertEqual(numbers[-1], 5e4)
@@ -15,23 +15,23 @@ class MilestoneTests(TestCase):
 
 @pytest.mark.django_db
 class StatTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         Stat.objects.all().delete()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Stat.objects.all().delete()
 
-    def test_tally_a_stat(self):
+    def test_tally_a_stat(self) -> None:
         count = tally_stat("test")
         self.assertEqual(count, 1)
 
-    def test_increment_a_stat(self):
+    def test_increment_a_stat(self) -> None:
         count = tally_stat("test2")
         self.assertEqual(count, 1)
         count = tally_stat("test2")
         self.assertEqual(count, 2)
 
-    def test_increment_by_two(self):
+    def test_increment_by_two(self) -> None:
         count = tally_stat("test3", inc=2)
         self.assertEqual(count, 2)
         count = tally_stat("test3", inc=2)

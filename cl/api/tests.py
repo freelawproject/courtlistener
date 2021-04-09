@@ -1,6 +1,7 @@
 import json
 import shutil
 from datetime import date, timedelta
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
@@ -48,56 +49,58 @@ class BasicAPIPageTest(TestCase):
         "test_objects_search.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.client = Client()
 
-    def test_api_root(self):
+    def test_api_root(self) -> None:
         r = self.client.get(
             reverse("api-root", kwargs={"version": "v3"}),
             HTTP_ACCEPT="text/html",
         )
         self.assertEqual(r.status_code, 200)
 
-    def test_api_index(self):
+    def test_api_index(self) -> None:
         r = self.client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_swagger_interface(self):
+    def test_swagger_interface(self) -> None:
         r = self.client.get(reverse("swagger_schema"))
         self.assertEqual(r.status_code, 200)
 
-    def test_options_request(self):
+    def test_options_request(self) -> None:
         r = self.client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_court_index(self):
+    def test_court_index(self) -> None:
         r = self.client.get(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_rest_docs(self):
+    def test_rest_docs(self) -> None:
         r = self.client.get(reverse("rest_docs"))
         self.assertEqual(r.status_code, 200)
 
-    def test_bulk_data_index(self):
+    def test_bulk_data_index(self) -> None:
         r = self.client.get(reverse("bulk_data_index"))
         self.assertEqual(r.status_code, 200)
 
-    def test_coverage_api(self):
+    def test_coverage_api(self) -> None:
         r = self.client.get(
             reverse("coverage_data", kwargs={"version": 2, "court": "ca1"})
         )
         self.assertEqual(r.status_code, 200)
 
-    def test_coverage_api_via_url(self):
+    def test_coverage_api_via_url(self) -> None:
         r = self.client.get("/api/rest/v2/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
-    def test_api_info_page_displays_latest_rest_docs_by_default(self):
+    def test_api_info_page_displays_latest_rest_docs_by_default(self) -> None:
         response = self.client.get(reverse("rest_docs"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "rest-docs-vlatest.html")
 
-    def test_api_info_page_can_display_different_versions_of_rest_docs(self):
+    def test_api_info_page_can_display_different_versions_of_rest_docs(
+        self,
+    ) -> None:
         for version in ["v1", "v2"]:
             response = self.client.get(
                 reverse("rest_docs", kwargs={"version": version})
@@ -109,14 +112,14 @@ class BasicAPIPageTest(TestCase):
 
 
 class CoverageTests(IndexedSolrTestCase):
-    def test_coverage_data_view_provides_court_data(self):
+    def test_coverage_data_view_provides_court_data(self) -> None:
         response = coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
         self.assertContains(response, "total")
 
-    def test_coverage_data_all_courts(self):
+    def test_coverage_data_all_courts(self) -> None:
         r = self.client.get(
             reverse("coverage_data", kwargs={"version": "3", "court": "all"})
         )
@@ -124,7 +127,7 @@ class CoverageTests(IndexedSolrTestCase):
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
         self.assertIn("total", j)
 
-    def test_coverage_data_specific_court(self):
+    def test_coverage_data_specific_court(self) -> None:
         r = self.client.get(
             reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
         )
@@ -152,7 +155,7 @@ class ApiQueryCountTests(TransactionTestCase):
         "recap_processing_queue_query_counts.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Add the permissions to the user.
         u = User.objects.get(pk=6)
         ps = Permission.objects.filter(codename="has_recap_api_access")
@@ -162,15 +165,15 @@ class ApiQueryCountTests(TransactionTestCase):
             self.client.login(username="recap-user", password="password")
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         cache.clear()
 
-    def test_audio_api_query_counts(self):
+    def test_audio_api_query_counts(self) -> None:
         with self.assertNumQueries(4):
             path = reverse("audio-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_search_api_query_counts(self):
+    def test_search_api_query_counts(self) -> None:
         with self.assertNumQueries(7):
             path = reverse("docket-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -191,7 +194,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("opinion-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_party_api_query_counts(self):
+    def test_party_api_query_counts(self) -> None:
         with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -200,7 +203,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_recap_api_query_counts(self):
+    def test_recap_api_query_counts(self) -> None:
         with self.assertNumQueries(3):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -209,7 +212,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
-    def test_recap_api_required_filter(self):
+    def test_recap_api_required_filter(self) -> None:
         path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
         r = self.client.get(path, {"pacer_doc_id": "17711118263"})
         self.assertEqual(HTTP_200_OK, r.status_code)
@@ -228,14 +231,14 @@ class ApiEventCreationTestCase(TestCase):
         r = make_redis_interface("STATS")
         r.flushdb()
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Add the permissions to the user.
         self.user = User.objects.get(pk=6)
         ps = Permission.objects.filter(codename="has_recap_api_access")
         self.user.user_permissions.add(*ps)
         self.flush_stats()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         Event.objects.all().delete()
         self.flush_stats()
 
@@ -256,7 +259,7 @@ class ApiEventCreationTestCase(TestCase):
 
         view(request)
 
-    def test_is_the_welcome_email_sent(self):
+    def test_is_the_welcome_email_sent(self) -> None:
         """Do we send welcome emails for new API users?"""
         # Create correct number of API requests
         for _ in range(0, SEND_API_WELCOME_EMAIL_COUNT):
@@ -266,7 +269,7 @@ class ApiEventCreationTestCase(TestCase):
         expected_email_count = 1
         self.assertEqual(expected_email_count, len(mail.outbox))
 
-    def test_are_events_created_properly(self):
+    def test_are_events_created_properly(self) -> None:
         """Are event objects created as API requests are made?"""
         self.hit_the_api()
 
@@ -333,13 +336,13 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
 
     fixtures = ["judge_judy.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.assertTrue(
             self.client.login(username="pandora", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
-    def test_judge_filtering_by_first_name(self):
+    def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
 
@@ -351,7 +354,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"name_first__istartswith": "XXX"}
         self.assertCountInResults(0)
 
-    def test_judge_filtering_by_date(self):
+    def test_judge_filtering_by_date(self) -> None:
         """Do the various date filters work properly?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
 
@@ -369,7 +372,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"date_dob__lt": before.isoformat()}
         self.assertCountInResults(0)
 
-    def test_nested_judge_filtering(self):
+    def test_nested_judge_filtering(self) -> None:
         """Can we filter across various relations?
 
         Each of these assertions adds another parameter making our final test
@@ -429,7 +432,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["aba_ratings__rating"] = "nq"
         self.assertCountInResults(2)
 
-    def test_education_filtering(self):
+    def test_education_filtering(self) -> None:
         """Can we filter education objects?"""
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
@@ -445,7 +448,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["school__name__istartswith"] = "New York"
         self.assertCountInResults(1)
 
-    def test_title_filtering(self):
+    def test_title_filtering(self) -> None:
         """Can Judge Titles be filtered?"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
@@ -455,14 +458,14 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["position_type"] = "c-jud"
         self.assertCountInResults(1)
 
-    def test_reverse_filtering(self):
+    def test_reverse_filtering(self) -> None:
         """Can we filter Source objects by judge name?"""
         # I want any source notes about judge judy.
         self.path = reverse("source-list", kwargs={"version": "v3"})
         self.q = {"person": 2}
         self.assertCountInResults(1)
 
-    def test_position_filters(self):
+    def test_position_filters(self) -> None:
         """Can we filter on positions"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
@@ -480,7 +483,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["appointer"] = 3
         self.assertCountInResults(0)
 
-    def test_racial_filters(self):
+    def test_racial_filters(self) -> None:
         """Can we filter by race?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
         self.q = {"race": "w"}
@@ -491,7 +494,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["race"] = ["w", "b"]
         self.assertCountInResults(3)
 
-    def test_circular_relationships(self):
+    def test_circular_relationships(self) -> None:
         """Do filters configured using strings instead of classes work?"""
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
@@ -507,7 +510,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["person__name_first"] = "Judith"  # Yep.
         self.assertCountInResults(2)
 
-    def test_exclusion_filters(self):
+    def test_exclusion_filters(self) -> None:
         """Can we exclude using !'s?"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
@@ -525,7 +528,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         "user_with_recap_api_access.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Add the permissions to the user.
         u = User.objects.get(pk=6)
         ps = Permission.objects.filter(codename="has_recap_api_access")
@@ -534,9 +537,9 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
-    def test_docket_entry_to_docket_filters(self):
+    def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
@@ -548,7 +551,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"docket__id!": 100000000}
         self.assertCountInResults(1)
 
-    def test_docket_tag_filters(self):
+    def test_docket_tag_filters(self) -> None:
         """Can we filter dockets by tags?"""
         self.path = reverse("docket-list", kwargs={"version": "v3"})
 
@@ -557,7 +560,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"docket_entries__recap_documents__tags": 2}
         self.assertCountInResults(0)
 
-    def test_docket_entry_docket_court_filters(self):
+    def test_docket_entry_docket_court_filters(self) -> None:
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
         # Across docket to court...
@@ -566,7 +569,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q["docket__court__id"] = "foo"
         self.assertCountInResults(0)
 
-    def test_nested_recap_document_filters(self):
+    def test_nested_recap_document_filters(self) -> None:
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
@@ -587,7 +590,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"recap_documents__docket_entry__docket__id": 2}
         self.assertCountInResults(0)
 
-    def test_recap_document_filters(self):
+    def test_recap_document_filters(self) -> None:
         self.path = reverse("recapdocument-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
@@ -614,7 +617,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"tags__name": "test2"}
         self.assertCountInResults(0)
 
-    def test_attorney_filters(self):
+    def test_attorney_filters(self) -> None:
         self.path = reverse("attorney-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
@@ -636,7 +639,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"parties_represented__name__contains": "Honker-Nope"}
         self.assertCountInResults(0)
 
-    def test_party_filters(self):
+    def test_party_filters(self) -> None:
         self.path = reverse("party-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
@@ -676,13 +679,13 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         "user_with_recap_api_access.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
-        self.q = dict()
+        self.q: Dict[Any, Any] = dict()
 
-    def test_cluster_filters(self):
+    def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""
         self.path = reverse("opinioncluster-list", kwargs={"version": "v3"})
 
@@ -709,7 +712,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.q["scdb_votes_majority__gt"] = 1
         self.assertCountInResults(1)
 
-    def test_opinion_filter(self):
+    def test_opinion_filter(self) -> None:
         """Do a variety of opinion filters work?"""
         self.path = reverse("opinion-list", kwargs={"version": "v3"})
 
@@ -748,7 +751,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         types.append(Opinion.LEAD)
         self.assertCountInResults(6)
 
-    def test_docket_filters(self):
+    def test_docket_filters(self) -> None:
         """Do a variety of docket filters work?"""
         self.path = reverse("docket-list", kwargs={"version": "v3"})
 
@@ -776,7 +779,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         ] = "de8cff186eb263dc06bdc5340860eb6809f898d3"
         self.assertCountInResults(1)
 
-    def test_audio_filters(self):
+    def test_audio_filters(self) -> None:
         self.path = reverse("audio-list", kwargs={"version": "v3"})
 
         # Simple filter
@@ -797,7 +800,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         sources.append("CR")
         self.assertCountInResults(3)
 
-    def test_opinion_cited_filters(self):
+    def test_opinion_cited_filters(self) -> None:
         """Do the filters on the opinions_cited work?"""
         self.path = reverse("opinionscited-list", kwargs={"version": "v3"})
 
@@ -851,7 +854,7 @@ class DRFFieldSelectionTest(TestCase):
 class DRFRecapPermissionTest(TestCase):
     fixtures = ["user_with_recap_api_access.json", "authtest_data.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Add the permissions to the user.
         u = User.objects.get(pk=6)
         ps = Permission.objects.filter(codename="has_recap_api_access")
@@ -867,7 +870,7 @@ class DRFRecapPermissionTest(TestCase):
             ]
         ]
 
-    def test_has_access(self):
+    def test_has_access(self) -> None:
         """Does the RECAP user have access to all of the RECAP endpoints?"""
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
@@ -878,7 +881,7 @@ class DRFRecapPermissionTest(TestCase):
             self.assertEqual(r.status_code, HTTP_200_OK)
             print("✓")
 
-    def test_lacks_access(self):
+    def test_lacks_access(self) -> None:
         """Does a normal user lack access to the RECPAP endpoints?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -891,21 +894,21 @@ class DRFRecapPermissionTest(TestCase):
 
 
 class BulkJsonHistoryTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.history = BulkJsonHistory("test", settings.BULK_DATA_DIR)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.history.delete_from_disk()
 
-    def test_load_the_file(self):
+    def test_load_the_file(self) -> None:
         data = self.history.load_json_file()
         self.assertEqual({}, data)
 
-    def test_load_date_when_none(self):
+    def test_load_date_when_none(self) -> None:
         d = self.history.get_last_good_date()
         self.assertIsNone(d)
 
-    def test_set_date_then_load_it(self):
+    def test_set_date_then_load_it(self) -> None:
         self.history.add_current_attempt_and_save()
         self.history.mark_success_and_save()
         d = self.history.get_last_good_date()
@@ -916,7 +919,7 @@ class BulkJsonHistoryTest(TestCase):
             delta=timedelta(seconds=10),
         )
 
-    def test_add_current_attempt(self):
+    def test_add_current_attempt(self) -> None:
         self.history.add_current_attempt_and_save()
         d = self.history.get_last_attempt()
         self.assertAlmostEqual(d, now(), delta=timedelta(seconds=10))
@@ -925,7 +928,7 @@ class BulkJsonHistoryTest(TestCase):
 class BulkDataTest(TestCase):
     tmp_data_dir = "/tmp/bulk-dir/"
 
-    def setUp(self):
+    def setUp(self) -> None:
         docket = Docket(
             case_name="foo",
             court=Court.objects.get(pk="test"),
@@ -952,7 +955,7 @@ class BulkDataTest(TestCase):
         site = test_oral_arg_scraper.Site().parse()
         OralArgumentCommand().scrape_court(site, full_crawl=True)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
         Audio.objects.all().delete()
@@ -962,11 +965,13 @@ class BulkDataTest(TestCase):
             pass
 
     @override_settings(BULK_DATA_DIR=tmp_data_dir)
-    def test_make_all_bulk_files(self):
+    def test_make_all_bulk_files(self) -> None:
         """Can we successfully generate all bulk files?"""
         call_command("cl_make_bulk_data")
 
-    def test_database_has_objects_for_bulk_export(self):
+    def test_database_has_objects_for_bulk_export(self) -> None:
+        # This is a very weird test. It's essentially just testing the
+        # setUp function, which...OK?
         self.assertTrue(Opinion.objects.count() > 0, "Opinions exist")
         self.assertTrue(OpinionsCited.objects.count() > 0, "Citations exist")
         self.assertTrue(Audio.objects.count() > 0, "Audio exist")

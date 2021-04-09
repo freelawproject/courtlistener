@@ -44,7 +44,7 @@ class ScraperIngestionTest(TestCase):
             "Should have 6 test opinions, not %s" % count,
         )
 
-    def test_ingest_oral_arguments(self):
+    def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
@@ -57,61 +57,61 @@ class ScraperIngestionTest(TestCase):
         audio_files = Audio.objects.all()
         self.assertEqual(2, audio_files.count())
 
-    def test_parsing_xml_opinion_site_to_site_object(self):
+    def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
         site = test_opinion_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
-    def test_parsing_xml_oral_arg_site_to_site_object(self):
+    def test_parsing_xml_oral_arg_site_to_site_object(self) -> None:
         """Does a basic parse of an oral arg site work?"""
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
 
 class IngestionTest(IndexedSolrTestCase):
-    def test_doc_content_extraction(self):
+    def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
         image_opinion = Opinion.objects.get(pk=1)
         extract_doc_content(image_opinion.pk, ocr_available=False)
         image_opinion.refresh_from_db()
         self.assertIn("indiana", image_opinion.plain_text.lower())
 
-    def test_image_based_pdf(self):
+    def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
         image_opinion = Opinion.objects.get(pk=2)
         extract_doc_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
-    def test_text_based_pdf(self):
+    def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
         txt_opinion = Opinion.objects.get(pk=3)
         extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("tarrant", txt_opinion.plain_text.lower())
 
-    def test_html_content_extraction(self):
+    def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
         html_opinion = Opinion.objects.get(pk=4)
         extract_doc_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
-    def test_wpd_content_extraction(self):
+    def test_wpd_content_extraction(self) -> None:
         """Can we ingest a wpd file?"""
         wpd_opinion = Opinion.objects.get(pk=5)
         extract_doc_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
-    def test_txt_content_extraction(self):
+    def test_txt_content_extraction(self) -> None:
         """Can we ingest a txt file?"""
         txt_opinion = Opinion.objects.get(pk=6)
         extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
 
-    def test_txt_extraction_with_bad_data(self):
+    def test_txt_extraction_with_bad_data(self) -> None:
         """Can we extract text from nasty files lacking encodings?"""
 
         path = os.path.join(
@@ -134,7 +134,7 @@ class IngestionTest(IndexedSolrTestCase):
 class ExtractionTest(TestCase):
     fixtures = ["tax_court_test.json"]
 
-    def test_juriscraper_object_creation(self):
+    def test_juriscraper_object_creation(self) -> None:
         """Can we extract text from tax court pdf and add to db?"""
 
         o = Opinion.objects.get(pk=76)
@@ -149,7 +149,7 @@ class ExtractionTest(TestCase):
             msg="Expected citation was not created in db",
         )
 
-    def test_juriscraper_docket_number_extraction(self):
+    def test_juriscraper_docket_number_extraction(self) -> None:
         """Can we extract docket number from tax court pdf and add to db?"""
 
         o = Opinion.objects.get(pk=76)
@@ -166,27 +166,27 @@ class ExtractionTest(TestCase):
 
 
 class ExtensionIdentificationTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 
-    def test_wpd_extension(self):
+    def test_wpd_extension(self) -> None:
         with open(os.path.join(self.path, "opinion_wpd.wpd"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".wpd")
 
-    def test_pdf_extension(self):
+    def test_pdf_extension(self) -> None:
         with open(
             os.path.join(self.path, "opinion_pdf_text_based.pdf"), "rb"
         ) as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".pdf")
 
-    def test_doc_extension(self):
+    def test_doc_extension(self) -> None:
         with open(os.path.join(self.path, "opinion_doc.doc"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".doc")
 
-    def test_html_extension(self):
+    def test_html_extension(self) -> None:
         with open(os.path.join(self.path, "opinion_html.html"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".html")
@@ -203,7 +203,7 @@ class ReportScrapeStatusTest(TestCase):
         "test_objects_search.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         super(ReportScrapeStatusTest, self).setUp()
         self.court = Court.objects.get(pk="test")
         # Make some errors that we can tally
@@ -214,7 +214,7 @@ class ReportScrapeStatusTest(TestCase):
             log_level="CRITICAL", court=self.court, message="test_msg"
         ).save()
 
-    def test_tallying_errors(self):
+    def test_tallying_errors(self) -> None:
         errors = cl_report_scrape_status.tally_errors()
         self.assertEqual(
             errors["test"],
@@ -237,14 +237,14 @@ class ReportScrapeStatusTest(TestCase):
 class DupcheckerTest(TestCase):
     fixtures = ["test_court.json"]
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.court = Court.objects.get(pk="test")
         self.dup_checkers = [
             DupChecker(self.court, full_crawl=True),
             DupChecker(self.court, full_crawl=False),
         ]
 
-    def test_abort_when_new_court_website(self):
+    def test_abort_when_new_court_website(self) -> None:
         """Tests what happens when a new website is discovered."""
         site = test_opinion_scraper.Site()
         site.hash = "this is a dummy hash code string"
@@ -266,7 +266,7 @@ class DupcheckerTest(TestCase):
             # part of cleanup.
             dup_checker.url_hash.delete()
 
-    def test_abort_on_unchanged_court_website(self):
+    def test_abort_on_unchanged_court_website(self) -> None:
         """Similar to the above, but we create a UrlHash object before
         checking if it exists."""
         site = test_opinion_scraper.Site()
@@ -287,7 +287,7 @@ class DupcheckerTest(TestCase):
 
             dup_checker.url_hash.delete()
 
-    def test_abort_on_changed_court_website(self):
+    def test_abort_on_changed_court_website(self) -> None:
         """Similar to the above, but we create a UrlHash with a different
         hash before checking if it exists.
         """
@@ -311,7 +311,7 @@ class DupcheckerTest(TestCase):
 
             dup_checker.url_hash.delete()
 
-    def test_press_on_with_an_empty_database(self):
+    def test_press_on_with_an_empty_database(self) -> None:
         site = test_opinion_scraper.Site()
         site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
@@ -344,7 +344,7 @@ class DupcheckerWithFixturesTest(TestCase):
         "test_objects_search.json",
     ]
 
-    def setUp(self):
+    def setUp(self) -> None:
         super(DupcheckerWithFixturesTest, self).setUp()
         self.court = Court.objects.get(pk="test")
 
@@ -357,7 +357,7 @@ class DupcheckerWithFixturesTest(TestCase):
         # Set up the hash value using one in the fixture.
         self.content_hash = "asdfasdfasdfasdfasdfasddf"
 
-    def test_press_on_with_a_dup_found(self):
+    def test_press_on_with_a_dup_found(self) -> None:
         for dup_checker in self.dup_checkers:
             onwards = dup_checker.press_on(
                 Opinion,
@@ -394,7 +394,7 @@ class DupcheckerWithFixturesTest(TestCase):
                     "We should have hit a break but didn't.",
                 )
 
-    def test_press_on_with_dup_found_and_older_date(self):
+    def test_press_on_with_dup_found_and_older_date(self) -> None:
         for dup_checker in self.dup_checkers:
             # Note that the next case occurs prior to the current one
             onwards = dup_checker.press_on(
@@ -440,12 +440,12 @@ class AudioFileTaskTest(TestCase):
         "test_objects_audio.json",
     ]
 
-    def test_process_audio_file(self):
+    def test_process_audio_file(self) -> None:
         af = Audio.objects.get(pk=1)
         af.duration = None
         af.save()
 
-        expected_duration = 15
+        expected_duration = 15.0
         self.assertNotEqual(
             af.duration,
             expected_duration,
@@ -454,7 +454,7 @@ class AudioFileTaskTest(TestCase):
 
         process_audio_file(pk=1)
         af.refresh_from_db()
-        measured_duration = af.duration
+        measured_duration: float = af.duration  # type: ignore
         # Use almost equal because measuring MP3's is wonky.
         self.assertAlmostEqual(
             measured_duration,
@@ -464,7 +464,7 @@ class AudioFileTaskTest(TestCase):
             "Instead we got %s." % (expected_duration, measured_duration),
         )
 
-    def test_BTE_audio_conversion(self):
+    def test_BTE_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
         audio_obj = Audio.objects.get(pk=1)
         bte_respone_obj = convert_and_clean_audio(audio_obj)
