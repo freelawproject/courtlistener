@@ -6,6 +6,7 @@ from django.utils.timezone import now
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.crypto import sha1_activation_key
+from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
 
@@ -119,10 +120,10 @@ class Command(VerboseCommand):
 
                 # Send the email.
                 current_site = Site.objects.get_current()
-                email = emails["email_not_confirmed"]
+                email: EmailType = emails["email_not_confirmed"]
                 send_mail(
                     email["subject"] % current_site.name,
                     email["body"] % (up.user.username, up.activation_key),
-                    email["from"],
+                    email["from_email"],
                     [up.user.email],
                 )

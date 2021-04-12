@@ -20,6 +20,7 @@ from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.types import EmailType
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -61,40 +62,44 @@ def update_entry_types(court_pk, description):
     court = Court.objects.get(pk=court_pk)
     if court.pacer_rss_entry_types != new_entry_types:
         # PACER CHANGED AN RSS FEED.
-        email = emails["changed_rss_feed"]
+        email: EmailType = emails["changed_rss_feed"]
         send_mail(
             email["subject"] % court,
             email["body"]
             % (court, court.pacer_rss_entry_types, new_entry_types),
-            email["from"],
+            email["from_email"],
             email["to"],
         )
         court.pacer_rss_entry_types = new_entry_types
         court.save()
 
 
-def get_last_build_date(s):
+def get_last_build_date(b: bytes) -> Optional[datetime]:
     """Get the last build date for an RSS feed
 
     In this case we considered using lxml & xpath, which was 1000× faster than
     feedparser, but it turns out that using regex is *another* 1000× faster, so
     we use that. See: https://github.com/freelawproject/juriscraper/issues/195#issuecomment-385848344
 
-    :param s: The content of the RSS feed as a string
-    :type s: bytes! This is a performance enhancement, but perhaps a premature
+    :param b: The content of the RSS feed as a string
+    :type b: bytes! This is a performance enhancement, but perhaps a premature
     one. Depending on how this function returns we might not need to decode
     the byte-string to text, so we just regex it as is.
     """
     # Most courts use lastBuildDate, but leave it up to ilnb to have pubDate.
     date_re = rb"<(?P<tag>lastBuildDate|pubDate)>(.*?)</(?P=tag)>"
-    m = re.search(date_re, s)
+    m = re.search(date_re, b)
     if m is None:
         return None
     last_build_date_b = m.group(2)
     return parser.parse(last_build_date_b, fuzzy=False)
 
 
-def alert_on_staleness(current_build_date, court_id, url):
+def alert_on_staleness(
+    current_build_date: datetime,
+    court_id: str,
+    url: str,
+) -> None:
     """Send an alert email if a feed goes stale on a weekday, according to its
     timezone. Slow down after the first day.
 
@@ -125,12 +130,12 @@ def alert_on_staleness(current_build_date, court_id, url):
         return
 
     # All limits have passed; send an alert
-    email = emails["stale_feed"]
+    email: EmailType = emails["stale_feed"]
     send_mail(
         email["subject"] % court_id,
         email["body"]
         % (court_id, round(staleness.total_seconds() / 60, 2), url),
-        email["from"],
+        email["from_addr"],
         email["to"],
     )
 

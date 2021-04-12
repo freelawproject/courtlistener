@@ -29,6 +29,7 @@ from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.types import EmailType
 from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
@@ -275,11 +276,11 @@ class LoggingMixin(object):
                     user=user,
                 )
             if user_count == SEND_API_WELCOME_EMAIL_COUNT:
-                email = emails["new_api_user"]
+                email: EmailType = emails["new_api_user"]
                 send_mail(
                     email["subject"],
                     email["body"] % user.first_name or "there",
-                    email["from"],
+                    email["from_email"],
                     [user.email],
                 )
 
@@ -661,7 +662,7 @@ def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
     return statuses
 
 
-emails: Dict[str, Dict[str, str]] = {
+emails: Dict[str, EmailType] = {
     "new_api_user": {
         "subject": "Welcome to the CourtListener API from Free Law Project",
         "body": (
@@ -684,6 +685,6 @@ emails: Dict[str, Dict[str, str]] = {
             "Founder, Free Law Project\n"
             "https://www.courtlistener.com/donate/\n"
         ),
-        "from": "Mike Lissner <mlissner@courtlistener.com>",
+        "from_email": "Mike Lissner <mlissner@courtlistener.com>",
     },
 }

@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from cl.lib.crypto import md5
+from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 
 
@@ -126,7 +127,7 @@ def convert_to_stub_account(user: User) -> User:
     return user
 
 
-emails = {
+emails: Dict[str, EmailType] = {
     "account_deleted": {
         "subject": "User deleted their account on CourtListener!",
         "body": "Sad day indeed. Somebody deleted their account completely, "
@@ -134,7 +135,7 @@ emails = {
         "account was: \n\n"
         " - %s\n\n"
         "Can't keep 'em all, I suppose.\n\n",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
     "take_out_requested": {
@@ -145,7 +146,7 @@ emails = {
         " - %s\n"
         " - %s\n\n"
         "Good luck getting this taken care of.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
     "email_changed_successfully": {
@@ -160,7 +161,7 @@ emails = {
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "notify_old_address": {
         "subject": "This email address is no longer in use on CourtListener",
@@ -176,7 +177,7 @@ emails = {
         "    security@free.law\n\n"
         "Thanks for using our site,\n\n"
         "The Free Law Project Team\n\n",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "confirm_your_new_account": {
         "subject": "Confirm your account on CourtListener.com",
@@ -196,7 +197,7 @@ emails = {
         "-------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "confirm_existing_account": {
         "subject": "Confirm your account on CourtListener.com",
@@ -213,7 +214,7 @@ emails = {
         "For questions or comments, please visit our contact page, "
         "https://www.courtlistener.com/contact/\n"
         "We're always happy to hear from you.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     # Used both when people want to confirm an email address and when they
     # want to reset their password, with one small tweak in the wording.
@@ -245,7 +246,7 @@ emails = {
         "For questions or comments, please visit our contact page, "
         "https://www.courtlistener.com/contact/\n"
         "We're always happy to hear from you.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "email_not_confirmed": {
         "subject": "Please confirm your account on %s",
@@ -263,7 +264,7 @@ emails = {
         "------------------\n"
         "For questions or comments, please see our contact page, "
         "https://www.courtlistener.com/contact/.",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "new_account_created": {
         "subject": "New user confirmed on CourtListener: %s",
@@ -273,7 +274,7 @@ emails = {
         "  Their email address is: %s\n\n"
         "Sincerely,\n\n"
         "The CourtListener Bots",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
 }

@@ -12,6 +12,7 @@ from cl.donate.utils import (
     send_failed_subscription_email,
 )
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.types import EmailType
 
 
 class Command(VerboseCommand):
@@ -80,7 +81,7 @@ class Command(VerboseCommand):
                 # is triggered.
 
         if results["users"]:
-            email = emails["admin_donation_report"]
+            email: EmailType = emails["admin_donation_report"]
             body = email["body"] % (
                 results["amount"],
                 "\n".join(results["users"]),
@@ -88,6 +89,6 @@ class Command(VerboseCommand):
             send_mail(
                 email["subject"] % results["amount"],
                 body,
-                email["from"],
+                email["from_email"],
                 email["to"],
             )

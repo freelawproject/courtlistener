@@ -1,8 +1,10 @@
 import time
+from typing import Dict
 
 from django.conf import settings
 from django.contrib import messages
 
+from cl.lib.types import EmailType
 from cl.stats.utils import tally_stat
 from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.models import JSONVersion
@@ -48,7 +50,7 @@ def build_visualization(viz):
     return "success", viz
 
 
-emails = {
+emails: Dict[str, EmailType] = {
     "referer_detected": {
         "subject": "Somebody seems to have embedded a viz somewhere.",
         "body": "Hey admins,\n\n"
@@ -63,7 +65,7 @@ emails = {
         "If nobody approves it, it'll never show up on the site.\n\n"
         "Godspeed, fair admin.\n"
         "The CourtListener bots",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     }
 }
