@@ -54,28 +54,34 @@ jobs:
       # Add modules here as they're ready (remove them from the file-by-file
       # checker below as you do so).
       - name: mypy Static Type Cheker (packages)
-        run: >
-          mypy
-          --follow-imports=skip
-          --exclude 'migrations/*'
-          -p cl.alerts
-          -p cl.audio
-          -p cl.opinion_page
-          -p cl.simple_pages
+        run: |
+          mypy \
+          --follow-imports=skip \
+          --exclude 'migrations/*' \
+          -p cl.alerts \
+          -p cl.audio \
+          -p cl.opinion_page \
+          -p cl.simple_pages \
+          -p cl.recap_rss
 
       # Add files here as they're ready
       - name: mypy Static Type Cheker (files)
-        run: >
-          mypy
-          --follow-imports=skip
-          --exclude 'migrations/*'
-          cl/api/api_permissions.py
-          cl/api/models.py
-          cl/api/routers.py
-          cl/api/tests.py
-          cl/api/views.py
-          cl/lib/storage.py
-          cl/opinion_page/views.py
+        run: |
+          mypy \
+          --follow-imports=skip \
+          --exclude 'migrations/*' \
+          cl/api/api_permissions.py \
+          cl/api/models.py \
+          cl/api/routers.py \
+          cl/api/tests.py \
+          cl/api/views.py \
+          cl/donate/management/commands/charge_monthly_donors.py \
+          cl/donate/utils.py \
+          cl/lib/storage.py \
+          cl/lib/types.py \
+          cl/opinion_page/views.py \
+          cl/users/management/commands/cl_account_management.py \
+          cl/users/forms.py
 
       - name: Black Code Formatter
         uses: psf/black@stable
