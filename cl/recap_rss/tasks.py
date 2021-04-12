@@ -4,7 +4,8 @@ import json
 import logging
 import re
 from calendar import SATURDAY, SUNDAY
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Optional
 
 import requests
 from dateutil import parser
@@ -95,31 +96,43 @@ def get_last_build_date(s):
 
 def alert_on_staleness(current_build_date, court_id, url):
     """Send an alert email if a feed goes stale on a weekday, according to its
-    timezone.
+    timezone. Slow down after the first day.
 
     :param current_build_date: When the feed was updated
     :param court_id: The CL ID of the court
     :param url: The URL for the feed
     """
     _now = now()
+    staleness = _now - current_build_date
+
+    # If a feed is not stale, do not send an alert.
+    staleness_limit = timedelta(minutes=2 * 60)
+    if staleness < staleness_limit:
+        return
+
+    # Maintenance is frequently done on weekends, causing staleness. Don't
+    # send alerts on weekends.
     court_tz = timezone(COURT_TIMEZONES.get(court_id, "US/Pacific"))
     court_now = _now.astimezone(court_tz)
     if court_now.weekday() in [SATURDAY, SUNDAY]:
-        # Maintenance is frequently done on weekends, causing staleness. Don't
-        # send alerts on weekends.
         return
 
-    staleness_limit = timedelta(minutes=2 * 60)
-    staleness = _now - current_build_date
-    if staleness > staleness_limit:
-        email = emails["stale_feed"]
-        send_mail(
-            email["subject"] % court_id,
-            email["body"]
-            % (court_id, round(staleness.total_seconds() / 60, 2), url),
-            email["from"],
-            email["to"],
-        )
+    # If it's really stale, don't send alerts except during hours evenly
+    # divisible by six to slow down alerts.
+    on_a_sixth = _now.hour % 6 == 0
+    really_stale = timedelta(minutes=60 * 60 * 24)
+    if staleness > really_stale and not on_a_sixth:
+        return
+
+    # All limits have passed; send an alert
+    email = emails["stale_feed"]
+    send_mail(
+        email["subject"] % court_id,
+        email["body"]
+        % (court_id, round(staleness.total_seconds() / 60, 2), url),
+        email["from"],
+        email["to"],
+    )
 
 
 def mark_status(status_obj, status_value):
