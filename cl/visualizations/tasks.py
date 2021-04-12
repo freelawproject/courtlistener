@@ -6,6 +6,7 @@ from lxml import html
 from requests.exceptions import HTTPError, MissingSchema, TooManyRedirects
 
 from cl.celery_init import app
+from cl.lib.types import EmailType
 from cl.visualizations.models import Referer
 from cl.visualizations.network_utils import new_title_for_viz
 from cl.visualizations.utils import emails
@@ -84,7 +85,7 @@ def get_title(self, referer_id):
         if new_title_for_viz(referer):
             # Only send the email if we haven't seen this page title before for
             # this visualization.
-            email = emails["referer_detected"]
+            email: EmailType = emails["referer_detected"]
             email_body = email["body"] % (
                 referer.url,
                 referer.page_title,
@@ -92,7 +93,9 @@ def get_title(self, referer_id):
                     "admin:visualizations_referer_change", args=(referer.pk,)
                 ),
             )
-            send_mail(email["subject"], email_body, email["from"], email["to"])
+            send_mail(
+                email["subject"], email_body, email["from_email"], email["to"]
+            )
     else:
         try:
             # Create an exception to catch.

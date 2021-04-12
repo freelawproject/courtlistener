@@ -1,8 +1,11 @@
+from typing import Dict
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.urls import reverse
 
-from cl.donate.models import PAYMENT_TYPES
+from cl.donate.models import PAYMENT_TYPES, Donation, MonthlyDonation
+from cl.lib.types import EmailType
 
 
 class PaymentFailureException(Exception):
@@ -10,7 +13,7 @@ class PaymentFailureException(Exception):
         self.message = message
 
 
-emails = {
+emails: Dict[str, EmailType] = {
     "donation_thanks": {
         "subject": "Thanks for your donation to Free Law Project!",
         "body": (
@@ -31,7 +34,7 @@ emails = {
             "Founders of Free Law Project\n"
             "https://free.law/contact/"
         ),
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "donation_thanks_recurring": {
         "subject": "We have received your recurring contribution to Free Law "
@@ -57,7 +60,7 @@ emails = {
             "Founders of Free Law Project\n"
             "https://free.law/contact/"
         ),
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "payment_thanks": {
         "subject": "Receipt for your payment to Free Law Project",
@@ -72,7 +75,7 @@ emails = {
             "Founders of Free Law Project\n"
             "https://free.law/contact/"
         ),
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "badge_thanks": {
         "subject": "Thanks for becoming a Free Law Project supporter!",
@@ -101,7 +104,7 @@ emails = {
             "Founders of Free Law Project\n"
             "https://free.law/contact/"
         ),
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "user_bad_subscription": {
         "subject": "Your monthly donation to Free Law Project has failed",
@@ -120,7 +123,7 @@ emails = {
         "Thanks again,\n\n\n"
         "Free Law Project\n"
         "https://free.law/contact/",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "admin_donation_report": {
         "subject": "$%s were donated by monthly donors today",
@@ -128,13 +131,17 @@ emails = {
         "%s\n\n"
         "(Note that some of these charges still can fail to go "
         "through.)",
-        "from": settings.DEFAULT_FROM_EMAIL,
+        "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
 }
 
 
-def send_thank_you_email(donation, payment_type, recurring=False):
+def send_thank_you_email(
+    donation: Donation,
+    payment_type: str,
+    recurring: bool = False,
+) -> None:
     """Send an appropriate email for the payment or donation.
 
     :param donation: The donation object to process
@@ -151,11 +158,15 @@ def send_thank_you_email(donation, payment_type, recurring=False):
                 donation.amount,
                 settings.EIN_SECRET,
             )
-            send_mail(email["subject"], body, email["from"], [user.email])
+            send_mail(
+                email["subject"], body, email["from_email"], [user.email]
+            )
         elif payment_type == PAYMENT_TYPES.BADGE_SIGNUP:
             email = emails["badge_thanks"]
             body = email["body"] % (user.first_name, settings.EIN_SECRET)
-            send_mail(email["subject"], body, email["from"], [user.email])
+            send_mail(
+                email["subject"], body, email["from_email"], [user.email]
+            )
     else:
         if payment_type == PAYMENT_TYPES.DONATION:
             email = emails["donation_thanks"]
@@ -164,7 +175,9 @@ def send_thank_you_email(donation, payment_type, recurring=False):
                 donation.amount,
                 settings.EIN_SECRET,
             )
-            send_mail(email["subject"], body, email["from"], [user.email])
+            send_mail(
+                email["subject"], body, email["from_email"], [user.email]
+            )
         elif payment_type == PAYMENT_TYPES.PAYMENT:
             email = emails["payment_thanks"]
             body = email["body"] % (
@@ -172,10 +185,12 @@ def send_thank_you_email(donation, payment_type, recurring=False):
                 donation.amount,
                 donation.pk,
             )
-            send_mail(email["subject"], body, email["from"], [user.email])
+            send_mail(
+                email["subject"], body, email["from_email"], [user.email]
+            )
 
 
-def send_failed_subscription_email(m_donation):
+def send_failed_subscription_email(m_donation: MonthlyDonation) -> None:
     """Send an email to the user to tell them their subscription failed.
 
     m_donation: The MonthlyDonation object that failed.
@@ -187,4 +202,6 @@ def send_failed_subscription_email(m_donation):
         reverse("donate"),
         m_donation.monthly_donation_amount,
     )
-    send_mail(email["subject"], body, email["from"], [m_donation.donor.email])
+    send_mail(
+        email["subject"], body, email["from_email"], [m_donation.donor.email]
+    )

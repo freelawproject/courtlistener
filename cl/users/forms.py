@@ -13,6 +13,7 @@ from django.urls import reverse
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
 
@@ -252,9 +253,9 @@ class CustomPasswordResetForm(PasswordResetForm):
         email = self.cleaned_data["email"]
         users = self.get_users(email)
         if not len(list(users)):
-            msg = emails["no_account_found"]
-            body = msg["body"] % ("password reset", reverse("register"))
-            send_mail(msg["subject"], body, msg["from"], [email])
+            email: EmailType = emails["no_account_found"]
+            body = email["body"] % ("password reset", reverse("register"))
+            send_mail(email["subject"], body, email["from_email"], [email])
         else:
             super(CustomPasswordResetForm, self).save(*args, **kwargs)
 

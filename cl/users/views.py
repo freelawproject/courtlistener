@@ -32,6 +32,7 @@ from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
+from cl.lib.types import EmailType
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -237,18 +238,18 @@ def view_settings(request: HttpRequest) -> HttpResponse:
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
-            email = emails["email_changed_successfully"]
+            email: EmailType = emails["email_changed_successfully"]
             send_mail(
                 email["subject"],
                 email["body"] % (user.username, up.activation_key),
-                email["from"],
+                email["from_email"],
                 [new_email],
             )
-            email = emails["notify_old_address"]
+            email: EmailType = emails["notify_old_address"]
             send_mail(
                 email["subject"],
                 email["body"] % (user.username, old_email, new_email),
-                email["from"],
+                email["from_email"],
                 [old_email],
             )
             msg = message_dict["email_changed_successfully"]
@@ -289,11 +290,11 @@ def view_settings(request: HttpRequest) -> HttpResponse:
 def delete_account(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
-            email = emails["account_deleted"]
+            email: EmailType = emails["account_deleted"]
             send_mail(
                 email["subject"],
                 email["body"] % request.user,
-                email["from"],
+                email["from_email"],
                 email["to"],
             )
             request.user.alerts.all().delete()
@@ -329,11 +330,11 @@ def delete_profile_done(request: HttpRequest) -> HttpResponse:
 @login_required
 def take_out(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
-        email = emails["take_out_requested"]
+        email: EmailType = emails["take_out_requested"]
         send_mail(
             email["subject"],
             email["body"] % (request.user, request.user.email),
-            email["from"],
+            email["from_email"],
             email["to"],
         )
 
@@ -403,14 +404,14 @@ def register(request: HttpRequest) -> HttpResponse:
                 up.key_expires = now() + timedelta(days=5)
                 up.save()
 
-                email = emails["confirm_your_new_account"]
+                email: EmailType = emails["confirm_your_new_account"]
                 send_mail(
                     email["subject"],
                     email["body"] % (user.username, up.activation_key),
-                    email["from"],
+                    email["from_email"],
                     [user.email],
                 )
-                email = emails["new_account_created"]
+                email: EmailType = emails["new_account_created"]
                 send_mail(
                     email["subject"] % up.user.username,
                     email["body"]
@@ -418,7 +419,7 @@ def register(request: HttpRequest) -> HttpResponse:
                         up.user.get_full_name() or "Not provided",
                         up.user.email,
                     ),
-                    email["from"],
+                    email["from_email"],
                     email["to"],
                 )
                 tally_stat("user.created")
@@ -532,13 +533,16 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
                 # was a success. Meanwhile, we send an email saying that a
                 # request was made, but we don't have an account with that
                 # email address.
-                email = emails["no_account_found"]
+                email: EmailType = emails["no_account_found"]
                 message = email["body"] % (
                     "email confirmation",
                     reverse("register"),
                 )
                 send_mail(
-                    email["subject"], message, email["from"], [cd["email"]]
+                    email["subject"],
+                    message,
+                    email["from_email"],
+                    [cd["email"]],
                 )
                 return HttpResponseRedirect(reverse("email_confirm_success"))
 
@@ -552,11 +556,11 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
                 up.key_expires = key_expires
                 up.save()
 
-            email = emails["confirm_existing_account"]
+            email: EmailType = emails["confirm_existing_account"]
             send_mail(
                 email["subject"],
                 email["body"] % activation_key,
-                email["from"],
+                email["from_email"],
                 [user.email],
             )
             return HttpResponseRedirect(reverse("email_confirm_success"))
