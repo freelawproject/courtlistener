@@ -126,7 +126,7 @@ def alert_on_staleness(
     # divisible by six to slow down alerts.
     on_a_sixth = _now.hour % 6 == 0
     really_stale = timedelta(minutes=60 * 60 * 24)
-    if staleness > really_stale and not on_a_sixth:
+    if (staleness > really_stale) and not on_a_sixth:
         return
 
     # All limits have passed; send an alert
