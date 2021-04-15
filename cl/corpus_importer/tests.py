@@ -3,6 +3,7 @@ import os
 import unittest
 from datetime import date, datetime
 from glob import iglob
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -469,8 +470,13 @@ class TNCorpusTests(TestCase):
 
     fixtures = ["tenn_court_fixture.json"]
 
-    test_dir = os.path.join(
-        settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
+    test_file = (
+        Path(settings.INSTALL_ROOT)
+        / "cl"
+        / "corpus_importer"
+        / "test_assets"
+        / "tenn_test_files"
+        / "tn_corpus_test_asset.json"
     )
 
     def tearDown(self) -> None:
@@ -479,25 +485,17 @@ class TNCorpusTests(TestCase):
     def test_import(self) -> None:
         """Can we import two cases successfully"""
         pre_install_count = OpinionCluster.objects.all().count()
-        filepath = os.path.join(
-            self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
-        )
-        with open(filepath) as file:
-            import_tn_corpus(log=False, skip_until=False, filepath=file)
+        with open(self.test_file) as file:
+            import_tn_corpus(
+                log=False, skip_until=False, file=file, ocr_available=False
+            )
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
             pre_install_count + 2,
             post_install_count,
-            msg="Did not get two installs",
+            msg="Did not get two imports",
         )
 
-    def test_panel_selection(self) -> None:
-        """Can we choose panelist correctly?"""
-        filepath = os.path.join(
-            self.test_dir, "tenn_test_files", "tn_corpus_test_asset.json"
-        )
-        with open(filepath) as file:
-            import_tn_corpus(log=False, skip_until=False, filepath=file)
         oc = OpinionCluster.objects.get(citation="2019 TN WC App. 1")
         self.assertEqual(
             oc.judges,

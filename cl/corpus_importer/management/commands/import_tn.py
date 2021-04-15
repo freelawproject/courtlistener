@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from glob import glob
+from typing import IO, Union
 
 from dateutil import parser
 from django.utils.encoding import force_bytes
@@ -63,12 +64,19 @@ def make_item(case):
     }
 
 
-def import_tn_corpus(log, skip_until, filepath):
+def import_tn_corpus(
+    log: bool,
+    skip_until: Union[bool, str],
+    file: IO,
+    ocr_available: bool,
+) -> None:
     """Import TN Corpus
 
     :param log: Should we view logging info
-    :param skip_until: Label ID, if any, to process first
-    :param filepath: Location of our overriding data json file
+    :param skip_until: Label ID, if any, to process first, else False to
+    indicate no skipping.
+    :param file: Location of our overriding data json file
+    :param ocr_available: Whether you can do OCR during the import
     :return: None
     """
     ready = False if skip_until else True
@@ -77,7 +85,7 @@ def import_tn_corpus(log, skip_until, filepath):
         logging.getLogger().setLevel(logging.INFO)
 
     logging.info("Starting import")
-    tn_corpus = sorted(json.load(filepath), key=lambda x: x["label"])
+    tn_corpus = sorted(json.load(file), key=lambda x: x["label"])
     if not ready:
         case = [x for x in tn_corpus if x["label"] == skip_until][0]
         logging.info(
@@ -97,7 +105,7 @@ def import_tn_corpus(log, skip_until, filepath):
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
         pdf_path = glob(
-            "%s/%s/*.pdf" % (os.path.dirname(filepath.name), case["label"])
+            "%s/%s/*.pdf" % (os.path.dirname(file.name), case["label"])
         )[0]
         with open(pdf_path, "rb") as p:
             pdf_data = p.read()
@@ -106,7 +114,7 @@ def import_tn_corpus(log, skip_until, filepath):
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
             op = ops[0]
-            logging.warn(
+            logging.warning(
                 "Document already in database. See: %s at %s"
                 % (op.get_absolute_url(), op.cluster.case_name)
             )
@@ -130,7 +138,7 @@ def import_tn_corpus(log, skip_until, filepath):
 
         extract_doc_content.delay(
             opinion.pk,
-            ocr_available=True,
+            ocr_available=ocr_available,
             citation_jitter=True,
         )
         logging.info(
@@ -166,4 +174,5 @@ class Command(VerboseCommand):
             options["log"],
             options["skip_until"],
             options["input_file"],
+            ocr_available=True,
         )
