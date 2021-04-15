@@ -135,7 +135,7 @@ def alert_on_staleness(
         email["subject"] % court_id,
         email["body"]
         % (court_id, round(staleness.total_seconds() / 60, 2), url),
-        email["from_addr"],
+        email["from_email"],
         email["to"],
     )
 
