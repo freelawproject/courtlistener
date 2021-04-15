@@ -60,6 +60,8 @@ To set up a development server, do the following:
 
     `cp 05-private.example 05-private.py`
 
+    That will get you pretty far, but CourtListener does rely on a number of cloud services. To make all features work, you'll need to get tokens for these services. The main one you'll run into almost immediately is AWS S3 (tests won't pass without it). To make that work, you'll need to create an access token for a user with S3 access. This isn't too terribly hard, but for partners we can do it for you. Just ask. 
+    
     See [below](#how-settings-work-in-courtlistener) for more information about settings files.
 
 4. Next, create the bridge network that the docker relies on:
@@ -93,7 +95,7 @@ So that should be it! You should now be able to access the following URLs:
  - <http://127.0.0.1:8983/solr> - Solr admin page
  - 127.0.0.1:5900 - A VNC server to the selenium machine (it doesn't serve http though)
  
- A good next step is to [run the test suite](#testing) to verify that your development server is configured correctly.
+A good next step is to [run the test suite](#testing) to verify that your development server is configured correctly.
 
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
 
