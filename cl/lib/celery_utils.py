@@ -217,16 +217,18 @@ def throttle_task(
                     )
             proceed = is_rate_okay(task, rate, key=key_value)
             if not proceed:
-                logger.info(
-                    "Throttling task %s (%s) via decorator.",
-                    task.name,
-                    task.request.id,
-                )
                 # Decrement the number of times the task has retried. If you
                 # fail to do this, it gets auto-incremented, and you'll expend
                 # retries during the backoff.
                 task.request.retries = task.request.retries - 1
-                return task.retry(countdown=random.uniform(*jitter))
+                countdown = random.uniform(*jitter)
+                logger.info(
+                    "Throttling task %s (%s) via decorator for %ss",
+                    task.name,
+                    task.request.id,
+                    countdown,
+                )
+                return task.retry(countdown=countdown)
             else:
                 # All set. Run the task.
                 return func(*args, **kwargs)

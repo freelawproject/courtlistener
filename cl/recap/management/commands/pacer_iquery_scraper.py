@@ -83,7 +83,9 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
     docket_ids.update(
         Docket.objects.filter(
             case_name__isnull=True, source__in=Docket.RECAP_SOURCES
-        ).values_list("pk", flat=True)
+        )
+        .order_by("?")
+        .values_list("pk", flat=True)
     )
     return docket_ids
 
@@ -133,7 +135,7 @@ class Command(VerboseCommand):
             len(docket_ids),
         )
         queue = options["queue"]
-        throttle = CeleryThrottle(queue_name=queue)
+        throttle = CeleryThrottle(queue_name=queue, min_items=10)
         now = datetime.now().date()
         include_old_terminated = options["include_old_terminated"]
         for i, docket_id in enumerate(docket_ids):
