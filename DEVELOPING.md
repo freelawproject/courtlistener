@@ -7,6 +7,11 @@ Historically, we have used [wiki instructions to get set up][wiki], but these da
 But before we can get into that, we must address...
 
 
+# Discussing things
+
+We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones.
+
+
 ## Legal Matters
 
 Not surprisingly, we have a lot of legal, and particularly IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns. 
