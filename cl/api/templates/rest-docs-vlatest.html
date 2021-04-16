@@ -45,7 +45,21 @@
     <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger/OpenAPI interface</a>. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
     </p>
 
-    <h3>Data Modeling</h3>
+
+    <h2>Support</h2>
+    <p>Questions about the APIs can be sent <a href="https://flp.discourse.group/c/api/5" target="_blank">to our Discourse forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
+    </p>
+    <p>
+      <a href="https://flp.discourse.group/c/api/5"
+          target="_blank"
+          class="btn btn-default">Ask in Our Forum</a>
+      <a href="{% url "contact" %}"
+         target="_blank"
+         class="btn btn-default">Send us a Private Message</a>
+    </p>
+
+
+    <h2>Data Modeling</h2>
     <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
       href="{{ STATIC_PREFIX }}png/complete-model-v3.13.png"
       target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
