@@ -250,12 +250,14 @@ class CustomPasswordResetForm(PasswordResetForm):
         """Override the usual password form to send a message if we don't find
         any accounts
         """
-        email = self.cleaned_data["email"]
-        users = self.get_users(email)
+        recipient_addr = self.cleaned_data["email"]
+        users = self.get_users(recipient_addr)
         if not len(list(users)):
             email: EmailType = emails["no_account_found"]
             body = email["body"] % ("password reset", reverse("register"))
-            send_mail(email["subject"], body, email["from_email"], [email])
+            send_mail(
+                email["subject"], body, email["from_email"], [recipient_addr]
+            )
         else:
             super(CustomPasswordResetForm, self).save(*args, **kwargs)
 
