@@ -79,6 +79,7 @@ jobs:
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
           cl/lib/storage.py \
+          cl/lib/string_utils.py \
           cl/lib/types.py \
           cl/opinion_page/views.py \
           cl/users/management/commands/cl_account_management.py \

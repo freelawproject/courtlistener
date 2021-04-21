@@ -132,29 +132,14 @@ class JurisdictionFeed(Feed):
     def item_enclosure_url(self, item):
         try:
             path = get_item(item)["local_path"]
-            if not path.startswith("/"):
-                return "/%s" % (path,)
-            return path
-        except:
-            return None
-
-    def item_enclosure_length(self, item):
-        try:
-            file_loc = os.path.join(
-                settings.MEDIA_ROOT,
-                get_item(item)["local_path"],
-            )
-            return os.path.getsize(file_loc)
+            return f"https://storage.courtlistener.com/{path}"
         except:
             return None
 
     def item_enclosure_mime_type(self, item):
         try:
-            file_loc = os.path.join(
-                settings.MEDIA_ROOT,
-                get_item(item)["local_path"],
-            )
-            return lookup_mime_type(file_loc)
+            path = get_item(item)["local_path"]
+            return lookup_mime_type(path)
         except:
             return None
 
