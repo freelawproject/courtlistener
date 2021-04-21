@@ -415,6 +415,8 @@ def make_and_save(
             # type=OPINION_TYPE_MAPPING[opinion_info['type']],
             html_columbia=converted_text,
             sha1=opinion_info["sha1"],
+            # This is surely not updated for the new S3 world. If you're
+            # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
         joined_by = [

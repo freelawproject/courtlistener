@@ -190,10 +190,10 @@ def extract_from_pdf(
         if ocr_needed(path, content):
             success, ocr_content = extract_by_ocr(path)
             if success:
-                opinion.extracted_by_ocr = True
                 # Check content length and take the longer of the two
                 if len(ocr_content) > len(content):
                     content = ocr_content
+                    opinion.extracted_by_ocr = True
             elif content == "" or not success:
                 content = "Unable to extract document content."
 
@@ -345,35 +345,41 @@ def extract_doc_content(
     larger scrape.
     """
     opinion = Opinion.objects.get(pk=pk)
+    extension = opinion.local_path.name.split(".")[-1]
 
-    path = opinion.local_path.path
+    with NamedTemporaryFile(
+        prefix="extract_file_",
+        suffix=f".{extension}",
+        buffering=0,  # Make sure it's on disk when we try to use it
+    ) as tmp:
+        # Get file contents from S3 and put them in a temp file.
+        tmp.write(opinion.local_path.read())
 
-    extension = path.split(".")[-1]
-    if extension == "doc":
-        content, err = extract_from_doc(path)
-    elif extension == "docx":
-        content, err = extract_from_docx(path)
-    elif extension == "html":
-        content, err = extract_from_html(path)
-    elif extension == "pdf":
-        content, err = extract_from_pdf(path, opinion, ocr_available)
-    elif extension == "txt":
-        content, err = extract_from_txt(path)
-    elif extension == "wpd":
-        content, err = extract_from_wpd(path, opinion)
-    else:
-        print(
-            "*****Unable to extract content due to unknown extension: %s "
-            "on opinion: %s****" % (extension, opinion)
-        )
-        return
+        if extension == "doc":
+            content, err = extract_from_doc(tmp.name)
+        elif extension == "docx":
+            content, err = extract_from_docx(tmp.name)
+        elif extension == "html":
+            content, err = extract_from_html(tmp.name)
+        elif extension == "pdf":
+            content, err = extract_from_pdf(tmp.name, opinion, ocr_available)
+        elif extension == "txt":
+            content, err = extract_from_txt(tmp.name)
+        elif extension == "wpd":
+            content, err = extract_from_wpd(tmp.name, opinion)
+        else:
+            print(
+                "*****Unable to extract content due to unknown extension: %s "
+                "on opinion: %s****" % (extension, opinion)
+            )
+            return
+
+        # Do page count, if possible
+        opinion.page_count = get_page_count(tmp.name, extension)
 
     assert isinstance(
         content, str
     ), "content must be of type str, not %s" % type(content)
-
-    # Do page count, if possible
-    opinion.page_count = get_page_count(path, extension)
 
     # Do blocked status
     if extension in ["html", "wpd"]:
@@ -528,7 +534,7 @@ def extract_by_ocr(path: str) -> (bool, str):
         "Unable to extract the content from this file. Please try "
         "reading the original."
     )
-    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff") as tmp:
+    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff", buffering=0) as tmp:
         out, err, returncode = rasterize_pdf(path, tmp.name)
         if returncode != 0:
             return False, fail_msg
