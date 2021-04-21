@@ -534,7 +534,7 @@ def extract_by_ocr(path: str) -> (bool, str):
         "Unable to extract the content from this file. Please try "
         "reading the original."
     )
-    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff") as tmp:
+    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff", buffering=0) as tmp:
         out, err, returncode = rasterize_pdf(path, tmp.name)
         if returncode != 0:
             return False, fail_msg
