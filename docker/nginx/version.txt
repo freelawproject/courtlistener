@@ -1,5 +1,6 @@
-0.0.19
+0.0.20
 
+0.0.20: Add PDFs and other opinion-related content to storage.cl.com redirection
 0.0.19: Create new location block for audio file redirection
 0.0.18: Add no-index headers to /protected/ location
 0.0.17: Stop blocking Allen v. Chanel
