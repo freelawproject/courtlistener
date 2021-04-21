@@ -1,5 +1,9 @@
-0.0.20
+0.0.21
 
+0.0.21: Add recap-thumbnails to storage.cl.com redirection. This also remvoes
+        our last usage of the X-Accel-Redirect, and thus removes the
+        /protected/ location block. If we want to serve static files again
+        someday, we'll want it back.
 0.0.20: Add PDFs and other opinion-related content to storage.cl.com redirection
 0.0.19: Create new location block for audio file redirection
 0.0.18: Add no-index headers to /protected/ location
