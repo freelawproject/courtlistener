@@ -190,10 +190,10 @@ def extract_from_pdf(
         if ocr_needed(path, content):
             success, ocr_content = extract_by_ocr(path)
             if success:
-                opinion.extracted_by_ocr = True
                 # Check content length and take the longer of the two
                 if len(ocr_content) > len(content):
                     content = ocr_content
+                    opinion.extracted_by_ocr = True
             elif content == "" or not success:
                 content = "Unable to extract document content."
 
