@@ -137,7 +137,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             if entry.enclosures is not None:
                 self.assertEqual(len(entry.enclosures), 1)
                 self.assertTrue(len(entry.enclosures[0].type) > 0)
-                self.assertTrue(int(entry.enclosures[0].length) > 1)
 
     def test_oral_argument_feeds_contain_valid_mp3_links(self) -> None:
         """
