@@ -22,14 +22,15 @@ from cl.lib.model_helpers import (
     make_recap_path,
     make_upload_path,
 )
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
+from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
     null_map,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import AWSMediaStorage, IncrementingFileSystemStorage
 from cl.lib.string_utils import trunc
+from cl.lib.utils import deepgetattr
 
 DOCUMENT_STATUSES = (
     ("Published", "Precedential"),
@@ -515,7 +516,9 @@ class Docket(AbstractDateTimeModel):
         blank=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP's Docket XML page.",
+        help_text="Path to RECAP's Docket XML page as provided by the "
+        "original RECAP architecture. These fields are for backup purposes "
+        "only.",
         upload_to=make_recap_path,
         storage=IncrementingFileSystemStorage(),
         max_length=1000,
@@ -2344,7 +2347,7 @@ class OpinionCluster(AbstractDateTimeModel):
                     "joined_by_ids": [j.pk for j in opinion.joined_by.all()],
                     "type": opinion.type,
                     "download_url": opinion.download_url or None,
-                    "local_path": str(opinion.local_path),
+                    "local_path": deepgetattr(self, "local_path.name", None),
                     "text": text_template.render(
                         {
                             "item": opinion,
@@ -2585,11 +2588,11 @@ class Opinion(AbstractDateTimeModel):
     )
     local_path = models.FileField(
         help_text=(
-            "The location, relative to MEDIA_ROOT on the CourtListener "
-            "server, where files are stored"
+            f"The location in AWS S3 where the original opinion file is "
+            f"stored. {s3_warning_note}"
         ),
         upload_to=make_upload_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=AWSMediaStorage(),
         blank=True,
         db_index=True,
     )
@@ -2682,7 +2685,7 @@ class Opinion(AbstractDateTimeModel):
                 "joined_by_ids": [judge.pk for judge in self.joined_by.all()],
                 "type": self.type,
                 "download_url": self.download_url or None,
-                "local_path": str(self.local_path),
+                "local_path": deepgetattr(self, "local_path.name", None),
             }
         )
 
