@@ -187,7 +187,7 @@ class ModelTest(TestCase):
         self.oc.save()
 
         try:
-            cf = ContentFile(io.StringIO("blah").read())
+            cf = ContentFile(io.BytesIO(b"blah").read())
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
             self.o.save(index=False)
@@ -992,23 +992,6 @@ class JurisdictionFeedTest(TestCase):
         self.feed = JurisdictionFeed()
         super(JurisdictionFeedTest, self).setUp()
 
-    def test_proper_calculation_of_length(self) -> None:
-        """
-        Does the item_enclosure_length method count the file size properly?
-        """
-        self.assertEqual(
-            self.feed.item_enclosure_length(self.good_item), 31293
-        )
-        self.assertEqual(
-            self.feed.item_enclosure_length(self.zero_item),
-            0,
-            "item %s should be zero bytes" % (self.zero_item["local_path"]),
-        )
-
-    def test_enclosure_length_returns_none_on_bad_input(self) -> None:
-        """Given a bad path to a nonexistant file, do we safely return None?"""
-        self.assertIsNone(self.feed.item_enclosure_length(self.bad_item))
-
     def test_item_enclosure_mime_type(self) -> None:
         """Does the mime type detection work correctly?"""
         self.assertEqual(
@@ -1053,7 +1036,6 @@ class JurisdictionFeedTest(TestCase):
                 'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom',
                 xml,
             )
-            self.assertNotIn("enclosure", xml)
         except Exception as e:
             self.fail("Could not call get_feed(): %s" % (e,))
 
