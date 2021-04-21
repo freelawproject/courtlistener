@@ -20,7 +20,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% endfor %}{% endif %}~~~~~
  - View this item on our site: https://www.courtlistener.com{{result.absolute_url}}
 {% if result.download_url %} - Download original from the court: {{result.download_url}}
-{% endif %}{% if result.local_path %} - Download the original from our backup: https://{% if type == "oa" %}storage{% else %}www{% endif %}.courtlistener.com/{{ result.local_path }}{% endif %}{% endfor %}
+{% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endfor %}
 
 {% endfor %}
 ************************
