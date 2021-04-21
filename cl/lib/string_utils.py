@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import re
+from typing import Optional, Tuple
 
 
-def anonymize(s):
+def anonymize(s: str) -> Tuple[str, bool]:
     """Anonymizes private information.
 
     Converts SSNs, EINs, and A-Numbers to X's. Reports whether a modification
@@ -26,7 +27,7 @@ def anonymize(s):
     return s, modified
 
 
-def trunc(s, length, ellipsis=None):
+def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
     """Truncates a string at a good length.
 
     Finds the rightmost space in a string, and truncates there. Lacking such
@@ -57,7 +58,7 @@ def trunc(s, length, ellipsis=None):
         return s
 
 
-def filter_invalid_XML_chars(input):
+def filter_invalid_XML_chars(input: str) -> str:
     """XML allows:
 
        Char ::= #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
@@ -78,7 +79,7 @@ def filter_invalid_XML_chars(input):
         return input
 
 
-def removeLeftMargin(s):
+def removeLeftMargin(s: str) -> str:
     """Gets rid of left hand margin.
 
     Given a block of text, calculates the mode of the number of spaces before
@@ -114,7 +115,7 @@ def removeLeftMargin(s):
     return "\n".join(lines_out)
 
 
-def removeDuplicateLines(s):
+def removeDuplicateLines(s: str) -> str:
     """Remove duplicate lines next to each other."""
     lines = s.split("\n")
     lines_out = []
