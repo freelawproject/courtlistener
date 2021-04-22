@@ -1,6 +1,6 @@
 import re
-from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from datetime import date, datetime, timedelta
+from typing import Any, cast, Dict, List, Optional, Tuple, Union
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -14,6 +14,7 @@ from cl.citations.match_citations import match_citation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.types import CleanData, SearchParam
 from cl.search.constants import (
     SOLR_OPINION_HL_FIELDS,
     SOLR_ORAL_ARGUMENT_HL_FIELDS,
@@ -29,21 +30,25 @@ from cl.search.models import (
 )
 
 recap_boosts_qf = {
-    "text": 1,
-    "caseName": 4,
-    "docketNumber": 3,
-    "description": 2,
+    "text": 1.0,
+    "caseName": 4.0,
+    "docketNumber": 3.0,
+    "description": 2.0,
 }
-recap_boosts_pf = {"text": 3, "caseName": 3, "description": 3}
-BOOSTS = {
+recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
+BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
-        SEARCH_TYPES.OPINION: {"text": 1, "caseName": 4, "docketNumber": 2},
+        SEARCH_TYPES.OPINION: {
+            "text": 1.0,
+            "caseName": 4.0,
+            "docketNumber": 2.0,
+        },
         SEARCH_TYPES.RECAP: recap_boosts_qf,
         SEARCH_TYPES.DOCKETS: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
-            "text": 1,
-            "caseName": 4,
-            "docketNumber": 2,
+            "text": 1.0,
+            "caseName": 4.0,
+            "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
             "text": 1,
@@ -57,10 +62,10 @@ BOOSTS = {
     },
     # Phrase-based boosts.
     "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3, "caseName": 3},
+        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
         SEARCH_TYPES.RECAP: recap_boosts_pf,
         SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3},
+        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
         SEARCH_TYPES.PEOPLE: {
             # None here. Phrases don't make much sense for people.
         },
@@ -68,7 +73,7 @@ BOOSTS = {
 }
 
 
-def get_solr_interface(cd: Dict[str, Any]) -> ExtraSolrInterface:
+def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
     """Get the correct solr interface for the query"""
     search_type = cd["type"]
     if search_type == SEARCH_TYPES.OPINION:
@@ -106,7 +111,7 @@ def make_get_string(
     return get_string
 
 
-def get_query_citation(cd: Dict[str, Any]) -> Optional[List[Citation]]:
+def get_query_citation(cd: CleanData) -> Optional[List[Citation]]:
     """Extract citations from the query string and return them, or return
     None
     """
@@ -174,7 +179,10 @@ def make_stats_variable(
     return facet_fields
 
 
-def merge_form_with_courts(courts, search_form):
+def merge_form_with_courts(
+    courts: Dict,
+    search_form: SearchForm,
+) -> Tuple[Dict[str, List], str, str]:
     """Merges the courts dict with the values from the search form.
 
     Final value is like (note that order is significant):
@@ -215,8 +223,8 @@ def merge_form_with_courts(courts, search_form):
     ]
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
-    court_count = len(
-        [status for status in checked_statuses if status is True]
+    court_count = str(
+        len([status for status in checked_statuses if status is True])
     )
     court_count_human = court_count
     if all_facets_selected:
@@ -235,7 +243,7 @@ def merge_form_with_courts(courts, search_form):
                     break
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
-    court_tabs = {
+    court_tabs: Dict[str, List] = {
         "federal": [],
         "district": [],
         "state": [],
@@ -243,7 +251,7 @@ def merge_form_with_courts(courts, search_form):
     }
     bap_bundle = []
     b_bundle = []
-    state_bundle = []
+    state_bundle: List = []
     state_bundles = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -289,7 +297,12 @@ def merge_form_with_courts(courts, search_form):
     return court_tabs, court_count_human, court_count
 
 
-def make_fq(cd, field, key, make_phrase=False):
+def make_fq(
+    cd: CleanData,
+    field: str,
+    key: str,
+    make_phrase: bool = False,
+) -> str:
     """Does some minimal processing of the query string to get it into a
     proper field query.
 
@@ -338,11 +351,11 @@ def make_fq(cd, field, key, make_phrase=False):
     return fq
 
 
-def make_boolean_fq(cd, field, key):
+def make_boolean_fq(cd: CleanData, field: str, key: str) -> str:
     return "%s:%s" % (field, str(cd[key]).lower())
 
 
-def make_fq_proximity_query(cd, field, key):
+def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     """Make an fq proximity query, attempting to normalize and user input.
 
     This neuters the citation query box, but at the same time ensures that a
@@ -364,7 +377,11 @@ def make_fq_proximity_query(cd, field, key):
     return '%s:("%s"~5)' % (field, " ".join(tokens))
 
 
-def make_date_query(query_field, before, after):
+def make_date_query(
+    query_field: str,
+    before: datetime,
+    after: datetime,
+) -> str:
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
         if hasattr(after, "strftime"):
@@ -381,7 +398,7 @@ def make_date_query(query_field, before, after):
     return "%s:%s" % (query_field, date_filter)
 
 
-def make_cite_count_query(cd):
+def make_cite_count_query(cd: CleanData) -> str:
     """Given the cleaned data from a form, return a valid Solr fq string"""
     start = cd.get("cited_gt") or "*"
     end = cd.get("cited_lt") or "*"
@@ -391,7 +408,7 @@ def make_cite_count_query(cd):
         return "citeCount:[%s TO %s]" % (start, end)
 
 
-def get_selected_field_string(cd, prefix):
+def get_selected_field_string(cd: CleanData, prefix: str) -> str:
     """Pulls the selected checkboxes out of the form data, and puts it into
     Solr strings. Uses a prefix to know which items to pull out of the cleaned
     data. Check forms.py to see how the prefixes are set up.
@@ -412,14 +429,14 @@ def get_selected_field_string(cd, prefix):
         return selected_field_string
 
 
-def make_boost_string(fields):
+def make_boost_string(fields: Dict[str, float]) -> str:
     qf_array = []
     for k, v in fields.items():
         qf_array.append("%s^%s" % (k, v))
     return " ".join(qf_array)
 
 
-def add_boosts(main_params, cd):
+def add_boosts(main_params: SearchParam, cd: CleanData) -> None:
     """Add any boosts that make sense for the query."""
     if cd["type"] == SEARCH_TYPES.OPINION and main_params["sort"].startswith(
         "score"
@@ -463,13 +480,13 @@ def add_boosts(main_params, cd):
         main_params["ps"] = 5
 
 
-def add_faceting(main_params, cd, facet):
+def add_faceting(main_params: SearchParam, cd: CleanData, facet: bool) -> None:
     """Add any faceting filters to the query."""
     if not facet:
         # Faceting is off. Do nothing.
         return
 
-    facet_params = {}
+    facet_params = cast(SearchParam, {})
     if cd["type"] == SEARCH_TYPES.OPINION:
         facet_params = {
             "facet": "true",
@@ -479,7 +496,11 @@ def add_faceting(main_params, cd, facet):
     main_params.update(facet_params)
 
 
-def add_highlighting(main_params, cd, highlight):
+def add_highlighting(
+    main_params: SearchParam,
+    cd: CleanData,
+    highlight: Union[bool, str],
+) -> None:
     """Add any parameters relating to highlighting."""
 
     if not highlight:
@@ -577,11 +598,11 @@ def add_highlighting(main_params, cd, highlight):
     for field in hlfl:
         if field == "text":
             continue
-        main_params["f.%s.hl.fragListBuilder" % field] = "single"
-        main_params["f.%s.hl.alternateField" % field] = field
+        main_params["f.%s.hl.fragListBuilder" % field] = "single"  # type: ignore
+        main_params["f.%s.hl.alternateField" % field] = field  # type: ignore
 
 
-def add_filter_queries(main_params, cd):
+def add_filter_queries(main_params: SearchParam, cd) -> None:
     """Add the fq params"""
     # Changes here are usually mirrored in place_facet_queries, below.
     main_fq = []
@@ -702,7 +723,7 @@ def add_filter_queries(main_params, cd):
             main_params["fq"] = main_fq
 
 
-def map_to_docket_entry_sorting(sort_string):
+def map_to_docket_entry_sorting(sort_string: str) -> str:
     """Convert a RECAP sorting param to a docket entry sorting parameter."""
     if sort_string == "dateFiled asc":
         return "entry_date_filed asc"
@@ -712,7 +733,7 @@ def map_to_docket_entry_sorting(sort_string):
         return sort_string
 
 
-def add_grouping(main_params, cd, group):
+def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
     """Add any grouping parameters."""
     if cd["type"] == SEARCH_TYPES.OPINION:
         # Group clusters. Because this uses faceting, we use the collapse query
@@ -722,7 +743,7 @@ def add_grouping(main_params, cd, group):
         if "fq" in main_params:
             main_params["fq"].append(group_fq)
         else:
-            main_params["fq"] = group_fq
+            main_params["fq"] = [group_fq]
 
     elif (
         cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
@@ -737,13 +758,16 @@ def add_grouping(main_params, cd, group):
             group_limit = 5 if not docket_query else 500
         elif cd["type"] == SEARCH_TYPES.DOCKETS:
             group_limit = 1 if not docket_query else 500
-        group_params = {
-            "group": "true",
-            "group.ngroups": "true",
-            "group.limit": group_limit,
-            "group.field": "docket_id",
-            "group.sort": group_sort,
-        }
+        group_params = cast(
+            SearchParam,
+            {
+                "group": "true",
+                "group.ngroups": "true",
+                "group.limit": group_limit,
+                "group.field": "docket_id",
+                "group.sort": group_sort,
+            },
+        )
         main_params.update(group_params)
 
 
@@ -783,7 +807,7 @@ def regroup_snippets(results):
             group["snippets"] = snippets
 
 
-def print_params(params):
+def print_params(params: SearchParam) -> None:
     if settings.DEBUG:
         print(
             "Params sent to search are:\n%s"
@@ -792,7 +816,7 @@ def print_params(params):
         # print results_si.execute()
 
 
-def cleanup_main_query(query_string):
+def cleanup_main_query(query_string: str) -> str:
     """Enhance the query string with some simple fixes
 
      - Make any numerical queries into phrases (except dates)
@@ -839,12 +863,21 @@ def cleanup_main_query(query_string):
     return "".join(cleaned_items)
 
 
-def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
-    main_params = {
-        "q": cleanup_main_query(cd["q"] or "*"),
-        "sort": cd.get("order_by", order_by),
-        "caller": "build_main_query",
-    }
+def build_main_query(
+    cd: CleanData,
+    highlight: str = "all",
+    order_by: str = "",
+    facet: bool = True,
+    group: bool = True,
+) -> SearchParam:
+    main_params = cast(
+        SearchParam,
+        {
+            "q": cleanup_main_query(cd["q"] or "*"),
+            "sort": cd.get("order_by", order_by),
+            "caller": "build_main_query",
+        },
+    )
     add_faceting(main_params, cd, facet)
     add_boosts(main_params, cd)
     add_highlighting(main_params, cd, highlight)
@@ -856,8 +889,10 @@ def build_main_query(cd, highlight="all", order_by="", facet=True, group=True):
 
 
 def build_main_query_from_query_string(
-    query_string, updates=None, kwargs=None
-):
+    query_string,
+    updates=None,
+    kwargs=None,
+) -> Optional[SearchParam]:
     """Build a main query dict from a query string
 
     :param query_string: A GET string to build from.
@@ -883,44 +918,47 @@ def build_main_query_from_query_string(
     return main_query
 
 
-def build_coverage_query(court, q, facet_field):
+def build_coverage_query(court: str, q: str, facet_field: str) -> SearchParam:
     """
     Create a coverage that can be used to make a facet query
 
     :param court: String representation of the court to filter to, e.g. 'ca1',
     defaults to 'all'.
-    :type court: str
     :param q: A query to limit the coverage query, defaults to '*'
-    :type q: str
     :param facet_field: The field to do faceting on
     :type facet_field: str
     :return: A coverage query dict
-    :rtype: dict
     """
-    params = {
-        "facet": "true",
-        "facet.range": facet_field,
-        "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
-        "facet.range.end": "NOW/DAY",
-        "facet.range.gap": "+1YEAR",
-        "rows": 0,
-        "q": q or "*",  # Without this, results will be omitted.
-        "caller": "build_coverage_query",
-    }
+    params = cast(
+        SearchParam,
+        {
+            "facet": "true",
+            "facet.range": facet_field,
+            "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
+            "facet.range.end": "NOW/DAY",
+            "facet.range.gap": "+1YEAR",
+            "rows": 0,
+            "q": q or "*",  # Without this, results will be omitted.
+            "caller": "build_coverage_query",
+        },
+    )
     if court.lower() != "all":
         params["fq"] = ["court_exact:%s" % court]
     return params
 
 
-def build_alert_estimation_query(cd, day_count):
+def build_alert_estimation_query(cd: CleanData, day_count: int) -> SearchParam:
     """Build the parameters for estimating the frequency an alert is
     triggered.
     """
-    params = {
-        "q": cleanup_main_query(cd["q"] or "*"),
-        "rows": 0,
-        "caller": "alert_estimator",
-    }
+    params = cast(
+        SearchParam,
+        {
+            "q": cleanup_main_query(cd["q"] or "*"),
+            "rows": 0,
+            "caller": "alert_estimator",
+        },
+    )
     cd["filed_after"] = date.today() - timedelta(days=day_count)
     cd["filed_before"] = None
     add_filter_queries(params, cd)
@@ -929,29 +967,35 @@ def build_alert_estimation_query(cd, day_count):
     return params
 
 
-def build_court_count_query(group: bool = False) -> Dict[str, Union[int, str]]:
+def build_court_count_query(group: bool = False) -> SearchParam:
     """Build a query that returns the count of cases for all courts
 
     :param group: Should the results be grouped? Note that grouped facets have
     bad performance.
     """
-    params = {
-        "q": "*",
-        "facet": "true",
-        "facet.field": "court_exact",
-        "facet.limit": -1,
-        "rows": 0,
-        "caller": "build_court_count_query",
-    }
+    params = cast(
+        SearchParam,
+        {
+            "q": "*",
+            "facet": "true",
+            "facet.field": "court_exact",
+            "facet.limit": -1,
+            "rows": 0,
+            "caller": "build_court_count_query",
+        },
+    )
     if group:
         params.update(
-            {
-                "group": "true",
-                "group.ngroups": "true",
-                "group.field": "docket_id",
-                "group.limit": "0",
-                "group.facet": "true",
-            }
+            cast(
+                SearchParam,
+                {
+                    "group": "true",
+                    "group.ngroups": "true",
+                    "group.field": "docket_id",
+                    "group.limit": "0",
+                    "group.facet": "true",
+                },
+            )
         )
     return params
 
@@ -1137,15 +1181,22 @@ def get_related_clusters_with_cache(
     return related_clusters, sub_opinion_ids, url_search_params
 
 
-def get_mlt_query(si, cd, facet, seed_pks, filter_query):
+def get_mlt_query(
+    si: ExtraSolrInterface,
+    cd: CleanData,
+    facet: bool,
+    seed_pks: List[str],
+    filter_query: str,
+) -> SolrResponse:
     """
-    By default Solr MoreLikeThis queries do not support highlighting. Thus, we use a special search interface
-    and build the Solr query manually.
+    By default Solr MoreLikeThis queries do not support highlighting. Thus, we
+    use a special search interface and build the Solr query manually.
 
     :param si: SolrInterface
     :param cd: Cleaned search form data
     :param facet: Set to True to enable facets
-    :param seed_pks: List of IDs of the documents for that related documents should be returned
+    :param seed_pks: List of IDs of the documents for that related documents
+    should be returned
     :param filter_query:
     :return: Executed SolrSearch
     """
