@@ -1,6 +1,6 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, cast, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -718,7 +718,7 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
     # main_params var. Otherwise, we don't, as doing so throws an error.
     if len(main_fq) > 0:
         if "fq" in main_params:
-            main_params["fq"].append(main_fq)
+            main_params["fq"].extend(main_fq)
         else:
             main_params["fq"] = main_fq
 
