@@ -78,6 +78,7 @@ jobs:
           cl/corpus_importer/management/commands/import_tn.py \
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
+          cl/lib/search_utils.py \
           cl/lib/storage.py \
           cl/lib/string_utils.py \
           cl/lib/types.py \
