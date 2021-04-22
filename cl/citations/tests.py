@@ -137,22 +137,23 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print(
-                "Testing plain text to html conversion for %s..." % s, end=" "
-            )
-            opinion = Opinion(plain_text=s)
-            get_and_clean_opinion_text(opinion)
-            citations = get_citations(opinion.cleaned_text)
-            created_html = create_cited_html(
-                opinion=opinion,
-                citations=citations,
-            )
-            self.assertEqual(
-                created_html,
-                expected_html,
-                msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
-            )
-            print("✓")
+            with self.subTest(
+                "Testing plain text to html conversion for %s..." % s,
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(plain_text=s)
+                get_and_clean_opinion_text(opinion)
+                citations = get_citations(opinion.cleaned_text)
+                created_html = create_cited_html(
+                    opinion=opinion,
+                    citations=citations,
+                )
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                )
 
     def test_make_html_from_html(self) -> None:
         """Can we convert the HTML of an opinion into modified HTML?"""
@@ -188,20 +189,23 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print("Testing html to html conversion for %s..." % s, end=" ")
-            opinion = Opinion(html=s)
-            get_and_clean_opinion_text(opinion)
-            citations = get_citations(opinion.cleaned_text)
-            created_html = create_cited_html(
-                opinion=opinion,
-                citations=citations,
-            )
-            self.assertEqual(
-                created_html,
-                expected_html,
-                msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
-            )
-            print("✓")
+            with self.subTest(
+                "Testing html to html conversion for %s..." % s,
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(html=s)
+                get_and_clean_opinion_text(opinion)
+                citations = get_citations(opinion.cleaned_text)
+                created_html = create_cited_html(
+                    opinion=opinion,
+                    citations=citations,
+                )
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                )
 
     def test_make_html_from_matched_citation_objects(self) -> None:
         """Can we render matched citation objects as HTML?"""
@@ -232,26 +236,26 @@ class CiteTest(TestCase):
 
         # fmt: on
         for s, expected_html in test_pairs:
-            print(
+            with self.subTest(
                 "Testing object to HTML rendering for %s..." % s,
-                end=" ",
-            )
-            opinion = Opinion(plain_text=s)
-            get_and_clean_opinion_text(opinion)
-            citations = get_citations(opinion.cleaned_text)
-            for c in citations:  # Fake correct matching for the citations
-                c.match_url = "MATCH_URL"
-                c.match_id = "MATCH_ID"
-            created_html = create_cited_html(
-                opinion=opinion,
-                citations=citations,
-            )
-            self.assertEqual(
-                created_html,
-                expected_html,
-                msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
-            )
-            print("✓")
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(plain_text=s)
+                get_and_clean_opinion_text(opinion)
+                citations = get_citations(opinion.cleaned_text)
+                for c in citations:  # Fake correct matching for the citations
+                    c.match_url = "MATCH_URL"
+                    c.match_id = "MATCH_ID"
+                created_html = create_cited_html(
+                    opinion=opinion,
+                    citations=citations,
+                )
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                )
 
 
 class MatchingTest(IndexedSolrTestCase):
@@ -486,19 +490,23 @@ class MatchingTest(IndexedSolrTestCase):
 
         # fmt: on
         for citations, expected_matches in test_pairs:
-            print("Testing citation matching for %s..." % citations)
+            with self.subTest(
+                "Testing citation matching for %s..." % citations,
+                citations=citations,
+                expected_matches=expected_matches,
+            ):
+                # The citing opinion does not matter for this test
+                citing_opinion = Opinion.objects.get(pk=1)
 
-            # The citing opinion does not matter for this test
-            citing_opinion = Opinion.objects.get(pk=1)
-
-            citation_matches = get_citation_matches(citing_opinion, citations)
-            self.assertEqual(
-                citation_matches,
-                expected_matches,
-                msg="\n%s\n\n    !=\n\n%s"
-                % (citation_matches, expected_matches),
-            )
-            print("✓")
+                citation_matches = get_citation_matches(
+                    citing_opinion, citations
+                )
+                self.assertEqual(
+                    citation_matches,
+                    expected_matches,
+                    msg="\n%s\n\n    !=\n\n%s"
+                    % (citation_matches, expected_matches),
+                )
 
     def test_citation_matching_issue621(self) -> None:
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
@@ -563,14 +571,17 @@ class UpdateTest(IndexedSolrTestCase):
         ]
 
         for cited, depth in test_pairs:
-            print("Testing OpinionsCited creation for %s..." % cited, end=" ")
-            self.assertEqual(
-                OpinionsCited.objects.get(
-                    citing_opinion=citing, cited_opinion=cited
-                ).depth,
-                depth,
-            )
-            print("✓")
+            with self.subTest(
+                "Testing OpinionsCited creation for %s..." % cited,
+                cited=cited,
+                depth=depth,
+            ):
+                self.assertEqual(
+                    OpinionsCited.objects.get(
+                        citing_opinion=citing, cited_opinion=cited
+                    ).depth,
+                    depth,
+                )
 
 
 class CitationFeedTest(IndexedSolrTestCase):
@@ -694,42 +705,48 @@ class ParallelCitationTest(SimpleTestCase):
             ("1 U.S. 1 too many words, then 22 U.S. 33, 13 WL 33223", 1, 2),
         )
         for q, citation_group_count, expected_num_parallel_citations in tests:
-            print(
+            with self.subTest(
                 "Testing parallel citation identification for: %s..." % q,
-                end=" ",
-            )
-            citations = get_citations(q)
-            citation_groups = identify_parallel_citations(citations)
-            computed_num_citation_groups = len(citation_groups)
-            self.assertEqual(
-                computed_num_citation_groups,
-                citation_group_count,
-                msg="Did not have correct number of citation groups. Got %s, "
-                "not %s."
-                % (computed_num_citation_groups, citation_group_count),
-            )
-            if not citation_groups:
-                # Add an empty list to make testing easier.
-                citation_groups = [[]]
-            computed_num_parallel_citation = len(list(citation_groups)[0])
-            self.assertEqual(
-                computed_num_parallel_citation,
-                expected_num_parallel_citations,
-                msg="Did not identify correct number of parallel citations in "
-                "the group. Got %s, not %s"
-                % (
+                q=q,
+                citation_group_count=citation_group_count,
+                expected_num_parallel_citations=expected_num_parallel_citations,
+            ):
+                citations = get_citations(q)
+                citation_groups = identify_parallel_citations(citations)
+                computed_num_citation_groups = len(citation_groups)
+                self.assertEqual(
+                    computed_num_citation_groups,
+                    citation_group_count,
+                    msg="Did not have correct number of citation groups. Got %s, "
+                    "not %s."
+                    % (computed_num_citation_groups, citation_group_count),
+                )
+                if not citation_groups:
+                    # Add an empty list to make testing easier.
+                    citation_groups = [[]]
+                computed_num_parallel_citation = len(list(citation_groups)[0])
+                self.assertEqual(
                     computed_num_parallel_citation,
                     expected_num_parallel_citations,
-                ),
-            )
-            print("✓")
+                    msg="Did not identify correct number of parallel citations in "
+                    "the group. Got %s, not %s"
+                    % (
+                        computed_num_parallel_citation,
+                        expected_num_parallel_citations,
+                    ),
+                )
 
     def test_making_edge_list(self) -> None:
-        """Can we make networkx-friendly edge lists?"""
+        """Can we make network-friendly edge lists?"""
         tests = [
             ([1, 2], [(1, 2)]),
             ([1, 2, 3], [(1, 2), (2, 3)]),
             ([1, 2, 3, 4], [(1, 2), (2, 3), (3, 4)]),
         ]
         for q, a in tests:
-            self.assertEqual(make_edge_list(q), a)
+            with self.subTest(
+                "Testing network-friendly edge creation for: %s..." % q,
+                q=q,
+                a=a,
+            ):
+                self.assertEqual(make_edge_list(q), a)
