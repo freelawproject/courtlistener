@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from urllib.parse import urljoin
 
 import magic
+import re
 import requests
 from django.conf import settings
 from django.db.models import QuerySet
@@ -69,6 +70,8 @@ def get_extension(content: str) -> str:
         mime = "text/plain"
     elif file_str.startswith("WordPerfect document"):
         mime = "application/vnd.wordperfect"
+    elif re.match(file_str, r"Audio file with ID3.*MPEG.*layer III"):
+        mime = "audio/mpeg"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)
