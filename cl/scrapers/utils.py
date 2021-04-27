@@ -1,12 +1,12 @@
 import mimetypes
 import os
+import re
 import sys
 import traceback
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
 import magic
-import re
 import requests
 from django.conf import settings
 from django.db.models import QuerySet
