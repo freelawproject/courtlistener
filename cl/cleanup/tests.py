@@ -296,7 +296,7 @@ with Virginia Historic Tax Credit Fund""",
             self.assertEqual(computed, answer)
 
     def test_tax_court_citation_extractor(self) -> None:
-        """Find Tax Court Citations """
+        """Find Tax Court Citations"""
 
         test_pairs = (
             (
