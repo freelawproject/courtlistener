@@ -290,7 +290,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
 
 
 class Investment(AbstractDateTimeModel):
-    """ Financial Disclosure Investments Table"""
+    """Financial Disclosure Investments Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -376,7 +376,7 @@ class Investment(AbstractDateTimeModel):
 
 
 class Position(AbstractDateTimeModel):
-    """ Financial Disclosure Position Table"""
+    """Financial Disclosure Position Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -403,7 +403,7 @@ class Position(AbstractDateTimeModel):
 
 
 class Agreement(AbstractDateTimeModel):
-    """ Financial Disclosure Agreements Table"""
+    """Financial Disclosure Agreements Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -463,7 +463,7 @@ class NonInvestmentIncome(AbstractDateTimeModel):
 
 
 class SpouseIncome(AbstractDateTimeModel):
-    """ Financial Disclosure Judge Spouse Income Table"""
+    """Financial Disclosure Judge Spouse Income Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -532,7 +532,7 @@ class Reimbursement(AbstractDateTimeModel):
 
 
 class Gift(AbstractDateTimeModel):
-    """ Financial Disclosure Gifts Table"""
+    """Financial Disclosure Gifts Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,
@@ -562,7 +562,7 @@ class Gift(AbstractDateTimeModel):
 
 
 class Debt(AbstractDateTimeModel):
-    """ Financial Disclosure Judicial Debts/Liabilities Table"""
+    """Financial Disclosure Judicial Debts/Liabilities Table"""
 
     financial_disclosure = models.ForeignKey(
         FinancialDisclosure,

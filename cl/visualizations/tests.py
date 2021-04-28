@@ -27,7 +27,7 @@ from cl.visualizations.network_utils import reverse_endpoints_if_needed
 
 
 class TestVizUtils(TestCase):
-    """ Tests for Visualization app utils """
+    """Tests for Visualization app utils"""
 
     fixtures = ["scotus_map_data.json"]
 
@@ -61,7 +61,7 @@ class TestVizUtils(TestCase):
 
 
 class TestVizModels(TestCase):
-    """ Tests for Visualization models """
+    """Tests for Visualization models"""
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
@@ -73,7 +73,7 @@ class TestVizModels(TestCase):
         )
 
     def test_SCOTUSMap_builds_nx_digraph(self) -> None:
-        """ Tests build_nx_digraph method to see how it works """
+        """Tests build_nx_digraph method to see how it works"""
         viz = SCOTUSMap(
             user=self.user,
             cluster_start=self.start,
@@ -108,7 +108,7 @@ class TestVizModels(TestCase):
 
 
 class TestViews(TestCase):
-    """ Tests for Visualization views """
+    """Tests for Visualization views"""
 
     view = "new_visualization"
 
@@ -130,7 +130,7 @@ class TestViews(TestCase):
         JSONVersion.objects.all().delete()
 
     def test_new_visualization_view_provides_form(self) -> None:
-        """ Test a GET to the Visualization view provides a VizForm """
+        """Test a GET to the Visualization view provides a VizForm"""
         self.assertTrue(
             self.client.login(username="user", password="password")
         )
@@ -139,7 +139,7 @@ class TestViews(TestCase):
         self.assertIsInstance(response.context["form"], VizForm)
 
     def test_new_visualization_view_creates_map_on_post(self) -> None:
-        """ Test a valid POST creates a new ScotusMap object """
+        """Test a valid POST creates a new ScotusMap object"""
         SCOTUSMap.objects.all().delete()
 
         self.assertTrue(
@@ -160,7 +160,7 @@ class TestViews(TestCase):
         _ = SCOTUSMap.objects.get(title="Test Map Title")
 
     def test_published_visualizations_show_in_gallery(self) -> None:
-        """ Test that a user can see published visualizations from others """
+        """Test that a user can see published visualizations from others"""
         self.assertTrue(
             self.client.login(username="user", password="password")
         )
@@ -171,7 +171,7 @@ class TestViews(TestCase):
         self.assertIn("FREE KESHA", html)
 
     def test_cannot_view_anothers_private_visualization(self) -> None:
-        """ Test unpublished visualizations cannot be seen by others """
+        """Test unpublished visualizations cannot be seen by others"""
         viz = SCOTUSMap.objects.get(pk=2)
         self.assertFalse(viz.published, "Test SCOTUSMap should be unpublished")
         url = reverse(
