@@ -1,10 +1,8 @@
 import json
 import logging
-import os
 import re
 from datetime import timedelta
 from typing import Dict, List, Optional, Union
-from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -32,10 +30,7 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.lib.bot_detector import is_og_bot
-from cl.lib.decorators import track_in_matomo
 from cl.lib.ratelimiter import ratelimiter_unsafe_1_per_m
-from cl.opinion_page.views import view_recap_document
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
@@ -369,67 +364,3 @@ def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
         {"private": True},
         status=HTTP_429_TOO_MANY_REQUESTS,
     )
-
-
-@track_in_matomo(timeout=0.01)
-def serve_static_file(
-    request: HttpRequest,
-    file_path: str = "",
-) -> HttpResponse:
-    """Serve a recap file or redirect to HTML if it's a bot.
-
-    Use nginx's X-Accel system to set headers without putting files in memory.
-    """
-    # If it's a open graph crawler, serve the HTML page so they can get
-    # thumbnails instead of serving the PDF binary.
-    og_disabled = bool(request.GET.get("no-og"))
-    if is_og_bot(request) and not og_disabled:
-        # Serve up the regular HTML page, which has the twitter card info.
-        try:
-            rd = RECAPDocument.objects.get(filepath_local=file_path)
-        except (
-            RECAPDocument.DoesNotExist,
-            RECAPDocument.MultipleObjectsReturned,
-        ):
-            # Fall through; serve it normally.
-            pass
-        else:
-            return view_recap_document(
-                request,
-                docket_id=rd.docket_entry.docket_id,
-                doc_num=rd.document_number,
-                att_num=rd.attachment_number,
-            )
-
-    response = HttpResponse()
-    response["Content-Type"] = "application/pdf"
-
-    file_name = file_path.split("/")[-1]
-
-    # HTTP headers didn't get encoding figured out until recently. As a result
-    # content disposition headers are a mess. Luckily, we can steal the junk
-    # below from Django.
-    try:
-        # Try with ascii. If it works, do it.
-        file_name.encode("ascii")
-        file_expr = 'filename="{}"'.format(file_name)
-    except UnicodeEncodeError:
-        # Ascii failed. Do utf-8 params.
-        file_expr = "filename*=utf-8''{}".format(quote(file_name))
-    response["Content-Disposition"] = "inline; %s" % file_expr
-
-    # Use microcache for RECAP PDFs. This should help with traffic bursts.
-    response["X-Accel-Expires"] = "5"
-    # Block all RECAP PDFs
-    response["X-Robots-Tag"] = "noindex, noodp, noarchive, noimageindex"
-
-    if settings.DEVELOPMENT:
-        # X-Accel-Redirect will only confuse you in a dev env.
-        file_loc = os.path.join(settings.MEDIA_ROOT, file_path)
-        with open(file_loc, "rb") as f:
-            response.content = f.read()
-    else:
-        file_loc = os.path.join("/protected/", file_path)
-        response["X-Accel-Redirect"] = file_loc
-
-    return response
