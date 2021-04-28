@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='docket',
             name='filepath_local',
-            field=models.FileField(default='', upload_to=cl.lib.model_helpers.make_recap_path, storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, blank=True, help_text="Path to RECAP's Docket XML page."),
+            field=models.FileField(default='', upload_to=cl.lib.model_helpers.make_recap_path, max_length=1000, blank=True, help_text="Path to RECAP's Docket XML page."),
             preserve_default=False,
         ),
         migrations.AlterField(
