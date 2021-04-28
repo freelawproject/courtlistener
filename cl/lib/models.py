@@ -7,7 +7,13 @@ from cl.lib.model_helpers import (
     make_pdf_path,
     make_pdf_thumb_path,
 )
-from cl.lib.storage import IncrementingFileSystemStorage
+from cl.lib.storage import AWSMediaStorage, IncrementingAWSMediaStorage
+
+s3_warning_note = (
+    "Note that the field name is historical, from before when we used S3. To "
+    "find the location in S3, concatenate https://storage.courtlistener.com/ "
+    "and the value of this field."
+)
 
 
 class THUMBNAIL_STATUSES(object):
@@ -69,9 +75,10 @@ class AbstractPDF(models.Model):
         null=True,
     )
     filepath_local = models.FileField(
-        help_text="The path of the file in the local storage area.",
+        help_text=f"The path is AWS S3 where the file is saved. "
+        f"{s3_warning_note}",
         upload_to=make_pdf_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         db_index=True,
         blank=True,
@@ -87,9 +94,10 @@ class AbstractPDF(models.Model):
         blank=True,
     )
     thumbnail = models.FileField(
-        help_text="A thumbnail of the first page of the document",
+        help_text="The path to a thumbnail in S3 of the first page of the "
+        "document.",
         upload_to=make_pdf_thumb_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=IncrementingAWSMediaStorage(),
         null=True,
         blank=True,
     )
@@ -135,6 +143,7 @@ class AbstractJSON(AbstractFile):
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_lasc_json_path,
+        storage=AWSMediaStorage(),
         max_length=150,
         blank=True,
     )
@@ -156,10 +165,3 @@ class Note(AbstractDateTimeModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
-
-
-s3_warning_note = (
-    "Note that the field name is historical, from before when we used S3. To "
-    "find the location in S3, concatenate https://storage.courtlistener.com/ "
-    "and the value of this field."
-)
