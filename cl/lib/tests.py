@@ -284,10 +284,10 @@ class UUIDFileSystemStorageTest(SimpleTestCase):
 
 
 class TestMimeLookup(TestCase):
-    """ Test the Mime type lookup function(s)"""
+    """Test the Mime type lookup function(s)"""
 
     def test_unsupported_extension_returns_octetstream(self) -> None:
-        """ For a bad extension, do we return the proper default? """
+        """For a bad extension, do we return the proper default?"""
         tests = [
             "/var/junk/filename.something.xyz",
             "../var/junk/~filename_something",
@@ -299,7 +299,7 @@ class TestMimeLookup(TestCase):
             )
 
     def test_known_good_mimetypes(self) -> None:
-        """ For known good mimetypes, make sure we return the right value """
+        """For known good mimetypes, make sure we return the right value"""
         tests = {
             "mp3/2015/1/1/something_v._something_else.mp3": "audio/mpeg",
             "doc/2015/1/1/voutila_v._bonvini.doc": "application/msword",
@@ -312,12 +312,12 @@ class TestMimeLookup(TestCase):
 
 @override_settings(MAINTENANCE_MODE_ENABLED=True)
 class TestMaintenanceMiddleware(TestCase):
-    """ Test the maintenance middleware """
+    """Test the maintenance middleware"""
 
     fixtures = ["authtest_data.json"]
 
     def test_middleware_works_when_enabled(self) -> None:
-        """ Does the middleware block users when enabled? """
+        """Does the middleware block users when enabled?"""
         r = self.client.get(reverse("show_results"))
         self.assertEqual(
             r.status_code,
@@ -327,7 +327,7 @@ class TestMaintenanceMiddleware(TestCase):
         )
 
     def test_staff_can_get_through(self) -> None:
-        """ Can staff get through when the middleware is enabled? """
+        """Can staff get through when the middleware is enabled?"""
         self.assertTrue(
             self.client.login(username="admin", password="password")
         )

@@ -29,7 +29,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_blocked_opinion(self) -> None:
-        """ For a blocked Opinion, an Admin should see indication. """
+        """For a blocked Opinion, an Admin should see indication."""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -46,7 +46,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_non_admin_viewing_blocked_opinion(self) -> None:
-        """ For a blocked Opinion, a Non-admin should see NO indication. """
+        """For a blocked Opinion, a Non-admin should see NO indication."""
         # Pandora (not an Admin) logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
@@ -63,7 +63,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_opinion(self) -> None:
-        """ For a non-blocked Opinion, there should be no indication """
+        """For a non-blocked Opinion, there should be no indication"""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -95,7 +95,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_blocked_docket(self) -> None:
-        """ For a blocked Dockets, an Admin should see indication. """
+        """For a blocked Dockets, an Admin should see indication."""
         # Admin navigates to CL and logs in
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -111,7 +111,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_non_admin_viewing_blocked_docket(self) -> None:
-        """ For a blocked Docket, a Non-admin should see NO indication. """
+        """For a blocked Docket, a Non-admin should see NO indication."""
         # Pandora navigates to CL and logs in
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
@@ -138,7 +138,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_docket(self) -> None:
-        """ For a non-blocked Docket, there should be no indication. """
+        """For a non-blocked Docket, there should be no indication."""
         # Admin navigates to CL and logs in
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -170,7 +170,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_blocked_audio_page(self) -> None:
-        """ For a blocked Audio pages, an Admin should see indication. """
+        """For a blocked Audio pages, an Admin should see indication."""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
@@ -195,7 +195,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_non_admin_viewing_blocked_audio_page(self) -> None:
-        """ For a blocked Audio pages, a Non-admin should see NO indication. """
+        """For a blocked Audio pages, a Non-admin should see NO indication."""
         # Pandora logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
@@ -217,7 +217,7 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_audio_page(self) -> None:
-        """ For a non-blocked Audio pages, there should be no indication """
+        """For a non-blocked Audio pages, there should be no indication"""
         # Admin logs into CL using her admin account
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
