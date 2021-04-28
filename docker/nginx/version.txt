@@ -1,5 +1,6 @@
-0.0.21
+0.0.22
 
+0.0.22: Add redirection support for RECAP PDFs.
 0.0.21: Add recap-thumbnails to storage.cl.com redirection. This also remvoes
         our last usage of the X-Accel-Redirect, and thus removes the
         /protected/ location block. If we want to serve static files again
