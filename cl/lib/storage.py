@@ -72,6 +72,11 @@ class AWSMediaStorage(S3Boto3Storage):
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
 
+
+class IncrementingAWSMediaStorage(AWSMediaStorage):
+
+    file_overwrite = False
+
     def get_available_name(
         self,
         name: str,
