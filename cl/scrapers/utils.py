@@ -1,5 +1,6 @@
 import mimetypes
 import os
+import re
 import sys
 import traceback
 from typing import Optional, Tuple
@@ -69,6 +70,8 @@ def get_extension(content: str) -> str:
         mime = "text/plain"
     elif file_str.startswith("WordPerfect document"):
         mime = "application/vnd.wordperfect"
+    elif re.match(file_str, r"Audio file with ID3.*MPEG.*layer III"):
+        mime = "audio/mpeg"
     else:
         # No workaround necessary
         mime = magic.from_buffer(content, mime=True)
