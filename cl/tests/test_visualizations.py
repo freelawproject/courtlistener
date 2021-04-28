@@ -31,7 +31,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_creating_new_visualization(self) -> None:
-        """ Test if a user can create a new Visualization """
+        """Test if a user can create a new Visualization"""
         # Beth Beta-User logs into CL
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("user", "password")

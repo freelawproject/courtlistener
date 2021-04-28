@@ -41,7 +41,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         """
 
         def patched_path(self, name):
-            """ Patching Path method to use MEDIA_ROOT properly """
+            """Patching Path method to use MEDIA_ROOT properly"""
             return "%s%s" % (settings.MEDIA_ROOT, name)
 
         IncrementingFileSystemStorage.path = patched_path

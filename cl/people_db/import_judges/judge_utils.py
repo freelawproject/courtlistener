@@ -19,7 +19,7 @@ from cl.people_db.models import (
 
 
 def process_date(year, month, day):
-    """ return date object and accompanying granularity """
+    """return date object and accompanying granularity"""
     if pd.isnull(year) or year in ["n/a", "N/A", "present"]:
         pdate = None
         granularity = ""
