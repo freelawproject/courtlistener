@@ -3,7 +3,7 @@ from typing import Dict, Optional, Union
 from django.db import models
 
 from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
-from cl.lib.storage import AWSMediaStorage
+from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.people_db.models import Person
 
 
@@ -194,14 +194,14 @@ class FinancialDisclosure(AbstractDateTimeModel):
     filepath = models.FileField(
         help_text="The filepath to the disclosure normalized to a PDF.",
         upload_to=pdf_path,
-        storage=AWSMediaStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=300,
         db_index=True,
     )
     thumbnail = models.FileField(
         help_text="A thumbnail of the first page of the disclosure form.",
         upload_to=thumbnail_path,
-        storage=AWSMediaStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=300,
         null=True,
         blank=True,
