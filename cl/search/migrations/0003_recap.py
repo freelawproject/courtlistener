@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ('pacer_doc_id', models.CharField(help_text='The ID of the document in PACER. This information is provided by RECAP.', unique=True, max_length=32)),
                 ('is_available', models.BooleanField(default=False, null=True, blank=True, help_text='True if the item is available in RECAP')),
                 ('sha1', models.CharField(help_text='The ID used for a document in RECAP', max_length=40, blank=True)),
-                ('filepath_local', models.FileField(help_text='The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_recap_path)),
+                ('filepath_local', models.FileField(help_text='The path of the file in the local storage area.', max_length=1000, upload_to=cl.lib.model_helpers.make_recap_path)),
                 ('filepath_ia', models.CharField(help_text='The URL of the file in IA', max_length=1000)),
                 ('docket_entry', models.ForeignKey(help_text='Foreign Key to the DocketEntry object to which it belongs. Multiple documents can belong to a DocketEntry. (Attachments and Documents together)', to='search.DocketEntry',
                                                    on_delete=models.CASCADE)),
@@ -79,7 +79,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='docket',
             name='filepath_local',
-            field=models.FileField(upload_to=cl.lib.model_helpers.make_recap_path, storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, blank=True, help_text='Path to RECAP\'s Docket XML page.', null=True),
+            field=models.FileField(upload_to=cl.lib.model_helpers.make_recap_path, max_length=1000, blank=True, help_text='Path to RECAP\'s Docket XML page.', null=True),
         ),
         migrations.AddField(
             model_name='docket',

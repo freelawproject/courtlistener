@@ -28,7 +28,7 @@ from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
 )
-from cl.lib.storage import AWSMediaStorage, IncrementingFileSystemStorage
+from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
@@ -516,11 +516,11 @@ class Docket(AbstractDateTimeModel):
         blank=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP's Docket XML page as provided by the "
-        "original RECAP architecture. These fields are for backup purposes "
-        "only.",
+        help_text=f"Path to RECAP's Docket XML page as provided by the "
+        f"original RECAP architecture. These fields are for backup purposes "
+        f"only. {s3_warning_note}",
         upload_to=make_recap_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
     )
@@ -2592,7 +2592,7 @@ class Opinion(AbstractDateTimeModel):
             f"stored. {s3_warning_note}"
         ),
         upload_to=make_upload_path,
-        storage=AWSMediaStorage(),
+        storage=IncrementingAWSMediaStorage(),
         blank=True,
         db_index=True,
     )
