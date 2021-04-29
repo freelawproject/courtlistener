@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.contrib.auth.models import User
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -7,6 +7,7 @@ from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     REQUEST_TYPE,
     UPLOAD_TYPE,
+    EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     ProcessingQueue,
@@ -150,6 +151,75 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+
+
+class EmailProcessingQueueSerializer(serializers.ModelSerializer):
+    uploader = serializers.HiddenField(
+        default=serializers.CurrentUserDefault(),
+    )
+    court = serializers.PrimaryKeyRelatedField(
+        queryset=Court.federal_courts.all(),
+        html_cutoff=500,  # Show all values in HTML view.
+        required=True,
+    )
+    mail = serializers.JSONField(write_only=True)
+    receipt = serializers.JSONField(write_only=True)
+    recap_document = serializers.HyperlinkedRelatedField(
+        many=False,
+        read_only=True,
+        view_name="recapdocument-detail",
+        style={"base_template": "input.html"},
+    )
+
+    class Meta:
+        model = EmailProcessingQueue
+        fields = "__all__"
+        read_only_fields = (
+            "error_message",
+            "status",
+            "recap_documents",
+        )
+
+    def validate(self, attrs):
+        court_id = attrs["court"].pk
+        mail = attrs["mail"]
+        receipt = attrs["receipt"]
+
+        all_court_ids = Court.federal_courts.all_pacer_courts().values_list(
+            "pk", flat=True
+        )
+
+        if court_id not in all_court_ids:
+            raise ValidationError(
+                "%s is not a PACER court ID." % attrs["court"].pk
+            )
+
+        for attr_name in ["timestamp", "source", "destination", "headers"]:
+            if (
+                mail.get(attr_name) is None
+                or mail.get(attr_name) == "undefined"
+            ):
+                raise ValidationError(
+                    "The JSON value at key 'mail' should include '%s'."
+                    % attr_name
+                )
+
+        for attr_name in ["timestamp", "recipients"]:
+            if (
+                receipt.get(attr_name) is None
+                or receipt.get(attr_name) == "undefined"
+            ):
+                raise ValidationError(
+                    "The JSON value at key 'receipt' should include '%s'."
+                    % attr_name
+                )
+
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("mail", None)
+        validated_data.pop("receipt", None)
+        return super().create(validated_data)
 
 
 class PacerFetchQueueSerializer(serializers.ModelSerializer):

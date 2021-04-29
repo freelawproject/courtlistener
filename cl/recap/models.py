@@ -3,7 +3,11 @@ from django.db import models
 
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel, AbstractFile
-from cl.lib.storage import UUIDFileSystemStorage
+from cl.lib.storage import (
+    AWSMediaStorage,
+    IncrementingAWSMediaStorage,
+    UUIDFileSystemStorage,
+)
 from cl.recap.constants import DATASET_SOURCES, NOO_CODES, NOS_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
@@ -40,6 +44,10 @@ def make_recap_processing_queue_path(instance, filename):
 
 def make_recap_data_path(instance, filename):
     return make_path("recap-data", filename)
+
+
+def make_recap_email_processing_queue_aws_path(instance, filename: str) -> str:
+    return f"recap-email/{filename}"
 
 
 class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
@@ -210,6 +218,50 @@ class ProcessingQueue(AbstractDateTimeModel):
 
     def print_file_contents(self):
         print(self.file_contents)
+
+
+class EmailProcessingQueue(AbstractDateTimeModel):
+    uploader = models.ForeignKey(
+        User,
+        help_text="The user that sent in the email for processing.",
+        related_name="recap_email_processing_queue",
+        on_delete=models.CASCADE,
+    )
+    court = models.ForeignKey(
+        Court,
+        help_text="The court where the upload was from",
+        related_name="recap_email_processing_queue",
+        on_delete=models.CASCADE,
+    )
+    filepath = models.FileField(
+        help_text="The S3 filepath to the email and receipt stored as JSON text.",
+        upload_to=make_recap_email_processing_queue_aws_path,
+        storage=IncrementingAWSMediaStorage(),
+        max_length=300,
+        null=True,
+    )
+    status = models.SmallIntegerField(
+        help_text="The current status of this upload. Possible values "
+        "are: %s"
+        % ", ".join(
+            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
+        ),
+        default=PROCESSING_STATUS.ENQUEUED,
+        choices=PROCESSING_STATUS.NAMES,
+        db_index=True,
+    )
+    status_message = models.TextField(
+        help_text="Any errors that occurred while processing an item",
+        blank=True,
+    )
+    recap_documents = models.ManyToManyField(
+        RECAPDocument,
+        related_name="recap_email_processing_queue",
+        help_text="Document(s) created from the PACER email, processed as a function of this queue.",
+    )
+
+    def __str__(self) -> str:
+        return f"EmailProcessingQueue: {self.pk} in court {self.court_id}"
 
 
 class REQUEST_TYPE:

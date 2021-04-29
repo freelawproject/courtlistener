@@ -41,6 +41,7 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
+    EmailProcessingQueue,
     PacerFetchQueue,
     ProcessingQueue,
 )
@@ -456,6 +457,63 @@ class ProcessingQueueApiFilterTest(TestCase):
         r = self.client.get(self.path, {"upload_type": UPLOAD_TYPE.PDF})
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_pdfs)
+
+
+class RecapEmailToEmailProcessingQueueTest(TestCase):
+    """Test the rest endpoint, but exclude the processing tasks."""
+
+    fixtures = ["canb_court.json"]
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = "Token " + self.user.auth_token.key
+        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v3/recap-email/"
+        test_dir = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets"
+        )
+        with open(os.path.join(test_dir, "recap_mail_receipt.json")) as file:
+            recap_mail_receipt = json.loads(file.read())
+            self.data = {
+                "court": "akd",
+                "mail": recap_mail_receipt["mail"],
+                "receipt": recap_mail_receipt["receipt"],
+            }
+
+    def test_non_pacer_court_fails(self):
+        self.data["court"] = "scotus"
+        r = self.client.post(self.path, self.data, format="json")
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            j["non_field_errors"], ["scotus is not a PACER court ID."]
+        )
+
+    def test_missing_mail_properties_fails(self):
+        del self.data["mail"]["headers"]
+        r = self.client.post(self.path, self.data, format="json")
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            j["non_field_errors"],
+            ["The JSON value at key 'mail' should include 'headers'."],
+        )
+
+    def test_missing_receipt_properties_fails(self):
+        del self.data["receipt"]["recipients"]
+        r = self.client.post(self.path, self.data, format="json")
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            j["non_field_errors"],
+            ["The JSON value at key 'receipt' should include 'recipients'."],
+        )
+
+    def test_email_processing_queue_create(self):
+        self.assertEqual(EmailProcessingQueue.objects.count(), 0)
+        self.client.post(self.path, self.data, format="json")
+        self.assertEqual(EmailProcessingQueue.objects.count(), 1)
 
 
 class DebugRecapUploadtest(TestCase):
