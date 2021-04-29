@@ -1,14 +1,21 @@
+import json
+from io import StringIO
+
+from django.contrib.auth.models import User
+from django.core.files import File
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import (
     BigPagination,
+    EmailProcessingQueueAPIUsers,
     LoggingMixin,
     RECAPUploaders,
     RECAPUsersReadOnly,
 )
 from cl.recap.api_serializers import (
+    EmailProcessingQueueSerializer,
     FjcIntegratedDatabaseSerializer,
     PacerDocIdLookUpSerializer,
     PacerFetchQueueSerializer,
@@ -20,6 +27,7 @@ from cl.recap.filters import (
     ProcessingQueueFilter,
 )
 from cl.recap.models import (
+    EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     ProcessingQueue,
@@ -43,6 +51,28 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     def perform_create(self, serializer):
         pq = serializer.save(uploader=self.request.user)
         process_recap_upload(pq)
+
+
+class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
+    permission_classes = (EmailProcessingQueueAPIUsers,)
+    queryset = EmailProcessingQueue.objects.all().order_by("-id")
+    serializer_class = EmailProcessingQueueSerializer
+
+    def get_stream_for_mail_and_receipt(self, mail, receipt) -> StringIO:
+        payload = {"mail": mail, "receipt": receipt}
+        stream: StringIO = StringIO()
+        stream.write(json.dumps(payload))
+        return stream
+
+    def perform_create(self, serializer):
+        filepath_stream = self.get_stream_for_mail_and_receipt(
+            self.request.data["mail"], self.request.data["receipt"]
+        )
+        recap_email_user = User.objects.get(username="recap-email")
+        epq = serializer.save(
+            filepath=File(filepath_stream), uploader=recap_email_user
+        )
+        return epq
 
 
 class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
