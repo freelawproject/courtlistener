@@ -33,6 +33,7 @@ from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.lib.types import EmailType
+from cl.lib.url_utils import sanitize_redirection
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -45,12 +46,7 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
-from cl.users.utils import (
-    convert_to_stub_account,
-    emails,
-    message_dict,
-    sanitize_redirection,
-)
+from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
