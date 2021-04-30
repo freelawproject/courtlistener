@@ -1,13 +1,42 @@
 from urllib.parse import quote
 
 from django.conf import settings
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
-def sanitize_redirection(request: HttpRequest) -> str:
-    """Security and sanity checks on redirections.
+def get_redirect_or_login_url(request: HttpRequest, field_name: str) -> str:
+    """Get the redirect if it's safe, or send the user to the login page
+
+    :param request: The HTTP request
+    :param field_name: The field where the redirect is located
+    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
+    a sanity or security check failed.
+    """
+    url = request.GET.get(field_name, "")
+    is_safe = is_safe_url(url, request)
+    if not is_safe:
+        return settings.LOGIN_REDIRECT_URL
+    return url
+
+
+def get_redirect_or_404(request: HttpRequest, field_name: str) -> str:
+    """Get the redirect if safe, or throw a 404
+
+    :param request: The HTTP request
+    :param field_name: The field where the redirect is located
+    :return: The URL if it was safe
+    """
+    url = request.GET.get(field_name, "")
+    is_safe = is_safe_url(url, request)
+    if not is_safe:
+        raise Http404(f"Unsafe redirect URL: {url}")
+    return url
+
+
+def is_safe_url(s: str, request: HttpRequest) -> bool:
+    """Check whether a redirect URL is safe
 
     Much of this code was grabbed from Django:
 
@@ -26,14 +55,13 @@ def sanitize_redirection(request: HttpRequest) -> str:
 
     1. Prevent dangerous URLs (like JavaScript)
 
-    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
-    a sanity or security check failed.
+    :param s: The URL to check
+    :param request: The user request
+    :return True if safe, else False
     """
-    redirect_to = request.GET.get("next", "")
-
     # Fixes security vulnerability reported upstream to Django, where
     # whitespace can be provided in the scheme like "java\nscript:alert(bad)"
-    redirect_to = quote(redirect_to)
+    redirect_to = quote(s)
     sign_in_url = reverse("sign-in") in redirect_to
     register_in_url = reverse("register") in redirect_to
     garbage_url = " " in redirect_to
@@ -44,5 +72,5 @@ def sanitize_redirection(request: HttpRequest) -> str:
         require_https=request.is_secure(),
     )
     if any([sign_in_url, register_in_url, garbage_url, no_url, not_safe_url]):
-        return settings.LOGIN_REDIRECT_URL
-    return redirect_to
+        return False
+    return True
