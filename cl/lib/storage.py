@@ -47,17 +47,6 @@ def get_name_by_incrementing(
     return name
 
 
-class IncrementingFileSystemStorage(FileSystemStorage):
-    """A storage class that increments the filename."""
-
-    def get_available_name(
-        self,
-        name: str,
-        max_length: Optional[int] = None,
-    ) -> str:
-        return get_name_by_incrementing(self, name, max_length)
-
-
 class UUIDFileSystemStorage(FileSystemStorage):
     """Implements a simple UUID file system storage.
 
@@ -82,6 +71,11 @@ class AWSMediaStorage(S3Boto3Storage):
     location = ""
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
+
+
+class IncrementingAWSMediaStorage(AWSMediaStorage):
+
+    file_overwrite = False
 
     def get_available_name(
         self,

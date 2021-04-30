@@ -1,5 +1,5 @@
 import logging
-import os
+from tempfile import NamedTemporaryFile
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
@@ -289,7 +289,7 @@ def process_recap_pdf(self, pk):
         [
             rd.sha1 == new_sha1,
             rd.is_available,
-            rd.filepath_local and os.path.isfile(rd.filepath_local.path),
+            rd.filepath_local,
         ]
     )
     if not existing_document:
@@ -306,9 +306,15 @@ def process_recap_pdf(self, pk):
             rd.filepath_local.save(file_name, cf, save=False)
 
             # Do page count and extraction
-            extension = rd.filepath_local.path.split(".")[-1]
-            rd.page_count = get_page_count(rd.filepath_local.path, extension)
-            rd.file_size = rd.filepath_local.size
+            extension = rd.filepath_local.name.split(".")[-1]
+            with NamedTemporaryFile(
+                prefix="rd_page_count_",
+                suffix=f".{extension}",
+                buffering=0,
+            ) as tmp:
+                tmp.write(content)
+                rd.page_count = get_page_count(tmp.name, extension)
+                rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
         rd.is_available = True
@@ -1084,7 +1090,7 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd(self, rd_pk, fq_pk):
+def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages

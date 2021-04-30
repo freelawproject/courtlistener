@@ -79,8 +79,7 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     :return: None
     """
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
-    pdf_url = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
-    pdf_content = requests.get(url=pdf_url, timeout=2).content
+    pdf_content = disclosure.filepath.read()
 
     try:
         thumbnail_content = generate_thumbnail(pdf_content)

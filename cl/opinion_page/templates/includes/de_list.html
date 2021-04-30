@@ -31,14 +31,14 @@
                 <div class="col-xs-3">
                   <p>
                     {% if rd.document_type == rd.ATTACHMENT %}
-                      {% if rd.filepath_local.name %}
+                      {% if rd.filepath_local %}
                         <a href="{{ rd.get_absolute_url }}">Att<span
                                 class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
                       {% else %}
                         Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
                       {% endif %}
                     {% else %}
-                      {% if rd.filepath_local.name %}
+                      {% if rd.filepath_local %}
                         <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
                       {% else %}
                         Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
@@ -61,7 +61,7 @@
                 {# Hide this if an unnumbered minute entry #}
                 <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
                   {% if rd.filepath_local %}
-                    <a href="/{{ rd.filepath_local }}"
+                    <a href="{{ rd.filepath_local.url }}"
                        role="button"
                        class="btn btn-primary btn-xs"
                             {% if rd.date_upload %}
@@ -79,7 +79,7 @@
                     </button>
                     <ul class="dropdown-menu">
                       <li>
-                        <a href="/{{ rd.filepath_local }}">From
+                        <a href="{{ rd.filepath_local.url }}">From
                           CourtListener</a>
                       </li>
                       {% if rd.filepath_ia %}
@@ -115,7 +115,7 @@
                 </div>
                 <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
                   {% if rd.filepath_local %}
-                    <a href="/{{ rd.filepath_local }}"
+                    <a href="{{ rd.filepath_local.url }}"
                        role="button"
                        class="btn btn-primary btn-xs"
                        title="Download PDF"><i class="fa fa-download"></i>
