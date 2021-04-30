@@ -303,19 +303,22 @@ class CourtMatchingTest(unittest.TestCase):
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
 
+    fixtures = ["court_test_asset.json"]
+
     NUM_PARTIES = 3
     NUM_PETRO_ATTYS = 6
     NUM_FLOYD_ROLES = 3
     NUM_DOCKET_ENTRIES = 123
-    DOCKET_PATH = os.path.join(
-        settings.MEDIA_ROOT, "test", "xml", "gov.uscourts.akd.41664.docket.xml"
-    )
 
     def setUp(self) -> None:
-        self.docket = find_docket_object("akd", "41664", "3:11-cv-00064")
-        process_docket_data(
-            self.docket, self.DOCKET_PATH, UPLOAD_TYPE.IA_XML_FILE
+        docket_number = "3:11-cv-00064"
+        self.docket = find_docket_object("akd", "41664", docket_number)
+        self.docket.filepath_local = (
+            "/test/xml/gov.uscourts.akd.41664.docket.xml"
         )
+        self.docket.docket_number = docket_number
+        self.docket.save()
+        process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
