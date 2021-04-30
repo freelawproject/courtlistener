@@ -30,8 +30,10 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
+from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
@@ -39,6 +41,7 @@ from cl.lib.search_utils import (
     make_get_string,
 )
 from cl.lib.string_utils import trunc
+from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -46,7 +49,6 @@ from cl.opinion_page.forms import (
     TennWorkersForm,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
-from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import (
     Citation,
@@ -117,6 +119,38 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request, "publish.html", {"form": form, "private": True, "pk": pk}
     )
+
+
+def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
+    """Redirect an open graph bot to the page for a RECAP document so that
+    it can get good thumbnails and metadata even though it's a PDF.
+
+    If it hits an error, send the bot back to AWS to get the PDF, but set
+    "no-og" parameter to be sure the file gets served.
+    """
+    file_path = request.GET.get("file_path")
+    if not file_path:
+        raise Http404("No file_path parameter provided.")
+
+    try:
+        rd = RECAPDocument.objects.get(filepath_local=file_path)
+    except (
+        RECAPDocument.DoesNotExist,
+        RECAPDocument.MultipleObjectsReturned,
+    ):
+        # We couldn't find the URL. Redirect back to AWS, but be sure to serve
+        # the file this time. Ideally this doesn't happen, but let's be ready
+        # in case it does.
+        return HttpResponseRedirect(
+            f"https://storage.courtlistener.com/{file_path}?no-og=1"
+        )
+    else:
+        return view_recap_document(
+            request,
+            docket_id=rd.docket_entry.docket_id,
+            doc_num=rd.document_number,
+            att_num=rd.attachment_number,
+        )
 
 
 def redirect_docket_recap(

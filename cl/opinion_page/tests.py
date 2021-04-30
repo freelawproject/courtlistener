@@ -1,6 +1,8 @@
 import datetime
 import os
 import shutil
+from unittest import mock
+from unittest.mock import MagicMock
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -151,6 +153,34 @@ class ViewRecapDocketTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+
+
+class OgRedirectLookupViewTest(TestCase):
+
+    fixtures = ["recap_docs.json"]
+
+    def setUp(self) -> None:
+        self.client = Client(HTTP_USER_AGENT="facebookexternalhit")
+        self.url = reverse("redirect_og_lookup")
+
+    def test_do_we_404_no_param(self) -> None:
+        """Does the view return 404 when no parameters given?"""
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+
+    def test_unknown_doc(self) -> None:
+        """Do we redirect to S3 when unknown file path?"""
+        r = self.client.get(self.url, {"file_path": "xxx"})
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+
+    @mock.patch("cl.opinion_page.views.make_png_thumbnail_for_instance")
+    def test_success_goes_to_view(self, mock: MagicMock) -> None:
+        path = (
+            "recap/dev.gov.uscourts.txnd.28766/gov.uscourts.txnd.28766.1.0.pdf"
+        )
+        r = self.client.get(self.url, {"file_path": path})
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        mock.assert_called_once()
 
 
 class NewDocketAlertTest(TestCase):
