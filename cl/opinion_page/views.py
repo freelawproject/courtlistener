@@ -344,6 +344,29 @@ def make_rd_title(rd: RECAPDocument) -> str:
     )
 
 
+def make_thumb_if_needed(
+    request: HttpRequest,
+    rd: RECAPDocument,
+) -> RECAPDocument:
+    """Make a thumbnail for a RECAP Document, if needed
+
+    If a thumbnail is needed, can be made and should be made, make one.
+
+    :param request: The request sent to the server
+    :param rd: A RECAPDocument object
+    """
+    needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
+    if all([needs_thumb, rd.has_valid_pdf, is_og_bot(request)]):
+        make_png_thumbnail_for_instance(
+            pk=rd.pk,
+            klass=RECAPDocument,
+            file_attr="filepath_local",
+            max_dimension=1068,
+        )
+        rd.refresh_from_db()
+    return rd
+
+
 @ratelimit_if_not_whitelisted
 def view_recap_document(
     request: HttpRequest,
