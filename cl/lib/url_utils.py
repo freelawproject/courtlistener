@@ -35,7 +35,7 @@ def get_redirect_or_404(request: HttpRequest, field_name: str) -> str:
     return url
 
 
-def is_safe_url(s: str, request: HttpRequest) -> bool:
+def is_safe_url(url: str, request: HttpRequest) -> bool:
     """Check whether a redirect URL is safe
 
     Much of this code was grabbed from Django:
@@ -55,19 +55,18 @@ def is_safe_url(s: str, request: HttpRequest) -> bool:
 
     1. Prevent dangerous URLs (like JavaScript)
 
-    :param s: The URL to check
+    :param url: The URL to check
     :param request: The user request
     :return True if safe, else False
     """
-    # Fixes security vulnerability reported upstream to Django, where
+    sign_in_url = reverse("sign-in") in url
+    register_in_url = reverse("register") in url
+    # Fixes security vulnerability reported upstream to Python, where
     # whitespace can be provided in the scheme like "java\nscript:alert(bad)"
-    redirect_to = quote(s)
-    sign_in_url = reverse("sign-in") in redirect_to
-    register_in_url = reverse("register") in redirect_to
-    garbage_url = " " in redirect_to
-    no_url = not redirect_to
+    garbage_url = any([c in url for c in ["\n", "\r", " "]])
+    no_url = not url
     not_safe_url = not url_has_allowed_host_and_scheme(
-        redirect_to,
+        url,
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
     )
