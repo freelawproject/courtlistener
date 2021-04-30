@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Prefetch
+from django.db.models import Prefetch
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
@@ -42,6 +42,7 @@ from cl.lib.search_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
+from cl.lib.url_utils import get_redirect_or_404
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -128,9 +129,7 @@ def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
     If it hits an error, send the bot back to AWS to get the PDF, but set
     "no-og" parameter to be sure the file gets served.
     """
-    file_path = request.GET.get("file_path")
-    if not file_path:
-        raise Http404("No file_path parameter provided.")
+    file_path = get_redirect_or_404(request, "file_path")
 
     try:
         rd = RECAPDocument.objects.get(filepath_local=file_path)
