@@ -13,7 +13,7 @@ from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.files.base import ContentFile, File
+from django.core.files.base import ContentFile
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
