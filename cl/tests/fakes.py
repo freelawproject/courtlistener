@@ -65,4 +65,4 @@ class FakeFreeOpinionReport:
         pass
 
     def download_pdf(self, *args, **kwargs):
-        return MagicMock(content="")
+        return MagicMock(content=b"")
