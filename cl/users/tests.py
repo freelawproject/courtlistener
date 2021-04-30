@@ -90,23 +90,24 @@ class UserTest(LiveServerTestCase):
                 path=reverse("register_success"),
                 next=next_param,
             )
-            print("Checking redirect on %s" % bad_url)
             response = self.client.get(bad_url)
-            if is_evil:
-                self.assertNotIn(
-                    next_param,
-                    response.content.decode(),
-                    msg="'%s' found in HTML of response. This suggests it was "
-                    "not cleaned by the sanitize_redirection function."
-                    % next_param,
-                )
-            else:
-                self.assertIn(
-                    next_param,
-                    response.content.decode(),
-                    msg="'%s' not found in HTML of response. This suggests it "
-                    "was sanitized when it should not have been." % next_param,
-                )
+            with self.subTest("Checking redirect", url=bad_url):
+                if is_evil:
+                    self.assertNotIn(
+                        next_param,
+                        response.content.decode(),
+                        msg="'%s' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function."
+                        % next_param,
+                    )
+                else:
+                    self.assertIn(
+                        next_param,
+                        response.content.decode(),
+                        msg="'%s' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been."
+                        % next_param,
+                    )
 
     def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
