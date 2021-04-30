@@ -10,7 +10,6 @@ from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.lib.storage import IncrementingFileSystemStorage
 from cl.search.models import Court
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
@@ -27,25 +26,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         "functest_opinions.json",
         "functest_audio.json",
     ]
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Need to work around issue reported and fixed in Django project:
-        https://code.djangoproject.com/ticket/26038
-
-        Overwriting the current 1.8/1.9 logic on FileSystemStorage:
-            def path(self, name):
-                    return safe_join(self.location, name)
-
-        """
-
-        def patched_path(self, name):
-            """Patching Path method to use MEDIA_ROOT properly"""
-            return "%s%s" % (settings.MEDIA_ROOT, name)
-
-        IncrementingFileSystemStorage.path = patched_path
-        super(FeedsFunctionalTest, cls).setUpClass()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self) -> None:
