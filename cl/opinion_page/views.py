@@ -356,7 +356,7 @@ def view_recap_document(
     depending on the URL pattern that is matched.
     """
     try:
-        item = RECAPDocument.objects.filter(
+        rd = RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
             document_number=doc_num,
             attachment_number=att_num,
@@ -364,15 +364,15 @@ def view_recap_document(
     except IndexError:
         raise Http404("No RECAPDocument matches the given query.")
 
-    title = make_rd_title(item)
-    item = make_thumb_if_needed(request, item)
+    title = make_rd_title(rd)
+    rd = make_thumb_if_needed(request, rd)
     try:
-        fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
+        fave = Favorite.objects.get(recap_doc_id=rd.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(
             initial={
-                "recap_doc_id": item.pk,
+                "recap_doc_id": rd.pk,
                 "name": trunc(title, 100, ellipsis="..."),
             }
         )
@@ -383,7 +383,7 @@ def view_recap_document(
         request,
         "recap_document.html",
         {
-            "document": item,
+            "rd": rd,
             "title": title,
             "favorite_form": favorite_form,
             "private": True,  # Always True for RECAP docs.
