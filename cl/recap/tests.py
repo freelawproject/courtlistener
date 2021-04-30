@@ -46,6 +46,7 @@ from cl.recap.models import (
 )
 from cl.recap.tasks import (
     do_pacer_fetch,
+    fetch_pacer_doc_by_rd,
     process_recap_appellate_docket,
     process_recap_attachment,
     process_recap_claims_register,
@@ -339,8 +340,14 @@ class RecapPdfFetchApiTest(TestCase):
 
     def test_fetch_available_pdf(self, mock_get_cookie):
         orig_date_modified = self.rd.date_modified
-        result = do_pacer_fetch(self.fq)
-        result.get()
+
+        response = fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
+        self.assertIsNone(
+            response,
+            "Did not get None from fetch, indicating that the fetch did "
+            "something, but it shouldn't have done anything when the doc is "
+            "available.",
+        )
 
         self.fq.refresh_from_db()
         self.rd.refresh_from_db()
