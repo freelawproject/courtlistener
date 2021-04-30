@@ -972,11 +972,13 @@ class BulkDataTest(TestCase):
     def test_database_has_objects_for_bulk_export(self) -> None:
         # This is a very weird test. It's essentially just testing the
         # setUp function, which...OK?
-        self.assertTrue(Opinion.objects.count() > 0, "Opinions exist")
-        self.assertTrue(OpinionsCited.objects.count() > 0, "Citations exist")
-        self.assertTrue(Audio.objects.count() > 0, "Audio exist")
-        self.assertTrue(Docket.objects.count() > 0, "Docket exist")
-        self.assertTrue(Court.objects.count() > 0, "Court exist")
+        self.assertTrue(Opinion.objects.count() > 0, "No opinions exist")
+        self.assertTrue(
+            OpinionsCited.objects.count() > 0, "No citations exist"
+        )
+        self.assertTrue(Audio.objects.count() > 0, "No audio exist")
+        self.assertTrue(Docket.objects.count() > 0, "No docket exist")
+        self.assertTrue(Court.objects.count() > 0, "No courts exist")
         self.assertEqual(
             Court.objects.get(pk="test").full_name, "Testing Supreme Court"
         )

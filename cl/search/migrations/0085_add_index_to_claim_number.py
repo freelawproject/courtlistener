@@ -37,11 +37,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='claimhistory',
             name='thumbnail',
-            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the document', null=True, storage=cl.lib.storage.IncrementingFileSystemStorage(), upload_to=cl.lib.model_helpers.make_pdf_thumb_path),
+            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the document', null=True,  upload_to=cl.lib.model_helpers.make_pdf_thumb_path),
         ),
         migrations.AlterField(
             model_name='recapdocument',
             name='thumbnail',
-            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the document', null=True, storage=cl.lib.storage.IncrementingFileSystemStorage(), upload_to=cl.lib.model_helpers.make_pdf_thumb_path),
+            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the document', null=True,  upload_to=cl.lib.model_helpers.make_pdf_thumb_path),
         ),
     ]

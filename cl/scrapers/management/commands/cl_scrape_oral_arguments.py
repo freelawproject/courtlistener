@@ -114,75 +114,73 @@ class Command(cl_scrape_opinions.Command):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         abort = dup_checker.abort_by_url_hash(site.url, site.hash)
-        if not abort:
-            if site.cookies:
-                logger.info("Using cookies: %s" % site.cookies)
-            for i, item in enumerate(site):
-                msg, r = get_binary_content(
-                    item["download_urls"],
-                    site.cookies,
-                    method=site.method,
-                )
-                if msg:
-                    logger.warning(msg)
-                    ErrorLog(
-                        log_level="WARNING", court=court, message=msg
-                    ).save()
-                    continue
+        if abort:
+            return
 
-                content = site.cleanup_content(r.content)
-
-                current_date = item["case_dates"]
-                try:
-                    next_date = site[i + 1]["case_dates"]
-                except IndexError:
-                    next_date = None
-
-                # request.content is sometimes a str, sometimes unicode, so
-                # force it all to be bytes, pleasing hashlib.
-                sha1_hash = sha1(force_bytes(content))
-                onwards = dup_checker.press_on(
-                    Audio,
-                    current_date,
-                    next_date,
-                    lookup_value=sha1_hash,
-                    lookup_by="sha1",
-                )
-                if dup_checker.emulate_break:
-                    break
-
-                if onwards:
-                    # Not a duplicate, carry on
-                    logger.info(
-                        "Adding new document found at: %s"
-                        % item["download_urls"].encode()
-                    )
-                    dup_checker.reset()
-
-                    docket, audio_file = make_objects(
-                        item, court, sha1_hash, content
-                    )
-
-                    save_everything(
-                        items={"docket": docket, "audio_file": audio_file},
-                        index=False,
-                        backscrape=backscrape,
-                    )
-                    process_audio_file.apply_async(
-                        (audio_file.pk,), countdown=random.randint(0, 3600)
-                    )
-
-                    logger.info(
-                        "Successfully added audio file {pk}: {name}".format(
-                            pk=audio_file.pk,
-                            name=item["case_names"].encode(),
-                        )
-                    )
-
-            # Update the hash if everything finishes properly.
-            logger.info(
-                "%s: Successfully crawled oral arguments." % site.court_id
+        if site.cookies:
+            logger.info("Using cookies: %s" % site.cookies)
+        for i, item in enumerate(site):
+            msg, r = get_binary_content(
+                item["download_urls"],
+                site.cookies,
+                method=site.method,
             )
-            if not full_crawl:
-                # Only update the hash if no errors occurred.
-                dup_checker.update_site_hash(site.hash)
+            if msg:
+                logger.warning(msg)
+                ErrorLog(log_level="WARNING", court=court, message=msg).save()
+                continue
+
+            content = site.cleanup_content(r.content)
+
+            current_date = item["case_dates"]
+            try:
+                next_date = site[i + 1]["case_dates"]
+            except IndexError:
+                next_date = None
+
+            # request.content is sometimes a str, sometimes unicode, so
+            # force it all to be bytes, pleasing hashlib.
+            sha1_hash = sha1(force_bytes(content))
+            onwards = dup_checker.press_on(
+                Audio,
+                current_date,
+                next_date,
+                lookup_value=sha1_hash,
+                lookup_by="sha1",
+            )
+            if dup_checker.emulate_break:
+                break
+
+            if onwards:
+                # Not a duplicate, carry on
+                logger.info(
+                    "Adding new document found at: %s"
+                    % item["download_urls"].encode()
+                )
+                dup_checker.reset()
+
+                docket, audio_file = make_objects(
+                    item, court, sha1_hash, content
+                )
+
+                save_everything(
+                    items={"docket": docket, "audio_file": audio_file},
+                    index=False,
+                    backscrape=backscrape,
+                )
+                process_audio_file.apply_async(
+                    (audio_file.pk,), countdown=random.randint(0, 3600)
+                )
+
+                logger.info(
+                    "Successfully added audio file {pk}: {name}".format(
+                        pk=audio_file.pk,
+                        name=item["case_names"].encode(),
+                    )
+                )
+
+        # Update the hash if everything finishes properly.
+        logger.info("%s: Successfully crawled oral arguments." % site.court_id)
+        if not full_crawl:
+            # Only update the hash if no errors occurred.
+            dup_checker.update_site_hash(site.hash)

@@ -1,4 +1,3 @@
-import os
 import re
 from typing import Any, Dict, List
 
@@ -28,7 +27,7 @@ from cl.lib.search_index_utils import (
     normalize_search_dicts,
     null_map,
 )
-from cl.lib.storage import AWSMediaStorage, IncrementingFileSystemStorage
+from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
@@ -516,11 +515,11 @@ class Docket(AbstractDateTimeModel):
         blank=True,
     )
     filepath_local = models.FileField(
-        help_text="Path to RECAP's Docket XML page as provided by the "
-        "original RECAP architecture. These fields are for backup purposes "
-        "only.",
+        help_text=f"Path to RECAP's Docket XML page as provided by the "
+        f"original RECAP architecture. These fields are for backup purposes "
+        f"only. {s3_warning_note}",
         upload_to=make_recap_path,
-        storage=IncrementingFileSystemStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
     )
@@ -822,7 +821,7 @@ class Docket(AbstractDateTimeModel):
                     }
                 )
                 if rd.filepath_local:
-                    rd_out["filepath_local"] = rd.filepath_local.path
+                    rd_out["filepath_local"] = rd.filepath_local.name
                 try:
                     rd_out["absolute_url"] = rd.get_absolute_url()
                 except NoReverseMatch:
@@ -863,9 +862,7 @@ class Docket(AbstractDateTimeModel):
         if do_original_xml and self.filepath_local:
             from cl.recap.models import UPLOAD_TYPE
 
-            process_docket_data(
-                self, self.filepath_local.path, UPLOAD_TYPE.IA_XML_FILE
-            )
+            process_docket_data(self, UPLOAD_TYPE.IA_XML_FILE)
 
         # Then layer the uploads on top of that.
         for html in self.html_documents.order_by("date_created"):
@@ -1135,16 +1132,8 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 )
 
     @property
-    def has_valid_pdf(self):
-        return all(
-            [
-                self.is_available,
-                (
-                    self.filepath_local
-                    and os.path.isfile(self.filepath_local.path)
-                ),
-            ]
-        )
+    def has_valid_pdf(self) -> bool:
+        return self.is_available and self.filepath_local
 
     @property
     def needs_extraction(self):
@@ -1343,7 +1332,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             }
         )
         if self.filepath_local:
-            out["filepath_local"] = self.filepath_local.path
+            out["filepath_local"] = self.filepath_local.name
 
         try:
             out["absolute_url"] = self.get_absolute_url()
@@ -2592,7 +2581,7 @@ class Opinion(AbstractDateTimeModel):
             f"stored. {s3_warning_note}"
         ),
         upload_to=make_upload_path,
-        storage=AWSMediaStorage(),
+        storage=IncrementingAWSMediaStorage(),
         blank=True,
         db_index=True,
     )

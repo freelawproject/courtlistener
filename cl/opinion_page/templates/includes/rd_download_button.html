@@ -1,6 +1,6 @@
 <div class="btn-group v-offset-below-3 v-offset-above-1">
-  {% if document.is_available %}
-    <a href="/{{ document.filepath_local }}"
+  {% if rd.is_available %}
+    <a href="{{ rd.filepath_local.url }}"
        role="button"
        class="btn btn-primary">Download PDF&nbsp;<i
       class="fa fa-file-pdf-o"></i>
@@ -15,19 +15,19 @@
     </button>
     <ul class="dropdown-menu">
       <li>
-        <a href="/{{ document.filepath_local }}">From
+        <a href="{{ rd.filepath_local.url }}">From
           CourtListener</a>
       </li>
-      {% if document.filepath_ia %}
+      {% if rd.filepath_ia %}
         <li>
-          <a href="{{ document.filepath_ia }}">From
+          <a href="{{ rd.filepath_ia }}">From
             Internet Archive</a>
         </li>
         <li role="separator" class="divider"></li>
       {% endif %}
-      {% if document.pacer_url %}
+      {% if rd.pacer_url %}
         <li>
-          <a href="{{ document.pacer_url }}"
+          <a href="{{ rd.pacer_url }}"
              target="_blank"
              rel="nofollow">Buy on PACER</a>
         </li>
@@ -35,11 +35,11 @@
     </ul>
   {% else %}
     {# We don't have it #}
-    {% if document.is_sealed %}
+    {% if rd.is_sealed %}
       <span class="btn btn-primary disabled">This Item is Sealed</span>
     {% else %}
-      {% if document.pacer_url %}
-        <a href="{{ document.pacer_url }}"
+      {% if rd.pacer_url %}
+        <a href="{{ rd.pacer_url }}"
            class="btn btn-primary"
            target="_blank"
            rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>

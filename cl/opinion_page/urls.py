@@ -8,6 +8,7 @@ from cl.opinion_page.views import (
     court_publish_page,
     docket_idb_data,
     redirect_docket_recap,
+    redirect_og_lookup,
     view_authorities,
     view_docket,
     view_opinion,
@@ -42,6 +43,11 @@ urlpatterns = [
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
         redirect_docket_recap,
         name="redirect_docket_recap",
+    ),
+    path(
+        "recap/og-lookup/",
+        redirect_og_lookup,
+        name="redirect_og_lookup",
     ),
     path(
         "docket/<int:docket_id>/parties/<blank-slug:slug>/",

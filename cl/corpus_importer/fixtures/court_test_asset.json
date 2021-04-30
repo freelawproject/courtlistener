@@ -42,5 +42,24 @@
       "jurisdiction": "S",
       "notes": ""
     }
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": null,
+      "short_name": "D. Alaska",
+      "citation_string": "D. Alaska",
+      "in_use": true,
+      "url": "http://www.akd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": "2013-08-15T17:49:55Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "District Court, D. Alaska",
+      "position": 202.5,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "akd"
   }
 ]

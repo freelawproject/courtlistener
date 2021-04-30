@@ -17,11 +17,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='audio',
             name='local_path_mp3',
-            field=models.FileField(blank=True, db_index=True, help_text=f"The location in AWS S3 where our enhanced copy of the original audio file is stored. {s3_warning_note}", storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
+            field=models.FileField(blank=True, db_index=True, help_text=f"The location in AWS S3 where our enhanced copy of the original audio file is stored. {s3_warning_note}", storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
         ),
         migrations.AlterField(
             model_name='audio',
             name='local_path_original_file',
-            field=models.FileField(db_index=True, help_text=f"The location in AWS S3 where the original audio file downloaded from the court is stored. {s3_warning_note}", storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
+            field=models.FileField(db_index=True, help_text=f"The location in AWS S3 where the original audio file downloaded from the court is stored. {s3_warning_note}", storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
         ),
     ]
