@@ -131,7 +131,7 @@
                     <p class="bottom">We were unable to extract text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
                     </p>
                   {% elif rd.ocr_status == rd.OCR_NEEDED %}
-                    <p class="bottom">We have not yet extracted text from this document. Please <a href="/{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
+                    <p class="bottom">We have not yet extracted text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
                     </p>
                   {% endif %}
                 </div>
