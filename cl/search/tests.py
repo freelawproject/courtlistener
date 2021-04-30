@@ -2,6 +2,7 @@ import io
 import os
 import time
 from datetime import date
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -279,8 +280,13 @@ class IndexingTest(EmptySolrTestCase):
         """Are URL's coalesced properly?"""
         # Save a docket to the backend using coalescing
 
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "assets", "media", "test", "search"
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "assets"
+            / "media"
+            / "test"
+            / "search"
         )
         self.att_filename = "fake_document.html"
         fake_path = os.path.join(test_dir, self.att_filename)
