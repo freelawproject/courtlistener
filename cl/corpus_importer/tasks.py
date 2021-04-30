@@ -13,7 +13,7 @@ from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
@@ -610,7 +610,7 @@ def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
     responses = upload_to_ia(
         self,
         identifier=bucket_name,
-        files=rd.filepath_local.path,
+        files={file_name: rd.filepath_local},
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
@@ -1577,7 +1577,13 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    rd.page_count = get_page_count(rd.filepath_local.path, "pdf")
+    with NamedTemporaryFile(
+        prefix="rd_for_page_size_",
+        suffix=".pdf",
+        buffering=0,
+    ) as tmp:
+        tmp.write(rd.filepath_local.read())
+        rd.page_count = get_page_count(tmp.name, "pdf")
 
     # Save and extract, skipping OCR.
     rd.save()
