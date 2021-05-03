@@ -12,7 +12,6 @@ from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
 from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.sitemap import SimpleSitemap
-from cl.simple_pages.views import serve_static_file
 from cl.sitemap import cached_sitemap
 from cl.visualizations.sitemap import VizSitemap
 
@@ -62,11 +61,5 @@ urlpatterns = [
     path(
         "removal/",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
-    ),
-    # Catch-alls that could conflict with other regexps -- place them last
-    #   Serve a static file
-    re_path(
-        r"^(?P<file_path>(?:recap)/.+)$",
-        serve_static_file,
     ),
 ] + static("/", document_root=settings.MEDIA_ROOT)

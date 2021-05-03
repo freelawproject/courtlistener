@@ -22,6 +22,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='recapdocument',
             name='filepath_local',
-            field=models.FileField(help_text='The path of the file in the local storage area.', storage=cl.lib.storage.IncrementingFileSystemStorage(), max_length=1000, upload_to=cl.lib.model_helpers.make_pdf_path, blank=True),
+            field=models.FileField(help_text='The path of the file in the local storage area.', max_length=1000, upload_to=cl.lib.model_helpers.make_pdf_path, blank=True),
         ),
     ]

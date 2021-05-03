@@ -33,6 +33,7 @@ from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.lib.types import EmailType
+from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -45,12 +46,7 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
-from cl.users.utils import (
-    convert_to_stub_account,
-    emails,
-    message_dict,
-    sanitize_redirection,
-)
+from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
@@ -358,7 +354,7 @@ def take_out_done(request: HttpRequest) -> HttpResponse:
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
-    redirect_to = sanitize_redirection(request)
+    redirect_to = get_redirect_or_login_url(request, "next")
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
@@ -448,7 +444,7 @@ def register(request: HttpRequest) -> HttpResponse:
 def register_success(request: HttpRequest) -> HttpResponse:
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = sanitize_redirection(request)
+    redirect_to = get_redirect_or_login_url(request, "next")
     email = request.GET.get("email", "")
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return render(

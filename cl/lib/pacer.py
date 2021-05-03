@@ -2,6 +2,7 @@ import logging
 import re
 from collections import OrderedDict
 from datetime import date
+from typing import Optional
 
 import usaddress
 from dateutil import parser
@@ -199,12 +200,13 @@ def get_blocked_status(docket, count_override=None):
     return False, None
 
 
-def process_docket_data(d, filepath, report_type):
+def process_docket_data(
+    d: Docket,
+    report_type: int,
+) -> Optional[int]:
     """Process docket data file.
 
     :param d: A docket object to work on.
-    :param filepath: The path to a saved HTML file containing docket or docket
-    history report data.
     :param report_type: Whether it's a docket or a docket history report.
     """
     from cl.recap.mergers import (
@@ -234,8 +236,7 @@ def process_docket_data(d, filepath, report_type):
             "The report type with id '%s' is not yet "
             "supported. Perhaps you need to add it?" % report_type
         )
-    with open(filepath, "r") as f:
-        text = f.read()
+    text = d.filepath_local.read().decode()
     report._parse_text(text)
     data = report.data
     if data == {}:

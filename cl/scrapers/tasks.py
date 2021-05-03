@@ -443,25 +443,31 @@ def extract_recap_pdf(
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
-        path = rd.filepath_local.path
-        process = make_pdftotext_process(path)
-        content, err = process.communicate()
-        content = content.decode()
 
-        if needs_ocr(content):
-            if not skip_ocr:
-                # probably an image PDF. Send it to OCR.
-                success, content = extract_by_ocr(path)
-                if success:
-                    rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                elif content == "" or not success:
-                    content = "Unable to extract document content."
-                    rd.ocr_status = RECAPDocument.OCR_FAILED
+        with NamedTemporaryFile(
+            prefix="extract_file_",
+            suffix=".pdf",
+            buffering=0,  # Make sure it's on disk when we try to use it
+        ) as tmp:
+            tmp.write(rd.filepath_local.read())
+            process = make_pdftotext_process(tmp.name)
+            content, err = process.communicate()
+            content = content.decode()
+
+            if needs_ocr(content):
+                if not skip_ocr:
+                    # probably an image PDF. Send it to OCR.
+                    success, content = extract_by_ocr(tmp.name)
+                    if success:
+                        rd.ocr_status = RECAPDocument.OCR_COMPLETE
+                    elif content == "" or not success:
+                        content = "Unable to extract document content."
+                        rd.ocr_status = RECAPDocument.OCR_FAILED
+                else:
+                    content = ""
+                    rd.ocr_status = RECAPDocument.OCR_NEEDED
             else:
-                content = ""
-                rd.ocr_status = RECAPDocument.OCR_NEEDED
-        else:
-            rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+                rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
