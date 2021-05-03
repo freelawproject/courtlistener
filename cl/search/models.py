@@ -844,7 +844,7 @@ class Docket(AbstractDateTimeModel):
 
         return search_list
 
-    def reprocess_recap_content(self, do_original_xml=False):
+    def reprocess_recap_content(self, do_original_xml: bool = False) -> None:
         """Go over any associated RECAP files and reprocess them.
 
         Start with the XML, then do them in the order they were received since
@@ -866,7 +866,9 @@ class Docket(AbstractDateTimeModel):
 
         # Then layer the uploads on top of that.
         for html in self.html_documents.order_by("date_created"):
-            process_docket_data(self, html.filepath.path, html.upload_type)
+            process_docket_data(
+                self, html.upload_type, filepath=html.filepath.path
+            )
 
 
 class DocketEntry(AbstractDateTimeModel):

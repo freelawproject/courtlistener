@@ -203,11 +203,14 @@ def get_blocked_status(docket, count_override=None):
 def process_docket_data(
     d: Docket,
     report_type: int,
+    filepath: str = None,
 ) -> Optional[int]:
     """Process docket data file.
 
     :param d: A docket object to work on.
     :param report_type: Whether it's a docket or a docket history report.
+    :param filepath: A local path where the item can be found. If not provided,
+    the filepath_local field of the docket object will be attempted.
     """
     from cl.recap.mergers import (
         add_bankruptcy_data_to_docket,
@@ -236,7 +239,14 @@ def process_docket_data(
             "The report type with id '%s' is not yet "
             "supported. Perhaps you need to add it?" % report_type
         )
-    text = d.filepath_local.read().decode()
+
+    if filepath:
+        with open(filepath, "r") as f:
+            text = f.read()
+    else:
+        # This is an S3 path, so get it remotely.
+        text = d.filepath_local.read().decode()
+
     report._parse_text(text)
     data = report.data
     if data == {}:
