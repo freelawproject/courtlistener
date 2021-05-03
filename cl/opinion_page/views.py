@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Prefetch
+from django.db.models import Prefetch
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
@@ -30,8 +30,10 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
 from cl.lib.auth import group_required
+from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
@@ -39,6 +41,8 @@ from cl.lib.search_utils import (
     make_get_string,
 )
 from cl.lib.string_utils import trunc
+from cl.lib.thumbnails import make_png_thumbnail_for_instance
+from cl.lib.url_utils import get_redirect_or_404
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -46,7 +50,6 @@ from cl.opinion_page.forms import (
     TennWorkersForm,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
-from cl.people_db.tasks import make_thumb_if_needed
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import (
     Citation,
@@ -117,6 +120,36 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request, "publish.html", {"form": form, "private": True, "pk": pk}
     )
+
+
+def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
+    """Redirect an open graph bot to the page for a RECAP document so that
+    it can get good thumbnails and metadata even though it's a PDF.
+
+    If it hits an error, send the bot back to AWS to get the PDF, but set
+    "no-og" parameter to be sure the file gets served.
+    """
+    file_path = get_redirect_or_404(request, "file_path")
+
+    try:
+        rd = RECAPDocument.objects.get(filepath_local=file_path)
+    except (
+        RECAPDocument.DoesNotExist,
+        RECAPDocument.MultipleObjectsReturned,
+    ):
+        # We couldn't find the URL. Redirect back to AWS, but be sure to serve
+        # the file this time. Ideally this doesn't happen, but let's be ready
+        # in case it does.
+        return HttpResponseRedirect(
+            f"https://storage.courtlistener.com/{file_path}?no-og=1"
+        )
+    else:
+        return view_recap_document(
+            request,
+            docket_id=rd.docket_entry.docket_id,
+            doc_num=rd.document_number,
+            att_num=rd.attachment_number,
+        )
 
 
 def redirect_docket_recap(
@@ -344,6 +377,29 @@ def make_rd_title(rd: RECAPDocument) -> str:
     )
 
 
+def make_thumb_if_needed(
+    request: HttpRequest,
+    rd: RECAPDocument,
+) -> RECAPDocument:
+    """Make a thumbnail for a RECAP Document, if needed
+
+    If a thumbnail is needed, can be made and should be made, make one.
+
+    :param request: The request sent to the server
+    :param rd: A RECAPDocument object
+    """
+    needs_thumb = rd.thumbnail_status != THUMBNAIL_STATUSES.COMPLETE
+    if all([needs_thumb, rd.has_valid_pdf, is_og_bot(request)]):
+        make_png_thumbnail_for_instance(
+            pk=rd.pk,
+            klass=RECAPDocument,
+            file_attr="filepath_local",
+            max_dimension=1068,
+        )
+        rd.refresh_from_db()
+    return rd
+
+
 @ratelimit_if_not_whitelisted
 def view_recap_document(
     request: HttpRequest,
@@ -356,7 +412,7 @@ def view_recap_document(
     depending on the URL pattern that is matched.
     """
     try:
-        item = RECAPDocument.objects.filter(
+        rd = RECAPDocument.objects.filter(
             docket_entry__docket__id=docket_id,
             document_number=doc_num,
             attachment_number=att_num,
@@ -364,15 +420,15 @@ def view_recap_document(
     except IndexError:
         raise Http404("No RECAPDocument matches the given query.")
 
-    title = make_rd_title(item)
-    item = make_thumb_if_needed(request, item)
+    title = make_rd_title(rd)
+    rd = make_thumb_if_needed(request, rd)
     try:
-        fave = Favorite.objects.get(recap_doc_id=item.pk, user=request.user)
+        fave = Favorite.objects.get(recap_doc_id=rd.pk, user=request.user)
     except (ObjectDoesNotExist, TypeError):
         # Not favorited or anonymous user
         favorite_form = FavoriteForm(
             initial={
-                "recap_doc_id": item.pk,
+                "recap_doc_id": rd.pk,
                 "name": trunc(title, 100, ellipsis="..."),
             }
         )
@@ -383,7 +439,7 @@ def view_recap_document(
         request,
         "recap_document.html",
         {
-            "document": item,
+            "rd": rd,
             "title": title,
             "favorite_form": favorite_form,
             "private": True,  # Always True for RECAP docs.

@@ -6,16 +6,16 @@
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
-{% block description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
+{% block description %}{% if rd.docket_entry.description %}{{ rd.docket_entry.description }}{% else %}{{ rd.description }}{% endif %}
 {% endblock %}
-{% block og_description %}{% if document.docket_entry.description %}{{ document.docket_entry.description }}{% else %}{{ document.description }}{% endif %}
+{% block og_description %}{% if rd.docket_entry.description %}{{ rd.docket_entry.description }}{% else %}{{ rd.description }}{% endif %}
 {% endblock %}
-{% block twitter_card_type %}{% if document.thumbnail %}summary_large_image{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image %}{% if document.thumbnail %}{% get_full_host %}/{{ document.thumbnail }}{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_alt %}{% if document.thumbnail %}The first page of the document in the linked PDF{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_width %}{% if document.thumbnail %}826{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_height %}{% if document.thumbnail %}1068{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_type %}{% if document.thumbnail %}image/jpeg{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block twitter_card_type %}{% if rd.thumbnail %}summary_large_image{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image %}{% if rd.thumbnail %}{{ rd.thumbnail.url }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_alt %}{% if rd.thumbnail %}The first page of the document in the linked PDF{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_width %}{% if rd.thumbnail %}826{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_height %}{% if rd.thumbnail %}1068{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_type %}{% if rd.thumbnail %}image/jpeg{% else %}{{ block.super }}{% endif %}{% endblock %}
 
 
 {% block navbar-r %}active{% endblock %}
@@ -32,11 +32,11 @@
         <div class="sidebar-section">
             <h4>
                 <i class="fa fa-arrow-circle-o-left gray"></i>
-                <a href="{{ document.docket_entry.docket.get_absolute_url }}">Back to Docket</a>
+                <a href="{{ rd.docket_entry.docket.get_absolute_url }}">Back to Docket</a>
             </h4>
         </div>
 
-        {% include "includes/rd_admin_tools.html" with d=document.docket_entry.docket de=document.docket_entry rd=document %}
+        {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry %}
 
         {# show this div if it is a favorite, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not favorite_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
@@ -70,22 +70,22 @@
          data-target="#modal-save-favorite, #modal-logged-out"
          title="{% if favorite_form.instance.recap_doc_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
       <h2 class="inline"><a
-              href="{{ document.docket_entry.docket.get_absolute_url }}"
-              class="no-underline black-link">{{ document.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
+              href="{{ rd.docket_entry.docket.get_absolute_url }}"
+              class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
       {% include "includes/favorites_modal.html" %}
 
       {% include "includes/rd_metadata_headers.html" %}
       <br>
 
       <div>
-        {% if document.docket_entry.description %}
+        {% if rd.docket_entry.description %}
         <div class="well well-sm">
             <h4>Description</h4>
-            <p>{{ document.docket_entry.description }}</p>
+            <p>{{ rd.docket_entry.description }}</p>
         </div>
         {% endif %}
 
-        {% if document.is_available %}
+        {% if rd.is_available %}
           <ul class="nav nav-tabs v-offset-below-1" role="tablist">
             <li role="presentation" class="active">
               <a href="#pdf"
@@ -102,7 +102,7 @@
           <div class="tab-content">
             <div role="tabpanel" class="tab-pane active" id="pdf">
               <div class="embed-responsive embed-responsive-8by11">
-                <object data="/{{ document.filepath_local }}?no-og=true"
+                <object data="{{ rd.filepath_local.url }}?no-og=true"
                         type="application/pdf"
                         width="100%"
                         height="100%">
@@ -122,16 +122,16 @@
               </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="text">
-              {% if document.ocr_status and document.ocr_status != document.OCR_UNNECESSARY %}
+              {% if rd.ocr_status and rd.ocr_status != rd.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
-                  {% if document.ocr_status == document.OCR_COMPLETE %}
-                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="/{{ document.filepath_local }}" class="visitable">reading the original PDF</a>.
+                  {% if rd.ocr_status == rd.OCR_COMPLETE %}
+                    <p class="bottom">The text of this document was obtained by analyzing a scanned document provided by the court. As a result it may have typos, and you may prefer <a href="{{ rd.filepath_local.url }}" class="visitable">reading the original PDF</a>.
                     </p>
-                  {% elif document.ocr_status == document.OCR_FAILED %}
-                    <p class="bottom">We were unable to extract text from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                  {% elif rd.ocr_status == rd.OCR_FAILED %}
+                    <p class="bottom">We were unable to extract text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
                     </p>
-                  {% elif document.ocr_status == document.OCR_NEEDED %}
-                    <p class="bottom">We have not yet extracted text from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                  {% elif rd.ocr_status == rd.OCR_NEEDED %}
+                    <p class="bottom">We have not yet extracted text from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
                     </p>
                   {% endif %}
                 </div>
@@ -140,11 +140,11 @@
 
               <div id='default-text'>
                 <div id="opinion-content"> {# used by Zotero, Juris-M #}
-                  {% if document.plain_text %}
-                    <pre>{{ document.plain_text }}</pre>
+                  {% if rd.plain_text %}
+                    <pre>{{ rd.plain_text }}</pre>
                   {% else %}
                     <div class="col-sm-12 alert-warning alert">
-                      <p>Text not yet extracted from this document. Please <a href="/{{ document.filepath_local }}" class="visitable">download and read the original PDF</a>.
+                      <p>Text not yet extracted from this document. Please <a href="{{ rd.filepath_local.url }}" class="visitable">download and read the original PDF</a>.
                       </p>
                     </div>
                   {% endif %}
@@ -154,7 +154,7 @@
           </div>
         {% else %}
 
-          {% if document.is_sealed %}
+          {% if rd.is_sealed %}
             <div class="col-sm-12 alert-danger alert">
               <p class="bottom">
                 <i class="fa fa-ban"></i> This item is unavailable in PACER. This is usually caused by the court sealing the document.
@@ -164,9 +164,9 @@
             <div class="col-sm-12 alert-warning alert">
               <p class="bottom">This item is not yet in the RECAP collection.
                 <span class="float-right">
-                  {% if document.pacer_url %}
+                  {% if rd.pacer_url %}
                     <a class="btn btn-primary btn-sm"
-                       href="{{ document.pacer_url }}"
+                       href="{{ rd.pacer_url }}"
                        rel="nofollow"
                        target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
                   {% endif %}

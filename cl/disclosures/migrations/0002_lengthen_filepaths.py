@@ -18,11 +18,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='financialdisclosure',
             name='filepath',
-            field=models.FileField(db_index=True, help_text='The filepath to the disclosure normalized to a PDF.', max_length=300, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.disclosures.models.pdf_path),
+            field=models.FileField(db_index=True, help_text='The filepath to the disclosure normalized to a PDF.', max_length=300, storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.disclosures.models.pdf_path),
         ),
         migrations.AlterField(
             model_name='financialdisclosure',
             name='thumbnail',
-            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the disclosure form.', max_length=300, null=True, storage=cl.lib.storage.AWSMediaStorage(), upload_to=cl.disclosures.models.thumbnail_path),
+            field=models.FileField(blank=True, help_text='A thumbnail of the first page of the disclosure form.', max_length=300, null=True, storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.disclosures.models.thumbnail_path),
         ),
     ]

@@ -35,6 +35,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='lascjson',
             name='filepath',
-            field=models.FileField(blank=True, help_text='The path of the file in the local storage area.', max_length=150, upload_to=cl.lib.model_helpers.make_lasc_json_path),
+            field=models.FileField(blank=True, help_text='The path of the file in the local storage area.', max_length=150, upload_to=cl.lib.model_helpers.make_lasc_json_path, storage=cl.lib.storage.AWSMediaStorage()),
         ),
     ]

@@ -67,7 +67,7 @@ class Migration(migrations.Migration):
                 ('type', models.CharField(max_length=20, choices=[('010combined', 'Combined Opinion'), ('020lead', 'Lead Opinion'), ('030concurrence', 'Concurrence'), ('040dissent', 'Dissent')])),
                 ('sha1', models.CharField(help_text='unique ID for the document, as generated via SHA1 of the binary file or text data', max_length=40, db_index=True)),
                 ('download_url', models.URLField(help_text='The URL on the court website where the document was originally scraped', max_length=500, null=True, db_index=True, blank=True)),
-                ('local_path', models.FileField(help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored', upload_to=cl.lib.model_helpers.make_upload_path, storage=cl.lib.storage.IncrementingFileSystemStorage(), db_index=True, blank=True)),
+                ('local_path', models.FileField(help_text='The location, relative to MEDIA_ROOT on the CourtListener server, where files are stored', upload_to=cl.lib.model_helpers.make_upload_path,  db_index=True, blank=True)),
                 ('plain_text', models.TextField(help_text='Plain text of the document after extraction using pdftotext, wpd2txt, etc.', blank=True)),
                 ('html', models.TextField(help_text='HTML of the document, if available in the original', null=True, blank=True)),
                 ('html_lawbox', models.TextField(help_text='HTML of Lawbox documents', null=True, blank=True)),

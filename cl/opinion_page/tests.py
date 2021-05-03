@@ -1,6 +1,8 @@
 import datetime
 import os
 import shutil
+from unittest import mock
+from unittest.mock import MagicMock
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -16,7 +18,6 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
 )
 
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
@@ -38,14 +39,27 @@ class TitleTest(TestCase):
         self.assertEqual(make_docket_title(d), "foo")
 
 
-class ViewDocumentTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
+class SimpleLoadTest(TestCase):
+    fixtures = [
+        "test_objects_search.json",
+        "judge_judy.json",
+        "recap_docs.json",
+    ]
 
-    def test_simple_url_check_for_document(self) -> None:
+    def test_simple_opinion_page(self) -> None:
         """Does the page load properly?"""
-        response = self.client.get("/opinion/1/asdf/")
-        self.assertEqual(response.status_code, 200)
+        path = reverse("view_case", kwargs={"pk": 1, "_": "asdf"})
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertIn("33 state 1", response.content.decode())
+
+    def test_simple_rd_page(self) -> None:
+        path = reverse(
+            "view_recap_document",
+            kwargs={"docket_id": 1, "doc_num": "1", "slug": "asdf"},
+        )
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
 
 
 class CitationRedirectorTest(TestCase):
@@ -151,6 +165,34 @@ class ViewRecapDocketTest(TestCase):
             follow=True,
         )
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+
+
+class OgRedirectLookupViewTest(TestCase):
+
+    fixtures = ["recap_docs.json"]
+
+    def setUp(self) -> None:
+        self.client = Client(HTTP_USER_AGENT="facebookexternalhit")
+        self.url = reverse("redirect_og_lookup")
+
+    def test_do_we_404_no_param(self) -> None:
+        """Does the view return 404 when no parameters given?"""
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+
+    def test_unknown_doc(self) -> None:
+        """Do we redirect to S3 when unknown file path?"""
+        r = self.client.get(self.url, {"file_path": "xxx"})
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+
+    @mock.patch("cl.opinion_page.views.make_png_thumbnail_for_instance")
+    def test_success_goes_to_view(self, mock: MagicMock) -> None:
+        path = (
+            "recap/dev.gov.uscourts.txnd.28766/gov.uscourts.txnd.28766.1.0.pdf"
+        )
+        r = self.client.get(self.url, {"file_path": path})
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        mock.assert_called_once()
 
 
 class NewDocketAlertTest(TestCase):

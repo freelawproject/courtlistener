@@ -8,7 +8,7 @@ from django.db.models import Q
 
 from cl.lib.model_helpers import make_pdf_path
 from cl.lib.models import AbstractDateTimeModel, AbstractJSON, AbstractPDF
-from cl.lib.storage import AWSMediaStorage
+from cl.lib.storage import IncrementingAWSMediaStorage
 
 
 class UPLOAD_TYPE:
@@ -50,7 +50,7 @@ class LASCPDF(AbstractPDF, AbstractDateTimeModel):
     filepath_s3 = models.FileField(
         help_text="The path of the file in the s3 bucket.",
         upload_to=make_pdf_path,
-        storage=AWSMediaStorage(),
+        storage=IncrementingAWSMediaStorage(),
         max_length=150,
         blank=True,
     )
