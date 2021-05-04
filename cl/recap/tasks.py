@@ -70,7 +70,7 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def process_recap_upload(pq):
+def process_recap_upload(pq: ProcessingQueue) -> None:
     """Process an item uploaded from an extension or API user.
 
     Uploaded objects can take a variety of forms, and we'll need to
