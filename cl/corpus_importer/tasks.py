@@ -750,6 +750,10 @@ def upload_to_ia(
             # Give up for now. It'll get done next time cron is run.
             return
         raise self.retry(exc=exc)
+    except FileNotFoundError as exc:
+        # For some reason the file path is populated but no good. No point in
+        # retrying. Just abort.
+        return
     logger.info(
         "Item uploaded to IA with responses %s"
         % [r.status_code for r in responses]
