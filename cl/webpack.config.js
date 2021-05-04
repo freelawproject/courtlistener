@@ -7,9 +7,10 @@ const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin'
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const baseOutput = {
-  path: path.resolve('./assets/bundles/'),
-  filename: '[name]-[hash].js',
-};
+    path: path.resolve('./assets/bundles/'),
+    filename: '[name]-[hash].js',
+    publicPath: 'http://localhost:3000/assets/bundles/',
+}
 
 module.exports = {
   context: __dirname,
@@ -33,7 +34,14 @@ module.exports = {
   plugins: [
     isDevelopment && new ReactRefreshWebpackPlugin(),
     new CompressionPlugin(),
-    new BundleTracker({ filename: './webpack-stats.json' }),
+    new BundleTracker(
+      {
+        path:__dirname,
+        relativePath: true,
+        filename: './webpack-stats.json',
+        integrity: true
+        }
+      )
   ].filter(Boolean),
 
   module: {
