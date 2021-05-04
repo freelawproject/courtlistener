@@ -43,12 +43,16 @@ module.exports = {
         include: path.join(__dirname, 'assets', 'react'),
         loader: 'babel-loader',
       },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      },
     ],
   },
 
   resolve: {
     modules: ['node_modules'],
-    extensions: ['.js', '.jsx', '.ts', '.tsx'],
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
   devServer: {
     compress: true,
