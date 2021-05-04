@@ -15,5 +15,9 @@
     "noEmit": true,
     "jsx": "react"
   },
-  "include": ["assets/react/**/*"]
+  "include": ["assets/react/**/*"],
+  "typeRoots": [
+            "../node_modules/@types",
+            "../@types"
+        ]
 }
