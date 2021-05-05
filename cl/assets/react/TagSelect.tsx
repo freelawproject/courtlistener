@@ -3,36 +3,11 @@ import { useVirtual } from 'react-virtual';
 import { useCombobox } from 'downshift';
 import { ListItem } from './ListItem';
 import { useTags } from './_useTags';
-import { Association } from './_types';
+import { Association, UserState } from './_types';
 
-function getDataFromReactRoot() {
-  const div = document.querySelector('div#react-root');
-  if (div && div instanceof HTMLElement) {
-    return {
-      isAuthenticated: div.dataset.authenticated === 'true',
-      editUrl: div.dataset.editUrl,
-    };
-  } else {
-    console.error('Unable to fetch credentials from server. Tags disabled.');
-    return { isAuthenticated: undefined, editUrl: undefined };
-  }
-}
 
-function getDocketIdFromH1Tag() {
-  const h1 = document.querySelector('h1[data-id]');
-  if (h1 && h1 instanceof HTMLElement) {
-    return parseInt(h1.dataset.id as string);
-  } else {
-    console.error('Unable to fetch docket number from page. Tags disabled.');
-  }
-}
-
-const TagSelect: React.FC = () => {
+const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
-
-  const { isAuthenticated, editUrl } = getDataFromReactRoot();
-
-  const docket = getDocketIdFromH1Tag();
 
   const {
     infiniteQueryState: { status, canFetchMore, isFetching, isFetchingMore, fetchMore },
@@ -43,7 +18,7 @@ const TagSelect: React.FC = () => {
     addNewTag,
     addNewAssociation,
     deleteAssociation,
-  } = useTags({ docket: docket as number, enabled: !!docket && isAuthenticated });
+  } = useTags({ docket: docket as number, enabled: !!docket && userName, userId: userId });
 
   const parentRef = React.useRef(null);
   const rowVirtualizer = useVirtual({
@@ -130,26 +105,26 @@ const TagSelect: React.FC = () => {
     (nativeEvent.preventDownshiftDefault = true);
 
   return (
-    <div style={{ paddingRight: '3px', position: 'relative' }}>
+    <div>
       <button
         {...getToggleButtonProps({
           onClick: (event) => {
             // Anonymous user
-            if (!isAuthenticated) {
+            if (!userName) {
               disableDownshiftMenuToggle(event);
-              // event.preventDefault();
             }
           },
           onKeyDown: (event) => {
-            if (!isAuthenticated) {
+            if (!userName) {
               disableDownshiftMenuToggle(event);
             }
           },
         })}
         aria-label="toggle tag menu"
-        className={!isAuthenticated ? 'btn btn-primary logged-out-modal-trigger' : 'btn btn-primary'}
+        className={!userName ? 'btn btn-success logged-out-modal-trigger' : 'btn btn-success'}
       >
-        Tags <span className="caret"></span>
+        <i className="fa fa-tags" />
+        &nbsp;Tags <span className="caret" />
       </button>
 
       <div
@@ -193,7 +168,7 @@ const TagSelect: React.FC = () => {
         </a>
         <div
           style={{
-            overflowY: isOpen ? 'scroll' : 'hidden',
+            overflowY: isOpen ? 'auto' : 'hidden',
             maxHeight: '500px',
           }}
         >
@@ -238,6 +213,7 @@ const TagSelect: React.FC = () => {
                         <ListItem
                           isSelected={!!associations.find((a) => a.tag === tag.id)}
                           key={virtualRow.index}
+                          user={userName}
                           {...tag}
                         />
                       )}
