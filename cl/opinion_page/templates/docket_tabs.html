@@ -76,7 +76,7 @@
 
     <h2>{{ docket.court }}</h2>
 
-    {% if docket.pacer_url or docket_entries %}
+    {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
         {% if docket_entries %}
           <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
@@ -101,6 +101,7 @@
             <li><a href="{% url "alert_help" %}#recap-alerts">Learn More</a></li>
           </ul>
         </div>
+        {% include "includes/pacer_links_dropdown.html" %}
       </div>
     {% endif %}
 
