@@ -3,7 +3,6 @@
 {% load humanize %}
 {% load extras %}
 
-
 {% block title %}Tag: &quot;{{ tag.name }}&quot; by {{ tag.user.username }}, {{  tag.view_count|intcomma }} view{{ tag.view_count|pluralize }} – CourtListener.com{% endblock %}
 {% block og_title %}Tag: &quot;{{ tag.name }}&quot; by {{ tag.user.username }}, {{  tag.view_count|intcomma }} view{{ tag.view_count|pluralize }} – CourtListener.com{% endblock %}
 {% block description %}{{ tag.user.username }} created tag &quot;{{ tag.name }}&quot; containing {{ total_tag_count|intcomma }} items. Tags allow you to create public and private collections of items you wish to track.
@@ -12,28 +11,31 @@
 {% endblock %}
 {% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-tag-300x300.png{% endblock %}
 
+{% block footer-scripts %}
+      <script type="text/javascript"
+        src="{{ STATIC_PREFIX }}js/react/main.js"></script>
+    <script type="text/javascript"
+        src="{{ STATIC_PREFIX }}js/react/vendor-7fc02c6513aff82cf8da.js"></script>
+{% endblock %}
+
 
 {% block sidebar %}{% endblock %}
 {% block content %}
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
   <div class="col-xs-12 col-md-10 col-lg-8">
-    {% if tag.user == user %}
-      <div class="float-right v-offset-above-1">
-        <a href="" class="btn btn-primary btn-lg"><i class="fa fa-pencil"></i>&nbsp;Edit</a>
-        <button title="Delete Tag" class="btn btn-danger btn-lg inline delete-tag-button" data-id={{ tag.id }}>
-          <i class="fa fa-times"></i>
-        </button>
-      </div>
-    {% endif %}
-    <h1 class="clearfix"><span class="tag">{{ tag.name }}</span> {% if tag.title %}<small>{{ tag.title }}</small>{% endif %}</h1>
-    <p>Created by <span class="alt">{{ tag.user }}</span> on <span class="alt">{{ tag.date_created|date }}</span> with <span class="alt">{{ tag.view_count|intcomma }} view{{ tag.view_count|pluralize }}</span></p>
 
-    {% if tag.description %}
-      <div class="v-offset-above-3">
-        <h3>Description</h3>
-        {{ tag.description|markdown }}
-      </div>
-    {% endif %}
+    <div id="react-root"
+         data-page-owner="{{ is_page_owner }}"
+         data-description="{{ tag.description }}"
+         data-id="{{ tag.id }}"
+         data-title="{{ tag.title }}"
+         data-user="{{ tag.user }}"
+         data-published="{{ tag.published }}"
+         data-date-created-date="{{ tag.date_created|date }}"
+         data-view-count="{{ tag.view_count|intcomma }} view{{ tag.view_count|pluralize }}"
+         data-name="{{ tag.name }}">
+    </div>
+
 
     {% for docket in dockets %}
       {% if forloop.first %}
@@ -51,6 +53,4 @@
     {% endfor %}
   </div>
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
-  <script defer type="text/javascript" src="{{ STATIC_URL }}js/tag-utils.js?v=20200722"></script>
 {% endblock %}
-
