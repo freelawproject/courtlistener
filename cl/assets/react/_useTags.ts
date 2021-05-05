@@ -1,18 +1,19 @@
 import React from 'react';
 import { useInfiniteQuery, useMutation, queryCache, useQuery } from 'react-query';
 import { appFetch } from './_fetch';
-import { ApiResult, Tag, Association } from './_types';
+import {ApiResult, Tag, Association} from './_types';
 
 interface UseTagsProps {
   docket: number;
-  enabled?: boolean;
+  enabled?: boolean | undefined | string;
+  userId: number | undefined;
 }
 
-export const useTags = ({ docket, enabled }: UseTagsProps) => {
+export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
   const [textVal, setTextVal] = React.useState<string>('');
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?page=${page}`),
+    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
     []
   );
 
@@ -115,8 +116,8 @@ export const useTags = ({ docket, enabled }: UseTagsProps) => {
     const flatTags = !tags
       ? []
       : Object.entries(tags)
-          .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
-          .flat(1);
+        .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
+        .flat(1);
 
     // rebuild tagData with the assocId
     const enhancedTags = flatTags.map((tag: Tag) => {
@@ -135,7 +136,6 @@ export const useTags = ({ docket, enabled }: UseTagsProps) => {
     let exactMatch;
 
     const filtered: Tag[] | undefined = sortedTags.filter((tag: Tag) => {
-      console.log(textVal);
       if (!!textVal && tag.name === textVal) {
         exactMatch = true;
       }
