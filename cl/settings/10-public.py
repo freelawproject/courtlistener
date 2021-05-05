@@ -92,7 +92,6 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "storages",
-    "webpack_loader",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",

@@ -1,15 +1,15 @@
 const path = require('path');
 const webpack = require('webpack');
-const BundleTracker = require('webpack-bundle-tracker');
 const CompressionPlugin = require('compression-webpack-plugin');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+const isDevelopment = process.env.NODE_ENV == 'production';
 
 const baseOutput = {
-    path: path.resolve('./assets/bundles/'),
-    filename: '[name]-[hash].js',
-    publicPath: 'http://localhost:3000/assets/bundles/',
+  path: path.resolve(__dirname, "assets/static-global/js/react/"), // Should be in STATICFILES_DIRS
+  publicPath: "/static/", // Should match Django STATIC_URL
+  filename: "[name].js", // No filename hashing, Django takes care of this
+  chunkFilename: "[id]-[chunkhash].js", // DO have Webpack hash chunk filename, see below
 }
 
 module.exports = {
@@ -23,7 +23,6 @@ module.exports = {
     ? // Tell django to use this URL to load packages and not use STATIC_URL + bundle_name
       { ...baseOutput, publicPath: 'http://localhost:3000/assets/bundles/' }
     : { ...baseOutput },
-
   optimization: {
     removeAvailableModules: true,
     splitChunks: {
@@ -34,16 +33,7 @@ module.exports = {
   plugins: [
     isDevelopment && new ReactRefreshWebpackPlugin(),
     new CompressionPlugin(),
-    new BundleTracker(
-      {
-        path:__dirname,
-        relativePath: true,
-        filename: './webpack-stats.json',
-        integrity: true
-        }
-      )
   ].filter(Boolean),
-
   module: {
     rules: [
       {
@@ -57,12 +47,12 @@ module.exports = {
       },
     ],
   },
-
   resolve: {
     modules: ['node_modules'],
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
   devServer: {
+    writeToDisk: true,
     compress: true,
     headers: {
       'Access-Control-Allow-Origin': '*',
