@@ -174,3 +174,42 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     deleteAssociation,
   };
 };
+
+export const updateTags = () => {
+  //  Update our tag fields
+    const updateTag = React.useCallback(
+    async (tag: Tag ) =>
+      await appFetch(`/api/rest/v3/tags/${tag.id}/`, {
+        method: 'PUT',
+        body: {...tag},
+      }),
+    []
+  );
+
+  const deleteTag = React.useCallback(
+    async (id: number) =>
+      await appFetch(`/api/rest/v3/tags/${id}/`, {
+        method: 'DELETE',
+      }),
+    []
+  );
+
+    const [deleteTags] = useMutation(deleteTag, {
+    // To update a description - if successful log it.
+    onSuccess: (data, variables) => {
+        console.log("Successfully deletion")
+      },
+  });
+
+    const [modifyTags] = useMutation(updateTag, {
+    // To update a description or publication status
+    onSuccess: (data, variables) => {
+        console.log("Successful update to Tag")
+      },
+  });
+
+ return {
+   modifyTags,
+   deleteTags
+  };
+}
