@@ -139,10 +139,19 @@ def view_tag(request, username, tag_name):
         docket.association_id = DocketTag.objects.get(
             docket=docket, tag=tag
         ).pk
+    requested_user = get_object_or_404(User, username=username)
+    is_page_owner = request.user == requested_user
+
     return render(
         request,
         "tag.html",
-        {"tag": tag, "dockets": enhanced_dockets, "total_tag_count": total_tag_count, "private": False},
+        {
+            "tag": tag,
+            "dockets": enhanced_dockets,
+            "total_tag_count": total_tag_count,
+            "private": False,
+            "is_page_owner": is_page_owner,
+        },
     )
 
 
@@ -152,17 +161,12 @@ def view_tags(request, username):
     """
     requested_user = get_object_or_404(User, username=username)
     is_page_owner = request.user == requested_user
-    tags = requested_user.user_tags.all().order_by("name")
-    if not is_page_owner:
-        # Only show public tags
-        tags = tags.filter(published=True)
     return render(
         request,
         "tag_list.html",
         {
             "requested_user": requested_user,
             "is_page_owner": is_page_owner,
-            "tags": tags,
             "private": False,
         },
     )
