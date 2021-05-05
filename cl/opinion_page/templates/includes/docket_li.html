@@ -16,8 +16,8 @@
       {% if entry_count %}
         <li><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"><i class="fa fa-search"></i>&nbsp;Search this Docket</a></li>
       {% endif %}
-      {% if docket.pacer_url %}
-        <li><a href="{{ docket.pacer_url }}"><i class="fa fa-external-link"></i> View on PACER</a></li>
+      {% if docket.pacer_docket_url %}
+        <li><a href="{{ docket.pacer_docket_url }}"><i class="fa fa-external-link"></i> View on PACER</a></li>
       {% endif %}
     </ul>
   </div>
