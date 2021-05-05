@@ -1,0 +1,65 @@
+
+.editor-toolbar {
+  border-top: none !important;
+  border-top-left-radius: 0px !important;
+  border-top-right-radius: 0px !important;
+  border-left: 1px solid lightgray;
+  border-right: 1px solid lightgray;
+}
+
+#markdown_viewer {
+  border: 1px solid;
+  border-color: lightgrey;
+  padding: 10px;
+  min-height: 100px;
+  border-top: none;
+}
+
+.view-only {
+  margin-top: 50px !important;
+  border: none !important;
+}
+
+#tab-tabs {
+    margin-top: 40px !important;
+}
+
+#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {
+  border: 1px solid;
+  padding:5px;
+}
+
+#left-tabs-example > ul > li > a:focus {
+   outline: none;
+}
+
+#save_button {
+  border: none;
+}
+
+td  {
+  vertical-align: middle;
+}
+
+li:focus {
+  outline: 0;
+}
+a:focus {
+  outline: 0;
+}
+
+.btn-sm {
+  font-size: 10px;
+  line-height: 1.0 !important;
+}
+
+label.toggle input span {
+  border-radius: 2px !important;
+}
+
+label.toggle {
+  vertical-align: text-top;
+  height: 16px;
+  width: 28px;
+}
+
