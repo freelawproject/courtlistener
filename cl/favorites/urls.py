@@ -22,5 +22,5 @@ urlpatterns = [
         view_tag,
         name="view_tag",
     ),
-    url(r"^tags/(?P<username>[^/]*)", view_tags, name="tag_list"),
+    url(r"^tags/(?P<username>[^/]*)/", view_tags, name="tag_list"),
 ]
