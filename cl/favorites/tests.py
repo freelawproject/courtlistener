@@ -483,3 +483,49 @@ class APITests(APITestCase):
         UserTag.objects.filter(pk=tag_id).update(published=True)
         response = self.client2.get(self.docket_path)
         self.assertEqual(response.json()["count"], 1)
+
+
+class UserTagTest(BaseSeleniumTest):
+    fixtures = [
+        "authtest_data.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
+
+    def setUp(self) -> None:
+        super(UserTagTest, self).setUp()
+
+    def get_tag_count(self, username):
+        tag_list = reverse("tag_list", kwargs={"username": username})
+        self.browser.get(self.live_server_url + tag_list)
+        react_root = self.browser.find_element(By.ID, "react-root")
+        rows = react_root.find_elements(By.TAG_NAME, "tbody")[0].find_elements(
+            By.TAG_NAME, "tr"
+        )
+        return len(rows)
+
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    def test_tag_viewing(self) -> None:
+        """Can we see our tags public and private and other public tags?"""
+
+        # Check anonymous user can view only the public tag for user pandora
+        self.assertEqual(
+            self.get_tag_count("pandora"),
+            1,
+            msg="Incorrect tags for anonymous user",
+        )
+
+        # Log in and check user pandora can see both tags.
+        self.attempt_sign_in("pandora", "password")
+        self.assertEqual(
+            self.get_tag_count("pandora"),
+            2,
+            msg="Incorrect tags for logged in user",
+        )
+
+        # Check user pandora can only see another users public tag.
+        self.assertEqual(
+            self.get_tag_count("unconfirmed_email"),
+            1,
+            msg="Did not find other users public tag",
+        )
