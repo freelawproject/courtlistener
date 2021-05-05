@@ -376,5 +376,70 @@
     },
     "model": "search.opinionscited",
     "pk": 4
+  },
+  {
+    "fields": {
+      "date_created": "2021-04-23 20:01:35.714923",
+      "date_modified": "2021-04-23 20:30:25.376431",
+      "name": "This tag is public",
+      "title": "",
+      "description": "this is a description",
+      "view_count": 1,
+      "published": true,
+      "user_id": 1001
+    },
+    "model": "favorites.usertag",
+    "pk": 1
+  },
+  {
+    "fields": {
+      "date_created": "2021-04-23 20:01:35.714923",
+      "date_modified": "2021-04-23 20:30:25.376431",
+      "name": "This tag is not public",
+      "title": "",
+      "description": "this is a description",
+      "view_count": 100,
+      "published": false,
+      "user_id": 1001
+    },
+    "model": "favorites.usertag",
+    "pk": 2
+  },
+  {
+    "fields": {
+      "date_created": "2021-04-23 20:01:35.714923",
+      "date_modified": "2021-04-23 20:30:25.376431",
+      "name": "This tag is another users tag",
+      "title": "",
+      "description": "this is a description",
+      "view_count": 100,
+      "published": false,
+      "user_id": 1002
+    },
+    "model": "favorites.usertag",
+    "pk": 3
+  },
+  {
+    "fields": {
+      "date_created": "2021-04-23 20:01:35.714923",
+      "date_modified": "2021-04-23 20:30:25.376431",
+      "name": "This tag is another users public tag",
+      "title": "",
+      "description": "this is a description",
+      "view_count": 100,
+      "published": true,
+      "user_id": 1002
+    },
+    "model": "favorites.usertag",
+    "pk": 4
+  },
+  {
+    "fields":
+        {
+          "docket_id": 1,
+          "tag_id": 1
+        },
+    "model": "favorites.dockettag",
+    "pk": 1
   }
 ]
