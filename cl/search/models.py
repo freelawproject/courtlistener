@@ -674,7 +674,7 @@ class Docket(AbstractDateTimeModel):
             self.court.jurisdiction == Court.FEDERAL_APPELLATE
         ):
             return None
-        return u"https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
+        return "https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
             self.pacer_court_id,
             path,
             self.pacer_case_id,
@@ -700,7 +700,7 @@ class Docket(AbstractDateTimeModel):
                 "incDktEntries=Y"
             ) % (self.pacer_court_id, self.pacer_case_id)
         else:
-            return self.pacer_district_url(u"DktRpt.pl")
+            return self.pacer_district_url("DktRpt.pl")
 
     @property
     def pacer_alias_url(self):
