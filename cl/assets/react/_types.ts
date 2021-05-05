@@ -25,4 +25,5 @@ export interface UserState {
   userName?: string;
   editUrl?: string;
   isPageOwner?: boolean;
+  docket?: number;
 }
