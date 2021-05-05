@@ -495,6 +495,10 @@ class UserTagTest(BaseSeleniumTest):
     def setUp(self) -> None:
         super(UserTagTest, self).setUp()
 
+    def tearDown(cls):
+        UserTag.objects.all().delete()
+        DocketTag.objects.all().delete()
+
     def get_tag_count(self, username):
         tag_list = reverse("tag_list", kwargs={"username": username})
         self.browser.get(self.live_server_url + tag_list)
