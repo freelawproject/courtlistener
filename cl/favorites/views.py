@@ -14,8 +14,8 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import FavoriteForm
+from cl.favorites.models import DocketTag, Favorite, UserTag
 from cl.lib.http import is_ajax
-from cl.favorites.models import Favorite, UserTag, DocketTag
 from cl.lib.view_utils import increment_view_count
 
 
