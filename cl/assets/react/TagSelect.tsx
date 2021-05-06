@@ -59,6 +59,12 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) =>
       const { changes, type } = actionAndChanges;
       switch (type) {
         case useCombobox.stateChangeTypes.InputKeyDownEnter:
+          return {
+            ...changes,
+            isOpen: true,
+            highlightedIndex: state.highlightedIndex,
+            inputValue: 'return'
+          }
         case useCombobox.stateChangeTypes.ItemClick:
           return {
             ...changes,
@@ -68,6 +74,19 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) =>
           };
         default:
           return changes;
+      }
+    },
+    onInputValueChange: ({inputValue}) => {
+      if (inputValue !== 'return') return;
+      let d3i0 = document.getElementById("downshift-3-item-0")
+      const isCreateItemOption = d3i0!.innerText.startsWith('Create Tag:')
+      if (isCreateItemOption) {
+        const validInput = textVal.match(/^[a-z0-9-]*$/);
+        if (!validInput) {
+          return setValidationError("Only lowercase letters, numbers, and '-' allowed");
+        }
+        const tag_name = d3i0!.innerText.replace('Create Tag: ', '')
+        return addNewTag({ name: tag_name });
       }
     },
     onSelectedItemChange: ({ selectedItem }) => {
