@@ -15,6 +15,11 @@
   border-top: none;
 }
 
+#react-root[data-page-owner='False'] > div > div#markdown_viewer {
+  border-top: 1px solid lightgrey;
+
+}
+
 /*Update the tables inside markdown viewer to look better*/
 #markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {
   border: 1px solid;
