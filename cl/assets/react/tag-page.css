@@ -1,8 +1,8 @@
 
 .editor-toolbar {
-  border-top: none !important;
-  border-top-left-radius: 0px !important;
-  border-top-right-radius: 0px !important;
+  border-top: none;
+  border-top-left-radius: 1px;
+  border-top-right-radius: 1px;
   border-left: 1px solid lightgray;
   border-right: 1px solid lightgray;
 }
@@ -15,46 +15,49 @@
   border-top: none;
 }
 
-.view-only {
-  margin-top: 50px !important;
-  border: none !important;
-}
-
-#tab-tabs {
-    margin-top: 40px !important;
-}
-
+/*Update the tables inside markdown viewer to look better*/
 #markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {
   border: 1px solid;
   padding:5px;
 }
 
-#left-tabs-example > ul > li > a:focus {
-   outline: none;
+/*Provide consitent spacing on markdown viewing*/
+.view-only {
+  margin-top: 50px;
+  border: none;
 }
 
+/*Add consistent spacing for tabs*/
+#tab-tabs {
+    margin-top: 40px;
+}
+
+/*Make save button on markdown page more subtle*/
 #save_button {
   border: none;
 }
 
-td  {
-  vertical-align: middle;
-}
-
+/*Remove blue borders around tabs*/
 li:focus {
   outline: 0;
 }
+
 a:focus {
   outline: 0;
 }
 
-.btn-sm {
+/*Align content in tag tables and dropdown better*/
+td  {
+  vertical-align: middle;
+}
+
+.delete-tag {
   font-size: 10px;
-  line-height: 1.0 !important;
+  line-height: 1.0;
 }
 
 label.toggle input span {
-  border-radius: 2px !important;
+  border-radius: 2px;
 }
 
 label.toggle {
