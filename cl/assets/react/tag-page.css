@@ -34,7 +34,8 @@
 
 /*Make save button on markdown page more subtle*/
 #save_button {
-  border: none;
+  margin-top: 2px;
+  border-radius: 2px;
 }
 
 /*Remove blue borders around tabs*/
