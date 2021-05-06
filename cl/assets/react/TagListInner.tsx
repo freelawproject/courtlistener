@@ -77,7 +77,7 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
                       <Button
                         id={`dlt_${tag.id}`}
                         onClick={event => delete_tag(event, Number(`${tag.id}`))}
-                        className={"fa fa-trash btn-sm inline"}> Delete</Button>
+                        className={"fa fa-trash btn-sm inline delete-tag"}> Delete</Button>
                     </td>
                   </>
                 )}
