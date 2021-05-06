@@ -24,7 +24,8 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   }
 
   return (
-     <div><h1>Tags for: {userName}</h1>
+     <div>
+       {isPageOwner ? (<h1>Your Tags</h1>) : (<h1>Tags for: {userName}</h1>)}
        {isLoading ? (
          <div>Loading...</div>
        ) : isError ? (
