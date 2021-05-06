@@ -456,7 +456,7 @@ var TagListInner = function TagListInner(_ref2) {
       onClick: function onClick(event) {
         return delete_tag(event, Number("".concat(tag.id)));
       },
-      className: "fa fa-trash btn-sm inline"
+      className: "fa fa-trash btn-sm inline delete-tag"
     }, " Delete"))));
   }))));
 };
@@ -1275,7 +1275,7 @@ var useTags = function useTags(_ref) {
   var associations = assocData ? assocData.results : [];
 
   var _useInfiniteQuery = Object(react_query__WEBPACK_IMPORTED_MODULE_6__["useInfiniteQuery"])('tags', getTags, {
-    enabled: !!enabled,
+    enabled: enabled,
     // if the lastPage has a next key, extract the page number
     getFetchMore: function getFetchMore(lastPage, allPages) {
       var nextPage = lastPage.next;
@@ -1515,25 +1515,6 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-function getDataFromReactRoot() {
-  var div = document.querySelector('div#react-root');
-
-  if (div && div instanceof HTMLElement) {
-    var authStr = div.dataset.authenticated;
-    if (!authStr) return {};
-    var strParts = authStr.split(':', 2);
-    return {
-      userId: parseInt(strParts[0], 10),
-      userName: strParts[1],
-      editUrl: div.dataset.editUrl,
-      isPageOwner: div.dataset.isPageOwner != ''
-    };
-  } else {
-    console.error('Unable to fetch credentials from server. Tags disabled.');
-    return {};
-  }
-}
-
 var App = function App() {
   var root = document.getElementById('react-root');
   var data = JSON.parse(JSON.stringify(root.dataset));
@@ -1601,7 +1582,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "\n.editor-toolbar {\n  border-top: none !important;\n  border-top-left-radius: 0px !important;\n  border-top-right-radius: 0px !important;\n  border-left: 1px solid lightgray;\n  border-right: 1px solid lightgray;\n}\n\n#markdown_viewer {\n  border: 1px solid;\n  border-color: lightgrey;\n  padding: 10px;\n  min-height: 100px;\n  border-top: none;\n}\n\n.view-only {\n  margin-top: 50px !important;\n  border: none !important;\n}\n\n#tab-tabs {\n    margin-top: 40px !important;\n}\n\n#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {\n  border: 1px solid;\n  padding:5px;\n}\n\n#left-tabs-example > ul > li > a:focus {\n   outline: none;\n}\n\n#save_button {\n  border: none;\n}\n\ntd  {\n  vertical-align: middle;\n}\n\nli:focus {\n  outline: 0;\n}\na:focus {\n  outline: 0;\n}\n\n.btn-sm {\n  font-size: 10px;\n  line-height: 1.0 !important;\n}\n\nlabel.toggle input span {\n  border-radius: 2px !important;\n}\n\nlabel.toggle {\n  vertical-align: text-top;\n  height: 16px;\n  width: 28px;\n}\n\n", "",{"version":3,"sources":["webpack://./assets/react/tag-page.css"],"names":[],"mappings":";AACA;EACE,2BAA2B;EAC3B,sCAAsC;EACtC,uCAAuC;EACvC,gCAAgC;EAChC,iCAAiC;AACnC;;AAEA;EACE,iBAAiB;EACjB,uBAAuB;EACvB,aAAa;EACb,iBAAiB;EACjB,gBAAgB;AAClB;;AAEA;EACE,2BAA2B;EAC3B,uBAAuB;AACzB;;AAEA;IACI,2BAA2B;AAC/B;;AAEA;EACE,iBAAiB;EACjB,WAAW;AACb;;AAEA;GACG,aAAa;AAChB;;AAEA;EACE,YAAY;AACd;;AAEA;EACE,sBAAsB;AACxB;;AAEA;EACE,UAAU;AACZ;AACA;EACE,UAAU;AACZ;;AAEA;EACE,eAAe;EACf,2BAA2B;AAC7B;;AAEA;EACE,6BAA6B;AAC/B;;AAEA;EACE,wBAAwB;EACxB,YAAY;EACZ,WAAW;AACb","sourcesContent":["\n.editor-toolbar {\n  border-top: none !important;\n  border-top-left-radius: 0px !important;\n  border-top-right-radius: 0px !important;\n  border-left: 1px solid lightgray;\n  border-right: 1px solid lightgray;\n}\n\n#markdown_viewer {\n  border: 1px solid;\n  border-color: lightgrey;\n  padding: 10px;\n  min-height: 100px;\n  border-top: none;\n}\n\n.view-only {\n  margin-top: 50px !important;\n  border: none !important;\n}\n\n#tab-tabs {\n    margin-top: 40px !important;\n}\n\n#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {\n  border: 1px solid;\n  padding:5px;\n}\n\n#left-tabs-example > ul > li > a:focus {\n   outline: none;\n}\n\n#save_button {\n  border: none;\n}\n\ntd  {\n  vertical-align: middle;\n}\n\nli:focus {\n  outline: 0;\n}\na:focus {\n  outline: 0;\n}\n\n.btn-sm {\n  font-size: 10px;\n  line-height: 1.0 !important;\n}\n\nlabel.toggle input span {\n  border-radius: 2px !important;\n}\n\nlabel.toggle {\n  vertical-align: text-top;\n  height: 16px;\n  width: 28px;\n}\n\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "\n.editor-toolbar {\n  border-top: none;\n  border-top-left-radius: 1px;\n  border-top-right-radius: 1px;\n  border-left: 1px solid lightgray;\n  border-right: 1px solid lightgray;\n}\n\n#markdown_viewer {\n  border: 1px solid;\n  border-color: lightgrey;\n  padding: 10px;\n  min-height: 100px;\n  border-top: none;\n}\n\n/*Update the tables inside markdown viewer to look better*/\n#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {\n  border: 1px solid;\n  padding:5px;\n}\n\n/*Provide consitent spacing on markdown viewing*/\n.view-only {\n  margin-top: 50px;\n  border: none;\n}\n\n/*Add consistent spacing for tabs*/\n#tab-tabs {\n    margin-top: 40px;\n}\n\n/*Make save button on markdown page more subtle*/\n#save_button {\n  border: none;\n}\n\n/*Remove blue borders around tabs*/\nli:focus {\n  outline: 0;\n}\n\na:focus {\n  outline: 0;\n}\n\n/*Align content in tag tables and dropdown better*/\ntd  {\n  vertical-align: middle;\n}\n\n.delete-tag {\n  font-size: 10px;\n  line-height: 1.0;\n}\n\nlabel.toggle input span {\n  border-radius: 2px;\n}\n\nlabel.toggle {\n  vertical-align: text-top;\n  height: 16px;\n  width: 28px;\n}\n\n", "",{"version":3,"sources":["webpack://./assets/react/tag-page.css"],"names":[],"mappings":";AACA;EACE,gBAAgB;EAChB,2BAA2B;EAC3B,4BAA4B;EAC5B,gCAAgC;EAChC,iCAAiC;AACnC;;AAEA;EACE,iBAAiB;EACjB,uBAAuB;EACvB,aAAa;EACb,iBAAiB;EACjB,gBAAgB;AAClB;;AAEA,0DAA0D;AAC1D;EACE,iBAAiB;EACjB,WAAW;AACb;;AAEA,gDAAgD;AAChD;EACE,gBAAgB;EAChB,YAAY;AACd;;AAEA,kCAAkC;AAClC;IACI,gBAAgB;AACpB;;AAEA,gDAAgD;AAChD;EACE,YAAY;AACd;;AAEA,kCAAkC;AAClC;EACE,UAAU;AACZ;;AAEA;EACE,UAAU;AACZ;;AAEA,kDAAkD;AAClD;EACE,sBAAsB;AACxB;;AAEA;EACE,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;AACpB;;AAEA;EACE,wBAAwB;EACxB,YAAY;EACZ,WAAW;AACb","sourcesContent":["\n.editor-toolbar {\n  border-top: none;\n  border-top-left-radius: 1px;\n  border-top-right-radius: 1px;\n  border-left: 1px solid lightgray;\n  border-right: 1px solid lightgray;\n}\n\n#markdown_viewer {\n  border: 1px solid;\n  border-color: lightgrey;\n  padding: 10px;\n  min-height: 100px;\n  border-top: none;\n}\n\n/*Update the tables inside markdown viewer to look better*/\n#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {\n  border: 1px solid;\n  padding:5px;\n}\n\n/*Provide consitent spacing on markdown viewing*/\n.view-only {\n  margin-top: 50px;\n  border: none;\n}\n\n/*Add consistent spacing for tabs*/\n#tab-tabs {\n    margin-top: 40px;\n}\n\n/*Make save button on markdown page more subtle*/\n#save_button {\n  border: none;\n}\n\n/*Remove blue borders around tabs*/\nli:focus {\n  outline: 0;\n}\n\na:focus {\n  outline: 0;\n}\n\n/*Align content in tag tables and dropdown better*/\ntd  {\n  vertical-align: middle;\n}\n\n.delete-tag {\n  font-size: 10px;\n  line-height: 1.0;\n}\n\nlabel.toggle input span {\n  border-radius: 2px;\n}\n\nlabel.toggle {\n  vertical-align: text-top;\n  height: 16px;\n  width: 28px;\n}\n\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 
