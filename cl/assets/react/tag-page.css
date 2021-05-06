@@ -67,3 +67,6 @@ label.toggle {
   width: 28px;
 }
 
+span.tag {
+  white-space: nowrap;
+}
