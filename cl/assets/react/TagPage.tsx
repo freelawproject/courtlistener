@@ -25,6 +25,7 @@ type CLData = {
 
 type markdown_opts = {
   autoRefresh: boolean;
+  spellChecker: boolean;
   uploadImage: boolean;
   placeholder: string;
   maxHeight: string;
@@ -36,6 +37,7 @@ type markdown_opts = {
 
 const markdown_options: markdown_opts = {
   autoRefresh: true,
+  spellChecker: false,
   uploadImage: false,
   placeholder: "Add your descriptions here...",
   maxHeight:"400px",
@@ -103,7 +105,7 @@ const TagOptions = (data: CLData) => {
           noCaret
           title=""
           id="tag-settings">
-            <MenuItem onClick={event => toggle_menu(event, isPublic, `${data.name}`, Number(`${data.id}`))}>Is Publicly Available&nbsp;<Switch className={'toggle'} value={+isPublic}/></MenuItem>
+            <MenuItem onClick={event => toggle_menu(event, isPublic, `${data.name}`, Number(`${data.id}`))}><Switch className={'toggle'} value={+isPublic}/>&nbsp;Is Publicly Available</MenuItem>
           <MenuItem divider />
           <MenuItem
             checked={true}
