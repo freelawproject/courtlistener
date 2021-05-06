@@ -1,5 +1,7 @@
+# Python stuff
 .venv
 *.egg-info
+.dmypy.json
 
 # no compiled files!
 *.class
@@ -11,30 +13,15 @@
 # Javascript Dev Bundles
 cl/node_modules/
 cl/assets/bundles
-cl/webpack-stats.json
 
 # Downloaded and generated assets
-cl/assets/media/doc/
-cl/assets/media/dot/
 cl/assets/media/bulk-data/
 cl/assets/media/financial-disclosures/
 cl/assets/media/harvard_corpus/
-cl/assets/media/html/
-cl/assets/media/mp3/
-cl/assets/media/pdf/
-cl/assets/media/recap/
-cl/assets/media/sitemaps/
 cl/assets/media/recap-data/
 cl/assets/media/recap_processing_queue/
-cl/assets/media/recap-thumbnails/
-cl/assets/media/txt/
-cl/assets/media/wma/
-cl/assets/media/wpd/
 cl/assets/media/xml/
 cl/assets/static/
-cl/assets/media/state/
-cl/assets/media/pdf-data/
-cl/assets/media/json-data/
 
 # IntelliJ IDEA files
 .idea
@@ -43,8 +30,5 @@ cl/assets/media/json-data/
 cl/settings/*private.py
 cl/settings/google_auth.json
 .DS_Store
-
-
-cl/assets/media/lasc-data/*/
 
 cl/node_modules
