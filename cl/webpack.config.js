@@ -22,6 +22,7 @@ module.exports = {
     splitChunks: {
       chunks: 'all',
       name: 'vendor',
+      filename: '[name].js',
     },
   },
   plugins: [].filter(Boolean),
