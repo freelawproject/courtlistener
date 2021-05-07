@@ -81,7 +81,7 @@ const TagOptions = (data: CLData) => {
   const [isPublic, setPublic] = useState((data.published == 'True'));
 
   const delete_tag = (tag_id: number) => {
-    if (window.confirm('Are you sure you wish to delete this item???')) {
+    if (window.confirm('Are you sure you want to delete this item?')) {
       deleteTags(tag_id)
       // Relocate to the previous page on delete
       let url = window.location.href.slice(0, -1)
