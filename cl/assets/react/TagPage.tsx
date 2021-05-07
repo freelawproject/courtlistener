@@ -194,7 +194,7 @@ const TagMarkdown = (data: CLData) => {
           </Tab>
           <Tab eventKey="preview" title="Edit">
             <SimpleMDE options={markdown_options} value={text} onChange={update}/>
-            <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"fa fa-save whitesmoke"}> Save</Button></span>
+            <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
           </Tab>
         </Tabs>
       </TabContainer>
