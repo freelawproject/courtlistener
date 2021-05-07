@@ -17,6 +17,7 @@ except ImportError:
 from cl.lib.redis_utils import make_redis_interface
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
+TESTING = "test" in sys.argv
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
@@ -276,6 +277,10 @@ STATICFILES_DIRS = (
 )
 # This is where things get collected to
 STATIC_ROOT = os.path.join(INSTALL_ROOT, "cl/assets/static/")
+if not TESTING:
+    STATICFILES_STORAGE = (
+        "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+    )
 
 # Where should the bulk data be stored?
 BULK_DATA_DIR = os.path.join(INSTALL_ROOT, "cl/assets/media/bulk-data/")
@@ -445,7 +450,7 @@ if DEVELOPMENT:
     # INSTALLED_APPS.append('debug_toolbar')
     INTERNAL_IPS = ("127.0.0.1",)
 
-    if "test" in sys.argv:
+    if TESTING:
         db = DATABASES["default"]
         db["ENCODING"] = "UTF8"
         db["TEST_ENCODING"] = "UTF8"
