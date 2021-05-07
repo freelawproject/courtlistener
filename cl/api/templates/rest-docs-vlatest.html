@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load extras %}
 
 {% block title %}REST API, v3.13 &ndash; CourtListener.com{% endblock %}
@@ -61,24 +62,24 @@
 
     <h2>Data Modeling</h2>
     <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
-      href="{{ STATIC_PREFIX }}png/complete-model-v3.13.png"
+      href="{% static "png/complete-model-v3.13.png" %}"
       target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
     </p>
     <p>
-      <a href="{{ STATIC_PREFIX }}png/people-model-v3.13.png"
+      <a href="{% static "png/people-model-v3.13.png" %}"
          target="_blank"
          title="Click to see details.">
-        <img src="{{ STATIC_PREFIX }}png/people-model-v3.13-small.png"
+        <img src="{% static "png/people-model-v3.13-small.png" %}"
              width="640"
              height="306"
              class="img-responsive img-rounded">
       </a>
     </p>
     <p>
-      <a href="{{ STATIC_PREFIX }}png/search-model-v3.13.png"
+      <a href="{% static "png/search-model-v3.13.png" %}"
          target="_blank"
          title="Click to see details.">
-        <img src="{{ STATIC_PREFIX }}png/search-model-v3.13-small.png"
+        <img src="{% static "png/search-model-v3.13-small.png" %}"
              width="640"
              height="754"
              class="img-responsive img-rounded">
@@ -1053,7 +1054,7 @@ PACER_TO_CL_IDS = {
       <p> If you are interested, we have a variety of <a href="https://free.law/assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
       </p>
       <a href="https://free.law/assets/">
-        <img src="{{ STATIC_PREFIX }}png/logo-long-w350.png" width="350" height="81">
+        <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
       </a>
     </div>
 
