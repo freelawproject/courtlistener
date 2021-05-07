@@ -39,7 +39,7 @@ const markdown_options: markdown_opts = {
   autoRefresh: true,
   spellChecker: false,
   uploadImage: false,
-  placeholder: "Add your descriptions here...",
+  placeholder: "Add your description here...",
   maxHeight:"400px",
   minHeight:"400px",
   sideBySideFullscreen: false,
