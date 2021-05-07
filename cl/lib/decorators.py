@@ -3,13 +3,6 @@ import time
 from functools import wraps
 from typing import Callable, Type
 
-import requests
-import tldextract
-from django.conf import settings
-from requests import RequestException
-
-from cl.lib.bot_detector import is_bot
-
 logger = logging.getLogger(__name__)
 
 
