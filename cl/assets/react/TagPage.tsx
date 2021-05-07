@@ -59,6 +59,15 @@ const markdown_options: markdown_opts = {
       },
     ],
   }
+  // // document.getElementsByClassName('dropdown')[0]!.addEventListener('click', function (event) {
+  // //   // event.stopPropagation();
+  // //   alert("ok")
+  // // });
+  //
+  // document.getElementsByClassName('row')[0]!.addEventListener('click', function (event) {
+  //   // event.stopPropagation();
+  //   alert("ok")
+  // });
 
 const PageTop = (data: CLData) => {
   return (
@@ -89,10 +98,9 @@ const TagOptions = (data: CLData) => {
     }
   }
 
-  function toggle_menu(e: any, published: boolean, name: string, id: number) {
+  function toggle_menu(published: boolean, name: string, id: number ){
     modifyTags({published: !published, name: name, id: id} as Tag)
     setPublic(!published)
-    e.parent().toggleClass('open');
   }
 
   return (
@@ -105,7 +113,16 @@ const TagOptions = (data: CLData) => {
           noCaret
           title=""
           id="tag-settings">
-            <MenuItem onClick={event => toggle_menu(event, isPublic, `${data.name}`, Number(`${data.id}`))}><Switch className={'toggle'} value={+isPublic}/>&nbsp;Is Publicly Available</MenuItem>
+            <li role="presentation"
+                value={+isPublic}
+                onClick={e => toggle_menu(isPublic, `${data.name}`, Number(`${data.id}`))}
+                className="">
+              <a role="menuitem"
+                 href="#">
+                <Switch value={+isPublic} />
+                &nbsp;Is Publicly Available
+              </a>
+            </li>
           <MenuItem divider />
           <MenuItem
             checked={true}
