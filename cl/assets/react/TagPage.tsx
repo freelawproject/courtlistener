@@ -59,15 +59,6 @@ const markdown_options: markdown_opts = {
       },
     ],
   }
-  // // document.getElementsByClassName('dropdown')[0]!.addEventListener('click', function (event) {
-  // //   // event.stopPropagation();
-  // //   alert("ok")
-  // // });
-  //
-  // document.getElementsByClassName('row')[0]!.addEventListener('click', function (event) {
-  //   // event.stopPropagation();
-  //   alert("ok")
-  // });
 
 const PageTop = (data: CLData) => {
   return (
