@@ -1,9 +1,11 @@
+{% load static %}
+
 {% if DEBUG %}
   <script defer type="application/javascript"
-          src="{{ STATIC_URL }}js/bootstrap-datepicker.js"></script>
+          src="{% static "js/bootstrap-datepicker.js" %}"></script>
 {% else %}
   <script defer type="application/javascript"
-          src="{{ STATIC_URL }}js/bootstrap-datepicker.min.js"></script>
+          src="{% static "js/bootstrap-datepicker.min.js" %}"></script>
 {% endif %}
 <script type="text/javascript">
   $(document).ready(function () {
