@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Tag } from './_types';
-import { format, parseISO } from 'date-fns';
-import {Button} from "react-bootstrap";
+import format from 'date-fns/format';
+import parseISO from 'date-fns/parseISO';
+import Button from "react-bootstrap/lib/Button";
 import Switch from 'react-input-switch';
 import {updateTags} from "./_useTags";
 
