@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load humanize %}
 {% load text_filters %}
+{% load static %}
 
 {% block message %}{% endblock %}
 
@@ -40,10 +41,10 @@
           href="/podcast/court/all/">
   {% if DEBUG %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+          href="{% static "css/bootstrap-datepicker3.css" %}"/>
   {% else %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+          href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
 {% endblock %}
 

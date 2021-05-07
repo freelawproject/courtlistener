@@ -1,6 +1,7 @@
 {% extends "docket_tabs.html" %}
 {% load extras %}
 {% load admin_urls %}
+{% load static %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Docket for {{ title }} - CourtListener.com{% endblock %}
@@ -14,10 +15,10 @@
 {% block head %}
   {% if DEBUG %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+          href="{% static "css/bootstrap-datepicker3.css" %}"/>
   {% else %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+          href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
 {% endblock %}
 

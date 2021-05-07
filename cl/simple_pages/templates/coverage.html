@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 {% load partition_util %}
 
@@ -8,11 +9,11 @@
 {% block footer-scripts %}
 
     {% if DEBUG %}
-        <script src="{{ STATIC_URL }}js/d3.js"></script>
-        <script src="{{ STATIC_URL }}js/plottable.js"></script>
+        <script src="{% static "js/d3.js" %}"></script>
+        <script src="{% static "js/plottable.js" %}"></script>
     {% else %}
-        <script src="{{ STATIC_URL }}js/d3.min.js"></script>
-        <script src="{{ STATIC_URL }}js/plottable.min.js"></script>
+        <script src="{% static "js/d3.min.js" %}"></script>
+        <script src="{% static "js/plottable.min.js" %}"></script>
     {% endif %}
 
     <script type="text/javascript">
@@ -23,14 +24,14 @@
         ];
         var sorted_courts = {{ sorted_courts|safe}};
     </script>
-    <script src="{{ STATIC_URL }}js/coverage.js"></script>
+    <script src="{% static "js/coverage.js" %}"></script>
 
     {% include "includes/anchors.html" %}
 
 {% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/plottable.css"
+    <link rel="stylesheet" href="{% static "css/plottable.css" %}"
           type="text/css" media="screen, projection">
 {% endblock %}
 
