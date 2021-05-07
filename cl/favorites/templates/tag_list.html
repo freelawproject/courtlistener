@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% load extras %}
 {% load text_filters %}
+{% load static %}
 
 {% block title %}{% if is_page_owner %} Your Tags {% else %}Tags for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
 {% block og_title %}{% if is_page_owner %} Your tags {% else %}Tags for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
 {% block description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
-{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-tag-300x300.png{% endblock %}
+{% block og_image %}{% get_full_host %}{% static "png/og-image-tag-300x300.png" %}{% endblock %}
 
 
 {% load static %}
 {% block footer-scripts %}
     <script type="text/javascript" src="{% static 'js/react/main.js' %}"></script>
-    <script type="text/javascript" src="{% static 'js/react/vendor-7fc02c6513aff82cf8da.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/react/vendor.js' %}"></script>
 
 {% endblock %}
 {% block sidebar %}{% endblock %}

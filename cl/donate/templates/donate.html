@@ -1,4 +1,5 @@
 {% extends "payment_base.html" %}
+{% load static %}
 {% load partition_util %}
 
 {% block title %}Donate to Free Law Project – CourtListener.com{% endblock %}
@@ -248,7 +249,7 @@
 {% block bitcoin_info %}
 <div id="bitcoin-info">
   <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin</strong>, please use the address or QR code below.</p>
-  <img src="{{ STATIC_PREFIX }}png/bitcoin-qr-code.png"
+  <img src="{% static "png/bitcoin-qr-code.png" %}"
        width="200"
        height="200"
        class="img-responsive center-block"
@@ -256,7 +257,7 @@
   <p class="text-center"><a href="bitcoin:19FBmVguf86kaxEM7air6EDrtq5bJSo8qs">19FBmVguf86kaxEM7air6EDrtq5bJSo8qs</a></p>
 
   <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin Cash</strong>, please use the address or QR code below.</p>
-  <img src="{{ STATIC_PREFIX }}png/bitcoin-cash-qr-code.png"
+  <img src="{% static "png/bitcoin-cash-qr-code.png" %}"
        width="200"
        height="200"
        class="img-responsive center-block"
@@ -265,7 +266,7 @@
   <p class="text-center"><a href="bitcoincash:1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn">Legacy address: 1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn</a></p>
 
   <p class="v-offset-below-2">To donate to Free Law Project using <strong>Ethereum</strong>, please use the QR code below.</p>
-  <img src="{{ STATIC_PREFIX }}png/ethereum-qr-code.png"
+  <img src="{% static "png/ethereum-qr-code.png" %}"
        width="200"
        height="200"
        class="img-responsive center-block"

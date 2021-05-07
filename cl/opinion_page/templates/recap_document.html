@@ -2,6 +2,7 @@
 {% load text_filters %}
 {% load extras %}
 {% load admin_urls %}
+{% load static %}
 
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
@@ -22,9 +23,9 @@
 
 {% block footer-scripts %}
     <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+            src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/save-favorites.js?v=20200722"></script>
+            src="{% static "js/save-favorites.js" %}"></script>
 {% endblock %}
 
 {% block sidebar %}

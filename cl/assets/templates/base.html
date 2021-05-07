@@ -1,4 +1,4 @@
-{% load static %}{% get_static_prefix as STATIC_PREFIX %}{% load humanize %}{% load widget_tweaks %}{% load extras %}<!DOCTYPE html>
+{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -13,7 +13,7 @@
   <link rel="search"
         type="application/opensearchdescription+xml"
         title="CourtListener"
-        href="{{ STATIC_PREFIX }}xml/opensearch.xml" />
+        href="{% static "xml/opensearch.xml" %}" />
 
   {# MS Application Icons #}
   <meta name="application-name" content="CourtListener"/>
@@ -34,7 +34,7 @@
   <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
-        content="{% block og_image %}{% get_full_host %}{{ STATIC_URL }}png/og-image-300x300.png{% endblock %}"/>
+        content="{% block og_image %}{% get_full_host %}{% static "png/og-image-300x300.png" %}{% endblock %}"/>
   <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
@@ -63,7 +63,7 @@
         href="/apple-touch-icon-precomposed.png">
   {% endblock %}
 
-  <link href="{{ STATIC_PREFIX }}css/font-awesome.css" rel="stylesheet">
+  <link href="{% static "css/font-awesome.css" %}" rel="stylesheet">
 
   {% block privacy %}
     {% if private %}
@@ -78,13 +78,13 @@
   <title>{% block title %}CourtListener.com{% endblock %}</title>
   {% block head %}{% endblock %}
   {% if DEBUG %}
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap/3.3.0/bootstrap.css"
+    <link rel="stylesheet" href="{% static "css/bootstrap/3.3.0/bootstrap.css" %} "
           type="text/css">
   {% else %}
-    <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/bootstrap/3.3.0/bootstrap.min.css"
+    <link rel="stylesheet" href="{% static "css/bootstrap/3.3.0/bootstrap.min.css" %}"
           type="text/css">
   {% endif %}
-  <link rel="stylesheet" href="{{ STATIC_PREFIX }}css/override.css?v=20201201" type="text/css"
+  <link rel="stylesheet" href="{% static "css/override.css" %}" type="text/css"
         media="screen, projection">
 </head>
 
@@ -140,14 +140,14 @@
             <span class="icon-bar"></span>
           </button>
           <a class="navbar-brand hidden-xs" href="/">
-            <img src="{{ STATIC_PREFIX }}png/logo-large.png"
+            <img src="{% static "png/logo-large.png" %}"
                  alt="CourtListener logo"
                  width="364"
                  height="40"
                  tabindex="1"/>
           </a>
           <a class="navbar-brand visible-xs-block" href="/">
-            <img src="{{ STATIC_PREFIX }}png/logo-initials-only.png"
+            <img src="{% static "png/logo-initials-only.png" %}"
                  alt="CourtListener Logo"
                  width="67"
                  height="40"
@@ -389,7 +389,7 @@
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
       <a href="{% url "donate" %}?referrer=footer-button">
-        <img src="{{ STATIC_PREFIX }}png/donate-button.png"
+        <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"
              width="227">
@@ -430,18 +430,18 @@
 
 {% if DEBUG %}
 <script type="text/javascript"
-        src="{{ STATIC_PREFIX }}js/jquery/jquery-3.4.1.js"></script>
+        src="{% static "js/jquery/jquery-3.4.1.js" %}"></script>
 {% else %}
 <script type="text/javascript"
-        src="{{ STATIC_PREFIX }}js/jquery/jquery-3.4.1.min.js"></script>
+        src="{% static "js/jquery/jquery-3.4.1.min.js" %}"></script>
 {% endif %}
 
 {% if DEBUG %}
-  <script type="text/javascript" src="{{ STATIC_PREFIX }}js/bootstrap.js"></script>
+  <script type="text/javascript" src="{% static "js/bootstrap.js" %}"></script>
 {% else %}
-  <script type="text/javascript" src="{{ STATIC_PREFIX }}js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="{% static "js/bootstrap.min.js" %}"></script>
 {% endif %}
-<script type="text/javascript" src="{{ STATIC_PREFIX }}js/base.js?v=20200206"></script>
+<script type="text/javascript" src="{% static "js/base.js" %}"></script>
 <script type="text/javascript">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
   var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),

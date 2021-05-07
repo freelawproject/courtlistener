@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load text_filters %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -14,14 +15,14 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script defer type="text/javascript" src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <script defer type="text/javascript" src="{{ STATIC_URL }}js/save-favorites.js?v=20200722"></script>
+    <script defer type="text/javascript" src="{% static "js/jquery.NobleCount.min.js" %}"></script>
+    <script defer type="text/javascript" src="{% static "js/save-favorites.js" %}"></script>
     {% if request.user.is_staff %}
-        <script defer type="text/javascript" src="{{ STATIC_URL }}js/admin_tools.js"></script>
+        <script defer type="text/javascript" src="{% static "js/admin_tools.js" %}"></script>
         {% if DEBUG %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+            <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
         {% else %}
-            <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+            <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
         {% endif %}
     {% endif %}
 {% endblock %}
