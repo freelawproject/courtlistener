@@ -9,13 +9,11 @@
 {% block og_description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
 {% block og_image %}{% get_full_host %}{% static "png/og-image-tag-300x300.png" %}{% endblock %}
 
-
-{% load static %}
 {% block footer-scripts %}
-    <script type="text/javascript" src="{% static 'js/react/main.js' %}"></script>
-    <script type="text/javascript" src="{% static 'js/react/vendor.js' %}"></script>
-
+  <script type="text/javascript" src="{% static 'js/react/main.js' %}"></script>
+  <script type="text/javascript" src="{% static 'js/react/vendor.js' %}"></script>
 {% endblock %}
+
 {% block sidebar %}{% endblock %}
 {% block content %}
   <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
