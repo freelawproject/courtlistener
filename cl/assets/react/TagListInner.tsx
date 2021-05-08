@@ -41,12 +41,11 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
 
   const onRowClick = (e: any, name: string) => {
 
-    if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) {
+    if (e.metaKey || e.ctrlKey) {
       window.open(`/tags/${userName}/${name}/`)
     } else {
       window.location.href = `/tags/${userName}/${name}/`
     }
-
   }
 
 
