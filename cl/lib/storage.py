@@ -5,7 +5,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage, Storage
-from storages.backends.s3boto3 import S3Boto3Storage
+from storages.backends.s3boto3 import S3Boto3Storage, S3ManifestStaticStorage
 
 
 def get_name_by_incrementing(
@@ -83,3 +83,7 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
         max_length: Optional[int] = None,
     ) -> str:
         return get_name_by_incrementing(self, name, max_length)
+
+
+class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
+    location = "static"
