@@ -276,10 +276,8 @@ STATICFILES_DIRS = (
 )
 # This is where things get collected to
 STATIC_ROOT = os.path.join(INSTALL_ROOT, "cl/assets/static/")
-if not TESTING:
-    STATICFILES_STORAGE = (
-        "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
-    )
+if not any([TESTING, DEBUG]):
+    STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
 
 # Where should the bulk data be stored?
 BULK_DATA_DIR = os.path.join(INSTALL_ROOT, "cl/assets/media/bulk-data/")
