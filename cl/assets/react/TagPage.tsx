@@ -39,7 +39,7 @@ const markdown_options: markdown_opts = {
   autoRefresh: true,
   spellChecker: false,
   uploadImage: false,
-  placeholder: "Add your descriptions here...",
+  placeholder: "Add your description here...",
   maxHeight:"400px",
   minHeight:"400px",
   sideBySideFullscreen: false,
@@ -81,7 +81,7 @@ const TagOptions = (data: CLData) => {
   const [isPublic, setPublic] = useState((data.published == 'True'));
 
   const delete_tag = (tag_id: number) => {
-    if (window.confirm('Are you sure you wish to delete this item???')) {
+    if (window.confirm('Are you sure you want to delete this item?')) {
       deleteTags(tag_id)
       // Relocate to the previous page on delete
       let url = window.location.href.slice(0, -1)
@@ -89,10 +89,9 @@ const TagOptions = (data: CLData) => {
     }
   }
 
-  function toggle_menu(e: any, published: boolean, name: string, id: number) {
+  function toggle_menu(published: boolean, name: string, id: number ){
     modifyTags({published: !published, name: name, id: id} as Tag)
     setPublic(!published)
-    e.parent().toggleClass('open');
   }
 
   return (
@@ -105,7 +104,16 @@ const TagOptions = (data: CLData) => {
           noCaret
           title=""
           id="tag-settings">
-            <MenuItem onClick={event => toggle_menu(event, isPublic, `${data.name}`, Number(`${data.id}`))}><Switch className={'toggle'} value={+isPublic}/>&nbsp;Is Publicly Available</MenuItem>
+            <li role="presentation"
+                value={+isPublic}
+                onClick={e => toggle_menu(isPublic, `${data.name}`, Number(`${data.id}`))}
+                className="">
+              <a role="menuitem"
+                 href="#">
+                <Switch value={+isPublic} />
+                &nbsp;Is Publicly Available
+              </a>
+            </li>
           <MenuItem divider />
           <MenuItem
             checked={true}
@@ -186,7 +194,7 @@ const TagMarkdown = (data: CLData) => {
           </Tab>
           <Tab eventKey="preview" title="Edit">
             <SimpleMDE options={markdown_options} value={text} onChange={update}/>
-            <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"fa fa-save whitesmoke"}> Save</Button></span>
+            <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
           </Tab>
         </Tabs>
       </TabContainer>

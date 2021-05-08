@@ -33,11 +33,22 @@ const Toggle = ({state, name, id}: ToggleProps) => {
 const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName }) => {
   const {modifyTags, deleteTags} = updateTags();
   const delete_tag = (e: any, tag_id: number) => {
-    if (window.confirm('Are you sure you wish to delete this item?')) {
+    if (window.confirm('Are you sure you want to delete this item?')) {
       deleteTags(tag_id)
       window.location.reload(false)
     }
   }
+
+  const onRowClick = (e: any, name: string) => {
+
+    if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) {
+      window.open(`/tags/${userName}/${name}/`)
+    } else {
+      window.location.href = `/tags/${userName}/${name}/`
+    }
+
+  }
+
 
   return (
     <div className="table-responsive">
@@ -55,20 +66,18 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
           {data.map((tag) => {
             return (
               <tr>
-                <td
-                style={{"cursor": "pointer"}}
-                onClick={() => (window.location.href = `/tags/${userName}/${tag.name}/`)}>
-                  <a href={`/tags/${userName}/${tag.name}/`} className="black-link">
+                <td style={{"cursor": "pointer"}}
+                  onClick={event => onRowClick(event, tag.name)}>
                     <span className="tag">{tag.name}</span>
-                  </a>
                 </td>
                 <td style={{"cursor": "pointer"}}
-                onClick={() => (window.location.href = `/tags/${userName}/${tag.name}/`)}
-                  >{format(parseISO(tag.date_created || ""), 'MMM d, yyyy')}</td>
-                <td
-                style={{"cursor": "pointer"}}
-                onClick={() => (window.location.href = `/tags/${userName}/${tag.name}/`)}
-                >{tag.view_count}</td>
+                    onClick={event => onRowClick(event, tag.name)}>
+                  {format(parseISO(tag.date_created || ""), 'MMM d, yyyy')}
+                </td>
+                <td style={{"cursor": "pointer"}}
+                    onClick={event => onRowClick(event, tag.name)}>
+                  {tag.view_count}
+                </td>
                 {isPageOwner && (
                   <>
                     <td>
