@@ -38,7 +38,6 @@ class PROVIDERS(object):
         (PAYPAL, "PayPal"),
         (CREDIT_CARD, "Credit Card"),
         (CHECK, "Check"),
-        (BITCOIN, 'Crypto<span class="hidden-xs">currency</span>'),
     )
 
 
