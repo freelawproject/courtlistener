@@ -255,7 +255,6 @@ def contribute(request: HttpRequest) -> HttpResponse:
 
 
 @ratelimiter_unsafe_1_per_m
-@check_honeypot(field_name="skip_me_if_alive")
 def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
