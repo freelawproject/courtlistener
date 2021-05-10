@@ -5,6 +5,7 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.forms import ModelForm
+from hcaptcha.fields import hCaptchaField
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
@@ -132,6 +133,7 @@ class DonationForm(ModelForm):
         choices=PROVIDERS.ACTIVE_NAMES,
         initial=PROVIDERS.CREDIT_CARD,
     )
+    hcaptcha = hCaptchaField()
 
     class Meta:
         model = Donation
@@ -143,6 +145,7 @@ class DonationForm(ModelForm):
             "send_annual_reminder",
             "referrer",
             "reference",
+            "hcaptcha",
         )
         widgets = {
             "referrer": forms.HiddenInput(),
