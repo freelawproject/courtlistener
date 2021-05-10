@@ -424,6 +424,14 @@ python-versions = ">=3.5"
 Django = ">=2.2"
 
 [[package]]
+name = "django-hcaptcha"
+version = "0.1.0"
+description = "Django hCaptcha provides a simple way to protect your django forms using hCaptcha"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "django-localflavor"
 version = "3.0.1"
 description = "Country-specific Django helpers"
@@ -1702,7 +1710,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "42196810c1267f81304d1483f70bac3ea0d05799e2f88e6450e0801cbe491d31"
+content-hash = "defe313b312e4659d2f48921c05df611bc0c7be4b83df49bcef7297d8f40f83b"
 
 [metadata.files]
 amqp = [
@@ -1920,6 +1928,9 @@ django-extensions = [
 django-filter = [
     {file = "django-filter-2.4.0.tar.gz", hash = "sha256:84e9d5bb93f237e451db814ed422a3a625751cbc9968b484ecc74964a8696b06"},
     {file = "django_filter-2.4.0-py3-none-any.whl", hash = "sha256:e00d32cebdb3d54273c48f4f878f898dced8d5dfaad009438fe61ebdf535ace1"},
+]
+django-hcaptcha = [
+    {file = "django-hCaptcha-0.1.0.tar.gz", hash = "sha256:2b80197c07bb8444249bcce3758b0472d369cca309fb02d7abcd0a856431b76b"},
 ]
 django-localflavor = [
     {file = "django-localflavor-3.0.1.tar.gz", hash = "sha256:24e9a03bc11ced92365821d3cfdd96eb4e2f3e44a6f40e86c645d3e0ec65ec53"},
