@@ -1,16 +1,17 @@
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db.models import QuerySet
 from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import DocketAlert
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
@@ -26,9 +27,51 @@ def enqueue_docket_alert(d_pk: int) -> bool:
     return create_redis_semaphore("ALERTS", key, ttl=60 * 10)
 
 
+def make_alert_messages(
+    d: Docket,
+    new_des: QuerySet,
+    email_addresses: "ValuesQuerySet[User, Optional[str]]",  # type: ignore
+) -> List[EmailMultiAlternatives]:
+    """Make docket alert messages that can be sent to users
+
+    :param d: The docket to work on
+    :param new_des: The new docket entries
+    :param email_addresses: A list of user email addresses to send to
+    :return: A list of email messages to send
+    """
+    case_name = trunc(best_case_name(d), 100, ellipsis="...")
+    subject_template = loader.get_template("docket_alert_subject.txt")
+    subject = subject_template.render(
+        {
+            "docket": d,
+            "count": new_des.count(),
+            "case_name": case_name,
+        }
+    ).strip()  # Remove newlines that editors can insist on adding.
+    email_context = {"new_des": new_des, "docket": d}
+    txt_template = loader.get_template("docket_alert_email.txt")
+    html_template = loader.get_template("docket_alert_email.html")
+    messages = []
+    for email_address in email_addresses:
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=txt_template.render(email_context),
+            from_email=settings.DEFAULT_ALERTS_EMAIL,
+            to=[email_address],
+            headers={f"X-Entity-Ref-ID": "docket.alert:{d.pk}"},
+        )
+        html = html_template.render(email_context)
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
+
+    # Add a bcc to the first message in the list so that we get a copy.
+    messages[0].bcc = ["docket-alert-testing@free.law"]
+    return messages
+
+
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
-def send_docket_alert(d_pk: int, since: datetime):
+def send_docket_alert(d_pk: int, since: datetime) -> None:
     """Send an alert for a given docket
 
     :param d_pk: The docket PK that was modified
@@ -40,56 +83,32 @@ def send_docket_alert(d_pk: int, since: datetime):
         .distinct()
         .values_list("email", flat=True)
     )
-    if email_addresses:
-        # We have an alert for this docket. Proceed.
-        docket = Docket.objects.get(pk=d_pk)
-        new_des = DocketEntry.objects.filter(
-            date_created__gte=since, docket=docket
-        )
+    if not email_addresses:
+        # Nobody subscribed to the docket.
+        delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
+        return
 
-        if new_des.count() > 0:
-            # Notify every user that's subscribed to this alert.
-            case_name = trunc(best_case_name(docket), 100, ellipsis="...")
-            subject_template = loader.get_template("docket_alert_subject.txt")
-            subject = subject_template.render(
-                {
-                    "docket": docket,
-                    "count": new_des.count(),
-                    "case_name": case_name,
-                }
-            ).strip()  # Remove newlines that editors can insist on adding.
-            email_context = {"new_des": new_des, "docket": docket}
-            txt_template = loader.get_template("docket_alert_email.txt")
-            html_template = loader.get_template("docket_alert_email.html")
-            messages = []
-            for email_address in email_addresses:
-                msg = EmailMultiAlternatives(
-                    subject=subject,
-                    body=txt_template.render(email_context),
-                    from_email=settings.DEFAULT_ALERTS_EMAIL,
-                    to=[email_address],
-                    headers={"X-Entity-Ref-ID": "docket.alert:%s" % d_pk},
-                )
-                html = html_template.render(email_context)
-                msg.attach_alternative(html, "text/html")
-                messages.append(msg)
+    d = Docket.objects.get(pk=d_pk)
+    new_des = DocketEntry.objects.filter(date_created__gte=since, docket=d)
+    if new_des.count() == 0:
+        # No new docket entries.
+        delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
+        return
 
-            # Add a bcc to the first message in the list so that we get a copy.
-            messages[0].bcc = ["docket-alert-testing@free.law"]
-            connection = get_connection()
-            connection.send_messages(messages)
-            tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
+    # Notify every user that's subscribed to this alert.
+    messages = make_alert_messages(d, new_des, email_addresses)
+    connection = get_connection()
+    connection.send_messages(messages)
 
-        DocketAlert.objects.filter(docket=docket).update(date_last_hit=now())
-
-    # Work completed, clear the semaphore
-    r = make_redis_interface("ALERTS")
-    r.delete(make_alert_key(d_pk))
+    # Work completed. Tally, log, and clean up
+    tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
+    DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
+    delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 
 @app.task(ignore_result=True)
 def send_docket_alerts(
-    data: Dict[str, List[Tuple[int, datetime]]],
+    data: Dict[str, Union[List[Tuple], List[int]]]
 ) -> List[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_docket_alert function.
@@ -108,4 +127,4 @@ def send_docket_alerts(
     for args in data["d_pks_to_alert"]:
         send_docket_alert(*args)
 
-    return data.get("rds_for_solr", [])
+    return cast(List[int], data.get("rds_for_solr", []))
