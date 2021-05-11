@@ -261,10 +261,11 @@
       {% endblock %}
 
       {% block donation_annual_reminder %}{% endblock %}
-
-      {{ donation_form.hcaptcha }}
-
       {% block newsletter_sign_up %}{% endblock %}
+
+      <div class="v-offset-above-2">
+        {{ donation_form.hcaptcha }}
+      </div>
 
       {{ donation_form.referrer }}
 

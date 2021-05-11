@@ -18,7 +18,6 @@ from django.views.decorators.cache import cache_page
 from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
-from cl.custom_filters.decorators import check_honeypot
 from cl.disclosures.models import (
     Agreement,
     Debt,
