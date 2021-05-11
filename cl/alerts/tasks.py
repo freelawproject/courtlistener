@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Dict, List, Tuple
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -13,31 +16,32 @@ from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
 
 
-def make_alert_key(d_pk):
-    return "docket.alert.enqueued:%s" % d_pk
+def make_alert_key(d_pk: int) -> str:
+    return f"docket.alert.enqueued:{d_pk}"
 
 
-def enqueue_docket_alert(d_pk):
+def enqueue_docket_alert(d_pk: int) -> bool:
     """Enqueue a docket alert or punt it if there's already a task for it.
 
     :param d_pk: The ID of the docket we're going to send alerts for.
     :return: True if we enqueued the item, false if not.
     """
-    # Create an expiring semaphor in redis or check if there's already one
+    # Create an expiring semaphore in redis or check if there's already one
     # there.
     r = make_redis_interface("ALERTS")
     key = make_alert_key(d_pk)
-    # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
-    currently_enqueued = bool(r.getset(key, 1))
+
+    currently_enqueued = bool(r.get(key))
     if currently_enqueued:
         # We've got a task going for this alert.
         return False
 
     # We don't have a task for this yet. Set an expiration for the new key,
     # and make a new async task. The expiration gives us a safety so that the
-    # semaphor *will* eventually go away even if our task or server crashes.
+    # semaphore *will* eventually go away even if our task or server crashes.
+    # Redis doesn't do bools anymore, so use 1 as True.
     safety_expiration_timeout = 10 * 60
-    r.expire(key, safety_expiration_timeout)
+    r.set(key, 1, ex=safety_expiration_timeout)
     return True
 
 
