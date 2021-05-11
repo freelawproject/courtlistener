@@ -584,6 +584,9 @@ class Docket(AbstractDateTimeModel):
 
     class Meta:
         unique_together = ("docket_number", "pacer_case_id", "court")
+        indexes = [
+            models.Index(fields=["court_id", "id"]),
+        ]
         index_together = (
             (
                 "ia_upload_failure_count",
