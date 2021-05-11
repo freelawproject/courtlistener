@@ -2,7 +2,7 @@ import re
 from typing import Any, Dict
 
 from django import forms
-from django.core.exceptions import ValidationError
+from hcaptcha.fields import hCaptchaField
 
 
 class ContactForm(forms.Form):
@@ -27,17 +27,7 @@ class ContactForm(forms.Form):
         min_length=20, widget=forms.Textarea(attrs={"class": "form-control"})
     )
 
-    quiz = forms.CharField(
-        widget=forms.TextInput(
-            attrs={"class": "form-control", "autocomplete": "off"},
-        ),
-    )
-
-    def clean_quiz(self) -> Dict[str, str]:
-        data = self.cleaned_data["quiz"]
-        if data.strip().lower() != "blue":
-            raise ValidationError("Please say the sky is blue.")
-        return data
+    hcaptcha = hCaptchaField()
 
     def clean(self) -> Dict[str, Any]:
         cleaned_data = super().clean()

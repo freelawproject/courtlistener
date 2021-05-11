@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     "django.contrib.sitemaps",
     "django.contrib.staticfiles",
     "corsheaders",
+    "hcaptcha",
     "markdown_deux",
     "mathfilters",
     "rest_framework",

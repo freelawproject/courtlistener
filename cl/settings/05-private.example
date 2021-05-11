@@ -89,6 +89,10 @@ IA_OA_COLLECTIONS = ["uscourtsoralargumentsdev"]
 MAILCHIMP_SECRET = ""
 MAILCHIMP_API_KEY = ""
 
+# hCaptcha
+HCAPTCHA_SITEKEY = "10000000-ffff-ffff-ffff-000000000001"
+HCAPTCHA_SECRET = "0x0000000000000000000000000000000000000000"
+
 # Matomo token (used for reporting API)
 MATOMO_TOKEN = ""
 
