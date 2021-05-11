@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+from unittest.mock import MagicMock, patch
 
 from django.core import mail
 from django.test import TestCase
@@ -7,6 +8,8 @@ from lxml.html import fromstring
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 
+# Mock the hcaptcha thing so that we're sure it validates during tests
+@patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class ContactTest(TestCase):
     fixtures = ["authtest_data.json"]
     test_msg = {
@@ -14,11 +17,10 @@ class ContactTest(TestCase):
         "phone_number": "asdf",
         "message": "123456789012345678901",
         "email": "pandora@box.com",
-        "skip_me_if_alive": "",
-        "quiz": "blue",
+        "hcaptcha": "xxx",
     }
 
-    def test_multiple_requests_request(self) -> None:
+    def test_multiple_requests_request(self, mock: MagicMock) -> None:
         """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
@@ -37,7 +39,7 @@ class ContactTest(TestCase):
         r = self.client.get(reverse("contact"))
         self.assertNotIn("pandora", r.content.decode())
 
-    def test_contact_logged_in(self) -> None:
+    def test_contact_logged_in(self, mock: MagicMock) -> None:
         """Can we use the contact form to send a message when logged in?"""
         self.assertTrue(
             self.client.login(username="pandora", password="password")
@@ -46,13 +48,13 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_logged_out(self) -> None:
+    def test_contact_logged_out(self, mock: MagicMock) -> None:
         """Can we use the contact form to send a message when logged out?"""
         response = self.client.post(reverse("contact"), self.test_msg)
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_contact_unicode(self) -> None:
+    def test_contact_unicode(self, mock: MagicMock) -> None:
         """Can unicode be used when contacting us?"""
         msg = self.test_msg.copy()
         msg["message"] = (
@@ -65,7 +67,7 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_spam_message_is_rejected(self) -> None:
+    def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
         """Do we reject it if people put a phone number in the phone_number
         field?
 
@@ -84,15 +86,7 @@ class ContactTest(TestCase):
         self.assertEqual(response.status_code, HTTP_302_FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_spam_message_sky_color(self) -> None:
-        """Do we block things that don't know the color of the sky?"""
-        msg = self.test_msg.copy()
-        msg["quiz"] = "yellow"
-        response = self.client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(len(mail.outbox), 0)
-
-    def test_removals_require_http(self) -> None:
+    def test_removals_require_http(self, mock: MagicMock) -> None:
         """Do we ensure removals have an HTTP link?"""
         msg = self.test_msg.copy()
 

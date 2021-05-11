@@ -262,6 +262,8 @@
 
       {% block donation_annual_reminder %}{% endblock %}
 
+      {{ donation_form.hcaptcha }}
+
       {% block newsletter_sign_up %}{% endblock %}
 
       {{ donation_form.referrer }}
@@ -275,6 +277,5 @@
   </form>
 
   {% block check_info %}{% endblock %}
-  {% block bitcoin_info %}{% endblock %}
 </div>
 {% endblock %}

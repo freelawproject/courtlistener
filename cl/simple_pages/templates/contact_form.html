@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load honeypot %}
 
 {% block title %}Contact Us – CourtListener.com{% endblock %}
 
@@ -22,7 +21,6 @@
     {% endif %}
 
     <form action="" method="post">{% csrf_token %}
-      {% render_honeypot_field "skip_me_if_alive" %}
       <div class="form-group">
         <label for="id_name">Name</label>
         {{ form.name }}
@@ -73,11 +71,10 @@
       </div>
 
       <div class="form-group">
-        <label for="id_quiz">What color is the sky during the day?</label>
-        {{ form.quiz }}
-        {% if form.quiz.errors %}
+        {{ form.hcaptcha }}
+        {% if form.hcaptcha.errors %}
           <p class="help-block">
-            {% for error in form.quiz.errors %}
+            {% for error in form.hcaptcha.errors %}
               {{ error|escape }}
             {% endfor %}
           </p>
