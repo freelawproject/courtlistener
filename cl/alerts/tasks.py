@@ -47,7 +47,7 @@ def enqueue_docket_alert(d_pk: int) -> bool:
 
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
-def send_docket_alert(d_pk, since):
+def send_docket_alert(d_pk: int, since: datetime):
     """Send an alert for a given docket
 
     :param d_pk: The docket PK that was modified
@@ -107,7 +107,9 @@ def send_docket_alert(d_pk, since):
 
 
 @app.task(ignore_result=True)
-def send_docket_alerts(data):
+def send_docket_alerts(
+    data: Dict[str, List[Tuple[int, datetime]]],
+) -> List[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_docket_alert function.
 
