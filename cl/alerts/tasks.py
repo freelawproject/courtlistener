@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from cl.alerts.models import DocketAlert
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
@@ -21,28 +21,9 @@ def make_alert_key(d_pk: int) -> str:
 
 
 def enqueue_docket_alert(d_pk: int) -> bool:
-    """Enqueue a docket alert or punt it if there's already a task for it.
-
-    :param d_pk: The ID of the docket we're going to send alerts for.
-    :return: True if we enqueued the item, false if not.
-    """
-    # Create an expiring semaphore in redis or check if there's already one
-    # there.
-    r = make_redis_interface("ALERTS")
+    """Small wrapper to create keys for docket alerts"""
     key = make_alert_key(d_pk)
-
-    currently_enqueued = bool(r.get(key))
-    if currently_enqueued:
-        # We've got a task going for this alert.
-        return False
-
-    # We don't have a task for this yet. Set an expiration for the new key,
-    # and make a new async task. The expiration gives us a safety so that the
-    # semaphore *will* eventually go away even if our task or server crashes.
-    # Redis doesn't do bools anymore, so use 1 as True.
-    safety_expiration_timeout = 10 * 60
-    r.set(key, 1, ex=safety_expiration_timeout)
-    return True
+    return create_redis_semaphore("ALERTS", key, ttl=60 * 10)
 
 
 # Ignore the result or else we'll use a lot of memory.
