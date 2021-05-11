@@ -64,3 +64,16 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     # Redis doesn't do bools anymore, so use 1 as True.
     r.set(key, 1, ex=ttl)
     return True
+
+
+def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
+    """Delete a redis key
+
+    :param r: The Redis DB to connect to as a connection interface or str that
+    can be handed off to make_redis_interface.
+    :param key: The key to delete
+    :return: None
+    """
+    if isinstance(r, str):
+        r = make_redis_interface(r)
+    r.delete(key)
