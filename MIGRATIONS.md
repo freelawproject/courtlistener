@@ -41,16 +41,25 @@ new text column with `blank=True`. That's very bad and until we upgrade to
 Postgresql 11 we will have to contend with this issue.
 
 
-## Adding an index to a column doesn't use CONCURRENTLY
+## Adding and removing indexes to a column don't use CONCURRENTLY by default
 
-Until [Django issue 21039][concur] is merged, Django creates indexes without using 
-the `CONCURRENTLY` statement. This locks the table for the duration of the index 
-creation. It takes more work, but this can be avoided by tweaking the Python and SQL
-migration files [as described in this excellent blog post][concur-blog]. You can see
-an example of this in CourtListener [too][ex]. Note that `CONCURRENTLY` can't 
-be used in a transaction block.
+By default, Django creates and removes indexes without using the `CONCURRENTLY`
+statement. This locks the table for the duration of the index creation. This is 
+devastating. 
+
+It takes more work, but as of Django 3.0 this can be avoided by tweaking the 
+Python migration files to use [`AddIndexConcurrently` and 
+`RemoveIndexConcurrently`][dj-concur]. Search the code for these to find 
+examples.
+
+Note that `CONCURRENTLY` can't be used in a transaction block.
+
+The old process for this is [described in this excellent blog post]
+[concur-blog]. You can see an example of the way we used to do this in 
+CourtListener [too][ex].
 
 [concur]: https://code.djangoproject.com/ticket/21039
+[dj-concur]: https://docs.djangoproject.com/en/3.1/ref/migration-operations/#django.db.migrations.operations.AddIndex
 [concur-blog]: https://realpython.com/create-django-index-without-downtime/
 [ex]: https://github.com/freelawproject/courtlistener/pull/1132
 
