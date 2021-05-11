@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from cl.alerts.admin import DocketAlertInline
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
@@ -185,6 +186,7 @@ class DocketAdmin(admin.ModelAdmin):
     inlines = (
         DocketEntryInline,
         BankruptcyInformationInline,
+        DocketAlertInline,
     )
     readonly_fields = (
         "date_created",
