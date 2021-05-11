@@ -28,7 +28,7 @@ from cl.disclosures.utils import has_been_extracted, has_been_pdfed
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
 from cl.people_db.models import Person
 from cl.scrapers.transformer_extractor_utils import (
     generate_thumbnail,
@@ -43,28 +43,6 @@ def make_disclosure_key(data_id: str) -> str:
     :return: Disclosure key
     """
     return f"disclosure.enqueued:fd-{data_id}"
-
-
-def enqueue_disclosure_process(interface: Redis, disclosure_key: str) -> bool:
-    """Enqueue a disclosure or punt it if there's already a task for it.
-
-    :param disclosure_key: The ID of the disclosure extracting.
-    :return: True if we enqueued the item, false if not.
-    """
-    # Create an expiring semaphor in redis or check if there's already one
-    # there.
-    # Set to True if not already set. Redis doesn't do bools anymore, so use 1.
-    currently_enqueued = bool(interface.getset(disclosure_key, 1))
-    if currently_enqueued:
-        # We've got a task going for this alert.
-        return False
-
-    # We don't have a task for this yet. Set an expiration for the new key,
-    # and make a new async task. The expiration gives us a safety so that the
-    # semaphor *will* eventually go away even if our task or server crashes.
-    safety_expiration_timeout = 60 * 60 * 12
-    interface.expire(disclosure_key, safety_expiration_timeout)
-    return True
 
 
 @app.task(bind=True, max_retries=2, ignore_result=True)
@@ -429,7 +407,11 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
 
     interface = make_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
-    newly_enqueued = enqueue_disclosure_process(interface, disclosure_key)
+    newly_enqueued = create_redis_semaphore(
+        interface,
+        disclosure_key,
+        ttl=60 * 60 * 12,
+    )
 
     if not newly_enqueued:
         logger.info(f"Process is already running {data['id']}.")
