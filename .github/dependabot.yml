@@ -8,3 +8,8 @@ updates:
     # no longer access Github secrets, tests don't get run by dependabot
     # properly and it is no longer useful.
     open-pull-requests-limit: 0
+    ignore:
+    - dependency-name: black
+    - dependency-name: pylint
+    - dependency-name: flake8
+    - dependency-name: isort
