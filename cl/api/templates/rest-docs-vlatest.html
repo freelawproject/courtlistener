@@ -370,6 +370,9 @@
         </p>
       </li>
       <li>
+        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be very expensive.</p>
+      </li>
+      <li>
         <p>In general less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?
         </p>
       </li>
