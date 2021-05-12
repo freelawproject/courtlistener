@@ -8,7 +8,7 @@ import {
 import "./tag-page.css";
 import Switch from 'react-input-switch';
 import {Tag} from "./_types";
-import * as MdEditor from 'react-markdown-editor-lite';
+import MdEditor from 'react-markdown-editor-lite';
 import 'react-markdown-editor-lite/lib/index.css';
 
 type CLData = {
@@ -194,7 +194,7 @@ const TagMarkdown = (data: CLData) => {
           </div>
           </Tab>
           <Tab eventKey="preview" title="Edit">
-              <MdEditor value={text} onChange={update}
+              <MdEditor value={text} onChange={() => update}
                         style={{height: "500px"}}
                         renderHTML={(text: string) => convert.makeHtml(text)}/>
             <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
