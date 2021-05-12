@@ -66,7 +66,7 @@ const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName
           </tr>
         </thead>
         <tbody>
-          {data.map((tag) => {
+          {rows.map((tag) => {
             return (
               <tr>
                 <td style={{"cursor": "pointer"}}
