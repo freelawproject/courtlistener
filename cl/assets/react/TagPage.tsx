@@ -1,15 +1,15 @@
 import React, {useState} from "react";
 import MarkdownView from "react-showdown";
-import SimpleMDE from "react-simplemde-editor";
+import {Converter} from "showdown";
 import {updateTags} from "./_useTags";
 import {
   Tabs, Tab, TabContainer, ButtonToolbar, DropdownButton, MenuItem, Button,
 } from 'react-bootstrap';
-import "easymde/dist/easymde.min.css";
 import "./tag-page.css";
 import Switch from 'react-input-switch';
 import {Tag} from "./_types";
-
+import * as MdEditor from 'react-markdown-editor-lite';
+import 'react-markdown-editor-lite/lib/index.css';
 
 type CLData = {
   title: string;
@@ -157,8 +157,8 @@ const TagMarkdown = (data: CLData) => {
     })
   }
 
-  function update(markdown: string) {
-    setText(markdown)
+  function update(html: string, text: string) {
+    setText(text)
     setDisabled(false)
   }
 
@@ -177,6 +177,7 @@ const TagMarkdown = (data: CLData) => {
       </div>
     )
   }
+  const convert = new Converter({ tables: true, emoji: true, simpleLineBreaks: true})
 
   return (
     <div>
@@ -193,7 +194,9 @@ const TagMarkdown = (data: CLData) => {
           </div>
           </Tab>
           <Tab eventKey="preview" title="Edit">
-            <SimpleMDE options={markdown_options} value={text} onChange={update}/>
+              <MdEditor value={text} onChange={update}
+                        style={{height: "500px"}}
+                        renderHTML={(text: string) => convert.makeHtml(text)}/>
             <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
           </Tab>
         </Tabs>
