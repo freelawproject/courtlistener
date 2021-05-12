@@ -157,7 +157,7 @@ const TagMarkdown = (data: CLData) => {
     })
   }
 
-  function update(html: string, text: string) {
+  function update({html, text}) {
     setText(text)
     setDisabled(false)
   }
@@ -194,7 +194,7 @@ const TagMarkdown = (data: CLData) => {
           </div>
           </Tab>
           <Tab eventKey="preview" title="Edit">
-              <MdEditor value={text} onChange={() => update}
+              <MdEditor value={text} onChange={update}
                         style={{height: "500px"}}
                         renderHTML={(text: string) => convert.makeHtml(text)}/>
             <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
