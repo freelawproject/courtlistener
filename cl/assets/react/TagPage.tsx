@@ -196,6 +196,24 @@ const TagMarkdown = (data: CLData) => {
           <Tab eventKey="preview" title="Edit">
               <MdEditor value={text} onChange={update}
                         style={{height: "500px"}}
+                        plugins={['header',
+                          'font-bold',
+                          'font-italic',
+                          'font-underline',
+                          'font-strikethrough',
+                          'list-unordered',
+                          'list-ordered',
+                          'block-quote',
+                          'block-wrap',
+                          'block-code-block',
+                          'block-code-inline',
+                          'mode-toggle',
+                          'logger',
+                          'table',
+                          'link',
+                          'auto-resize',
+                          'tab-insert'
+                        ]}
                         renderHTML={(text: string) => convert.makeHtml(text)}/>
             <span id={"save_span"} style={{"float": "right"}}><Button disabled={disabled} id={'save_button'} onClick={save_button} className={"whitesmoke"}><i className={"fa fa-save"}/> Save</Button></span>
           </Tab>
