@@ -79,3 +79,7 @@ span.tag {
 .tag-back {
   color: #009;
 }
+
+#tag-settings {
+  z-index: 1;
+}
