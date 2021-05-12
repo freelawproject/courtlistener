@@ -12,6 +12,13 @@ interface ListItemProps {
 export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelected, user }) => {
   const isCreateItem = name.startsWith('Create Tag: ');
 
+  function go_to(e: any) {
+    (window.location.href = `/tags/${user}/${name}/`)
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+
   return (
     <a className="list-group-item cursor">
       {isCreateItem ? (
@@ -34,7 +41,7 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
           <span className="float-right gray">
             <i
               className="fa fa-external-link cursor"
-              onClick={() => (window.location.href = `/tags/${user}/${name}/`)}
+              onClick={(e) => (go_to(e))}
               title="View this tag"
             />
           </span>
