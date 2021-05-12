@@ -32,10 +32,14 @@ const Toggle = ({state, name, id}: ToggleProps) => {
 
 const TagListInner: React.FC<TagListInnerProps> = ({ data, isPageOwner, userName }) => {
   const {modifyTags, deleteTags} = updateTags();
+  const [rows, setRows] = React.useState(data)
+
   const delete_tag = (e: any, tag_id: number) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       deleteTags(tag_id)
-      window.location.reload(false)
+      const index = data.findIndex(x => x.id === tag_id);
+      data.splice(index, 1);
+      setRows(data)
     }
   }
 
