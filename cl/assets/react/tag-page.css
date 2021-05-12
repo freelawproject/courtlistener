@@ -75,3 +75,7 @@ label.toggle {
 span.tag {
   white-space: nowrap;
 }
+
+.tag-back {
+  color: #009;
+}

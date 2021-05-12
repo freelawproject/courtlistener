@@ -69,7 +69,7 @@ const PageTop = (data: CLData) => {
         </div>
       </div>
       <p>Created by
-        <a className="alt" href={`/tags/${data.user}/`}> {data.user}</a> on
+        <a className="alt tag-back" href={`/tags/${data.user}/`}> {data.user}</a> on
         <span className="alt"> {data.dateCreatedDate}</span> with {data.viewCount}
       </p>
     </React.Fragment>
