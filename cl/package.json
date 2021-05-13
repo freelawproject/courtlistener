@@ -55,6 +55,7 @@
   "dependencies": {
     "@types/react-bootstrap": "^0.32.23",
     "@types/showdown": "^1.9.3",
+    "caniuse-lite": "^1.0.30001228",
     "css-loader": "^5.2.4",
     "date-fns": "^2.21.1",
     "i": "^0.3.6",
