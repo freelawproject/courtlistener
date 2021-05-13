@@ -21,7 +21,7 @@ from django.views.decorators.vary import vary_on_headers
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.permissions import BasePermission, DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
@@ -361,6 +361,12 @@ class RECAPUploaders(DjangoModelPermissions):
         "PATCH": ["%(app_label)s.has_recap_upload_access"],
         "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
+
+
+class EmailProcessingQueueAPIUsers(BasePermission):
+    def has_permission(self, request, view):
+        # TODO - This will check against an API token in the header. This will be stored in environment variables on either side. https://github.com/freelawproject/courtlistener/issues/1676
+        return True
 
 
 class DisclosureAPIUsers(DjangoModelPermissions):

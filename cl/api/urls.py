@@ -60,6 +60,7 @@ router.register(
 
 # RECAP
 router.register(r"recap", recap_views.PacerProcessingQueueViewSet)
+router.register(r"recap-email", recap_views.EmailProcessingQueueViewSet)
 router.register(r"recap-fetch", recap_views.PacerFetchRequestViewSet)
 router.register(
     r"recap-query",
