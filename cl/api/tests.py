@@ -2,6 +2,7 @@ import json
 import shutil
 from datetime import date, timedelta
 from typing import Any, Dict
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
@@ -25,6 +26,7 @@ from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.management.commands.cl_scrape_oral_arguments import (
     Command as OralArgumentCommand,
@@ -953,7 +955,11 @@ class BulkDataTest(TestCase):
 
         # Scrape the audio "site" and add its contents
         site = test_oral_arg_scraper.Site().parse()
-        OralArgumentCommand().scrape_court(site, full_crawl=True)
+        with mock.patch(
+            "cl.lib.storage.get_name_by_incrementing",
+            side_effect=clobbering_get_name,
+        ):
+            OralArgumentCommand().scrape_court(site, full_crawl=True)
 
     def tearDown(self) -> None:
         OpinionCluster.objects.all().delete()
