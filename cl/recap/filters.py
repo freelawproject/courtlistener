@@ -26,7 +26,7 @@ class EmailProcessingQueueFilter(FilterSet):
         fields = {
             "status": ["exact", "in"],
             "court": ["exact"],
-            "recap_document": ["exact", "in"],
+            "recap_documents": ["exact", "in"],
         }
 
 
