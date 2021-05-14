@@ -1,11 +1,13 @@
 import os
 from datetime import timedelta
+from unittest import mock
 
 from django.conf import settings
 from django.test import TestCase
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
+from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
@@ -25,10 +27,14 @@ from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 
 
+@mock.patch(
+    "cl.lib.storage.get_name_by_incrementing",
+    side_effect=clobbering_get_name,
+)
 class ScraperIngestionTest(TestCase):
     fixtures = ["test_court.json"]
 
-    def test_ingest_opinions_from_scraper(self) -> None:
+    def test_ingest_opinions_from_scraper(self, mock) -> None:
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
@@ -43,8 +49,9 @@ class ScraperIngestionTest(TestCase):
             opinions.count() == 6,
             "Should have 6 test opinions, not %s" % count,
         )
+        mock.assert_called()
 
-    def test_ingest_oral_arguments(self) -> None:
+    def test_ingest_oral_arguments(self, mock) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
@@ -56,13 +63,14 @@ class ScraperIngestionTest(TestCase):
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
         self.assertEqual(2, audio_files.count())
+        mock.assert_called()
 
-    def test_parsing_xml_opinion_site_to_site_object(self) -> None:
+    def test_parsing_xml_opinion_site_to_site_object(self, mock) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
         site = test_opinion_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
-    def test_parsing_xml_oral_arg_site_to_site_object(self) -> None:
+    def test_parsing_xml_oral_arg_site_to_site_object(self, mock) -> None:
         """Does a basic parse of an oral arg site work?"""
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
