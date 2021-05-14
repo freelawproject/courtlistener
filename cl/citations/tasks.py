@@ -18,8 +18,8 @@ from cl.search.tasks import add_items_to_solr
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
-# "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 4.
-PARALLEL_DISTANCE = 4
+# "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 6.
+PARALLEL_DISTANCE = 6
 
 
 @app.task
