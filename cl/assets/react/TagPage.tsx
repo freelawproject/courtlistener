@@ -157,8 +157,8 @@ const TagMarkdown = (data: CLData) => {
     })
   }
 
-  function update({html, text}) {
-    setText(text)
+  function update({... data}) {
+    setText(data.text)
     setDisabled(false)
   }
 
@@ -194,7 +194,8 @@ const TagMarkdown = (data: CLData) => {
           </div>
           </Tab>
           <Tab eventKey="preview" title="Edit">
-              <MdEditor value={text} onChange={update}
+              <MdEditor value={text}
+                        onChange={update}
                         style={{height: "500px"}}
                         plugins={['header',
                           'font-bold',

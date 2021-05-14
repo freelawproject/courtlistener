@@ -197,15 +197,13 @@ export const updateTags = () => {
     const [deleteTags] = useMutation(deleteTag, {
     // To update a description - if successful log it.
     onSuccess: (data, variables) => {
-        console.log("Successfully deletion")
-      },
+    },
   });
 
     const [modifyTags] = useMutation(updateTag, {
     // To update a description or publication status
     onSuccess: (data, variables) => {
-        console.log("Successful update to Tag")
-      },
+    },
   });
 
  return {
