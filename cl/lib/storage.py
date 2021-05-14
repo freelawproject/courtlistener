@@ -8,6 +8,15 @@ from django.core.files.storage import FileSystemStorage, Storage
 from storages.backends.s3boto3 import S3Boto3Storage, S3ManifestStaticStorage
 
 
+def clobbering_get_name(
+    instance: Storage,
+    name: str,
+    max_length: Optional[int] = None,
+) -> str:
+    """A no-op get name function that clobbers if the item already exists"""
+    return name
+
+
 def get_name_by_incrementing(
     instance: Storage,
     name: str,
