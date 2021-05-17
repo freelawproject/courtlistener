@@ -1,7 +1,7 @@
 import React from 'react';
 import { useInfiniteQuery, useMutation, queryCache, useQuery } from 'react-query';
 import { appFetch } from './_fetch';
-import {ApiResult, Tag, Association} from './_types';
+import { ApiResult, Tag, Association } from './_types';
 
 interface UseTagsProps {
   docket: number;
@@ -116,8 +116,8 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     const flatTags = !tags
       ? []
       : Object.entries(tags)
-        .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
-        .flat(1);
+          .map(([key, apiResult]) => (apiResult as ApiResult<Tag>).results)
+          .flat(1);
 
     // rebuild tagData with the assocId
     const enhancedTags = flatTags.map((tag: Tag) => {
@@ -177,11 +177,11 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
 export const updateTags = () => {
   //  Update our tag fields
-    const updateTag = React.useCallback(
-    async (tag: Tag ) =>
+  const updateTag = React.useCallback(
+    async (tag: Tag) =>
       await appFetch(`/api/rest/v3/tags/${tag.id}/`, {
         method: 'PUT',
-        body: {...tag},
+        body: { ...tag },
       }),
     []
   );
@@ -194,20 +194,18 @@ export const updateTags = () => {
     []
   );
 
-    const [deleteTags] = useMutation(deleteTag, {
+  const [deleteTags] = useMutation(deleteTag, {
     // To update a description - if successful log it.
-    onSuccess: (data, variables) => {
-    },
+    onSuccess: (data, variables) => {},
   });
 
-    const [modifyTags] = useMutation(updateTag, {
+  const [modifyTags] = useMutation(updateTag, {
     // To update a description or publication status
-    onSuccess: (data, variables) => {
-    },
+    onSuccess: (data, variables) => {},
   });
 
- return {
-   modifyTags,
-   deleteTags
+  return {
+    modifyTags,
+    deleteTags,
   };
-}
+};

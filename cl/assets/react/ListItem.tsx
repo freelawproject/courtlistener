@@ -13,11 +13,10 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
   const isCreateItem = name.startsWith('Create Tag: ');
 
   function go_to(e: any) {
-    (window.location.href = `/tags/${user}/${name}/`)
-    e.preventDefault()
-    e.stopPropagation()
+    window.location.href = `/tags/${user}/${name}/`;
+    e.preventDefault();
+    e.stopPropagation();
   }
-
 
   return (
     <a className="list-group-item cursor">
@@ -39,11 +38,7 @@ export const ListItem: React.FC<ListItemProps> = ({ id, name, assocId, isSelecte
           />
           <label className="form-check-label">{name}</label>
           <span className="float-right gray">
-            <i
-              className="fa fa-external-link cursor"
-              onClick={(e) => (go_to(e))}
-              title="View this tag"
-            />
+            <i className="fa fa-external-link cursor" onClick={(e) => go_to(e)} title="View this tag" />
           </span>
         </div>
       )}
