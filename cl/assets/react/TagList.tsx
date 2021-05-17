@@ -4,7 +4,6 @@ import TagListInner from './TagListInner';
 import { appFetch } from './_fetch';
 import { Tag, UserState } from './_types';
 
-
 const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const [page, setPage] = React.useState(1);
 
@@ -14,31 +13,31 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
     []
   );
 
-  const { isLoading, isError, error, resolvedData, latestData, isFetching } = usePaginatedQuery( // this has been deprecated...
+  const { isLoading, isError, error, resolvedData, latestData, isFetching } = usePaginatedQuery(
+    // this has been deprecated...
     ['tags', page],
     getTags
   );
 
   if (latestData == undefined) {
-    return (<div>Loading...</div>)
+    return <div>Loading...</div>;
   }
 
   return (
-     <div>
-       {isPageOwner ? (<h1>Your Tags</h1>) : (<h1>Tags for: {userName}</h1>)}
-       {isLoading ? (
-         <div>Loading...</div>
-       ) : isError ? (
-         <div>Error: {(error as any).message} </div>
-       ) : (
-
-         <TagListInner
-            data={(latestData as any).results as Tag[]}
-            isPageOwner={isPageOwner as boolean}
-            userName={userName as string}
-          />
-       )}
-    {page === 1 && latestData && !(latestData as any).next ? null : (
+    <div>
+      {isPageOwner ? <h1>Your Tags</h1> : <h1>Tags for: {userName}</h1>}
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : isError ? (
+        <div>Error: {(error as any).message} </div>
+      ) : (
+        <TagListInner
+          data={(latestData as any).results as Tag[]}
+          isPageOwner={isPageOwner as boolean}
+          userName={userName as string}
+        />
+      )}
+      {page === 1 && latestData && !(latestData as any).next ? null : (
         <div className="well v-offset-above-3 hidden-print">
           <div className="row">
             <div className="col-xs-2 col-sm-3">
@@ -88,9 +87,9 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
           </div>
         </div>
       )}
-       {isFetching ? <span> Fetching...</span> : null}{' '}
-     </div>
-   )
- }
+      {isFetching ? <span> Fetching...</span> : null}{' '}
+    </div>
+  );
+};
 
 export default TagList;

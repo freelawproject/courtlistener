@@ -1,4 +1,4 @@
-import Cookies from 'js-cookie'
+import Cookies from 'js-cookie';
 
 interface FetchOptions {
   method?: 'GET' | 'POST' | 'DELETE' | 'PUT' | 'PATCH' | 'OPTIONS';
@@ -9,7 +9,7 @@ interface FetchOptions {
 export async function appFetch<T>(url: string, options?: FetchOptions): Promise<T | boolean> {
   const csrfTokenHeader = {
     'Content-Type': 'application/json',
-    'X-CSRFToken': Cookies.get('csrftoken')
+    'X-CSRFToken': Cookies.get('csrftoken'),
   };
 
   const mergedOptions: FetchOptions = {

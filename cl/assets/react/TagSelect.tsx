@@ -5,8 +5,7 @@ import { ListItem } from './ListItem';
 import { useTags } from './_useTags';
 import { Association, UserState } from './_types';
 
-
-const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) => {
+const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) => {
   const [validationError, setValidationError] = React.useState<null | string>(null);
 
   const {
@@ -63,8 +62,8 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) =>
             ...changes,
             isOpen: true,
             highlightedIndex: state.highlightedIndex,
-            inputValue: 'return'
-          }
+            inputValue: 'return',
+          };
         case useCombobox.stateChangeTypes.ItemClick:
           return {
             ...changes,
@@ -76,16 +75,16 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket}) =>
           return changes;
       }
     },
-    onInputValueChange: ({inputValue}) => {
+    onInputValueChange: ({ inputValue }) => {
       if (inputValue !== 'return') return;
-      let d3i0 = document.querySelector("div.list-group > div > div > div > div")!.textContent || ""
-      const isCreateItemOption = d3i0.startsWith('Create Tag:')
+      const d3i0 = document.querySelector('div.list-group > div > div > div > div')!.textContent || '';
+      const isCreateItemOption = d3i0.startsWith('Create Tag:');
       if (isCreateItemOption) {
         const validInput = textVal.match(/^[a-z0-9-]*$/);
         if (!validInput) {
           return setValidationError("Only lowercase letters, numbers, and '-' allowed");
         }
-        const tag_name = d3i0.replace('Create Tag: ', '')
+        const tag_name = d3i0.replace('Create Tag: ', '');
         return addNewTag({ name: tag_name });
       }
     },
