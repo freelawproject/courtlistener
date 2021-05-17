@@ -3,6 +3,7 @@ import os
 import time
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -19,7 +20,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
-from cl.lib.solr_core_admin import get_data_dir
+from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
     IndexedSolrTestCase,
@@ -178,7 +179,11 @@ class ModelTest(TestCase):
         self.o.delete()
         self.c.delete()
 
-    def test_save_old_opinion(self) -> None:
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_save_old_opinion(self, mock) -> None:
         """Can we save opinions older than 1900?"""
         docket = Docket(
             case_name="Blah", court_id="test", source=Docket.DEFAULT
