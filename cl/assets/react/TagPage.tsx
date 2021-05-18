@@ -19,6 +19,7 @@ type CLData = {
   name: string;
   pageOwner: string;
   published: string;
+  adminUrl: string;
 };
 
 const PageTop = (data: CLData) => {
@@ -80,8 +81,17 @@ const TagOptions = (data: CLData) => {
             </li>
             <MenuItem divider />
             <MenuItem checked={true} onClick={(_) => delete_tag(Number(`${data.id}`))} eventKey="4">
-              <i className="fa fa-trash gray"></i>&nbsp;Delete
+              <i className="fa fa-trash fa-fw gray" />
+              &nbsp;Delete
             </MenuItem>
+            {data.adminUrl ? (
+              <MenuItem href={data.adminUrl}>
+                <i className="fa fa-lock fa-fw gray" />
+                &nbsp;Admin
+              </MenuItem>
+            ) : (
+              ''
+            )}
           </DropdownButton>
         </ButtonToolbar>
       </div>
