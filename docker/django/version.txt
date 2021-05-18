@@ -1,5 +1,6 @@
-1.0.38
+1.0.39
 
+1.0.39 - Update eyecite and reporters_db
 1.0.38 - Add hCaptcha
 1.0.37 - Upgrade juriscraper
 1.0.36 - Numerous package tweaks
