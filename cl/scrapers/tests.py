@@ -448,7 +448,11 @@ class AudioFileTaskTest(TestCase):
         "test_objects_audio.json",
     ]
 
-    def test_process_audio_file(self) -> None:
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_process_audio_file(self, mock) -> None:
         af = Audio.objects.get(pk=1)
         af.duration = None
         af.save()
@@ -471,6 +475,7 @@ class AudioFileTaskTest(TestCase):
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
         )
+        mock.assert_called()
 
     def test_BTE_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
