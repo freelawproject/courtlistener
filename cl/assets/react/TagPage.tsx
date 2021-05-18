@@ -21,55 +21,6 @@ type CLData = {
   published: string;
 };
 
-type markdown_opts = {
-  autoRefresh: boolean;
-  spellChecker: boolean;
-  uploadImage: boolean;
-  placeholder: string;
-  maxHeight: string;
-  minHeight: string;
-  sideBySideFullscreen: boolean;
-  status: boolean;
-  toolbar: any;
-};
-
-const markdown_options: markdown_opts = {
-  autoRefresh: true,
-  spellChecker: false,
-  uploadImage: false,
-  placeholder: 'Add your description here...',
-  maxHeight: '400px',
-  minHeight: '400px',
-  sideBySideFullscreen: false,
-  status: false,
-  toolbar: [
-    'bold',
-    'italic',
-    'heading',
-    '|',
-    'quote',
-    'code',
-    'horizontal-rule',
-    'unordered-list',
-    'ordered-list',
-    'table',
-    'link',
-    '|',
-    'side-by-side',
-    {
-      name: 'guide',
-      action() {
-        const win = window.open('https://www.courtlistener.com/help/markdown/', '_blank');
-        if (win) {
-          win.focus();
-        }
-      },
-      className: 'fa fa-info-circle',
-      title: 'Markdown Syntax',
-    },
-  ],
-};
-
 const PageTop = (data: CLData) => {
   return (
     <React.Fragment>
