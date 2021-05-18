@@ -7,8 +7,10 @@ from celery.canvas import chain
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils.timezone import now
+from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
+from urllib3.exceptions import ReadTimeoutError
 
 from cl.corpus_importer.tasks import (
     delete_pacer_row,
@@ -126,13 +128,27 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                 status = get_and_save_free_document_report(
                     pacer_court_id, next_start_d, next_end_d
                 )
-            except RequestException:
+            except (
+                RequestException,
+                ReadTimeoutError,
+                IndexError,
+                TypeError,
+                PacerLoginException,
+            ) as exc:
+                if isinstance(exc, (RequestException, ReadTimeoutError)):
+                    reason = "network error."
+                elif isinstance(exc, IndexError):
+                    reason = "PACER 6.3 bug."
+                elif isinstance(exc, TypeError):
+                    reason = "failing PACER website."
+                elif isinstance(exc, PacerLoginException):
+                    reason = "PACER login issue."
+                else:
+                    reason = "unknown reason."
                 logger.error(
-                    "Failed to get document references for %s "
-                    "between %s and %s due to network error.",
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
+                    f"Failed to get free document references for "
+                    f"{pacer_court_id} between {next_start_d} and "
+                    f"{next_end_d} due to {reason}."
                 )
                 mark_court_done_on_date(
                     PACERFreeDocumentLog.SCRAPE_FAILED,
@@ -140,26 +156,10 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                     next_end_d,
                 )
                 break
-            except IndexError:
-                logger.error(
-                    "Failed to get document references for %s "
-                    "between %s and %s due to PACER 6.3 bug.",
-                    pacer_court_id,
-                    next_start_d,
-                    next_end_d,
-                )
-                mark_court_done_on_date(
-                    PACERFreeDocumentLog.SCRAPE_FAILED,
-                    pacer_court_id,
-                    next_end_d,
-                )
-                break
-            else:
-                result = mark_court_done_on_date(
-                    status, pacer_court_id, next_end_d
-                )
 
-            if result == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
+            mark_court_done_on_date(status, pacer_court_id, next_end_d)
+
+            if status == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
                 if next_end_d >= today.date():
                     logger.info(
                         "Got all document references for '%s'.", pacer_court_id
@@ -170,7 +170,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                     # More dates to do; let it continue
                     continue
 
-            elif result == PACERFreeDocumentLog.SCRAPE_FAILED:
+            elif status == PACERFreeDocumentLog.SCRAPE_FAILED:
                 logger.error(
                     "Encountered critical error on %s "
                     "(network error?). Marking as failed and "
