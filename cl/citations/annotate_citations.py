@@ -13,35 +13,18 @@ def get_and_clean_opinion_text(opinion: Opinion) -> None:
 
     :param opinion: The Opinion whose text should be parsed
     """
-    if opinion.html_anon_2020:
-        opinion.source_text = opinion.html_anon_2020
-        opinion.cleaned_text = clean_text(
-            opinion.html_anon_2020, ["html", "all_whitespace"]
-        )
-        opinion.source_is_html = True
-    elif opinion.html_columbia:
-        opinion.source_text = opinion.html_columbia
-        opinion.cleaned_text = clean_text(
-            opinion.html_columbia, ["html", "all_whitespace"]
-        )
-        opinion.source_is_html = True
-    elif opinion.html_lawbox:
-        opinion.source_text = opinion.html_lawbox
-        opinion.cleaned_text = clean_text(
-            opinion.html_lawbox, ["html", "all_whitespace"]
-        )
-        opinion.source_is_html = True
-    elif opinion.html:
-        opinion.source_text = opinion.html
-        opinion.cleaned_text = clean_text(
-            opinion.html, ["html", "all_whitespace"]
-        )
-        opinion.source_is_html = True
-    elif opinion.plain_text:
-        opinion.source_text = opinion.plain_text
-        opinion.cleaned_text = clean_text(
-            opinion.plain_text, ["all_whitespace"]
-        )
+    for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
+        text = getattr(opinion, attr)
+        if text:
+            opinion.source_text = text
+            opinion.cleaned_text = clean_text(text, ["html", "all_whitespace"])
+            opinion.source_is_html = True
+            break
+    else:
+        # Didn't hit the break; use plain text
+        text = getattr(opinion, "plain_text")
+        opinion.source_text = text
+        opinion.cleaned_text = clean_text(text, ["all_whitespace"])
         opinion.source_is_html = False
 
 
