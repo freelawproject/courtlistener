@@ -18,6 +18,7 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
 )
 
+from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
@@ -247,6 +248,10 @@ class OpinionSitemapTest(SitemapTest):
 @override_settings(
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
+@mock.patch(
+    "cl.lib.storage.get_name_by_incrementing",
+    side_effect=clobbering_get_name,
+)
 class UploadPublication(TestCase):
 
     fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
@@ -306,7 +311,7 @@ class UploadPublication(TestCase):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
         Docket.objects.all().delete()
 
-    def test_access_upload_page(self) -> None:
+    def test_access_upload_page(self, mock) -> None:
         """Can we successfully access upload page with access?"""
         self.client.login(username="learned", password="thehandofjustice")
         response = self.client.get(
@@ -314,7 +319,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-    def test_redirect_without_access(self) -> None:
+    def test_redirect_without_access(self, mock) -> None:
         """Can we successfully redirect individuals without proper access?"""
         self.client.login(username="test_user", password="simplepassword")
         response = self.client.get(
@@ -322,7 +327,7 @@ class UploadPublication(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_pdf_upload(self) -> None:
+    def test_pdf_upload(self, mock) -> None:
         """Can we upload a PDF and form?"""
         form = TennWorkersForm(
             self.work_comp_data,
@@ -336,7 +341,7 @@ class UploadPublication(TestCase):
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
 
-    def test_pdf_validation_failure(self) -> None:
+    def test_pdf_validation_failure(self, mock) -> None:
         """Can we fail upload documents that are not PDFs?"""
         form = TennWorkersForm(
             self.work_comp_data,
@@ -355,7 +360,7 @@ class UploadPublication(TestCase):
             ],
         )
 
-    def test_tn_wc_app_upload(self) -> None:
+    def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uplading?"""
         form = TennWorkersForm(
             self.work_comp_app_data,
@@ -371,7 +376,7 @@ class UploadPublication(TestCase):
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
 
-    def test_required_case_title(self) -> None:
+    def test_required_case_title(self, mock) -> None:
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
@@ -389,7 +394,7 @@ class UploadPublication(TestCase):
             form.errors["case_title"], ["This field is required."]
         )
 
-    def test_form_save(self) -> None:
+    def test_form_save(self, mock) -> None:
         """Can we saves successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
@@ -409,7 +414,7 @@ class UploadPublication(TestCase):
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
 
-    def test_handle_duplicate_pdf(self) -> None:
+    def test_handle_duplicate_pdf(self, mock) -> None:
         """Can we validate PDF not in system?"""
         d = Docket.objects.create(
             source=Docket.DIRECT_INPUT,
