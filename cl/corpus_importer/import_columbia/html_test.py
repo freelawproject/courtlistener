@@ -693,7 +693,7 @@ folders.sort()
 
 from collections import Counter
 
-html_tab = Counter()
+html_tab: Counter = Counter()
 
 for folder in folders:
     if "_" in folder:

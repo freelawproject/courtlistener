@@ -1,7 +1,7 @@
 import argparse
 import os
 from datetime import date, timedelta
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 
 from celery.canvas import chain
 from django.conf import settings
@@ -116,6 +116,13 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
     for pacer_court_id in pacer_court_ids:
         while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
+            if next_end_d is None:
+                logger.warn(
+                    f"Free opinion scraper for {pacer_court_id} still "
+                    f"in progress."
+                )
+                break
+
             logger.info(
                 "Attempting to get latest document references for "
                 "%s between %s and %s",
@@ -291,9 +298,10 @@ class Command(VerboseCommand):
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
         super(Command, self).handle(*args, **options)
-        options["action"](options)
+        action = cast(Callable, options["action"])
+        action(options)
 
-    VALID_ACTIONS = {
+    VALID_ACTIONS: Dict[str, Callable] = {
         "do-everything": do_everything,
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,

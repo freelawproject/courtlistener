@@ -5,7 +5,7 @@ import shutil
 from datetime import date
 from io import BytesIO
 from tempfile import NamedTemporaryFile
-from typing import Any, Dict, List, Optional, Tuple, Union, re
+from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 import internetarchive as ia
 import requests
@@ -69,6 +69,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
+from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
@@ -180,7 +181,7 @@ def generate_ia_json(
         *[
             "parties__party_types__criminal_complaints",
             "parties__party_types__criminal_counts",
-            attorney_prefetch,
+            attorney_prefetch,  # type: ignore
         ],
     )
 
@@ -312,7 +313,7 @@ def get_and_save_free_document_report(
         password=settings.PACER_PASSWORD,
     )
     report = FreeOpinionReport(court_id, s)
-    msg = None
+    msg = ""
     try:
         report.query(start, end, sort="case_number")
     except (
@@ -381,7 +382,7 @@ def process_free_opinion_result(
     row_pk: int,
     court_id: str,
     cnt: CaseNameTweaker,
-) -> Optional[Dict[str, Union[PACERFreeDocumentRow, str, int]]]:
+) -> Optional[TaskData]:
     """Add data from a free opinion report to our DB
 
     :param self: The celery task
@@ -395,7 +396,7 @@ def process_free_opinion_result(
     except PACERFreeDocumentRow.DoesNotExist:
         logger.warning("Unable to find PACERFreeDocumentRow: %s" % row_pk)
         self.request.chain = None
-        return
+        return None
 
     result.court = Court.objects.get(pk=map_pacer_to_cl_id(result.court_id))
     result.case_name = harmonize(result.case_name)
@@ -418,7 +419,7 @@ def process_free_opinion_result(
                 result.error_msg = msg
                 result.save()
                 self.request.chain = None
-                return
+                return None
             d.blocked, d.date_blocked = get_blocked_status(d)
             mark_ia_upload_needed(d, save_docket=False)
             d.save()
@@ -486,7 +487,7 @@ def process_free_opinion_result(
         if self.request.retries == self.max_retries:
             result.error_msg = msg
             result.save()
-            return
+            return None
         raise self.retry(exc=e)
     except DatabaseError as e:
         msg = "Unable to complete database transaction:\n%s" % e
@@ -494,13 +495,13 @@ def process_free_opinion_result(
         result.error_msg = msg
         result.save()
         self.request.chain = None
-        return
+        return None
 
     if not rd_created and rd.is_available:
         # The item already exists and is available. Fantastic. Call it a day.
         result.delete()
         self.request.chain = None
-        return
+        return None
 
     if rd_created:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -523,9 +524,9 @@ def process_free_opinion_result(
 )
 def get_and_process_free_pdf(
     self: Task,
-    data: Dict[str, Union[PACERFreeDocumentRow, int, str]],
+    data: TaskData,
     row_pk: int,
-) -> Optional[Dict[str, Union[FreeOpinionReport, int]]]:
+) -> Optional[TaskData]:
     """Get a PDF from a PACERFreeDocumentRow object
 
     :param self: The celery task
@@ -537,7 +538,7 @@ def get_and_process_free_pdf(
     :param row_pk: The PACERFreeDocumentRow operate on
     """
     if data is None:
-        return
+        return None
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
     cookies = get_or_cache_pacer_cookies(
@@ -554,7 +555,7 @@ def get_and_process_free_pdf(
         if self.request.retries == self.max_retries:
             logger.warning(msg)
             self.request.chain = None
-            return
+            return None
         logger.info(msg + " Retrying.")
         raise self.retry(exc=exc)
     except (ReadTimeoutError, requests.RequestException) as exc:
@@ -562,7 +563,7 @@ def get_and_process_free_pdf(
         if self.request.retries == self.max_retries:
             logger.warning(msg)
             self.request.chain = None
-            return
+            return None
         logger.info(msg + " Retrying.")
         raise self.retry(exc=exc)
 
@@ -580,7 +581,7 @@ def get_and_process_free_pdf(
 
     if success is False:
         PACERFreeDocumentRow.objects.filter(pk=row_pk).update(error_msg=msg)
-        return
+        return None
 
     rd.refresh_from_db()
     rd.is_free_on_pacer = True
@@ -647,7 +648,7 @@ def upload_to_ia(
     identifier: str,
     files: Union[str, List[str], List[BytesIO], Dict[str, BytesIO]],
     title: str,
-    collection: str,
+    collection: List[str],
     court_id: str,
     source_url: str,
     media_type: str,
@@ -694,7 +695,7 @@ def upload_to_ia(
         # Overloaded: IA wants us to slow down.
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
-            return
+            return None
         raise self.retry(exc=exc)
     logger.info(
         "Uploading file to Internet Archive with identifier: %s and "
@@ -725,7 +726,7 @@ def upload_to_ia(
         #             by IA is bad (or something).
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
-            return
+            return None
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response.status_code in [
@@ -738,7 +739,7 @@ def upload_to_ia(
             # overloaded, but doesn't get caught in the
             # OverloadedException below due to multiple processes
             # running at the same time. Just give up for now.
-            return
+            return None
         raise self.retry(exc=exc)
     except (requests.Timeout, requests.RequestException) as exc:
         logger.warning(
@@ -748,12 +749,12 @@ def upload_to_ia(
         )
         if self.request.retries == self.max_retries:
             # Give up for now. It'll get done next time cron is run.
-            return
+            return None
         raise self.retry(exc=exc)
     except FileNotFoundError as exc:
         # For some reason the file path is populated but no good. No point in
         # retrying. Just abort.
-        return
+        return None
     logger.info(
         "Item uploaded to IA with responses %s"
         % [r.status_code for r in responses]
@@ -771,7 +772,7 @@ def mark_court_done_on_date(
             status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
         ).latest("date_queried")
     except PACERFreeDocumentLog.DoesNotExist:
-        return
+        return None
     else:
         doc_log.date_queried = d
         doc_log.status = status
@@ -782,7 +783,7 @@ def mark_court_done_on_date(
 
 
 @app.task(ignore_result=True)
-def delete_pacer_row(data: Dict[str, int], pk: int) -> List[int]:
+def delete_pacer_row(data: TaskData, pk: int) -> List[int]:
     try:
         PACERFreeDocumentRow.objects.get(pk=pk).delete()
     except PACERFreeDocumentRow.DoesNotExist:
@@ -838,7 +839,7 @@ def get_pacer_case_id_and_title(
     case_name: Optional[str] = None,
     office_number: Optional[str] = None,
     docket_number_letters: Optional[str] = None,
-) -> Optional[Dict[str, str]]:
+) -> Optional[TaskData]:
     """Get the pacer_case_id and title values for a district court docket. Use
     heuristics to disambiguate the results.
 
@@ -888,7 +889,7 @@ def get_pacer_case_id_and_title(
         cookies = get_pacer_cookie_from_cache(user_pk)
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
-    msg = None
+    msg = ""
     try:
         report.query(docket_number)
     except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
@@ -932,11 +933,11 @@ def get_pacer_case_id_and_title(
 )
 def do_case_query_by_pacer_case_id(
     self: Task,
-    data: Dict[str, str],
+    data: TaskData,
     court_id: str,
     cookies: RequestsCookieJar,
     tag_names: List[str] = None,
-) -> Optional[Dict[str, Union[str, int]]]:
+) -> Optional[TaskData]:
     """Run a case query (iquery.pl) query on a case and save the data
 
     :param self: The celery task
@@ -954,7 +955,7 @@ def do_case_query_by_pacer_case_id(
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
-        return
+        return None
 
     pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
@@ -975,7 +976,7 @@ def do_case_query_by_pacer_case_id(
     if not docket_data:
         logger.info("No valid docket data for %s.%s", court_id, pacer_case_id)
         self.request.chain = None
-        return
+        return None
 
     # Merge the contents into CL.
     if d is None:
@@ -1027,7 +1028,7 @@ def filter_docket_by_tags(
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
-        return
+        return None
 
     ds = Docket.objects.filter(
         pacer_case_id=data["pacer_case_id"],
@@ -1095,7 +1096,7 @@ def make_docket_by_iquery(
             "Trying again if retries not exceeded."
         )
         if self.request.retries == self.max_retries:
-            return
+            return None
         raise self.retry(exc=exc)
 
     if not report.data:
@@ -1104,7 +1105,7 @@ def make_docket_by_iquery(
             court_id,
             pacer_case_id,
         )
-        return
+        return None
 
     d = find_docket_object(
         court_id,
@@ -1134,13 +1135,13 @@ def make_docket_by_iquery(
 )
 def get_docket_by_pacer_case_id(
     self: Task,
-    data: Dict[str, Union[str, int]],
+    data: TaskData,
     court_id: str,
     cookies: Optional[RequestsCookieJar] = None,
     docket_pk: Optional[int] = None,
     tag_names: Optional[str] = None,
     **kwargs,
-) -> Optional[Dict[str, Union[int, bool]]]:
+) -> Optional[TaskData]:
     """Get a docket by PACER case id, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1164,7 +1165,7 @@ def get_docket_by_pacer_case_id(
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
-        return
+        return None
 
     # Attempt a light docket look up, we'll do better after fetching more data
     pacer_case_id = data.get("pacer_case_id")
@@ -1205,7 +1206,7 @@ def get_docket_by_pacer_case_id(
     if not docket_data:
         logger.info("No valid docket data for %s", logging_id)
         self.request.chain = None
-        return
+        return None
 
     if d is None:
         d = find_docket_object(
@@ -1240,7 +1241,7 @@ def get_appellate_docket_by_docket_number(
     cookies: RequestsCookieJar,
     tag_names: Optional[List[str]] = None,
     **kwargs,
-) -> Optional[Dict[str, Union[int, bool]]]:
+) -> Optional[TaskData]:
     """Get a docket by docket number, CL court ID, and a collection of kwargs
     that can be passed to the DocketReport query.
 
@@ -1325,7 +1326,7 @@ def get_attachment_page_by_rd(
     if not rd.pacer_doc_id:
         # Some docket entries are just text/don't have a pacer_doc_id.
         self.request.chain = None
-        return
+        return None
 
     s = PacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
@@ -1345,7 +1346,7 @@ def get_attachment_page_by_rd(
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, exc.response.status_code)
             self.request.chain = None
-            return
+            return None
     except requests.RequestException as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
@@ -1362,10 +1363,10 @@ def get_attachment_page_by_rd(
 )
 def get_bankr_claims_registry(
     self: Task,
-    data: Optional[Dict[str, int]],
+    data: TaskData,
     cookies: RequestsCookieJar,
     tag_names: Optional[List[str]] = None,
-) -> Optional[Dict[str, int]]:
+) -> Optional[TaskData]:
     """Get the bankruptcy claims registry for a docket
 
     :param self: The celery task
@@ -1384,7 +1385,7 @@ def get_bankr_claims_registry(
             "and exiting."
         )
         self.request.chain = None
-        return
+        return None
 
     d = Docket.objects.get(pk=data["docket_pk"])
     logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
@@ -1513,7 +1514,7 @@ def download_pacer_pdf_by_rd(
             if self.request.retries == self.max_retries:
                 logger.error(msg, exc.response.status_code)
                 self.request.chain = None
-                return
+                return None
             logger.info(msg + " Retrying.", exc.response.status_code)
             raise self.retry(exc)
         else:
@@ -1523,14 +1524,14 @@ def download_pacer_pdf_by_rd(
                 exc.response.status_code,
             )
             self.request.chain = None
-            return
+            return None
     except requests.RequestException as exc:
         logger.warning(
             "Unable to get PDF for %s in %s", pacer_doc_id, pacer_case_id
         )
         if self.request.retries == self.max_retries:
             self.request.chain = None
-            return
+            return None
         raise self.retry(exc=exc)
     return r
 
@@ -1597,7 +1598,7 @@ def update_rd_metadata(
     return True, "Saved item successfully"
 
 
-def add_tags(rd: RECAPDocument, tag_name: str) -> None:
+def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
     """Add tags to a tree of objects starting with the RECAPDocument
 
     Adds the tag to the RECAPDocument, Docket Entry, and Docket.
@@ -1640,7 +1641,7 @@ def get_pacer_doc_by_rd(
     if rd.is_available:
         add_tags(rd, tag)
         self.request.chain = None
-        return
+        return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     r = download_pacer_pdf_by_rd(
@@ -1660,8 +1661,7 @@ def get_pacer_doc_by_rd(
 
     if success is False:
         self.request.chain = None
-        return
-
+        return None
     add_tags(rd, tag)
     return rd.pk
 
@@ -1676,10 +1676,10 @@ def get_pacer_doc_by_rd(
 def get_pacer_doc_by_rd_and_description(
     self: Task,
     rd_pk: int,
-    description_re: re.Pattern,
+    description_re: Pattern,
     cookies: RequestsCookieJar,
     fallback_to_main_doc: bool = False,
-    tag: Optional[List[str]] = None,
+    tag_name: Optional[List[str]] = None,
 ) -> None:
     """Using a RECAPDocument object ID and a description of a document, get the
     document from PACER.
@@ -1695,7 +1695,7 @@ def get_pacer_doc_by_rd_and_description(
     logged-in PACER user.
     :param fallback_to_main_doc: Should we grab the main doc if none of the
     attachments match the regex?
-    :param tag: A tag name to apply to any downloaded content.
+    :param tag_name: A tag name to apply to any downloaded content.
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1720,8 +1720,7 @@ def get_pacer_doc_by_rd_and_description(
             msg = "Aborting. Did not find civil cover sheet for %s." % rd
             logger.error(msg)
             self.request.chain = None
-            return
-
+            return None
     if not att_found.get("pacer_doc_id"):
         logger.warning("No pacer_doc_id for document (is it sealed?)")
         self.request.chain = None
@@ -1739,8 +1738,8 @@ def get_pacer_doc_by_rd_and_description(
     # Replace the description if we have description data.
     # Else fallback on old.
     rd.description = att_found.get("description", "") or rd.description
-    if tag is not None:
-        tag, _ = Tag.objects.get_or_create(name=tag)
+    if tag_name is not None:
+        tag, _ = Tag.objects.get_or_create(name=tag_name)
         tag.tag_object(rd)
 
     if rd.is_available:
