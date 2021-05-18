@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from glob import iglob
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -42,8 +42,8 @@ def merge_or_add_opinions(
     cluster_id: int,
     html_str: str,
     data: Dict[str, Any],
-    date_argued: datetime.date,
-    date_filed: datetime.date,
+    date_argued: Optional[date],
+    date_filed: Optional[date],
     case_names: Dict[str, str],
     status: str,
     docket_number: str,
@@ -73,7 +73,7 @@ def merge_or_add_opinions(
     )
     if does_exist:
         logger.info(f"Opinion already in database at {cluster_id}")
-        return
+        return None
 
     logger.info(f"Starting merger of opinions in cluster {cluster_id}.")
 
@@ -154,8 +154,8 @@ def merge_or_add_opinions(
 def add_new_records(
     html_str: str,
     data: Dict[str, Any],
-    date_argued: datetime.date,
-    date_filed: datetime.date,
+    date_argued: Optional[date],
+    date_filed: Optional[date],
     case_names: Dict[str, str],
     status: str,
     docket_number: str,
@@ -328,7 +328,9 @@ def find_court_id(court_str: str) -> str:
     return "tax"
 
 
-def process_dates(data: Dict[str, Any]) -> Tuple[datetime.date, datetime.date]:
+def process_dates(
+    data: Dict[str, Any]
+) -> Tuple[Optional[date], Optional[date]]:
     """Process date argued and date filed
 
     Dates in this dataset fall into two categories, argued and filed/decided.
@@ -370,7 +372,7 @@ def import_anon_2020_db(
         logger.info(f"Importing case id: {dir.split('/')[-2]}")
         if skip_until:
             if skip_until in dir:
-                skip_until = False
+                skip_until = ""
             continue
 
         # Prepare data and html
