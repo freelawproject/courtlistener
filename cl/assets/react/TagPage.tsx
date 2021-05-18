@@ -32,13 +32,13 @@ const PageTop = (data: CLData) => {
         </div>
       </div>
       <p>
-        Created by
+        Created by{' '}
         <a className="alt tag-back" href={`/tags/${data.user}/`}>
-          {' '}
           {data.user}
         </a>{' '}
-        on
-        <span className="alt"> {data.dateCreatedDate}</span> with {data.viewCount}
+        on <span className="alt">{data.dateCreatedDate}</span> with{' '}
+        <span className="alt">{data.viewCount.toLocaleString()}</span> view
+        {data.viewCount !== 1 ? 's' : ''}
       </p>
     </React.Fragment>
   );
