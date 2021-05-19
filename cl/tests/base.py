@@ -84,19 +84,12 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         cls.host = socket.gethostbyname(socket.gethostname())
 
     def setUp(self) -> None:
-        self.reset_browser()
+        self.browser = self._create_browser()
+        self.browser.implicitly_wait(5)
         self._update_index()
 
     def reset_browser(self) -> None:
-        try:
-            self.browser.quit()
-        except AttributeError:
-            # it's ok we forgive you http://stackoverflow.com/a/610923
-            pass
-        finally:
-            self.browser = self._create_browser()
-
-        self.browser.implicitly_wait(5)
+        self.browser.delete_all_cookies()
 
     def tearDown(self) -> None:
         if self.screenshot:
