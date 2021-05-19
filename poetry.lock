@@ -514,6 +514,14 @@ mypy = ">=0.790"
 typing-extensions = "*"
 
 [[package]]
+name = "django-waffle"
+version = "2.1.0"
+description = "A feature flipper for Django."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "djangorestframework"
 version = "3.12.4"
 description = "Web APIs for Django, made easy."
@@ -1710,7 +1718,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "defe313b312e4659d2f48921c05df611bc0c7be4b83df49bcef7297d8f40f83b"
+content-hash = "68fdba1d28bc29c955d94be48e00eb9d940df29034dbead41bd475b963fc45d9"
 
 [metadata.files]
 amqp = [
@@ -1957,6 +1965,10 @@ django-storages = [
 django-stubs = [
     {file = "django-stubs-1.7.0.tar.gz", hash = "sha256:ddd190aca5b9adb4d30760d5c64f67cb3658703f5f42c3bb0c2c71ff4d752c39"},
     {file = "django_stubs-1.7.0-py3-none-any.whl", hash = "sha256:30a7d99c694acf79c5d93d69a5a8e4b54d2a8c11dd672aa869006789e2189fa6"},
+]
+django-waffle = [
+    {file = "django-waffle-2.1.0.tar.gz", hash = "sha256:a96b52ed6256238b7e0dda8c5c18b6f00e38008fae380f9ff22e12fd1a702c7f"},
+    {file = "django_waffle-2.1.0-py2.py3-none-any.whl", hash = "sha256:a39f294f8c4e026b9e441d0e4d35ff3b26d1eb2da1d52196ba4bc04ba78b1db1"},
 ]
 djangorestframework = [
     {file = "djangorestframework-3.12.4-py3-none-any.whl", hash = "sha256:6d1d59f623a5ad0509fe0d6bfe93cbdfe17b8116ebc8eda86d45f6e16e819aaf"},
