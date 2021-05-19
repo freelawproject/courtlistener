@@ -4,7 +4,6 @@ import TagListInner from './TagListInner';
 import { appFetch } from './_fetch';
 import { Tag, UserState } from './_types';
 
-
 const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const [page, setPage] = React.useState(1);
 
@@ -23,8 +22,9 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
   const latestData = data
 
   if (latestData == undefined) {
-    return (<div>Loading...</div>)
+    return <div>Loading...</div>;
   }
+
   return (
      <div>
        {isPageOwner ? (<h1>Your Tags</h1>) : (<h1>Tags for: {userName}</h1>)}
@@ -92,9 +92,9 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
           </div>
         </div>
       )}
-       {isFetching ? <span> Fetching...</span> : null}{' '}
-     </div>
-   )
- }
+      {isFetching ? <span> Fetching...</span> : null}{' '}
+    </div>
+  );
+};
 
 export default TagList;
