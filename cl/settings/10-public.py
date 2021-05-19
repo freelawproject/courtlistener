@@ -283,8 +283,6 @@ if not any([TESTING, DEBUG]):
 # Where should the bulk data be stored?
 BULK_DATA_DIR = os.path.join(INSTALL_ROOT, "cl/assets/media/bulk-data/")
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 #####################
 # Payments & Prices #
 #####################
