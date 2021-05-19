@@ -1,9 +1,9 @@
 import itertools
 import time
-from typing import Dict, List, Union
+from typing import List, TypedDict
 
 from django.conf import settings
-from django.core.management import CommandParser
+from django.core.management import CommandParser  # type: ignore
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
@@ -12,9 +12,14 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.search.models import Court
 
 
-def add_all_cases_to_cl(
-    options: Dict[str, Union[List[str], int, str, float]],
-) -> None:
+class OptionsType(TypedDict):
+    queue: str
+    courts: List[str]
+    iterations: int
+    iteration_delay: float
+
+
+def add_all_cases_to_cl(options: OptionsType) -> None:
     """Iterate over courts and gather iquery results from them.
 
     :param options: The options from the handle method
