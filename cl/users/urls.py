@@ -93,6 +93,7 @@ urlpatterns = [
         name="view_deleted_visualizations",
     ),
     path("profile/api/", views.view_api, name="view_api"),
+    path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
     path(
         "profile/password/change/",
         views.password_change,

@@ -1,0 +1,76 @@
+{% extends "profile/nav.html" %}
+{% block title %}Webhooks &ndash; CourtListener.com{% endblock %}
+
+{% block nav-webhooks %}active{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+  <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+    <h1>CourtListener Webhooks (Beta)</h1>
+    <p>Currently in beta, please use understanding there may be breaking changes in the next few weeks.</p>
+  </div>
+
+  <div class="col-xs-12 v-offset-above-3">
+
+    <div class="row">
+      <div class="col-xs-10 col-xs-offset-1">
+        <form action="" method="post">{% csrf_token %}
+          <div class="row">
+            <div class="col-xs-12">
+              <div class="form-group">
+                <div class="row">
+                  <label class="col-xs-2">Webhook Event Type</label>
+                  <div class="col-xs-10">
+                    {{ webhook_form.event_type }}
+                    {% if webhook_form.event_type.errors %}
+                      <p class="help-block">
+                        {% for error in webhook_form.event_type.errors %}
+                          {{ error|escape }}
+                        {% endfor %}
+                      </p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-12">
+              <div class="form-group">
+                <div class="row">
+                  <label class="col-xs-2">URL</label>
+                  <div class="col-xs-10">
+                    {{ webhook_form.url }}
+                    {% if webhook_form.url.errors %}
+                      <p class="help-block">
+                        {% for error in webhook_form.url.errors %}
+                          {{ error|escape }}
+                        {% endfor %}
+                      </p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-xs-12">
+              <div class="form-group">
+                <div class="row">
+                  <label class="col-xs-2">&nbsp;</label>
+                  <div class="col-xs-2">
+                    <button class="btn btn-primary btn-block" type="submit">
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+{% endblock %}
