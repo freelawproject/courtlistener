@@ -1,12 +1,5 @@
 
-.editor-toolbar {
-  border-top: none;
-  border-top-left-radius: 1px;
-  border-top-right-radius: 1px;
-  border-left: 1px solid lightgray;
-  border-right: 1px solid lightgray;
-}
-
+/*Stylize markdown viewer*/
 #markdown_viewer {
   border: 1px solid;
   border-color: lightgrey;
@@ -17,7 +10,6 @@
 
 #react-root[data-page-owner='False'] > div > div#markdown_viewer {
   border-top: 1px solid lightgrey;
-
 }
 
 /*Update the tables inside markdown viewer to look better*/
@@ -26,7 +18,7 @@
   padding:5px;
 }
 
-/*Provide consitent spacing on markdown viewing*/
+/*Provide consistent spacing on markdown viewing*/
 .view-only {
   margin-top: 50px;
   border: none;
@@ -57,11 +49,13 @@ td  {
   vertical-align: middle;
 }
 
+/*Stylize dropdown*/
 .delete-tag {
   font-size: 10px;
   line-height: 1.0;
 }
 
+/*Define toggle css in dropdown*/
 label.toggle input span {
   border-radius: 2px;
 }
@@ -72,14 +66,17 @@ label.toggle {
   width: 28px;
 }
 
+/*Fix tag wrapping*/
 span.tag {
   white-space: nowrap;
 }
 
+/*Update color link on tag page back to tag list*/
 .tag-back {
   color: #009;
 }
 
+/*Fixes mobile bug for button*/
 #tag-settings {
   z-index: 1;
 }
