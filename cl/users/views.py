@@ -28,6 +28,7 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 
+from cl.api.models import Webhook
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -43,6 +44,7 @@ from cl.users.forms import (
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
+    WebhookForm,
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
@@ -200,6 +202,23 @@ def view_deleted_visualizations(request: HttpRequest) -> HttpResponse:
 @never_cache
 def view_api(request: HttpRequest) -> HttpResponse:
     return render(request, "profile/api.html", {"private": True})
+
+
+@login_required
+@never_cache
+def view_webhooks(request: HttpRequest) -> HttpResponse:
+    user = request.user
+    webhook = user.webhooks.first() if user.webhooks.count() > 0 else Webhook()
+    webhook_form = WebhookForm(request.POST or None, instance=webhook)
+    if webhook_form.is_valid():
+        webhook.user = user
+        webhook_form.save()
+        return HttpResponseRedirect(reverse("view_webhooks"))
+    return render(
+        request,
+        "profile/webhooks.html",
+        {"webhook_form": webhook_form, "private": True},
+    )
 
 
 @sensitive_variables(
