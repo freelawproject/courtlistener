@@ -18,6 +18,7 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
+from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganizationAssociation,
@@ -326,7 +327,11 @@ class RecapPdfFetchApiTest(TestCase):
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
 
-    def test_fetch_unavailable_pdf(self, mock_get_cookie):
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_fetch_unavailable_pdf(self, mock_get_cookie, mock_get_name):
         """Can we do a simple fetch of a PDF from PACER?"""
         self.rd.is_available = False
         self.rd.save()
@@ -434,7 +439,7 @@ class ProcessingQueueApiFilterTest(TestCase):
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
-    def test_filters(self) -> None:
+    def test_pq_filters(self) -> None:
         """Can we filter with the status and upload_type filters?"""
         # Create two PQ objects with different values.
         ProcessingQueue.objects.create(**self.params)
@@ -544,7 +549,11 @@ class DebugRecapUploadtest(TestCase):
         RECAPDocument.objects.all().delete()
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    def test_debug_does_not_create_rd(self, mock):
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_debug_does_not_create_rd(self, mock_extract, mock_get_name):
         """If debug is passed, do we avoid creating recap documents?"""
         docket = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="asdf"
@@ -562,7 +571,7 @@ class DebugRecapUploadtest(TestCase):
         )
         process_recap_pdf(pq.pk)
         self.assertEqual(RECAPDocument.objects.count(), 0)
-        mock.assert_not_called()
+        mock_extract.assert_not_called()
 
     @mock.patch("cl.recap.mergers.add_attorney")
     def test_debug_does_not_create_docket(self, add_atty_mock):
@@ -614,15 +623,19 @@ class RecapPdfTaskTest(TestCase):
         self.file_content = b"file content more content"
         f = SimpleUploadedFile(self.filename, self.file_content)
         sha1 = "dcfdea519bef494e9672b94a4a03a49d591e3762"  # <-- SHA1 for above
-        self.pq = ProcessingQueue.objects.create(
-            court_id="scotus",
-            uploader=user,
-            pacer_case_id="asdf",
-            pacer_doc_id="asdf",
-            document_number="1",
-            filepath_local=f,
-            upload_type=UPLOAD_TYPE.PDF,
-        )
+        with mock.patch(
+            "cl.lib.storage.get_name_by_incrementing",
+            side_effect=clobbering_get_name,
+        ):
+            self.pq = ProcessingQueue.objects.create(
+                court_id="scotus",
+                uploader=user,
+                pacer_case_id="asdf",
+                pacer_doc_id="asdf",
+                document_number="1",
+                filepath_local=f,
+                upload_type=UPLOAD_TYPE.PDF,
+            )
         self.docket = Docket.objects.create(
             source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
         )
@@ -649,7 +662,11 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    def test_recap_document_already_exists(self, mock):
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_recap_document_already_exists(self, mock_get_name, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
         self.rd.is_available = True
@@ -675,7 +692,8 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.recap_document_id, self.rd.pk)
 
         # Did we correctly avoid running document extraction?
-        mock.assert_not_called()
+        mock_extract.assert_not_called()
+        mock_get_name.assert_called()
 
     def test_only_the_docket_already_exists(self) -> None:
         """Never seen this docket entry before?
@@ -692,7 +710,13 @@ class RecapPdfTaskTest(TestCase):
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    def test_docket_and_docket_entry_already_exist(self, mock):
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_docket_and_docket_entry_already_exist(
+        self, mock_get_name, mock_extract
+    ):
         """What happens if we have everything but the PDF?
 
         This is the good case. We simply create a new item.
@@ -702,8 +726,10 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(rd.is_available)
         self.assertTrue(rd.sha1)
         self.assertTrue(rd.filepath_local)
-        mock.assert_called_once()
         self.assertIn("gov.uscourts.scotus.asdf.1.0", rd.filepath_local.name)
+
+        mock_get_name.assert_called()
+        mock_extract.assert_called_once()
 
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
@@ -779,7 +805,11 @@ class RecapZipTaskTest(TestCase):
         ProcessingQueue.objects.all().delete()
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    def test_simple_zip_upload(self, mock):
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_simple_zip_upload(self, mock_get_name, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
         results = process_recap_zip(self.pq.pk)
@@ -822,7 +852,8 @@ class RecapZipTaskTest(TestCase):
 
         # Was the mock called once per PDF in the zip?
         expected_call_count = len(results["new_pqs"])
-        self.assertEqual(mock.call_count, expected_call_count)
+        self.assertEqual(mock_extract.call_count, expected_call_count)
+        mock_get_name.assert_called()
 
 
 class RecapAddAttorneyTest(TestCase):
@@ -1385,7 +1416,11 @@ class RecapDocketTaskTest(TestCase):
             msg="New docket entry didn't get created.",
         )
 
-    def test_orphan_documents_are_added(self) -> None:
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_orphan_documents_are_added(self, mock) -> None:
         """If there's a pq that exists but previously wasn't processed, do we
         clean it up after we finish adding the docket?
         """
