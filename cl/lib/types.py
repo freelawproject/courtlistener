@@ -5,6 +5,7 @@ from django.http import HttpRequest
 from cl.users.models import User
 
 CleanData = Dict[str, Any]
+TaskData = Dict[str, Any]
 
 
 class AuthenticatedHttpRequest(HttpRequest):

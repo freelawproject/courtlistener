@@ -68,6 +68,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "ratelimit.middleware.RatelimitMiddleware",
+    "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.MaintenanceModeMiddleware",
 ]
@@ -93,6 +94,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "storages",
+    "waffle",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
@@ -471,6 +473,13 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+##########
+# Waffle #
+##########
+WAFFLE_CREATE_MISSING_FLAGS = True
+WAFFLE_CREATE_MISSING_SWITCHES = True
+WAFFLE_CREATE_MISSING_SAMPLES = True
 
 ########################
 # Logging Machinations #
