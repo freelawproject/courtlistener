@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePaginatedQuery } from 'react-query';
+import { useQuery } from 'react-query';
 import TagListInner from './TagListInner';
 import { appFetch } from './_fetch';
 import { Tag, UserState } from './_types';
@@ -13,20 +13,24 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
       await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}&page_size=10&order_by=name`),
     []
   );
-
-  const { isLoading, isError, error, resolvedData, latestData, isFetching } = usePaginatedQuery( // this has been deprecated...
-    ['tags', page],
-    getTags
-  );
+  const {
+    isLoading,
+    isError,
+    error,
+    data,
+    isFetching,
+   } = useQuery(['tags', page], getTags, { keepPreviousData : true })
+  const latestData = data
 
   if (latestData == undefined) {
     return (<div>Loading...</div>)
   }
-
   return (
      <div>
        {isPageOwner ? (<h1>Your Tags</h1>) : (<h1>Tags for: {userName}</h1>)}
        {isLoading ? (
+         <div>Loading...</div>
+       ) : isFetching ? (
          <div>Loading...</div>
        ) : isError ? (
          <div>Error: {(error as any).message} </div>
