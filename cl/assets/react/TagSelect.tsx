@@ -77,15 +77,14 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) =
     },
     onInputValueChange: ({ inputValue }) => {
       if (inputValue !== 'return') return;
-      const d3i0 = document.querySelector('div.list-group > div > div > div > div')!.textContent || '';
+      const d3i0 = document.querySelector("a.list-group-item > p")!.textContent || ""
       const isCreateItemOption = d3i0.startsWith('Create Tag:');
       if (isCreateItemOption) {
         const validInput = textVal.match(/^[a-z0-9-]*$/);
         if (!validInput) {
           return setValidationError("Only lowercase letters, numbers, and '-' allowed");
         }
-        const tag_name = d3i0.replace('Create Tag: ', '');
-        return addNewTag({ name: tag_name });
+        return addNewTag({ name: textVal });
       }
     },
     onSelectedItemChange: ({ selectedItem }) => {
