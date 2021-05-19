@@ -26,13 +26,16 @@
 
     <div id="react-root"
          data-page-owner="{{ is_page_owner }}"
+         {% if perms.favorites.change_usertag %}
+           data-admin-url="{% url "admin:favorites_usertag_change" tag.id %}"
+         {% endif %}
          data-description="{{ tag.description }}"
          data-id="{{ tag.id }}"
          data-title="{{ tag.title }}"
          data-user="{{ tag.user }}"
          data-published="{{ tag.published }}"
          data-date-created-date="{{ tag.date_created|date }}"
-         data-view-count="{{ tag.view_count|intcomma }} view{{ tag.view_count|pluralize }}"
+         data-view-count="{{ tag.view_count }}"
          data-name="{{ tag.name }}">
     </div>
 
