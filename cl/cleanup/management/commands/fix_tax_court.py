@@ -4,7 +4,7 @@
 import argparse
 import re
 
-from eyecite.find_citations import get_citations
+from eyecite import get_citations
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import normalize_dashes
@@ -78,7 +78,7 @@ def find_tax_court_citation(opinion_text):
                     # If not the first cite - Skip
                     return None
 
-                if cite.reporter_index > 2:
+                if cite.index > 2:
                     # If reporter not in first or second term in the line we skip.
                     return None
 

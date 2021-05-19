@@ -1837,7 +1837,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
                     citation_str,
                     do_post_citation=False,
                     do_defendant=False,
-                    disambiguate=False,
+                    remove_ambiguous=False,
                 )[0]
             except IndexError:
                 raise ValueError(
