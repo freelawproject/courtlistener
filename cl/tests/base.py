@@ -83,28 +83,28 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # Set host to externally accessible web server address
         cls.host = socket.gethostbyname(socket.gethostname())
 
+        cls.browser = cls._create_browser()
+        cls.browser.implicitly_wait(5)
+
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
 
     def reset_browser(self) -> None:
-        try:
-            self.browser.quit()
-        except AttributeError:
-            # it's ok we forgive you http://stackoverflow.com/a/610923
-            pass
-        finally:
-            self.browser = self._create_browser()
-
-        self.browser.implicitly_wait(5)
+        self.browser.delete_all_cookies()
 
     def tearDown(self) -> None:
         if self.screenshot:
             filename = type(self).__name__ + "-selenium.png"
             print("\nSaving screenshot: %s" % (filename,))
             self.browser.save_screenshot("/tmp/" + filename)
-        self.browser.quit()
         self._teardown_test_solr()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super(BaseSeleniumTest, cls).tearDownClass()
+
+        cls.browser.quit()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_in_node(self, text: str, tag_name: str) -> None:
