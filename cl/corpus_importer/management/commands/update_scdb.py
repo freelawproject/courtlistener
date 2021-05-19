@@ -171,7 +171,7 @@ class Command(VerboseCommand):
                     scdb_info[scdb_field],
                     do_post_citation=False,
                     do_defendant=False,
-                    disambiguate=False,
+                    remove_ambiguous=False,
                 )[0]
             except IndexError:
                 logger.warning(
