@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, TypeVar
 
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
@@ -2796,6 +2796,9 @@ class OpinionsCited(models.Model):
         unique_together = ("citing_opinion", "cited_opinion")
 
 
+TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
+
+
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",
@@ -2807,7 +2810,7 @@ class Tag(AbstractDateTimeModel):
     def __str__(self) -> str:
         return "%s: %s" % (self.pk, self.name)
 
-    def tag_object(self, thing):
+    def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
         """Atomically add a tag to an item.
 
         Django has a system for adding to a m2m relationship like the ones

@@ -1,5 +1,6 @@
-1.0.39
+1.0.40
 
+1.0.40 - Add waffle
 1.0.39 - Update eyecite and reporters_db
 1.0.38 - Add hCaptcha
 1.0.37 - Upgrade juriscraper
