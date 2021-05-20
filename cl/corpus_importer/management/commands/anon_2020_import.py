@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
-from eyecite.find_citations import get_citations
-from eyecite.models import Citation as FoundCitation
+from eyecite.find_citations import clean_text, get_citations
+from eyecite.models import CitationBase as FoundCitation
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
 
@@ -31,7 +31,7 @@ def find_cites(case_data: Dict[str, str]) -> List[FoundCitation]:
         r"\"(.*?)\"", case_data["lexis_ids_normalized"], re.DOTALL
     )
     for cite in cites:
-        fc = get_citations(cite, clean=("html", "whitespace"))
+        fc = get_citations(clean_text(cite, ["html", "inline_whitespace"]))
         if len(fc) > 0:
             found_citations.append(fc[0])
     return found_citations

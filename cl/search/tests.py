@@ -366,8 +366,10 @@ class SearchTest(IndexedSolrTestCase):
         """Does querying by date work?"""
         response = self.client.get(
             reverse("show_results"),
-            {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
+            {"q": "*", "filed_after": "1895-06", "filed_before": "1896-01"},
         )
+        text = response.content.decode()
+        print(text)
         self.assertIn("Honda", response.content.decode())
 
     def test_faceted_queries(self) -> None:

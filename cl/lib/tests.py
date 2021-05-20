@@ -1,6 +1,3 @@
-# coding=utf8
-
-
 import datetime
 import os
 import re
@@ -25,7 +22,7 @@ from cl.lib.pacer import (
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.lib.string_utils import anonymize, trunc
+from cl.lib.string_utils import anonymize, normalize_dashes, trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
@@ -187,6 +184,17 @@ class TestStringUtils(TestCase):
             anonymize("Term 111-11-1111 Term 111-11-1111 Term"),
             ("Term XXX-XX-XXXX Term XXX-XX-XXXX Term", True),
         )
+
+    def test_dash_handling(self) -> None:
+        """Can we convert dashes nicely?"""
+        tests = {
+            "en dash –": "en dash -",  # En-dash
+            "em dash —": "em dash -",  # Em-dash
+            "dash -": "dash -",  # Regular dash
+        }
+        for test, answer in tests.items():
+            computed = normalize_dashes(test)
+            self.assertEqual(computed, answer)
 
 
 class TestMakeFQ(TestCase):

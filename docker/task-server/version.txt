@@ -1,6 +1,7 @@
 1.0.35
 
 1.0.35 - Add waffle
+1.0.34 - Update eyecite and reporters_db
 1.0.33 - Add hCaptcha
 1.0.32 - Upgrade juriscraper
 1.0.31 - Numerous package tweaks
