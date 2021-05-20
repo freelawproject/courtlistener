@@ -1736,7 +1736,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "68fdba1d28bc29c955d94be48e00eb9d940df29034dbead41bd475b963fc45d9"
+content-hash = "ac14a085435e84be2e76bf3ee56ae3f0285e00ee17105524cae308eb69ac84a1"
 
 [metadata.files]
 amqp = [
