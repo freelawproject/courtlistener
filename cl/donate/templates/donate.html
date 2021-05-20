@@ -21,15 +21,13 @@
     let donor_info = $("#donor-info");
     let check_info = $("#check-info");
     let cc_info = $("#cc-info");
-    let bitcoin_info = $("#bitcoin-info");
 
     // Monthly/one-time handling
     $("#id_frequency_0").parent("label").on("click", function () {
       // Credit card
       $("#annual-reminder").hide();
       $("#how-donate label[for=id_payment_provider_0], " +
-        "#how-donate label[for=id_payment_provider_2], " +
-        "#how-donate label[for=id_payment_provider_3]")
+        "#how-donate label[for=id_payment_provider_2]")
         .addClass('disabled')
         .removeClass('active');
 
@@ -38,13 +36,11 @@
       donor_info.show("fast");
       check_info.hide();
       cc_info.show();
-      bitcoin_info.hide();
     });
     $("#id_frequency_1").parent("label").on("click", function () {
       $("#annual-reminder").show("fast");
       $("#how-donate label[for=id_payment_provider_0], " +
-        "#how-donate label[for=id_payment_provider_2], " +
-        "#how-donate label[for=id_payment_provider_3]")
+        "#how-donate label[for=id_payment_provider_2]")
         .removeClass('disabled');
 
       $("#how-donate input[value=paypal]").prop('checked', true);
@@ -54,9 +50,8 @@
     });
 
 
-    // Hide check and bitcoin info by default
+    // Hide check info by default
     check_info.hide();
-    bitcoin_info.hide();
 
     // Disable other forms of payment, monthly donation is the default and only accepts CC
     $("#id_frequency_0").parent("label").click();
@@ -67,28 +62,18 @@
       donor_info.show("fast");
       check_info.hide();
       cc_info.hide();
-      bitcoin_info.hide();
     });
     $("#id_payment_provider_1").parent("label").on("click", function () {
       // Credit Card
       donor_info.show("fast");
       check_info.hide();
       cc_info.show();
-      bitcoin_info.hide();
     });
     $("#id_payment_provider_2").parent("label").on("click", function () {
       // Check
       donor_info.hide();
       check_info.show("fast");
       cc_info.hide();
-      bitcoin_info.hide();
-    });
-    $("#id_payment_provider_3").parent("label").on("click", function () {
-      // Bitcoin
-      donor_info.hide();
-      check_info.hide();
-      cc_info.hide();
-      bitcoin_info.show("fast");
     });
   </script>
 {% endblock %}
@@ -241,42 +226,5 @@
     </p>
     <p>Thank you for your donation.</p>
   {% endif %}
-</div>
-{% endblock %}
-
-
-{% block bitcoin_info %}
-<div id="bitcoin-info">
-  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin</strong>, please use the address or QR code below.</p>
-  <img src="{% static "png/bitcoin-qr-code.png" %}"
-       width="200"
-       height="200"
-       class="img-responsive center-block"
-       alt="QR code for Bitcoin">
-  <p class="text-center"><a href="bitcoin:19FBmVguf86kaxEM7air6EDrtq5bJSo8qs">19FBmVguf86kaxEM7air6EDrtq5bJSo8qs</a></p>
-
-  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Bitcoin Cash</strong>, please use the address or QR code below.</p>
-  <img src="{% static "png/bitcoin-cash-qr-code.png" %}"
-       width="200"
-       height="200"
-       class="img-responsive center-block"
-       alt="QR code for Bitcoin Cash">
-  <p class="text-center"><a href="bitcoincash:qz29895afcv6g3ycktsz8645vzldanqvpq3zyvdeyc">qz29895afcv6g3ycktsz8645vzldanqvpq3zyvdeyc</a></p>
-  <p class="text-center"><a href="bitcoincash:1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn">Legacy address: 1EXH9DCtHcVZV4QcKBYpq1MAZfT7fUA2Jn</a></p>
-
-  <p class="v-offset-below-2">To donate to Free Law Project using <strong>Ethereum</strong>, please use the QR code below.</p>
-  <img src="{% static "png/ethereum-qr-code.png" %}"
-       width="200"
-       height="200"
-       class="img-responsive center-block"
-       alt="QR code for Ethereum">
-
-  <p class="v-offset-above-2">To donate to Free Law Project using <strong>Stellar Lumens</strong>, please use the following address and memo:</p>
-  <div class="text-center">
-    <p class="bottom">Address: <code>GDQP2KPQGKIHYJGXNUIYOMHARUARCA</code></p>
-    <p class="v-offset-below-2">Memo: <code>3316058103</code></p>
-  </div>
-
-  <p class="text-center v-offset-above-2 lead">Thank you for your donation.</p>
 </div>
 {% endblock %}
