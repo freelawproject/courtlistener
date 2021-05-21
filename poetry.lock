@@ -1570,6 +1570,14 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 requests = {version = ">=2.20", markers = "python_version >= \"3.0\""}
 
 [[package]]
+name = "tblib"
+version = "1.7.0"
+description = "Traceback serialization library."
+category = "dev"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+
+[[package]]
 name = "texttable"
 version = "1.6.3"
 description = "module for creating simple ASCII tables"
@@ -1736,7 +1744,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "ac14a085435e84be2e76bf3ee56ae3f0285e00ee17105524cae308eb69ac84a1"
+content-hash = "4c6df128265ce69fcc2a63b628eb379e911608d85fde79457da5539457203ad5"
 
 [metadata.files]
 amqp = [
@@ -2731,6 +2739,10 @@ sqlparse = [
 stripe = [
     {file = "stripe-2.56.0-py2.py3-none-any.whl", hash = "sha256:6c685eeadf9e3608315b6d84b4f5f2da2909179b65633ce20f296be22ed21a98"},
     {file = "stripe-2.56.0.tar.gz", hash = "sha256:2ff904fb8dee0d25f135059468a876852d24dc8cbe0b45d7aff56a028045777c"},
+]
+tblib = [
+    {file = "tblib-1.7.0-py2.py3-none-any.whl", hash = "sha256:289fa7359e580950e7d9743eab36b0691f0310fce64dee7d9c31065b8f723e23"},
+    {file = "tblib-1.7.0.tar.gz", hash = "sha256:059bd77306ea7b419d4f76016aef6d7027cc8a0785579b5aad198803435f882c"},
 ]
 texttable = [
     {file = "texttable-1.6.3-py2.py3-none-any.whl", hash = "sha256:f802f2ef8459058736264210f716c757cbf85007a30886d8541aa8c3404f1dda"},
