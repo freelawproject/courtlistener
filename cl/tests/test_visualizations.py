@@ -1,7 +1,10 @@
 """
 Functional tests for the Visualization feature of CourtListener
 """
+from pathlib import Path
+
 from django.contrib.auth.models import User
+from django.test.testcases import SerializeMixin
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -10,10 +13,12 @@ from cl.users.models import UserProfile
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
-class VisualizationCrudTests(BaseSeleniumTest):
+class VisualizationCrudTests(SerializeMixin, BaseSeleniumTest):
     """
     Test CRUD operations from the browser point of view
     """
+
+    lockfile = Path(__file__).parents[1] / "settings.py"
 
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
