@@ -1,8 +1,10 @@
 from datetime import timedelta
+from pathlib import Path
 
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.test import Client, LiveServerTestCase, TestCase
+from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
@@ -246,8 +248,10 @@ class DisposableEmailTest(TestCase):
         )
 
 
-class LiveUserTest(BaseSeleniumTest):
+class LiveUserTest(SerializeMixin, BaseSeleniumTest):
     fixtures = ["authtest_data.json"]
+
+    lockfile = Path(__file__).parents[1] / "settings.py"
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_reset_password_using_the_HTML(self) -> None:

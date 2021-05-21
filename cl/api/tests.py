@@ -1,6 +1,7 @@
 import json
 import shutil
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Dict
 from unittest import mock
 
@@ -17,6 +18,7 @@ from django.test import (
     TransactionTestCase,
     override_settings,
 )
+from django.test.testcases import SerializeMixin
 from django.urls import ResolverMatch, reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
@@ -113,7 +115,9 @@ class BasicAPIPageTest(TestCase):
             self.assertContains(response, header)
 
 
-class CoverageTests(IndexedSolrTestCase):
+class CoverageTests(SerializeMixin, IndexedSolrTestCase):
+    lockfile = Path(__file__).parents[1] / "settings.py"
+
     def test_coverage_data_view_provides_court_data(self) -> None:
         response = coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
