@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from lxml import etree
 
@@ -6,7 +9,9 @@ from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from cl.search.models import SEARCH_TYPES
 
 
-class PodcastTest(IndexedSolrTestCase):
+class PodcastTest(SerializeMixin, IndexedSolrTestCase):
+    lockfile = Path(__file__).parents[1] / "settings.py"
+
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
         response = self.client.get(
