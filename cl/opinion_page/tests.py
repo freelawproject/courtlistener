@@ -234,8 +234,7 @@ class NewDocketAlertTest(TestCase):
 
 
 class OpinionSitemapTest(SitemapTest):
-    def __init__(self, *args, **kwargs):
-        super(OpinionSitemapTest, self).__init__(*args, **kwargs)
+    def setUp(self) -> None:
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )

@@ -99,11 +99,6 @@ class IndexedSolrTestCase(SolrTestCase):
 
 
 class SitemapTest(TestCase):
-    def __init__(self, *args, **kwargs) -> None:
-        super(SitemapTest, self).__init__(*args, **kwargs)
-        self.item_qs = None
-        self.sitemap_url = None
-
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
         response = self.client.get(self.sitemap_url)
