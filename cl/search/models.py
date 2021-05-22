@@ -549,7 +549,6 @@ class Docket(AbstractDateTimeModel):
         ),
         blank=True,
         null=True,
-        db_index=True,
     )
     ia_date_first_change = models.DateTimeField(
         help_text=(
@@ -578,7 +577,6 @@ class Docket(AbstractDateTimeModel):
             "Whether a document should be blocked from indexing by "
             "search engines"
         ),
-        db_index=True,
         default=False,
     )
 
@@ -926,7 +924,6 @@ class DocketEntry(AbstractDateTimeModel):
             "entry and a sequence number indicating the order that the "
             "unnumbered entries occur."
         ),
-        db_index=True,
         max_length=50,
         blank=True,
     )
@@ -939,7 +936,6 @@ class DocketEntry(AbstractDateTimeModel):
             "we do not use this value for anything. Still, we collect "
             "it for good measure."
         ),
-        db_index=True,
         null=True,
         blank=True,
     )
@@ -1008,7 +1004,6 @@ class AbstractPacerDocument(models.Model):
     )
     is_sealed = models.BooleanField(
         help_text="Is this item sealed or otherwise unavailable on PACER?",
-        db_index=True,
         null=True,
     )
 
@@ -1043,7 +1038,6 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
-        db_index=True,
         choices=DOCUMENT_TYPES,
     )
     description = models.TextField(
@@ -1063,6 +1057,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         ordering = ("document_type", "document_number", "attachment_number")
         index_together = [
             ["document_type", "document_number", "attachment_number"],
+        ]
+        indexes = [
+            models.Index(
+                fields=["filepath_local"],
+                name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
+            ),
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
