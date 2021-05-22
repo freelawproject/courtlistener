@@ -1547,7 +1547,6 @@ class Attorney(AbstractDateTimeModel):
     )
     contact_raw = models.TextField(
         help_text="The raw contents of the contact field",
-        db_index=True,
     )
     phone = models.CharField(
         help_text="The phone number of the attorney.",
