@@ -575,6 +575,11 @@ if DEVELOPMENT:
     # Versbose logs for devs
     LOGGING["handlers"]["console"]["formatter"] = "verbose"
 
+SILENCED_SYSTEM_CHECKS = [
+    # Allow index names >30 characters, because we aren’t using Oracle
+    "models.E034",
+]
+
 ###################
 # Related content #
 ###################

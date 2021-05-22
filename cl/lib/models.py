@@ -80,7 +80,6 @@ class AbstractPDF(models.Model):
         upload_to=make_pdf_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=1000,
-        db_index=True,
         blank=True,
     )
     filepath_ia = models.CharField(
