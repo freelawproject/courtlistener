@@ -44,7 +44,6 @@ class RssFeedStatus(AbstractDateTimeModel):
         help_text="The current status of this feed. Possible values are: %s"
         % ", ".join(["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUSES]),
         choices=PROCESSING_STATUSES,
-        db_index=True,
     )
     is_sweep = models.BooleanField(
         help_text="Whether this object is tracking the progress of a sweep or "
