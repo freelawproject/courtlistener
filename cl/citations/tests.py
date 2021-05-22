@@ -339,6 +339,19 @@ class MatchingTest(SerializeMixin, IndexedSolrTestCase):
                 Opinion.objects.get(pk=11)
             ]),
 
+            # Test resolving a supra citation when its antecedent guess is
+            # None. We it expect it not to be matched, but not to crash.
+            ([
+                case_citation(volume='1', reporter='U.S.', page='1',
+                              canonical_reporter='U.S.',
+                              court='scotus', index=1,
+                              reporter_found='U.S.'),
+                supra_citation(index=1, antecedent_guess=None, pin_cite='99',
+                               volume='1')
+                ], [
+                Opinion.objects.get(pk=7)
+            ]),
+
             # Test resolving a short form citation with a meaningful antecedent
             ([
                 case_citation(volume='1', reporter='U.S.', page='1',
