@@ -2,7 +2,7 @@
 # encoding utf-8
 
 from datetime import date, datetime
-from typing import Dict, List, Tuple, Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 from django.conf import settings
 from eyecite.models import (
@@ -159,6 +159,25 @@ def match_citation(
     return []
 
 
+def filter_by_matching_antecedent(
+    citation_matches: List[Opinion],
+    antecedent_guess: Optional[str],
+) -> Optional[Opinion]:
+    if not antecedent_guess:
+        return None
+
+    antecedent_guess = strip_punct(antecedent_guess)
+    candidates: List[Opinion] = []
+
+    for cm in citation_matches:
+        if antecedent_guess in best_case_name(cm.cluster):
+            candidates.append(cm)
+
+    # Remove duplicates and only accept if one candidate remains
+    candidates = list(set(candidates))
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def get_citation_matches(
     citing_opinion: Opinion,
     citations: List[CitationBase],
@@ -193,24 +212,16 @@ def get_citation_matches(
         # If the citation is a supra citation, try to resolve it to one of
         # the citations that has already been matched
         elif isinstance(citation, SupraCitation):
-            candidates = []
-            for cm in citation_matches:
-                # The only clue we have to help us with resolution is the guess
-                # of what the supra citation's antecedent is, so we try to
-                # match that string to one of the known case names of the
-                # already matched opinions. However, because case names might
-                # look alike, matches using this heuristic may not be unique.
-                # If no match, or more than one match, is found, then the supra
-                # reference is effectively dropped.
-                antecedent_guess = strip_punct(citation.antecedent_guess)
-                cm_case_name = best_case_name(cm.cluster)
-                if antecedent_guess in cm_case_name:
-                    candidates.append(cm)
-
-            candidates = list(set(candidates))  # Remove duplicate matches
-            if len(candidates) == 1:
-                # Accept the match!
-                matched_opinion = candidates[0]
+            # The only clue we have to help us with resolution is the guess
+            # of what the supra citation's antecedent is, so we try to
+            # match that string to one of the known case names of the
+            # already matched opinions. However, because case names might
+            # look alike, matches using this heuristic may not be unique.
+            # If no match, or more than one match, is found, then the supra
+            # reference is effectively dropped.
+            matched_opinion = filter_by_matching_antecedent(
+                citation_matches, citation.antecedent_guess
+            )
 
         # Likewise, if the citation is a short form citation, try to resolve it
         # to one of the citations that has already been matched
@@ -236,17 +247,9 @@ def get_citation_matches(
                 # Accept the match!
                 matched_opinion = candidates[0]
             else:
-                refined_candidates = []
-                for cm in candidates:
-                    antecedent_guess = strip_punct(citation.antecedent_guess)
-                    cm_case_name = best_case_name(cm.cluster)
-                    if antecedent_guess in cm_case_name:
-                        refined_candidates.append(cm)
-
-                refined_candidates = list(set(refined_candidates))
-                if len(refined_candidates) == 1:
-                    # Accept the match!
-                    matched_opinion = refined_candidates[0]
+                matched_opinion = filter_by_matching_antecedent(
+                    candidates, citation.antecedent_guess
+                )
 
         # Otherwise, the citation is just a regular citation, so try to match
         # it directly to an opinion
