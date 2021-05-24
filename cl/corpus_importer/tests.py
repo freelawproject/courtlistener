@@ -4,7 +4,7 @@ import unittest
 from datetime import date, datetime
 from glob import iglob
 from pathlib import Path
-from unittest import mock
+from unittest.mock import patch
 
 import pytest
 from django.conf import settings
@@ -23,6 +23,7 @@ from cl.corpus_importer.management.commands.import_tn import import_tn_corpus
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
+from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
@@ -485,7 +486,11 @@ class TNCorpusTests(TestCase):
     def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def test_import(self) -> None:
+    @patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_import(self, mock) -> None:
         """Can we import two cases successfully"""
         pre_install_count = OpinionCluster.objects.all().count()
         with open(self.test_file) as file:
@@ -505,6 +510,7 @@ class TNCorpusTests(TestCase):
             "Timothy W. Conner, David F. Hensley, Marshall L. Davidson III",
             msg="Did not identify the correct three panelists.",
         )
+        mock.assert_called()
 
 
 class HarvardTests(TestCase):
@@ -531,7 +537,7 @@ class HarvardTests(TestCase):
         )
         print(post_install_count - pre_install_count, "✓")
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[[os.path.join(test_dir, "mass_court_new.json")]],
     )
@@ -572,7 +578,7 @@ class HarvardTests(TestCase):
         expected_docket_number = "105739"
         self.assertEqual(docket.docket_number, expected_docket_number)
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "tax_court_similar*"))],
     )
@@ -582,7 +588,7 @@ class HarvardTests(TestCase):
         """
         self.assertSuccessfulParse(1)
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "bta_*.json"))],
     )
@@ -592,7 +598,7 @@ class HarvardTests(TestCase):
         """
         self.assertSuccessfulParse(2)
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
     )
@@ -603,7 +609,7 @@ class HarvardTests(TestCase):
         self.assertEqual(cite.cluster.syllabus.count("<p>"), 3)
         self.assertEqual(cite.cluster.summary.count("<p>"), 32)
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
     )
@@ -618,7 +624,7 @@ class HarvardTests(TestCase):
         )
         print("✓")
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "per_curiam*"))],
     )
@@ -631,7 +637,7 @@ class HarvardTests(TestCase):
         self.assertTrue(ops[0].per_curiam)
         print("Success ✓")
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
     )
@@ -650,7 +656,7 @@ class HarvardTests(TestCase):
         )
         print("Success ✓")
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
     )
@@ -663,7 +669,7 @@ class HarvardTests(TestCase):
         self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
         print("Success ✓")
 
-    @mock.patch(
+    @patch(
         "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
         side_effect=[iglob(os.path.join(test_dir, "no_author_tag*"))],
     )
@@ -675,15 +681,15 @@ class HarvardTests(TestCase):
     def test_partial_dates(self) -> None:
         """Can we validate partial dates?"""
         pairs = (
-            {"q": "2019-01-01", "a": ("2019-01-01", False)},
-            {"q": "2019-01", "a": ("2019-01-15", True)},
-            {"q": "2019-05", "a": ("2019-05-15", True)},
-            {"q": "1870-05", "a": ("1870-05-15", True)},
-            {"q": "2019", "a": ("2019-07-01", True)},
+            {"q": "2019-01-01", "a": "2019-01-01"},
+            {"q": "2019-01", "a": "2019-01-15"},
+            {"q": "2019-05", "a": "2019-05-15"},
+            {"q": "1870-05", "a": "1870-05-15"},
+            {"q": "2019", "a": "2019-07-01"},
         )
         for test in pairs:
             print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
             got = validate_dt(test["q"])
-            dt_obj = datetime.strptime(test["a"][0], "%Y-%m-%d").date()
+            dt_obj = datetime.strptime(test["a"], "%Y-%m-%d").date()
             self.assertEqual(dt_obj, got[0])
             print("Success ✓")

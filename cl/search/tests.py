@@ -3,6 +3,7 @@ import os
 import time
 from datetime import date
 from pathlib import Path
+from unittest import mock
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -19,7 +20,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
-from cl.lib.solr_core_admin import get_data_dir
+from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
     IndexedSolrTestCase,
@@ -44,12 +45,8 @@ from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 
-class SetupException(Exception):
-    def __init__(self, message):
-        Exception.__init__(self, message)
-
-
 class UpdateIndexCommandTest(SolrTestCase):
+
     args = [
         "--type",
         "search.Opinion",
@@ -178,7 +175,11 @@ class ModelTest(TestCase):
         self.o.delete()
         self.c.delete()
 
-    def test_save_old_opinion(self) -> None:
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    def test_save_old_opinion(self, mock) -> None:
         """Can we save opinions older than 1900?"""
         docket = Docket(
             case_name="Blah", court_id="test", source=Docket.DEFAULT
@@ -361,8 +362,10 @@ class SearchTest(IndexedSolrTestCase):
         """Does querying by date work?"""
         response = self.client.get(
             reverse("show_results"),
-            {"q": "*", "filed_after": "1795-06", "filed_before": "1796-01"},
+            {"q": "*", "filed_after": "1895-06", "filed_before": "1896-01"},
         )
+        text = response.content.decode()
+        print(text)
         self.assertIn("Honda", response.content.decode())
 
     def test_faceted_queries(self) -> None:
@@ -655,7 +658,8 @@ class SearchTest(IndexedSolrTestCase):
     # MLT results should not be cached
     RELATED_USE_CACHE=False,
     # Default MLT settings limit the search space to minimize run time.
-    # These limitations are not needed on the small document collections during testing.
+    # These limitations are not needed on the small document collections during
+    # testing.
     RELATED_MLT_MINTF=0,
     RELATED_MLT_MAXQT=9999,
     RELATED_MLT_MINWL=0,
@@ -748,6 +752,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
 
 class GroupedSearchTest(EmptySolrTestCase):
+
     fixtures = ["opinions-issue-550.json"]
 
     def setUp(self) -> None:

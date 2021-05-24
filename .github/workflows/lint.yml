@@ -59,7 +59,9 @@ jobs:
           --follow-imports=skip \
           --exclude 'migrations/*' \
           -p cl.alerts \
+          -p cl.citations \
           -p cl.audio \
+          -p cl.corpus_importer \
           -p cl.opinion_page \
           -p cl.simple_pages \
           -p cl.recap_rss
@@ -82,7 +84,6 @@ jobs:
           cl/lib/storage.py \
           cl/lib/string_utils.py \
           cl/lib/types.py \
-          cl/opinion_page/views.py \
           cl/users/management/commands/cl_account_management.py \
           cl/users/forms.py
 
@@ -91,4 +92,3 @@ jobs:
 
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0
-
