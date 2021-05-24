@@ -7,11 +7,6 @@ Historically, we have used [wiki instructions to get set up][wiki], but these da
 But before we can get into that, we must address...
 
 
-# Discussing things
-
-We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones.
-
-
 ## Legal Matters
 
 Not surprisingly, we have a lot of legal, and particularly IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns. 
@@ -23,13 +18,18 @@ The other thing we do is require a contributor license agreement from any non-em
 On with the show.
 
 
+# Discussing things
+
+We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones.
+
+
 ## Architecture
 
 The major components of CourtListener are:
 
  - Postgresql - For database storage. We used to use MySQL long ago, but it caused endless weird and surprising problems. Postgresql is great.
 
- - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great.
+ - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great. If you have something small you want to store quickly and kind of durably, it's fantastic. 
 
  - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried. 
 
@@ -37,18 +37,27 @@ The major components of CourtListener are:
 
  - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose Sphinx early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times, and that logic might have been sound).
 
+ - React - For dynamic front-end features. We're slowly moving the trickiest parts of the front end over to React.
+
  - Python/Django/et al - And their associated bits and pieces.
 
 
 ### Pulling Everything Together
 
-We use a docker compose file to make development easier. Don't use it for production! It's not secure enough and it uses bad practices for data storage. But if you're a dev, it should work nicely.
+We use a docker compose file to make development easier. Don't use it for production! It's not secure enough, and it uses bad practices for data storage. But if you're a dev, it should work nicely.
 
 To set up a development server, do the following:
 
 1. Clone the [courtlistener](https://github.com/freelawproject/courtlistener) and [courtlistener-solr-server](https://github.com/freelawproject/courtlistener-solr-server) repositories so that they are side-by-side in the same folder.
 
-2. Next, you'll need to update the group permissions for the Solr server. `cd` into the courtlistener-solr-server directory, and run the following commands:
+1. Install the React dependencies and get hot-reloading going. Install node, and then:
+
+    ```bash
+    npm install
+    npm run dev
+    ```
+
+1. Next, you'll need to update the group permissions for the Solr server. `cd` into the courtlistener-solr-server directory, and run the following commands:
 
     ```bash
     sudo chown -R :1024 data
@@ -61,7 +70,7 @@ To set up a development server, do the following:
     sudo find solr -type f -exec chmod 664 {} \;
     ```
 
-3. Create a personal settings file. To do that, `cd` into courtlistener/cl/settings and run the following:
+1. Create a personal settings file. To do that, `cd` into courtlistener/cl/settings and run the following:
 
     `cp 05-private.example 05-private.py`
 
@@ -69,21 +78,21 @@ To set up a development server, do the following:
     
     See [below](#how-settings-work-in-courtlistener) for more information about settings files.
 
-4. Next, create the bridge network that the docker relies on:
+1. Next, create the bridge network that the docker relies on:
 
     `docker network create -d bridge --attachable cl_net_overlay`
 
     This is important so that each service in the compose file can have a hostname.
 
-5. Initialize the docker swarm:
+1. Initialize the docker swarm:
 
     `docker swarm init`
 
-6. `cd` into courtlistener/docker/courtlistener, then launch the server by running:
+1. `cd` into courtlistener/docker/courtlistener, then launch the server by running:
 
     `docker-compose up`
 
-7. Finally, finish setting up the Django database. While the server is running:
+1. Finally, finish setting up the Django database. While the server is running:
 
     - Migrate the models by running:
 
@@ -151,7 +160,7 @@ life is fairly easy. What that means generally, is:
 1. Commits should represent a unit of work. In other words, if you're working 
 on a big feature, each commit should be a discrete step along the path of 
 getting that feature ready to land. Bad or experimental work shouldn't be in a
-commit that you submit as part of a PR, if you can avoid it. 
+commit that you submit as part of a PR, if you can avoid it. Often you can clean up your commits with an interactive rebase followed by a force push to your branch.
 
 1. Your commit messages should use [the format defined by the Angular.js 
 project][format]. This is pretty easy if you use [this plugin][format-plugin] 
@@ -168,11 +177,7 @@ your code. We recommend [integrating it into your editor][black-ed].
     the PR's become impossible to read and risky to merge. This is a big reason
     we use black. 
 
-1. We are beginning to use mypy to add type hints to our Python code. New code
-must include hints and updates to old code should add hints to the old code. 
-Our Github Action for mypy is in lint.yml, and should be updated to run against 
-any areas that have hints. This just takes a second once mypy is working 
-properly on a file or module.
+1. We are beginning to use mypy to add type hints to our Python code. New code must include hints and updates to old code should add hints to the old code. The idea is for our hunts to gradually get better and more complete. Our Github Action for mypy is in lint.yml, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
 
 1. We use iSort to sort our imports. If your imports aren't sorted properly, 
 iSort will tell you so when you push your code to Github. Again, we recommend
@@ -180,7 +185,7 @@ getting iSort integrated into your editor or workflow.
 
 1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort. 
 It doesn't have to be done — it doesn't even have to work! — but it should be 
-clean and it should be your best effort at clean *progress*. PRs are both a way
+clean, and it should be your best effort at clean *progress*. PRs are both a way
 of getting your work into the system and a way to *communicate* your work. The
 latter is more important. 10 small, clean PRs are about 10× better than a 
 monolithic one that is fully functional. 
@@ -201,6 +206,15 @@ projects have greater quality needs, are popular enough to demand a high
 bar, and can envision coding techniques as a part of their overall goal. We 
 don't have to lead the industry with our approach, we just need to get good 
 work done. That's the goal here. 
+
+### Special notes for special types of code
+
+1. If your PR includes a migration of the DB, we need SQL files for any tables
+that we replicate to customers. These can be easily made with the `sqlmigrate` 
+command. See MIGRATIONS.md as well for details on smart migration files and why
+this is needed.
+   
+2. If you alter any react code, include minified builds and map files of the new JS in your PR so that they can be deployed.
 
 [me]: https://github.com/mlissner
 [flow]: https://guides.github.com/introduction/flow/
