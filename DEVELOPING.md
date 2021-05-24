@@ -214,7 +214,9 @@ that we replicate to customers. These can be easily made with the `sqlmigrate`
 command. See MIGRATIONS.md as well for details on smart migration files and why
 this is needed.
    
-2. If you alter any react code, include minified builds and map files of the new JS in your PR so that they can be deployed.
+2. If you alter any react code, include minified builds and map files of the new JS in your PR so that they can be deployed. While developing, you will have non-minified versions of these files. To build the minified versions, do:
+
+        npm run build
 
 [me]: https://github.com/mlissner
 [flow]: https://guides.github.com/introduction/flow/
