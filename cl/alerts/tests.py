@@ -1,10 +1,8 @@
 from datetime import timedelta
-from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.core import mail
 from django.test import Client, TestCase
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from django.utils.timezone import now
 from selenium.webdriver.common.by import By
@@ -190,8 +188,7 @@ class DisableDocketAlertTest(TestCase):
             self.assertEqual(report.ninety_ago, [self.docket])
 
 
-class AlertSeleniumTest(SerializeMixin, BaseSeleniumTest):
-    lockfile = Path(__file__).parents[1] / "settings.py"
+class AlertSeleniumTest(BaseSeleniumTest):
     fixtures = ["test_court.json", "authtest_data.json"]
 
     def setUp(self) -> None:

@@ -115,9 +115,7 @@ class BasicAPIPageTest(TestCase):
             self.assertContains(response, header)
 
 
-class CoverageTests(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class CoverageTests(IndexedSolrTestCase):
     def test_coverage_data_view_provides_court_data(self) -> None:
         response = coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)

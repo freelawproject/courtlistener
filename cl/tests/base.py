@@ -20,6 +20,7 @@ from timeout_decorator import TimeoutError
 
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
+from cl.lib.test_helpers import SerializeSolrTestMixin
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -36,7 +37,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
     SOLR_URLS=settings.SOLR_TEST_URLS,
 )
-class BaseSeleniumTest(StaticLiveServerTestCase):
+class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot

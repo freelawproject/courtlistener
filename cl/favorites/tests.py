@@ -1,8 +1,6 @@
 import time
-from pathlib import Path
 
 from django.test import Client, TestCase
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from rest_framework.status import (
     HTTP_200_OK,
@@ -70,13 +68,11 @@ class FavoriteTest(TestCase):
         self.client.logout()
 
 
-class UserFavoritesTest(SerializeMixin, BaseSeleniumTest):
+class UserFavoritesTest(BaseSeleniumTest):
     """
     Functionally test all aspects of favoriting Opinions and Oral Arguments
     including CRUD related operations of a user's favorites.
     """
-
-    lockfile = Path(__file__).parents[1] / "settings.py"
 
     fixtures = [
         "test_court.json",

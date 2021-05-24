@@ -1,11 +1,9 @@
 import os
 from datetime import timedelta
-from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
 from django.test import TestCase
-from django.test.testcases import SerializeMixin
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
@@ -78,9 +76,7 @@ class ScraperIngestionTest(TestCase):
         self.assertEqual(len(site.case_names), 2)
 
 
-class IngestionTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class IngestionTest(IndexedSolrTestCase):
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
         image_opinion = Opinion.objects.get(pk=1)
