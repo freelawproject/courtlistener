@@ -69,6 +69,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "ratelimit.middleware.RatelimitMiddleware",
+    "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.MaintenanceModeMiddleware",
 ]
@@ -94,12 +95,12 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "storages",
+    "waffle",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
     "cl.api",
     "cl.citations",
-    "cl.cleanup",
     "cl.corpus_importer",
     "cl.custom_filters",
     "cl.disclosures",
@@ -474,6 +475,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+##########
+# Waffle #
+##########
+WAFFLE_CREATE_MISSING_FLAGS = True
+WAFFLE_CREATE_MISSING_SWITCHES = True
+WAFFLE_CREATE_MISSING_SAMPLES = True
+
 ########################
 # Logging Machinations #
 ########################
@@ -568,6 +576,11 @@ if DEVELOPMENT:
     }
     # Versbose logs for devs
     LOGGING["handlers"]["console"]["formatter"] = "verbose"
+
+SILENCED_SYSTEM_CHECKS = [
+    # Allow index names >30 characters, because we aren’t using Oracle
+    "models.E034",
+]
 
 ###################
 # Related content #

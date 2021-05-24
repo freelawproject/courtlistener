@@ -84,11 +84,11 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
 
-#      # Run the checks and tests
+      # Run the checks and tests
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
       - name: Run the tests!
-        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2
+        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2 --parallel
       - name: cp selenium results from docker to host
         if: failure()
         run: |

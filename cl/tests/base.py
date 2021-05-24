@@ -20,6 +20,7 @@ from timeout_decorator import TimeoutError
 
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
+from cl.lib.test_helpers import SerializeSolrTestMixin
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
 
@@ -36,7 +37,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
     SOLR_URLS=settings.SOLR_TEST_URLS,
 )
-class BaseSeleniumTest(StaticLiveServerTestCase):
+class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
@@ -83,28 +84,28 @@ class BaseSeleniumTest(StaticLiveServerTestCase):
         # Set host to externally accessible web server address
         cls.host = socket.gethostbyname(socket.gethostname())
 
+        cls.browser = cls._create_browser()
+        cls.browser.implicitly_wait(5)
+
     def setUp(self) -> None:
         self.reset_browser()
         self._update_index()
 
     def reset_browser(self) -> None:
-        try:
-            self.browser.quit()
-        except AttributeError:
-            # it's ok we forgive you http://stackoverflow.com/a/610923
-            pass
-        finally:
-            self.browser = self._create_browser()
-
-        self.browser.implicitly_wait(5)
+        self.browser.delete_all_cookies()
 
     def tearDown(self) -> None:
         if self.screenshot:
             filename = type(self).__name__ + "-selenium.png"
             print("\nSaving screenshot: %s" % (filename,))
             self.browser.save_screenshot("/tmp/" + filename)
-        self.browser.quit()
         self._teardown_test_solr()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super(BaseSeleniumTest, cls).tearDownClass()
+
+        cls.browser.quit()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_in_node(self, text: str, tag_name: str) -> None:

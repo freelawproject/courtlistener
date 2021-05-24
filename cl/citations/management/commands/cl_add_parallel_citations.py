@@ -5,15 +5,14 @@ from celery.canvas import group
 from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError
+from eyecite.find_citations import get_citations
 
+from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import (
     build_date_range,
     get_years_from_reporter,
 )
-from cl.citations.tasks import (
-    get_document_citations,
-    identify_parallel_citations,
-)
+from cl.citations.tasks import identify_parallel_citations
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -295,10 +294,9 @@ class Command(VerboseCommand):
         subtasks = []
         for o in opinions:
             subtasks.append(
-                # This will call the second function with the results from the
-                # first.
-                get_document_citations.s(o)
-                | identify_parallel_citations.s()
+                identify_parallel_citations.s(
+                    get_citations(get_and_clean_opinion_text(o).cleaned_text)
+                )
             )
             last_item = count == completed + 1
             if (completed % 50 == 0) or last_item:

@@ -14,11 +14,11 @@ from collections import Counter, defaultdict
 
 os.chdir("/home/elliott/freelawmachine/flp/columbia_data/logs/2")
 currfile = ""
-courtid_tab = Counter()
-cite_tab = Counter()
-court_cite_tab = Counter()
+courtid_tab: Counter = Counter()
+cite_tab: Counter = Counter()
+court_cite_tab: Counter = Counter()
 printline = False
-file_lists = defaultdict(list)
+file_lists: defaultdict = defaultdict(list)
 for line in open("import_columbia_output_stage_2.log"):
     if "exception in file" in line:
         i = line.find("opinions/") + len("opinions/")
