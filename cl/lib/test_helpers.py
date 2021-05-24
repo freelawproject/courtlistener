@@ -1,6 +1,7 @@
 import scorched
 from django.conf import settings
 from django.test import TestCase
+from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
 
@@ -10,6 +11,10 @@ from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
 
 
+class SerializeSolrTestMixin(SerializeMixin):
+    lockfile = __file__
+
+
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
@@ -17,7 +22,7 @@ from cl.search.tasks import add_items_to_solr
     SOLR_RECAP_URL=settings.SOLR_RECAP_TEST_URL,
     SOLR_URLS=settings.SOLR_TEST_URLS,
 )
-class EmptySolrTestCase(TestCase):
+class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
 
     Other Solr test classes subclass this one, adding additional content or

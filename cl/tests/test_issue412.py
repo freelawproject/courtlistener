@@ -3,9 +3,6 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
-from pathlib import Path
-
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
@@ -16,13 +13,12 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 BLOCKED_MSG = "Blocked"
 
 
-class OpinionBlockedFromSearchEnginesTest(SerializeMixin, BaseSeleniumTest):
+class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Opinions are blocked from Search Engines
     """
 
-    lockfile = Path(__file__).parents[1] / "settings.py"
     fixtures = [
         "test_court.json",
         "authtest_data.json",
@@ -83,13 +79,12 @@ class OpinionBlockedFromSearchEnginesTest(SerializeMixin, BaseSeleniumTest):
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
 
-class DocketBlockedFromSearchEnginesTest(SerializeMixin, BaseSeleniumTest):
+class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Dockets are blocked from Search Engines
     """
 
-    lockfile = Path(__file__).parents[1] / "settings.py"
     fixtures = [
         "test_court.json",
         "authtest_data.json",
@@ -159,13 +154,12 @@ class DocketBlockedFromSearchEnginesTest(SerializeMixin, BaseSeleniumTest):
         self.assertNotIn(BLOCKED_MSG, btn.text)
 
 
-class AudioBlockedFromSearchEnginesTest(SerializeMixin, BaseSeleniumTest):
+class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Audio pages are blocked from Search Engines
     """
 
-    lockfile = Path(__file__).parents[1] / "settings.py"
     fixtures = [
         "test_court.json",
         "authtest_data.json",

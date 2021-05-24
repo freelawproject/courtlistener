@@ -12,7 +12,6 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory, TestCase, override_settings
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -46,8 +45,7 @@ from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 
-class UpdateIndexCommandTest(SerializeMixin, SolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
+class UpdateIndexCommandTest(SolrTestCase):
 
     args = [
         "--type",
@@ -274,10 +272,8 @@ class DocketValidationTest(TestCase):
                 )
 
 
-class IndexingTest(SerializeMixin, EmptySolrTestCase):
+class IndexingTest(EmptySolrTestCase):
     """Are things indexed properly?"""
-
-    lockfile = Path(__file__).parents[1] / "settings.py"
 
     fixtures = ["test_court.json"]
 
@@ -335,9 +331,7 @@ class IndexingTest(SerializeMixin, EmptySolrTestCase):
         RECAPDocument.objects.all().delete()
 
 
-class SearchTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
         """Get the article count in a query response"""
@@ -664,14 +658,13 @@ class SearchTest(SerializeMixin, IndexedSolrTestCase):
     # MLT results should not be cached
     RELATED_USE_CACHE=False,
     # Default MLT settings limit the search space to minimize run time.
-    # These limitations are not needed on the small document collections during testing.
+    # These limitations are not needed on the small document collections during
+    # testing.
     RELATED_MLT_MINTF=0,
     RELATED_MLT_MAXQT=9999,
     RELATED_MLT_MINWL=0,
 )
-class RelatedSearchTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class RelatedSearchTest(IndexedSolrTestCase):
     def setUp(self) -> None:
         # Add additional user fixtures
         self.fixtures.append("authtest_data.json")
@@ -758,8 +751,7 @@ class RelatedSearchTest(SerializeMixin, IndexedSolrTestCase):
         self.client.logout()
 
 
-class GroupedSearchTest(SerializeMixin, EmptySolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
+class GroupedSearchTest(EmptySolrTestCase):
 
     fixtures = ["opinions-issue-550.json"]
 
@@ -795,9 +787,7 @@ class GroupedSearchTest(SerializeMixin, EmptySolrTestCase):
         )
 
 
-class JudgeSearchTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class JudgeSearchTest(IndexedSolrTestCase):
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
         sort_fields = [
@@ -949,9 +939,7 @@ class JudgeSearchTest(SerializeMixin, IndexedSolrTestCase):
         )
 
 
-class FeedTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class FeedTest(IndexedSolrTestCase):
     def test_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
         response = self.client.get(
@@ -1091,13 +1079,11 @@ class PagerankTest(TestCase):
             )
 
 
-class OpinionSearchFunctionalTest(SerializeMixin, BaseSeleniumTest):
+class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
     These tests should exercise all aspects of using the search box and SERP.
     """
-
-    lockfile = Path(__file__).parents[1] / "settings.py"
 
     fixtures = [
         "test_court.json",

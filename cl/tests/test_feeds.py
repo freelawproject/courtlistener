@@ -2,11 +2,9 @@
 Functional testing of courtlistener RSS feeds
 """
 import os
-from pathlib import Path
 
 import feedparser
 from django.conf import settings
-from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from django.urls import reverse
 from selenium.webdriver.common.by import By
@@ -19,10 +17,9 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 @override_settings(
     MEDIA_ROOT=os.path.join(settings.INSTALL_ROOT, "cl/assets/media/test/")
 )
-class FeedsFunctionalTest(SerializeMixin, BaseSeleniumTest):
+class FeedsFunctionalTest(BaseSeleniumTest):
     """Tests the Feeds page and functionality"""
 
-    lockfile = Path(__file__).parents[1] / "settings.py"
     fixtures = [
         "test_court.json",
         "judge_judy.json",

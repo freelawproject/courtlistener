@@ -1,8 +1,5 @@
-from pathlib import Path
-
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from eyecite import get_citations
 from eyecite.test_factories import (
@@ -261,8 +258,7 @@ class CiteTest(TestCase):
                 )
 
 
-class MatchingTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
+class MatchingTest(IndexedSolrTestCase):
     fixtures = [
         "judge_judy.json",
         "test_objects_search.json",
@@ -534,13 +530,12 @@ class MatchingTest(SerializeMixin, IndexedSolrTestCase):
         self.assertEqual([], results)
 
 
-class UpdateTest(SerializeMixin, IndexedSolrTestCase):
+class UpdateTest(IndexedSolrTestCase):
     """Tests whether the update task performs correctly, i.e., whether it
     creates new OpinionsCited objects and whether it updates the citation
     counters.
     """
 
-    lockfile = Path(__file__).parents[1] / "settings.py"
     fixtures = [
         "judge_judy.json",
         "test_objects_search.json",
@@ -602,9 +597,7 @@ class UpdateTest(SerializeMixin, IndexedSolrTestCase):
                 )
 
 
-class CitationFeedTest(SerializeMixin, IndexedSolrTestCase):
-    lockfile = Path(__file__).parents[1] / "settings.py"
-
+class CitationFeedTest(IndexedSolrTestCase):
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(
@@ -642,10 +635,8 @@ class CitationFeedTest(SerializeMixin, IndexedSolrTestCase):
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(SerializeMixin, IndexedSolrTestCase):
+class CitationCommandTest(IndexedSolrTestCase):
     """Test a variety of the ways that cl_find_citations can be called."""
-
-    lockfile = Path(__file__).parents[1] / "settings.py"
 
     def call_command_and_test_it(self, args):
         remove_citations_from_imported_fixtures()
