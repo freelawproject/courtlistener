@@ -7,10 +7,10 @@ from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
-from eyecite.models import CaseCitation
+from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse
 
-from cl.citations.match_citations import match_citation
+from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -111,7 +111,7 @@ def make_get_string(
     return get_string
 
 
-def get_query_citation(cd: CleanData) -> Optional[List[CaseCitation]]:
+def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     """Extract citations from the query string and return them, or return
     None
     """
@@ -121,12 +121,12 @@ def get_query_citation(cd: CleanData) -> Optional[List[CaseCitation]]:
         cd["q"], do_post_citation=False, do_defendant=False
     )
 
-    citations = [c for c in citations if isinstance(c, CaseCitation)]
+    citations = [c for c in citations if isinstance(c, FullCaseCitation)]
 
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.
-        matches = match_citation(citations[0])
+        matches = search_db_for_fullcitation(citations[0])
         if len(matches) == 1:
             # If more than one match, don't show the tip
             return matches.result.docs[0]

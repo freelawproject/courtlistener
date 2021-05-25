@@ -1,11 +1,21 @@
 from typing import Any, Dict, List, TypedDict, Union
 
 from django.http import HttpRequest
+from eyecite.models import (
+    FullCaseCitation,
+    IdCitation,
+    ShortCaseCitation,
+    SupraCitation,
+)
 
 from cl.users.models import User
 
 CleanData = Dict[str, Any]
 TaskData = Dict[str, Any]
+
+SupportedCitationType = Union[
+    FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
+]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
