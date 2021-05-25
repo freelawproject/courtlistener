@@ -6,11 +6,13 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
+from django.db.models.base import ModelBase
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from eyecite.models import ResourceType
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -2476,6 +2478,11 @@ def sort_cites(c):
         return 8
 
 
+# class OpinionMeta(type(AbstractDateTimeModel), type(ResourceType)):
+#     pass
+
+
+# class Opinion(AbstractDateTimeModel, ResourceType, metaclass=OpinionMeta):
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
