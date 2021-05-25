@@ -1,6 +1,7 @@
 {% extends "docket_tabs.html" %}
 {% load extras %}
 {% load admin_urls %}
+{% load static %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Docket for {{ title }} - CourtListener.com{% endblock %}
@@ -14,10 +15,10 @@
 {% block head %}
   {% if DEBUG %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+          href="{% static "css/bootstrap-datepicker3.css" %}"/>
   {% else %}
     <link rel="stylesheet"
-          href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+          href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
 {% endblock %}
 
@@ -33,10 +34,10 @@
       <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
       </p>
     </div>
-    {% if docket.pacer_url %}
+    {% if docket.pacer_docket_url %}
       <div class="col-sm-4 right">
         <p>
-          <a href="{{ docket.pacer_url }}"
+          <a href="{{ docket.pacer_docket_url }}"
              class="btn btn-lg btn-primary"
              target="_blank"
              rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>

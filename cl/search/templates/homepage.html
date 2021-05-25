@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Non-Profit Free Legal Search Engine and Alert System – CourtListener.com{% endblock %}
 
@@ -8,7 +9,7 @@
 {% block navbar-o %}active{% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+    <link rel="stylesheet" href="{% static "css/plottable.css" %}"/>
 {% endblock %}
 
 {% block footer-scripts %}

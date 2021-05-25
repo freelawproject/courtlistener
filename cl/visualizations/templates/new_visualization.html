@@ -1,16 +1,17 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Create a New Citation Network – CourtListener.com{% endblock %}
 {% block navbar-vis %}active{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+    <link rel="stylesheet" href="{% static "css/plottable.css" %}"/>
 {% endblock %}
 
 {% block footer-scripts %}
-    <script src="{{ STATIC_URL }}js/typeahead.jquery.js"></script>
-    <script src="{{ STATIC_URL }}js/scotus_map_new.js"></script>
+    <script src="{% static "js/typeahead.jquery.js" %}"></script>
+    <script src="{% static "js/scotus_map_new.js" %}"></script>
 
     <script type="application/javascript">
         var last_year = "{{ SCDB_LATEST_CASE }}";

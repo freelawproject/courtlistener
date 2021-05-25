@@ -1,4 +1,4 @@
-{% if docket.pacer_url %}
+{% if docket.pacer_docket_url %}
   <a href="{% url "toggle_docket_alert" %}"
      data-id="{{ docket.pk }}"
      data-enable-message="Get Alerts"

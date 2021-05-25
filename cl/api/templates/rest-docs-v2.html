@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+
 
 {% block title %}REST API, v2 &ndash; CourtListener.com{% endblock %}
 {% block description %}
@@ -55,7 +57,7 @@
         <p>The following representation of our database should be instructive
             when thinking about how these endpoints work together:
         </p>
-        <img src="{{ STATIC_PREFIX }}png/schema-design.png" height="276" width="470" class="img-responsive">
+        <img src="{% static "png/schema-design.png" %}" height="276" width="470" class="img-responsive">
 
         <p class="alt">(A more detailed version of this diagram <a
                 href="http://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
@@ -694,7 +696,7 @@
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
             <a href="https://free.law/assets/">
-                <img src="{{ STATIC_PREFIX }}png/logo-long-w350.png" width="350" height="81">
+                <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
             </a>
         </div>
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 
 {% block title %}Financial Disclosure Coverage – CourtListener.com{% endblock %}
@@ -19,7 +20,7 @@
     </p>
 
     <p>
-      <img src="{{ STATIC_PREFIX }}jpeg/disclosure-thumb-drives.jpeg"
+      <img src="{% static "jpeg/disclosure-thumb-drives.jpeg" %}"
            width="992"
            height="309"
            class="img-responsive img-rounded"
