@@ -1,34 +1,39 @@
 from django.db.models import Q
+from rest_framework import permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.api_permissions import IsOwner
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, MediumAdjustablePagination
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import DocketTagSerializer, UserTagSerializer
-from cl.favorites.filters import UserTagFilter
+from cl.favorites.filters import DocketTagFilter, UserTagFilter
 from cl.favorites.models import DocketTag, UserTag
 
 
 class UserTagViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [permissions.AllowAny]
     serializer_class = UserTagSerializer
+    pagination_class = MediumAdjustablePagination
     filterset_class = UserTagFilter
     ordering_fields = (
         "date_created",
         "date_modified",
+        "name",
         "view_count",
     )
 
     def get_queryset(self):
-        return UserTag.objects.filter(
-            Q(user=self.request.user) | Q(published=True)
-        ).order_by("-id")
+        q = Q(published=True)
+        if self.request.user.is_authenticated:
+            q |= Q(user=self.request.user)
+        return UserTag.objects.filter(q).order_by("-id")
 
 
 class DocketTagViewSet(LoggingMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner]
     serializer_class = DocketTagSerializer
+    filter_class = DocketTagFilter
+    pagination_class = MediumAdjustablePagination
 
     def get_queryset(self):
         return DocketTag.objects.filter(

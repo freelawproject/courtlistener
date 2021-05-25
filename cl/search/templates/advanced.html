@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load static %}
 
 {% block head %}
   {% if DEBUG %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.css"/>
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.css" %}"/>
   {% else %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/bootstrap-datepicker3.min.css"/>
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
 {% endblock %}
 

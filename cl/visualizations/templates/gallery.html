@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% load humanize %}
 {% load markdown_deux_tags %}
 {% block title %}Visualization Gallery – CourtListener.com{% endblock %}
@@ -13,7 +15,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-    <link rel="stylesheet" href="{{ STATIC_URL }}css/plottable.css"/>
+    <link rel="stylesheet" href="{% static "css/plottable.css" %}"/>
 {% endblock %}
 
 {% block footer-scripts %}

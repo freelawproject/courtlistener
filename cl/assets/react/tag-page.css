@@ -1,0 +1,82 @@
+
+/*Stylize markdown viewer*/
+#markdown_viewer {
+  border: 1px solid;
+  border-color: lightgrey;
+  padding: 10px;
+  min-height: 100px;
+  border-top: none;
+}
+
+#react-root[data-page-owner='False'] > div > div#markdown_viewer {
+  border-top: 1px solid lightgrey;
+}
+
+/*Update the tables inside markdown viewer to look better*/
+#markdown_viewer table, #markdown_viewer thead, #markdown_viewer tbody, #markdown_viewer tr, #markdown_viewer td, #markdown_viewer th {
+  border: 1px solid;
+  padding:5px;
+}
+
+/*Provide consistent spacing on markdown viewing*/
+.view-only {
+  margin-top: 50px;
+  border: none;
+}
+
+/*Add consistent spacing for tabs*/
+#tab-tabs {
+    margin-top: 40px;
+}
+
+/*Make save button on markdown page more subtle*/
+#save_button {
+  margin-top: 2px;
+  border-radius: 2px;
+}
+
+/*Remove blue borders around tabs*/
+li:focus {
+  outline: 0;
+}
+
+a:focus {
+  outline: 0;
+}
+
+/*Align content in tag tables and dropdown better*/
+td  {
+  vertical-align: middle;
+}
+
+/*Stylize dropdown*/
+.delete-tag {
+  font-size: 10px;
+  line-height: 1.0;
+}
+
+/*Define toggle css in dropdown*/
+label.toggle input span {
+  border-radius: 2px;
+}
+
+label.toggle {
+  vertical-align: text-top;
+  height: 16px;
+  width: 28px;
+}
+
+/*Fix tag wrapping*/
+span.tag {
+  white-space: nowrap;
+}
+
+/*Update color link on tag page back to tag list*/
+.tag-back {
+  color: #009;
+}
+
+/*Fixes mobile bug for button*/
+#tag-settings {
+  z-index: 1;
+}

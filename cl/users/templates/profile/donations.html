@@ -1,4 +1,5 @@
 {% extends "profile/nav.html" %}
+{% load static %}
 {% load humanize %}
 
 {% block title %}Donations – CourtListener.com{% endblock %}
@@ -6,9 +7,9 @@
 {% block nav-donations %}active{% endblock %}
 {% block footer-scripts %}
   <script type="text/javascript"
-          src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+          src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
   <script defer type="text/javascript"
-          src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+          src="{% static "js/toggle_settings.js" %}"></script>
 {% endblock %}
 
 {% block content %}

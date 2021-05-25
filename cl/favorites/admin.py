@@ -31,5 +31,13 @@ class FavoriteAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(DocketTag)
+class DocketTagAdmin(admin.ModelAdmin):
+    raw_id_fields = ("docket",)
+    list_display = (
+        "id",
+        "tag",
+    )
+
+
 admin.site.register(UserTag)
-admin.site.register(DocketTag)

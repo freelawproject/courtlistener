@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+
+{% block title %}{% if is_page_owner %} Your Tags {% else %}Tags for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %} Your tags {% else %}Tags for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you tag and share legal information. View the tags for {{ requested_user }}.{% endblock %}
+{% block og_image %}{% get_full_host %}{% static "png/og-image-tag-300x300.png" %}{% endblock %}
+
+{% block footer-scripts %}
+  <script type="text/javascript" src="{% static 'js/react/main.js' %}"></script>
+  <script type="text/javascript" src="{% static 'js/react/vendor.js' %}"></script>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block content %}
+  <div class="hidden-xs hidden-sm col-md-1 col-lg-2"></div>
+  <div class="col-xs-12 col-md-10 col-lg-8">
+    <div
+      class="col-xs-12"
+      id="react-root"
+      data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
+      data-edit-url="{% url "tag_list" request.user %}"
+      data-page-owner="{{ is_page_owner }}"
+      data-user-id="{% if user.is_authenticated %}{{ user.pk }}{% endif %}"
+      data-user-name="{% if user.is_authenticated %}{{ user.get_username }}{% endif %}"
+      data-is-page-owner="{% if is_page_owner %}{{ is_page_owner }}{% endif %}"
+      data-requested-user="{{ requested_user }}"
+      data-requested-user-id="{{ requested_user.id }}"
+    ></div>
+  </div>
+{% endblock %}

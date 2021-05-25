@@ -2,7 +2,7 @@
 {% load text_filters %}
 {% load humanize %}
 {% load tz %}
-
+{% load static %}
 
 {% block sidebar %}{% endblock %}
 {% block content %}{% endblock %}
@@ -12,26 +12,34 @@
 
 {% block footer-scripts %}
     <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
-    <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+            src="{% static "js/jquery.NobleCount.min.js" %}"></script>
+    <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     <script defer type="text/javascript"
-            src="{{ STATIC_URL }}js/save-favorites.js?v=20200722"></script>
+            src="{% static "js/save-favorites.js" %}"></script>
     {% if request.user.is_authenticated %}
       <script defer type="text/javascript"
-              src="{{ STATIC_URL }}js/toggle_settings.js"></script>
+              src="{% static "js/toggle_settings.js" %}"></script>
     {% endif %}
     {% if request.user.is_staff %}
         <script defer type="text/javascript"
-                src="{{ STATIC_URL }}js/admin_tools.js"></script>
+                src="{% static "js/admin_tools.js" %}"></script>
     {% endif %}
-  <script type="text/javascript">
-    // Set this variable for the docket alerts script to find
-    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
-  </script>
-  <script defer type="text/javascript"
-    src="{{ STATIC_URL }}js/docket_alerts.js?v=20200428"></script>
 
-  {% include "includes/date_picker.html" %}
+    <script type="text/javascript">
+      // Set this variable for the docket alerts script to find
+      var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
+    </script>
+
+    <script defer type="text/javascript"
+            src="{% static "js/docket_alerts.js" %}"></script>
+
+    {% include "includes/date_picker.html" %}
+
+    <script type="text/javascript"
+            src="{% static "js/react/main.js" %}"></script>
+    <script type="text/javascript"
+            src="{% static "js/react/vendor.js" %}"></script>
+
 {% endblock %}
 
 {% block nav %}
@@ -60,7 +68,7 @@
        data-target="#modal-save-favorite, #modal-logged-out"
        title="{% if favorite_form.instance.docket_id %}Edit this favorite{% else %}Save this as a favorite in your profile{% endif %}"></i>
 
-    <h1 class="bottom inline">
+    <h1 class="bottom inline" data-type="search.Docket" data-id="{{ docket.pk }}">
       {{ docket|best_case_name|safe|v_wrapper }}
       {% if docket.docket_number %}
         ({{ docket.docket_number }})
@@ -71,33 +79,33 @@
 
     <h2>{{ docket.court }}</h2>
 
-    {% if docket.pacer_url or docket_entries %}
+    {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
-        {% if docket.pacer_url %}
-          <div class="left">
-            <p><a href="{{ docket.pacer_url }}"
-               class="btn btn-primary"
-               target="_blank"
-               rel="nofollow"><i class="fa fa-external-link"></i> View on PACER</a>&nbsp;</p>
-          </div>
-        {% endif %}
         {% if docket_entries %}
-          <div class="left">
-            <p><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-               class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>&nbsp;</p>
-          </div>
+          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+             class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
         {% endif %}
-        <div class="left">
+        <div class="btn-group"
+             id="react-root"
+             data-docket="{{ docket.id }}"
+             data-user-id="{% if user.is_authenticated %}{{ user.pk }}{% endif %}"
+             data-user-name="{% if user.is_authenticated %}{{ user.get_username }}{% endif %}"
+             data-authenticated="{% if user.is_authenticated %}{{ user.pk }}:{{ user.get_username }}{% endif %}"
+             data-edit-url="{% url "tag_list" request.user %}"
+             data-is-page-owner=""
+        ></div>
+        <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}
-          <a href="{% url "alert_help" %}#recap-alerts"
-             class="btn btn-link btn-close"
-             data-toggle="tooltip"
-             data-placement="right"
-             title="Learn about docket alerts"><i
-                  class="fa fa-question-circle fa-lg gray"></i></a>
+          <a class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="caret"></span>
+            <span class="sr-only">Toggle Dropdown</span>
+          </a>
+          <ul class="dropdown-menu">
+            <li><a href="{% url "alert_help" %}#recap-alerts">Learn More</a></li>
+          </ul>
         </div>
+        {% include "includes/pacer_links_dropdown.html" %}
       </div>
-      <div class="clearfix"></div>
     {% endif %}
 
     {% if docket.source in docket.RECAP_SOURCES %}

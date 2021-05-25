@@ -1,15 +1,16 @@
 {% extends "profile/nav.html" %}
+{% load static %}
 {% load humanize %}
 {% block title %}Visualizations – CourtListener.com{% endblock %}
 
 {% block nav-visualizations %}active{% endblock %}
 
 {% block footer-scripts %}
-    <script src="{{ STATIC_URL }}js/visualization_tools.js"></script>
+    <script src="{% static "js/visualization_tools.js" %}"></script>
     {% if DEBUG %}
-        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.js"></script>
+        <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
     {% else %}
-        <script src="{{ STATIC_URL }}js/jquery.bootstrap-growl.min.js"></script>
+        <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     {% endif %}
 {% endblock %}
 
