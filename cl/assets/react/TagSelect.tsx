@@ -26,7 +26,7 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) =
     estimateSize: React.useCallback(() => 40, []),
   });
 
-  // fetchmore if we are at the bottom of the list
+  // fetch more if we are at the bottom of the list
   React.useEffect(() => {
     const [lastItem] = [...rowVirtualizer.virtualItems].reverse();
 
@@ -75,9 +75,36 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) =
           return changes;
       }
     },
+    onIsOpenChange: (inputId) => {
+      if (!isOpen) {
+        document.getElementById(getInputProps()['id'])!.focus()
+      }
+    },
     onInputValueChange: ({ inputValue }) => {
       if (inputValue !== 'return') return;
-      const d3i0 = document.querySelector("a.list-group-item > p")!.textContent || ""
+      const first_item = document.querySelector("a.list-group-item > p")
+      if (!first_item) {
+        const rows = document.querySelectorAll("input.form-check" )
+        for (let idx of rows) {
+          const name = document.getElementById(getInputProps()['id'])!.value
+          if (idx.value == name) {
+            const tag_id = Number(idx.getAttribute("data-tagid"))
+            const assoc_id = Number(idx.id)
+        const isAlreadySelected = !associations
+        ? false
+        : !!(associations as Association[]).find((a) => a.tag === tag_id);
+        if (isAlreadySelected) {
+                console.log(`Removing ${name} from tags for docket ${docket}`);
+                deleteAssociation({ assocId: assoc_id });
+              } else {
+                console.log(`Adding ${name} to tags for docket ${docket}`);
+                addNewAssociation({ tag: tag_id });
+              }
+          }
+        }
+        return
+      }
+      const d3i0 = first_item.textContent || ""
       const isCreateItemOption = d3i0.startsWith('Create Tag:');
       if (isCreateItemOption) {
         const validInput = textVal.match(/^[a-z0-9-]*$/);
@@ -242,7 +269,7 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) =
         </div>
         <a style={{ display: isOpen ? 'block' : 'none' }} className="list-group-item" href={editUrl}>
           <i className="fa fa-pencil" style={{ marginRight: '1em' }} />
-          Edit Tags
+          View All Tags
         </a>
       </div>
     </div>

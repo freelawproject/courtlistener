@@ -96,7 +96,7 @@
         ></div>
         <div class="btn-group">
           {% include "includes/docket_alerts_button.html" %}
-          <a class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <a class="btn {% if has_alert %}btn-danger{% else %}btn-success{% endif %} dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <span class="caret"></span>
             <span class="sr-only">Toggle Dropdown</span>
           </a>
