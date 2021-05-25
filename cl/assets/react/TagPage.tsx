@@ -76,7 +76,7 @@ const TagOptions = (data: CLData) => {
             >
               <a role="menuitem" href="#">
                 <Switch value={+isPublic} />
-                &nbsp;Is Publicly Available
+                &nbsp;Publicly Available
               </a>
             </li>
             <MenuItem divider />
