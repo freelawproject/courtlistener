@@ -26,7 +26,7 @@ class WebhookAdmin(admin.ModelAdmin):
 
 
 @admin.register(WebhookEvent)
-class WebhookEvent(admin.ModelAdmin):
+class WebhookEventAdmin(admin.ModelAdmin):
     list_display = (
         "__str__",
         "webhook",

@@ -22,7 +22,7 @@ class WebhookEventType(models.IntegerChoices):
     ALERT = 2, "Alert triggered"
 
 
-HttpStatusCodes = models.IntegerChoices(
+HttpStatusCodes = models.IntegerChoices(  # type: ignore
     "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]
 )
 
