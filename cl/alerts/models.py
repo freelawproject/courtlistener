@@ -102,7 +102,6 @@ class DocketAlert(models.Model):
 class DocketSubscription(AbstractDateTimeModel):
     date_last_hit = models.DateTimeField(
         help_text="The last date on which an email was received for the case.",
-        verbose_name="The last date on which an email was received for the case.",
         blank=True,
         null=True,
     )
@@ -120,9 +119,6 @@ class DocketSubscription(AbstractDateTimeModel):
     )
     secret_key = models.CharField(
         help_text="A key to be used in links to access the alert without "
-        "having to log in. Can be used for a variety of "
-        "purposes.",
-        verbose_name="A key to be used in links to access the alert without "
         "having to log in. Can be used for a variety of "
         "purposes.",
         max_length=40,
