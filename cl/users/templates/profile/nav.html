@@ -53,14 +53,8 @@
             </li>
             <li class="{% block nav-api%}inactive{% endblock %}"
                 role="presentation">
-                <a href="{% url "view_api" %}"><i class="fa fa-code gray"></i>&nbsp;API</a>
-            </li>
-            {% flag "user-webhooks" %}
-            <li class="{% block nav-webhooks%}inactive{% endblock %}"
-                role="presentation">
-                <a href="{% url "view_webhooks" %}"><i class="fa fa-code gray"></i>&nbsp;Webhooks</a>
-            </li>
-            {% endflag %}
+                <a href="{% url "view_api" %}"><i class="fa fa-code gray"></i>&nbsp;{% flag "user-webhooks" %}Developer Tools{% else %}API{% endflag %}</a>
+            </li>}
         </ul>
     </div>
 {% endblock %}
