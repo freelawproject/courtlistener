@@ -201,23 +201,20 @@ def view_deleted_visualizations(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api(request: HttpRequest) -> HttpResponse:
-    return render(request, "profile/api.html", {"private": True})
+    if request.method == "POST":
+        instance = Webhook()
+        form = WebhookForm(request.POST, instance=instance)
+        if form.is_valid():
+            instance.user = request.user
+            form.save()
+            return HttpResponseRedirect(reverse("view_api"))
+    else:
+        form = WebhookForm()
 
-
-@login_required
-@never_cache
-def view_webhooks(request: HttpRequest) -> HttpResponse:
-    user = request.user
-    webhook = user.webhooks.first() if user.webhooks.count() > 0 else Webhook()
-    webhook_form = WebhookForm(request.POST or None, instance=webhook)
-    if webhook_form.is_valid():
-        webhook.user = user
-        webhook_form.save()
-        return HttpResponseRedirect(reverse("view_webhooks"))
     return render(
         request,
-        "profile/webhooks.html",
-        {"webhook_form": webhook_form, "private": True},
+        "profile/api.html",
+        {"webhook_form": form, "private": True},
     )
 
 
