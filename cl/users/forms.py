@@ -13,6 +13,7 @@ from django.urls import reverse
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
+from cl.api.models import Webhook, WebhookEventType
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -279,3 +280,20 @@ class CustomSetPasswordForm(SetPasswordForm):
         self.fields["new_password2"].widget.attrs.update(
             {"class": "form-control", "autocomplete": "new-password"}
         )
+
+
+class WebhookForm(ModelForm):
+    class Meta:
+        model = Webhook
+        fields = (
+            "event_type",
+            "url",
+        )
+        widgets = {
+            "event_type": forms.Select(
+                attrs={"class": "form-control"},
+            ),
+            "url": forms.TextInput(
+                attrs={"class": "form-control"},
+            ),
+        }
