@@ -19,6 +19,7 @@ from cl.simple_pages.views import (
     old_terms,
     podcasts,
     robots,
+    tag_help,
     validate_for_wot,
 )
 
@@ -38,6 +39,7 @@ urlpatterns = [
     path("help/alerts/", alert_help, name="alert_help"),
     path("help/donations/", donation_help, name="donation_help"),
     path("help/delete-account/", delete_help, name="delete_help"),
+    path("help/tags/", tag_help, name="tag_help"),
     path("help/search-operators/", advanced_search, name="advanced_search"),
     # Added 2018-10-23
     path(

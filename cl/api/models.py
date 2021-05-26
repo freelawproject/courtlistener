@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.postgres import fields
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -69,7 +70,7 @@ class WebhookEvent(AbstractDateTimeModel):
         "created.",
         choices=HttpStatusCodes.choices,
     )
-    content = models.JSONField(
+    content = fields.JSONField(
         help_text="The content of the outgoing body in the POST request."
     )
     response = models.TextField(

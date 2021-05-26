@@ -124,6 +124,10 @@ def markdown_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/markdown_help.html", {"private": False})
 
 
+def tag_help(request: HttpRequest) -> HttpResponse:
+    return render(request, "help/tags_help.html", {"private": False})
+
+
 def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
