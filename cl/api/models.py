@@ -1,7 +1,6 @@
-from enum import Enum
-
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.postgres import fields
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -58,7 +57,7 @@ class WebhookEvent(AbstractDateTimeModel):
     status_code = models.IntegerField(
         help_text="The HTTP status code received when the webhook event was created."
     )
-    content = models.JSONField(
+    content = fields.JSONField(
         help_text="The content of the outgoing body in the POST request."
     )
     response = models.TextField(
