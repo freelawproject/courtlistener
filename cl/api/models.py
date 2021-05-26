@@ -1,4 +1,4 @@
-from enum import Enum
+from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -17,8 +17,13 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
 
 
 class WebhookEventType(models.IntegerChoices):
-    RECAP_EMAIL = 1, "RECAP Email received"
+    RECAP_EMAIL = 1, "RECAP email received"
     ALERT = 2, "Alert triggered"
+
+
+HttpStatusCodes = models.IntegerChoices(
+    "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]
+)
 
 
 class Webhook(AbstractDateTimeModel):
@@ -39,13 +44,17 @@ class Webhook(AbstractDateTimeModel):
     enabled = models.BooleanField(
         help_text="An on/off switch for the webhook.", default=False
     )
-    webhook_version = models.IntegerField(
+    version = models.IntegerField(
         help_text="The specific version of the webhook provisioned.", default=1
     )
     failure_count = models.IntegerField(
-        help_text="The number of failures (400+ status) responses the webhook has received.",
+        help_text="The number of failures (400+ status) responses the webhook "
+        "has received.",
         default=0,
     )
+
+    def __str__(self) -> str:
+        return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
 
 
 class WebhookEvent(AbstractDateTimeModel):
@@ -56,7 +65,9 @@ class WebhookEvent(AbstractDateTimeModel):
         on_delete=models.CASCADE,
     )
     status_code = models.IntegerField(
-        help_text="The HTTP status code received when the webhook event was created."
+        help_text="The HTTP status code received when the webhook event was "
+        "created.",
+        choices=HttpStatusCodes.choices,
     )
     content = models.JSONField(
         help_text="The content of the outgoing body in the POST request."
