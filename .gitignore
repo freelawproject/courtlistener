@@ -1,5 +1,6 @@
 # Python stuff
 .venv
+.env.json
 *.egg-info
 .dmypy.json
 

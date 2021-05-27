@@ -193,7 +193,13 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
                 f"{attrs['court'].pk} is not a PACER court ID."
             )
 
-        for attr_name in ["timestamp", "source", "destination", "headers"]:
+        for attr_name in [
+            "message_id",
+            "timestamp",
+            "source",
+            "destination",
+            "headers",
+        ]:
             if (
                 mail.get(attr_name) is None
                 or mail.get(attr_name) == "undefined"
