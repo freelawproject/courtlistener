@@ -104,3 +104,7 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
 
 class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
     location = "static"
+
+
+class RecapEmailSESStorage(S3Boto3Storage):
+    bucket_name = "recap-dot-email-global-inbox"
