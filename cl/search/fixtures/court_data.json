@@ -70,7 +70,9 @@
       "full_name": "United States Bankruptcy Court, D. Alaska",
       "position": 157.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 22,
+      "fjc_court_id": "7-"
     },
     "model": "search.court",
     "pk": "akb"
@@ -89,7 +91,9 @@
       "full_name": "District Court, D. Alaska",
       "position": 202.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 23,
+      "fjc_court_id": "7-"
     },
     "model": "search.court",
     "pk": "akd"
@@ -241,7 +245,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Alabama",
       "position": 155.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 16,
+      "fjc_court_id": "27"
     },
     "model": "search.court",
     "pk": "almb"
@@ -260,7 +266,9 @@
       "full_name": "District Court, M.D. Alabama",
       "position": 201.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 17,
+      "fjc_court_id": "27"
     },
     "model": "search.court",
     "pk": "almd"
@@ -279,7 +287,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Alabama",
       "position": 156.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 18,
+      "fjc_court_id": "26"
     },
     "model": "search.court",
     "pk": "alnb"
@@ -298,7 +308,9 @@
       "full_name": "District Court, N.D. Alabama",
       "position": 201.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 19,
+      "fjc_court_id": "26"
     },
     "model": "search.court",
     "pk": "alnd"
@@ -317,7 +329,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Alabama",
       "position": 156.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 20,
+      "fjc_court_id": "28"
     },
     "model": "search.court",
     "pk": "alsb"
@@ -336,7 +350,9 @@
       "full_name": "District Court, S.D. Alabama",
       "position": 202.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 21,
+      "fjc_court_id": "28"
     },
     "model": "search.court",
     "pk": "alsd"
@@ -355,7 +371,9 @@
       "full_name": "United States Bankruptcy Court, D. Arizona",
       "position": 157.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 24,
+      "fjc_court_id": "70"
     },
     "model": "search.court",
     "pk": "arb"
@@ -374,7 +392,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Arkansas",
       "position": 157.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 26,
+      "fjc_court_id": "60"
     },
     "model": "search.court",
     "pk": "areb"
@@ -393,7 +413,9 @@
       "full_name": "District Court, E.D. Arkansas",
       "position": 204.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 27,
+      "fjc_court_id": "60"
     },
     "model": "search.court",
     "pk": "ared"
@@ -495,6 +517,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Arkansas Attorney General Reports",
+      "citation_string": "Ark. Att'y Gen.",
+      "in_use": true,
+      "url": "http://www.arkansasag.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Arkansas Attorney General Reports",
+      "position": 345.0,
+      "date_modified": "2016-05-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "arkag"
+  },
+  {
+    "fields": {
       "jurisdiction": "SA",
       "end_date": null,
       "short_name": "Court of Appeals of Arkansas",
@@ -525,6 +566,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Arkansas Workers' Compensation Commission",
       "position": 340.0,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "arkworkcompcom"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Arkansas Workers' Compensation Commission",
+      "citation_string": "Ark. Workers' Comp.",
+      "in_use": true,
+      "url": "http://www.awcc.state.ar.us/",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Arkansas Workers' Compensation Commission",
+      "position": 340.0,
+      "date_modified": "2016-05-18T17:52:50.471Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -564,7 +624,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Arkansas",
       "position": 157.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 28,
+      "fjc_court_id": "61"
     },
     "model": "search.court",
     "pk": "arwb"
@@ -583,7 +645,9 @@
       "full_name": "District Court, W.D. Arkansas",
       "position": 204.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 29,
+      "fjc_court_id": "61"
     },
     "model": "search.court",
     "pk": "arwd"
@@ -621,7 +685,9 @@
       "full_name": "District Court, D. Arizona",
       "position": 203.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 25,
+      "fjc_court_id": "70"
     },
     "model": "search.court",
     "pk": "azd"
@@ -811,7 +877,8 @@
       "full_name": "Court of Appeals for the First Circuit",
       "position": 101.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "1"
     },
     "model": "search.court",
     "pk": "ca1"
@@ -830,7 +897,8 @@
       "full_name": "Court of Appeals for the Tenth Circuit",
       "position": 110.0,
       "has_opinion_scraper": true,
-      "start_date": "1929-02-28"
+      "start_date": "1929-02-28",
+      "fjc_court_id": "10"
     },
     "model": "search.court",
     "pk": "ca10"
@@ -849,7 +917,8 @@
       "full_name": "Court of Appeals for the Eleventh Circuit",
       "position": 111.0,
       "has_opinion_scraper": true,
-      "start_date": "1980-10-14"
+      "start_date": "1980-10-14",
+      "fjc_court_id": "11"
     },
     "model": "search.court",
     "pk": "ca11"
@@ -868,7 +937,8 @@
       "full_name": "Court of Appeals for the Second Circuit",
       "position": 102.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "2"
     },
     "model": "search.court",
     "pk": "ca2"
@@ -887,7 +957,8 @@
       "full_name": "Court of Appeals for the Third Circuit",
       "position": 103.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "3"
     },
     "model": "search.court",
     "pk": "ca3"
@@ -906,7 +977,8 @@
       "full_name": "Court of Appeals for the Fourth Circuit",
       "position": 104.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "4"
     },
     "model": "search.court",
     "pk": "ca4"
@@ -925,7 +997,8 @@
       "full_name": "Court of Appeals for the Fifth Circuit",
       "position": 105.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "5"
     },
     "model": "search.court",
     "pk": "ca5"
@@ -944,7 +1017,8 @@
       "full_name": "Court of Appeals for the Sixth Circuit",
       "position": 106.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "6"
     },
     "model": "search.court",
     "pk": "ca6"
@@ -963,7 +1037,8 @@
       "full_name": "Court of Appeals for the Seventh Circuit",
       "position": 107.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "7"
     },
     "model": "search.court",
     "pk": "ca7"
@@ -982,7 +1057,8 @@
       "full_name": "Court of Appeals for the Eighth Circuit",
       "position": 108.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "8"
     },
     "model": "search.court",
     "pk": "ca8"
@@ -1001,7 +1077,8 @@
       "full_name": "Court of Appeals for the Ninth Circuit",
       "position": 109.0,
       "has_opinion_scraper": true,
-      "start_date": "1891-03-03"
+      "start_date": "1891-03-03",
+      "fjc_court_id": "9"
     },
     "model": "search.court",
     "pk": "ca9"
@@ -1039,7 +1116,9 @@
       "full_name": "United States Bankruptcy Court, C.D. California",
       "position": 158.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 973,
+      "fjc_court_id": "73"
     },
     "model": "search.court",
     "pk": "cacb"
@@ -1058,7 +1137,9 @@
       "full_name": "District Court, C.D. California",
       "position": 205.05,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 31,
+      "fjc_court_id": "73"
     },
     "model": "search.court",
     "pk": "cacd"
@@ -1077,7 +1158,8 @@
       "full_name": "Court of Appeals for the D.C. Circuit",
       "position": 112.0,
       "has_opinion_scraper": true,
-      "start_date": "1893-02-09"
+      "start_date": "1893-02-09",
+      "fjc_court_id": "0"
     },
     "model": "search.court",
     "pk": "cadc"
@@ -1096,7 +1178,9 @@
       "full_name": "United States Bankruptcy Court, E.D. California",
       "position": 158.05,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 32,
+      "fjc_court_id": "72"
     },
     "model": "search.court",
     "pk": "caeb"
@@ -1115,7 +1199,9 @@
       "full_name": "District Court, E.D. California",
       "position": 205.06,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 33,
+      "fjc_court_id": "72"
     },
     "model": "search.court",
     "pk": "caed"
@@ -1179,6 +1265,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "California Attorney General Reports",
+      "citation_string": "Cal. Att'y Gen.",
+      "in_use": true,
+      "url": "https://oag.ca.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "California Attorney General Reports",
+      "position": 350.5,
+      "date_modified": "2016-05-18T20:03:18.222Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "calag"
+  },
+  {
+    "fields": {
       "jurisdiction": "SA",
       "end_date": null,
       "short_name": "Appellate Division of the Superior Court of California",
@@ -1190,6 +1295,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Appellate Division of the Superior Court of California",
       "position": 350.3,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "calappdeptsuper"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Appellate Division of the Superior Court of California",
+      "citation_string": "Cal. App. Dep\u2019t Super. Ct.",
+      "in_use": true,
+      "url": "http://www.courts.ca.gov/12430.htm",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Appellate Division of the Superior Court of California",
+      "position": 350.3,
+      "date_modified": "2016-05-18T18:54:40.877Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -1267,7 +1391,9 @@
       "full_name": "United States Bankruptcy Court, N.D. California",
       "position": 158.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 34,
+      "fjc_court_id": "71"
     },
     "model": "search.court",
     "pk": "canb"
@@ -1286,7 +1412,9 @@
       "full_name": "District Court, N.D. California",
       "position": 205.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 35,
+      "fjc_court_id": "71"
     },
     "model": "search.court",
     "pk": "cand"
@@ -1305,7 +1433,9 @@
       "full_name": "United States Bankruptcy Court, S.D. California",
       "position": 158.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 36,
+      "fjc_court_id": "74"
     },
     "model": "search.court",
     "pk": "casb"
@@ -1324,7 +1454,9 @@
       "full_name": "District Court, S.D. California",
       "position": 205.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 37,
+      "fjc_court_id": "74"
     },
     "model": "search.court",
     "pk": "casd"
@@ -1409,6 +1541,25 @@
     "fields": {
       "jurisdiction": "FD",
       "end_date": "1912-01-01",
+      "short_name": "Circuit Court of Delaware",
+      "citation_string": "Cir. Ct. Del.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_de.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of Delaware",
+      "position": 208.2,
+      "has_opinion_scraper": false,
+      "start_date": "1789-09-24"
+    },
+    "model": "search.court",
+    "pk": "circtdel"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
       "short_name": "Circuit Court of North Carolina",
       "citation_string": "Cir. Ct. N.C.",
       "in_use": true,
@@ -1423,6 +1574,44 @@
     },
     "model": "search.court",
     "pk": "circtnc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
+      "short_name": "Circuit Court of North Carolina",
+      "citation_string": "Cir. Ct. N.C.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_nc.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of North Carolina",
+      "position": 245.25,
+      "has_opinion_scraper": false,
+      "start_date": "1790-06-04"
+    },
+    "model": "search.court",
+    "pk": "circtnc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": "1912-01-01",
+      "short_name": "Circuit Court of Tennessee",
+      "citation_string": "Cir. Ct. N.C.",
+      "in_use": true,
+      "url": "http://www.fjc.gov/history/home.nsf/page/courts_circuit_tn.html",
+      "notes": "",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. Circuit Court for the District of Tennessee",
+      "position": 249.91,
+      "has_opinion_scraper": false,
+      "start_date": "1807-02-24"
+    },
+    "model": "search.court",
+    "pk": "circttenn"
   },
   {
     "fields": {
@@ -1495,7 +1684,9 @@
       "full_name": "United States Bankruptcy Court, D. Colorado",
       "position": 159.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 38,
+      "fjc_court_id": "82"
     },
     "model": "search.court",
     "pk": "cob"
@@ -1514,7 +1705,9 @@
       "full_name": "District Court, D. Colorado",
       "position": 206.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 39,
+      "fjc_court_id": "82"
     },
     "model": "search.court",
     "pk": "cod"
@@ -1559,6 +1752,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Colorado Attorney General Reports",
+      "citation_string": "Colo. Att'y Gen.",
+      "in_use": true,
+      "url": "http://coag.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Colorado Attorney General Reports",
+      "position": 351.3,
+      "date_modified": "2016-05-18T20:04:31.403Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "coloag"
+  },
+  {
+    "fields": {
       "jurisdiction": "SA",
       "end_date": null,
       "short_name": "Colorado Court of Appeals",
@@ -1589,6 +1801,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Colorado Industrial Claim Appeals Office",
       "position": 351.2,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "coloworkcompcom"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Colorado Industrial Claim Appeals Office",
+      "citation_string": "Colo. Indus. Cl. App.",
+      "in_use": true,
+      "url": "https://www.colorado.gov/pacific/cdle/icao-wc",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Colorado Industrial Claim Appeals Office",
+      "position": 351.2,
+      "date_modified": "2016-05-18T18:04:37.690Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -1692,6 +1923,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Connecticut Compensation Review Board",
+      "citation_string": "Conn. Comp. Rev. Bd.",
+      "in_use": true,
+      "url": "http://wcc.state.ct.us/crb/menus/crb-opin.htm",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Connecticut Compensation Review Board",
+      "position": 351.8,
+      "date_modified": "2016-05-18T18:09:20.530Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "connworkcompcom"
+  },
+  {
+    "fields": {
       "jurisdiction": "FB",
       "end_date": null,
       "short_name": "D. Connecticut",
@@ -1704,7 +1954,9 @@
       "full_name": "United States Bankruptcy Court, D. Connecticut",
       "position": 159.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 40,
+      "fjc_court_id": "05"
     },
     "model": "search.court",
     "pk": "ctb"
@@ -1723,7 +1975,9 @@
       "full_name": "District Court, D. Connecticut",
       "position": 207.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 41,
+      "fjc_court_id": "05"
     },
     "model": "search.court",
     "pk": "ctd"
@@ -1780,7 +2034,9 @@
       "full_name": "United States Bankruptcy Court, District of Columbia",
       "position": 160.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 44,
+      "fjc_court_id": "90"
     },
     "model": "search.court",
     "pk": "dcb"
@@ -1799,7 +2055,30 @@
       "full_name": "District Court, District of Columbia",
       "position": 200.5,
       "has_opinion_scraper": true,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 45,
+      "fjc_court_id": "90"
+    },
+    "model": "search.court",
+    "pk": "dcd"
+  },
+  {
+    "fields": {
+      "jurisdiction": "FD",
+      "end_date": null,
+      "short_name": "District of Columbia",
+      "citation_string": "D.C.",
+      "in_use": true,
+      "url": "http://www.dcd.uscourts.gov/",
+      "notes": "Lawbox",
+      "date_modified": "2014-05-20T00:58:40.714Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "District Court, District of Columbia",
+      "position": 200.5,
+      "has_opinion_scraper": true,
+      "start_date": null,
+      "pacer_court_id": 45,
+      "fjc_court_id": "90"
     },
     "model": "search.court",
     "pk": "dcd"
@@ -1818,7 +2097,9 @@
       "full_name": "United States Bankruptcy Court, D. Delaware",
       "position": 159.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 42,
+      "fjc_court_id": "11"
     },
     "model": "search.court",
     "pk": "deb"
@@ -1837,7 +2118,9 @@
       "full_name": "District Court, D. Delaware",
       "position": 208.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 43,
+      "fjc_court_id": "11"
     },
     "model": "search.court",
     "pk": "ded"
@@ -2053,6 +2336,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Florida Attorney General Reports",
+      "citation_string": "Fla. Att'y Gen.",
+      "in_use": true,
+      "url": "http://www.myfloridalegal.com/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Florida Attorney General Reports",
+      "position": 355.1,
+      "date_modified": "2016-05-18T20:05:17.583Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "flaag"
+  },
+  {
+    "fields": {
       "jurisdiction": "SA",
       "end_date": null,
       "short_name": "District Court of Appeal of Florida",
@@ -2103,7 +2405,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Florida",
       "position": 176.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 46,
+      "fjc_court_id": "3A"
     },
     "model": "search.court",
     "pk": "flmb"
@@ -2122,7 +2426,9 @@
       "full_name": "District Court, M.D. Florida",
       "position": 208.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 47,
+      "fjc_court_id": "3A"
     },
     "model": "search.court",
     "pk": "flmd"
@@ -2141,7 +2447,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Florida",
       "position": 176.95,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 48,
+      "fjc_court_id": "29"
     },
     "model": "search.court",
     "pk": "flnb"
@@ -2160,7 +2468,9 @@
       "full_name": "District Court, N.D. Florida",
       "position": 208.51,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 49,
+      "fjc_court_id": "29"
     },
     "model": "search.court",
     "pk": "flnd"
@@ -2179,7 +2489,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Florida.",
       "position": 177.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 50,
+      "fjc_court_id": "3C"
     },
     "model": "search.court",
     "pk": "flsb"
@@ -2198,7 +2510,9 @@
       "full_name": "District Court, S.D. Florida",
       "position": 208.52,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 51,
+      "fjc_court_id": "3C"
     },
     "model": "search.court",
     "pk": "flsd"
@@ -2274,7 +2588,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Georgia",
       "position": 179.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 52,
+      "fjc_court_id": "3G"
     },
     "model": "search.court",
     "pk": "gamb"
@@ -2293,7 +2609,9 @@
       "full_name": "District Court, M.D. Georgia",
       "position": 208.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 53,
+      "fjc_court_id": "3G"
     },
     "model": "search.court",
     "pk": "gamd"
@@ -2312,7 +2630,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Georgia",
       "position": 179.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 54,
+      "fjc_court_id": "3E"
     },
     "model": "search.court",
     "pk": "ganb"
@@ -2331,7 +2651,9 @@
       "full_name": "District Court, N.D. Georgia",
       "position": 208.61,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 55,
+      "fjc_court_id": "3E"
     },
     "model": "search.court",
     "pk": "gand"
@@ -2350,7 +2672,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Georgia",
       "position": 180.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 56,
+      "fjc_court_id": "3J"
     },
     "model": "search.court",
     "pk": "gasb"
@@ -2369,7 +2693,9 @@
       "full_name": "District Court, S.D. Georgia",
       "position": 208.62,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 57,
+      "fjc_court_id": "3J"
     },
     "model": "search.court",
     "pk": "gasd"
@@ -2388,7 +2714,9 @@
       "full_name": "United States Bankruptcy Court, D. Guam",
       "position": 199.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 58,
+      "fjc_court_id": "93"
     },
     "model": "search.court",
     "pk": "gub"
@@ -2407,7 +2735,9 @@
       "full_name": "District Court, D. Guam",
       "position": 299.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 59,
+      "fjc_court_id": "93"
     },
     "model": "search.court",
     "pk": "gud"
@@ -2464,7 +2794,9 @@
       "full_name": "United States Bankruptcy Court, D. Hawaii",
       "position": 180.05,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 60,
+      "fjc_court_id": "75"
     },
     "model": "search.court",
     "pk": "hib"
@@ -2483,7 +2815,9 @@
       "full_name": "District Court, D. Hawaii",
       "position": 208.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 61,
+      "fjc_court_id": "75"
     },
     "model": "search.court",
     "pk": "hid"
@@ -2521,7 +2855,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Iowa",
       "position": 185.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 74,
+      "fjc_court_id": "62"
     },
     "model": "search.court",
     "pk": "ianb"
@@ -2540,7 +2876,9 @@
       "full_name": "District Court, N.D. Iowa",
       "position": 215.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 75,
+      "fjc_court_id": "62"
     },
     "model": "search.court",
     "pk": "iand"
@@ -2559,7 +2897,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Iowa",
       "position": 185.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 76,
+      "fjc_court_id": "63"
     },
     "model": "search.court",
     "pk": "iasb"
@@ -2578,7 +2918,9 @@
       "full_name": "District Court, S.D. Iowa",
       "position": 216.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 77,
+      "fjc_court_id": "63"
     },
     "model": "search.court",
     "pk": "iasd"
@@ -2635,7 +2977,9 @@
       "full_name": "United States Bankruptcy Court, D. Idaho",
       "position": 180.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 62,
+      "fjc_court_id": "76"
     },
     "model": "search.court",
     "pk": "idb"
@@ -2654,7 +2998,9 @@
       "full_name": "District Court, D. Idaho",
       "position": 209.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 63,
+      "fjc_court_id": "76"
     },
     "model": "search.court",
     "pk": "idd"
@@ -2673,7 +3019,9 @@
       "full_name": " United States Bankruptcy Court, C.D. Illinois",
       "position": 182.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 64,
+      "fjc_court_id": "53"
     },
     "model": "search.court",
     "pk": "ilcb"
@@ -2692,7 +3040,9 @@
       "full_name": "District Court, C.D. Illinois",
       "position": 209.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 65,
+      "fjc_court_id": "53"
     },
     "model": "search.court",
     "pk": "ilcd"
@@ -2787,7 +3137,9 @@
       "full_name": " United States Bankruptcy Court, N.D. Illinois",
       "position": 183.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 66,
+      "fjc_court_id": "52"
     },
     "model": "search.court",
     "pk": "ilnb"
@@ -2806,7 +3158,9 @@
       "full_name": "District Court, N.D. Illinois",
       "position": 210.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 67,
+      "fjc_court_id": "52"
     },
     "model": "search.court",
     "pk": "ilnd"
@@ -2825,7 +3179,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Illinois",
       "position": 183.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 68,
+      "fjc_court_id": "54"
     },
     "model": "search.court",
     "pk": "ilsb"
@@ -2844,7 +3200,9 @@
       "full_name": "District Court, S.D. Illinois",
       "position": 210.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 69,
+      "fjc_court_id": "54"
     },
     "model": "search.court",
     "pk": "ilsd"
@@ -2939,7 +3297,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Indiana",
       "position": 183.15,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 70,
+      "fjc_court_id": "55"
     },
     "model": "search.court",
     "pk": "innb"
@@ -2958,7 +3318,9 @@
       "full_name": "District Court, N.D. Indiana",
       "position": 211.0,
       "has_opinion_scraper": false,
-      "start_date": "1928-04-21"
+      "start_date": "1928-04-21",
+      "pacer_court_id": 71,
+      "fjc_court_id": "55"
     },
     "model": "search.court",
     "pk": "innd"
@@ -2977,7 +3339,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Indiana",
       "position": 183.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 72,
+      "fjc_court_id": "56"
     },
     "model": "search.court",
     "pk": "insb"
@@ -2996,7 +3360,9 @@
       "full_name": "District Court, S.D. Indiana",
       "position": 212.0,
       "has_opinion_scraper": false,
-      "start_date": "1928-04-21"
+      "start_date": "1928-04-21",
+      "pacer_court_id": 73,
+      "fjc_court_id": "56"
     },
     "model": "search.court",
     "pk": "insd"
@@ -3098,6 +3464,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Kansas Attorney General Reports",
+      "citation_string": "Kan. Att'y Gen.",
+      "in_use": true,
+      "url": "http://ag.ks.gov/about-the-office/contact-us",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Kansas Attorney General Reports",
+      "position": 362.21,
+      "date_modified": "2016-05-18T20:06:01.719Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "kanag"
+  },
+  {
+    "fields": {
       "jurisdiction": "SA",
       "end_date": null,
       "short_name": "Court of Appeals of Kansas",
@@ -3136,6 +3521,25 @@
   },
   {
     "fields": {
+      "end_date": "1873-12-31",
+      "short_name": "Court of King's Bench",
+      "citation_string": "King's Bench",
+      "in_use": true,
+      "url": "https://en.wikipedia.org/wiki/Court_of_King%27s_Bench_(England)",
+      "notes": "This court was abolished by a total reorganization in Great Britain.",
+      "jurisdiction": "I",
+      "has_oral_argument_scraper": false,
+      "full_name": "Court of King's Bench",
+      "position": 501,
+      "date_modified": "2016-05-18T17:52:50.471Z",
+      "has_opinion_scraper": false,
+      "start_date": "1200-01-01"
+    },
+    "model": "search.court",
+    "pk": "kingsbench"
+  },
+  {
+    "fields": {
       "jurisdiction": "FB",
       "end_date": null,
       "short_name": "D. Kansas",
@@ -3148,7 +3552,9 @@
       "full_name": "United States Bankruptcy Court, D. Kansas",
       "position": 187.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 78,
+      "fjc_court_id": "83"
     },
     "model": "search.court",
     "pk": "ksb"
@@ -3167,7 +3573,9 @@
       "full_name": "District Court, D. Kansas",
       "position": 228.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 79,
+      "fjc_court_id": "83"
     },
     "model": "search.court",
     "pk": "ksd"
@@ -3262,7 +3670,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Kentucky",
       "position": 187.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 80,
+      "fjc_court_id": "43"
     },
     "model": "search.court",
     "pk": "kyeb"
@@ -3281,7 +3691,9 @@
       "full_name": "District Court, E.D. Kentucky",
       "position": 229.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 81,
+      "fjc_court_id": "43"
     },
     "model": "search.court",
     "pk": "kyed"
@@ -3300,7 +3712,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Kentucky",
       "position": 187.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 82,
+      "fjc_court_id": "44"
     },
     "model": "search.court",
     "pk": "kywb"
@@ -3319,7 +3733,9 @@
       "full_name": "District Court, W.D. Kentucky",
       "position": 230.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 83,
+      "fjc_court_id": "44"
     },
     "model": "search.court",
     "pk": "kywd"
@@ -3356,6 +3772,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Louisiana Attorney General Reports",
       "position": 362.52,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "laag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Louisiana Attorney General Reports",
+      "citation_string": "La. Att'y Gen.",
+      "in_use": true,
+      "url": "https://www.ag.state.la.us/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Louisiana Attorney General Reports",
+      "position": 362.52,
+      "date_modified": "2016-05-18T20:06:50.981Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -3414,7 +3849,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Louisiana",
       "position": 187.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 84,
+      "fjc_court_id": "3L"
     },
     "model": "search.court",
     "pk": "laeb"
@@ -3433,7 +3870,9 @@
       "full_name": "District Court, E.D. Louisiana.",
       "position": 231.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 85,
+      "fjc_court_id": "3L"
     },
     "model": "search.court",
     "pk": "laed"
@@ -3452,7 +3891,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Louisiana",
       "position": 188.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 86,
+      "fjc_court_id": "3N"
     },
     "model": "search.court",
     "pk": "lamb"
@@ -3471,7 +3912,9 @@
       "full_name": "District Court, M.D. Louisiana",
       "position": 231.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 87,
+      "fjc_court_id": "3N"
     },
     "model": "search.court",
     "pk": "lamd"
@@ -3490,7 +3933,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Louisiana",
       "position": 188.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 88,
+      "fjc_court_id": "36"
     },
     "model": "search.court",
     "pk": "lawb"
@@ -3509,7 +3954,9 @@
       "full_name": "District Court, W.D. Louisiana",
       "position": 231.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 89,
+      "fjc_court_id": "36"
     },
     "model": "search.court",
     "pk": "lawd"
@@ -3528,7 +3975,9 @@
       "full_name": "United States Bankruptcy Court, D. Massachusetts",
       "position": 189.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 94,
+      "fjc_court_id": "01"
     },
     "model": "search.court",
     "pk": "mab"
@@ -3547,7 +3996,9 @@
       "full_name": "District Court, D. Massachusetts",
       "position": 240.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 95,
+      "fjc_court_id": "01"
     },
     "model": "search.court",
     "pk": "mad"
@@ -3649,6 +4100,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Massachusetts Department of Industrial Accidents",
+      "citation_string": "Mass. Dep't Indus. Accid.",
+      "in_use": true,
+      "url": "http://www.mass.gov/lwd/workers-compensation/",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Massachusetts Department of Industrial Accidents",
+      "position": 364.5,
+      "date_modified": "2016-05-18T19:03:43.626Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "maworkcompcom"
+  },
+  {
+    "fields": {
       "jurisdiction": "FS",
       "end_date": null,
       "short_name": "Military Commission Review",
@@ -3706,6 +4176,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Maryland Attorney General Reports",
+      "citation_string": "Md. Att'y Gen.",
+      "in_use": true,
+      "url": "https://www.oag.state.md.us/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Maryland Attorney General Reports",
+      "position": 362.7,
+      "date_modified": "2016-05-18T20:08:32.128Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "mdag"
+  },
+  {
+    "fields": {
       "jurisdiction": "FB",
       "end_date": null,
       "short_name": "D. Maryland",
@@ -3718,7 +4207,9 @@
       "full_name": "United States Bankruptcy Court, D. Maryland",
       "position": 188.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 92,
+      "fjc_court_id": "16"
     },
     "model": "search.court",
     "pk": "mdb"
@@ -3756,7 +4247,9 @@
       "full_name": "District Court, D. Maryland",
       "position": 240.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 93,
+      "fjc_court_id": "16"
     },
     "model": "search.court",
     "pk": "mdd"
@@ -3794,7 +4287,9 @@
       "full_name": " United States Bankruptcy Court, D. Maine",
       "position": 188.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 90,
+      "fjc_court_id": "00"
     },
     "model": "search.court",
     "pk": "meb"
@@ -3813,7 +4308,9 @@
       "full_name": "District Court, D. Maine",
       "position": 239.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 91,
+      "fjc_court_id": "00"
     },
     "model": "search.court",
     "pk": "med"
@@ -3889,7 +4386,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Michigan",
       "position": 189.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 96,
+      "fjc_court_id": "45"
     },
     "model": "search.court",
     "pk": "mieb"
@@ -3908,7 +4407,9 @@
       "full_name": "District Court, E.D. Michigan",
       "position": 240.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 97,
+      "fjc_court_id": "45"
     },
     "model": "search.court",
     "pk": "mied"
@@ -4041,7 +4542,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Michigan",
       "position": 189.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 98,
+      "fjc_court_id": "46"
     },
     "model": "search.court",
     "pk": "miwb"
@@ -4060,7 +4563,9 @@
       "full_name": "District Court, W.D. Michigan",
       "position": 240.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 99,
+      "fjc_court_id": "46"
     },
     "model": "search.court",
     "pk": "miwd"
@@ -4079,7 +4584,9 @@
       "full_name": "United States Bankruptcy Court, D. Minnesota",
       "position": 189.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 100,
+      "fjc_court_id": "64"
     },
     "model": "search.court",
     "pk": "mnb"
@@ -4098,7 +4605,9 @@
       "full_name": "District Court, D. Minnesota",
       "position": 241.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 101,
+      "fjc_court_id": "64"
     },
     "model": "search.court",
     "pk": "mnd"
@@ -4135,6 +4644,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Missouri Attorney General Reports",
       "position": 366.06,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "moag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Missouri Attorney General Reports",
+      "citation_string": "Mo. Att'y Gen.",
+      "in_use": true,
+      "url": "https://www.ago.mo.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Missouri Attorney General Reports",
+      "position": 366.06,
+      "date_modified": "2016-05-18T20:09:20.073Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -4193,7 +4721,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Missouri",
       "position": 189.4,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 106,
+      "fjc_court_id": "65"
     },
     "model": "search.court",
     "pk": "moeb"
@@ -4212,7 +4742,9 @@
       "full_name": "District Court, E.D. Missouri",
       "position": 242.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 107,
+      "fjc_court_id": "65"
     },
     "model": "search.court",
     "pk": "moed"
@@ -4257,6 +4789,44 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Montana Attorney General Reports",
+      "citation_string": "Mont. Att'y Gen.",
+      "in_use": true,
+      "url": "https://dojmt.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Montana Attorney General Reports",
+      "position": 366.15,
+      "date_modified": "2016-05-18T20:16:36.397Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "montag"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SS",
+      "end_date": null,
+      "short_name": "Montana Tax Appeal Board",
+      "citation_string": "Mont.T.A.B.",
+      "in_use": true,
+      "url": "http://mtab.mt.gov/",
+      "notes": "Columbia",
+      "date_modified": "2016-06-29T18:20:40.217Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "Montana Tax Appeal Board",
+      "position": 366.12,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "monttc"
+  },
+  {
+    "fields": {
       "jurisdiction": "SS",
       "end_date": null,
       "short_name": "Montana Tax Appeal Board",
@@ -4288,7 +4858,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Missouri",
       "position": 189.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 108,
+      "fjc_court_id": "66"
     },
     "model": "search.court",
     "pk": "mowb"
@@ -4307,7 +4879,9 @@
       "full_name": "District Court, W.D. Missouri",
       "position": 242.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 109,
+      "fjc_court_id": "66"
     },
     "model": "search.court",
     "pk": "mowd"
@@ -4326,7 +4900,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Mississippi",
       "position": 189.34,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 102,
+      "fjc_court_id": "37"
     },
     "model": "search.court",
     "pk": "msnb"
@@ -4345,7 +4921,9 @@
       "full_name": "District Court, N.D. Mississippi",
       "position": 241.12,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 103,
+      "fjc_court_id": "37"
     },
     "model": "search.court",
     "pk": "msnd"
@@ -4383,7 +4961,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Mississippi",
       "position": 189.35,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 104,
+      "fjc_court_id": "38"
     },
     "model": "search.court",
     "pk": "mssb"
@@ -4402,7 +4982,9 @@
       "full_name": "District Court, S.D. Mississippi",
       "position": 241.15,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 105,
+      "fjc_court_id": "38"
     },
     "model": "search.court",
     "pk": "mssd"
@@ -4421,7 +5003,9 @@
       "full_name": "United States Bankruptcy Court, D. Montana",
       "position": 189.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 110,
+      "fjc_court_id": "77"
     },
     "model": "search.court",
     "pk": "mtb"
@@ -4440,7 +5024,9 @@
       "full_name": "District Court, D. Montana",
       "position": 242.19,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 111,
+      "fjc_court_id": "77"
     },
     "model": "search.court",
     "pk": "mtd"
@@ -4516,7 +5102,9 @@
       "full_name": "United States Bankruptcy Court, E.D. North Carolina",
       "position": 190.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 130,
+      "fjc_court_id": "17"
     },
     "model": "search.court",
     "pk": "nceb"
@@ -4535,7 +5123,9 @@
       "full_name": "District Court, E.D. North Carolina",
       "position": 245.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 131,
+      "fjc_court_id": "17"
     },
     "model": "search.court",
     "pk": "nced"
@@ -4554,7 +5144,9 @@
       "full_name": "United States Bankruptcy Court, M.D. North Carolina",
       "position": 190.4,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 132,
+      "fjc_court_id": "18"
     },
     "model": "search.court",
     "pk": "ncmb"
@@ -4573,7 +5165,9 @@
       "full_name": "District Court, M.D. North Carolina",
       "position": 245.15,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 133,
+      "fjc_court_id": "18"
     },
     "model": "search.court",
     "pk": "ncmd"
@@ -4599,6 +5193,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Superior Court of North Carolina",
+      "citation_string": "Sup. Ct. N.C.",
+      "in_use": true,
+      "url": "http://www.nccourts.org/Courts/Trial/Superior/",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Superior Court of North Carolina",
+      "position": 366.985,
+      "date_modified": "2016-05-18T19:06:55.615Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "ncsuperct"
+  },
+  {
+    "fields": {
       "jurisdiction": "FB",
       "end_date": null,
       "short_name": "W.D. North Carolina",
@@ -4611,7 +5224,9 @@
       "full_name": "United States Bankruptcy Court, W.D. North Carolina",
       "position": 190.45,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 134,
+      "fjc_court_id": "19"
     },
     "model": "search.court",
     "pk": "ncwb"
@@ -4630,7 +5245,9 @@
       "full_name": "District Court, W.D. North Carolina",
       "position": 245.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 135,
+      "fjc_court_id": "19"
     },
     "model": "search.court",
     "pk": "ncwd"
@@ -4648,6 +5265,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "North Carolina Industrial Commission",
       "position": 366.987,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "ncworkcompcom"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "North Carolina Industrial Commission",
+      "citation_string": "N.C. Indus. Comm.",
+      "in_use": true,
+      "url": "http://www.ic.nc.gov/",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "North Carolina Industrial Commission",
+      "position": 366.987,
+      "date_modified": "2016-05-18T19:09:13.453Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -4687,7 +5323,9 @@
       "full_name": " United States Bankruptcy Court, D. North Dakota",
       "position": 190.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 136,
+      "fjc_court_id": "68"
     },
     "model": "search.court",
     "pk": "ndb"
@@ -4725,7 +5363,9 @@
       "full_name": "District Court, D. North Dakota",
       "position": 245.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 137,
+      "fjc_court_id": "68"
     },
     "model": "search.court",
     "pk": "ndd"
@@ -4744,7 +5384,8 @@
       "full_name": "Nebraska Supreme Court",
       "position": 366.2,
       "has_opinion_scraper": true,
-      "start_date": "1854-01-01"
+      "start_date": "1854-01-01",
+      "fjc_court_id": "67"
     },
     "model": "search.court",
     "pk": "neb"
@@ -4762,6 +5403,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Nebraska Attorney General Reports",
       "position": 366.3,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "nebag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Nebraska Attorney General Reports",
+      "citation_string": "Neb. Att'y Gen.",
+      "in_use": true,
+      "url": "https://ago.nebraska.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Nebraska Attorney General Reports",
+      "position": 366.3,
+      "date_modified": "2016-05-18T20:10:01.050Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -4801,7 +5461,8 @@
       "full_name": "United States Bankruptcy Court, D. Nebraska",
       "position": 189.61,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 112
     },
     "model": "search.court",
     "pk": "nebraskab"
@@ -4820,7 +5481,9 @@
       "full_name": "District Court, D. Nebraska",
       "position": 242.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 113,
+      "fjc_court_id": "67"
     },
     "model": "search.court",
     "pk": "ned"
@@ -4877,7 +5540,9 @@
       "full_name": "United States Bankruptcy Court, D. New Hampshire",
       "position": 189.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 116,
+      "fjc_court_id": "02"
     },
     "model": "search.court",
     "pk": "nhb"
@@ -4896,7 +5561,9 @@
       "full_name": "District Court, D. New Hampshire",
       "position": 243.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 117,
+      "fjc_court_id": "02"
     },
     "model": "search.court",
     "pk": "nhd"
@@ -4934,7 +5601,9 @@
       "full_name": "United States Bankruptcy Court, D. New Jersey",
       "position": 189.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 118,
+      "fjc_court_id": "12"
     },
     "model": "search.court",
     "pk": "njb"
@@ -4960,6 +5629,25 @@
   },
   {
     "fields": {
+      "end_date": "1947-12-31",
+      "short_name": "New Jersey Court of Chancery",
+      "citation_string": "N.J. Ct. of Ch.",
+      "in_use": true,
+      "url": "http://www.nj.gov/state/archives/catsjchance.html",
+      "notes": "Another good source of information is https://familysearch.org/wiki/en/New_Jersey_Court_Records",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "New Jersey Court of Chancery",
+      "position": 366.8,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": "1684-01-01"
+    },
+    "model": "search.court",
+    "pk": "njch"
+  },
+  {
+    "fields": {
       "jurisdiction": "FD",
       "end_date": null,
       "short_name": "D. New Jersey",
@@ -4972,7 +5660,9 @@
       "full_name": "District Court, D. New Jersey",
       "position": 243.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 119,
+      "fjc_court_id": "12"
     },
     "model": "search.court",
     "pk": "njd"
@@ -5048,7 +5738,9 @@
       "full_name": "United States Bankruptcy Court, D. New Mexico",
       "position": 189.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 120,
+      "fjc_court_id": "84"
     },
     "model": "search.court",
     "pk": "nmb"
@@ -5105,7 +5797,9 @@
       "full_name": "District Court, D. New Mexico",
       "position": 243.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 121,
+      "fjc_court_id": "84"
     },
     "model": "search.court",
     "pk": "nmd"
@@ -5124,7 +5818,9 @@
       "full_name": "United States Bankruptcy Court, Northern Mariana Islands",
       "position": 199.65,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 138,
+      "fjc_court_id": "94"
     },
     "model": "search.court",
     "pk": "nmib"
@@ -5143,7 +5839,9 @@
       "full_name": "District Court, Northern Mariana Islands",
       "position": 299.4,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 139,
+      "fjc_court_id": "94"
     },
     "model": "search.court",
     "pk": "nmid"
@@ -5162,7 +5860,9 @@
       "full_name": "United States Bankruptcy Court, D. Nevada",
       "position": 189.65,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 114,
+      "fjc_court_id": "78"
     },
     "model": "search.court",
     "pk": "nvb"
@@ -5181,7 +5881,9 @@
       "full_name": "District Court, D. Nevada",
       "position": 242.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 115,
+      "fjc_court_id": "78"
     },
     "model": "search.court",
     "pk": "nvd"
@@ -5218,6 +5920,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "New York Attorney General Reports",
       "position": 366.968,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "nyag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "New York Attorney General Reports",
+      "citation_string": "N.Y. Att'y Gen.",
+      "in_use": true,
+      "url": "http://www.ag.ny.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "New York Attorney General Reports",
+      "position": 366.968,
+      "date_modified": "2016-05-18T20:10:41.828Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -5283,6 +6004,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Civil Court of the City of New York",
+      "citation_string": " N.Y. City Civ. Ct.",
+      "in_use": true,
+      "url": "https://www.nycourts.gov/COURTS/nyc/civil/index.shtml",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Civil Court of the City of New York",
+      "position": 366.967,
+      "date_modified": "2016-05-18T19:12:48.079Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "nycivct"
+  },
+  {
+    "fields": {
       "jurisdiction": "SS",
       "end_date": null,
       "short_name": "Criminal Court of the City of New York",
@@ -5294,6 +6034,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Criminal Court of the City of New York",
       "position": 366.9675,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "nycrimct"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Criminal Court of the City of New York",
+      "citation_string": "N.Y. City Crim. Ct.",
+      "in_use": true,
+      "url": "https://www.nycourts.gov/courts/nyc/criminal/",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Criminal Court of the City of New York",
+      "position": 366.9675,
+      "date_modified": "2016-05-18T19:14:24.089Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -5333,7 +6092,9 @@
       "full_name": "United States Bankruptcy Court, E.D. New York",
       "position": 190.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 122,
+      "fjc_court_id": "07"
     },
     "model": "search.court",
     "pk": "nyeb"
@@ -5352,7 +6113,9 @@
       "full_name": "District Court, E.D. New York",
       "position": 244.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 123,
+      "fjc_court_id": "07"
     },
     "model": "search.court",
     "pk": "nyed"
@@ -5390,7 +6153,9 @@
       "full_name": "United States Bankruptcy Court, N.D. New York",
       "position": 190.05,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 124,
+      "fjc_court_id": "06"
     },
     "model": "search.court",
     "pk": "nynb"
@@ -5409,7 +6174,9 @@
       "full_name": "District Court, N.D. New York",
       "position": 244.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 125,
+      "fjc_court_id": "06"
     },
     "model": "search.court",
     "pk": "nynd"
@@ -5428,7 +6195,9 @@
       "full_name": "United States Bankruptcy Court, S.D. New York",
       "position": 190.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 126,
+      "fjc_court_id": "08"
     },
     "model": "search.court",
     "pk": "nysb"
@@ -5447,7 +6216,9 @@
       "full_name": "District Court, S.D. New York",
       "position": 245.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 127,
+      "fjc_court_id": "08"
     },
     "model": "search.court",
     "pk": "nysd"
@@ -5504,7 +6275,9 @@
       "full_name": "United States Bankruptcy Court, W.D. New York",
       "position": 190.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 128,
+      "fjc_court_id": "09"
     },
     "model": "search.court",
     "pk": "nywb"
@@ -5523,7 +6296,9 @@
       "full_name": "District Court, W.D. New York",
       "position": 245.05,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 129,
+      "fjc_court_id": "09"
     },
     "model": "search.court",
     "pk": "nywd"
@@ -5618,7 +6393,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Ohio",
       "position": 190.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 140,
+      "fjc_court_id": "47"
     },
     "model": "search.court",
     "pk": "ohnb"
@@ -5637,7 +6414,9 @@
       "full_name": "District Court, N.D. Ohio",
       "position": 245.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 141,
+      "fjc_court_id": "47"
     },
     "model": "search.court",
     "pk": "ohnd"
@@ -5656,7 +6435,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Ohio",
       "position": 190.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 142,
+      "fjc_court_id": "48"
     },
     "model": "search.court",
     "pk": "ohsb"
@@ -5675,7 +6456,9 @@
       "full_name": "District Court, S.D. Ohio",
       "position": 245.91,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 143,
+      "fjc_court_id": "48"
     },
     "model": "search.court",
     "pk": "ohsd"
@@ -5694,7 +6477,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Oklahoma",
       "position": 191.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 144,
+      "fjc_court_id": "86"
     },
     "model": "search.court",
     "pk": "okeb"
@@ -5713,7 +6498,9 @@
       "full_name": "District Court, E.D. Oklahoma",
       "position": 245.95,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 145,
+      "fjc_court_id": "86"
     },
     "model": "search.court",
     "pk": "oked"
@@ -5846,7 +6633,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Oklahoma",
       "position": 192.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 146,
+      "fjc_court_id": "85"
     },
     "model": "search.court",
     "pk": "oknb"
@@ -5865,7 +6654,9 @@
       "full_name": "District Court, N.D. Oklahoma",
       "position": 245.99,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 147,
+      "fjc_court_id": "85"
     },
     "model": "search.court",
     "pk": "oknd"
@@ -5884,7 +6675,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Oklahoma",
       "position": 192.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 148,
+      "fjc_court_id": "87"
     },
     "model": "search.court",
     "pk": "okwb"
@@ -5903,7 +6696,9 @@
       "full_name": "District Court, W.D. Oklahoma",
       "position": 246.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 149,
+      "fjc_court_id": "87"
     },
     "model": "search.court",
     "pk": "okwd"
@@ -5941,7 +6736,9 @@
       "full_name": "United States Bankruptcy Court, D. Oregon",
       "position": 193.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 150,
+      "fjc_court_id": "79"
     },
     "model": "search.court",
     "pk": "orb"
@@ -5979,7 +6776,9 @@
       "full_name": "District Court, D. Oregon",
       "position": 247.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 151,
+      "fjc_court_id": "79"
     },
     "model": "search.court",
     "pk": "ord"
@@ -6016,6 +6815,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Oregon Tax Court",
       "position": 367.11,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "ortc"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Oregon Tax Court",
+      "citation_string": "Or. T.C.",
+      "in_use": true,
+      "url": "http://courts.oregon.gov/Tax/Pages/index.aspx",
+      "notes": "",
+      "jurisdiction": "SS",
+      "has_oral_argument_scraper": false,
+      "full_name": "Oregon Tax Court",
+      "position": 367.11,
+      "date_modified": "2016-05-18T19:29:41.433Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -6074,7 +6892,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Pennsylvania",
       "position": 193.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 152,
+      "fjc_court_id": "13"
     },
     "model": "search.court",
     "pk": "paeb"
@@ -6093,7 +6913,9 @@
       "full_name": "District Court, E.D. Pennsylvania",
       "position": 247.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 153,
+      "fjc_court_id": "13"
     },
     "model": "search.court",
     "pk": "paed"
@@ -6112,7 +6934,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Pennsylvania",
       "position": 193.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 154,
+      "fjc_court_id": "14"
     },
     "model": "search.court",
     "pk": "pamb"
@@ -6131,7 +6955,9 @@
       "full_name": "District Court, M.D. Pennsylvania",
       "position": 247.95,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 155,
+      "fjc_court_id": "14"
     },
     "model": "search.court",
     "pk": "pamd"
@@ -6169,7 +6995,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Pennsylvania",
       "position": 194.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 156,
+      "fjc_court_id": "15"
     },
     "model": "search.court",
     "pk": "pawb"
@@ -6188,7 +7016,9 @@
       "full_name": "District Court, W.D. Pennsylvania",
       "position": 248.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 157,
+      "fjc_court_id": "15"
     },
     "model": "search.court",
     "pk": "pawd"
@@ -6226,7 +7056,9 @@
       "full_name": "United States Bankruptcy Court, D. Puerto Rico",
       "position": 199.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 158,
+      "fjc_court_id": "04"
     },
     "model": "search.court",
     "pk": "prb"
@@ -6245,10 +7077,31 @@
       "full_name": "District Court, D. Puerto Rico",
       "position": 299.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 159,
+      "fjc_court_id": "04"
     },
     "model": "search.court",
     "pk": "prd"
+  },
+  {
+    "fields": {
+      "jurisdiction": "T",
+      "end_date": null,
+      "short_name": "PACER Training Site",
+      "citation_string": "Test.",
+      "in_use": false,
+      "url": "https://dcecf.psc.uscourts.gov/cgi-bin/ShowIndex.pl",
+      "notes": "",
+      "date_modified": "2016-04-30T00:11:51.389Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "U.S. DISTRICT COURT for the PACER Training Site",
+      "position": 999.1,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "psc"
   },
   {
     "fields": {
@@ -6321,7 +7174,9 @@
       "full_name": "United States Bankruptcy Court, D. Rhode Island",
       "position": 194.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 160,
+      "fjc_court_id": "03"
     },
     "model": "search.court",
     "pk": "rib"
@@ -6340,7 +7195,9 @@
       "full_name": "District Court, D. Rhode Island",
       "position": 248.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 161,
+      "fjc_court_id": "03"
     },
     "model": "search.court",
     "pk": "rid"
@@ -6358,6 +7215,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Superior Court of Rhode Island",
       "position": 367.35,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "risuperct"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Superior Court of Rhode Island",
+      "citation_string": "Sup. Ct. R.I.",
+      "in_use": true,
+      "url": "https://www.courts.ri.gov/Courts/SuperiorCourt/Pages/default.aspx",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Superior Court of Rhode Island",
+      "position": 367.35,
+      "date_modified": "2016-05-18T19:33:46.675Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -6397,7 +7273,9 @@
       "full_name": "United States Bankruptcy Court, D. South Carolina",
       "position": 194.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 162,
+      "fjc_court_id": "20"
     },
     "model": "search.court",
     "pk": "scb"
@@ -6435,7 +7313,9 @@
       "full_name": "District Court, D. South Carolina",
       "position": 248.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 163,
+      "fjc_court_id": "20"
     },
     "model": "search.court",
     "pk": "scd"
@@ -6492,7 +7372,9 @@
       "full_name": "United States Bankruptcy Court, D. South Dakota",
       "position": 194.85,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 164,
+      "fjc_court_id": "69"
     },
     "model": "search.court",
     "pk": "sdb"
@@ -6511,7 +7393,9 @@
       "full_name": "District Court, D. South Dakota",
       "position": 249.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 165,
+      "fjc_court_id": "69"
     },
     "model": "search.court",
     "pk": "sdd"
@@ -6572,6 +7456,25 @@
     },
     "model": "search.court",
     "pk": "stp"
+  },
+  {
+    "fields": {
+      "jurisdiction": "C",
+      "end_date": null,
+      "short_name": "Special Tribunals of Texas",
+      "citation_string": "Spec. Trib. of Tex.",
+      "in_use": true,
+      "url": "",
+      "notes": "Columbia",
+      "date_modified": "2016-06-29T17:11:46.596Z",
+      "has_oral_argument_scraper": false,
+      "full_name": "United States Special Tribunal of Texas",
+      "position": 451.5,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "sttex"
   },
   {
     "fields": {
@@ -6746,6 +7649,69 @@
   },
   {
     "fields": {
+      "end_date": "1809-12-31",
+      "short_name": "Tennessee Superior Court for Law and Equity",
+      "citation_string": "Tenn. Sup. Ct.",
+      "in_use": true,
+      "url": "https://familysearch.org/wiki/en/Tennessee_Court_Records",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Tennessee Superior Court for Law and Equity",
+      "position": 367.9,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": "1796-01-01"
+    },
+    "model": "search.court",
+    "pk": "tennsuperct"
+  },
+  {
+    "model": "search.court",
+    "pk": "tennworkcompapp",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2020-01-07T00:22:05.671Z",
+      "in_use": true,
+      "has_opinion_scraper": false,
+      "has_oral_argument_scraper": false,
+      "position": 367.851,
+      "citation_string": "",
+      "short_name": "Tennessee Workers' Comp. Appeals Board",
+      "full_name": "Tennessee Workers' Compensation Appeals Board",
+      "url": "https://www.tn.gov/workforce/injuries-at-work/bureau-services/bureau-services/appeals-board.html",
+      "start_date": "2013-01-01",
+      "end_date": null,
+      "jurisdiction": "SS",
+      "notes": ""
+    }
+  },
+  {
+    "model": "search.court",
+    "pk": "tennworkcompcl",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2020-01-07T00:22:01.984Z",
+      "in_use": true,
+      "has_opinion_scraper": false,
+      "has_oral_argument_scraper": false,
+      "position": 367.85,
+      "citation_string": "",
+      "short_name": "Tennessee Court of Workers' Comp. Claims",
+      "full_name": "Tennessee Court of Workers' Compensation Claims",
+      "url": "https://www.tn.gov/workforce/injuries-at-work/bureau-services/bureau-services/court-of-wc-claims.html",
+      "start_date": "2013-01-01",
+      "end_date": null,
+      "jurisdiction": "SS",
+      "notes": ""
+    }
+  },
+  {
+    "fields": {
       "jurisdiction": "T",
       "end_date": null,
       "short_name": "Testing Supreme Court",
@@ -6795,6 +7761,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Texas Attorney General Reports",
       "position": 368.6,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "texag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Texas Attorney General Reports",
+      "citation_string": "Tex. Att'y Gen.",
+      "in_use": true,
+      "url": "https://texasattorneygeneral.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Texas Attorney General Reports",
+      "position": 368.6,
+      "date_modified": "2016-05-18T20:12:57.644Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -6879,6 +7864,25 @@
   },
   {
     "fields": {
+      "end_date": null,
+      "short_name": "Texas Judicial Panel on Multidistrict Litigation",
+      "citation_string": "Tex. J.P.M.L.",
+      "in_use": true,
+      "url": "http://www.txcourts.gov/about-texas-courts/multi-district-litigation-panel.aspx",
+      "notes": "",
+      "jurisdiction": "SA",
+      "has_oral_argument_scraper": false,
+      "full_name": "Texas Judicial Panel on Multidistrict Litigation",
+      "position": 368.5,
+      "date_modified": "2016-06-18T20:01:59.649Z",
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "texjpml"
+  },
+  {
+    "fields": {
       "jurisdiction": "SS",
       "end_date": null,
       "short_name": "Texas Special Court of Review",
@@ -6910,7 +7914,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Tennessee",
       "position": 195.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 166,
+      "fjc_court_id": "49"
     },
     "model": "search.court",
     "pk": "tneb"
@@ -6929,7 +7935,9 @@
       "full_name": "District Court, E.D. Tennessee",
       "position": 249.6,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 167,
+      "fjc_court_id": "49"
     },
     "model": "search.court",
     "pk": "tned"
@@ -6948,7 +7956,9 @@
       "full_name": "United States Bankruptcy Court, M.D. Tennessee",
       "position": 195.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 168,
+      "fjc_court_id": "50"
     },
     "model": "search.court",
     "pk": "tnmb"
@@ -6967,7 +7977,9 @@
       "full_name": "District Court, M.D. Tennessee",
       "position": 249.7,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 169,
+      "fjc_court_id": "50"
     },
     "model": "search.court",
     "pk": "tnmd"
@@ -6986,7 +7998,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Tennessee",
       "position": 195.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 170,
+      "fjc_court_id": "51"
     },
     "model": "search.court",
     "pk": "tnwb"
@@ -7005,7 +8019,9 @@
       "full_name": "District Court, W.D. Tennessee",
       "position": 249.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 171,
+      "fjc_court_id": "51"
     },
     "model": "search.court",
     "pk": "tnwd"
@@ -7024,7 +8040,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Texas",
       "position": 196.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 174,
+      "fjc_court_id": "40"
     },
     "model": "search.court",
     "pk": "txeb"
@@ -7043,7 +8061,9 @@
       "full_name": "District Court, E.D. Texas",
       "position": 250.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 175,
+      "fjc_court_id": "40"
     },
     "model": "search.court",
     "pk": "txed"
@@ -7062,7 +8082,9 @@
       "full_name": "United States Bankruptcy Court, N.D. Texas",
       "position": 196.2,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 176,
+      "fjc_court_id": "39"
     },
     "model": "search.court",
     "pk": "txnb"
@@ -7081,7 +8103,9 @@
       "full_name": "District Court, N.D. Texas",
       "position": 250.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 177,
+      "fjc_court_id": "39"
     },
     "model": "search.court",
     "pk": "txnd"
@@ -7100,7 +8124,9 @@
       "full_name": "United States Bankruptcy Court, S.D. Texas",
       "position": 196.25,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 178,
+      "fjc_court_id": "41"
     },
     "model": "search.court",
     "pk": "txsb"
@@ -7119,7 +8145,9 @@
       "full_name": "District Court, S.D. Texas",
       "position": 250.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 179,
+      "fjc_court_id": "41"
     },
     "model": "search.court",
     "pk": "txsd"
@@ -7138,7 +8166,9 @@
       "full_name": "United States District Court, W.D. Texas",
       "position": 196.3,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 180,
+      "fjc_court_id": "42"
     },
     "model": "search.court",
     "pk": "txwb"
@@ -7157,7 +8187,9 @@
       "full_name": "District Court, W.D. Texas",
       "position": 251.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 181,
+      "fjc_court_id": "42"
     },
     "model": "search.court",
     "pk": "txwd"
@@ -7252,7 +8284,9 @@
       "full_name": "United States Bankruptcy Court, D. Utah",
       "position": 196.34,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 182,
+      "fjc_court_id": "88"
     },
     "model": "search.court",
     "pk": "utb"
@@ -7271,7 +8305,9 @@
       "full_name": "District Court, D. Utah",
       "position": 251.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 183,
+      "fjc_court_id": "88"
     },
     "model": "search.court",
     "pk": "utd"
@@ -7347,7 +8383,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Virginia",
       "position": 196.4,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 188,
+      "fjc_court_id": "22"
     },
     "model": "search.court",
     "pk": "vaeb"
@@ -7366,7 +8404,9 @@
       "full_name": "District Court, E.D. Virginia",
       "position": 279.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 189,
+      "fjc_court_id": "22"
     },
     "model": "search.court",
     "pk": "vaed"
@@ -7385,7 +8425,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Virginia",
       "position": 197.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 190,
+      "fjc_court_id": "23"
     },
     "model": "search.court",
     "pk": "vawb"
@@ -7404,7 +8446,9 @@
       "full_name": "District Court, W.D. Virginia",
       "position": 280.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 191,
+      "fjc_court_id": "23"
     },
     "model": "search.court",
     "pk": "vawd"
@@ -7423,7 +8467,9 @@
       "full_name": "United States Bankruptcy Court, D. Virgin Islands",
       "position": 199.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 192,
+      "fjc_court_id": "91"
     },
     "model": "search.court",
     "pk": "vib"
@@ -7442,7 +8488,9 @@
       "full_name": "District Court, Virgin Islands",
       "position": 299.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 193,
+      "fjc_court_id": "91"
     },
     "model": "search.court",
     "pk": "vid"
@@ -7480,7 +8528,9 @@
       "full_name": "United States Bankruptcy Court, D. Vermont",
       "position": 196.35,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 184,
+      "fjc_court_id": "10"
     },
     "model": "search.court",
     "pk": "vtb"
@@ -7499,7 +8549,9 @@
       "full_name": "District Court, D. Vermont",
       "position": 252.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 185,
+      "fjc_court_id": "10"
     },
     "model": "search.court",
     "pk": "vtd"
@@ -7518,7 +8570,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Washington",
       "position": 197.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 194,
+      "fjc_court_id": "80"
     },
     "model": "search.court",
     "pk": "waeb"
@@ -7537,7 +8591,9 @@
       "full_name": "District Court, E.D. Washington",
       "position": 289.0,
       "has_opinion_scraper": false,
-      "start_date": "1905-03-02"
+      "start_date": "1905-03-02",
+      "pacer_court_id": 195,
+      "fjc_court_id": "80"
     },
     "model": "search.court",
     "pk": "waed"
@@ -7574,6 +8630,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Washington Attorney General Reports",
       "position": 385.05,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "washag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Washington Attorney General Reports",
+      "citation_string": "Wash. Att'y Gen.",
+      "in_use": true,
+      "url": "http://www.atg.wa.gov/",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Washington Attorney General Reports",
+      "position": 385.05,
+      "date_modified": "2016-05-18T20:13:55.908Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -7632,7 +8707,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Washington",
       "position": 198.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 196,
+      "fjc_court_id": "81"
     },
     "model": "search.court",
     "pk": "wawb"
@@ -7651,7 +8728,9 @@
       "full_name": "District Court, W.D. Washington",
       "position": 290.0,
       "has_opinion_scraper": false,
-      "start_date": "1905-03-02"
+      "start_date": "1905-03-02",
+      "pacer_court_id": 197,
+      "fjc_court_id": "81"
     },
     "model": "search.court",
     "pk": "wawd"
@@ -7670,7 +8749,9 @@
       "full_name": "United States Bankruptcy Court, E.D. Wisconsin",
       "position": 199.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 202,
+      "fjc_court_id": "57"
     },
     "model": "search.court",
     "pk": "wieb"
@@ -7689,7 +8770,9 @@
       "full_name": "District Court, E.D. Wisconsin",
       "position": 297.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 203,
+      "fjc_court_id": "57"
     },
     "model": "search.court",
     "pk": "wied"
@@ -7726,6 +8809,25 @@
       "has_oral_argument_scraper": false,
       "full_name": "Wisconsin Attorney General Reports",
       "position": 388.0,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.court",
+    "pk": "wisag"
+  },
+  {
+    "fields": {
+      "end_date": null,
+      "short_name": "Wisconsin Attorney General Reports",
+      "citation_string": "Wis. Att'y Gen.",
+      "in_use": true,
+      "url": "https://docs.legis.wisconsin.gov/misc/oag",
+      "notes": "",
+      "jurisdiction": "SAG",
+      "has_oral_argument_scraper": false,
+      "full_name": "Wisconsin Attorney General Reports",
+      "position": 388.0,
+      "date_modified": "2016-05-18T20:15:10.051Z",
       "has_opinion_scraper": false,
       "start_date": null
     },
@@ -7784,7 +8886,9 @@
       "full_name": "United States Bankruptcy Court, W.D. Wisconsin",
       "position": 199.1,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 204,
+      "fjc_court_id": "58"
     },
     "model": "search.court",
     "pk": "wiwb"
@@ -7803,7 +8907,9 @@
       "full_name": "District Court, W.D. Wisconsin",
       "position": 298.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 205,
+      "fjc_court_id": "58"
     },
     "model": "search.court",
     "pk": "wiwd"
@@ -7860,7 +8966,9 @@
       "full_name": "United States District Court, N.D. West Virginia",
       "position": 198.8,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 198,
+      "fjc_court_id": "24"
     },
     "model": "search.court",
     "pk": "wvnb"
@@ -7879,7 +8987,9 @@
       "full_name": "District Court, N.D. West Virginia",
       "position": 294.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 199,
+      "fjc_court_id": "24"
     },
     "model": "search.court",
     "pk": "wvnd"
@@ -7898,7 +9008,9 @@
       "full_name": "United States Bankruptcy Court, S.D. West Virginia",
       "position": 198.9,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 200,
+      "fjc_court_id": "25"
     },
     "model": "search.court",
     "pk": "wvsb"
@@ -7917,7 +9029,9 @@
       "full_name": "District Court, S.D. West Virginia",
       "position": 295.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 201,
+      "fjc_court_id": "25"
     },
     "model": "search.court",
     "pk": "wvsd"
@@ -7936,7 +9050,9 @@
       "full_name": "United States Bankruptcy Court, D. Wyoming",
       "position": 199.5,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 206,
+      "fjc_court_id": "89"
     },
     "model": "search.court",
     "pk": "wyb"
@@ -7955,7 +9071,9 @@
       "full_name": "District Court, D. Wyoming",
       "position": 299.0,
       "has_opinion_scraper": false,
-      "start_date": null
+      "start_date": null,
+      "pacer_court_id": 207,
+      "fjc_court_id": "89"
     },
     "model": "search.court",
     "pk": "wyd"
