@@ -113,15 +113,16 @@
                       <p>Oops! Your browser does not support embedded PDF viewing.
                       </p>
                       <p>
-                        {% include "includes/rd_download_button.html" %}
+                        <div class="v-offset-below-1 v-offset-above-1">
+                          {% include "includes/rd_download_button.html" %}
+                        </div>
                       </p>
                     </div>
                   </div>
-
-
                 </object>
               </div>
             </div>
+
             <div role="tabpanel" class="tab-pane" id="text">
               {% if rd.ocr_status and rd.ocr_status != rd.OCR_UNNECESSARY %}
                 <div class="col-sm-12 alert-warning alert">
