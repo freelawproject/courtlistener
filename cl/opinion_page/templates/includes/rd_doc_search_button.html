@@ -1,0 +1,21 @@
+{% if rd.is_available %}
+<div class="btn-group">
+  <a href="/?type=r&amp;q=id%3A{{ rd.pk }}"
+     role="button"
+     class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this PDF
+  </a>
+  <button type="button"
+          class="btn btn-success dropdown-toggle"
+          data-toggle="dropdown"
+          aria-haspopup="true"
+          aria-expanded="false">
+    <span class="caret"></span>
+    <span class="sr-only">Toggle Dropdown</span>
+  </button>
+  <ul class="dropdown-menu">
+    <li>
+      <a href="/?type=r&amp;q=docket_id%3A{{ rd.docket_entry.docket.pk }}">Search full Docket</a>
+    </li>
+  </ul>
+</div>
+{% endif %}
