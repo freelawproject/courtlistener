@@ -1,17 +1,6 @@
 from django.contrib import admin
 
-from cl.lasc.models import (
-    Action,
-    CrossReference,
-    Docket,
-    DocumentFiled,
-    DocumentImage,
-    Party,
-    Proceeding,
-    QueuedCase,
-    QueuedPDF,
-    TentativeRuling,
-)
+from cl.lasc.models import Docket, DocumentFiled
 from cl.lib.admin import AdminTweaksMixin
 
 

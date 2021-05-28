@@ -33,7 +33,7 @@ from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
-from cl.lib.types import EmailType
+from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
@@ -76,7 +76,7 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_favorites(request: HttpRequest) -> HttpResponse:
+def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
     favorites = request.user.favorites.all().order_by("pk")
     favorite_forms = OrderedDict()
     favorite_forms["Dockets"] = []
@@ -144,13 +144,13 @@ def view_favorites(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_donations(request: HttpRequest) -> HttpResponse:
+def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(request, "profile/donations.html", {"private": True})
 
 
 @login_required
 @never_cache
-def view_visualizations(request: HttpRequest) -> HttpResponse:
+def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
     visualizations = (
         SCOTUSMap.objects.filter(user=request.user, deleted=False)
         .annotate(Count("clusters"))
@@ -173,7 +173,9 @@ def view_visualizations(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_deleted_visualizations(request: HttpRequest) -> HttpResponse:
+def view_deleted_visualizations(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
     thirty_days_ago = now() - timedelta(days=30)
     visualizations = (
         SCOTUSMap.objects.filter(
@@ -200,7 +202,7 @@ def view_deleted_visualizations(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_api(request: HttpRequest) -> HttpResponse:
+def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         instance = Webhook()
         form = WebhookForm(request.POST, instance=instance)
@@ -226,7 +228,7 @@ def view_api(request: HttpRequest) -> HttpResponse:
 )
 @login_required
 @never_cache
-def view_settings(request: HttpRequest) -> HttpResponse:
+def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     old_email = request.user.email  # this line has to be at the top to work.
     old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
@@ -299,7 +301,7 @@ def view_settings(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def delete_account(request: HttpRequest) -> HttpResponse:
+def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
             email: EmailType = emails["account_deleted"]
@@ -340,7 +342,7 @@ def delete_profile_done(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def take_out(request: HttpRequest) -> HttpResponse:
+def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         email: EmailType = emails["take_out_requested"]
         send_mail(
@@ -598,7 +600,7 @@ def email_confirm_success(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 @ratelimiter_unsafe_10_per_m
-def password_change(request: HttpRequest) -> HttpResponse:
+def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = CustomPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
