@@ -314,9 +314,9 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             request.user.alerts.all().delete()
             request.user.docket_alerts.all().delete()
             request.user.favorites.all().delete()
-            request.user.scotus_maps.all().update(
-                date_modified=now(), deleted=True
-            )
+            request.user.user_tags.all().delete()
+            request.user.monthly_donations.all().upate(enabled=False)
+            request.user.scotus_maps.all().update(deleted=True)
             user = convert_to_stub_account(request.user)
             update_session_auth_hash(request, user)
             logout(request)
