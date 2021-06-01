@@ -33,11 +33,19 @@ class FavoriteAdmin(admin.ModelAdmin):
 
 @admin.register(DocketTag)
 class DocketTagAdmin(admin.ModelAdmin):
-    raw_id_fields = ("docket",)
+    raw_id_fields = ("docket", "tag")
     list_display = (
         "id",
         "tag",
     )
 
 
-admin.site.register(UserTag)
+@admin.register(UserTag)
+class UserTagAdmin(admin.ModelAdmin):
+    raw_id_fields = ("user", "dockets")
+    readonly_fields = ("date_modified", "date_created")
+
+
+class UserTagInline(admin.StackedInline):
+    model = UserTag
+    extra = 0
