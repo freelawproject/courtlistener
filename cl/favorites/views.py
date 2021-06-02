@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.http import (
@@ -13,7 +14,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import FavoriteForm
-from cl.favorites.models import Favorite, UserTag
+from cl.favorites.models import DocketTag, Favorite, UserTag
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 
@@ -132,9 +133,40 @@ def view_tag(request, username, tag_name):
 
     # Calculate the total tag count (as we add more types of taggables, add
     # them here).
-    total_tag_count = tag.dockets.all().count()
+    enhanced_dockets = tag.dockets.all()
+    total_tag_count = len(enhanced_dockets)
+    for docket in enhanced_dockets:
+        docket.association_id = DocketTag.objects.get(
+            docket=docket, tag=tag
+        ).pk
+    requested_user = get_object_or_404(User, username=username)
+    is_page_owner = request.user == requested_user
+
     return render(
         request,
         "tag.html",
-        {"tag": tag, "total_tag_count": total_tag_count, "private": False},
+        {
+            "tag": tag,
+            "dockets": enhanced_dockets,
+            "total_tag_count": total_tag_count,
+            "private": False,
+            "is_page_owner": is_page_owner,
+        },
+    )
+
+
+def view_tags(request, username):
+    """Show the user their tags if they're looking at their own, or show the
+    public tags of somebody else.
+    """
+    requested_user = get_object_or_404(User, username=username)
+    is_page_owner = request.user == requested_user
+    return render(
+        request,
+        "tag_list.html",
+        {
+            "requested_user": requested_user,
+            "is_page_owner": is_page_owner,
+            "private": False,
+        },
     )

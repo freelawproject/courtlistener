@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load humanize %}
 {% load partition_util %}
 
@@ -82,7 +83,7 @@
     <p>To create a RECAP Alert, simply find the docket you are interested in following, and look for the button on the top that says, "<i class="fa fa-bell gray"></i> Get Alerts":
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}png/docket-alert-button.png"
+      <img src="{% static "png/docket-alert-button.png" %}"
            alt="screenshot of the enable button"
            class="img-responsive img-rounded shadow center-block"
            height="31"
@@ -93,8 +94,8 @@
     <p>Here's an example of what an email might look like:</p>
 
     <p class="v-offset-above-2">
-      <a href="{{ STATIC_PREFIX }}png/alert-example.png">
-        <img src="{{ STATIC_PREFIX }}png/alert-example.png"
+      <a href="{% static "png/alert-example.png" %}">
+        <img src="{% static "png/alert-example.png" %}"
              width="835"
              height="519"
              class="img-responsive img-rounded center-block shadow"
@@ -109,7 +110,7 @@
     <p>To disable an a RECAP Alert, simply pull up the docket you no longer are interested in, and press the button that says, "<i class="fa fa-bell-slash-o"></i> Disable Alerts":
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}png/docket-alert-disable-button.png"
+      <img src="{% static "png/docket-alert-disable-button.png" %}"
            alt="screenshot of the disable button"
            class="img-responsive img-rounded shadow center-block"
            height="31"
@@ -213,7 +214,7 @@
     <p>Creating a search alert is usually straightforward. Simply do a search in CourtListener's Opinion or Oral Argument sections and then click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}png/search-bar.png"
+      <img src="{% static "png/search-bar.png" %}"
            alt="screenshot of the search bar"
            class="img-responsive img-rounded shadow center-block"
            height="76"
@@ -222,7 +223,7 @@
     <p>After you click the bell icon (<i class="fa fa-bell-o gray"></i>) or the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button, you will see a pop-up like this, where you can see the filters applied to your alert, how many results it had over the past 100 days, and give it a name and frequency.
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}png/alert-modal.png"
+      <img src="{% static "png/alert-modal.png" %}"
            alt="screenshot of the create alert form"
            class="img-responsive img-rounded shadow center-block"
            height="873"
@@ -238,7 +239,7 @@
     <p>Real Time alerts are only available for supporters of Free Law Project that have donated at least ten dollars over the past year. If you see a message like the one below, you will <a href="{% url "donate" %}?referrer=alerts-help">need to donate</a> to enable Real Time alerts:
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}/png/real-time-donation-required.png"
+      <img src="{% static "png/real-time-donation-required.png" %}"
            alt="screenshot of the please donate for real time notification"
            class="img-responsive img-rounded shadow center-block"
            height="388"
@@ -268,7 +269,7 @@
     <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
     </p>
     <p>
-      <img src="{{ STATIC_PREFIX }}/png/citing-opinions.png"
+      <img src="{% static "png/citing-opinions.png" %}"
            alt="screenshot of the citing opinions sidebar"
            class="img-responsive img-rounded shadow center-block"
            width="241"
