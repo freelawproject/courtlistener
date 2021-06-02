@@ -2,7 +2,6 @@
 *
 
 # Except a few things...
-!requirements*.txt
 !.circleci
 !cl
 !poetry.lock

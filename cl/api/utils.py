@@ -170,9 +170,6 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
-SEND_API_WELCOME_EMAIL_COUNT = 5
-
-
 class LoggingMixin(object):
     """Log requests to Redis
 
@@ -274,14 +271,6 @@ class LoggingMixin(object):
                     description="User '%s' has placed their %s API request."
                     % (user.username, intcomma(ordinal(user_count))),
                     user=user,
-                )
-            if user_count == SEND_API_WELCOME_EMAIL_COUNT:
-                email: EmailType = emails["new_api_user"]
-                send_mail(
-                    email["subject"],
-                    email["body"] % user.first_name or "there",
-                    email["from_email"],
-                    [user.email],
                 )
 
 
@@ -385,6 +374,11 @@ class DisclosureAPIUsers(DjangoModelPermissions):
         "PATCH": ["%(app_label)s.has_disclosure_api_access"],
         "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
+
+
+class MediumAdjustablePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
 
 
 class BigPagination(PageNumberPagination):
@@ -666,41 +660,3 @@ def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
             if rows:
                 statuses[alias] = rows
     return statuses
-
-
-emails: Dict[str, EmailType] = {
-    "new_api_user": {
-        "subject": "Welcome to the CourtListener API from Free Law Project",
-        "body": (
-            "Hi %s,\n\n"
-            ""
-            "I'm Mike Lissner, the main guy behind CourtListener and Free "
-            "Law Project, the non-profit that runs it. I noticed that you "
-            "started using the API a bit today (we watch our logs closely "
-            "when it comes to the API!) and I just wanted to reach out, "
-            "say hello, and make sure that everything is working properly "
-            "and making sense.\n"
-            "\n"
-            "We've found that the API can be a bit complicated at first, "
-            "and that sometimes it helps to get a quick conversation "
-            "going when people are first exploring the APIs.\n"
-            "\n"
-            "To help with this, we operate a forum where you can post "
-            "questions and search past ones:\n"
-            "\n"
-            "   https://flp.discourse.group/c/api/5\n"
-            "\n"
-            "You should also feel free to respond to this email with any "
-            "questions that come up or comments that occur to you about the "
-            "API. I can usually respond pretty quickly to help out or address "
-            "issues.\n"
-            "\n"
-            "Enjoy the API and thanks for giving it a try!\n"
-            "\n"
-            "Mike Lissner\n"
-            "Founder, Free Law Project\n"
-            "https://www.courtlistener.com/donate/\n"
-        ),
-        "from_email": "Mike Lissner <mlissner@courtlistener.com>",
-    },
-}

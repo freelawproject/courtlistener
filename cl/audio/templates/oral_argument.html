@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load text_filters %}
 {% load admin_urls %}
+{% load static %}
 
 {% block title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Oral Argument for {{ title }} – CourtListener.com{% endblock %}
@@ -15,17 +16,17 @@
     <meta property="og:audio:secure_url" content="{{ af.local_path_mp3.url }}">
     <meta property="og:audio:type" content="audio/mp3">
 
-    <link type="text/css" href="{{ STATIC_URL }}skin/jplayer.blue.monday.css"
+    <link type="text/css" href="{% static "skin/jplayer.blue.monday.css" %}"
           rel="stylesheet"/>
 {% endblock %}
 
 {% block footer-scripts %}
   <script defer type="text/javascript"
-          src="{{ STATIC_URL }}js/jquery.NobleCount.min.js"></script>
+          src="{% static "js/jquery.NobleCount.min.js" %}"></script>
   <script defer type="text/javascript"
-          src="{{ STATIC_URL }}js/save-favorites.js?v=20200722"></script>
+          src="{% static "js/save-favorites.js" %}"></script>
   <script defer type="text/javascript"
-          src="{{ STATIC_URL }}js/jquery.jplayer.min.js"></script>
+          src="{% static "js/jquery.jplayer.min.js" %}"></script>
   <script type="text/javascript">
     $(document).ready(function () {
       $("#jquery_jplayer_1").jPlayer({
@@ -35,7 +36,7 @@
             mp3: "{{ af.local_path_mp3.url }}"
           });
         },
-        swfPath: "{{ STATIC_URL }}swf/Jplayer.swf"
+        swfPath: "{% static "swf/Jplayer.swf" %}"
       });
     });
   </script>

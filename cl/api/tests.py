@@ -18,12 +18,11 @@ from django.test import (
     TransactionTestCase,
     override_settings,
 )
-from django.test.testcases import SerializeMixin
 from django.urls import ResolverMatch, reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 
-from cl.api.utils import SEND_API_WELCOME_EMAIL_COUNT, BulkJsonHistory
+from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
 from cl.audio.models import Audio
@@ -262,16 +261,6 @@ class ApiEventCreationTestCase(TestCase):
         )
 
         view(request)
-
-    def test_is_the_welcome_email_sent(self) -> None:
-        """Do we send welcome emails for new API users?"""
-        # Create correct number of API requests
-        for _ in range(0, SEND_API_WELCOME_EMAIL_COUNT):
-            self.hit_the_api()
-
-        # Did the email get sent?
-        expected_email_count = 1
-        self.assertEqual(expected_email_count, len(mail.outbox))
 
     def test_are_events_created_properly(self) -> None:
         """Are event objects created as API requests are made?"""

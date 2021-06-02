@@ -1,11 +1,11 @@
 import itertools
 import os
 import uuid
-from typing import Optional
+from typing import Dict, Optional
 
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage, Storage
-from storages.backends.s3boto3 import S3Boto3Storage
+from storages.backends.s3boto3 import S3Boto3Storage, S3ManifestStaticStorage
 
 
 def clobbering_get_name(
@@ -81,6 +81,16 @@ class AWSMediaStorage(S3Boto3Storage):
     AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
 
+    def get_object_parameters(self, name: str) -> Dict[str, str]:
+        # Set extremely long caches b/c we hash our content anyway
+        # Expires is the old header, replaced by Cache-Control, but we can
+        # include them both for good measure.
+        params = self.object_parameters.copy()
+        params["CacheControl"] = "max-age=315360000"
+        # Use the date provided by nginx's Expires max parameter
+        params["Expires"] = "Thu, 31 Dec 2037 23:55:55 GMT"
+        return params
+
 
 class IncrementingAWSMediaStorage(AWSMediaStorage):
 
@@ -92,3 +102,7 @@ class IncrementingAWSMediaStorage(AWSMediaStorage):
         max_length: Optional[int] = None,
     ) -> str:
         return get_name_by_incrementing(self, name, max_length)
+
+
+class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
+    location = "static"

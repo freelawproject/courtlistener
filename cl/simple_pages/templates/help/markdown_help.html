@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Markdown Guide – CourtListener.com{% endblock %}
 {% block footer-scripts %}
@@ -278,14 +279,14 @@ The [Oyez Project][oyez] reported big news today on their blog:
         <p>Links to images are allowed, and can be used in two ways similar to the link formats. For example, you can either do:
         </p>
         <pre>
-![CourtListener Logo](https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png)</pre>
+![CourtListener Logo](https://www.courtlistener.com{%  static "png/logo.png" %})</pre>
         <p>Or you can do footnote-style images:</p>
         <pre>
 ![CourtListener Logo][logo]
 
-[logo]: https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png</pre>
+[logo]: https://www.courtlistener.com{%  static "png/logo.png" %}</pre>
         <p>Both of these would render as:</p>
-        <img src="{{ STATIC_PREFIX }}png/logo.png"
+        <img src="{% static "png/logo.png" %}"
              alt="CourtListener Logo"
              width="260"
              height="29">
@@ -295,12 +296,12 @@ The [Oyez Project][oyez] reported big news today on their blog:
         <pre>
 [![CourtListener Logo][logo]][cl]
 
-[logo]: https://www.courtlistener.com{{ STATIC_PREFIX }}png/logo.png
+[logo]: https://www.courtlistener.com{%  static "png/logo.png" %}
 [cl]: https://www.courtlistener.com/</pre>
 
         <p>Which looks the same as above, but takes you to the CourtListener homepage:</p>
         <p><a href="/"><img
-                src="{{ STATIC_PREFIX }}png/logo.png"
+                src="{% static "png/logo.png" %}"
                 alt="CourtListener Logo"
                 width="260"
                 height="29"/></a>
