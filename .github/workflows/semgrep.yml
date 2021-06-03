@@ -10,4 +10,7 @@ jobs:
         id: semgrep
         uses: returntocorp/semgrep-action@v1
         with:
-          config: p/r2c, p/django, r/python.requests.best-practice.use-timeout.use-timeout
+          config: >-
+            p/r2c
+            p/django
+            r/python.requests.best-practice.use-timeout.use-timeout
