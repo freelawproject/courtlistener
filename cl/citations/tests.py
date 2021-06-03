@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -18,7 +20,11 @@ from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
 )
-from cl.citations.match_citations import get_citation_matches, match_citation
+from cl.citations.match_citations import (
+    NO_MATCH_RESOURCE,
+    do_resolve_citations,
+    resolve_fullcase_citation,
+)
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionCluster, OpinionsCited
@@ -129,10 +135,11 @@ class CiteTest(TestCase):
              'Ibid.</span><pre class="inline"> Lorem ipsum dolor sit amet'
              '</pre>'),
 
-            # NonopinionCitation (currently nothing should happen here)
+            # NonopinionCitation
             ('Lorem ipsum dolor sit amet. U.S. Code §3617. Foo bar.',
-             '<pre class="inline">Lorem ipsum dolor sit amet. U.S. Code '
-             '§3617. Foo bar.</pre>'),
+             '<pre class="inline">Lorem ipsum dolor sit amet. U.S. Code </pre>'
+             '<span class="citation no-link">§3617.</span><pre class="inline">'
+             ' Foo bar.</pre>'),
         ]
 
         # fmt: on
@@ -145,10 +152,14 @@ class CiteTest(TestCase):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
                 citations = get_citations(opinion.cleaned_text)
-                created_html = create_cited_html(
-                    opinion=opinion,
-                    citations=citations,
-                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive.
+                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+
+                created_html = create_cited_html(opinion, citation_resolutions)
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -197,10 +208,14 @@ class CiteTest(TestCase):
                 opinion = Opinion(html=s)
                 get_and_clean_opinion_text(opinion)
                 citations = get_citations(opinion.cleaned_text)
-                created_html = create_cited_html(
-                    opinion=opinion,
-                    citations=citations,
-                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive.
+                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+
+                created_html = create_cited_html(opinion, citation_resolutions)
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -244,13 +259,19 @@ class CiteTest(TestCase):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
                 citations = get_citations(opinion.cleaned_text)
-                for c in citations:  # Fake correct matching for the citations
-                    c.match_url = "MATCH_URL"
-                    c.match_id = "MATCH_ID"
-                created_html = create_cited_html(
-                    opinion=opinion,
-                    citations=citations,
-                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive. Also make sure that the "matched" opinion is
+                # mocked appropriately.
+                opinion.pk = "MATCH_ID"
+                opinion.cluster = Mock(OpinionCluster(id=24601))
+                opinion.cluster.get_absolute_url.return_value = "MATCH_URL"
+                citation_resolutions = {opinion: citations}
+
+                created_html = create_cited_html(opinion, citation_resolutions)
+
                 self.assertEqual(
                     created_html,
                     expected_html,
@@ -269,256 +290,207 @@ class MatchingTest(IndexedSolrTestCase):
         """Tests whether different types of citations (i.e., full, short form,
         supra, id) resolve correctly to opinion matches.
         """
-        # fmt: off
-
         # Opinion fixture info:
         # pk=7 is mocked with name 'Foo v. Bar' and citation '1 U.S. 1'
         # pk=8 is mocked with name 'Qwerty v. Uiop' and citation '2 F.3d 2'
         # pk=9 is mocked with name 'Lorem v. Ipsum' and citation '1 U.S. 50'
         # pk=11 is mocked with name 'Abcdef v. Ipsum' and citation '1 U.S. 999'
+        opinion7 = Opinion.objects.get(pk=7)
+        opinion8 = Opinion.objects.get(pk=8)
+        opinion9 = Opinion.objects.get(pk=9)
+        opinion11 = Opinion.objects.get(pk=11)
+
+        full7 = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page="1",
+            canonical_reporter="U.S.",
+            court="scotus",
+            index=1,
+            reporter_found="U.S.",
+        )
+        full8 = case_citation(
+            volume="2",
+            reporter="F.3d",
+            page="2",
+            canonical_reporter="F.",
+            court="ca1",
+            index=1,
+            reporter_found="F.3d",
+        )
+        full9 = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page="50",
+            canonical_reporter="U.S.",
+            court="scotus",
+            index=1,
+            reporter_found="U.S.",
+        )
+        full11 = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page="999",
+            canonical_reporter="U.S.",
+            court="scotus",
+            index=1,
+            reporter_found="U.S.",
+        )
+        full_na = case_citation(
+            volume="1",
+            reporter="U.S.",
+            page="99",
+            canonical_reporter="U.S.",
+            court="scotus",
+            index=1,
+            reporter_found="U.S.",
+        )
+
+        supra7 = supra_citation(
+            index=1, antecedent_guess="Bar", pin_cite="99", volume="1"
+        )
+        supra9_or_11 = supra_citation(
+            index=1, antecedent_guess="Ipsum", pin_cite="99", volume="1"
+        )
+
+        short7 = case_citation(
+            reporter="U.S.",
+            page="99",
+            volume="1",
+            index=1,
+            antecedent_guess="Bar,",
+            short=True,
+        )
+        short7_or_9_tiebreaker = case_citation(
+            reporter="U.S.",
+            page="99",
+            volume="1",
+            index=1,
+            antecedent_guess="Bar",
+            short=True,
+        )
+        short7_or_9_bad_antecedent = case_citation(
+            reporter="U.S.",
+            page="99",
+            volume="1",
+            index=1,
+            antecedent_guess="somethingwrong",
+            short=True,
+        )
+        short9_or_11_common_antecedent = case_citation(
+            reporter="U.S.",
+            page="99",
+            volume="1",
+            index=1,
+            antecedent_guess="Ipsum",
+            short=True,
+        )
+        short_na = case_citation(
+            reporter="F.3d",
+            page="99",
+            volume="1",
+            index=1,
+            antecedent_guess="somethingwrong",
+            short=True,
+        )
+
+        id = id_citation(index=1)
+        non = nonopinion_citation(index=1, source_text="§99")
 
         test_pairs = [
             # Simple test for matching a single, full citation
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.')
-            ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            ([full7], {opinion7: [full7]}),
             # Test matching multiple full citations to different documents
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='2', reporter='F.3d', page='2',
-                              canonical_reporter='F.',
-                              court='ca1', index=1,
-                              reporter_found='F.3d')
-            ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=8)
-            ]),
-
+            ([full7, full8], {opinion7: [full7], opinion8: [full8]}),
+            # Test matching an unmatchacble full citation
+            ([full_na], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving a supra citation
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                supra_citation(index=1, antecedent_guess='Bar', pin_cite='99',
-                               volume='1')
-                ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=7)
-            ]),
-
+            ([full7, supra7], {opinion7: [full7, supra7]}),
             # Test resolving a supra citation when its antecedent guess matches
             # two possible candidates. We expect the supra citation to not
             # be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='50',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='1', reporter='U.S.', page='999',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                supra_citation(index=1, antecedent_guess='Ipsum', pin_cite='99',
-                               volume='1')
-                ], [
-                Opinion.objects.get(pk=9),
-                Opinion.objects.get(pk=11)
-            ]),
-
-            # Test resolving a supra citation when its antecedent guess is
-            # None. We it expect it not to be matched, but not to crash.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                supra_citation(index=1, antecedent_guess=None, pin_cite='99',
-                               volume='1')
-                ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            (
+                [full9, full11, supra9_or_11],
+                {opinion9: [full9], opinion11: [full11]},
+            ),
             # Test resolving a short form citation with a meaningful antecedent
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='U.S.', page='99', volume='1', index=1,
-                              antecedent_guess='Bar,', short=True)
-            ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=7)
-            ]),
-
+            ([full7, short7], {opinion7: [full7, short7]}),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates. We expect its antecedent
             # guess to provide the correct tiebreaker.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='1', reporter='U.S.', page='50',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='U.S.', page='99', volume='1', index=1,
-                              antecedent_guess='Bar', short=True)
-            ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=9),
-                Opinion.objects.get(pk=7)
-            ]),
-
+            (
+                [full7, full9, short7_or_9_tiebreaker],
+                {opinion7: [full7, short7_or_9_tiebreaker], opinion9: [full9]},
+            ),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates, and when it lacks a
             # meaningful antecedent.
             # We expect the short form citation to not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='1', reporter='U.S.', page='50',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='U.S.', page='99', volume='1', index=1,
-                              antecedent_guess='somethingwrong', short=True)
-            ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=9)
-            ]),
-
+            (
+                [full7, full9, short7_or_9_bad_antecedent],
+                {opinion7: [full7], opinion9: [full9]},
+            ),
             # Test resolving a short form citation when its reporter and
             # volume match two possible candidates, and when its antecedent
             # guess also matches multiple possibilities.
             # We expect the short form citation to not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='50',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='1', reporter='U.S.', page='999',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='U.S.', page='99', volume='1', index=1,
-                              antecedent_guess='Ipsum', short=True)
-            ], [
-                Opinion.objects.get(pk=9),
-                Opinion.objects.get(pk=11)
-            ]),
-
+            (
+                [full9, full11, short9_or_11_common_antecedent],
+                {opinion9: [full9], opinion11: [full11]},
+            ),
             # Test resolving a short form citation when its reporter and
             # volume are erroneous.
             # We expect the short form citation to not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='F.3d', page='99', volume='1', index=1,
-                              antecedent_guess='somethingwrong', short=True)
-            ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            ([full7, short_na], {opinion7: [full7]}),
             # Test resolving an Id. citation
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                id_citation(index=1)
-            ], [
-                Opinion.objects.get(pk=7),
-                Opinion.objects.get(pk=7)
-            ]),
-
+            ([full7, id], {opinion7: [full7, id]}),
             # Test resolving an Id. citation when the previous citation match
             # failed because there is no clear antecedent. We expect the Id.
             # citation to also not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(reporter='F.3d', page='99', volume='1', index=1,
-                              antecedent_guess='somethingwrong', short=True),
-                id_citation(index=1)
-            ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            (
+                [full7, short_na, id],
+                {opinion7: [full7]},
+            ),
             # Test resolving an Id. citation when the previous citation match
             # failed because a normal full citation lookup returned nothing.
-            # We expect the Id. citation to also not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                case_citation(volume='1', reporter='U.S.', page='99',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                id_citation(index=1)
-            ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            # We expect the Id. citation to be matched to the
+            # NO_MATCH_RESOURCE placeholder object.
+            (
+                [full7, full_na, id],
+                {opinion7: [full7], NO_MATCH_RESOURCE: [full_na, id]},
+            ),
             # Test resolving an Id. citation when the previous citation is to a
             # non-opinion document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
-            ([
-                case_citation(volume='1', reporter='U.S.', page='1',
-                              canonical_reporter='U.S.',
-                              court='scotus', index=1,
-                              reporter_found='U.S.'),
-                nonopinion_citation(index=1, source_text='§99'),
-                id_citation(index=1)
-            ], [
-                Opinion.objects.get(pk=7)
-            ]),
-
+            (
+                [full7, non, id],
+                {opinion7: [full7]},
+            ),
             # Test resolving an Id. citation when it is the first citation
             # found. Since there is nothing before it, we expect no matches to
             # be returned.
-            ([
-                id_citation(index=1)
-            ], [])
+            ([id], {}),
         ]
 
         # fmt: on
-        for citations, expected_matches in test_pairs:
+        for citations, expected_resolutions in test_pairs:
             with self.subTest(
                 "Testing citation matching for %s..." % citations,
                 citations=citations,
-                expected_matches=expected_matches,
+                expected_resolutions=expected_resolutions,
             ):
                 # The citing opinion does not matter for this test
                 citing_opinion = Opinion.objects.get(pk=1)
 
-                citation_matches = get_citation_matches(
-                    citing_opinion, citations
+                citation_resolutions = do_resolve_citations(
+                    citations, citing_opinion
                 )
+
                 self.assertEqual(
-                    citation_matches,
-                    expected_matches,
+                    citation_resolutions,
+                    expected_resolutions,
                     msg="\n%s\n\n    !=\n\n%s"
-                    % (citation_matches, expected_matches),
+                    % (citation_resolutions, expected_resolutions),
                 )
 
     def test_citation_matching_issue621(self) -> None:
@@ -526,8 +498,8 @@ class MatchingTest(IndexedSolrTestCase):
         # The fixture contains a reference to 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
         citation = get_citations(citation_str)[0]
-        results = match_citation(citation)
-        self.assertEqual([], results)
+        results = resolve_fullcase_citation(citation)
+        self.assertEqual(NO_MATCH_RESOURCE, results)
 
 
 class UpdateTest(IndexedSolrTestCase):
