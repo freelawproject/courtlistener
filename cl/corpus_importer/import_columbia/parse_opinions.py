@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # Functions to parse court data in XML format into a list of dictionaries.
 import os
 import re
