@@ -60,7 +60,7 @@ def make_dict_of_ftm_eids(use_pickle=True):
                 year=year,
             )
             logger.info("Getting url at: %s" % url)
-            data = requests.get(url).json()
+            data = requests.get(url, timeout=30).json()
 
             if data["records"] == ["No Records"]:
                 logger.info(
