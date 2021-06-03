@@ -616,7 +616,7 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
-@csrf_exempt
+@csrf_exempt  # nosemgrep
 def mailchimp_webhook(request: HttpRequest) -> HttpResponse:
     """Respond to changes to our mailing list"""
     logger.info("Got mailchimp webhook with %s method.", request.method)

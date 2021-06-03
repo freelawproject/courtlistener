@@ -203,7 +203,7 @@ def update_donation_for_event(
     return HttpResponse("<h1>200: OK</h1>")
 
 
-@csrf_exempt
+@csrf_exempt  # nosemgrep
 def process_stripe_callback(request: HttpRequest) -> HttpResponse:
     """Always return 200 message or else the webhook will try again ~200 times
     and then send us an email.
