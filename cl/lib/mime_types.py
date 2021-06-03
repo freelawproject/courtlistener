@@ -1,4 +1,3 @@
-# coding=utf8
 """
 Mime type lookup helpers
 """

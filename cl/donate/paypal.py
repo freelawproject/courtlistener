@@ -48,7 +48,7 @@ def get_paypal_access_token() -> str:
     return json.loads(r.content).get("access_token")
 
 
-@csrf_exempt
+@csrf_exempt  # nosemgrep
 def process_paypal_callback(request: HttpRequest) -> HttpResponse:
     """Process the GET request that PayPal uses.
 

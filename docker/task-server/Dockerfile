@@ -19,4 +19,3 @@ CMD celery \
     --concurrency=4 \
     --pool=prefork \
     --queues=io_bound,celery
-
