@@ -10,5 +10,3 @@ DATABASES['default']['HOST'] = ''
 # Dev machines are unlikely to need to tinker with these.
 MEDIA_ROOT = '/sata/'
 BULK_DATA_DIR = '/sata/bulk-data/'
-
-

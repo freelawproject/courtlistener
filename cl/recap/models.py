@@ -91,6 +91,8 @@ class PROCESSING_STATUS:
 
 
 class ProcessingQueue(AbstractDateTimeModel):
+    """Where we store each RECAP upload."""
+
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",

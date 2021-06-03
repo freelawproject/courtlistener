@@ -100,6 +100,10 @@ class DocketAlert(models.Model):
 
 
 class DocketSubscription(AbstractDateTimeModel):
+    """A table of subscriptions so users can get emails when recap.email gets
+    emails.
+    """
+
     date_last_hit = models.DateTimeField(
         help_text="The last date on which an email was received for the case.",
         blank=True,

@@ -5,7 +5,7 @@ DeGraff v. Burnett (2006-266)
 [Filed 31-Aug-2007]
 
   NOTICE:  This opinion is subject to motions for reargument under V.R.A.P.
-  40 as well as formal revision before publication in the Vermont Reports. 
+  40 as well as formal revision before publication in the Vermont Reports.
   Readers are requested to notify the Reporter of Decisions, Vermont Supreme
   Court, 109 State Street, Montpelier, Vermont 05609-0801 of any errors in
   order that corrections may be made before this opinion goes to press.
@@ -17,10 +17,10 @@ DeGraff v. Burnett (2006-266)
 
 
   Danny L. DeGraff, Nancy R. DeGraff             Supreme Court
-  and MBS Hardware & Lumber, Inc. d/b/a 
+  and MBS Hardware & Lumber, Inc. d/b/a
   Milton Hardware Supply                        On Appeal from
                                                 Chittenden Superior Court
-      v.  
+      v.
 
   Norman Burnett                                March Term, 2007
 
@@ -44,7 +44,7 @@ DeGraff v. Burnett (2006-266)
   for garage space and storage of lumber.  Plaintiffs argue that the trial
   court erred in: (1) interpreting their deed; (2) denying their claim for
   damages; and (3) denying their request for a jury trial.  We affirm.
-   
+
        ¶  2.  Plaintiffs and defendant own adjoining commercial lots in
   Milton, Vermont.  Plaintiffs purchased their lot, Lot 5, in 1990 from
   William and Lois Warren.  Lot 5 has westerly frontage on Route 7, and
@@ -55,13 +55,13 @@ DeGraff v. Burnett (2006-266)
 
        ¶  3.  Plaintiffs' deed contained two express easements.  The first,
   at issue in this appeal,  burdened an adjacent lot, Lot 3, then owned by
-  the Warrens and now owned by defendant.  The deed specifically provided: 
+  the Warrens and now owned by defendant.  The deed specifically provided:
 
      The property herein conveyed has the benefit of an easement across
     the northerly boundary of Lot 3 as depicted on said plan, for the
     purpose of storing lumber and garage space for the lumber business
     located on Lot 5.  This easement is 27 feet in width at its widest
-    point, extending southerly from the southeasterly corner of Lot 5. 
+    point, extending southerly from the southeasterly corner of Lot 5.
     The easement area follows an existing fence line.
 
   Plaintiffs were also granted a right of "ingress and egress" across the
@@ -72,18 +72,18 @@ DeGraff v. Burnett (2006-266)
   is made that the size and exact location of said easement are as shown on
   any survey plans."  Lot 3 is shaped "like a square with a tail."  It fronts
   TH 47 on the east, Lot 5 on the north, and Lot 7 on the west.  Lot 3 does
-  not extend to Route 7, and it is only half as long as Lot 5. 
-   
+  not extend to Route 7, and it is only half as long as Lot 5.
+
        ¶  5.  At about the time that defendant took possession of Lot 3 in
   2002, plaintiffs made improvements to the easement property.  They built up
   the easement path with gravel to accommodate large delivery trucks,
-  extended the existing fence line, and put a gate at the entrance to TH 47. 
-  Shortly thereafter, defendant removed the gate, the gravel, and the fence. 
+  extended the existing fence line, and put a gate at the entrance to TH 47.
+  Shortly thereafter, defendant removed the gate, the gravel, and the fence.
   Plaintiffs then filed a quiet-title action and a claim for damages, seeking
   to clarify the boundaries of their easement, receive compensation for the
   destruction of their improvements, and resume their asserted use of the
   easement as an access point for trucks delivering lumber and other
-  merchandise. 
+  merchandise.
 
        ¶  6.  In October 2002, defendant moved for partial summary judgment,
   arguing that plaintiffs' deed was unambiguous in its description of two
@@ -95,10 +95,10 @@ DeGraff v. Burnett (2006-266)
   5, not twenty-seven feet as set forth in the deed.  According to
   plaintiffs, they were entitled to the wider easement despite the reference
   to the twenty-seven-foot  width because the fence line, as a monument,
-  controlled over the metes-and-bounds description as a matter of law. 
+  controlled over the metes-and-bounds description as a matter of law.
   Plaintiffs also argued that their easement necessarily included a right of
   ingress and egress from TH 47.
-   
+
        ¶  7.  In an April 2003 order, Judge Dennis Pearson denied both
   motions.  He found defendant's motion inadequately supported and concluded,
   as to plaintiffs' request, that extrinsic evidence would be needed to
@@ -124,7 +124,7 @@ DeGraff v. Burnett (2006-266)
   and inconsistent with the express deed language.  Defendant, on the other
   hand, argued that the easement was twenty-seven feet at its widest point,
   as described in the deed, and its southerly boundary ran from that point
-  parallel to the fence line.  
+  parallel to the fence line.
 
        ¶  9.  The court found both interpretations plausible given the
   imprecise phrase, "follows an existing fence line."  Moreover, the court
@@ -134,8 +134,8 @@ DeGraff v. Burnett (2006-266)
   plaintiffs, that "in [any] conflict between courses and distances, and
   known boundaries and monuments, courses and distances must yield."  In any
   event, the court concluded, disputed issues of material fact precluded
-  entry of judgment in plaintiffs' favor. 
-   
+  entry of judgment in plaintiffs' favor.
+
        ¶  10.  After a three-day trial before Judge Richard Norton, the court
   issued its final order, which relied upon and partially incorporated Judge
   Pearson's order denying summary judgment.  The court explained that, in
@@ -143,7 +143,7 @@ DeGraff v. Burnett (2006-266)
   to establish the easement with precision, including the circumstances
   surrounding contract formation as well as hearsay statements from the
   grantor regarding the easement's boundaries.(FN1)  It ultimately adopted
-  defendant's proposed construction of the deed.  
+  defendant's proposed construction of the deed.
 
        ¶  11.  In reaching its conclusion, the court was unpersuaded by the
   extrinsic evidence offered by plaintiffs.  Plaintiff Danny DeGraff
@@ -153,17 +153,17 @@ DeGraff v. Burnett (2006-266)
   provided that the easement was twenty-seven feet at its widest point,
   extending southerly from the southeasterly corner of Lot 5, and neither Mr.
   DeGraff nor Mr. Warren's former wife, Lois Strong, could explain why or how
-  the explicit twenty-seven-foot measurement was inserted into the deed. 
+  the explicit twenty-seven-foot measurement was inserted into the deed.
 
        ¶  12.  While a 1998 survey map depicted plaintiffs' easement as
   extending sixty-five-feet at its base, the map contained a disclaimer
   indicating that it depicted the easement as it appeared on the ground in
-  1998 when plaintiffs were admittedly occupying the entire area in question. 
+  1998 when plaintiffs were admittedly occupying the entire area in question.
   Given this, as well as the surveyor's testimony that his map was not
   conclusive on the width of the easement, the court found that the survey
   map did not represent what the easement should be under the terms of the
-  deed.   
-   
+  deed.
+
        ¶  13.  In contrast, the court found that defendant produced evidence
   to credibly support his assertion that Mr. Warren told him that the
   sixty-five-foot easement boundary depicted on the 1998  survey map
@@ -173,16 +173,16 @@ DeGraff v. Burnett (2006-266)
   existing fence was not a boundary line but rather, plaintiffs' easement ran
   twenty-seven feet south from a pin near a mailbox on the road, and this
   measurement was reflected in plaintiffs' deed.  The court found Mr. Jagraw
-  persuasive and credible, and it adopted his testimony as factual. 
+  persuasive and credible, and it adopted his testimony as factual.
 
        ¶  14.  The court also credited the testimony of David Bowers, an
   individual who had extensive experience with maps and surveying.  Mr.
   Bowers testified that he laid out the easement's boundaries, starting from
-  a pin that marked the southeast corner of Lot 5, proceeding twenty-seven 
+  a pin that marked the southeast corner of Lot 5, proceeding twenty-seven
   feet southerly, and then proceeding along the existing fence line
   approximately ninety feet.  The court found Mr. Bowers's testimony
   compelling and his findings conclusive on the measure and nature of the
-  easement.  
+  easement.
 
        ¶  15.  In light of this and other evidence supporting the
   twenty-seven-foot measurement, the court concluded that the phrase "follows
@@ -197,13 +197,13 @@ DeGraff v. Burnett (2006-266)
   than that of other witnesses because it was essentially self-serving.  The
   court also found Mr. Warren's hearsay statement more credible in that it
   explained the existence of the twenty-seven-foot language in plaintiffs'
-  deed.  
-   
+  deed.
+
        ¶  16.  The court thus concluded that the easement area was that
   described by Mr. Bowers above - a triangular area, twenty-seven feet at its
   base, that followed a line parallel to the fence line, which was consistent
   with the deed language.  In this respect, the court explained, it accepted
-  Mr. DeGraff's argument that the fence line was a monument in the deed. 
+  Mr. DeGraff's argument that the fence line was a monument in the deed.
   But, the court concluded, the monument marked the direction of the easement
   rather than its boundary.  Therefore, it did not control over the clear
   metes-and-bounds description but rather informed the direction of that
@@ -217,16 +217,16 @@ DeGraff v. Burnett (2006-266)
   plaintiffs' mixed use inconsistent with the language of the deed, which
   gave them only a right to store lumber and use the easement for garage
   services.  None of the evidence offered supported use of this easement as
-  an ingress/egress or otherwise as an access point to the rear of Lot 5. 
+  an ingress/egress or otherwise as an access point to the rear of Lot 5.
   Thus, because such use was unsupported by either the language of the deed
   or the evidence of its meaning, the court concluded that it could not be
   continued.  The court also rejected plaintiffs' claim for damages arising
   from the loss of the gate or any structures on the encroached area.  This
-  appeal followed. 
-   
+  appeal followed.
+
        ¶  18.  Plaintiffs argue that the court erred in interpreting the
   terms of their deed.  They first assert that the deed is unambiguous and
-  that no extrinsic evidence was required to ascertain the parties' intent. 
+  that no extrinsic evidence was required to ascertain the parties' intent.
   According to plaintiffs, the phrase "follows an existing fence line" can
   mean only that the fence line itself is the boundary, and any discrepancy
   between the twenty-seven-foot measurement and the fence line must be
@@ -235,12 +235,12 @@ DeGraff v. Burnett (2006-266)
   beyond the parties' intent at the time of conveyance and engaging in a
   "general survey" of the situation.  They also assert that the court
   committed reversible error by excluding certain evidence relevant to the
-  parties' intent. 
+  parties' intent.
 
        ¶  19.  We find no error.  As discussed below, we conclude that the
   trial court properly considered extrinsic evidence to resolve ambiguities
   in the deed, and its findings regarding the parties' intent are supported
-  by the record.   
+  by the record.
 
        ¶  20.  Our master rule in construing a deed is that "the intent of
   the parties governs."  Main St. Landing, LLC v. Lake St. Ass'n, Inc., 2006
@@ -256,21 +256,21 @@ DeGraff v. Burnett (2006-266)
   however, the "interpretation of the parties' intent becomes a question of
   fact to be determined based on all of the evidence - not only the language
   of the written instrument, but also evidence concerning its subject matter,
-  its purpose at the time it was executed, and the situation of the parties." 
-  Id. (citation omitted).  
-   
+  its purpose at the time it was executed, and the situation of the parties."
+  Id. (citation omitted).
+
        ¶  21.  We begin with the easement's location.  The deed provides that
   the easement "is 27 feet in width at its widest point, extending southerly
   from the southeasterly corner of Lot 5.  The easement area follows an
   existing fence line."  As the trial court found, this description is
-  ambiguous.  See id. (Supreme Court reviews finding of ambiguity de novo). 
+  ambiguous.  See id. (Supreme Court reviews finding of ambiguity de novo).
   It could be read to mean that the easement area extended to the fence line
   itself, although this would contradict an express term in the deed.  It
   could also mean that the easement extended twenty-seven feet from the
-  southwest corner and then ran in a line parallel to the fence line. 
+  southwest corner and then ran in a line parallel to the fence line.
   Plaintiffs rely heavily on dictionary definitions of the term "follows,"
   yet in the context of the writing above, the phrase "follows an existing
-  fence line" is imprecise and capable of more than one reasonable meaning. 
+  fence line" is imprecise and capable of more than one reasonable meaning.
 
        ¶  22.  Given that the deed's reference to an alleged monument was
   itself ambiguous, the rule of construction urged by plaintiffs does not
@@ -280,7 +280,7 @@ DeGraff v. Burnett (2006-266)
   because it is more likely that there would be a mistake or misunderstanding
   about the course or distance than about the boundary or monument).  Indeed,
   as the trial court noted in its initial ruling, the two references do not
-  necessarily conflict, and they can in fact be harmonized. 
+  necessarily conflict, and they can in fact be harmonized.
 
        ¶  23.  Because the deed was ambiguous, the court properly considered
   extrinsic evidence to discern the parties' intent.  See Kipp v. Estate of
@@ -296,8 +296,8 @@ DeGraff v. Burnett (2006-266)
   Warren intended to convey an easement twenty-seven-feet wide at its base,
   which was consistent with the language of the deed.  The court was not
   obligated to accept the evidence offered by plaintiffs regarding the
-  parties' intent. 
-   
+  parties' intent.
+
        ¶  24.  Plaintiffs assert that the court should not have considered
   evidence that did not directly relate to the intent of the grantors at the
   time of the conveyance to plaintiffs.  In fact, defendant's evidence did go
@@ -310,7 +310,7 @@ DeGraff v. Burnett (2006-266)
   804(b)(4)(C) (out-of-court statements from unavailable witness as to
   boundaries of land admissible as exception to hearsay rule).  The weight to
   be accorded the evidence must be determined by the trial court, not this
-  Court. 
+  Court.
 
        ¶  25.  Based on the evidence presented, the court's conclusion that
   the phrase "follows the existing fence line" must mean "running in a line
@@ -332,7 +332,7 @@ DeGraff v. Burnett (2006-266)
   evidence in the record to support them).  We will not reweigh the evidence
   on appeal.  The court did not err in determining the easement's
   location.(FN2)
-    
+
        ¶  26.  Turning to the allowed use, we reject plaintiffs' contention
   that a right of ingress and egress was "implicit and consistent with" the
   intended use of their easement.  The permissible extent of the use of the
@@ -346,8 +346,8 @@ DeGraff v. Burnett (2006-266)
   the plain language of the parties' agreement.  See Kipp, 169 Vt. at 107,
   732 A.2d at 131 ("[W]hen looking at particular language in a deed, the
   court must accept the plain meaning of the language and not look to
-  construction aids if the language is not ambiguous.").  
-   
+  construction aids if the language is not ambiguous.").
+
        ¶  27.  Next, we consider and reject plaintiffs' contention that we
   should reverse the court's judgment because it improperly excluded part of
   plaintiffs' evidence on the intent of their grantors in conveying the
@@ -358,19 +358,19 @@ DeGraff v. Burnett (2006-266)
   court's theory of merger was correct, plaintiffs fail to demonstrate that
   they suffered any harm from the exclusion of this evidence.  See V.R.C.P.
   61 (Court will disregard errors that do not affect parties' substantial
-  rights).  
+  rights).
 
        ¶  28.  As we have noted, Rule 61 "requires examination of just how
   the court's ruling affected the rights of the plaintiffs, not merely
   procedurally, but in matters truly of substance."  Ordinetz v. Springfield
   Family Ctr., 142 Vt. 466, 470, 457 A.2d 282, 284 (1983).  The record shows
   that, despite the rulings that plaintiffs identify, all of the witnesses
-  plaintiffs mention testified to the intent underlying plaintiffs' deed. 
+  plaintiffs mention testified to the intent underlying plaintiffs' deed.
   The court was unpersuaded by this evidence, finding that plaintiffs failed
   to explain why the grantors had included a specific twenty-seven-foot
   measurement in the deed.  It is difficult to see how any additional
   evidence on this issue would have led to a different outcome.  Nonetheless,
-  we briefly address plaintiffs' specific claims of evidentiary error.  
+  we briefly address plaintiffs' specific claims of evidentiary error.
 
        ¶  29.  The record shows that when Mr. DeGraff started to explain why
   Mr. Warren might have intended to grant a wider easement - one that would
@@ -380,8 +380,8 @@ DeGraff v. Burnett (2006-266)
   had used this access point in the past and why allowing such highway access
   made sense for the lumber operation on Lot 5.  In light of this testimony,
   as well as Mr. DeGraff's additional statements regarding intent, any error
-  in the court's ruling was harmless. 
-   
+  in the court's ruling was harmless.
+
        ¶  30.  Ms. Strong testified that she and Mr. Warren intended to
   convey plaintiffs an easement "[r]ight up to the fence line."  As with Mr.
   DeGraff, when Ms. Strong was asked about the purpose of the easement, the
@@ -389,7 +389,7 @@ DeGraff v. Burnett (2006-266)
   easement was unambiguously and specifically stated in the deed.  The court
   did not commit reversible error in so ruling.  See Kipp, 169 Vt. at 107,
   732 A.2d at 131 (extrinsic evidence may not be used to vary the terms of an
-  unambiguous writing).    
+  unambiguous writing).
 
        ¶  31.  Roger Kohn, the attorney who drafted plaintiffs' 1990 deed for
   Mr. Warren, also testified.  Although the trial court indicated that it was
@@ -405,7 +405,7 @@ DeGraff v. Burnett (2006-266)
   testimony, we fail to see how plaintiffs were harmed by the court's initial
   ruling.  The exclusion of Mr. Bowers' testimony, cited by plaintiffs, was
   equally harmless.
-   
+
        ¶  32.  We similarly reject plaintiffs' general challenge to Mr.
   Bowers' testimony.  Plaintiffs assert that Mr. Bowers was never properly
   qualified as an expert witness, they had a continuing objection to his
@@ -442,17 +442,17 @@ DeGraff v. Burnett (2006-266)
   Restatement (Second) of Torts § 158 (1965).  It appears that plaintiffs
   made at least some of these improvements after it had become clear that the
   boundaries of the easement were disputed.  Under these circumstances, they
-  are not entitled to a remedy. 
+  are not entitled to a remedy.
 
        ¶  35.  Finally, plaintiffs argue that the trial court erred in
   denying their renewed request for a jury trial.  They maintain that they
   did not waive their right to a jury trial "in open court" as required for
   an oral waiver by V.R.C.P. 39(a)(1).  This assertion is belied by the video
   recording from the trial court, which unquestionably shows that the waiver
-  took place in open court on the record. 
-        
+  took place in open court on the record.
+
        Affirmed.
-       
+
 
                                        FOR THE COURT:
 
@@ -476,9 +476,6 @@ FN2.  In their reply brief, plaintiffs assert for the first time on appeal
   states that "[s]eller to convey easements in the Warranty Deed to Purchaser
   for . . . [y]ard fence which presently encroaches upon Lot 3."  Yet, as the
   trial court found, the Warrens did not convey an easement for the yard
-  fence to plaintiffs in the warranty deed.  Again, we emphasize that the 
+  fence to plaintiffs in the warranty deed.  Again, we emphasize that the
   weight to be assigned to the conflicting evidence is for the trial court to
   determine.
-
-
-

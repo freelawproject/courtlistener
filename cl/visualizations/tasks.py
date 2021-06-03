@@ -54,6 +54,7 @@ def get_title(self, referer_id):
             referer.url,
             headers={"User-Agent": "CourtListener"},
             verify=False,  # Integrity of a referer's referent is not important.
+            timeout=30,
         )
     except MissingSchema:
         return

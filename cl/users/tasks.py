@@ -42,6 +42,7 @@ def subscribe_to_mailchimp(self, email):
             headers={
                 "Authorization": "apikey %s" % settings.MAILCHIMP_API_KEY
             },
+            timeout=30,
         )
     except requests.RequestException as exc:
         abort_or_retry(self, exc)
@@ -82,6 +83,7 @@ def update_mailchimp(self, email, status):
             headers={
                 "Authorization": "apikey %s" % settings.MAILCHIMP_API_KEY
             },
+            timeout=30,
         )
     except requests.RequestException as exc:
         abort_or_retry(self, exc)

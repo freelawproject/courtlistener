@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import calendar
 import re
 import string

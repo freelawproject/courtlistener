@@ -24,7 +24,7 @@ def swap_solr_core(
         "core": current_core,
         "other": desired_core,
     }
-    r = requests.get("%s/solr/admin/cores" % url, params=params)
+    r = requests.get("%s/solr/admin/cores" % url, params=params, timeout=30)
     if r.status_code != 200:
         print(
             "Problem swapping cores. Got status_code of %s. "

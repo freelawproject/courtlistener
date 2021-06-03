@@ -34,6 +34,7 @@ class Command(VerboseCommand):
                 % (settings.IA_ACCESS_KEY, settings.IA_SECRET_KEY),
                 "x-archive-cascade-delete": "1",
             },
+            timeout=60,
         )
         if r.ok:
             print("Item deleted successfully")
