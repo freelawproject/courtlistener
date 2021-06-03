@@ -34,6 +34,7 @@ def get_paypal_access_token() -> str:
         headers={"Accept": "application/json", "Accept-Language": "en_US"},
         auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_KEY),
         data={"grant_type": "client_credentials"},
+        timeout=30,
     )
     if r.status_code == HTTP_200_OK:
         logger.info("Got paypal token successfully.")
@@ -76,6 +77,7 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
             "Authorization": "Bearer %s" % access_token,
         },
         data=json.dumps({"payer_id": request.GET["PayerID"]}),
+        timeout=30,
     )
     if r.status_code == HTTP_200_OK:
         d.clearing_date = now()
@@ -129,6 +131,7 @@ def process_paypal_payment(
             "Authorization": "Bearer %s" % access_token,
         },
         data=json.dumps(data),
+        timeout=30,
     )
 
     if r.status_code == HTTP_201_CREATED:
