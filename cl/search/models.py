@@ -440,7 +440,7 @@ class Docket(AbstractDateTimeModel):
         db_index=False,
         blank=True,
     )
-    docket_number = models.TextField(
+    docket_number = models.TextField(  # nosemgrep
         help_text="The docket numbers of a case, can be consolidated and "
         "quite long. In some instances they are too long to be "
         "indexed by postgres and we store the full docket in "
@@ -2543,11 +2543,6 @@ def sort_cites(c):
         return 8
 
 
-# class OpinionMeta(type(AbstractDateTimeModel), type(ResourceType)):
-#     pass
-
-
-# class Opinion(AbstractDateTimeModel, ResourceType, metaclass=OpinionMeta):
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
