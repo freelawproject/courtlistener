@@ -166,6 +166,10 @@ commit that you submit as part of a PR, if you can avoid it. Often you can clean
 project][format]. This is pretty easy if you use [this plugin][format-plugin]
 for Intellij/PyCharm/et al.
 
+1. We use a number of linters to make our code better. Some of these are enforced by Github Actions, and others are not. The easiest way to do your work is to use [pre-commit][pc]. If you install that locally, then run `pre-commit install`, you'll check `black`, `isort`, `semgrep` (minimally), `codespell`, and possibly other things each time you commit. Unfortunately, `pre-commit` doesn't work well with `mypy`. More on that below.
+
+[pc]: https://pre-commit.com/
+
 1. We use the [black][black] code formatter to make sure all our Python code
 has the same formatting. This is an automated tool that you *must* run on any
 code you run before you push it to Github. When you run it, it will reformat
