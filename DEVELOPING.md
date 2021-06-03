@@ -9,7 +9,7 @@ But before we can get into that, we must address...
 
 ## Legal Matters
 
-Not surprisingly, we have a lot of legal, and particularly IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns. 
+Not surprisingly, we have a lot of legal, and particularly IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns.
 
 We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license for server code that isn't normally distributed to end users (like an app would be, say).
 
@@ -29,9 +29,9 @@ The major components of CourtListener are:
 
  - Postgresql - For database storage. We used to use MySQL long ago, but it caused endless weird and surprising problems. Postgresql is great.
 
- - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great. If you have something small you want to store quickly and kind of durably, it's fantastic. 
+ - Redis - For in-memory fast storage, caching, task queueing, some stats logging, etc. Everybody loves Redis for a reason. It's great. If you have something small you want to store quickly and kind of durably, it's fantastic.
 
- - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried. 
+ - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried.
 
  - Tesseract - For OCR. It's getting good lately, which is nice since we convert hundreds of thousands of pages.
 
@@ -74,8 +74,8 @@ To set up a development server, do the following:
 
     `cp 05-private.example 05-private.py`
 
-    That will get you pretty far, but CourtListener does rely on a number of cloud services. To make all features work, you'll need to get tokens for these services. The main one you'll run into almost immediately is AWS S3 (tests won't pass without it). To make that work, you'll need to create an access token for a user with S3 access. This isn't too terribly hard, but for partners we can do it for you. Just ask. 
-    
+    That will get you pretty far, but CourtListener does rely on a number of cloud services. To make all features work, you'll need to get tokens for these services. The main one you'll run into almost immediately is AWS S3 (tests won't pass without it). To make that work, you'll need to create an access token for a user with S3 access. This isn't too terribly hard, but for partners we can do it for you. Just ask.
+
     See [below](#how-settings-work-in-courtlistener) for more information about settings files.
 
 1. Next, create the bridge network that the docker relies on:
@@ -108,7 +108,7 @@ So that should be it! You should now be able to access the following URLs:
  - <http://127.0.0.1:8000/admin> - The Django admin page (try the super user)
  - <http://127.0.0.1:8983/solr> - Solr admin page
  - 127.0.0.1:5900 - A VNC server to the selenium machine (it doesn't serve http though)
- 
+
 A good next step is to [run the test suite](#testing) to verify that your development server is configured correctly.
 
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
@@ -127,14 +127,14 @@ But usually you won't need to look at these logs.
 
 The files in the `cl/settings` directory contain all of the settings for CourtListener. They are read in alphabetical order, with each subsequent file potentially overriding the previous one.
 
-Thus, `10-public.py` contains default settings for CourtListener and Celery. To override it, simply create a file in `cl/settings` called `11-private.py`. Since `11` comes after `10` *alphabetically*, it'll override anything in `10-*`. 
+Thus, `10-public.py` contains default settings for CourtListener and Celery. To override it, simply create a file in `cl/settings` called `11-private.py`. Since `11` comes after `10` *alphabetically*, it'll override anything in `10-*`.
 
-Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them. 
+Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them.
 
 You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth skimming through. Please don't rename this file; copy it instead. If you rename it, sooner or later you'll accidentally commit the missing file into a PR.
 
-Files that are read later (with higher numbered file names) have access to the 
-context of files that are read earlier. For example, if `01-some-name.py` 
+Files that are read later (with higher numbered file names) have access to the
+context of files that are read earlier. For example, if `01-some-name.py`
 contains:
 
     SOME_VAR = {'some-key': 'some-value'}
@@ -143,77 +143,77 @@ You could create a file called `02-my-overrides.py` that contained:
 
     SOME_VAR['some-key'] = 'some-other-value'
 
-That is, you can assume that `SOME_VAR` exists because it was declared in an 
-earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't 
-exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the 
-code behind all this, look in `settings.py` (in the root directory). It's 
+That is, you can assume that `SOME_VAR` exists because it was declared in an
+earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't
+exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the
+code behind all this, look in `settings.py` (in the root directory). It's
 short.
 
 
 ## Guidelines for Contributions
 
-For the most part, we use [Github flow][flow] to get our work done. Our 
-[BDFL][bdfl] and primary developer is [@mlissner][me]. For better and/or for worse, 
-he doesn't care too much about git, provided things get done smoothly and his 
+For the most part, we use [Github flow][flow] to get our work done. Our
+[BDFL][bdfl] and primary developer is [@mlissner][me]. For better and/or for worse,
+he doesn't care too much about git, provided things get done smoothly and his
 life is fairly easy. What that means generally, is:
 
-1. Commits should represent a unit of work. In other words, if you're working 
-on a big feature, each commit should be a discrete step along the path of 
+1. Commits should represent a unit of work. In other words, if you're working
+on a big feature, each commit should be a discrete step along the path of
 getting that feature ready to land. Bad or experimental work shouldn't be in a
 commit that you submit as part of a PR, if you can avoid it. Often you can clean up your commits with an interactive rebase followed by a force push to your branch.
 
-1. Your commit messages should use [the format defined by the Angular.js 
-project][format]. This is pretty easy if you use [this plugin][format-plugin] 
+1. Your commit messages should use [the format defined by the Angular.js
+project][format]. This is pretty easy if you use [this plugin][format-plugin]
 for Intellij/PyCharm/et al.
 
-1. We use the [black][black] code formatter to make sure all our Python code 
+1. We use the [black][black] code formatter to make sure all our Python code
 has the same formatting. This is an automated tool that you *must* run on any
-code you run before you push it to Github. When you run it, it will reformat 
+code you run before you push it to Github. When you run it, it will reformat
 your code. We recommend [integrating it into your editor][black-ed].
 
     Beyond what black will do for you by default, if you somehow find a way to
-    do whitespace or other formatting changes, do so in their own commit and 
-    ideally in its own PR. When whitespace is combined with other code changes, 
+    do whitespace or other formatting changes, do so in their own commit and
+    ideally in its own PR. When whitespace is combined with other code changes,
     the PR's become impossible to read and risky to merge. This is a big reason
-    we use black. 
+    we use black.
 
 1. We are beginning to use mypy to add type hints to our Python code. New code must include hints and updates to old code should add hints to the old code. The idea is for our hunts to gradually get better and more complete. Our Github Action for mypy is in lint.yml, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
 
-1. We use iSort to sort our imports. If your imports aren't sorted properly, 
+1. We use iSort to sort our imports. If your imports aren't sorted properly,
 iSort will tell you so when you push your code to Github. Again, we recommend
-getting iSort integrated into your editor or workflow. 
+getting iSort integrated into your editor or workflow.
 
-1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort. 
-It doesn't have to be done — it doesn't even have to work! — but it should be 
+1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort.
+It doesn't have to be done — it doesn't even have to work! — but it should be
 clean, and it should be your best effort at clean *progress*. PRs are both a way
 of getting your work into the system and a way to *communicate* your work. The
-latter is more important. 10 small, clean PRs are about 10× better than a 
-monolithic one that is fully functional. 
+latter is more important. 10 small, clean PRs are about 10× better than a
+monolithic one that is fully functional.
 
     Say you are developing a system that relies on regexes to do something. Why
     not submit the regexes (and their tests!) in one PR and the thing that uses
-    those regexes in another? That'd be much easier to review than trying to 
+    those regexes in another? That'd be much easier to review than trying to
     see the whole thing at once.
 
-1. We have an editorconfig, an eslint configuration, and a black configuration. 
+1. We have an editorconfig, an eslint configuration, and a black configuration.
 Please use them.
 
-1. We do not yet have a Code of Conduct, but we do have [our employee 
-manual][hr], and we expect all our employees and volunteers to abide by it. 
+1. We do not yet have a Code of Conduct, but we do have [our employee
+manual][hr], and we expect all our employees and volunteers to abide by it.
 
-These guidelines are a little sloppy compared with many projects. Those 
-projects have greater quality needs, are popular enough to demand a high 
-bar, and can envision coding techniques as a part of their overall goal. We 
-don't have to lead the industry with our approach, we just need to get good 
-work done. That's the goal here. 
+These guidelines are a little sloppy compared with many projects. Those
+projects have greater quality needs, are popular enough to demand a high
+bar, and can envision coding techniques as a part of their overall goal. We
+don't have to lead the industry with our approach, we just need to get good
+work done. That's the goal here.
 
 ### Special notes for special types of code
 
 1. If your PR includes a migration of the DB, we need SQL files for any tables
-that we replicate to customers. These can be easily made with the `sqlmigrate` 
+that we replicate to customers. These can be easily made with the `sqlmigrate`
 command. See MIGRATIONS.md as well for details on smart migration files and why
 this is needed.
-   
+
 2. If you alter any react code, include minified builds and map files of the new JS in your PR so that they can be deployed. While developing, you will have non-minified versions of these files. To build the minified versions, do:
 
         npm run build
@@ -292,7 +292,7 @@ You can watch the remote selenium browser using VNC. To do so, start a VNC clien
 
 The password is `secret`. Make sure that `SELENIUM_HEADLESS` is set to `False` or else you'll see nothing.
 
-With those things done, run some tests and watch as it goes! 
+With those things done, run some tests and watch as it goes!
 
 ##### Increasing the Test Timeouts
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# encoding utf-8
 
 from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple, Union, cast

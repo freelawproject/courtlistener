@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.management import create_permissions
 from django.core.management import call_command
