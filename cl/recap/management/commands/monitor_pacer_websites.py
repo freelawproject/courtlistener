@@ -1,6 +1,7 @@
 import requests
 from django.conf import settings
 from django.utils.timezone import now
+from requests import Response, Session
 from rest_framework.status import HTTP_200_OK
 
 from cl.lib.command_utils import VerboseCommand, logger
@@ -10,7 +11,11 @@ from cl.search.models import Court
 
 
 @retry(requests.RequestException, tries=2, backoff=1)
-def check_and_log_url(session, url, timeout=10):
+def check_and_log_url(
+    session: Session,
+    url: str,
+    timeout: int = 10,
+) -> Response:
     """Check if a URL is accessible by sending it a GET request
 
     :param session: A requests.Session object
@@ -38,7 +43,6 @@ def check_if_global_outage(session, url, timeout=5):
         params={"url": url, "timeout": timeout},
         # Make this timeout *after* the proxy would, so that we can get errors
         # from the proxy, not from here.
-        timeout=timeout + 1,
     )
     if response.status_code != HTTP_200_OK:
         # Something went wrong with our request
