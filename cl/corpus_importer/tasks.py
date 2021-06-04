@@ -261,7 +261,6 @@ def download_recap_item(
         r = requests.get(
             url,
             stream=True,
-            timeout=60,
             headers={"User-Agent": "Free Law Project"},
         )
         r.raise_for_status()
