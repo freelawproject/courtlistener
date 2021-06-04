@@ -35,11 +35,6 @@ repos:
     hooks:
      - id: codespell
 
-  - repo: https://github.com/returntocorp/semgrep
-    rev: 'v0.54.0'
-    hooks:
-      - id: semgrep
-        args: ['--config', 'p/django', '--config', 'r/python.requests.best-practice.use-timeout.use-timeout', '--error' ]
 
 #
 # Tried and Failed
@@ -48,3 +43,4 @@ repos:
 #   isolated environment, that lacks all our dependencies.
 # 2. We might want flake8 someday. It's easy to turn on, but it's so noisy on
 #    our current code that it'd take some fine-tuning to get it right.
+# 3. semgrep was too slow and had to be moved to a github action.
