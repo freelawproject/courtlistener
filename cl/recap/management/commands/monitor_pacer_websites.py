@@ -19,7 +19,7 @@ def check_and_log_url(session, url, timeout=10):
     :return requests.Response object for the query, assuming it doesn't time
     out
     """
-    return session.get(url, timeout=timeout, verify=False)
+    return session.get(url, verify=False)
 
 
 def check_if_global_outage(session, url, timeout=5):
