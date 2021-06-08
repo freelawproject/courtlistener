@@ -19,9 +19,9 @@ from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.court_regexes import match_court_string
-from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
+from cl.people_db.utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
@@ -267,10 +267,10 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
         # Some documents contain images in the HTML
         # Flag them for a later crawl by using the placeholder '[[Image]]'
         judge_list = [
-            find_judge_names(x.text) for x in soup.find_all("judges")
+            extract_judge_last_name(x.text) for x in soup.find_all("judges")
         ]
         author_list = [
-            find_judge_names(x.text) for x in soup.find_all("author")
+            extract_judge_last_name(x.text) for x in soup.find_all("author")
         ]
         # Flatten and dedupe list of judges
         judges = ", ".join(
@@ -377,7 +377,7 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
                 if auth is not None:
                     author_tag_str = titlecase(auth.text.strip(":"))
                     author_str = titlecase(
-                        "".join(find_judge_names(author_tag_str))
+                        "".join(extract_judge_last_name(author_tag_str))
                     )
                 else:
                     author_str = ""
