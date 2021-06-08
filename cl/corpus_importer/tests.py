@@ -11,7 +11,6 @@ from django.conf import settings
 from django.test import TestCase
 
 from cl.corpus_importer.court_regexes import match_court_string
-from cl.corpus_importer.import_columbia.parse_judges import find_judge_names
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
@@ -25,6 +24,7 @@ from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
+from cl.people_db.utils import extract_judge_last_name
 from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import (
@@ -49,7 +49,7 @@ class JudgeExtractionTest(unittest.TestCase):
             ("BURWELL, J.:", ["burwell"]),
         )
         for q, a in tests:
-            self.assertEqual(find_judge_names(q), a)
+            self.assertEqual(extract_judge_last_name(q), a)
 
 
 class CourtMatchingTest(unittest.TestCase):

@@ -1,13 +1,11 @@
 import html
 import re
-from html.parser import HTMLParser
+from typing import List
 
 from django.utils.html import strip_tags
 
-h = HTMLParser()
-
 # list of words that aren't judge names
-NOT_JUDGE = [
+NOT_JUDGE_WORDS = [
     "above",
     "absent",
     "acting",
@@ -47,6 +45,7 @@ NOT_JUDGE = [
     "center",
     "certified",
     "chancellor",
+    "ch",
     "chairman",
     "chief",
     "circuit",
@@ -97,13 +96,10 @@ NOT_JUDGE = [
     "full",
     "foregoing",
     "four",
-    "furth",
     "further",
     "general",
     "his",
     "heard",
-    "ii",
-    "iii",
     "indiana",
     "indicated",
     "initial",
@@ -111,7 +107,6 @@ NOT_JUDGE = [
     "issuance",
     "issuing",
     "italic",
-    "iv",
     "joined",
     "joins",
     "judge",
@@ -134,6 +129,7 @@ NOT_JUDGE = [
     "note",
     "number",
     "october",
+    "of",
     "one",
     "opinion",
     "oral",
@@ -235,18 +231,15 @@ NAME_CUTOFF = 3
 IS_JUDGE = {"wu", "re", "du", "de"}
 
 
-def find_judge_names(text, first_names=False):
-    """Find judge names in a string of text.
+def extract_judge_last_name(text: str) -> List[str]:
+    """Find judge last names in a string of text.
 
     :param text: The text you wish to extract names from.
-    :param first_names: If True, will return a list of `(first, last)` tuples,
-    in which `first` will usually be None unless a judge's first name is
-    identified.
-
-    :return: a of last names of judges in `text`.
+    :return: last names of judges in `text`.
     """
     text = text.lower() or ""
-    # just use the first nonempty line (there's sometimes a useless second line)
+    # just use the first nonempty line (there's
+    # sometimes a useless second line)
     line = text
     if "\n" in text:
         line = ""
@@ -263,50 +256,26 @@ def find_judge_names(text, first_names=False):
     line = "".join([c if c.isalpha() else " " for c in line.lower()])
     names = []
     for word in line.split():
-        if (
-            len(word) < NAME_CUTOFF and word not in IS_JUDGE
-        ) or word in NOT_JUDGE:
+        word_too_short = len(word) < NAME_CUTOFF
+        word_not_short_name = word not in IS_JUDGE
+        if word_too_short and word_not_short_name:
+            continue
+        if word in NOT_JUDGE_WORDS:
             continue
         names.append(word)
-    # try to identify which names are first and last names
-    if len(names) < 2:
-        last_names = names
-        first_last_names = [(None, l) for l in last_names]
+
+    # identify which names are first and last names
+    if len(names) == 0:
+        return []
+    elif len(names) == 1:
+        return names
     else:
         last_names = [names[0]]
-        first_last_names = [(None, names[0])]
         for i in range(len(names))[1:]:
             first_last = "%s %s" % (names[i - 1], names[i])
             first_m_last = r"%s [a-z]\.? %s" % (names[i - 1], names[i])
             if re.search("%s|%s" % (first_last, first_m_last), text):
-                first_last_names[-1] = (first_last_names[-1][1], names[i])
                 last_names[-1] = names[i]
                 continue
-            first_last_names.append((None, names[i]))
             last_names.append(names[i])
-    return first_last_names if first_names else last_names
-
-
-def judges_exist(text, judges):
-    """Checks whether any of `judges` are in `text`. Returns the elements in `judges` that are matched.
-
-    :param text: String.
-    :param judges: Either a list of last names or a list of `(first, last)` tuples of judge names. These types can be
-    mixed, e.g. in a list ['last1', ('first2', 'last2'), 'last3'].
-    """
-    matched = []
-    for judge in judges:
-        if isinstance(judge, str):
-            if re.search(r"\b%s\b" % judge, text):
-                matched.append(judge)
-            continue
-        first_last = "%s %s" % judge
-        first_m_last = r"%s [a-z]\.? %s" % judge
-        if re.search(r"\b(%s|%s)\b" % (first_last, first_m_last), text):
-            matched.append(judge)
-    return matched
-
-
-if __name__ == "__main__":
-    s = "before: tom bryner, chief justice, tim v. matthews, eastaugh, fabe, and carpeneti, justices."
-    print(judges_exist(s, ["bryner", ("tim", "matthews")]))
+    return last_names
