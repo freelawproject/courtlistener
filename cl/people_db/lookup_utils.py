@@ -333,6 +333,16 @@ def lookup_judge_by_full_name(
     if name.first:
         filter_sets.append([Q(name_first__iexact=name.first)])
 
+    # Do middle name or initial next.
+    if name.middle:
+        initial = len(name.middle.strip(".,")) == 1
+        if initial:
+            filter_sets.append(
+                [Q(name_middle__istartswith=name.middle.strip(".,"))]
+            )
+        else:
+            filter_sets.append([Q(name_middle__iexect=name.middle)])
+
     # And finally, by suffix
     if name.suffix:
         suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
