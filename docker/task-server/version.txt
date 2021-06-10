@@ -1,5 +1,6 @@
-1.0.37
+1.0.38
 
+1.0.38 - Adds nameparser
 1.0.37 - Adds precommit
 1.0.36 - Add tblib for parallel tests
 1.0.35 - Add waffle
