@@ -39,6 +39,7 @@ SUFFIXES = (
     ("3", "III"),
     ("4", "IV"),
 )
+SUFFIX_LOOKUP = {v.lower(): k for k, v in SUFFIXES}
 GENDERS = (
     ("m", "Male"),
     ("f", "Female"),
