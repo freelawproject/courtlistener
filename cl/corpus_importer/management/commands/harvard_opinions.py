@@ -21,7 +21,7 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
-from cl.people_db.utils import extract_judge_last_name
+from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 

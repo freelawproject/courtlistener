@@ -1,8 +1,14 @@
 import html
 import re
-from typing import List
+from datetime import date
+from typing import List, Optional, Union
 
+from dateutil.relativedelta import relativedelta
+from django.db.models import Q
 from django.utils.html import strip_tags
+from nameparser import HumanName
+
+from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names
 NOT_JUDGE_WORDS = [
@@ -279,3 +285,134 @@ def extract_judge_last_name(text: str) -> List[str]:
                 continue
             last_names.append(names[i])
     return last_names
+
+
+def lookup_judge_by_full_name(
+    name: Union[HumanName, str],
+    court_id: str,
+    event_date: Optional[date] = None,
+) -> Optional[Person]:
+    """Uniquely identifies a judge by both name and metadata.
+
+    :param name: The judge's name, either as a str of the full name or as
+    a HumanName object. Do NOT provide just the last name of the judge. If you
+    do, it will be considered the judge's first name. You MUST provide their
+    full name or a HumanName object. To look up a judge by last name, see the
+    look_up_judge_by_last_name function. The str parsing used here is the
+    heuristic approach used by nameparser.HumanName.
+    :param court_id: The court where the judge did something
+    :param event_date: The date when the judge did something
+    :return Either the judge that matched the name in the court at the right
+    time, or None.
+    """
+    if isinstance(name, str):
+        name = HumanName(name)
+
+    # check based on last name and court first
+    filter_sets = [
+        [Q(name_last__iexact=name.last), Q(positions__court_id=court_id)],
+    ]
+    # Then narrow by date
+    if event_date is not None:
+        filter_sets.append(
+            [
+                Q(
+                    positions__date_start__lt=event_date
+                    + relativedelta(years=1)
+                )
+                | Q(positions__date_start=None),
+                Q(
+                    positions__date_termination__gt=event_date
+                    - relativedelta(years=1)
+                )
+                | Q(positions__date_termination=None),
+            ]
+        )
+
+    # Then by first name
+    if name.first:
+        filter_sets.append([Q(name_first__iexact=name.first)])
+
+    # And finally, by suffix
+    if name.suffix:
+        suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
+        if suffix:
+            filter_sets.append([Q(name_suffix__iexact=suffix)])
+
+    # Query people DB, slowly adding more filters to the query. If we get zero
+    # results, no luck. If we get one, great. If we get more than one, continue
+    # filtering. If we expend all our filters and still have more than one,
+    # just return None.
+    applied_filters = []
+    for filter_set in filter_sets:
+        applied_filters.extend(filter_set)
+        candidates = Person.objects.filter(*applied_filters)
+        if len(candidates) == 0:
+            # No luck finding somebody. Abort.
+            return None
+        elif len(candidates) == 1:
+            # Got somebody unique!
+            return candidates.first()
+    return None
+
+
+def lookup_judge_by_full_name_and_set_attr(
+    item: object,
+    target_field: str,
+    full_name: str,
+    court_id: str,
+    event_date: date,
+) -> None:
+    """Lookup a judge by the attribute of an object
+
+    :param item: The object containing the attribute you want to look up
+    :param target_field: The field on the attribute you want to look up.
+    :param full_name: The full name of the judge to look up.
+    :param court_id: The court where the judge did something.
+    :param event_date: The date the judge did something.
+    :return None
+    """
+    if not getattr(item, target_field, None):
+        return None
+    judge = lookup_judge_by_full_name(full_name, court_id, event_date)
+    if judge is not None:
+        setattr(item, target_field, judge)
+
+
+def lookup_judge_by_last_name(
+    last_name: str,
+    court_id: str,
+    event_date: Optional[date] = None,
+) -> Optional[Person]:
+    """Look up the judge using their last name, a date and court"""
+    hn = HumanName()
+    hn.last = last_name
+    return lookup_judge_by_full_name(hn, court_id, event_date)
+
+
+def lookup_judges_by_last_name_list(
+    last_names: List[str],
+    court_id: str,
+    event_date: Optional[date] = None,
+) -> List[Person]:
+    """Look up a group of judges by list of last names, a date, and a court"""
+    found_people = []
+    for last_name in last_names:
+        hn = HumanName()
+        hn.last = last_name
+        person = lookup_judge_by_full_name(hn, court_id, event_date)
+        if person is not None:
+            found_people.append(person)
+    return found_people
+
+
+def lookup_judges_by_messy_str(
+    s: str,
+    court_id: str,
+    event_date: Optional[date] = None,
+) -> List[Person]:
+    """Look up a group of judges by a messy string that might contain their
+    names. (This is the least accurate way to look up judges.)
+    """
+    last_names = extract_judge_last_name(s)
+    return lookup_judges_by_last_name_list(last_names, court_id, event_date)

@@ -16,8 +16,8 @@ from sentry_sdk import capture_exception
 from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
-from cl.lib.import_lib import get_candidate_judges
 from cl.lib.string_utils import trunc
+from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
@@ -141,7 +141,7 @@ def save_everything(
         citation.save()
 
     if cluster.judges:
-        candidate_judges = get_candidate_judges(
+        candidate_judges = lookup_judges_by_messy_str(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
         if len(candidate_judges) == 1:

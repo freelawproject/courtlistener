@@ -14,7 +14,7 @@ from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
-from cl.people_db.utils import extract_judge_last_name
+from cl.people_db.lookup_utils import extract_judge_last_name
 
 from .regexes_columbia import FOLDER_DICT, SPECIAL_REGEXES
 
