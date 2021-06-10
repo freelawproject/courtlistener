@@ -94,6 +94,7 @@ django-hCaptcha = "^0.1.0"
 eyecite = "^2.1.0"
 reporters-db = "^3.1.1"
 django-waffle = "^2.1.0"
+nameparser = "^1.0.6"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
