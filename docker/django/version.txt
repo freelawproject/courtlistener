@@ -1,5 +1,6 @@
-1.0.42
+1.0.43
 
+1.0.43 - Adds nameparser
 1.0.42 - Adds pre-commit
 1.0.41 - Add tblib for parallel tests
 1.0.40 - Add waffle

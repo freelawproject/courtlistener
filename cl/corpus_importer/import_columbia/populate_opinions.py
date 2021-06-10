@@ -7,11 +7,14 @@ from datetime import date
 from django.conf import settings
 from eyecite.find_citations import clean_text, get_citations
 
-from cl.lib.import_lib import find_person
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency
 from cl.search.models import Docket, Opinion, OpinionCluster
 
+from ...people_db.lookup_utils import (
+    lookup_judge_by_last_name,
+    lookup_judges_by_last_name_list,
+)
 from .convert_columbia_html import convert_columbia_html
 
 # only make a solr connection once
@@ -387,20 +390,19 @@ def make_and_save(
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
     )
-    panel = [
-        find_person(n, item["court_id"], case_date=panel_date)
-        for n in item["panel"]
-    ]
-    panel = [x for x in panel if x is not None]
+    panel = lookup_judges_by_last_name_list(
+        item["panel"], item["court_id"], panel_date
+    )
 
     opinions = []
     for i, opinion_info in enumerate(item["opinions"]):
         if opinion_info["author"] is None:
             author = None
         else:
-            author = find_person(
-                opinion_info["author"], item["court_id"], case_date=panel_date
+            author = lookup_judge_by_last_name(
+                opinion_info["author"], item["court_id"], panel_date
             )
+
         converted_text = convert_columbia_html(opinion_info["opinion"])
         opinion_type = OPINION_TYPE_MAPPING[opinion_info["type"]]
         if opinion_type == Opinion.LEAD and i > 0:
@@ -417,11 +419,9 @@ def make_and_save(
             # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
-        joined_by = [
-            find_person(n, item["court_id"], case_date=panel_date)
-            for n in opinion_info["joining"]
-        ]
-        joined_by = [x for x in joined_by if x is not None]
+        joined_by = lookup_judges_by_last_name_list(
+            item["joining"], item["court_id"], panel_date
+        )
         opinions.append((opinion, joined_by))
 
     if min_dates is None:

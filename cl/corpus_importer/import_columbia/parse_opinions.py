@@ -14,8 +14,8 @@ from lxml import etree
 
 from cl.corpus_importer.court_regexes import state_pairs
 from cl.lib.crypto import sha1_of_file
+from cl.people_db.lookup_utils import extract_judge_last_name
 
-from .parse_judges import find_judge_names
 from .regexes_columbia import FOLDER_DICT, SPECIAL_REGEXES
 
 # initialized once since it takes resources
@@ -74,7 +74,7 @@ def parse_file(file_path):
     panel_text = "".join(raw_info.get("panel", []))
     # if panel_text:
     #    judge_info.append(('Panel\n-----', panel_text))
-    info["panel"] = find_judge_names(panel_text) or []
+    info["panel"] = extract_judge_last_name(panel_text) or []
 
     # get case names
     info["case_name_full"] = (
@@ -133,7 +133,7 @@ def parse_file(file_path):
                 #    opinion['byline']
                 # ))
                 # add the opinion and all of the previous texts
-                judges = find_judge_names(opinion["byline"])
+                judges = extract_judge_last_name(opinion["byline"])
                 info["opinions"].append(
                     {
                         "opinion": "\n".join(last_texts),
