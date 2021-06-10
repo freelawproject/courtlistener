@@ -15,7 +15,6 @@ from juriscraper.pacer import AttachmentPage
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.import_lib import get_candidate_judges
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import (
     get_blocked_status,
@@ -26,6 +25,7 @@ from cl.lib.pacer import (
 )
 from cl.lib.string_utils import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
+from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganization,
@@ -268,21 +268,21 @@ def update_docket_metadata(d: Docket, docket_data: Dict[str, Any]) -> Docket:
         docket_data.get("jurisdiction") or d.jurisdiction_type
     )
     d.mdl_status = docket_data.get("mdl_status") or d.mdl_status
-    judges = get_candidate_judges(
+    lookup_judge_by_full_name_and_set_attr(
+        d,
+        "assigned_to",
         docket_data.get("assigned_to_str"),
         d.court_id,
         docket_data.get("date_filed"),
     )
-    if judges is not None and len(judges) == 1:
-        d.assigned_to = judges[0]
     d.assigned_to_str = docket_data.get("assigned_to_str") or ""
-    judges = get_candidate_judges(
+    lookup_judge_by_full_name_and_set_attr(
+        d,
+        "referred_to",
         docket_data.get("referred_to_str"),
         d.court_id,
         docket_data.get("date_filed"),
     )
-    if judges is not None and len(judges) == 1:
-        d.referred_to = judges[0]
     d.referred_to_str = docket_data.get("referred_to_str") or ""
     d.blocked, d.date_blocked = get_blocked_status(d)
 
@@ -365,19 +365,20 @@ def update_docket_appellate_metadata(d, docket_data):
         # Can't do judge lookups. Call it quits.
         return d, d_og_info
 
-    if og_info.get("assigned_to"):
-        judges = get_candidate_judges(
-            og_info["assigned_to"], d.appeal_from_id, d_og_info.date_filed
-        )
-        if judges is not None and len(judges) == 1:
-            d_og_info.assigned_to = judges[0]
-
-    if og_info.get("ordering_judge"):
-        judges = get_candidate_judges(
-            og_info["ordering_judge"], d.appeal_from_id, d_og_info.date_filed
-        )
-        if judges is not None and len(judges) == 1:
-            d_og_info.ordering_judge = judges[0]
+    lookup_judge_by_full_name_and_set_attr(
+        d_og_info,
+        "assigned_to",
+        og_info["assigned_to"],
+        d.appeal_from_id,
+        d_og_info.date_filed,
+    )
+    lookup_judge_by_full_name_and_set_attr(
+        d_og_info,
+        "ordering_judge",
+        og_info["ordering_judge"],
+        d.appeal_from_id,
+        d_og_info.date_filed,
+    )
 
     return d, d_og_info
 

@@ -23,8 +23,8 @@ from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
 from cl.lib.storage import clobbering_get_name
+from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.people_db.utils import extract_judge_last_name
 from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import (

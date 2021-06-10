@@ -11,8 +11,9 @@ from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
-from cl.lib.import_lib import get_candidate_judges, get_scotus_judges
+from cl.lib.import_lib import get_scotus_judges
 from cl.lib.string_utils import trunc
+from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.models import ErrorLog
@@ -36,7 +37,7 @@ def save_everything(
     candidate_judges = []
     if af.docket.court_id != "scotus":
         if af.judges:
-            candidate_judges = get_candidate_judges(
+            candidate_judges = lookup_judges_by_messy_str(
                 af.judges, docket.court.pk, af.docket.date_argued
             )
     else:
