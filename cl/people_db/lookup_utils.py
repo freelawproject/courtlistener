@@ -341,7 +341,7 @@ def lookup_judge_by_full_name(
                 [Q(name_middle__istartswith=name.middle.strip(".,"))]
             )
         else:
-            filter_sets.append([Q(name_middle__iexect=name.middle)])
+            filter_sets.append([Q(name_middle__iexact=name.middle)])
 
     # And finally, by suffix
     if name.suffix:
