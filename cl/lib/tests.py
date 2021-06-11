@@ -19,10 +19,11 @@ from cl.lib.pacer import (
     normalize_attorney_role,
     normalize_us_state,
 )
+from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import UUIDFileSystemStorage
-from cl.lib.string_utils import anonymize, normalize_dashes, trunc
+from cl.lib.string_utils import normalize_dashes, trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Court, Docket, Opinion, OpinionCluster

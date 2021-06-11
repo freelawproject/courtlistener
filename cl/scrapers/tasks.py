@@ -16,7 +16,6 @@ from django.utils.encoding import (
     force_str,
     smart_str,
 )
-from django.utils.timezone import now
 from juriscraper.pacer import CaseQuery, PacerSession
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
@@ -32,8 +31,9 @@ from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
+from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
-from cl.lib.string_utils import anonymize, trunc
+from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
 from cl.scrapers.transformer_extractor_utils import convert_and_clean_audio
@@ -381,15 +381,7 @@ def extract_doc_content(
         content, str
     ), "content must be of type str, not %s" % type(content)
 
-    # Do blocked status
-    if extension in ["html", "wpd"]:
-        opinion.html, blocked = anonymize(content)
-    else:
-        opinion.plain_text, blocked = anonymize(content)
-    if blocked:
-        opinion.cluster.blocked = True
-        opinion.cluster.date_blocked = now()
-
+    set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion)
 
     if err:
