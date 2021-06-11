@@ -1,4 +1,3 @@
-from dateutil.relativedelta import relativedelta
 from django.db.models import Min, Q
 
 from cl.people_db.models import Person
