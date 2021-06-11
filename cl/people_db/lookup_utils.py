@@ -382,7 +382,7 @@ def lookup_judge_by_full_name_and_set_attr(
     :param event_date: The date the judge did something.
     :return None
     """
-    if not getattr(item, target_field, None):
+    if not full_name:
         return None
     judge = lookup_judge_by_full_name(full_name, court_id, event_date)
     if judge is not None:
