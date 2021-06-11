@@ -368,14 +368,14 @@ def update_docket_appellate_metadata(d, docket_data):
     lookup_judge_by_full_name_and_set_attr(
         d_og_info,
         "assigned_to",
-        og_info["assigned_to"],
+        og_info.get("assigned_to"),
         d.appeal_from_id,
         d_og_info.date_filed,
     )
     lookup_judge_by_full_name_and_set_attr(
         d_og_info,
         "ordering_judge",
-        og_info["ordering_judge"],
+        og_info.get("ordering_judge"),
         d.appeal_from_id,
         d_og_info.date_filed,
     )
