@@ -23,7 +23,7 @@ from cl.lib.pacer import (
     normalize_attorney_contact,
     normalize_attorney_role,
 )
-from cl.lib.string_utils import anonymize
+from cl.lib.privacy_tools import anonymize
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
 from cl.people_db.models import (
