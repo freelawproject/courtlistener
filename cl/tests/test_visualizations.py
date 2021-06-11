@@ -71,7 +71,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         first_case = self.browser.find_element(
             By.ID, "starting-cluster-typeahead"
         )
-        v = first_case.get_attribute("value")
+        v = first_case.get_property("value")
         self.assertIn(suggestion_text, v)
 
         # For the Second Case, she starts typing 'Cutter'
@@ -91,7 +91,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         second_case = self.browser.find_element(
             By.ID, "ending-cluster-typeahead-search"
         )
-        self.assertIn(suggestion_text, second_case.get_attribute("value"))
+        self.assertIn(suggestion_text, second_case.get_property("value"))
 
         # She notices a "More Options" button and, why not, she clicks it
         more = self.browser.find_element(By.ID, "more")

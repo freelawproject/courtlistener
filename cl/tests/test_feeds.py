@@ -63,7 +63,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             print("Testing link to %s..." % court.full_name, end=" ")
             self.assertEqual(
                 link.get_attribute("href"),
-                "%s/feed/court/%s/" % (self.live_server_url, court.pk),
+                f"/feed/court/{court.pk}/",
             )
             link.click()
             print("clicked...", end=" ")

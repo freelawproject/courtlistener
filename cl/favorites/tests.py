@@ -253,7 +253,8 @@ class UserFavoritesTest(BaseSeleniumTest):
                     self.assertIn("Edit / Delete", tr.text)
                     already_found = True
 
-        # Clicking the name of the favorite brings her right back to the details
+        # Clicking the name of the favorite brings her
+        # right back to the details
         self.click_link_for_new_page(short_title)
 
         self.assertIn(short_title, self.browser.title)
@@ -301,10 +302,10 @@ class UserFavoritesTest(BaseSeleniumTest):
         notes = self.find_element_by_id(modal, "save-favorite-notes-field")
         # -- via favorites.json[pk=1]
         self.assertEqual(
-            name.get_attribute("value"),
+            name.get_property("value"),
             'Formerly known as "case name cluster 3"',
         )
-        self.assertEqual(notes.get_attribute("value"), "Totes my Notes 2")
+        self.assertEqual(notes.get_property("value"), "Totes my Notes 2")
 
         name.clear()
         name.send_keys("Renamed Favorite")
