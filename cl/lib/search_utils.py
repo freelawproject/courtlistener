@@ -865,7 +865,7 @@ def cleanup_main_query(query_string: str) -> str:
 
 def build_main_query(
     cd: CleanData,
-    highlight: str = "all",
+    highlight: Union[bool, str] = "all",
     order_by: str = "",
     facet: bool = True,
     group: bool = True,
