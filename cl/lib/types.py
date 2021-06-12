@@ -4,10 +4,12 @@ from django.http import HttpRequest
 from eyecite.models import (
     FullCaseCitation,
     IdCitation,
+    Resource,
     ShortCaseCitation,
     SupraCitation,
 )
 
+from cl.search.models import Opinion
 from cl.users.models import User
 
 CleanData = Dict[str, Any]
@@ -16,6 +18,7 @@ TaskData = Dict[str, Any]
 SupportedCitationType = Union[
     FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
 ]
+MatchedResourceType = Union[Opinion, Resource]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
