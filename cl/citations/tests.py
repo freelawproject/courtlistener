@@ -413,6 +413,10 @@ class MatchingTest(IndexedSolrTestCase):
                 [full9, full11, supra9_or_11],
                 {opinion9: [full9], opinion11: [full11]},
             ),
+            # Test resolving a supra citation when the previous citation
+            # match failed.
+            # We expect the supra citation to not be matched.
+            ([full_na, supra7], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving a short form citation with a meaningful antecedent
             ([full7, short7], {opinion7: [full7, short7]}),
             # Test resolving a short form citation when its reporter and
@@ -442,6 +446,10 @@ class MatchingTest(IndexedSolrTestCase):
             # volume are erroneous.
             # We expect the short form citation to not be matched.
             ([full7, short_na], {opinion7: [full7]}),
+            # Test resolving a short form citation when the previous citation
+            # match failed.
+            # We expect the short form citation to not be matched.
+            ([full_na, short7], {NO_MATCH_RESOURCE: [full_na]}),
             # Test resolving an Id. citation
             ([full7, id], {opinion7: [full7, id]}),
             # Test resolving an Id. citation when the previous citation match
