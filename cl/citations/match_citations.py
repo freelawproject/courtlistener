@@ -17,7 +17,11 @@ from eyecite.utils import strip_punct
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
-from cl.lib.types import SearchParam, SupportedCitationType
+from cl.lib.types import (
+    MatchedResourceType,
+    SearchParam,
+    SupportedCitationType,
+)
 from cl.search.models import Opinion
 
 DEBUG = True
@@ -196,7 +200,7 @@ def filter_by_matching_antecedent(
 
 def resolve_fullcase_citation(
     full_citation: FullCaseCitation,
-) -> Union[Opinion, Resource]:
+) -> MatchedResourceType:
     db_search_results: List[ExtraSolrSearch] = search_db_for_fullcitation(
         full_citation
     )
@@ -215,10 +219,13 @@ def resolve_fullcase_citation(
 
 def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
-    resolved_full_cites: Dict[FullCaseCitation, Opinion],
+    resolved_full_cites: Dict[FullCaseCitation, MatchedResourceType],
 ) -> Optional[Opinion]:
     candidates: List[Opinion] = []
-    for full_citation, opinion in resolved_full_cites.items():
+    matched_opinions = [
+        o for c, o in resolved_full_cites.items() if type(o) is Opinion
+    ]
+    for opinion in matched_opinions:
         for c in opinion.cluster.citations.all():
             if (
                 short_citation.reporter == c.reporter
@@ -242,16 +249,19 @@ def resolve_shortcase_citation(
 
 def resolve_supra_citation(
     supra_citation: SupraCitation,
-    resolved_full_cites: Dict[FullCaseCitation, Opinion],
+    resolved_full_cites: Dict[FullCaseCitation, MatchedResourceType],
 ) -> Optional[Opinion]:
+    matched_opinions = [
+        o for c, o in resolved_full_cites.items() if type(o) is Opinion
+    ]
     return filter_by_matching_antecedent(
-        resolved_full_cites.values(), supra_citation.antecedent_guess
+        matched_opinions, supra_citation.antecedent_guess
     )
 
 
 def do_resolve_citations(
     citations: List[CitationBase], citing_opinion: Opinion
-) -> Dict[Union[Opinion, Resource], List[SupportedCitationType]]:
+) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
