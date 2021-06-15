@@ -180,6 +180,7 @@ const TagSelect: React.FC<UserState> = ({ userId, userName, editUrl, docket }) =
           minWidth: '300px',
           maxWidth: '500px',
           position: 'absolute',
+          display: isOpen ? 'block' : 'none',
         }}
       >
         <a
