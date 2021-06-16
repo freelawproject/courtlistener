@@ -1,5 +1,8 @@
+from typing import Sized, cast
+
 import scorched
 from django.conf import settings
+from django.db.models import QuerySet
 from django.test import TestCase
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
@@ -104,6 +107,10 @@ class IndexedSolrTestCase(SolrTestCase):
 
 
 class SitemapTest(TestCase):
+
+    sitemap_url: str
+    item_qs: QuerySet
+
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
         response = self.client.get(self.sitemap_url)
@@ -112,11 +119,14 @@ class SitemapTest(TestCase):
         )
         xml_tree = etree.fromstring(response.content)
         node_count = len(
-            xml_tree.xpath(
-                "//s:url",
-                namespaces={
-                    "s": "http://www.sitemaps.org/schemas/sitemap/0.9"
-                },
+            cast(
+                Sized,
+                xml_tree.xpath(
+                    "//s:url",
+                    namespaces={
+                        "s": "http://www.sitemaps.org/schemas/sitemap/0.9"
+                    },
+                ),
             )
         )
         expected_item_count = self.item_qs.count()

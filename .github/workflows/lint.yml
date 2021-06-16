@@ -62,6 +62,7 @@ jobs:
           -p cl.citations \
           -p cl.audio \
           -p cl.corpus_importer \
+          -p cl.lib \
           -p cl.opinion_page \
           -p cl.simple_pages \
           -p cl.recap_rss
@@ -80,7 +81,6 @@ jobs:
           cl/corpus_importer/management/commands/import_tn.py \
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
-          cl/lib/search_utils.py \
           cl/lib/storage.py \
           cl/lib/string_utils.py \
           cl/lib/types.py \

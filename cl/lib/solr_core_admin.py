@@ -1,10 +1,11 @@
 import io
 import json
-from typing import Dict, List, Union
+from typing import Dict, List, Union, cast
 
 import lxml
 import requests
 from django.conf import settings
+from lxml.etree import _ElementTree
 from scorched.exc import SolrError
 
 
@@ -35,7 +36,7 @@ def swap_solr_core(
 def get_solr_core_status(
     core: str = "all",
     url: str = settings.SOLR_HOST,
-) -> Dict:
+) -> _ElementTree:
     """Get the status for the solr core as an XML document."""
     if core == "all":
         core_query = ""
@@ -88,15 +89,15 @@ def get_term_frequency(
         if len(content_as_json["fields"]) == 0:
             return {}
         else:
-            top_terms = {}
+            top_terms_dict = {}
             for result in content_as_json["fields"]["text"]["topTerms"]:
                 # We set aside the term until we reach its count, then we add
                 # them as a k,v pair
                 if isinstance(result, str):
                     key = result
                 else:
-                    top_terms[key] = result
-            return top_terms
+                    top_terms_dict[key] = result
+            return top_terms_dict
     else:
         raise ValueError("Unknown output type!")
 
@@ -108,8 +109,8 @@ def get_data_dir(core: str, url: str = settings.SOLR_HOST):
     Useful when writing the external_pagerank file or when reading it.
     """
     status_doc = get_solr_core_status(url=url)
-    return str(
-        status_doc.xpath('//*[@name="%s"]//*[@name="dataDir"]/text()' % core)[
-            0
-        ]
+    result = cast(
+        List[_ElementTree],
+        status_doc.xpath('//*[@name="%s"]//*[@name="dataDir"]/text()' % core),
     )
+    return str(result[0])
