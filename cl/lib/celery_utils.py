@@ -2,11 +2,9 @@ import functools
 import inspect
 import random
 import time
-from collections import deque
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, Final, List, Tuple
 
 from celery import Task
-from django.utils.timezone import now
 
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
@@ -75,107 +73,48 @@ class CeleryThrottle(object):
 
     def __init__(
         self,
-        min_items: int = 100,
-        min_wait: int = 0,
-        max_wait: int = 1,
+        poll_interval: float = 3.0,
+        min_items: int = 50,
         queue_name: str = "celery",
     ) -> None:
-        """Create a throttle to prevent celery run aways.
+        """Create a throttle to prevent celery runaways.
 
-        :param min_items: The minimum number of items that should be enqueued.
-        A maximum of 2× this number may be created. This minimum value is not
-        guaranteed and so a number slightly higher than your max concurrency
-        should be used. Note that this number includes all tasks unless you use
-        a specific queue for your processing.
-        :param min_wait: The minimum amount of time that should be waited every
-        time `maybe_wait()` is called.
-        :param max_wait: The maximum amount of time that can be slept between
-        loops. If min_wait is greater than max_wait, min_wait wins.
+        :param poll_interval: How long to wait between polling the queue
+        length in seconds, when you know it's greater than the min length.
+        :param min_items: Generally keep the queue longer than this, and
+        always shorter than 2× this value.
         """
-        self.set_min(min_items)
-        self.min_wait = min_wait
-        self.max_wait = max_wait
+        # All these variables are Final, i.e., they're consts. The only
+        # instance variable that changes is the shortage variable below.
+        self.min: Final = min_items
+        self.max: Final = min_items * 2
+        self.poll_interval: Final = poll_interval
+        self.queue_name: Final = queue_name
 
-        # Variables used to track the queue and wait-rate
-        self.last_processed_count = 0
-        self.count_to_do = self._max
-        self.last_measurement = None
-        self.first_run = True
-
-        # Use a fixed-length queue to hold last N rates
-        self.rates = deque(maxlen=15)
-        self.avg_rate = self._calculate_avg()
-
-        # For inspections
-        self.queue_name = queue_name
-
-    def set_min(self, new_min: int) -> None:
-        self._min = new_min
-        self._max = new_min * 2
-
-    def _calculate_avg(self) -> float:
-        return float(sum(self.rates)) / (len(self.rates) or 1)
-
-    def _add_latest_rate(self) -> None:
-        """Calculate the rate that the queue is processing items."""
-        right_now = now()
-        elapsed_seconds = (right_now - self.last_measurement).total_seconds()
-        self.rates.append(self.last_processed_count / elapsed_seconds)
-        self.last_measurement = right_now
-        self.last_processed_count = 0
-        self.avg_rate = self._calculate_avg()
+        # `shortage` stores the number of items that the queue is short by, as
+        # compared to `self.max`. At init, the queue is empty, so it's short by
+        # the full amount. Fill it up.
+        self.shortage = self.max
 
     def maybe_wait(self) -> None:
-        """Stall the calling function or let it proceed, depending on the queue
-
-        The idea here is to check the length of the queue as infrequently as
-        possible while keeping the number of items in the queue as closely
-        between self.min and self.max as possible.
-
-        We do this by immediately enqueueing self.max items. After that, we
-        monitor the queue to determine how quickly it is processing items. Using
-        that rate we wait an appropriate amount of time or immediately press
-        on.
-        """
-        self.last_processed_count += 1
-        if self.count_to_do > 0:
-            # Do not wait. Allow process to continue.
-            if self.first_run:
-                self.first_run = False
-                self.last_measurement = now()
-            self.count_to_do -= 1
-            if self.min_wait:
-                time.sleep(self.min_wait)
+        """Make the user wait until the queue is short enough"""
+        self.shortage -= 1
+        if self.shortage > 0:
+            # No need to sleep. Add items to the queue.
             return
 
-        self._add_latest_rate()
-        task_count = get_queue_length(self.queue_name)
-        if task_count > self._min:
-            # Estimate how long the surplus will take to complete and wait that
-            # long + 5% to ensure we're below self.min on next iteration.
-            surplus_task_count = task_count - self._min
-            wait_time = (surplus_task_count / self.avg_rate) * 1.05
-
-            if self.max_wait:
-                # Cap the wait time if max_wait is set.
-                wait_time = min(wait_time, self.max_wait)
-            if self.min_wait:
-                # But be sure to wait at least min_wait it is set (min_wait
-                # trumps max_wait this way).
-                wait_time = max(wait_time, self.min_wait)
-            time.sleep(wait_time)
-
-            # Assume we're below self.min due to waiting; max out the queue.
-            if task_count < self._max:
-                self.count_to_do = self._max - self._min
-            return
-
-        elif task_count <= self._min:
-            # Add more items.
-            self.count_to_do = self._max - task_count
-            if self.min_wait > 0:
-                time.sleep(self.min_wait)
-            return
+        # No shortage we know of. Measure the queue to see if it's below
+        # self.min. If so, we have a shortage that we should rectify.
+        while True:
+            queue_length = get_queue_length(self.queue_name)
+            if queue_length > self.min:
+                # The queue is still pretty full. Let it process a bit.
+                time.sleep(self.poll_interval)
+            else:
+                # Refill the queue. As Michelle Obama says, when it goes low,
+                # we go high.
+                self.shortage = self.max - queue_length
+                break
 
 
 def throttle_task(

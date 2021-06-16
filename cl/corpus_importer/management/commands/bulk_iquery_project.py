@@ -60,8 +60,6 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
                 if pacer_case_id > int(max_ids[court_id]):
                     # Enough scraping. Stop doing this court.
                     court_ids.remove(court_id)
-                    # Adjust the throttle queue to be shorter.
-                    throttle.set_min(len(court_ids * 2))
                     continue
                 make_docket_by_iquery.apply_async(
                     args=(court_id, pacer_case_id, next(db_key_cycle)),
