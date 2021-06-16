@@ -59,8 +59,8 @@ jobs:
           --follow-imports=skip \
           --exclude 'migrations/*' \
           -p cl.alerts \
-          -p cl.citations \
           -p cl.audio \
+          -p cl.citations \
           -p cl.corpus_importer \
           -p cl.lib \
           -p cl.opinion_page \
@@ -81,9 +81,6 @@ jobs:
           cl/corpus_importer/management/commands/import_tn.py \
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
-          cl/lib/storage.py \
-          cl/lib/string_utils.py \
-          cl/lib/types.py \
           cl/users/management/commands/cl_account_management.py \
           cl/users/forms.py
 

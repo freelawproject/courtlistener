@@ -886,7 +886,7 @@ def get_pacer_case_id_and_title(
     )
     if not cookies:
         # Get cookies from Redis if not provided
-        cookies = get_pacer_cookie_from_cache(user_pk)
+        cookies = get_pacer_cookie_from_cache(user_pk)  # type: ignore
     s = PacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     msg = ""
