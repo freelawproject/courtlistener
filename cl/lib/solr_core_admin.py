@@ -42,7 +42,10 @@ def get_solr_core_status(
         core_query = ""
     else:
         core_query = "&core=%s" % core
-    r = requests.get("%s/solr/admin/cores?action=STATUS%s" % (url, core_query))
+    r = requests.get(
+        "%s/solr/admin/cores?action=STATUS%s" % (url, core_query),
+        timeout=10,
+    )
     if r.status_code != 200:
         print(
             "Problem getting the core status. Got status_code of %s. "
@@ -72,7 +75,7 @@ def get_term_frequency(
         "numTerms": str(count),
         "wt": "json",
     }
-    r = requests.get("%s/solr/admin/luke" % url, params=params)
+    r = requests.get("%s/solr/admin/luke" % url, params=params, timeout=10)
     content_as_json = json.loads(r.content)
     if result_type == "list":
         if len(content_as_json["fields"]) == 0:
