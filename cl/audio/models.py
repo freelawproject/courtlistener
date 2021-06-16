@@ -170,7 +170,7 @@ class Audio(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
-    def save(
+    def save(  # type: ignore[override]
         self,
         index: bool = True,
         force_commit: bool = False,
@@ -185,18 +185,22 @@ class Audio(AbstractDateTimeModel):
         :param force_commit: Should a commit be performed in solr after
         indexing it?
         """
-        super(Audio, self).save(*args, **kwargs)
+        super(Audio, self).save(*args, **kwargs)  # type: ignore
         if index:
             from cl.search.tasks import add_items_to_solr
 
             add_items_to_solr([self.pk], "audio.Audio", force_commit)
 
-    def delete(self, *args: List, **kwargs: Dict) -> None:
+    def delete(  # type: ignore[override]
+        self,
+        *args: List,
+        **kwargs: Dict,
+    ) -> None:
         """
         Update the index as items are deleted.
         """
         id_cache = self.pk
-        super(Audio, self).delete(*args, **kwargs)
+        super(Audio, self).delete(*args, **kwargs)  # type: ignore
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "audio.Audio")
