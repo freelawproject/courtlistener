@@ -14,6 +14,7 @@ from eyecite.models import (
 )
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
+from scorched.response import SolrResponse
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
@@ -119,7 +120,7 @@ def get_years_from_reporter(
 
 def search_db_for_fullcitation(
     full_citation: FullCaseCitation,
-) -> List[ExtraSolrSearch]:
+) -> SolrResponse:
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
     Returns:

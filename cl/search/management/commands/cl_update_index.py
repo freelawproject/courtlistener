@@ -1,5 +1,6 @@
 import ast
 import sys
+from typing import Iterable
 
 from django.apps import apps
 from django.conf import settings
@@ -91,17 +92,9 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--queue",
+            type=str,
             default="celery",
             help="The celery queue where the tasks should be processed.",
-        )
-        parser.add_argument(
-            "--min-wait",
-            default=0,
-            type=int,
-            help="The amount of time to wait between enqueueing tasks. The "
-            "default is to keep Celery totally swamped, with no delays "
-            "but if you prefer to do things a little more slowly, set "
-            "this value to some number of seconds.",
         )
 
         actions_group = parser.add_mutually_exclusive_group()
@@ -150,6 +143,7 @@ class Command(VerboseCommand):
         )
         act_upon_group.add_argument(
             "--query",
+            type=str,
             help="Take action on items fulfilling a query. Queries should be "
             "formatted as Python dicts such as: \"{'court_id':'haw'}\"",
         )
@@ -236,7 +230,7 @@ class Command(VerboseCommand):
             )
             sys.exit(1)
 
-    def process_queryset(self, iterable, count):
+    def process_queryset(self, iterable: Iterable, count: int) -> None:
         """Chunks the queryset passed in, and dispatches it to Celery for
         adding to the index.
 
@@ -249,9 +243,7 @@ class Command(VerboseCommand):
         queue = self.options["queue"]
         start_at = self.options["start_at"]
         # Set low throttle. Higher values risk crashing Redis.
-        throttle = CeleryThrottle(
-            min_wait=self.options["min_wait"], queue_name=queue
-        )
+        throttle = CeleryThrottle(queue_name=queue, min_items=250)
         processed_count = 0
         chunk = []
         for item in iterable:

@@ -199,7 +199,7 @@ def get_pdfs(options: OptionsType) -> None:
 
     :return: None
     """
-    q = options["queue"]
+    q = cast(str, options["queue"])
     index = options["index"]
     cnt = CaseNameTweaker()
     rows = PACERFreeDocumentRow.objects.filter(error_msg="").only("pk")
@@ -234,7 +234,7 @@ def get_pdfs(options: OptionsType) -> None:
 
 def ocr_available(options: OptionsType) -> None:
     """Do the OCR for any items that need it, then save to the solr index."""
-    q = options["queue"]
+    q = cast(str, options["queue"])
     rds = (
         RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED)
         .values_list("pk", flat=True)
@@ -286,6 +286,7 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--queue",
+            type=str,
             default="batch1",
             help="The celery queue where the tasks should be processed.",
         )

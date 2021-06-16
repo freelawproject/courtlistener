@@ -1,6 +1,5 @@
-from typing import Union
+from typing import Union, cast
 
-import redis
 from django.conf import settings
 from redis import Redis
 
@@ -8,7 +7,7 @@ from redis import Redis
 def make_redis_interface(
     db_name: str,
     decode_responses: bool = True,
-) -> redis.Redis:
+) -> Redis:
     """Create a redis connection object
 
     :param db_name: The name of the database to use, as defined in our settings
@@ -17,10 +16,10 @@ def make_redis_interface(
     it.
     :return Redis interface using django settings
     """
-    return redis.Redis(
+    return Redis(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
-        db=settings.REDIS_DATABASES[db_name],
+        db=cast(int, settings.REDIS_DATABASES[db_name]),  # type: ignore
         decode_responses=decode_responses,
     )
 

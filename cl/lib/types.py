@@ -38,6 +38,7 @@ SearchParam = TypedDict(
     {
         "q": str,
         "fq": List[str],
+        "mm": int,
 
         # Pagination & ordering
         "rows": int,
