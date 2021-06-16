@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import tempfile
+from typing import Tuple, TypedDict
 
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -118,8 +119,14 @@ class TestDBTools(TestCase):
 class TestStringUtils(TestCase):
     def test_trunc(self) -> None:
         """Does trunc give us the results we expect?"""
+
+        class TestType(TypedDict, total=False):
+            length: int
+            result: str
+            ellipsis: str
+
         s = "Henry wants apple."
-        tests = (
+        tests: Tuple[TestType, ...] = (
             # Simple case
             {"length": 13, "result": "Henry wants"},
             # Off by one cases
@@ -784,9 +791,9 @@ class TestPACERPartyParsing(TestCase):
         ]
         for i, pair in enumerate(pairs):
             print("Normalizing address %s..." % i, end="")
-            result = normalize_attorney_contact(pair["q"])
+            result = normalize_attorney_contact(pair["q"])  # type: ignore
             self.maxDiff = None
-            self.assertEqual(result, pair["a"])
+            self.assertEqual(result, pair["a"])  # type: ignore
             print("✓")
 
     def test_making_a_lookup_key(self) -> None:
