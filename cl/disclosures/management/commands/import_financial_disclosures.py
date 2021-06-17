@@ -9,20 +9,15 @@ def import_financial_disclosures(
     filepath: str,
     skip_until: int,
     queue_name: str,
-    min_size: int,
 ) -> None:
     """Import financial documents into courtlistener.
 
     :param filepath: Path to file data to import.
     :param skip_until: ID if any to skip until.
     :param queue_name: The celery queue name.
-    :param min_size: The minimum items in a queue.
     :return:None
     """
-    throttle = CeleryThrottle(
-        queue_name=queue_name,
-        min_items=min_size,
-    )
+    throttle = CeleryThrottle(queue_name=queue_name)
     with open(filepath) as f:
         disclosures = json.load(f)
 
@@ -38,10 +33,7 @@ def import_financial_disclosures(
         throttle.maybe_wait()
 
         # Add disclosures to celery queue
-        import_disclosure.apply_async(
-            args=[data],
-            queue=queue_name,
-        )
+        import_disclosure.apply_async(args=[data], queue=queue_name)
 
 
 class Command(VerboseCommand):
@@ -68,18 +60,10 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
 
-        parser.add_argument(
-            "--min-size",
-            default=1,
-            type=int,
-            help="Minimum tasks in a queue (max = min x 2)",
-        )
-
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         import_financial_disclosures(
             filepath=options["filepath"],
             skip_until=options["skip_until"],
             queue_name=options["queue"],
-            min_size=options["min_size"],
         )

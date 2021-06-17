@@ -28,7 +28,7 @@ def download_dockets(options):
     f.seek(0)
     reader = csv.DictReader(f, dialect=dialect)
     q = options["queue"]
-    throttle = CeleryThrottle(queue_name=q, min_items=options["queue_length"])
+    throttle = CeleryThrottle(queue_name=q)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     session.login()
     for i, row in enumerate(reader):
@@ -108,16 +108,6 @@ class Command(VerboseCommand, CommandUtils):
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
-        )
-        parser.add_argument(
-            "--queue-length",
-            default=100,
-            type=int,
-            help="The number of items to queue up in Celery at one time. Use "
-            "a smaller value here to slow down the download. For "
-            "example, if you have 40 celery workers, any value above "
-            "that will keep all 40 going non-stop. Values below that "
-            "will only do that many tasks simultaneously.",
         )
         parser.add_argument(
             "--input-file",
