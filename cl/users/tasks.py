@@ -91,16 +91,20 @@ def update_mailchimp(self, email, status):
     if r.status_code == HTTP_200_OK:
         logger.info(
             "Successfully completed '%s' command on '%s' in mailchimp.",
-            (status, email),
+            status,
+            email,
         )
     elif r.status_code == HTTP_404_NOT_FOUND:
         logger.info(
             "Did not complete '%s' command on '%s' in mailchimp. "
             "Address not found.",
-            (status, email),
+            status,
+            email,
         )
     else:
         logger.warning(
             "Did not complete '%s' command on '%s' in mailchimp: '%s: %s'",
-            (status, email, r.status_code),
+            status,
+            email,
+            r.status_code,
         )
