@@ -228,19 +228,32 @@ def is_rate_okay(task: Task, rate: str = "1/s", key=None) -> bool:
 
     r = make_redis_interface("CACHE")
 
-    num_tasks, duration = parse_rate(rate)
+    allowed_task_count, duration = parse_rate(rate)
 
     # Check the count in redis
-    count = r.get(key)
-    if count is None:
+    actual_task_count = r.get(key)
+    if actual_task_count is None:
         # No key. Set the value to 1 and set the ttl of the key.
         r.set(key, 1, ex=duration)
         return True
     else:
         # Key found. Check it.
-        if int(count) <= num_tasks:
-            # We're OK, run it.
-            r.incr(key, 1)
+        if int(actual_task_count) <= allowed_task_count:
+            # We're OK to run the task. Increment our counter, and say things
+            # are OK by returning True.
+            new_count = r.incr(key, 1)
+            if new_count == 1:
+                # Safety check. If the count is 1 after incrementing, that
+                # means we created the key via the incr command. This can
+                # happen when it expires between when we `get` its value up
+                # above and when we increment it here. If that happens, it
+                # lacks a ttl! Set one.
+                #
+                # N.B. There's no need to worry about a race condition between
+                # our incr above, and the `expire` line here b/c without a ttl
+                # on this key, it can't expire between these two commands.
+                r.expire(key, duration)
             return True
         else:
+            # Over the threshold.
             return False
