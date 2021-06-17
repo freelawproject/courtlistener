@@ -135,7 +135,7 @@ class Command(VerboseCommand):
             len(docket_ids),
         )
         queue = options["queue"]
-        throttle = CeleryThrottle(queue_name=queue, min_items=10)
+        throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date()
         include_old_terminated = options["include_old_terminated"]
         for i, docket_id in enumerate(docket_ids):

@@ -93,7 +93,7 @@ def upload_recap_data(options):
     delay_count = 0
     t1 = now()
     logger.info("Sending recap dockets to Internet Archive")
-    throttle = CeleryThrottle(queue_name=q, min_items=5)
+    throttle = CeleryThrottle(queue_name=q)
     while True:
         # Start of quarter needs to be re-analyzed every time through the loop.
         # This ensures that if the quarter changes while this runs, we get the

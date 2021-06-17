@@ -243,7 +243,7 @@ class Command(VerboseCommand):
         queue = self.options["queue"]
         start_at = self.options["start_at"]
         # Set low throttle. Higher values risk crashing Redis.
-        throttle = CeleryThrottle(queue_name=queue, min_items=250)
+        throttle = CeleryThrottle(queue_name=queue)
         processed_count = 0
         chunk = []
         for item in iterable:
