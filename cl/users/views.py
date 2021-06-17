@@ -303,28 +303,23 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
-        try:
-            email: EmailType = emails["account_deleted"]
-            send_mail(
-                email["subject"],
-                email["body"] % request.user,
-                email["from_email"],
-                email["to"],
-            )
-            request.user.alerts.all().delete()
-            request.user.docket_alerts.all().delete()
-            request.user.favorites.all().delete()
-            request.user.user_tags.all().delete()
-            request.user.monthly_donations.all().upate(enabled=False)
-            request.user.scotus_maps.all().update(deleted=True)
-            user = convert_to_stub_account(request.user)
-            update_session_auth_hash(request, user)
-            logout(request)
-            update_mailchimp.delay(request.user.email, "unsubscribed")
-
-        except Exception as e:
-            logger.critical("User was unable to delete account. %s" % e)
-
+        email: EmailType = emails["account_deleted"]
+        send_mail(
+            email["subject"],
+            email["body"] % request.user,
+            email["from_email"],
+            email["to"],
+        )
+        request.user.alerts.all().delete()
+        request.user.docket_alerts.all().delete()
+        request.user.favorites.all().delete()
+        request.user.user_tags.all().delete()
+        request.user.monthly_donations.all().update(enabled=False)
+        request.user.scotus_maps.all().update(deleted=True)
+        user = convert_to_stub_account(request.user)
+        update_mailchimp.delay(request.user.email, "unsubscribed")
+        update_session_auth_hash(request, user)
+        logout(request)
         return HttpResponseRedirect(reverse("delete_profile_done"))
 
     non_deleted_map_count = request.user.scotus_maps.filter(
