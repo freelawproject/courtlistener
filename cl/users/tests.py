@@ -147,7 +147,7 @@ class UserTest(LiveServerTestCase):
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
-    ):
+    ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
         (
@@ -194,6 +194,17 @@ class ProfileTest(TestCase):
         # Now get the API page
         r = self.client.get(reverse("view_api"))
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_deleting_your_account(self) -> None:
+        """Can we delete an account properly?"""
+        self.assertTrue(
+            self.client.login(username="pandora", password="password")
+        )
+        response = self.client.post(reverse("delete_account"), follow=True)
+        self.assertRedirects(
+            response,
+            reverse("delete_profile_done"),
+        )
 
 
 class DisposableEmailTest(TestCase):
