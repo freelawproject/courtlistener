@@ -1110,6 +1110,18 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
         self.request.chain = None
         return
 
+    if not rd.pacer_doc_id:
+        msg = (
+            "Missing 'pacer_doc_id' attribute. Without this attribute we "
+            "cannot identify the document properly. Missing pacer_doc_id "
+            "attributes usually indicate that the item may not have a "
+            "document associated with it, or it may need to be updated via "
+            "the docket report to acquire a pacer_doc_id. Aborting request."
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
+        return
+
     cookies = get_pacer_cookie_from_cache(fq.user_id)
     if not cookies:
         msg = "Unable to find cached cookies. Aborting request."
