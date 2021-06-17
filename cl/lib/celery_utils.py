@@ -234,8 +234,7 @@ def is_rate_okay(task: Task, rate: str = "1/s", key=None) -> bool:
     count = r.get(key)
     if count is None:
         # No key. Set the value to 1 and set the ttl of the key.
-        r.set(key, 1)
-        r.expire(key, duration)
+        r.set(key, 1, ex=duration)
         return True
     else:
         # Key found. Check it.
