@@ -1,10 +1,9 @@
-from typing import Dict, List, Union
+from typing import Dict, List
 
 from eyecite import annotate, clean_text
-from eyecite.models import Resource
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
-from cl.lib.types import SupportedCitationType
+from cl.lib.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import Opinion
 
 
@@ -32,7 +31,7 @@ def get_and_clean_opinion_text(opinion: Opinion) -> None:
 
 def generate_annotations(
     citation_resolutions: Dict[
-        Union[Opinion, Resource], List[SupportedCitationType]
+        MatchedResourceType, List[SupportedCitationType]
     ],
 ) -> List[List]:
     """Generate the string annotations to insert into the opinion text
@@ -60,7 +59,7 @@ def generate_annotations(
 def create_cited_html(
     opinion: Opinion,
     citation_resolutions: Dict[
-        Union[Opinion, Resource], List[SupportedCitationType]
+        MatchedResourceType, List[SupportedCitationType]
     ],
 ) -> str:
     """Using the opinion itself and a list of citations found within it, make
