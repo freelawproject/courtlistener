@@ -11,8 +11,11 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
-from cl.citations.match_citations import do_resolve_citations
-from cl.lib.types import SupportedCitationType
+from cl.citations.match_citations import (
+    NO_MATCH_RESOURCE,
+    do_resolve_citations,
+)
+from cl.lib.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import Opinion, OpinionCluster, OpinionsCited
 from cl.search.tasks import add_items_to_solr
 
@@ -88,7 +91,7 @@ def find_citations_for_opinion_by_pks(
         # using a variety of heuristics.
         try:
             citation_resolutions: Dict[
-                Opinion, List[SupportedCitationType]
+                MatchedResourceType, List[SupportedCitationType]
             ] = do_resolve_citations(citations, opinion)
         except ResponseNotReady as e:
             # Threading problem in httplib, which is used in the Solr query.
@@ -98,6 +101,9 @@ def find_citations_for_opinion_by_pks(
         opinion.html_with_citations = create_cited_html(
             opinion, citation_resolutions
         )
+
+        # Delete the unmatched citations
+        citation_resolutions.pop(NO_MATCH_RESOURCE, None)
 
         # Increase the citation count for the cluster of each matched opinion
         # if that cluster has not already been cited by this opinion. First,
