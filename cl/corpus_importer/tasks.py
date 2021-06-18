@@ -522,10 +522,12 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
+@throttle_task("2/s", key="court_id", jitter=(5, 10))
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
     row_pk: int,
+    court_id: str,
 ) -> Optional[TaskData]:
     """Get a PDF from a PACERFreeDocumentRow object
 
@@ -536,6 +538,7 @@ def get_and_process_free_pdf(
          'rd_pk': rd.pk,
          'pacer_court_id': result.court_id}
     :param row_pk: The PACERFreeDocumentRow operate on
+    :param court_id: The court_id (used for throttling).
     """
     if data is None:
         return None
