@@ -34,8 +34,8 @@ class ContactForm(forms.Form):
         subject = cleaned_data.get("phone_number", "")
         message = cleaned_data.get("message", "")
         regex = re.compile(
-            r"block (from)?search engines?|block pages|ccpa|de-index|"
-            r"delete link|expunge|opt out|no ?index|remov(e|al)|"
+            r"block (from)?search engines?|block pages|ccpa|de-?index|"
+            r"delete link|dmca|expunge|opt out|no ?index|remov(e|al)|"
             r"take down request",
             re.I,
         )
