@@ -1,5 +1,6 @@
 from django.urls import path, re_path
 
+from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.views import (
     block_item,
     citation_redirector,
@@ -34,6 +35,11 @@ urlpatterns = [
         "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
         cluster_visualizations,
         name="cluster_visualizations",
+    ),
+    path(
+        "docket/<int:docket_id>/feed/",
+        DocketFeed(),
+        name="docket_feed",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),
     path(
