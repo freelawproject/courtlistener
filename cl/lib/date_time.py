@@ -1,18 +1,18 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 import pytz
 from django.conf import settings
 from django.utils.timezone import is_aware
 
 
-def midnight_pst(d):
+def midnight_pst(d: date) -> datetime:
     """Cast a naive date object to midnight PST"""
     pst = pytz.timezone("US/Pacific")
     d = datetime.combine(d, time()).replace(tzinfo=pst)
     return d
 
 
-def dt_as_local_date(dt):
+def dt_as_local_date(dt: datetime) -> date:
     """Convert a datetime to a localized date
 
     Datetimes are stored in the DB in UTC. Dates are handled a bit differently:
