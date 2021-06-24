@@ -20,6 +20,10 @@
     <link rel="stylesheet"
           href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
+  <link rel="alternate"
+        type="application/rss+xml"
+        title="Atom Feed for this Docket"
+        href="{% url "docket_feed" docket.pk %}" />
 {% endblock %}
 
 {% block nav-de %}active{% endblock %}

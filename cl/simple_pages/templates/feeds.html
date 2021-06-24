@@ -16,46 +16,47 @@
         <div class="row v-offset-above-3">
             <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
             <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
-                <h1 id="background" class="text-center">Atom Feeds of New Opinions&nbsp;<i class="gray fa fa-rss"></i></h1>
+                <h1 id="background" class="text-center">Atom Feeds with the Latest Updates&nbsp;<i class="gray fa fa-rss"></i></h1>
                 <p>We have a number of <a
                         href="https://en.wikipedia.org/wiki/RSS">feeds</a> so
-                    that you can easily stay up to date with the latest content from
-                    the courts without having to visit any website each day.</p>
+                    that you can easily stay up to date with the latest court documents
+                  without having to visit our website each day.</p>
                 <p>To subscribe to these feeds you will need an app or other program
                     that can regularly check the feed for new content. <a
                             href="https://en.wikipedia.org/wiki/Comparison_of_feed_aggregators">Numerous
                     options</a> for this are available for almost any device.</p>
                 <p>The feeds we provide require ongoing maintenance.
-                    We are able to add and support more feeds as we receive <a
+                    We are able to support these feeds as we receive <a
                             href="{% url "donate" %}?referrer=feeds">support</a> from you.</p>
+                <p><a href="{% url "donate" %}?referrer=feeds" class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Support our Work</a></p>
             </div>
         </div>
 
         <div class="row v-offset-above-2">
-            <div class="col-xs-6">
+            <div class="col-xs-4">
                 <h2 id="search-feeds" class="text-center">Search Feeds</h2>
                 <p>As you use the search engine, a feed is generated for
                     every search that you do. For opinions, you can subscribe to these
                     feeds using a URL like:</p>
                 <blockquote>
-                    <code>https://www.courtlistener.com/feed/search/?q=your-query</code>
+                    <code>/feed/search/?q={your-query}</code>
                 </blockquote>
 
                 <p>The best way to create these feeds is to do your search like you
-                    always do, and then use the subscribe button in your browser to
-                    subscribe. Another way is to click the RSS icon (<i class="gray fa fa-rss"></i>) on the
+                    normally do, and then click the subscribe button to
+                    sign up. Another way is to click the RSS icon (<i class="gray fa fa-rss"></i>) on the
                     search results page to identify the correct link.
                 </p>
             </div>
-            <div class="col-xs-6">
-                <h2 id="cited-by-feeds" class="text-center">Feeds for New Citations</h2>
+            <div class="col-xs-4">
+                <h2 id="cited-by-feeds" class="text-center">New Citation Feeds</h2>
                 <p>As we add items to our collection, we regularly discover new
                     citations to existing opinions. If you wish to stay up to date
                     with these new citations, you can do so using a search feed.
                 </p>
                 <p>Citation feeds thus take the form:</p>
                 <blockquote>
-                    <code>https://www.courtlistener.com/feed/search/?q=cites:({opinion_id})</code>
+                    <code>/feed/search/?q=cites:({opinion_id})</code>
                 </blockquote>
                 <p>As with search feeds, the easiest way to create these is to
                     do a search and then click the subscribe button in your
@@ -66,6 +67,17 @@
                     you an email whenever there is a new opinion citing one you
                     follow.
                 </p>
+            </div>
+            <div class="col-xs-4">
+              <h2 id="docket-feeds" class="text-center">Docket Feeds</h2>
+              <p>Each day we get <a href="{% url "coverage" %}#recap-archive">over 100,000 new items from PACER</a>. We have a sophisticated <a href="{% url "alert_help" %}">alert system</a> to send you emails about these, but some folks prefer to use RSS instead.
+              </p>
+              <p>If you prefer to get alerts for dockets by RSS instead, you can get a feed for a given docket with a link like:</p>
+              <blockquote>
+                <code>/docket/{docket-id}/feed/</code>
+              </blockquote>
+              <p>The easiest way to find these feeds is to find a docket you're interested in. From there, you can put its URL into your feed reader directly (and it should discover the RSS feed's link), or you can find the RSS feed's link by clicking the subscribe link in the alerts drop down.
+              </p>
             </div>
         </div>
 
