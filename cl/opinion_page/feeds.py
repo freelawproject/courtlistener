@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from django.contrib.syndication.views import Feed
 from django.db.models import Prefetch, QuerySet
@@ -21,6 +22,7 @@ class DocketFeed(Feed):
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     feed_copyright = "Created for the public domain by Free Law Project"
+    item_enclosure_mimetype = "application/pdf"
 
     def title(self, obj: Docket) -> str:
         return f"Docket updates for {make_docket_title(obj)}"
@@ -91,3 +93,25 @@ class DocketFeed(Feed):
 
     def item_pubdate(self, item: DocketEntry) -> datetime:
         return midnight_pst(item.date_filed)
+
+    def item_enclosure_url(self, item: DocketEntry) -> Optional[str]:
+        if not item.entry_number:
+            return None
+
+        # If we don't have the rd, abort.
+        try:
+            main_rd = item.main_docs[0]
+        except IndexError:
+            # No docs with entry
+            return None
+
+        # Serve the PDF if we have it
+        path = main_rd.filepath_local
+        if path:
+            return f"https://storage.courtlistener.com/{path}"
+
+        # If we don't have the PDF, serve a link to PACER
+        if main_rd.pacer_url:
+            return main_rd.pacer_url
+
+        return None
