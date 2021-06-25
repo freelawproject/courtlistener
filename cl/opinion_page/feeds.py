@@ -89,7 +89,11 @@ class DocketFeed(Feed):
         return item.description or main_rd.description
 
     def item_link(self, item: DocketEntry) -> str:
-        return f"{item.docket.get_absolute_url()}?order_by=desc#entry-{item.entry_number}"
+        if item.entry_number:
+            anchor = f"entry-{item.entry_number}"
+        else:
+            anchor = f"minute-entry-{item.pk}"
+        return f"{item.docket.get_absolute_url()}?order_by=desc#{anchor}"
 
     def item_pubdate(self, item: DocketEntry) -> datetime:
         return midnight_pst(item.date_filed)
