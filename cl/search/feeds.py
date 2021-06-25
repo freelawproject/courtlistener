@@ -143,6 +143,9 @@ class JurisdictionFeed(Feed):
         except:
             return None
 
+    # See: https://validator.w3.org/feed/docs/error/UseZeroForUnknown.html
+    item_enclosure_length = 0
+
 
 class AllJurisdictionsFeed(JurisdictionFeed):
     title = "CourtListener.com: All Opinions (High Volume)"

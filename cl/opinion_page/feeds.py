@@ -119,3 +119,6 @@ class DocketFeed(Feed):
             return main_rd.pacer_url
 
         return None
+
+    # See: https://validator.w3.org/feed/docs/error/UseZeroForUnknown.html
+    item_enclosure_length = 0
