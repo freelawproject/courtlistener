@@ -77,7 +77,12 @@ class DocketFeed(Feed):
 
     def item_title(self, item: DocketEntry) -> SafeText:
         docket_title = make_docket_title(item.docket)
-        return mark_safe(f"Entry #{item.entry_number} in {docket_title}")
+        entry_number = item.entry_number
+        if entry_number:
+            preface = f"Entry #{entry_number}"
+        else:
+            preface = f"Minute entry from {item.date_filed}"
+        return mark_safe(f"{preface} in {docket_title}")
 
     def item_description(self, item: DocketEntry) -> str:
         try:
