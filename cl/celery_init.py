@@ -3,6 +3,8 @@ import sys
 
 from celery import Celery
 
+from cl.lib.celery_utils import throttle_task
+
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cl.settings")
 
@@ -19,6 +21,7 @@ app.autodiscover_tasks()
 
 
 @app.task(bind=True)
+@throttle_task("2/4s")
 def debug_task(self) -> None:
     print("Request: {0!r}".format(self.request))
 
