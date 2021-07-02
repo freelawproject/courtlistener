@@ -24,6 +24,8 @@ TESTING = "test" in sys.argv
 TEST_RUNNER = "cl.tests.runner.TestRunner"
 if TESTING:
     PAGINATION_COUNT = 10
+    DEBUG = False
+
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
