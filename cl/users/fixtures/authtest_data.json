@@ -12,7 +12,7 @@
             "last_login": "2006-12-17T16:46:30Z",
             "groups": [],
             "user_permissions": [],
-            "password": "pbkdf2_sha256$36000$OIQCpvIXZil8$y7qUtb3Y0imzu1ATn4vQZeVtu7MuPg0zUqX5oBUL2zM=",
+            "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
             "email": "pandora@courtlistener.com",
             "date_joined": "2006-12-17T16:46:30Z"
         }
@@ -51,7 +51,7 @@
             "last_login": "2006-12-17T16:46:30Z",
             "groups": [],
             "user_permissions": [],
-            "password": "pbkdf2_sha256$36000$OIQCpvIXZil8$y7qUtb3Y0imzu1ATn4vQZeVtu7MuPg0zUqX5oBUL2zM=",
+            "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
             "email": "unconfirmed@courtlistener.com",
             "date_joined": "2006-12-17T16:46:30Z"
         }
@@ -90,7 +90,7 @@
             "last_login": "2006-12-17T16:46:30Z",
             "groups": [],
             "user_permissions": [],
-            "password": "pbkdf2_sha256$36000$OIQCpvIXZil8$y7qUtb3Y0imzu1ATn4vQZeVtu7MuPg0zUqX5oBUL2zM=",
+            "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
             "email": "unconfirmed2@courtlistener.com",
             "date_joined": "2006-12-17T16:46:30Z"
         }
@@ -129,7 +129,7 @@
             "last_login": "2006-12-17T16:46:30Z",
             "groups": [],
             "user_permissions": [],
-            "password": "pbkdf2_sha256$36000$OIQCpvIXZil8$y7qUtb3Y0imzu1ATn4vQZeVtu7MuPg0zUqX5oBUL2zM=",
+            "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
             "email": "unconfirmed2@courtlistener.com",
             "date_joined": "2006-12-17T16:46:30Z"
         }
@@ -168,7 +168,7 @@
           "last_login": null,
           "groups": [],
           "user_permissions": [],
-          "password": "pbkdf2_sha256$36000$OIQCpvIXZil8$y7qUtb3Y0imzu1ATn4vQZeVtu7MuPg0zUqX5oBUL2zM=",
+          "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
           "email": "",
           "date_joined": "2015-12-18T20:05:45.160Z"
         }
