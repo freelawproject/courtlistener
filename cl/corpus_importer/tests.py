@@ -1,6 +1,5 @@
 import json
 import os
-import unittest
 from datetime import date, datetime
 from glob import iglob
 from pathlib import Path
@@ -8,7 +7,6 @@ from unittest.mock import patch
 
 import pytest
 from django.conf import settings
-from django.test import TestCase
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_opinions import (
@@ -34,9 +32,10 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
-class JudgeExtractionTest(unittest.TestCase):
+class JudgeExtractionTest(SimpleTestCase):
     def test_get_judge_from_string_columbia(self) -> None:
         """Can we cleanly get a judge value from a string?"""
         tests = (
@@ -52,7 +51,7 @@ class JudgeExtractionTest(unittest.TestCase):
             self.assertEqual(extract_judge_last_name(q), a)
 
 
-class CourtMatchingTest(unittest.TestCase):
+class CourtMatchingTest(SimpleTestCase):
     """Tests related to converting court strings into court objects."""
 
     def test_get_court_object_from_string(self) -> None:
@@ -389,7 +388,7 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.state, "WA")
 
 
-class GetQuarterTest(unittest.TestCase):
+class GetQuarterTest(SimpleTestCase):
     """Can we properly figure out when the quarter that we're currently in
     began?
     """

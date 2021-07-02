@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
 from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
@@ -63,6 +62,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.tests import fakes
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -940,7 +940,7 @@ class RecapAddAttorneyTest(TestCase):
         self.assertNotIn(r, roles)
 
 
-class DocketCaseNameUpdateTest(TestCase):
+class DocketCaseNameUpdateTest(SimpleTestCase):
     """Do we properly handle the nine cases of incoming case name
     information?
     """
@@ -1660,7 +1660,7 @@ class RecapUploadAuthenticationTest(TestCase):
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
 
-class IdbImportTest(TestCase):
+class IdbImportTest(SimpleTestCase):
     """Assorted tests for the IDB importer."""
 
     cmd = Command()

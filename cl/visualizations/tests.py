@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict
 
 from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory
 from django.urls import reverse
 from httplib2 import Response
 from rest_framework.status import (
@@ -15,9 +15,9 @@ from rest_framework.status import (
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
-from rest_framework.test import APITestCase
 
 from cl.search.models import OpinionCluster
+from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
 from cl.users.models import UserProfile
 from cl.visualizations import views

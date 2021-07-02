@@ -1,7 +1,7 @@
 import datetime
 
 from django.template import Context
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory
 
 from cl.custom_filters.templatetags.extras import get_full_host, granular_date
 from cl.custom_filters.templatetags.text_filters import (
@@ -13,6 +13,7 @@ from cl.people_db.models import (
     GRANULARITY_MONTH,
     GRANULARITY_YEAR,
 )
+from cl.tests.cases import SimpleTestCase
 
 
 class TestTextFilters(TestCase):
@@ -39,7 +40,7 @@ class TestTextFilters(TestCase):
         )
 
 
-class TestNaturalDuration(TestCase):
+class TestNaturalDuration(SimpleTestCase):
     def test_conversion_to_strings(self) -> None:
         """Can we get the str output right?"""
         test_cases = (
@@ -101,7 +102,7 @@ class DummyObject(object):
     pass
 
 
-class TestExtras(TestCase):
+class TestExtras(SimpleTestCase):
 
     factory = RequestFactory()
 

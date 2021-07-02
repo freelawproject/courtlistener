@@ -8,7 +8,7 @@ import stripe
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test import Client, TestCase
+from django.test import Client
 from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from django.utils.timezone import now
@@ -19,6 +19,7 @@ from cl.donate.models import FREQUENCIES, PROVIDERS, Donation, MonthlyDonation
 
 # From: https://stripe.com/docs/testing#cards
 from cl.donate.utils import emails
+from cl.tests.cases import TestCase
 
 stripe_test_numbers = {
     "good": {"visa": "4242424242424242"},
@@ -248,7 +249,7 @@ class StripeTest(TestCase):
     "Only run PayPal tests if we have an API key available.",
 )
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
-class DonationIntegrationTest(SerializeMixin, TestCase):
+class DonationIntegrationTest(TestCase):
     """Attempt to handle all types/rates/providers/etc of payments
 
     See discussion in: https://github.com/freelawproject/courtlistener/issues/928

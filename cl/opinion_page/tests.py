@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.test.client import Client
 from django.urls import reverse
 from rest_framework.status import (
@@ -30,9 +30,10 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
 )
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
-class TitleTest(TestCase):
+class TitleTest(SimpleTestCase):
     def test_make_title_no_docket_number(self) -> None:
         """Can we make titles?"""
         # No docket number
