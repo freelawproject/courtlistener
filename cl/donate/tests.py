@@ -9,7 +9,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
 from django.test import Client
-from django.test.testcases import SerializeMixin
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
@@ -254,8 +253,6 @@ class DonationIntegrationTest(TestCase):
 
     See discussion in: https://github.com/freelawproject/courtlistener/issues/928
     """
-
-    lockfile = Path(__file__).parents[1] / "settings.py"
 
     fixtures = ["authtest_data.json"]
 
