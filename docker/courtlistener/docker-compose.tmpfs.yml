@@ -1,0 +1,9 @@
+# Run using `docker-compose up`
+version: "3.7"
+
+services:
+  cl-postgresql:
+    volumes:
+      # Set this to tmpfs for a speed boost
+      - type: tmpfs
+        target: /var/lib/postgresql/data/

@@ -31,9 +31,6 @@ services:
       POSTGRES_DB: "courtlistener"
     networks:
       - cl_net_overlay
-    volumes:
-      # Set this to tmpfs for a speed boost
-      - type=${POSTGRESQL_FILE_SYSTEM:-overlay2},destination=/var/lib/postgresql/data/
 
   # Search engine
   cl-solr:
