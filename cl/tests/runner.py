@@ -41,14 +41,8 @@ class OurCasesTestLoader(TestLoader):
 class TestRunner(DiscoverRunner):
     test_loader = OurCasesTestLoader()
 
-    def __init__(self, *args, enable_logging, exclude_tags=None, **kwargs):
-        on_ci = os.environ.get("GITHUB_ACTIONS", "") == "true"
-
-        # Exclude certain tests unless somebody is using the exclude_tags
-        # argument explicitly or we are on CI.
-        if exclude_tags is None and not on_ci:
-            exclude_tags = ["selenium", "slow"]
-        super().__init__(*args, exclude_tags=exclude_tags, **kwargs)
+    def __init__(self, *args, enable_logging, **kwargs):
+        super().__init__(*args, **kwargs)
         self.enable_logging = enable_logging
 
     @classmethod
