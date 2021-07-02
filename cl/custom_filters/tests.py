@@ -16,25 +16,26 @@ from cl.people_db.models import (
 from cl.tests.cases import SimpleTestCase
 
 
-class TestTextFilters(TestCase):
-    def test_oxford_zero_items(self) -> None:
+class TestOxfordJoinFilter(SimpleTestCase):
+    def test_oxford(self) -> None:
+        # Zero items
         self.assertEqual(oxford_join([]), "")
 
-    def test_oxford_one_item(self) -> None:
+        # One item
         self.assertEqual(oxford_join(["a"]), "a")
 
-    def test_oxford_two_items(self) -> None:
+        # Two items
         self.assertEqual(oxford_join(["a", "b"]), "a and b")
 
-    def test_oxford_three_items(self) -> None:
+        # Three items
         self.assertEqual(oxford_join(["a", "b", "c"]), "a, b, and c")
 
-    def test_oxford_separator(self) -> None:
+        # Custom separator
         self.assertEqual(
             oxford_join(["a", "b", "c"], separator=";"), "a; b; and c"
         )
 
-    def test_oxford_conjunction(self) -> None:
+        # Custom conjunction(self) -> None:
         self.assertEqual(
             oxford_join(["a", "b", "c"], conjunction="or"), "a, b, or c"
         )

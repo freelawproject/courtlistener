@@ -951,49 +951,48 @@ class DocketCaseNameUpdateTest(SimpleTestCase):
         self.new_case_name = "x v. z"
         self.uct = "Unknown Case Title"
 
-    def test_new_v_old_v_updates(self) -> None:
-        """Do we update if new is different and old has a value?"""
+    def test_case_name_updates(self) -> None:
+        # Do we update if new is different and old has a value?
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_v_old_uct_updates(self) -> None:
-        """Do we update if new has a value and old is UCT"""
+        # Do we update if new has a value and old is UCT
         self.d.case_name = self.uct
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_v_old_blank_updates(self) -> None:
+        # new_v_old_blank_updates
         self.d.case_name = ""
         d = update_case_names(self.d, self.new_case_name)
         self.assertEqual(d.case_name, self.new_case_name)
 
-    def test_new_uct_old_v_no_update(self) -> None:
+        # new_uct_old_v_no_update
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.v_case_name)
 
-    def test_new_uct_old_uct_no_update(self) -> None:
+        # new_uct_old_uct_no_update
         self.d.case_name = self.uct
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_uct_old_blank_updates(self) -> None:
+        # new_uct_old_blank_updates
         self.d.case_name = ""
         d = update_case_names(self.d, self.uct)
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_blank_old_v_no_update(self) -> None:
+        # new_blank_old_v_no_update
         self.d.case_name = self.v_case_name
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, self.v_case_name)
 
-    def test_new_blank_old_uct_no_update(self) -> None:
+        # new_blank_old_uct_no_update
         self.d.case_name = self.uct
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, self.uct)
 
-    def test_new_blank_old_blank_no_update(self) -> None:
+        # new_blank_old_blank_no_update
         self.d.case_name = ""
         d = update_case_names(self.d, "")
         self.assertEqual(d.case_name, "")
@@ -1306,20 +1305,21 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d.docket_entries.count(), expected_item_count)
 
 
-class DescriptionCleanupTest(TestCase):
-    def test_has_entered_date_at_end(self) -> None:
+class DescriptionCleanupTest(SimpleTestCase):
+    def test_cleanup(self) -> None:
+        # has_entered_date_at_end
         desc = "test (Entered: 01/01/2000)"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], "test")
 
-    def test_has_entered_date_in_middle(self) -> None:
+        # has_entered_date_in_middle
         desc = "test (Entered: 01/01/2000) test"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], desc)
 
-    def test_has_entered_date_in_middle_and_end(self) -> None:
+        # has_entered_date_in_middle_and_end
         desc = "test (Entered: 01/01/2000) and stuff (Entered: 01/01/2000)"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
@@ -1327,23 +1327,23 @@ class DescriptionCleanupTest(TestCase):
             docket_entry["description"], "test (Entered: 01/01/2000) and stuff"
         )
 
-    def test_has_no_entered_date(self) -> None:
+        # has_no_entered_date
         desc = "test stuff"
         docket_entry = {"description": "test stuff"}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], desc)
 
-    def test_no_description(self) -> None:
+        # no_description
         docket_entry = {}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry, {})
 
-    def test_removing_brackets(self) -> None:
+        # removing_brackets
         docket_entry = {"description": "test [10] stuff"}
         normalize_long_description(docket_entry)
         self.assertEqual(docket_entry["description"], "test 10 stuff")
 
-    def test_only_remove_brackets_on_numbers(self) -> None:
+        # only_remove_brackets_on_numbers
         desc = "test [asdf 10] stuff"
         docket_entry = {"description": desc}
         normalize_long_description(docket_entry)
