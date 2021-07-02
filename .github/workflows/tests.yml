@@ -75,11 +75,10 @@ jobs:
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
-        run: docker-compose up -d
+        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
           CELERY_DOCKER_TAG: "${{ github.sha }}"
           DJANGO_DOCKER_TAG: "${{ github.sha }}"
-          POSTGRESQL_FILE_SYSTEM: tmpfs  # For speed boost
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
