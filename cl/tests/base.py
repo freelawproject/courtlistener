@@ -32,6 +32,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
         pass
 
 
+@tag("selenium")
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
