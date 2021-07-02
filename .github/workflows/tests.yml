@@ -11,6 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
         uses: actions/checkout@v2-beta
@@ -76,6 +79,7 @@ jobs:
         env:
           CELERY_DOCKER_TAG: "${{ github.sha }}"
           DJANGO_DOCKER_TAG: "${{ github.sha }}"
+          POSTGRESQL_FILE_SYSTEM: tmpfs  # For speed boost
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
@@ -88,7 +92,10 @@ jobs:
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
       - name: Run the tests!
-        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2 --parallel
+        run: >
+          docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
+          python /opt/courtlistener/manage.py test
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: cp selenium results from docker to host
         if: failure()
         run: |
