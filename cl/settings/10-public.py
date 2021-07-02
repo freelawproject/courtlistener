@@ -20,6 +20,10 @@ TEST_RUNNER = "cl.tests.runner.TestRunner"
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 TESTING = "test" in sys.argv
+# ON_CI = os.environ.get("GITHUB_ACTIONS", "") == "true"
+TEST_RUNNER = "cl.tests.runner.TestRunner"
+if TESTING:
+    PAGINATION_COUNT = 10
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True
