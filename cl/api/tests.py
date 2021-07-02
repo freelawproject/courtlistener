@@ -11,13 +11,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
 from django.http import HttpRequest, JsonResponse
-from django.test import (
-    Client,
-    RequestFactory,
-    TestCase,
-    TransactionTestCase,
-    override_settings,
-)
+from django.test import Client, RequestFactory, override_settings
 from django.urls import ResolverMatch, reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
@@ -41,6 +35,7 @@ from cl.search.models import (
     OpinionsCited,
 )
 from cl.stats.models import Event
+from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 
 
 class BasicAPIPageTest(TestCase):
@@ -886,7 +881,7 @@ class DRFRecapPermissionTest(TestCase):
             print("✓")
 
 
-class BulkJsonHistoryTest(TestCase):
+class BulkJsonHistoryTest(SimpleTestCase):
     def setUp(self) -> None:
         self.history = BulkJsonHistory("test", settings.BULK_DATA_DIR)
 

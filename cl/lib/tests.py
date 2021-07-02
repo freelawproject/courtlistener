@@ -5,7 +5,7 @@ import tempfile
 from typing import Tuple, TypedDict
 
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
@@ -28,6 +28,7 @@ from cl.lib.string_utils import normalize_dashes, trunc
 from cl.people_db.models import Role
 from cl.scrapers.models import UrlHash
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 class TestPacerUtils(TestCase):
@@ -59,8 +60,8 @@ class TestPacerUtils(TestCase):
 
 
 class TestDBTools(TestCase):
-    # This fixture uses UrlHash objects b/c they've been around a long while and
-    # are wickedly simple objects.
+    # This fixture uses UrlHash objects b/c they've been around a long while
+    # and are wickedly simple objects.
     fixtures = ["test_queryset_generator.json"]
 
     def test_queryset_generator(self) -> None:
@@ -116,7 +117,7 @@ class TestDBTools(TestCase):
         print("✓")
 
 
-class TestStringUtils(TestCase):
+class TestStringUtils(SimpleTestCase):
     def test_trunc(self) -> None:
         """Does trunc give us the results we expect?"""
 
@@ -205,7 +206,7 @@ class TestStringUtils(TestCase):
             self.assertEqual(computed, answer)
 
 
-class TestMakeFQ(TestCase):
+class TestMakeFQ(SimpleTestCase):
     def test_make_fq(self) -> None:
         test_pairs = (
             ("1 2", "1 AND 2"),
@@ -299,7 +300,7 @@ class UUIDFileSystemStorageTest(SimpleTestCase):
         self.assertTrue(re.match("[a-f0-9]{32}", file_root_created))
 
 
-class TestMimeLookup(TestCase):
+class TestMimeLookup(SimpleTestCase):
     """Test the Mime type lookup function(s)"""
 
     def test_unsupported_extension_returns_octetstream(self) -> None:
@@ -356,7 +357,7 @@ class TestMaintenanceMiddleware(TestCase):
         )
 
 
-class TestPACERPartyParsing(TestCase):
+class TestPACERPartyParsing(SimpleTestCase):
     """Various tests for the PACER party parsers."""
 
     def test_attorney_role_normalization(self) -> None:
@@ -818,7 +819,7 @@ class TestPACERPartyParsing(TestCase):
         )
 
 
-class TestFilesizeConversions(TestCase):
+class TestFilesizeConversions(SimpleTestCase):
     def test_filesize_conversions(self) -> None:
         """Can we convert human filesizes to bytes?"""
         qa_pairs = [
@@ -843,7 +844,7 @@ class TestFilesizeConversions(TestCase):
             print("✓")
 
 
-class TestRateLimiters(TestCase):
+class TestRateLimiters(SimpleTestCase):
     def test_parsing_rates(self) -> None:
         qa_pairs = [
             ("1/s", (1, 1)),

@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test import Client, TestCase
+from django.test import Client
 from django.urls import reverse
 from django.utils.timezone import now
 from selenium.webdriver.common.by import By
@@ -15,6 +15,7 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.tests.cases import TestCase
 
 
 class AlertTest(TestCase):

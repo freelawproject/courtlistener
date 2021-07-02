@@ -3,7 +3,6 @@ from typing import Sized, cast
 import scorched
 from django.conf import settings
 from django.db.models import QuerySet
-from django.test import TestCase
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
@@ -12,6 +11,7 @@ from cl.audio.models import Audio
 from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
+from cl.tests.cases import TestCase
 
 
 class SerializeSolrTestMixin(SerializeMixin):

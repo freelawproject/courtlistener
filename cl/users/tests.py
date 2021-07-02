@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.test import Client, LiveServerTestCase, TestCase
+from django.test import Client
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
@@ -11,6 +11,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.tests.cases import LiveServerTestCase, TestCase
 from cl.users.models import UserProfile
 
 
