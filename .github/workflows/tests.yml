@@ -14,6 +14,11 @@ jobs:
     strategy:
       matrix:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       - name: Check out solr
         uses: actions/checkout@v2-beta
@@ -61,16 +66,16 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           file: docker/django/Dockerfile
-#          push: true
-          load: true
-          tags: freelawproject/courtlistener-django:${{ github.sha }}
+          push: true
+#          load: true
+          tags: localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}
       - name: Build and push latest docker celery image
         uses: docker/build-push-action@v2
         with:
           file: docker/task-server/Dockerfile
-#          push: true
-          tags: freelawproject/task-server:${{ github.sha }}
-          load: true
+          push: true
+          tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
+#          load: true
 
       # Docker images are ready. Start them up.
       - name: Create docker network
