@@ -52,23 +52,25 @@ jobs:
       # dependencies
       - name: Set up docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+#      - name: Login to DockerHub
+#        uses: docker/login-action@v1
+#        with:
+#          username: ${{ secrets.DOCKERHUB_USERNAME }}
+#          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and push latest docker django image
         uses: docker/build-push-action@v2
         with:
           file: docker/django/Dockerfile
-          push: true
+#          push: true
+          load: true
           tags: freelawproject/courtlistener-django:${{ github.sha }}
       - name: Build and push latest docker celery image
         uses: docker/build-push-action@v2
         with:
           file: docker/task-server/Dockerfile
-          push: true
+#          push: true
           tags: freelawproject/task-server:${{ github.sha }}
+          load: true
 
       # Docker images are ready. Start them up.
       - name: Create docker network
