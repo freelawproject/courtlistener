@@ -304,7 +304,7 @@
     <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
     </p>
     <pre class=pre-scrollable>curl {% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction!=F</pre>
-    <p>You can see more examples of almost any type of filter in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/api/tests.py" target="_blank">our automated tests</a>.
+    <p>You can see more examples of almost any type of filter in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank">our automated tests</a>.
     </p>
 
 
@@ -677,7 +677,7 @@
       <li>There are a number of date "granularity" fields. These are used to indicate how granular a date is known to be. For example, for many people we know the year they died but not the month or day. For these people, the <code>date_dod</code> field might be <code>2010-01-01</code>, and the <code>date_granularity_dod</code> field would be set to <code>%Y</code>, using <a href="https://secure.php.net/manual/en/function.strftime.php">strftime formatting</a> to indicate the granularity. If a date field has a granularity field, both fields will either be completed or null.
       </li>
       <li>There are a number of validation rules that can be useful for understanding this data. For example, one rule mandates that every position be affiliated with a school, a court, or an organization. These rules are written in Python and can be found by looking in the <code>clean_fields</code> method of the <code>Model</code> classes
-          <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/people_db/models.py">found here.</a>.
+          <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/people_db/models.py">found here.</a>.
       </li>
     </ul>
 
@@ -785,7 +785,7 @@
       <li><p><code>{% url "pacerfetchqueue-list" version="v3" %}</code> &mdash; Use this endpoint to ask our server to fetch an item from PACER on your behalf.</p></li>
     </ul>
     <h4 id="processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</h4>
-    <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/master/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
+    <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
     </p>
     <p>The following parameters apply to all uploads:</p>
     <ul>

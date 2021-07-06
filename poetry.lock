@@ -1543,7 +1543,7 @@ test = ["nose", "coverage", "mock"]
 [package.source]
 type = "git"
 url = "https://github.com/freelawproject/scorched.git"
-reference = "master"
+reference = "main"
 resolved_reference = "0632024e72e22a71e17cdb778805561f7cdd33d8"
 
 [[package]]
