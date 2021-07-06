@@ -69,7 +69,7 @@ jobs:
         with:
           file: docker/django/Dockerfile
 #          push: true
-#          load: true
+          load: true
           tags: freelawproject/courtlistener-django:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
@@ -79,9 +79,9 @@ jobs:
           file: docker/task-server/Dockerfile
 #          push: true
           tags: freelawproject/task-server:${{ github.sha }}
-#          load: true
+          load: true
           cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
+#          cache-to: type=local,dest=/tmp/.buildx-cache-new
 
       # Docker images are ready. Start them up.
       - name: Create docker network
