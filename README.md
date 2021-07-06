@@ -66,5 +66,5 @@ https://free.law/contact/
 [hw]: https://github.com/freelawproject/courtlistener/labels/help%20wanted
 [dq]: https://github.com/freelawproject/courtlistener/labels/data-quality
 [flp]: https://free.law/
-[developing]: https://github.com/freelawproject/courtlistener/blob/master/DEVELOPING.md
+[developing]: https://github.com/freelawproject/courtlistener/blob/main/DEVELOPING.md
 [yours-truly]: https://github.com/freelawproject/courtlistener/commit/90db0eb433990a7fd5e8cbe5b0fffef5fbf8e4f6

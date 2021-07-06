@@ -6,7 +6,7 @@ on:
       - '**'
   pull_request:
     branches:
-      - 'master'
+      - 'main'
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v2-beta
         with:
           repository: freelawproject/courtlistener-solr-server
-          ref: master
+          ref: main
           path: courtlistener-solr-server
       - name: Set up solr permissions
         run: |

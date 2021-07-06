@@ -227,7 +227,7 @@ this is needed.
 [bdfl]: https://en.wikipedia.org/wiki/Benevolent_dictator_for_life
 [format]: https://github.com/angular/angular.js/blob/master/DEVELOPERS.md#-git-commit-guidelines
 [format-plugin]: https://plugins.jetbrains.com/plugin/9861-git-commit-template/
-[hr]: https://github.com/freelawproject/hr/blob/master/handbook/handbook.md
+[hr]: https://github.com/freelawproject/hr/blob/main/handbook/handbook.md
 [black]: https://black.readthedocs.io/en/stable/
 [black-ed]: https://black.readthedocs.io/en/stable/editor_integration.html
 
@@ -334,7 +334,7 @@ Once an amazing new feature has been added to CL or to an import dependency (ie 
 To do this:
 
 1) Update the version numbers and version logs in `docker/django/version.txt` & `docker/task-server/version.txt`.
-2) Push to `master`
+2) Push to `main`
 
 Docker hub, automatically builds new versions and will update `:latest`.
 
@@ -348,12 +348,5 @@ We use Github Actions to run the full test and linting suite on every push. If t
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
 [chromedriver]: https://sites.google.com/a/chromium.org/chromedriver/downloads
 [django-testing]: https://docs.djangoproject.com/en/1.8/topics/testing/
-[vagrantfile]: https://raw.githubusercontent.com/freelawproject/freelawmachine/master/Vagrantfile
-[vagrantfile-desktop]: https://github.com/freelawproject/freelawmachine/blob/master/Vagrantfile.desktop
-[flm]: https://github.com/freelawproject/freelawmachine
-[flm-readme]: https://github.com/freelawproject/freelawmachine/blob/master/README.md
-[vagrant-ports]: https://www.vagrantup.com/docs/networking/forwarded_ports.html
-[circleci-cl-builds]: https://circleci.com/gh/freelawproject/courtlistener
 [hub-cl-testing]: https://hub.docker.com/r/freelawproject/courtlistener-testing/
 [hub-flp]: https://hub.docker.com/u/freelawproject/dashboard/
-[circleci-test-container-tag]: https://github.com/freelawproject/courtlistener/blob/360c259f7d427700c2de9bf8fd53a73a33ff2eed/.circleci/config.yml#L5
