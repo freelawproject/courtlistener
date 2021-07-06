@@ -86,7 +86,7 @@ usaddress = "*"
 
 # Currently this doesn't support py3, which blocks installation due to outdated dependencies.
 juriscraper = "^2.3.0"
-scorched = {git = "https://github.com/freelawproject/scorched.git"}
+scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.21.0"
 gunicorn = "^20.0.4"
