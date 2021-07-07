@@ -276,7 +276,7 @@ class CourtMatchingTest(SimpleTestCase):
             {"q": "M.D. of Pennsylvania", "a": "pamd"},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print(f"Testing: {test['q']}, expecting: {test['a']}")
             got = match_court_string(test["q"], federal_district=True)
             self.assertEqual(test["a"], got)
 
@@ -294,7 +294,7 @@ class CourtMatchingTest(SimpleTestCase):
             {"q": "U.S. Circuit Court for the Ninth Circuit", "a": "ca9"},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print(f"Testing: {test['q']}, expecting: {test['a']}")
             got = match_court_string(test["q"], federal_appeals=True)
             self.assertEqual(test["a"], got)
 
@@ -354,7 +354,7 @@ class PacerDocketParserTest(TestCase):
                     att_rd.description.endswith("added"),
                 ]
             ),
-            "Description didn't match. Got: %s" % att_rd.description,
+            f"Description didn't match. Got: {att_rd.description}",
         )
         self.assertEqual(att_rd.attachment_number, 1)
         self.assertEqual(att_rd.document_number, "116")
@@ -687,7 +687,7 @@ class HarvardTests(TestCase):
             {"q": "2019", "a": "2019-07-01"},
         )
         for test in pairs:
-            print("Testing: %s, expecting: %s" % (test["q"], test["a"]))
+            print(f"Testing: {test['q']}, expecting: {test['a']}")
             got = validate_dt(test["q"])
             dt_obj = datetime.strptime(test["a"], "%Y-%m-%d").date()
             self.assertEqual(dt_obj, got[0])

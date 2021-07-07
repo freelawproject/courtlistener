@@ -106,7 +106,7 @@ class QueuedCase(AbstractDateTimeModel):
         )
 
     def __str__(self) -> str:
-        return "%s" % self.internal_case_id
+        return f"{self.internal_case_id}"
 
     class Meta:
         verbose_name = "Queued Case"
@@ -246,7 +246,7 @@ class Docket(AbstractDateTimeModel):
         )
 
     def __str__(self) -> str:
-        return "%s" % self.case_id
+        return f"{self.case_id}"
 
 
 class QueuedPDF(AbstractDateTimeModel):
@@ -280,7 +280,7 @@ class QueuedPDF(AbstractDateTimeModel):
         )
 
     def __str__(self) -> str:
-        return "%s" % self.document_id
+        return f"{self.document_id}"
 
     class Meta:
         verbose_name = "Queued PDF"
@@ -415,10 +415,7 @@ class DocumentImage(AbstractDateTimeModel):
         return base_url + path_template % (self.docket.case_id, self.doc_id)
 
     def __str__(self) -> str:
-        return "Scanned PDF  %s for %s" % (
-            self.doc_id,
-            self.docket.docket_number,
-        )
+        return f"Scanned PDF  {self.doc_id} for {self.docket.docket_number}"
 
     class Meta:
         verbose_name = "Document Image"
@@ -463,7 +460,7 @@ class DocumentFiled(AbstractDateTimeModel):
         verbose_name_plural = "Documents Filed"
 
     def __str__(self) -> str:
-        return "%s for %s" % (self.document_type, self.docket.docket_number)
+        return f"{self.document_type} for {self.docket.docket_number}"
 
 
 class Action(AbstractDateTimeModel):
@@ -507,7 +504,7 @@ class Action(AbstractDateTimeModel):
         verbose_name_plural = "Action Entries"
 
     def __str__(self) -> str:
-        return "Action for %s" % self.docket.docket_number
+        return f"Action for {self.docket.docket_number}"
 
 
 class CrossReference(AbstractDateTimeModel):
@@ -544,10 +541,7 @@ class CrossReference(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s for %s" % (
-            self.cross_reference_type,
-            self.docket.docket_number,
-        )
+        return f"{self.cross_reference_type} for {self.docket.docket_number}"
 
     class Meta:
         verbose_name = "Cross Reference"
@@ -612,7 +606,7 @@ class Party(AbstractDateTimeModel):
         verbose_name_plural = "Parties"
 
     def __str__(self) -> str:
-        return "%s for %s" % (self.party_name, self.docket.docket_number)
+        return f"{self.party_name} for {self.docket.docket_number}"
 
 
 class TIME_CHOICES:
@@ -716,7 +710,7 @@ class Proceeding(AbstractDateTimeModel):
     future_objects = FutureProceedingManager()
 
     def __str__(self) -> str:
-        return "%s for %s" % (self.event, self.docket.docket_number)
+        return f"{self.event} for {self.docket.docket_number}"
 
 
 class TentativeRuling(AbstractDateTimeModel):
@@ -758,7 +752,7 @@ class TentativeRuling(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "Tentative ruling for %s" % self.docket.docket_number
+        return f"Tentative ruling for {self.docket.docket_number}"
 
     class Meta:
         verbose_name = "Tentative Ruling"

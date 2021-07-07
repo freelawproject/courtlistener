@@ -15,7 +15,7 @@ def clone_attorney(orig_atty_id, atty, docket):
     # careful which you use for lookups and assignment.
     atty.id = None
     atty.save()
-    logger.info("Created new attorney: %s" % atty)
+    logger.info(f"Created new attorney: {atty}")
 
     roles_for_docket = Role.objects.filter(
         attorney_id=orig_atty_id, docket=docket
@@ -60,8 +60,7 @@ class Command(VerboseCommand):
             .filter(id__count__gt=1)
         )
         logger.info(
-            "Got %s attorneys that are on more than one docket."
-            % roles.count()
+            f"Got {roles.count()} attorneys that are on more than one docket."
         )
 
         # That returns a list of dictionaries like:
@@ -77,8 +76,7 @@ class Command(VerboseCommand):
                 .distinct()
             )
             logger.info(
-                "Got %s dockets for attorney %s. Cloning them all."
-                % (dockets.count(), atty)
+                f"Got {dockets.count()} dockets for attorney {atty}. Cloning them all."
             )
 
             for docket in dockets[1:]:

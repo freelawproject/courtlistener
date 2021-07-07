@@ -14,7 +14,7 @@ def get_scraper_object_by_name(court_id):
     :rtype: juriscraper.AbstractSite.Site
     """
     for _, full_module_path, _ in pkgutil.walk_packages(
-        juriscraper.__path__, juriscraper.__name__ + "."
+        juriscraper.__path__, f"{juriscraper.__name__}."
     ):
         # Get the module name from the full path and trim
         # any suffixes like _p, _u

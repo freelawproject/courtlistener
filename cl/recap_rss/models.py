@@ -55,7 +55,7 @@ class RssFeedStatus(AbstractDateTimeModel):
         verbose_name_plural = "RSS Feed Statuses"
 
     def __str__(self) -> str:
-        return "RssFeedStatus: %s, %s" % (self.pk, self.court_id)
+        return f"RssFeedStatus: {self.pk}, {self.court_id}"
 
 
 class RssItemCache(models.Model):

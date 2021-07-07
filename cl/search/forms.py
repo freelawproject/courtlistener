@@ -44,7 +44,7 @@ def _clean_form(get_params, cd, courts):
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm().get_date_field_names():
         for time in ("before", "after"):
-            field = "%s_%s" % (date_field, time)
+            field = f"{date_field}_{time}"
             if get_params.get(field) and cd.get(field) is not None:
                 # Don't use strftime. It'll fail before 1900
                 before = cd[field]
@@ -58,10 +58,10 @@ def _clean_form(get_params, cd, courts):
     get_params["type"] = cd["type"]
 
     for court in courts:
-        get_params["court_%s" % court.pk] = cd["court_%s" % court.pk]
+        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
 
     for status in DOCUMENT_STATUSES:
-        get_params["stat_%s" % status[1]] = cd["stat_%s" % status[1]]
+        get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
 
     # Ensure that we have the cleaned_data and other related attributes set.
     form = SearchForm(get_params)
@@ -471,7 +471,7 @@ class SearchForm(forms.Form):
         """
         courts = Court.objects.filter(in_use=True)
         for court in courts:
-            self.fields["court_" + court.pk] = forms.BooleanField(
+            self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,
                 required=False,
                 initial=True,
@@ -492,7 +492,7 @@ class SearchForm(forms.Form):
                 widget=forms.CheckboxInput(attrs=attrs),
             )
             new_field.as_str_types = [SEARCH_TYPES.OPINION]
-            self.fields["stat_" + status[1]] = new_field
+            self.fields[f"stat_{status[1]}"] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for
@@ -587,13 +587,13 @@ class SearchForm(forms.Form):
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
         for field_name in self.get_date_field_names():
-            before = cleaned_data.get("%s_before" % field_name)
-            after = cleaned_data.get("%s_after" % field_name)
+            before = cleaned_data.get(f"{field_name}_before")
+            after = cleaned_data.get(f"{field_name}_after")
             if before and after and (before < after):
                 # The user is requesting dates like this: <--b  a-->. Switch
                 # the dates so their query is like this: a-->   <--b
-                cleaned_data["%s_before" % field_name] = after
-                cleaned_data["%s_after" % field_name] = before
+                cleaned_data[f"{field_name}_before"] = after
+                cleaned_data[f"{field_name}_after"] = before
 
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get("court")
@@ -605,7 +605,7 @@ class SearchForm(forms.Form):
             else:
                 court_ids = [court_str]
             for court_id in court_ids:
-                cleaned_data["court_%s" % court_id] = True
+                cleaned_data[f"court_{court_id}"] = True
 
         # 3. Make sure that the user has selected at least one facet for each
         #    taxonomy. Note that this logic must be paralleled in
@@ -679,5 +679,5 @@ class SearchForm(forms.Form):
         """Create a human-readable string representation of the search form"""
         crumbs = []
         for label, value in self.as_display_dict(court_count_human).items():
-            crumbs.append(u"%s: %s" % (label, value))
-        return u" › ".join(crumbs)
+            crumbs.append(f"{label}: {value}")
+        return " › ".join(crumbs)

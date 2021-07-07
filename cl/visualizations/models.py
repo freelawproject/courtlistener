@@ -312,9 +312,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         return json.dumps(j, indent=2)
 
     def __str__(self) -> str:
-        return "{pk}: {title}".format(
-            pk=getattr(self, "pk", None), title=self.title
-        )
+        return f"{getattr(self, 'pk', None)}: {self.title}"
 
     def get_absolute_url(self) -> str:
         return reverse(
@@ -392,10 +390,7 @@ class Referer(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "{pk}: Refers to {map}".format(
-            pk=getattr(self, "pk", None),
-            map=self.map,
-        )
+        return f"{getattr(self, 'pk', None)}: Refers to {self.map}"
 
     class Meta:
         # Ensure that we don't have dups in the DB for a given map.

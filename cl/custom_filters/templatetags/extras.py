@@ -37,7 +37,7 @@ def get_full_host(context, username=None, password=None):
         "{protocol}://{username}{password}{domain_and_port}".format(
             protocol=protocol,
             username="" if username is None else username,
-            password="" if password is None else ":" + password + "@",
+            password="" if password is None else f":{password}@",
             domain_and_port=domain_and_port,
         )
     )
@@ -70,7 +70,7 @@ def granular_date(
     d = obj.get(field_name, None)
     if granularity is None:
         date_parts = field_name.split("_")
-        granularity = obj["%s_granularity_%s" % (date_parts[0], date_parts[1])]
+        granularity = obj[f"{date_parts[0]}_granularity_{date_parts[1]}"]
 
     if not d:
         return default

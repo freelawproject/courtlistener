@@ -47,7 +47,7 @@ class ScraperIngestionTest(TestCase):
         count = opinions.count()
         self.assertTrue(
             opinions.count() == 6,
-            "Should have 6 test opinions, not %s" % count,
+            f"Should have 6 test opinions, not {count}",
         )
         mock.assert_called()
 
@@ -130,12 +130,12 @@ class IngestionTest(IndexedSolrTestCase):
         )
         content, err = extract_from_txt(path)
         self.assertFalse(
-            err, "Error reported while extracting text from %s" % path
+            err, f"Error reported while extracting text from {path}"
         )
         self.assertIn(
             "¶  1.  DOOLEY, J.   Plaintiffs",
             content,
-            "Issue extracting/encoding text from file at: %s" % path,
+            f"Issue extracting/encoding text from file at: {path}",
         )
 
 
@@ -227,8 +227,7 @@ class ReportScrapeStatusTest(TestCase):
         self.assertEqual(
             errors["test"],
             [1, 1],
-            msg="Did not get expected error counts. Instead got: %s"
-            % errors["test"],
+            msg=f"Did not get expected error counts. Instead got: {errors['test']}",
         )
 
     @staticmethod

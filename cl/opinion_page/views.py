@@ -373,7 +373,7 @@ def make_rd_title(rd: RECAPDocument) -> str:
         else "",
         case_name=best_case_name(d),
         court=d.court.citation_string,
-        docket_number=", %s" % d.docket_number if d.docket_number else "",
+        docket_number=f", {d.docket_number}" if d.docket_number else "",
     )
 
 
@@ -517,7 +517,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
-            "related_search_params": "&" + urlencode(related_search_params),
+            "related_search_params": f"&{urlencode(related_search_params)}",
         },
     )
 

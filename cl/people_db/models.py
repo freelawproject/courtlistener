@@ -207,7 +207,7 @@ class Person(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: %s" % (self.pk, self.name_full)
+        return f"{self.pk}: {self.name_full}"
 
     class Meta:
         verbose_name_plural = "people"
@@ -412,13 +412,9 @@ class School(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         if self.is_alias_of:
-            return "%s: %s (alias: %s)" % (
-                self.pk,
-                self.name,
-                self.is_alias_of.name,
-            )
+            return f"{self.pk}: {self.name} (alias: {self.is_alias_of.name})"
         else:
-            return "%s: %s" % (self.pk, self.name)
+            return f"{self.pk}: {self.name}"
 
     @property
     def is_alias(self):
@@ -907,11 +903,7 @@ class Position(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: %s at %s" % (
-            self.pk,
-            self.person.name_full,
-            self.court_id,
-        )
+        return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
     @property
     def is_judicial_position(self):
@@ -1175,7 +1167,7 @@ class Race(models.Model):
 
     def __str__(self) -> str:
         # This is used in the API via the StringRelatedField. Do not cthange.
-        return "{race}".format(race=self.race)
+        return f"{self.race}"
 
 
 class PoliticalAffiliation(AbstractDateTimeModel):
@@ -1454,7 +1446,7 @@ class Party(AbstractDateTimeModel):
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "%s: %s" % (self.pk, self.name)
+        return f"{self.pk}: {self.name}"
 
 
 class Role(models.Model):
@@ -1568,7 +1560,7 @@ class Attorney(AbstractDateTimeModel):
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
     def __str__(self) -> str:
-        return "%s: %s" % (self.pk, self.name)
+        return f"{self.pk}: {self.name}"
 
 
 class AttorneyOrganizationAssociation(models.Model):

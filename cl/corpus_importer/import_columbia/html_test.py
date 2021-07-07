@@ -186,7 +186,7 @@ def titlecase(text, DEBUG=False):
             print("Entire string is uppercase, thus lowercasing.")
         text = text.lower()
     elif not text_sans_small_words.isupper() and DEBUG:
-        print(("Entire string not upper case. Not lowercasing: %s" % text))
+        print(f"Entire string not upper case. Not lowercasing: {text}")
 
     lines = re.split("[\r\n]+", text)
     processed = []
@@ -196,22 +196,22 @@ def titlecase(text, DEBUG=False):
         tc_line = []
         for word in words:
             if DEBUG:
-                print("Word: " + word)
+                print(f"Word: {word}")
             if all_caps:
                 if UC_INITIALS.match(word):
                     if DEBUG:
-                        print("  UC_INITIALS match for: " + word)
+                        print(f"  UC_INITIALS match for: {word}")
                     tc_line.append(word)
                     continue
                 else:
                     if DEBUG:
-                        print("  Not initials. Lowercasing: " + word)
+                        print(f"  Not initials. Lowercasing: {word}")
                     word = word.lower()
 
             if APOS_SECOND.match(word):
                 # O'Reiley, L'Oreal, D'Angelo
                 if DEBUG:
-                    print("  APOS_SECOND matched. Fixing it: " + word)
+                    print(f"  APOS_SECOND matched. Fixing it: {word}")
                 word = word[0:3].upper() + word[3:]
                 tc_line.append(word)
                 continue
@@ -258,40 +258,36 @@ def titlecase(text, DEBUG=False):
             amp_match = INLINE_AMPERSAND.match(word)
             if amp_match:
                 if DEBUG:
-                    print("  INLINE_AMPERSAND matched. Uppercasing: " + word)
+                    print(f"  INLINE_AMPERSAND matched. Uppercasing: {word}")
                 tc_line.append(
-                    "%s%s" % (amp_match.group(1).upper(), amp_match.group(2))
+                    f"{amp_match.group(1).upper()}{amp_match.group(2)}"
                 )
                 continue
 
             if UC_ELSEWHERE.match(word):
                 if DEBUG:
-                    print("  UC_ELSEWHERE matched. Leaving unchanged: " + word)
+                    print(f"  UC_ELSEWHERE matched. Leaving unchanged: {word}")
                 tc_line.append(word)
                 continue
 
             if SMALL_WORDS.match(word):
                 if DEBUG:
-                    print("  SMALL_WORDS matched. Lowercasing: " + word)
+                    print(f"  SMALL_WORDS matched. Lowercasing: {word}")
                 tc_line.append(word.lower())
                 continue
 
             if BIG_WORDS.match(word):
                 if DEBUG:
-                    print("  BIG_WORDS matched. Uppercasing: " + word)
+                    print(f"  BIG_WORDS matched. Uppercasing: {word}")
                 tc_line.append(word.upper())
                 continue
 
             match = MAC_MC.match(word)
             if match and (word not in ["mack", "machine"]):
                 if DEBUG:
-                    print("  MAC_MAC matched. Capitlizing: " + word)
+                    print(f"  MAC_MAC matched. Capitlizing: {word}")
                 tc_line.append(
-                    "%s%s"
-                    % (
-                        match.group(1).capitalize(),
-                        match.group(2).capitalize(),
-                    )
+                    f"{match.group(1).capitalize()}{match.group(2).capitalize()}"
                 )
                 continue
 
@@ -305,12 +301,12 @@ def titlecase(text, DEBUG=False):
         result = " ".join(tc_line)
 
         result = SMALL_FIRST.sub(
-            lambda m: "%s%s" % (m.group(1), m.group(2).capitalize()), result
+            lambda m: f"{m.group(1)}{m.group(2).capitalize()}", result
         )
 
         result = SMALL_LAST.sub(lambda m: m.group(0).capitalize(), result)
         result = SUBPHRASE.sub(
-            lambda m: "%s%s" % (m.group(1), m.group(2).capitalize()), result
+            lambda m: f"{m.group(1)}{m.group(2).capitalize()}", result
         )
 
         processed.append(result)
@@ -589,12 +585,12 @@ def get_text(file_path):
             continue
         for opinion_type in OPINION_TYPES:
             # c if this child is a byline, note it down and use it later
-            if child.tag == "%s_byline" % opinion_type:
+            if child.tag == f"{opinion_type}_byline":
                 current_byline["type"] = opinion_type
                 current_byline["name"] = get_xml_string(child)
                 break
             # if this child is an opinion text blob, add it to an incomplete opinion and move into the info dict
-            if child.tag == "%s_text" % opinion_type:
+            if child.tag == f"{opinion_type}_text":
                 # add the full opinion info, possibly associating it to a byline
                 raw_info.setdefault("opinions", []).append(
                     {
@@ -713,7 +709,7 @@ for folder in folders:
         newname = path.replace("/", "_")
         if len(parsed["dates"]) == 0:
             print(path)
-            print(open(path).read(), file=open("_nodate/" + newname, "wt"))
+            print(open(path).read(), file=open(f"_nodate/{newname}", "wt"))
             continue
 
         if len(parsed["dates"][0]) == 0:

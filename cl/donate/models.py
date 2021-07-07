@@ -81,7 +81,7 @@ class Donation(AbstractDateTimeModel):
     )
     min_docket_donation = settings.MIN_DONATION["docket_alerts"]
     min_donation_error = (
-        "Sorry, the minimum donation amount is $%0.2f." % min_docket_donation
+        f"Sorry, the minimum donation amount is ${min_docket_donation:0.2f}."
     )
     amount = models.DecimalField(
         max_digits=10,

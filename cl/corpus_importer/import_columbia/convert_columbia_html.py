@@ -22,8 +22,8 @@ def convert_columbia_html(text):
     ]
 
     for (pattern, replacement) in conversions:
-        text = re.sub("<" + pattern + ">", "<" + replacement + ">", text)
-        text = re.sub("</" + pattern + ">", "</" + replacement + ">", text)
+        text = re.sub(f"<{pattern}>", f"<{replacement}>", text)
+        text = re.sub(f"</{pattern}>", f"</{replacement}>", text)
 
     # grayed-out page numbers
     text = re.sub("<page_number>", ' <span class="star-pagination">*', text)
@@ -39,11 +39,7 @@ def convert_columbia_html(text):
             fnum = re.search(r"[\*\d]+", ref).group()
         except AttributeError:
             fnum = re.search(r"\[fn(.+)\]", ref).group(1)
-        rep = '<sup id="ref-fn%s"><a href="#fn%s">%s</a></sup>' % (
-            fnum,
-            fnum,
-            fnum,
-        )
+        rep = f'<sup id="ref-fn{fnum}"><a href="#fn{fnum}">{fnum}</a></sup>'
         text = text.replace(ref, rep)
 
     foot_numbers = re.findall("<footnote_number>.*?</footnote_number>", text)
@@ -63,7 +59,7 @@ def convert_columbia_html(text):
     # Make nice paragraphs. This replaces double newlines with paragraphs, then
     # nests paragraphs inside blockquotes, rather than vice versa. The former
     # looks good. The latter is bad.
-    text = "<p>" + text + "</p>"
+    text = f"<p>{text}</p>"
     text = re.sub(r"</blockquote>\s*<blockquote>", "\n\n", text)
     text = re.sub("\n\n", "</p>\n<p>", text)
     text = re.sub(r"<p>\s*<blockquote>", "<blockquote><p>", text, re.M)

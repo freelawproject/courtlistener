@@ -177,9 +177,9 @@ def do_search(
         except (NotImplementedError, RequestException, SolrError) as e:
             error = True
             logger.warning(
-                "Error loading search page with request: %s" % get_params
+                f"Error loading search page with request: {get_params}"
             )
-            logger.warning("Error was: %s" % e)
+            logger.warning(f"Error was: {e}")
             if settings.DEBUG is True:
                 traceback.print_exc()
 
@@ -243,7 +243,7 @@ def get_homepage_stats():
     r = make_redis_interface("STATS")
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), utc)
     last_ten_days = [
-        "api:v3.d:%s.count" % (date.today() - timedelta(days=x)).isoformat()
+        f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)
     ]
     homepage_data = {
@@ -352,7 +352,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             messages.add_message(
                 request,
                 messages.SUCCESS,
-                "Your alert was %s successfully." % action,
+                f"Your alert was {action} successfully.",
             )
 
             # and redirect to the alerts page
@@ -420,7 +420,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                             path=reverse("sign-in"),
                             next=request.path,
                             encoded_params=quote(
-                                "?" + request.GET.urlencode()
+                                f"?{request.GET.urlencode()}"
                             ),
                         )
                     )
@@ -485,7 +485,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         elif request.path == reverse("advanced_p"):
             obj_type = SEARCH_TYPES.PEOPLE
         else:
-            raise NotImplementedError("Unknown path: %s" % request.path)
+            raise NotImplementedError(f"Unknown path: {request.path}")
 
         search_form = SearchForm({"type": obj_type})
         courts, court_count_human, court_count = merge_form_with_courts(

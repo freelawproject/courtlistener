@@ -34,7 +34,7 @@ class Command(VerboseCommand):
     @staticmethod
     def make_slugs(person):
         slug_name = (
-            slugify("%s %s" % (person.name_last, person.name_first)) + ".jpeg"
+            f"{slugify(f'{person.name_last} {person.name_first}')}.jpeg"
         )
 
         slug_name_dob = "{slug}-{date}.jpeg".format(
@@ -74,17 +74,17 @@ class Command(VerboseCommand):
         multi = 0
         for path, people in judge_map.items():
             if len(people) == 0:
-                logger.warning("Did not find a judge for %s" % path)
+                logger.warning(f"Did not find a judge for {path}")
                 missed += 1
             if len(people) == 1:
                 person = people[0]
                 found += 1
                 if not self.debug:
-                    logger.info("Updating judge %s" % person)
+                    logger.info(f"Updating judge {person}")
                     person.has_photo = True
                     person.save()
             if len(people) > 1:
-                logger.warning("Found more than one match for %s:" % path)
+                logger.warning(f"Found more than one match for {path}:")
                 for person in people:
                     logger.warning(
                         "Found: %s - %s"
@@ -93,6 +93,5 @@ class Command(VerboseCommand):
                 multi += 1
 
         logger.info(
-            "\n\n%s Matches\n%s Missed\n%s Multiple results"
-            % (found, missed, multi)
+            f"\n\n{found} Matches\n{missed} Missed\n{multi} Multiple results"
         )

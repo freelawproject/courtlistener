@@ -44,7 +44,7 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
                     "method": "Live.getLastVisitsDetails",
                     "period": "day",
                     "format": "json",
-                    "date": "last%s" % last_x_days,
+                    "date": f"last{last_x_days}",
                     "token_auth": settings.MATOMO_TOKEN,
                 },
             )

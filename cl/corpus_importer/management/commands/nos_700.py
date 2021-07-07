@@ -256,7 +256,7 @@ def get_dockets(options, items, tags, sample_size=0):
                 docket_number=row.docket_number,
                 court_id=row.district_id,
                 cookies=session.cookies,
-                **params
+                **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
@@ -267,7 +267,7 @@ def get_dockets(options, items, tags, sample_size=0):
                     "show_parties_and_counsel": True,
                     "show_terminated_parties": True,
                     "show_list_of_member_cases": True,
-                }
+                },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -324,7 +324,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "dockets_nos_700_sample":
             get_nos_700_docket_sample(options)
         elif options["task"] == "dockets_nos_700_all":

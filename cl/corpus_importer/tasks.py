@@ -202,7 +202,7 @@ def save_ia_docket_to_disk(self, d_pk: int, output_directory: str) -> None:
     :param output_directory: The location to save the docket's JSON
     """
     _, j = generate_ia_json(d_pk)
-    with open(os.path.join(output_directory, "%s.json" % d_pk), "w") as f:
+    with open(os.path.join(output_directory, f"{d_pk}.json"), "w") as f:
         f.write(j)
 
 
@@ -220,7 +220,7 @@ def upload_recap_json(self, pk: int, database: str = "default") -> None:
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
-        source_url="https://www.courtlistener.com%s" % d.get_absolute_url(),
+        source_url=f"https://www.courtlistener.com{d.get_absolute_url()}",
         media_type="texts",
         description="This item represents a case in PACER, the U.S. "
         "Government's website for federal case data. This "
@@ -237,9 +237,8 @@ def upload_recap_json(self, pk: int, database: str = "default") -> None:
         d.ia_upload_failure_count = None
         d.ia_date_first_changed = None
         d.ia_needs_upload = False
-        d.filepath_ia_json = "https://archive.org/download/%s/%s" % (
-            bucket_name,
-            file_name,
+        d.filepath_ia_json = (
+            f"https://archive.org/download/{bucket_name}/{file_name}"
         )
         d.save()
     else:
@@ -253,11 +252,11 @@ def download_recap_item(
     filename: str,
     clobber: bool = False,
 ) -> None:
-    logger.info("  Getting item at: %s" % url)
+    logger.info(f"  Getting item at: {url}")
     location = os.path.join(settings.MEDIA_ROOT, "recap", filename)
     try:
         if os.path.isfile(location) and not clobber:
-            raise IOError("    IOError: File already exists at %s" % location)
+            raise IOError(f"    IOError: File already exists at {location}")
         r = requests.get(
             url,
             stream=True,
@@ -266,12 +265,12 @@ def download_recap_item(
         )
         r.raise_for_status()
     except requests.Timeout as e:
-        logger.warning("    Timed out attempting to get: %s\n" % url)
+        logger.warning(f"    Timed out attempting to get: {url}\n")
         raise self.retry(exc=e, countdown=2)
     except requests.RequestException as e:
-        logger.warning("    Unable to get %s\nException was:\n%s" % (url, e))
+        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
     except IOError as e:
-        logger.warning("    %s" % e)
+        logger.warning(f"    {e}")
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
@@ -345,7 +344,7 @@ def get_and_save_free_document_report(
         if self.request.retries == self.max_retries:
             logger.error(msg, court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
-        logger.info(msg + " Retrying.", court_id, start, end)
+        logger.info(f"{msg} Retrying.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
 
     try:
@@ -394,7 +393,7 @@ def process_free_opinion_result(
     try:
         result = PACERFreeDocumentRow.objects.get(pk=row_pk)
     except PACERFreeDocumentRow.DoesNotExist:
-        logger.warning("Unable to find PACERFreeDocumentRow: %s" % row_pk)
+        logger.warning(f"Unable to find PACERFreeDocumentRow: {row_pk}")
         self.request.chain = None
         return None
 
@@ -414,7 +413,7 @@ def process_free_opinion_result(
         with transaction.atomic():
             d = lookup_and_save(row_copy)
             if not d:
-                msg = "Unable to create docket for %s" % result
+                msg = f"Unable to create docket for {result}"
                 logger.error(msg)
                 result.error_msg = msg
                 result.save()
@@ -482,7 +481,7 @@ def process_free_opinion_result(
                 rd.save()
                 rd_created = False
     except IntegrityError as e:
-        msg = "Raised IntegrityError: %s" % e
+        msg = f"Raised IntegrityError: {e}"
         logger.error(msg)
         if self.request.retries == self.max_retries:
             result.error_msg = msg
@@ -490,7 +489,7 @@ def process_free_opinion_result(
             return None
         raise self.retry(exc=e)
     except DatabaseError as e:
-        msg = "Unable to complete database transaction:\n%s" % e
+        msg = f"Unable to complete database transaction:\n{e}"
         logger.error(msg)
         result.error_msg = msg
         result.save()
@@ -559,7 +558,7 @@ def get_and_process_free_pdf(
             logger.warning(msg)
             self.request.chain = None
             return None
-        logger.info(msg + " Retrying.")
+        logger.info(f"{msg} Retrying.")
         raise self.retry(exc=exc)
     except (ReadTimeoutError, requests.RequestException) as exc:
         msg = "Request exception getting free PDF"
@@ -567,7 +566,7 @@ def get_and_process_free_pdf(
             logger.warning(msg)
             self.request.chain = None
             return None
-        logger.info(msg + " Retrying.")
+        logger.info(f"{msg} Retrying.")
         raise self.retry(exc=exc)
 
     attachment_number = 0  # Always zero for free opinions
@@ -618,7 +617,7 @@ def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
         title=best_case_name(d),
         collection=settings.IA_COLLECTIONS,
         court_id=d.court_id,
-        source_url="https://www.courtlistener.com%s" % rd.get_absolute_url(),
+        source_url=f"https://www.courtlistener.com{rd.get_absolute_url()}",
         media_type="texts",
         description="This item represents a case in PACER, the U.S. "
         "Government's website for federal case data. If you wish "
@@ -630,9 +629,8 @@ def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
 
     if all(r.ok for r in responses):
         rd.ia_upload_failure_count = None
-        rd.filepath_ia = "https://archive.org/download/%s/%s" % (
-            bucket_name,
-            file_name,
+        rd.filepath_ia = (
+            f"https://archive.org/download/{bucket_name}/{file_name}"
         )
         rd.save()
     else:
@@ -813,7 +811,7 @@ def make_fjc_idb_lookup_params(
         # Luenig". For a random sample, see:
         # https://www.courtlistener.com/?q=docketNumber%3Acr+AND+-case_name%3Aunited&type=r&order_by=random_123+desc.
         # ∴ not much we can do here for criminal cases
-        params["case_name"] = "%s v. %s" % (item.plaintiff, item.defendant)
+        params["case_name"] = f"{item.plaintiff} v. {item.defendant}"
 
     if item.dataset_source in [CR_2017, CR_OLD]:
         if item.multidistrict_litigation_docket_number:
@@ -911,7 +909,7 @@ def get_pacer_case_id_and_title(
             logger.warning(msg, court_id, docket_number)
             self.request.chain = None
             return None
-        logger.info(msg + " Retrying.", court_id, docket_number)
+        logger.info(f"{msg} Retrying.", court_id, docket_number)
         raise self.retry(exc=exc)
 
     try:
@@ -962,7 +960,7 @@ def do_case_query_by_pacer_case_id(
 
     pacer_case_id = data.get("pacer_case_id")
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    logger.info("Querying docket report %s.%s" % (court_id, pacer_case_id))
+    logger.info(f"Querying docket report {court_id}.{pacer_case_id}")
     try:
         d = Docket.objects.get(pacer_case_id=pacer_case_id, court_id=court_id)
     except Docket.DoesNotExist:
@@ -973,7 +971,7 @@ def do_case_query_by_pacer_case_id(
     report.query(pacer_case_id)
     docket_data = report.data
     logger.info(
-        "Querying and parsing complete for %s.%s" % (court_id, pacer_case_id)
+        f"Querying and parsing complete for {court_id}.{pacer_case_id}"
     )
 
     if not docket_data:
@@ -1002,7 +1000,7 @@ def do_case_query_by_pacer_case_id(
         ContentFile(report.response.text),
     )
 
-    logger.info("Created/updated docket: %s" % d)
+    logger.info(f"Created/updated docket: {d}")
     return {
         "pacer_case_id": pacer_case_id,
         "docket_pk": d.pk,
@@ -1189,7 +1187,7 @@ def get_docket_by_pacer_case_id(
         first_missing_date = get_first_missing_de_date(d)
         kwargs.setdefault("date_start", first_missing_date)
 
-    logging_id = "%s.%s" % (court_id, pacer_case_id)
+    logging_id = f"{court_id}.{pacer_case_id}"
     logger.info("Querying docket report %s", logging_id)
     s = PacerSession(cookies=cookies)
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
@@ -1198,10 +1196,10 @@ def get_docket_by_pacer_case_id(
     except (RequestException, ReadTimeoutError) as exc:
         msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
-            logger.error(msg + " Aborting chain.", logging_id)
+            logger.error(f"{msg} Aborting chain.", logging_id)
             self.request.chain = None
             return None
-        logger.info(msg + " Retrying.", logging_id)
+        logger.info(f"{msg} Retrying.", logging_id)
         raise self.retry(exc)
     docket_data = report.data
     logger.info("Querying and parsing complete for %s", logging_id)
@@ -1261,7 +1259,7 @@ def get_appellate_docket_by_docket_number(
     """
     s = PacerSession(cookies=cookies)
     report = AppellateDocketReport(court_id, s)
-    logging_id = "%s - %s" % (court_id, docket_number)
+    logging_id = f"{court_id} - {docket_number}"
     logger.info("Querying docket report %s", logging_id)
 
     try:
@@ -1391,7 +1389,7 @@ def get_bankr_claims_registry(
         return None
 
     d = Docket.objects.get(pk=data["docket_pk"])
-    logging_id = "docket %s with pacer_case_id %s" % (d.pk, d.pacer_case_id)
+    logging_id = f"docket {d.pk} with pacer_case_id {d.pacer_case_id}"
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
@@ -1518,7 +1516,7 @@ def download_pacer_pdf_by_rd(
                 logger.error(msg, exc.response.status_code)
                 self.request.chain = None
                 return None
-            logger.info(msg + " Retrying.", exc.response.status_code)
+            logger.info(f"{msg} Retrying.", exc.response.status_code)
             raise self.retry(exc)
         else:
             logger.error(
@@ -1714,13 +1712,12 @@ def get_pacer_doc_by_rd_and_description(
     if not att_found:
         if fallback_to_main_doc:
             logger.info(
-                "Falling back to main document for pacer_doc_id: %s"
-                % rd.pacer_doc_id
+                f"Falling back to main document for pacer_doc_id: {rd.pacer_doc_id}"
             )
             att_found = att_report.data
             document_type = RECAPDocument.PACER_DOCUMENT
         else:
-            msg = "Aborting. Did not find civil cover sheet for %s." % rd
+            msg = f"Aborting. Did not find civil cover sheet for {rd}."
             logger.error(msg)
             self.request.chain = None
             return None
@@ -1811,7 +1808,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
         if last_try:
             logger.error(msg, rd)
             return
-        logger.info(msg + " Retrying.", rd)
+        logger.info(f"{msg} Retrying.", rd)
         raise self.retry(exc=exc)
     except HTTPError as exc:
         status_code = exc.response.status_code
@@ -1821,10 +1818,10 @@ def get_pacer_doc_id_with_show_case_doc_url(
         ]:
             msg = "Got HTTPError with status code %s."
             if last_try:
-                logger.error(msg + " Aborting.", status_code)
+                logger.error(f"{msg} Aborting.", status_code)
                 return
 
-            logger.info(msg + " Retrying", status_code)
+            logger.info(f"{msg} Retrying", status_code)
             raise self.retry(exc)
         else:
             msg = "Ran into unknown HTTPError. %s. Aborting."
@@ -1833,9 +1830,9 @@ def get_pacer_doc_id_with_show_case_doc_url(
     try:
         pacer_doc_id = report.data
     except ParsingException:
-        logger.error("Unable to get redirect for %s" % rd)
+        logger.error(f"Unable to get redirect for {rd}")
         return
     else:
         rd.pacer_doc_id = pacer_doc_id
         rd.save()
-        logger.info("Successfully saved pacer_doc_id to rd %s" % rd_pk)
+        logger.info(f"Successfully saved pacer_doc_id to rd {rd_pk}")

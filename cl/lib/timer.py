@@ -10,7 +10,7 @@ def print_timing(func):
         t1 = time.time()
         res = func(*arg)
         t2 = time.time()
-        print("Completed in %0.1f seconds." % ((t2 - t1)))
+        print(f"Completed in {t2 - t1:0.1f} seconds.")
         return res
 
     return wrapper

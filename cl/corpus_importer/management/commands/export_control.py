@@ -116,7 +116,7 @@ def idb_row_transform(row):
 
     # Make a docket number. Combination of the two digit year and a five digit
     # 0-padded serial number.
-    row["docket_number"] = "%s-%s" % (row["DOCKET"][0:2], row["DOCKET"][2:])
+    row["docket_number"] = f"{row['DOCKET'][0:2]}-{row['DOCKET'][2:]}"
     return row
 
 
@@ -140,7 +140,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--task",
             type=str,
-            help="The task to perform. One of %s" % ", ".join(self.tasks),
+            help=f"The task to perform. One of {', '.join(self.tasks)}",
             required=True,
         )
         parser.add_argument(
@@ -167,7 +167,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "fdd_export":
             get_data(options, tcil_row_transform, [TAG])
         elif options["task"] == "idb_sample":

@@ -311,7 +311,7 @@ def update_document_from_text(opinion: Opinion) -> None:
         return
     metadata_dict = site.extract_from_text(opinion.plain_text)
     for model_name, data in metadata_dict.items():
-        ModelClass = apps.get_model("search.%s" % model_name)
+        ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
             opinion.cluster.docket.__dict__.update(data)
         elif model_name == "OpinionCluster":
@@ -321,7 +321,7 @@ def update_document_from_text(opinion: Opinion) -> None:
             ModelClass.objects.get_or_create(**data)
         else:
             raise NotImplementedError(
-                "Object type of %s not yet supported." % model_name
+                f"Object type of {model_name} not yet supported."
             )
 
 
@@ -379,16 +379,14 @@ def extract_doc_content(
 
     assert isinstance(
         content, str
-    ), "content must be of type str, not %s" % type(content)
+    ), f"content must be of type str, not {type(content)}"
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion)
 
     if err:
         print(err)
-        print(
-            "****Error extracting text from %s: %s****" % (extension, opinion)
-        )
+        print(f"****Error extracting text from {extension}: {opinion}****")
         return
 
     # Save item, and index Solr if needed.
@@ -557,7 +555,7 @@ def process_audio_file(self, pk) -> None:
     bte_audio_response.raise_for_status()
     audio_obj = bte_audio_response.json()
     cf = ContentFile(base64.b64decode(audio_obj["audio_b64"]))
-    file_name = trunc(best_case_name(af).lower(), 72) + "_cl.mp3"
+    file_name = f"{trunc(best_case_name(af).lower(), 72)}_cl.mp3"
     af.file_with_date = af.docket.date_argued
     af.local_path_mp3.save(file_name, cf, save=False)
     af.duration = audio_obj["duration"]

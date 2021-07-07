@@ -112,8 +112,7 @@ class Command(VerboseCommand):
         ]
 
         logger.info(
-            "Starting bulk file creation with %s celery tasks..."
-            % len(kwargs_list)
+            f"Starting bulk file creation with {len(kwargs_list)} celery tasks..."
         )
         for kwargs in kwargs_list:
             make_bulk_data_and_swap_it_in(

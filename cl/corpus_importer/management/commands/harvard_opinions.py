@@ -70,12 +70,12 @@ def filepath_list(reporter, volume):
     if reporter and volume:
         reporter_key = ".".join(["law.free.cap", reporter, volume])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s/*.json" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}/*.json"
         )
     elif reporter:
         reporter_key = ".".join(["law.free.cap", reporter])
         glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "%s.*/*.json" % reporter_key
+            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}.*/*.json"
         )
     else:
         glob_path = os.path.join(
@@ -140,7 +140,7 @@ def skip_processing(citation, case_name, file_path):
                     # Check if all same citations are Harvard imports
                     # If all Harvard data - match on file_path
                     # If no match assume different case
-                    logger.info("Looks like we already have %s." % case_name)
+                    logger.info(f"Looks like we already have {case_name}.")
                     return True
 
         logger.info("Duplicate cite string but appears to be a new case")
@@ -186,7 +186,7 @@ def parse_extra_fields(soup, fields, long_field=False):
         for elem in soup.find_all(field):
             [x.extract() for x in elem.find_all("page-number")]
             if long_field:
-                elements.append("<p>%s</p>" % elem.text)
+                elements.append(f"<p>{elem.text}</p>")
             else:
                 elements.append(elem.text)
         if long_field:
@@ -226,23 +226,23 @@ def parse_harvard_opinions(reporter, volume, make_searchable):
         if OpinionCluster.objects.filter(
             filepath_json_harvard=file_path
         ).exists():
-            logger.info("Skipping - already in system %s" % ia_download_url)
+            logger.info(f"Skipping - already in system {ia_download_url}")
             continue
 
         try:
             with open(file_path) as f:
                 data = json.load(f)
         except ValueError:
-            logger.warning("Empty json: missing case at: %s" % ia_download_url)
+            logger.warning(f"Empty json: missing case at: {ia_download_url}")
             continue
         except Exception as e:
-            logger.warning("Unknown error %s for: %s" % (e, ia_download_url))
+            logger.warning(f"Unknown error {e} for: {ia_download_url}")
             continue
 
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
             logger.info(
-                "No citation found for %s." % data["citations"][0]["cite"]
+                f"No citation found for {data['citations'][0]['cite']}."
             )
             continue
 

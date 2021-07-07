@@ -102,8 +102,7 @@ class Command(VerboseCommand):
             "--rate",
             required=True,
             choices=Alert.ALL_FREQUENCIES,
-            help="The rate to send emails (%s)"
-            % ", ".join(Alert.ALL_FREQUENCIES),
+            help=f"The rate to send emails ({', '.join(Alert.ALL_FREQUENCIES)})",
         )
 
     def handle(self, *args, **options):
@@ -120,7 +119,7 @@ class Command(VerboseCommand):
     def run_query(self, alert, rate):
         results = []
         cd = {}
-        logger.info("Now running the query: %s\n" % alert.query)
+        logger.info(f"Now running the query: {alert.query}\n")
 
         # Make a dict from the query string.
         qd = QueryDict(alert.query.encode(), mutable=True)
@@ -136,7 +135,7 @@ class Command(VerboseCommand):
             qd["filed_after"] = cut_off_date
         elif query_type == SEARCH_TYPES.ORAL_ARGUMENT:
             qd["argued_after"] = cut_off_date
-        logger.info("Data sent to SearchForm is: %s\n" % qd)
+        logger.info(f"Data sent to SearchForm is: {qd}\n")
         search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
@@ -155,14 +154,13 @@ class Command(VerboseCommand):
                     "start": "0",
                     "hl.tag.pre": "<em><strong>",
                     "hl.tag.post": "</strong></em>",
-                    "caller": "cl_send_alerts:%s" % query_type,
+                    "caller": f"cl_send_alerts:{query_type}",
                 }
             )
 
             if rate == Alert.REAL_TIME:
                 main_params["fq"].append(
-                    "id:(%s)"
-                    % " OR ".join([str(i) for i in self.valid_ids[query_type]])
+                    f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
                 )
 
             # Ignore warnings from this bit of code. Otherwise, it complains
@@ -178,7 +176,7 @@ class Command(VerboseCommand):
                 )
             regroup_snippets(results)
 
-        logger.info("There were %s results." % len(results))
+        logger.info(f"There were {len(results)} results.")
         return qd, results
 
     def send_emails(self, rate):
@@ -190,7 +188,7 @@ class Command(VerboseCommand):
         alerts_sent_count = 0
         for user in users:
             alerts = user.alerts.filter(rate=rate)
-            logger.info("Running alerts for user '%s': %s" % (user, alerts))
+            logger.info(f"Running alerts for user '{user}': {alerts}")
 
             not_donated_enough = (
                 user.profile.total_donated_last_year
@@ -210,7 +208,7 @@ class Command(VerboseCommand):
                 except:
                     traceback.print_exc()
                     logger.info(
-                        "Search for this alert failed: %s\n" % alert.query
+                        f"Search for this alert failed: {alert.query}\n"
                     )
                     continue
 
@@ -229,8 +227,8 @@ class Command(VerboseCommand):
                 alerts_sent_count += 1
                 send_alert(user.profile, hits)
 
-        tally_stat("alerts.sent.%s" % rate, inc=alerts_sent_count)
-        logger.info("Sent %s %s email alerts." % (alerts_sent_count, rate))
+        tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+        logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
     def clean_rt_queue(self):
         """Clean out any items in the RealTime queue once they've been run or
@@ -272,11 +270,11 @@ class Command(VerboseCommand):
             if ids:
                 main_params = {
                     "q": "*",  # Vital!
-                    "caller": "cl_send_alerts:%s" % item_type,
+                    "caller": f"cl_send_alerts:{item_type}",
                     "rows": MAX_RT_ITEM_QUERY,
                     "fl": "id",
                     "fq": [
-                        "id:(%s)" % " OR ".join([str(i.item_pk) for i in ids])
+                        f"id:({' OR '.join([str(i.item_pk) for i in ids])})"
                     ],
                 }
                 results = (

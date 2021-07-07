@@ -25,7 +25,7 @@ def swap_solr_core(
         "core": current_core,
         "other": desired_core,
     }
-    r = requests.get("%s/solr/admin/cores" % url, params=params, timeout=30)
+    r = requests.get(f"{url}/solr/admin/cores", params=params, timeout=30)
     if r.status_code != 200:
         print(
             "Problem swapping cores. Got status_code of %s. "
@@ -41,9 +41,9 @@ def get_solr_core_status(
     if core == "all":
         core_query = ""
     else:
-        core_query = "&core=%s" % core
+        core_query = f"&core={core}"
     r = requests.get(
-        "%s/solr/admin/cores?action=STATUS%s" % (url, core_query),
+        f"{url}/solr/admin/cores?action=STATUS{core_query}",
         timeout=10,
     )
     if r.status_code != 200:
@@ -55,7 +55,7 @@ def get_solr_core_status(
     try:
         solr_config = lxml.etree.parse(io.BytesIO(r.content))
     except lxml.etree.XMLSyntaxError as e:
-        raise SolrError("Invalid XML in schema:\n%s" % e.args[0])
+        raise SolrError(f"Invalid XML in schema:\n{e.args[0]}")
 
     return solr_config
 
@@ -75,7 +75,7 @@ def get_term_frequency(
         "numTerms": str(count),
         "wt": "json",
     }
-    r = requests.get("%s/solr/admin/luke" % url, params=params, timeout=10)
+    r = requests.get(f"{url}/solr/admin/luke", params=params, timeout=10)
     content_as_json = json.loads(r.content)
     if result_type == "list":
         if len(content_as_json["fields"]) == 0:
@@ -114,6 +114,6 @@ def get_data_dir(core: str, url: str = settings.SOLR_HOST):
     status_doc = get_solr_core_status(url=url)
     result = cast(
         List[_ElementTree],
-        status_doc.xpath('//*[@name="%s"]//*[@name="dataDir"]/text()' % core),
+        status_doc.xpath(f'//*[@name="{core}"]//*[@name="dataDir"]/text()'),
     )
     return str(result[0])

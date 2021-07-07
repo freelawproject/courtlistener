@@ -161,16 +161,16 @@ class Command(VerboseCommand):
     def import_all(self):
         datadir = self.options["input_file"]
         logger.info("importing presidents...")
-        self.import_presidents(infile=datadir + "/presidents.xlsx")
+        self.import_presidents(infile=f"{datadir}/presidents.xlsx")
         logger.info("importing FJC judges...")
-        self.import_fjc_judges(infile=datadir + "/fjc-data.xlsx")
+        self.import_fjc_judges(infile=f"{datadir}/fjc-data.xlsx")
         logger.info("importing state supreme court judges...")
         self.import_state_judges(
-            infile=datadir + "/state-supreme-court-bios-2016-04-06.xlsx"
+            infile=f"{datadir}/state-supreme-court-bios-2016-04-06.xlsx"
         )
         logger.info("importing state IAC judges...")
         self.import_state_judges(
-            infile=datadir + "/state-iac-bios-2016-04-06.xlsx"
+            infile=f"{datadir}/state-iac-bios-2016-04-06.xlsx"
         )
 
     def assign_judges_to_opinions(self):
@@ -230,25 +230,25 @@ class Command(VerboseCommand):
             exclusions = []
             for posnum in range(1, 7):
                 if posnum > 1:
-                    pos_str = " (%s)" % posnum
+                    pos_str = f" ({posnum})"
                 else:
                     pos_str = ""
 
-                if pd.isnull(item["Court Name" + pos_str]):
+                if pd.isnull(item[f"Court Name{pos_str}"]):
                     continue
                 courtid = match_court_string(
-                    item["Court Name" + pos_str], federal_district=True
+                    item[f"Court Name{pos_str}"], federal_district=True
                 )
                 if courtid is None:
                     raise Exception
                 date_termination = process_date_string(
-                    item["Date of Termination" + pos_str]
+                    item[f"Date of Termination{pos_str}"]
                 )
                 date_start = process_date_string(
-                    item["Commission Date" + pos_str]
+                    item[f"Commission Date{pos_str}"]
                 )
                 date_recess_appointment = process_date_string(
-                    item["Recess Appointment date" + pos_str]
+                    item[f"Recess Appointment date{pos_str}"]
                 )
                 if pd.isnull(date_start) and not pd.isnull(
                     date_recess_appointment
@@ -288,7 +288,7 @@ class Command(VerboseCommand):
 
                 if position.court.pk == courtid:
                     logger.info(
-                        "Court IDs are both '%s'. No changes made." % courtid
+                        f"Court IDs are both '{courtid}'. No changes made."
                     )
                 else:
                     logger.info(

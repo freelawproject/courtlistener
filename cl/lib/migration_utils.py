@@ -35,7 +35,7 @@ def load_migration_fixture(apps, schema_editor, fixture, app_label):
             return apps.get_model(model_identifier)
         except (LookupError, TypeError):
             raise base.DeserializationError(
-                "Invalid model identifier: '%s'" % model_identifier
+                f"Invalid model identifier: '{model_identifier}'"
             )
 
     # Replace the _get_model() function on the module so loaddata can use it

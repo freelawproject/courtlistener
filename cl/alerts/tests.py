@@ -74,7 +74,7 @@ class AlertTest(TestCase):
         self.alert.rate = "off"
         new_rate = "wly"
         path = reverse("enable_alert", args=[self.alert.secret_key])
-        self.client.get("%s?rate=%s" % (path, new_rate))
+        self.client.get(f"{path}?rate={new_rate}")
         self.alert.refresh_from_db()
         self.assertEqual(self.alert.rate, new_rate)
 
@@ -173,8 +173,7 @@ class DisableDocketAlertTest(TestCase):
         self.assertEqual(
             report.total_count(),
             0,
-            msg="Got dockets when we shouldn't have gotten any: %s"
-            % report.__dict__,
+            msg=f"Got dockets when we shouldn't have gotten any: {report.__dict__}",
         )
 
     def test_old_alert_recent_termination(self) -> None:
@@ -182,7 +181,7 @@ class DisableDocketAlertTest(TestCase):
         self.backdate_alert()
         for i in range(90, 97):
             new_date_terminated = now() - timedelta(days=i)
-            print("Trying a date_terminated of %s" % new_date_terminated)
+            print(f"Trying a date_terminated of {new_date_terminated}")
             self.docket.date_terminated = new_date_terminated
             self.docket.save()
             report = build_user_report(self.user, delete=True)

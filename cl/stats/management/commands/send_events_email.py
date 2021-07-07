@@ -20,8 +20,7 @@ class Command(VerboseCommand):
         if events.count() > 0:
             template = loader.get_template("emails/events_email.txt")
             send_mail(
-                subject="CourtListener events email for %s"
-                % today.date().isoformat(),
+                subject=f"CourtListener events email for {today.date().isoformat()}",
                 message=template.render({"events": events}),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=settings.MANAGERS,

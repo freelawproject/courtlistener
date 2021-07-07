@@ -160,7 +160,7 @@ def add_attorney(atty, p, d):
     elif count >= 2:
         # Too many found, choose the most recent attorney.
         logger.info(
-            "Got too many results for atty: '%s'. Picking earliest." % atty
+            f"Got too many results for atty: '{atty}'. Picking earliest."
         )
         a = attys.earliest("date_created")
 
@@ -656,7 +656,7 @@ def add_docket_entries(d, docket_entries, tags=None):
                 rd = RECAPDocument.objects.create(
                     pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
-                    **params
+                    **params,
                 )
             except ValidationError:
                 # Happens from race conditions.
@@ -1036,7 +1036,7 @@ def add_claim_history_entry(new_history, claim):
         db_history, _ = ClaimHistory.objects.get_or_create(
             claim_document_type=ClaimHistory.DOCKET_ENTRY,
             pacer_doc_id=new_history.get("pacer_doc_id", ""),
-            **common_lookup_params
+            **common_lookup_params,
         )
         db_history.pacer_dm_id = (
             new_history.get("pacer_dm_id") or db_history.pacer_dm_id
@@ -1048,7 +1048,7 @@ def add_claim_history_entry(new_history, claim):
             claim_document_type=ClaimHistory.CLAIM_ENTRY,
             claim_doc_id=new_history["id"],
             attachment_number=new_history["attachment_number"],
-            **common_lookup_params
+            **common_lookup_params,
         )
 
     db_history.description = (
@@ -1190,7 +1190,7 @@ def merge_pacer_docket_into_cl_docket(
     )
     add_parties_and_attorneys(d, docket_data["parties"])
     process_orphan_documents(rds_created, d.court_id, d.date_filed)
-    logger.info("Created/updated docket: %s" % d)
+    logger.info(f"Created/updated docket: {d}")
     return rds_created, content_updated
 
 
@@ -1340,7 +1340,7 @@ def save_iquery_to_docket(
     add_tags_to_objs(tag_names, [d])
     if add_to_solr:
         add_items_to_solr([d.pk], "search.Docket")
-    logger.info("Created/updated docket: %s" % d)
+    logger.info(f"Created/updated docket: {d}")
     return d.pk
 
 

@@ -66,8 +66,7 @@ def parse_file(file_path):
     )
     if not info["court_id"]:
         raise Exception(
-            'Failed to find a court ID for "%s".'
-            % "".join(raw_info.get("court", []))
+            f"Failed to find a court ID for \"{''.join(raw_info.get('court', []))}\"."
         )
 
     # get the full panel text and extract judges from it
@@ -272,13 +271,13 @@ def get_text(file_path):
 
         for opinion_type in OPINION_TYPES:
             # if this child is a byline, note it down and use it later
-            if child.tag == "%s_byline" % opinion_type:
+            if child.tag == f"{opinion_type}_byline":
                 current_byline["type"] = opinion_type
                 current_byline["name"] = get_xml_string(child)
                 break
             # if this child is an opinion text blob, add it to an incomplete
             # opinion and move into the info dict
-            if child.tag == "%s_text" % opinion_type:
+            if child.tag == f"{opinion_type}_text":
                 # add the full opinion info, possibly associating it to a byline
                 raw_info.setdefault("opinions", []).append(
                     {

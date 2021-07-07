@@ -97,9 +97,9 @@ class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
 
     def tearDown(self) -> None:
         if self.screenshot:
-            filename = type(self).__name__ + "-selenium.png"
-            print("\nSaving screenshot: %s" % (filename,))
-            self.browser.save_screenshot("/tmp/" + filename)
+            filename = f"{type(self).__name__}-selenium.png"
+            print(f"\nSaving screenshot: {filename}")
+            self.browser.save_screenshot(f"/tmp/{filename}")
         self._teardown_test_solr()
 
     @classmethod

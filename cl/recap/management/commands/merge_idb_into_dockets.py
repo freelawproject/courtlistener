@@ -69,7 +69,7 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "merge_and_create":
             self.join_fjc_with_dockets(options)
         elif options["task"] == "update_case_ids":
@@ -143,7 +143,7 @@ class Command(VerboseCommand, CommandUtils):
                     docket_number=d.idb_data.docket_number,
                     court_id=d.idb_data.district_id,
                     cookies=session.cookies,
-                    **params
+                    **params,
                 ).set(queue=q),
                 update_docket_from_hidden_api.s().set(queue=q),
             ).apply_async()

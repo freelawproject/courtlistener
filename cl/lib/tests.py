@@ -73,8 +73,7 @@ class TestDBTools(TestCase):
         ]
         for test in tests:
             print(
-                "Testing queryset_generator with %s expected results..."
-                % test["count"],
+                f"Testing queryset_generator with {test['count']} expected results...",
                 end="",
             )
             count = 0
@@ -222,7 +221,7 @@ class TestMakeFQ(SimpleTestCase):
             key = "key"
             self.assertEqual(
                 make_fq(cd={key: test[0]}, field=field, key=key),
-                "%s:(%s)" % (field, test[1]),
+                f"{field}:({test[1]})",
             )
 
 
@@ -290,7 +289,7 @@ class UUIDFileSystemStorageTest(SimpleTestCase):
         file_name = "filename"
         extension = "ext"
         f = self.storage.save(
-            "path/to/%s.%s" % (file_name, extension),
+            f"path/to/{file_name}.{extension}",
             ContentFile("file with path"),
         )
         self.assertTrue(self.storage.exists("path/to"))
@@ -463,8 +462,7 @@ class TestPACERPartyParsing(SimpleTestCase):
         ]
         for pair in pairs:
             print(
-                "Normalizing PACER role of '%s' to '%s'..."
-                % (pair["q"], pair["a"]),
+                f"Normalizing PACER role of '{pair['q']}' to '{pair['a']}'...",
                 end="",
             )
             result = normalize_attorney_role(pair["q"])
@@ -480,8 +478,7 @@ class TestPACERPartyParsing(SimpleTestCase):
         ]
         for pair in pairs:
             print(
-                "Normalizing state of '%s' to '%s'..."
-                % (pair["q"], pair["a"]),
+                f"Normalizing state of '{pair['q']}' to '{pair['a']}'...",
                 end="",
             )
             result = normalize_us_state(pair["q"])
@@ -791,7 +788,7 @@ class TestPACERPartyParsing(SimpleTestCase):
             },
         ]
         for i, pair in enumerate(pairs):
-            print("Normalizing address %s..." % i, end="")
+            print(f"Normalizing address {i}...", end="")
             result = normalize_attorney_contact(pair["q"])  # type: ignore
             self.maxDiff = None
             self.assertEqual(result, pair["a"])  # type: ignore
@@ -839,7 +836,7 @@ class TestFilesizeConversions(SimpleTestCase):
             ("5.2 mb", 5452595),
         ]
         for qa in qa_pairs:
-            print("Converting '%s' to bytes..." % qa[0], end="")
+            print(f"Converting '{qa[0]}' to bytes...", end="")
             self.assertEqual(convert_size_to_bytes(qa[0]), qa[1])
             print("✓")
 

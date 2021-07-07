@@ -161,7 +161,7 @@ def do_many(
         total = None
     # go through the files, yielding parsed files and printing status updates as
     # we go
-    folders = glob(dir_path + "/*")
+    folders = glob(f"{dir_path}/*")
     folders.sort()
     count = 0
 
@@ -251,18 +251,18 @@ def do_many(
                     "duplicate(s)",
                 ]
                 if any(k in str(e) for k in known):
-                    logger.info("Known exception in file '%s':" % path)
+                    logger.info(f"Known exception in file '{path}':")
                     logger.info(str(e))
                 else:
-                    logger.info("Unknown exception in file '%s':" % path)
+                    logger.info(f"Unknown exception in file '{path}':")
                     logger.info(traceback.format_exc())
         # status update
         count += 1
         if count % status_interval == 0:
             if total:
-                logger.info("Finished %s out of %s files." % (count, total))
+                logger.info(f"Finished {count} out of {total} files.")
             else:
-                logger.info("Finished %s files." % count)
+                logger.info(f"Finished {count} files.")
 
 
 def file_generator(dir_path, random_order=False, limit=None):
