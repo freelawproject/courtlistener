@@ -16,8 +16,19 @@ except ImportError:
 
 from cl.lib.redis_utils import make_redis_interface
 
+TEST_RUNNER = "cl.tests.runner.TestRunner"
+
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 TESTING = "test" in sys.argv
+TEST_RUNNER = "cl.tests.runner.TestRunner"
+if TESTING:
+    PAGINATION_COUNT = 10
+    DEBUG = False
+    PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]
+    CELERY_BROKER = "memory://"
+
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True

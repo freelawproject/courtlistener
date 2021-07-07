@@ -3,7 +3,6 @@ from datetime import timedelta
 from unittest import mock
 
 from django.conf import settings
-from django.test import TestCase
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
@@ -25,6 +24,7 @@ from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.transformer_extractor_utils import convert_and_clean_audio
 from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 @mock.patch(
@@ -173,7 +173,7 @@ class ExtractionTest(TestCase):
         )
 
 
-class ExtensionIdentificationTest(TestCase):
+class ExtensionIdentificationTest(SimpleTestCase):
     def setUp(self) -> None:
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
 

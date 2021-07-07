@@ -11,7 +11,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
@@ -43,6 +43,7 @@ from cl.search.models import (
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.tests.cases import TestCase
 
 
 class UpdateIndexCommandTest(SolrTestCase):

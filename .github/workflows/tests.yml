@@ -11,6 +11,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    strategy:
+      matrix:
+        tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
         uses: actions/checkout@v2-beta
@@ -49,33 +57,48 @@ jobs:
       # dependencies
       - name: Set up docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push latest docker django image
+          driver-opts: network=host
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Cache Docker celery layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache-celery
+          key: ${{ runner.os }}-buildx-celery-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-celery-
+      - name: Build latest docker django image
         uses: docker/build-push-action@v2
         with:
           file: docker/django/Dockerfile
           push: true
-          tags: freelawproject/courtlistener-django:${{ github.sha }}
-      - name: Build and push latest docker celery image
+          tags: localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+      - name: Build latest docker celery image
         uses: docker/build-push-action@v2
         with:
           file: docker/task-server/Dockerfile
           push: true
-          tags: freelawproject/task-server:${{ github.sha }}
+          tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache-celery
+          cache-to: type=local,dest=/tmp/.buildx-cache-celery-new
 
       # Docker images are ready. Start them up.
       - name: Create docker network
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
-        run: docker-compose up -d
+        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
-          CELERY_DOCKER_TAG: "${{ github.sha }}"
-          DJANGO_DOCKER_TAG: "${{ github.sha }}"
+          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/task-server:${{ github.sha }}"
+          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}"
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
@@ -88,7 +111,10 @@ jobs:
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
       - name: Run the tests!
-        run: docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django python /opt/courtlistener/manage.py test cl --verbosity=2 --parallel
+        run: >
+          docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
+          python /opt/courtlistener/manage.py test
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: cp selenium results from docker to host
         if: failure()
         run: |
@@ -104,3 +130,13 @@ jobs:
         with:
           name: selenium-screenshots
           path: selenium-screenshots/extract
+
+      # Temp fix
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          rm -rf /tmp/.buildx-cache-celery
+          mv /tmp/.buildx-cache-celery-new /tmp/.buildx-cache-celery

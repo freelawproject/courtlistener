@@ -1,7 +1,7 @@
 import datetime
 
 from django.template import Context
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory
 
 from cl.custom_filters.templatetags.extras import get_full_host, granular_date
 from cl.custom_filters.templatetags.text_filters import (
@@ -13,33 +13,35 @@ from cl.people_db.models import (
     GRANULARITY_MONTH,
     GRANULARITY_YEAR,
 )
+from cl.tests.cases import SimpleTestCase
 
 
-class TestTextFilters(TestCase):
-    def test_oxford_zero_items(self) -> None:
+class TestOxfordJoinFilter(SimpleTestCase):
+    def test_oxford(self) -> None:
+        # Zero items
         self.assertEqual(oxford_join([]), "")
 
-    def test_oxford_one_item(self) -> None:
+        # One item
         self.assertEqual(oxford_join(["a"]), "a")
 
-    def test_oxford_two_items(self) -> None:
+        # Two items
         self.assertEqual(oxford_join(["a", "b"]), "a and b")
 
-    def test_oxford_three_items(self) -> None:
+        # Three items
         self.assertEqual(oxford_join(["a", "b", "c"]), "a, b, and c")
 
-    def test_oxford_separator(self) -> None:
+        # Custom separator
         self.assertEqual(
             oxford_join(["a", "b", "c"], separator=";"), "a; b; and c"
         )
 
-    def test_oxford_conjunction(self) -> None:
+        # Custom conjunction(self) -> None:
         self.assertEqual(
             oxford_join(["a", "b", "c"], conjunction="or"), "a, b, or c"
         )
 
 
-class TestNaturalDuration(TestCase):
+class TestNaturalDuration(SimpleTestCase):
     def test_conversion_to_strings(self) -> None:
         """Can we get the str output right?"""
         test_cases = (
@@ -101,7 +103,7 @@ class DummyObject(object):
     pass
 
 
-class TestExtras(TestCase):
+class TestExtras(SimpleTestCase):
 
     factory = RequestFactory()
 
