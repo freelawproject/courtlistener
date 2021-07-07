@@ -1,5 +1,5 @@
 TAG_NAME = "yDVxdAsAKSixdsoM"
-TAG_NAME_OPINIONS = TAG_NAME + "-opinions"
+TAG_NAME_OPINIONS = f"{TAG_NAME}-opinions"
 
 """
 This file contains some of the work product of our collaboration with GSU. The

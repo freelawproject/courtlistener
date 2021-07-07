@@ -59,13 +59,12 @@ def make_dict_of_ftm_eids(use_pickle=True):
                 level=leveldict[level],
                 year=year,
             )
-            logger.info("Getting url at: %s" % url)
+            logger.info(f"Getting url at: {url}")
             data = requests.get(url, timeout=30).json()
 
             if data["records"] == ["No Records"]:
                 logger.info(
-                    "  No records found in court %s and year %s."
-                    % (courtid, year)
+                    f"  No records found in court {courtid} and year {year}."
                 )
                 continue
             logger.info(
@@ -86,7 +85,7 @@ def make_dict_of_ftm_eids(use_pickle=True):
 
     if use_pickle:
         with open(pickle_location, "w") as f:
-            logger.info("Creating pickle file at: %s" % pickle_location)
+            logger.info(f"Creating pickle file at: {pickle_location}")
             pickle.dump(candidate_eid_lists, f)
     return candidate_eid_lists
 
@@ -110,13 +109,12 @@ def print_stats(match_stats, candidate_eid_lists):
     logger.info("#########")
     logger.info("Finished matching judges:")
     for k, v in match_stats.items():
-        logger.info(" - %s had %s matches" % (v, k))
+        logger.info(f" - {v} had {k} matches")
     ftm_judge_count = 0
     for v in candidate_eid_lists.values():
         ftm_judge_count += len(v)
         logger.info(
-            "There were %s judges in FTM that we matched "
-            "against." % ftm_judge_count
+            f"There were {ftm_judge_count} judges in FTM that we matched against."
         )
 
 
@@ -130,7 +128,7 @@ def update_judges_by_solr(candidate_id_map, debug):
     for court_id, candidate_list in candidate_id_map.items():
         for candidate in candidate_list:
             # Look up the candidate in Solr.
-            logger.info("Doing: %s" % candidate["name"])
+            logger.info(f"Doing: {candidate['name']}")
             name = (
                 " AND ".join(
                     [
@@ -146,8 +144,8 @@ def update_judges_by_solr(candidate_id_map, debug):
                     **{
                         "caller": "ftm_update_judges_by_solr",
                         "fq": [
-                            "name:(%s)" % name,
-                            "court_exact:%s" % court_id,
+                            f"name:({name})",
+                            f"court_exact:{court_id}",
                             # This filters out Sr/Jr problems by insisting on recent
                             # positions. 1980 is arbitrary, based on testing.
                             "date_start:[1980-12-31T23:59:59Z TO *]",
@@ -164,7 +162,7 @@ def update_judges_by_solr(candidate_id_map, debug):
 
             elif len(results) == 1:
                 match_stats[len(results)] += 1
-                logger.info("Found one match: %s" % results[0]["name"])
+                logger.info(f"Found one match: {results[0]['name']}")
 
                 # Get the person from the DB and update them.
                 pk = results[0]["id"]
@@ -200,10 +198,10 @@ def update_judges_by_solr(candidate_id_map, debug):
 
             elif len(results) > 1:
                 match_stats[len(results)] += 1
-                logger.info("  Found more than one match: %s" % results)
+                logger.info(f"  Found more than one match: {results}")
 
     print_stats(match_stats, candidate_id_map)
-    logger.info("Blacklisted IDs: %s" % blacklisted_ids)
+    logger.info(f"Blacklisted IDs: {blacklisted_ids}")
     conn.conn.http_connection.close()
 
 

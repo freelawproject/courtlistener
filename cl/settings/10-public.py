@@ -153,10 +153,10 @@ MESSAGE_TAGS = {
 ########
 # Solr #
 ########
-SOLR_OPINION_URL = "%s/solr/collection1" % SOLR_HOST
-SOLR_AUDIO_URL = "%s/solr/audio" % SOLR_HOST
-SOLR_PEOPLE_URL = "%s/solr/person" % SOLR_HOST
-SOLR_RECAP_URL = "%s/solr/recap" % SOLR_RECAP_HOST
+SOLR_OPINION_URL = f"{SOLR_HOST}/solr/collection1"
+SOLR_AUDIO_URL = f"{SOLR_HOST}/solr/audio"
+SOLR_PEOPLE_URL = f"{SOLR_HOST}/solr/person"
+SOLR_RECAP_URL = f"{SOLR_RECAP_HOST}/solr/recap"
 SOLR_URLS = {
     "audio.Audio": SOLR_AUDIO_URL,
     "people_db.Person": SOLR_PEOPLE_URL,
@@ -171,10 +171,10 @@ SOLR_AUDIO_TEST_CORE_NAME = "audio_test"
 SOLR_PEOPLE_TEST_CORE_NAME = "person_test"
 SOLR_RECAP_TEST_CORE_NAME = "recap_test"
 
-SOLR_OPINION_TEST_URL = "%s/solr/opinion_test" % SOLR_HOST
-SOLR_AUDIO_TEST_URL = "%s/solr/audio_test" % SOLR_HOST
-SOLR_PEOPLE_TEST_URL = "%s/solr/person_test" % SOLR_HOST
-SOLR_RECAP_TEST_URL = "%s/solr/recap_test" % SOLR_RECAP_HOST
+SOLR_OPINION_TEST_URL = f"{SOLR_HOST}/solr/opinion_test"
+SOLR_AUDIO_TEST_URL = f"{SOLR_HOST}/solr/audio_test"
+SOLR_PEOPLE_TEST_URL = f"{SOLR_HOST}/solr/person_test"
+SOLR_RECAP_TEST_URL = f"{SOLR_RECAP_HOST}/solr/recap_test"
 SOLR_TEST_URLS = {
     "audio.Audio": SOLR_AUDIO_TEST_URL,
     "people_db.Person": SOLR_PEOPLE_TEST_URL,
@@ -224,15 +224,11 @@ else:
         "visibility_timeout": (60 * 60 * 6),  # six hours
     }
 
-CELERY_BROKER_URL = "redis://%s:%s/%s" % (
-    REDIS_HOST,
-    REDIS_PORT,
-    REDIS_DATABASES["CELERY"],
+CELERY_BROKER_URL = (
+    f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DATABASES['CELERY']}"
 )
-CELERY_RESULT_BACKEND = "redis://%s:%s/%s" % (
-    REDIS_HOST,
-    REDIS_PORT,
-    REDIS_DATABASES["CELERY"],
+CELERY_RESULT_BACKEND = (
+    f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DATABASES['CELERY']}"
 )
 
 # Rate limits aren't ever used, so disable them across the board for better
@@ -251,7 +247,7 @@ CELERY_ACCEPT_CONTENT = {"json", "pickle"}
 CACHES = {
     "default": {
         "BACKEND": "redis_cache.RedisCache",
-        "LOCATION": "%s:%s" % (REDIS_HOST, REDIS_PORT),
+        "LOCATION": f"{REDIS_HOST}:{REDIS_PORT}",
         "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
     },
     "db_cache": {
@@ -618,7 +614,7 @@ AWS_QUERYSTRING_AUTH = False
 
 if DEVELOPMENT:
     AWS_STORAGE_BUCKET_NAME = "dev-com-courtlistener-storage"
-    AWS_S3_CUSTOM_DOMAIN = "%s.s3.amazonaws.com" % AWS_STORAGE_BUCKET_NAME
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CLOUDFRONT_DOMAIN = ""
 

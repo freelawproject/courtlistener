@@ -70,7 +70,7 @@ class Command(VerboseCommand):
 
         for up in unconfirmed_ups:
             if self.options["verbose"]:
-                print("User %s deleted" % up.user.username)
+                print(f"User {up.user.username} deleted")
             if not self.options["simulate"]:
                 # Gather their foreign keys, delete those
                 up.user.alerts.all().delete()
@@ -108,7 +108,7 @@ class Command(VerboseCommand):
 
         for up in unconfirmed_ups:
             if self.options["verbose"]:
-                print("User %s will be notified" % up.user)
+                print(f"User {up.user} will be notified")
 
             if not self.options["simulate"]:
                 # Build and save a new activation key for the account.

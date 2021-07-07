@@ -50,9 +50,7 @@ def get_name_by_incrementing(
     count = itertools.count(1)
     while instance.exists(name):
         # file_ext includes the dot.
-        name = os.path.join(
-            dir_name, "%s_%s%s" % (file_root, next(count), file_ext)
-        )
+        name = os.path.join(dir_name, f"{file_root}_{next(count)}{file_ext}")
     return name
 
 

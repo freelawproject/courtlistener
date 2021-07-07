@@ -203,10 +203,7 @@ class ProcessingQueue(AbstractDateTimeModel):
                 self.get_upload_type_display(),
             )
         else:
-            return "ProcessingQueue: %s (%s)" % (
-                self.pk,
-                self.get_upload_type_display(),
-            )
+            return f"ProcessingQueue: {self.pk} ({self.get_upload_type_display()})"
 
     class Meta:
         permissions = (
@@ -400,10 +397,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s (%s)" % (
-            self.pk,
-            self.get_request_type_display(),
-        )
+        return f"{self.pk} ({self.get_request_type_display()})"
 
 
 class FjcIntegratedDatabase(AbstractDateTimeModel):
@@ -877,7 +871,7 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: %s v. %s" % (self.pk, self.plaintiff, self.defendant)
+        return f"{self.pk}: {self.plaintiff} v. {self.defendant}"
 
     class Meta:
         verbose_name_plural = "FJC Integrated Database Entries"

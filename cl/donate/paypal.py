@@ -30,7 +30,7 @@ def get_paypal_access_token() -> str:
     caching the token and detecting when it is expired.
     """
     r = requests.post(
-        "%s/v1/oauth2/token" % settings.PAYPAL_ENDPOINT,
+        f"{settings.PAYPAL_ENDPOINT}/v1/oauth2/token",
         headers={"Accept": "application/json", "Accept-Language": "en_US"},
         auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_SECRET_KEY),
         data={"grant_type": "client_credentials"},
@@ -70,11 +70,10 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
 
     d = Donation.objects.get(transaction_id=request.GET["token"])
     r = requests.post(
-        "%s/v1/payments/payment/%s/execute/"
-        % (settings.PAYPAL_ENDPOINT, d.payment_id),
+        f"{settings.PAYPAL_ENDPOINT}/v1/payments/payment/{d.payment_id}/execute/",
         headers={
             "Content-Type": "application/json",
-            "Authorization": "Bearer %s" % access_token,
+            "Authorization": f"Bearer {access_token}",
         },
         data=json.dumps({"payer_id": request.GET["PayerID"]}),
         timeout=30,
@@ -108,8 +107,8 @@ def process_paypal_payment(
     if not access_token:
         raise PaymentFailureException("NO_ACCESS_TOKEN")
 
-    return_url = "https://www.courtlistener.com%s" % reverse("paypal_callback")
-    cancel_url = "https://www.courtlistener.com%s" % reverse("paypal_cancel")
+    return_url = f"https://www.courtlistener.com{reverse('paypal_callback')}"
+    cancel_url = f"https://www.courtlistener.com{reverse('paypal_cancel')}"
     data = {
         "intent": "sale",
         "redirect_urls": {"return_url": return_url, "cancel_url": cancel_url},
@@ -125,10 +124,10 @@ def process_paypal_payment(
         ],
     }
     r = requests.post(
-        "%s/v1/payments/payment" % settings.PAYPAL_ENDPOINT,
+        f"{settings.PAYPAL_ENDPOINT}/v1/payments/payment",
         headers={
             "Content-Type": "application/json",
-            "Authorization": "Bearer %s" % access_token,
+            "Authorization": f"Bearer {access_token}",
         },
         data=json.dumps(data),
         timeout=30,

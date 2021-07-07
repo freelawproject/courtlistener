@@ -25,7 +25,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     item_enclosure_mime_type = "audio/mpeg"
 
     def title(self, obj):
-        return "Oral Arguments for the %s" % obj.full_name
+        return f"Oral Arguments for the {obj.full_name}"
 
     def items(self, obj):
         """
@@ -34,7 +34,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         solr = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
         params = {
             "q": "*",
-            "fq": "court_exact:%s" % obj.pk,
+            "fq": f"court_exact:{obj.pk}",
             "sort": "dateArgued desc",
             "rows": "20",
             "start": "0",
@@ -51,13 +51,11 @@ class JurisdictionPodcast(JurisdictionFeed):
             "iTunes_explicit": "no",
         }
         if hasattr(obj, "pk"):
-            path = "/static/png/producer-%s-2000x2000.png" % obj.pk
+            path = f"/static/png/producer-{obj.pk}-2000x2000.png"
         else:
             # Not a jurisdiction API -- A search API.
             path = "/static/png/producer-2000x2000.png"
-        extra_args["iTunes_image_url"] = (
-            "https://www.courtlistener.com%s" % path
-        )
+        extra_args["iTunes_image_url"] = f"https://www.courtlistener.com{path}"
 
         return extra_args
 

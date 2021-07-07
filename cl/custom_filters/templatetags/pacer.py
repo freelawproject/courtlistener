@@ -12,5 +12,5 @@ def price(rd: RECAPDocument) -> str:
 
     if rd.page_count:
         cost = rd.page_count * 0.10
-        return "{:.2f}".format(min(3, cost))
+        return f"{min(3, cost):.2f}"
     return ""

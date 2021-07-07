@@ -121,7 +121,7 @@ class DonationForm(ModelForm):
     amount = DecimalOrOtherChoiceField(
         widget=forms.RadioSelect, choices=AMOUNTS, initial="50"
     )
-    placeholder = "Amount (min $%s)" % settings.MIN_DONATION["docket_alerts"]
+    placeholder = f"Amount (min ${settings.MIN_DONATION['docket_alerts']})"
     amount_other = forms.DecimalField(
         required=False,
         widget=forms.TextInput(

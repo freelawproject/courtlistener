@@ -137,8 +137,7 @@ class TestExtras(SimpleTestCase):
                 result,
                 a,
                 msg=(
-                    "Incorrect granular date conversion. Got: %s instead of "
-                    "%s" % (result, a)
+                    f"Incorrect granular date conversion. Got: {result} instead of {a}"
                 ),
             )
 

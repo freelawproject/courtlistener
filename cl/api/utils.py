@@ -124,9 +124,9 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                     model_name = (
                         filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
                     )
-                    attrs["lookup_types"] = (
-                        "See available filters for '%s'" % model_name
-                    )
+                    attrs[
+                        "lookup_types"
+                    ] = f"See available filters for '{model_name}'"
                 else:
                     attrs["lookup_types"] = ["exact"]
 
@@ -232,26 +232,26 @@ class LoggingMixin(object):
 
         # Global and daily tallies for all URLs.
         pipe.incr("api:v3.count")
-        pipe.incr("api:v3.d:%s.count" % d)
+        pipe.incr(f"api:v3.d:{d}.count")
         pipe.incr("api:v3.timing", response_ms)
-        pipe.incr("api:v3.d:%s.timing" % d, response_ms)
+        pipe.incr(f"api:v3.d:{d}.timing", response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
         user_pk = user.pk or "AnonymousUser"
         pipe.zincrby("api:v3.user.counts", 1, user_pk)
-        pipe.zincrby("api:v3.user.d:%s.counts" % d, 1, user_pk)
+        pipe.zincrby(f"api:v3.user.d:{d}.counts", 1, user_pk)
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
         pipe.zincrby("api:v3.endpoint.counts", 1, endpoint)
-        pipe.zincrby("api:v3.endpoint.d:%s.counts" % d, 1, endpoint)
+        pipe.zincrby(f"api:v3.endpoint.d:{d}.counts", 1, endpoint)
 
         # We create a per-day key in redis for timings. Inside the key we have
         # members for every endpoint, with score of the total time. So to get
         # the average for an endpoint you need to get the number of requests
         # and the total time for the endpoint and divide.
-        timing_key = "api:v3.endpoint.d:%s.timings" % d
+        timing_key = f"api:v3.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
         results = pipe.execute()
@@ -263,7 +263,7 @@ class LoggingMixin(object):
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(
-                description="API has logged %s total requests." % total_count
+                description=f"API has logged {total_count} total requests."
             )
         if user.is_authenticated:
             if user_count in self.milestones:
@@ -612,8 +612,8 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     d_str = d.isoformat()
     r = make_redis_interface("STATS")
     pipe = r.pipeline()
-    pipe.zscore("api:v3.endpoint.d:%s.timings" % d_str, endpoint)
-    pipe.zscore("api:v3.endpoint.d:%s.counts" % d_str, endpoint)
+    pipe.zscore(f"api:v3.endpoint.d:{d_str}.timings", endpoint)
+    pipe.zscore(f"api:v3.endpoint.d:{d_str}.counts", endpoint)
     results = pipe.execute()
 
     return results[0] / results[1]

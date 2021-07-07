@@ -63,7 +63,7 @@ class Command(VerboseCommand):
             # Note that multiple scripts on multiple machines could still be
             # run.
             court_str = "-".join(sorted(options["courts"]))
-            with open("/tmp/rss-scraper-%s.pid" % court_str, "w") as fp:
+            with open(f"/tmp/rss-scraper-{court_str}.pid", "w") as fp:
                 try:
                     fcntl.lockf(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except IOError:

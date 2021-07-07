@@ -117,7 +117,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         name = "RECAP lookup API"
         suffix = getattr(self, "suffix", None)
         if suffix:
-            name += " " + suffix
+            name += f" {suffix}"
         return name
 
     def list(self, request, *args, **kwargs):

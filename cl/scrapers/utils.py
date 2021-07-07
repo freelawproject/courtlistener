@@ -52,7 +52,7 @@ def follow_redirections(r: Response, s: Session) -> Response:
     """
     redirected, url = test_for_meta_redirections(r)
     if redirected:
-        logger.info("Following a meta redirection to: %s" % url.encode())
+        logger.info(f"Following a meta redirection to: {url.encode()}")
         r = follow_redirections(s.get(url), s)
     return r
 
@@ -112,10 +112,7 @@ def get_binary_content(
     """
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
-        msg = "NoDownloadUrlError: %s\n%s" % (
-            download_url,
-            traceback.format_exc(),
-        )
+        msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
         return msg, None
     # noinspection PyBroadException
     try:
@@ -139,9 +136,8 @@ def get_binary_content(
 
             # test for empty files (thank you CA1)
             if len(r.content) == 0:
-                msg = "EmptyFileError: %s\n%s" % (
-                    download_url,
-                    traceback.format_exc(),
+                msg = (
+                    f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
                 )
                 return msg, None
 
@@ -150,10 +146,7 @@ def get_binary_content(
 
             r.raise_for_status()
     except:
-        msg = "DownloadingError: %s\n%s" % (
-            download_url,
-            traceback.format_exc(),
-        )
+        msg = f"DownloadingError: {download_url}\n{traceback.format_exc()}"
         return msg, None
 
     # Success!
@@ -208,7 +201,7 @@ def extract_recap_documents(
         throttle.maybe_wait()
         extract_recap_pdf.apply_async((pk, skip_ocr), priority=5, queue=queue)
         if i % 1000 == 0:
-            msg = "Sent %s/%s tasks to celery so far." % (i + 1, count)
+            msg = f"Sent {i + 1}/{count} tasks to celery so far."
             logger.info(msg)
-            sys.stdout.write("\r%s" % msg)
+            sys.stdout.write(f"\r{msg}")
             sys.stdout.flush()

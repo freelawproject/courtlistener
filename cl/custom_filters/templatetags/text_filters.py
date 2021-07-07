@@ -31,7 +31,7 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
     elif num_items == 1:
         s = items[0]
     elif num_items == 2:
-        s = "%s %s %s" % (items[0], conjunction, items[1])
+        s = f"{items[0]} {conjunction} {items[1]}"
     elif num_items > 2:
         # Don't use negative indexing here, even though they'd make this
         # easier. Instead use enumeration to figure out when we're close to the
@@ -42,10 +42,10 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
                 s = item
             elif i == (num_items - 1):
                 # Last item.
-                s += "%s %s %s" % (separator, conjunction, item)
+                s += f"{separator} {conjunction} {item}"
             else:
                 # Items in the middle
-                s += "%s " % separator + item
+                s += f"{separator} {item}"
 
     return mark_safe(s)
 

@@ -104,9 +104,9 @@ def import_tn_corpus(
         logging.info(
             "Processing label:%s for case:%s", case["label"], case["title"]
         )
-        pdf_path = glob(
-            "%s/%s/*.pdf" % (os.path.dirname(file.name), case["label"])
-        )[0]
+        pdf_path = glob(f"{os.path.dirname(file.name)}/{case['label']}/*.pdf")[
+            0
+        ]
         with open(pdf_path, "rb") as p:
             pdf_data = p.read()
 

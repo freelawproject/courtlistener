@@ -29,7 +29,7 @@ def trunc(s: str, length: int, ellipsis: Optional[str] = None) -> str:
             end = length - ellipsis_length
         s = s[0:end]
         if ellipsis:
-            s = "%s%s" % (s, ellipsis)
+            s = f"{s}{ellipsis}"
         return s
 
 

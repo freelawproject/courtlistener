@@ -114,7 +114,7 @@ def is_whitelisted(request: HttpRequest) -> bool:
     if ip_address is None:
         return False
 
-    whitelist_key = "%s:%s" % (whitelist_cache_prefix, ip_address)
+    whitelist_key = f"{whitelist_cache_prefix}:{ip_address}"
 
     # Check if the ip address is in our whitelist.
     if cache.get(whitelist_key):

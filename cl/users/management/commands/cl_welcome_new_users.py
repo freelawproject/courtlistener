@@ -57,7 +57,7 @@ class Command(VerboseCommand):
                     from_email="Mike Lissner <mike@courtlistener.com>",
                     to=[recipient.email],
                     headers={
-                        "X-Entity-Ref-ID": "welcome.email:%s" % recipient.pk
+                        "X-Entity-Ref-ID": f"welcome.email:{recipient.pk}"
                     },
                 )
             )
@@ -65,7 +65,7 @@ class Command(VerboseCommand):
         if not self.options["simulate"]:
             connection = get_connection()
             connection.send_messages(messages)
-            logger.info("Sent %s daily welcome emails." % len(messages))
+            logger.info(f"Sent {len(messages)} daily welcome emails.")
         else:
             sys.stdout.write(
                 "Simulation mode. Imagine that we just sent %s "

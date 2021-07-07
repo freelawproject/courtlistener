@@ -84,6 +84,13 @@ jobs:
           cl/users/management/commands/cl_account_management.py \
           cl/users/forms.py
 
+      - name: Flynt f-string Formatter
+        run: >
+          flynt .
+          --line-length=79
+          --transform-concats
+          --fail-on-change
+
       - name: Black Code Formatter
         uses: psf/black@stable
 

@@ -104,8 +104,8 @@ class BasicAPIPageTest(TestCase):
                 reverse("rest_docs", kwargs={"version": version})
             )
             self.assertEqual(response.status_code, 200)
-            self.assertTemplateUsed(response, "rest-docs-%s.html" % (version,))
-            header = "REST API &ndash; %s" % (version.upper(),)
+            self.assertTemplateUsed(response, f"rest-docs-{version}.html")
+            header = f"REST API &ndash; {version.upper()}"
             self.assertContains(response, header)
 
 
@@ -307,15 +307,14 @@ class FilteringCountTestCase(object):
     # noinspection PyPep8Naming
     def assertCountInResults(self, expected_count):
         """Do we get the correct number of API results from the endpoint?"""
-        print("Path and q are: %s, %s" % (self.path, self.q))
+        print(f"Path and q are: {self.path}, {self.q}")
         r = self.client.get(self.path, self.q)
         self.assertLess(r.status_code, 400)  # A valid status code?
         got = len(r.data["results"])
         self.assertEqual(
             got,
             expected_count,
-            msg="Expected %s, but got %s.\n\n"
-            "r.data was: %s" % (expected_count, got, r.data),
+            msg=f"Expected {expected_count}, but got {got}.\n\nr.data was: {r.data}",
         )
 
 
@@ -864,7 +863,7 @@ class DRFRecapPermissionTest(TestCase):
             self.client.login(username="recap-user", password="password")
         )
         for path in self.paths:
-            print("Access allowed to recap user at: %s... " % path, end="")
+            print(f"Access allowed to recap user at: {path}... ", end="")
             r = self.client.get(path)
             self.assertEqual(r.status_code, HTTP_200_OK)
             print("✓")
@@ -875,7 +874,7 @@ class DRFRecapPermissionTest(TestCase):
             self.client.login(username="pandora", password="password")
         )
         for path in self.paths:
-            print("Access denied to non-recap user at: %s... " % path, end="")
+            print(f"Access denied to non-recap user at: {path}... ", end="")
             r = self.client.get(path)
             self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
             print("✓")

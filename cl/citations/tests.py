@@ -145,7 +145,7 @@ class CiteTest(SimpleTestCase):
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
-                "Testing plain text to html conversion for %s..." % s,
+                f"Testing plain text to html conversion for {s}...",
                 s=s,
                 expected_html=expected_html,
             ):
@@ -163,7 +163,7 @@ class CiteTest(SimpleTestCase):
                 self.assertEqual(
                     created_html,
                     expected_html,
-                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
     def test_make_html_from_html(self) -> None:
@@ -201,7 +201,7 @@ class CiteTest(SimpleTestCase):
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
-                "Testing html to html conversion for %s..." % s,
+                f"Testing html to html conversion for {s}...",
                 s=s,
                 expected_html=expected_html,
             ):
@@ -219,7 +219,7 @@ class CiteTest(SimpleTestCase):
                 self.assertEqual(
                     created_html,
                     expected_html,
-                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
     def test_make_html_from_matched_citation_objects(self) -> None:
@@ -252,7 +252,7 @@ class CiteTest(SimpleTestCase):
         # fmt: on
         for s, expected_html in test_pairs:
             with self.subTest(
-                "Testing object to HTML rendering for %s..." % s,
+                f"Testing object to HTML rendering for {s}...",
                 s=s,
                 expected_html=expected_html,
             ):
@@ -275,7 +275,7 @@ class CiteTest(SimpleTestCase):
                 self.assertEqual(
                     created_html,
                     expected_html,
-                    msg="\n%s\n\n    !=\n\n%s" % (created_html, expected_html),
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
 
@@ -483,7 +483,7 @@ class MatchingTest(IndexedSolrTestCase):
         # fmt: on
         for citations, expected_resolutions in test_pairs:
             with self.subTest(
-                "Testing citation matching for %s..." % citations,
+                f"Testing citation matching for {citations}...",
                 citations=citations,
                 expected_resolutions=expected_resolutions,
             ):
@@ -497,8 +497,7 @@ class MatchingTest(IndexedSolrTestCase):
                 self.assertEqual(
                     citation_resolutions,
                     expected_resolutions,
-                    msg="\n%s\n\n    !=\n\n%s"
-                    % (citation_resolutions, expected_resolutions),
+                    msg=f"\n{citation_resolutions}\n\n    !=\n\n{expected_resolutions}",
                 )
 
     def test_citation_matching_issue621(self) -> None:
@@ -565,7 +564,7 @@ class UpdateTest(IndexedSolrTestCase):
 
         for cited, depth in test_pairs:
             with self.subTest(
-                "Testing OpinionsCited creation for %s..." % cited,
+                f"Testing OpinionsCited creation for {cited}...",
                 cited=cited,
                 depth=depth,
             ):
@@ -699,7 +698,7 @@ class ParallelCitationTest(SimpleTestCase):
         )
         for q, citation_group_count, expected_num_parallel_citations in tests:
             with self.subTest(
-                "Testing parallel citation identification for: %s..." % q,
+                f"Testing parallel citation identification for: {q}...",
                 q=q,
                 citation_group_count=citation_group_count,
                 expected_num_parallel_citations=expected_num_parallel_citations,
@@ -738,7 +737,7 @@ class ParallelCitationTest(SimpleTestCase):
         ]
         for q, a in tests:
             with self.subTest(
-                "Testing network-friendly edge creation for: %s..." % q,
+                f"Testing network-friendly edge creation for: {q}...",
                 q=q,
                 a=a,
             ):

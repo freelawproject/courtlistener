@@ -11,7 +11,7 @@ def valid_date(s):
     try:
         return parser.parse(s).date()
     except ValueError:
-        raise argparse.ArgumentTypeError("Unable to parse date, %s" % s)
+        raise argparse.ArgumentTypeError(f"Unable to parse date, {s}")
 
 
 def valid_date_time(s):
@@ -21,17 +21,17 @@ def valid_date_time(s):
             d = make_aware(d, utc)
         return d
     except ValueError:
-        raise argparse.ArgumentTypeError("Unable to parse date/time, %s" % s)
+        raise argparse.ArgumentTypeError(f"Unable to parse date/time, {s}")
 
 
 def readable_dir(prospective_dir):
     if not os.path.isdir(prospective_dir):
         raise argparse.ArgumentTypeError(
-            "readable_dir:{0} is not a valid path".format(prospective_dir)
+            f"readable_dir:{prospective_dir} is not a valid path"
         )
     if os.access(prospective_dir, os.R_OK):
         return prospective_dir
     else:
         raise argparse.ArgumentTypeError(
-            "readable_dir:{0} is not a readable dir".format(prospective_dir)
+            f"readable_dir:{prospective_dir} is not a readable dir"
         )

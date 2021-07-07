@@ -51,9 +51,7 @@ class UserTest(LiveServerTestCase):
             "consent": True,
         }
         response = self.client.post(
-            "{host}{path}".format(
-                host=self.live_server_url, path=reverse("register")
-            ),
+            f"{self.live_server_url}{reverse('register')}",
             params,
             follow=True,
         )
@@ -218,7 +216,7 @@ class DisposableEmailTest(TestCase):
 
     bad_domain = "yopmail.com"
     user = "Aamon"
-    bad_email = "%s@%s" % (user, bad_domain)
+    bad_email = f"{user}@{bad_domain}"
 
     def setUp(self) -> None:
         self.client = Client()
@@ -238,7 +236,7 @@ class DisposableEmailTest(TestCase):
             },
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain,
+            f"{self.bad_domain} is a blocked email provider",
             r.content.decode(),
         )
 
@@ -253,7 +251,7 @@ class DisposableEmailTest(TestCase):
             follow=True,
         )
         self.assertIn(
-            "%s is a blocked email provider" % self.bad_domain,
+            f"{self.bad_domain} is a blocked email provider",
             r.content.decode(),
         )
 
@@ -268,11 +266,7 @@ class LiveUserTest(BaseSeleniumTest):
         This test checks that the email goes out and that the status code
         returned is valid.
         """
-        self.browser.get(
-            "{host}{path}".format(
-                host=self.live_server_url, path=reverse("password_reset")
-            )
-        )
+        self.browser.get(f"{self.live_server_url}{reverse('password_reset')}")
         email_input = self.browser.find_element(By.NAME, "email")
         email_input.send_keys("pandora@courtlistener.com")
         email_input.submit()
@@ -282,9 +276,7 @@ class LiveUserTest(BaseSeleniumTest):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             self.browser.current_url,
-            "{host}{path}".format(
-                host=self.live_server_url, path=reverse("password_reset_done")
-            ),
+            f"{self.live_server_url}{reverse('password_reset_done')}",
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -317,8 +309,5 @@ class LiveUserTest(BaseSeleniumTest):
 
         self.assertEqual(
             self.browser.current_url,
-            "{host}{path}".format(
-                host=self.live_server_url,
-                path=reverse("password_reset_complete"),
-            ),
+            f"{self.live_server_url}{reverse('password_reset_complete')}",
         )

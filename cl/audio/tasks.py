@@ -27,7 +27,7 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
         title=best_case_name(d),
         collection=settings.IA_OA_COLLECTIONS,
         court_id=d.court_id,
-        source_url="https://www.courtlistener.com%s" % af.get_absolute_url(),
+        source_url=f"https://www.courtlistener.com{af.get_absolute_url()}",
         media_type="audio",
         description="This item represents an oral argument audio file as "
         "scraped from a U.S. Government website by Free Law "
@@ -39,9 +39,8 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
 
     if all(r.ok for r in responses):
         af.ia_upload_failure_count = None
-        af.filepath_ia = "https://archive.org/download/%s/%s" % (
-            bucket_name,
-            file_name,
+        af.filepath_ia = (
+            f"https://archive.org/download/{bucket_name}/{file_name}"
         )
         af.save()
     else:

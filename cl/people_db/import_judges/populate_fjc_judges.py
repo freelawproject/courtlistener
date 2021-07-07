@@ -58,7 +58,7 @@ def transform_employ(string):
                 employ_list[j].insert(1, A[1])
             elif len(A) >= 3:
                 position = ",".join(A[:-2])
-                location = A[-2] + "," + A[-1]
+                location = f"{A[-2]},{A[-1]}"
                 employ_list[j][0] = position
                 employ_list[j].insert(1, location)
         else:
@@ -160,7 +160,7 @@ def transform_bankruptcy(string):
                 bankruptcy_list[j].insert(1, A[1])
             elif len(A) >= 3:
                 position = ",".join(A[:-2])
-                location = A[-2] + "," + A[-1]
+                location = f"{A[-2]},{A[-1]}"
                 bankruptcy_list[j][0] = position
                 bankruptcy_list[j].insert(1, location)
         else:
@@ -213,49 +213,49 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
         # Save the position if we're running all positions or specifically
         # fixing this one.
         save_this_position = fix_nums is None or posnum in fix_nums
-        pos_str = " (%s)" % posnum
+        pos_str = f" ({posnum})"
 
-        if pd.isnull(item["Court Name" + pos_str]):
+        if pd.isnull(item[f"Court Name{pos_str}"]):
             continue
 
-        if re.search("appeal", item["Court Name" + pos_str], re.I):
+        if re.search("appeal", item[f"Court Name{pos_str}"], re.I):
             courtid = match_court_string(
-                item["Court Name" + pos_str], federal_appeals=True
+                item[f"Court Name{pos_str}"], federal_appeals=True
             )
-        elif re.search("district|trade", item["Court Name" + pos_str], re.I):
+        elif re.search("district|trade", item[f"Court Name{pos_str}"], re.I):
             courtid = match_court_string(
-                item["Court Name" + pos_str], federal_district=True
+                item[f"Court Name{pos_str}"], federal_district=True
             )
 
         if courtid is None:
             raise Exception
 
-        date_nominated = process_date_string(item["Nomination Date" + pos_str])
+        date_nominated = process_date_string(item[f"Nomination Date{pos_str}"])
         date_recess_appointment = process_date_string(
-            item["Recess Appointment Date" + pos_str]
+            item[f"Recess Appointment Date{pos_str}"]
         )
         date_referred_to_judicial_committee = process_date_string(
-            item["Committee Referral Date" + pos_str]
+            item[f"Committee Referral Date{pos_str}"]
         )
         date_judicial_committee_action = process_date_string(
-            item["Committee Action Date" + pos_str]
+            item[f"Committee Action Date{pos_str}"]
         )
-        date_hearing = process_date_string(item["Hearing Date" + pos_str])
+        date_hearing = process_date_string(item[f"Hearing Date{pos_str}"])
         date_confirmation = process_date_string(
-            item["Confirmation Date" + pos_str]
+            item[f"Confirmation Date{pos_str}"]
         )
 
         # assign start date
-        date_start = process_date_string(item["Commission Date" + pos_str])
+        date_start = process_date_string(item[f"Commission Date{pos_str}"])
         if pd.isnull(date_start) and not pd.isnull(date_recess_appointment):
             date_start = date_recess_appointment
         if pd.isnull(date_start):
             # if still no start date, skip
             date_start = None
         date_termination = process_date_string(
-            item["Termination Date" + pos_str]
+            item[f"Termination Date{pos_str}"]
         )
-        termination = item["Termination" + pos_str]
+        termination = item[f"Termination{pos_str}"]
 
         if date_termination is None:
             date_granularity_termination = ""
@@ -276,10 +276,10 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             continue
 
         # assign appointing president
-        if not pd.isnull(item["Reappointing President" + pos_str]):
-            appointstr = item["Reappointing President" + pos_str]
+        if not pd.isnull(item[f"Reappointing President{pos_str}"]):
+            appointstr = item[f"Reappointing President{pos_str}"]
         else:
-            appointstr = item["Appointing President" + pos_str]
+            appointstr = item[f"Appointing President{pos_str}"]
         appointer = None
         if appointstr not in ["Assignment", "Reassignment"]:
             names = appointstr.split()
@@ -317,13 +317,13 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 appointer = appoint_search[0]
 
         # Senate votes data.
-        votes = item["Ayes/Nays" + pos_str]
+        votes = item[f"Ayes/Nays{pos_str}"]
         if not pd.isnull(votes):
             votes_yes, votes_no = votes.split("/")
         else:
             votes_yes = None
             votes_no = None
-        if item["Senate Vote Type" + pos_str] == "Yes":
+        if item[f"Senate Vote Type{pos_str}"] == "Yes":
             voice_vote = True
         else:
             voice_vote = False
@@ -338,7 +338,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             "Resignation": "resign",
             "Retirement": "retire_vol",
         }
-        term_reason = item["Termination" + pos_str]
+        term_reason = item[f"Termination{pos_str}"]
         if pd.isnull(term_reason):
             term_reason = ""
         else:
@@ -371,9 +371,9 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             position.save()
 
         # set party
-        p = item["Party of Appointing President" + pos_str]
+        p = item[f"Party of Appointing President{pos_str}"]
         if not pd.isnull(p) and p not in ["Assignment", "Reassignment"]:
-            party = get_party(item["Party of Appointing President" + pos_str])
+            party = get_party(item[f"Party of Appointing President{pos_str}"])
             if prev_politics is None:
                 if pd.isnull(date_nominated):
                     politicsgran = ""
@@ -404,7 +404,7 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
                 )
                 if not testing and save_this_position:
                     politics.save()
-        rating = get_aba(item["ABA Rating" + pos_str])
+        rating = get_aba(item[f"ABA Rating{pos_str}"])
         if rating is not None:
             nom_year = date_nominated.year
             aba = ABARating(person=person, rating=rating, year_rated=nom_year)
@@ -460,15 +460,10 @@ def make_federal_judge(item, testing=False):
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ""
-    name = "%s: %s %s %s" % (
-        item["cl_id"],
-        item["First Name"],
-        item["Last Name"],
-        str(date_dob),
-    )
+    name = f"{item['cl_id']}: {item['First Name']} {item['Last Name']} {str(date_dob)}"
     fjc_check = Person.objects.filter(fjc_id=item["jid"])
     if len(fjc_check) > 0:
-        print("Warning: %s exists" % name)
+        print(f"Warning: {name} exists")
         return
 
     pres_check = Person.objects.filter(
@@ -478,9 +473,9 @@ def make_federal_judge(item, testing=False):
     )
 
     if not testing:
-        print("Now processing: %s" % name)
+        print(f"Now processing: {name}")
     if len(pres_check) > 0:
-        print("%s is a president." % name)
+        print(f"{name} is a president.")
         person = pres_check[0]
         person.fjc_id = item["jid"]
 
@@ -534,19 +529,19 @@ def make_federal_judge(item, testing=False):
 
     # add education items (up to 5 of them)
     for schoolnum in range(1, 6):
-        school_str = " (%s)" % schoolnum
-        schoolname = item["School" + school_str]
+        school_str = f" ({schoolnum})"
+        schoolname = item[f"School{school_str}"]
 
         if pd.isnull(schoolname):
             continue
 
-        if pd.isnull(item["Degree" + school_str]):
+        if pd.isnull(item[f"Degree{school_str}"]):
             degs = [""]
         else:
-            degs = [x.strip() for x in item["Degree" + school_str].split(";")]
+            degs = [x.strip() for x in item[f"Degree{school_str}"].split(";")]
         for degtype in degs:
             deg_level = get_degree_level(degtype)
-            degyear = item["Degree Year" + school_str]
+            degyear = item[f"Degree Year{school_str}"]
             try:
                 int(degyear)
             except:
@@ -669,11 +664,11 @@ def make_mag_bk_judge(item, testing=False):
     """
 
     name = "{CL_ID}: {NAME_FIRST} {NAME_LAST}".format(**item)
-    print("Now processing: %s" % name)
+    print(f"Now processing: {name}")
 
     if Person.objects.filter(cl_id=item["CL_ID"]).exists():
         raise ValidationError(
-            "CL_ID already exists for the record being imported: %s" % name
+            f"CL_ID already exists for the record being imported: {name}"
         )
 
     if Person.objects.filter(
@@ -682,7 +677,7 @@ def make_mag_bk_judge(item, testing=False):
         name_last=item["NAME_LAST"],
     ).exists():
         raise ValidationError(
-            "Name already exists for record being imported %s" % name
+            f"Name already exists for record being imported {name}"
         )
 
     if not pd.isnull(item["NAME_MIDDLE"]):

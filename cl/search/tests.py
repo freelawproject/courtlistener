@@ -69,7 +69,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args.extend(
             [
                 "--solr-url",
-                "%s/solr/%s" % (settings.SOLR_HOST, self.core_name_opinion),
+                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--update",
                 "--everything",
                 "--do-commit",
@@ -106,7 +106,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args.extend(
             [
                 "--solr-url",
-                "%s/solr/%s" % (settings.SOLR_HOST, self.core_name_opinion),
+                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--delete",
                 "--everything",
                 "--do-commit",
@@ -129,7 +129,7 @@ class UpdateIndexCommandTest(SolrTestCase):
         args.extend(
             [
                 "--solr-url",
-                "%s/solr/%s" % (settings.SOLR_HOST, self.core_name_opinion),
+                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
                 "--update",
                 "--items",
                 "1",
@@ -651,7 +651,7 @@ class SearchTest(IndexedSolrTestCase):
             self.assertEqual(
                 r.status_code,
                 HTTP_200_OK,
-                msg="Didn't get good status code with params: %s" % param,
+                msg=f"Didn't get good status code with params: {param}",
             )
 
 
@@ -686,7 +686,7 @@ class RelatedSearchTest(IndexedSolrTestCase):
         }
 
         # disable all status filters (otherwise results do not match detail page)
-        params.update({"stat_" + v: "on" for s, v in DOCUMENT_STATUSES})
+        params.update({f"stat_{v}": "on" for s, v in DOCUMENT_STATUSES})
 
         r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
@@ -763,7 +763,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             "--type",
             "search.Opinion",
             "--solr-url",
-            "%s/solr/%s" % (settings.SOLR_HOST, self.core_name_opinion),
+            f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
             "--update",
             "--everything",
             "--do-commit",
@@ -803,8 +803,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
             self.assertNotIn(
                 "an error",
                 r.content.decode().lower(),
-                msg="Got an error when doing a judge search ordered "
-                "by %s" % sort_field,
+                msg=f"Got an error when doing a judge search ordered by {sort_field}",
             )
 
     def _test_article_count(self, params, expected_count, field_name):
@@ -1049,7 +1048,7 @@ class JurisdictionFeedTest(TestCase):
                 xml,
             )
         except Exception as e:
-            self.fail("Could not call get_feed(): %s" % (e,))
+            self.fail(f"Could not call get_feed(): {e}")
 
 
 class PagerankTest(TestCase):

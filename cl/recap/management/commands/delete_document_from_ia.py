@@ -28,7 +28,7 @@ class Command(VerboseCommand):
         # path
         bucket_path = path.split("/", 2)[2]
         r = requests.delete(
-            "%s/%s" % (self.IA_STORAGE_URL, bucket_path),
+            f"{self.IA_STORAGE_URL}/{bucket_path}",
             headers={
                 "Authorization": "LOW %s:%s"
                 % (settings.IA_ACCESS_KEY, settings.IA_SECRET_KEY),
@@ -39,4 +39,4 @@ class Command(VerboseCommand):
         if r.ok:
             print("Item deleted successfully")
         else:
-            print("No luck with deletion: %s: %s" % (r.status_code, r.text))
+            print(f"No luck with deletion: {r.status_code}: {r.text}")
