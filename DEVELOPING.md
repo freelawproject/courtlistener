@@ -92,15 +92,15 @@ To set up a development server, do the following:
 
     `docker-compose up`
 
-1. Finally, finish setting up the Django database. While the server is running:
+1. Finally, create a new super user login by running this command, and entering the required information:
 
-    - Migrate the models by running:
+    `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
 
-        `docker exec -it cl-django python /opt/courtlistener/manage.py migrate`
+*Speed Tip:* If you want your tests and docker images to go faster, you might be able to run:
 
-    - Finally, create a new super user login by running this command, and entering the required information:
+    `docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up
 
-        `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
+If you do that, you'll run postgresql in memory. That means it'll get wiped out whenever you restart docker, but it should provide a speed bump. We do this in CI, for example.
 
 So that should be it! You should now be able to access the following URLs:
 
@@ -234,23 +234,29 @@ this is needed.
 
 ## Testing
 
-Any time you're contributing to or hacking on code base, whether adding features or fixing issues, you should validate your changes don't break the core functionality of CourtListener by executing the test suite. This is also a great way to validate your development environment is properly configured. You should also add new tests for your new feature or fix.
+Any time you're contributing to or hacking on code base, whether adding features or fixing issues, you should validate your changes don't break core functionality by executing the test suite. This is also a great way to validate your development environment is properly configured. You should also add new tests for your new feature or fix.
 
 In general, the easiest way to run the test suite is via Django's `test` command. In docker, that's:
 
 ```bash
-docker exec -it cl-django python /opt/courtlistener/manage.py test --noinput cl
+docker exec -it cl-django python /opt/courtlistener/manage.py test cl --exclude-tag selenium
 ```
-
-The `--noinput` flag tells Django to destroy any old test databases without prompting for confirmation (typically this is what you want).
 
 The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
 
-Other useful flags are:
+`--exclude-tag selenium` is used to exclude selenium tests during local development. They'll be run on CI and they take awhile, so it's sort of best not to bother with them most of the time.
 
- - `--failfast`: This makes the test suite crash as soon as one test fails, instead of running the whole suite to completion.
+We use a custom test runner to make our tests a bit faster:
 
- - `--keepdb`: Whenever tests are run, they generate a little DB on the side to run within by running all of your migrations. Using this flag keeps the DB between test runs, which can save some time.  
+ 1. By default, it disables output. This makes tests slightly faster. You can enable output with our special command, `--enable-logging`.
+
+ 1. By default, it runs tests in parallel. Normally, you have to use the `--parallel` flag of the test command to do this, but developers forget. No more. If you want to override this so your tests run on a single core (why would you?) you could pass `--parallel=1`.
+
+ 1. No matter how many databases you have configured in your settings, only one is used during tests. This makes tests faster since they don't have to mess around with transactions in databases that aren't even used.
+
+ 1. `--keepdb` is on by default and if your database was not deleted because the last run crashed, it will delete it for you. Ahhh.
+
+ 1. We use custom test classes (see below) and our runner blocks you from using other test classes.
 
 For more details, Django provides a lot of documentation on [testing in Django][django-testing]. Make sure to read the docs related to the current release used in CourtListener.
 
@@ -269,7 +275,9 @@ There are a few different types of tests in the CourtListener test suite and can
 
 #### Unit Tests
 
-Unit tests should derive from `unittest.TestCase` or `django.test.TestCase` and run without a functioning Solr environment or Selenium functioning. These are the bread and butter of validating functions and business logic. You should contribute these when you write any new functions or update them when enhancing existing functions.
+Unit tests all derive from the classes in `cl.tests.cases`. Typically, they will not need database access, and should thus use `cl.tests.cases.SimpleTestCase`. If possible, these should run without a functioning Solr, Postgresql, or Selenium environment.
+
+These are the bread and butter of validating functions and business logic. You should contribute these when you write any new functions or update them when enhancing existing functions.
 
 #### Solr Tests
 

@@ -2,10 +2,11 @@ from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
 from django.core import mail
-from django.test import TestCase
 from django.urls import reverse
 from lxml.html import fromstring
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
+
+from cl.tests.cases import TestCase
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests

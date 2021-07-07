@@ -17,7 +17,7 @@ from cl.lib.ratelimiter import ratelimiter_all_2_per_m
 
 
 def make_cache_key(request: HttpRequest, section: str) -> str:
-    """Make a cache key for a URL
+    """Make a Cache key for a URL
 
     This is a simplified version of django's get_cache_key method, which
     factors in additional things like the method and the headers that were

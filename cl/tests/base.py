@@ -7,8 +7,7 @@ from contextlib import contextmanager
 
 import scorched
 from django.conf import settings
-from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from django.test.utils import override_settings
+from django.test.utils import override_settings, tag
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -23,6 +22,7 @@ from cl.lib.decorators import retry
 from cl.lib.test_helpers import SerializeSolrTestMixin
 from cl.search.models import Opinion
 from cl.search.tasks import add_items_to_solr
+from cl.tests.cases import StaticLiveServerTestCase
 
 SELENIUM_TIMEOUT = 120
 if "SELENIUM_TIMEOUT" in os.environ:
@@ -32,6 +32,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
         pass
 
 
+@tag("selenium")
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,

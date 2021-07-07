@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 from django.core.management import call_command
-from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from eyecite import get_citations
 from eyecite.test_factories import (
@@ -28,6 +27,7 @@ from cl.citations.match_citations import (
 from cl.citations.tasks import find_citations_for_opinion_by_pks
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import Opinion, OpinionCluster, OpinionsCited
+from cl.tests.cases import SimpleTestCase
 
 
 def remove_citations_from_imported_fixtures():
@@ -38,7 +38,7 @@ def remove_citations_from_imported_fixtures():
     OpinionCluster.objects.all().update(citation_count=0)
 
 
-class CiteTest(TestCase):
+class CiteTest(SimpleTestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off

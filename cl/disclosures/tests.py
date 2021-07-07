@@ -4,7 +4,6 @@ import os
 import requests
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
-from django.test import TestCase
 from django.urls import reverse
 
 from cl.disclosures.models import (
@@ -14,6 +13,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
+from cl.tests.cases import TestCase
 
 
 class DisclosureIngestionTest(TestCase):
