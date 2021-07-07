@@ -189,7 +189,7 @@ def process_recap_pdf(self, pk):
     else:
         document_type = RECAPDocument.ATTACHMENT
 
-    logger.info("Processing RECAP item (debug is: %s): %s " % (pq.debug, pq))
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
     try:
         if pq.pacer_case_id:
             rd = RECAPDocument.objects.get(
@@ -223,7 +223,7 @@ def process_recap_pdf(self, pk):
                 )
                 raise self.retry(exc=exc)
         except Docket.MultipleObjectsReturned:
-            msg = "Too many dockets found when trying to save '%s'" % pq
+            msg = f"Too many dockets found when trying to save '{pq}'"
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
 
@@ -235,8 +235,7 @@ def process_recap_pdf(self, pk):
             )
         except DocketEntry.DoesNotExist as exc:
             logger.warning(
-                "Unable to find docket entry for processing "
-                "queue '%s'." % pq
+                f"Unable to find docket entry for processing queue '{pq}'."
             )
             msg = "Unable to find docket entry for item."
             if (self.request.retries == self.max_retries) or pq.debug:
@@ -276,7 +275,7 @@ def process_recap_pdf(self, pk):
     try:
         content = pq.filepath_local.read()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -418,8 +417,7 @@ def process_recap_zip(self, pk):
         # At the end, mark the pq as successful and return the PQ
         mark_pq_status(
             pq,
-            "Successfully created ProcessingQueue objects: %s"
-            % oxford_join(new_pqs),
+            f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
             PROCESSING_STATUS.SUCCESSFUL,
         )
 
@@ -454,14 +452,14 @@ def process_recap_docket(self, pk):
     start_time = now()
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     report = DocketReport(map_cl_to_pacer_id(pq.court_id))
 
     try:
         text = pq.filepath_local.read().decode()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -481,7 +479,7 @@ def process_recap_docket(self, pk):
 
     report._parse_text(text)
     data = report.data
-    logger.info("Parsing completed of item %s" % pq)
+    logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -551,12 +549,12 @@ def process_recap_attachment(
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     try:
         text = pq.filepath_local.read().decode()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -565,7 +563,7 @@ def process_recap_attachment(
             raise self.retry(exc=exc)
 
     att_data = get_data_from_att_report(text, pq.court_id)
-    logger.info("Parsing completed for item %s" % pq)
+    logger.info(f"Parsing completed for item {pq}")
 
     if att_data == {}:
         # Bad attachment page.
@@ -625,12 +623,12 @@ def process_recap_claims_register(self, pk):
         return None
 
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     try:
         text = pq.filepath_local.read().decode()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -641,7 +639,7 @@ def process_recap_claims_register(self, pk):
     report = ClaimsRegister(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
-    logger.info("Parsing completed for item %s" % pq)
+    logger.info(f"Parsing completed for item {pq}")
 
     if not data:
         # Bad HTML
@@ -707,12 +705,12 @@ def process_recap_docket_history_report(self, pk):
     start_time = now()
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info("Processing RECAP item (debug is: %s): %s" % (pq.debug, pq))
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     try:
         text = pq.filepath_local.read().decode()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -723,7 +721,7 @@ def process_recap_docket_history_report(self, pk):
     report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
-    logger.info("Parsing completed for item %s" % pq)
+    logger.info(f"Parsing completed for item {pq}")
 
     if data == {}:
         # Bad docket history page.
@@ -811,8 +809,7 @@ def process_recap_appellate_docket(self, pk):
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(
-        "Processing Appellate RECAP item"
-        " (debug is: %s): %s" % (pq.debug, pq)
+        f"Processing Appellate RECAP item (debug is: {pq.debug}): {pq}"
     )
 
     report = AppellateDocketReport(map_cl_to_pacer_id(pq.court_id))
@@ -820,7 +817,7 @@ def process_recap_appellate_docket(self, pk):
     try:
         text = pq.filepath_local.read().decode()
     except IOError as exc:
-        msg = "Internal processing error (%s: %s)." % (exc.errno, exc.strerror)
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
             mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return None
@@ -830,7 +827,7 @@ def process_recap_appellate_docket(self, pk):
 
     report._parse_text(text)
     data = report.data
-    logger.info("Parsing completed of item %s" % pq)
+    logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
         # Not really a docket. Some sort of invalid document (see Juriscraper).
@@ -909,7 +906,7 @@ def create_new_docket_from_idb(idb_row):
     Docket.
     :return Docket: The created Docket object.
     """
-    case_name = idb_row.plaintiff + " v. " + idb_row.defendant
+    case_name = f"{idb_row.plaintiff} v. {idb_row.defendant}"
     d = Docket(
         source=Docket.IDB,
         court=idb_row.district,
@@ -980,12 +977,10 @@ def do_heuristic_match(idb_row, ds):
             case_names.append(case_name)
         elif len(parts) == 2:
             plaintiff, defendant = parts[0], parts[1]
-            case_names.append("%s v. %s" % (plaintiff[0:30], defendant[0:30]))
+            case_names.append(f"{plaintiff[0:30]} v. {defendant[0:30]}")
         elif len(parts) > 2:
             case_names.append(case_name)
-    idb_case_name = harmonize(
-        "%s v. %s" % (idb_row.plaintiff, idb_row.defendant)
-    )
+    idb_case_name = harmonize(f"{idb_row.plaintiff} v. {idb_row.defendant}")
     results = find_best_match(case_names, idb_case_name, case_sensitive=False)
     if results["ratio"] > 0.65:
         logger.info(
@@ -1326,10 +1321,7 @@ def fetch_docket(self, fq_pk):
 
     cookies = get_pacer_cookie_from_cache(fq.user_id)
     if cookies is None:
-        msg = (
-            "Cookie cache expired before task could run for user: %s"
-            % fq.user_id
-        )
+        msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
 
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
@@ -1344,7 +1336,7 @@ def fetch_docket(self, fq_pk):
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except PacerLoginException as exc:
@@ -1354,7 +1346,7 @@ def fetch_docket(self, fq_pk):
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except ParsingException:
@@ -1392,7 +1384,7 @@ def fetch_docket(self, fq_pk):
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, msg + "Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except ParsingException:

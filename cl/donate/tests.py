@@ -153,8 +153,7 @@ class StripeTest(TestCase):
         event = get_stripe_event(token.card.fingerprint)
         self.assertIsNotNone(
             event,
-            msg="Unable to find correct event for token: %s"
-            % token.card.fingerprint,
+            msg=f"Unable to find correct event for token: {token.card.fingerprint}",
         )
 
         r = self.client.post(

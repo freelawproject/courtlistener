@@ -26,6 +26,6 @@ class CommandUtils(object):
     def ensure_file_ok(file_path):
         """Check to make sure that a file path exists and is valid."""
         if not os.path.exists(file_path):
-            raise CommandError("Unable to find file at %s" % file_path)
+            raise CommandError(f"Unable to find file at {file_path}")
         if not os.access(file_path, os.R_OK):
-            raise CommandError("Unable to read file at %s" % file_path)
+            raise CommandError(f"Unable to read file at {file_path}")

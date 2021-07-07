@@ -58,10 +58,10 @@ class DupChecker(dict):
         changed, self.url_hash = self._court_changed(url, hash)
         if not self.full_crawl:
             if not changed:
-                logger.info("Unchanged hash at: %s" % url)
+                logger.info(f"Unchanged hash at: {url}")
                 return True
             else:
-                logger.info("Identified changed hash at: %s" % url)
+                logger.info(f"Identified changed hash at: {url}")
                 return False
         else:
             # If it's a full crawl, we don't care about the hash. We continue

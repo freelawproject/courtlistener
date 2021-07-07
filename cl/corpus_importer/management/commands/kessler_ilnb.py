@@ -35,7 +35,7 @@ def make_docket_number(year, docket_number):
     """
     docket_serial = docket_number[-5:]
     two_digit_year = year[-2:]
-    return "%s-bk-%s" % (two_digit_year, docket_serial)
+    return f"{two_digit_year}-bk-{docket_serial}"
 
 
 def get_dockets(options):
@@ -59,7 +59,7 @@ def get_dockets(options):
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
-            logger.info("Sent %s tasks to celery so far." % i)
+            logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
         chain(
@@ -79,7 +79,7 @@ def get_dockets(options):
                     "show_parties_and_counsel": True,
                     "show_terminated_parties": True,
                     "show_list_of_member_cases": True,
-                }
+                },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -118,7 +118,7 @@ def get_petitions(options):
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
-            logger.info("Sent %s tasks to celery so far." % i)
+            logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
 
@@ -157,7 +157,7 @@ def get_final_docs(options):
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
-            logger.info("Sent %s tasks to celery so far." % i)
+            logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         rd_pks = (
             de.recap_documents.filter(
@@ -218,7 +218,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "all_dockets":
             get_dockets(options)
         elif options["task"] == "all_petitions":

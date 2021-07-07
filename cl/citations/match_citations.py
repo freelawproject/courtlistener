@@ -38,7 +38,7 @@ def build_date_range(start_year: int, end_year: int) -> str:
     """Build a date range to be handed off to a solr query."""
     start = datetime(start_year, 1, 1)
     end = datetime(end_year, 12, 31)
-    date_range = "[%sZ TO %sZ]" % (start.isoformat(), end.isoformat())
+    date_range = f"[{start.isoformat()}Z TO {end.isoformat()}Z]"
     return date_range
 
 
@@ -60,7 +60,7 @@ def reverse_match(
     """Uses the case name of the found document to verify that it is a match on
     the original.
     """
-    params: SearchParam = {"fq": ["id:%s" % citing_opinion.pk]}
+    params: SearchParam = {"fq": [f"id:{citing_opinion.pk}"]}
     for result in results:
         case_name, length = make_name_param(result["caseName"])
         # Avoid overly long queries
@@ -84,7 +84,7 @@ def case_name_query(
     citing_opinion: Opinion,
 ) -> List[ExtraSolrSearch]:
     query, length = make_name_param(citation.defendant, citation.plaintiff)
-    params["q"] = "caseName:(%s)" % query
+    params["q"] = f"caseName:({query})"
     params["caller"] = "match_citations"
     results = []
     # Use Solr minimum match search, starting with requiring all words to
@@ -140,7 +140,7 @@ def search_db_for_fullcitation(
     }
     if full_citation.citing_opinion is not None:
         # Eliminate self-cites.
-        main_params["fq"].append("-id:%s" % full_citation.citing_opinion.pk)
+        main_params["fq"].append(f"-id:{full_citation.citing_opinion.pk}")
     # Set up filter parameters
     if full_citation.year:
         start_year = end_year = full_citation.year
@@ -154,14 +154,14 @@ def search_db_for_fullcitation(
                 end_year, full_citation.citing_opinion.cluster.date_filed.year
             )
     main_params["fq"].append(
-        "dateFiled:%s" % build_date_range(start_year, end_year)
+        f"dateFiled:{build_date_range(start_year, end_year)}"
     )
 
     if full_citation.court:
-        main_params["fq"].append("court_exact:%s" % full_citation.court)
+        main_params["fq"].append(f"court_exact:{full_citation.court}")
 
     # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append('citation:("%s")' % full_citation.base_citation())
+    main_params["fq"].append(f'citation:("{full_citation.base_citation()}")')
     results = si.query().add_extra(**main_params).execute()
     si.conn.http_connection.close()
     if len(results) == 1:

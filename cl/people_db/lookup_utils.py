@@ -278,9 +278,9 @@ def extract_judge_last_name(text: str) -> List[str]:
     else:
         last_names = [names[0]]
         for i in range(len(names))[1:]:
-            first_last = "%s %s" % (names[i - 1], names[i])
+            first_last = f"{names[i - 1]} {names[i]}"
             first_m_last = r"%s [a-z]\.? %s" % (names[i - 1], names[i])
-            if re.search("%s|%s" % (first_last, first_m_last), text):
+            if re.search(f"{first_last}|{first_m_last}", text):
                 last_names[-1] = names[i]
                 continue
             last_names.append(names[i])

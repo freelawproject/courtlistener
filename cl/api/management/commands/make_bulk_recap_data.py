@@ -56,7 +56,7 @@ class Command(VerboseCommand):
         for data_type in options["data_types"]:
             kwargs = self.data_types[data_type]
             self.stdout.write(
-                "Starting bulk file creation of '%s'" % kwargs["obj_type_str"]
+                f"Starting bulk file creation of '{kwargs['obj_type_str']}'"
             )
             t1 = now()
 
@@ -64,4 +64,4 @@ class Command(VerboseCommand):
                 courts, bulk_dir=options["output_directory"], **kwargs
             )
             t2 = now()
-            self.stdout.write("Completed in %s" % (t2 - t1))
+            self.stdout.write(f"Completed in {t2 - t1}")

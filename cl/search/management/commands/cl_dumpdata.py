@@ -38,13 +38,13 @@ class Command(VerboseCommand):
         fmt = options["format"]
 
         self.stdout.write(
-            "Generating dump of up to %s randomly selected Opinions..." % n
+            f"Generating dump of up to {n} randomly selected Opinions..."
         )
 
         pks, cluster_pks = self._select_pks(n)
         if n > len(pks):
             self.stdout.write(
-                " n > number of Opinions, serializing all (n=%s)" % len(pks)
+                f" n > number of Opinions, serializing all (n={len(pks)})"
             )
 
         try:
@@ -62,7 +62,7 @@ class Command(VerboseCommand):
             self.stdout.write("Done!")
 
         except Exception as e:
-            self.stderr.write("Failed to serialize: %s" % (e,))
+            self.stderr.write(f"Failed to serialize: {e}")
             if options["traceback"]:
                 traceback.print_exc()
 
@@ -100,8 +100,8 @@ class Command(VerboseCommand):
             raise ModelTypeError(model)
 
         modelname = model.__name__
-        filename = "%s.%s" % (modelname, format)
-        self.stdout.write(" writing %ss to %s..." % (modelname, filename))
+        filename = f"{modelname}.{format}"
+        self.stdout.write(f" writing {modelname}s to {filename}...")
 
         with open(filename, "w") as stream:
             serializers.serialize(
@@ -118,4 +118,4 @@ class ModelTypeError(TypeError):
         self.model = model
 
     def __str__(self) -> str:
-        return "%s is not a valid CourtListnener model" % (self.model,)
+        return f"{self.model} is not a valid CourtListnener model"

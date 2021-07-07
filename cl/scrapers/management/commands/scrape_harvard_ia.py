@@ -36,7 +36,7 @@ def get_from_ia(reporter, volume):
     # Checks that the returned reporter is the requested one.
     # Ex. searching for Mich will return both Mich-app. and Mich.
     for ia_identifier in ia_session.search_items(reporter_key):
-        logger.info("Got ia identifier: %s" % ia_identifier)
+        logger.info(f"Got ia identifier: {ia_identifier}")
         ia_key = ia_identifier["identifier"]
         if ia_key.split(".")[3] != reporter:
             continue
@@ -50,19 +50,19 @@ def get_from_ia(reporter, volume):
 
         ia_item = ia_session.get_item(ia_key)
         for item in ia_item.get_files():
-            logger.info("Got item with name: %s" % item.name)
+            logger.info(f"Got item with name: {item.name}")
             if "json.json" in item.name:
                 continue
 
             if "json" not in item.name:
                 continue
 
-            url = "https://archive.org/download/%s/%s" % (ia_key, item.name)
+            url = f"https://archive.org/download/{ia_key}/{item.name}"
             file_path = os.path.join(
                 settings.MEDIA_ROOT,
                 "harvard_corpus",
-                "%s" % ia_key,
-                "%s" % item.name,
+                f"{ia_key}",
+                f"{item.name}",
             )
             directory = file_path.rsplit("/", 1)[0]
             if os.path.exists(file_path):

@@ -40,7 +40,7 @@ def download_dockets(options):
         throttle.maybe_wait()
         logger.info("Doing row %s: %s", i, row)
 
-        row_tag = "%s-%s" % (PROJECT_TAG_NAME, row["id"])
+        row_tag = f"{PROJECT_TAG_NAME}-{row['id']}"
         if not row["district_ct"]:
             chain(
                 get_appellate_docket_by_docket_number.s(
@@ -59,7 +59,7 @@ def download_dockets(options):
                         "show_panel_info": True,
                         "show_party_atty_info": True,
                         "show_caption": True,
-                    }
+                    },
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
@@ -88,7 +88,7 @@ def download_dockets(options):
                         "show_parties_and_counsel": True,
                         "show_terminated_parties": True,
                         "show_list_of_member_cases": True,
-                    }
+                    },
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()

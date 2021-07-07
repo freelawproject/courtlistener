@@ -54,7 +54,7 @@ def update_entry_types(court_pk, description):
         m = re.search(r"entries of type: (.+)", description)
         if not m:
             logger.error(
-                "Unable to parse PACER RSS description: %s" % description
+                f"Unable to parse PACER RSS description: {description}"
             )
             return
         new_entry_types = m.group(1)
@@ -196,7 +196,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         rss_feed.query()
     except requests.RequestException as exc:
         logger.warning(
-            "Network error trying to get RSS feed at %s" % rss_feed.url
+            f"Network error trying to get RSS feed at {rss_feed.url}"
         )
         abort_or_retry(self, feed_status, exc)
         return
@@ -205,8 +205,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     if not content:
         try:
             raise Exception(
-                "Empty RSS document returned by PACER: %s"
-                % feed_status.court_id
+                f"Empty RSS document returned by PACER: {feed_status.court_id}"
             )
         except Exception as exc:
             logger.warning(str(exc))
@@ -249,8 +248,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     )
     rss_feed.parse()
     logger.info(
-        "%s: Got %s results to merge."
-        % (feed_status.court_id, len(rss_feed.data))
+        f"{feed_status.court_id}: Got {len(rss_feed.data)} results to merge."
     )
 
     # Update RSS entry types in Court table
@@ -371,7 +369,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
 @app.task
 def mark_status_successful(feed_status_pk):
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
-    logger.info("Marking %s as a success." % feed_status.court_id)
+    logger.info(f"Marking {feed_status.court_id} as a success.")
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
 

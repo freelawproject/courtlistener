@@ -56,7 +56,7 @@ def get_next_date_range(
             .latest("date_queried")
         )
     except PACERFreeDocumentLog.DoesNotExist:
-        logger.warning("FAILED ON: %s" % court_id)
+        logger.warning(f"FAILED ON: {court_id}")
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
@@ -207,7 +207,7 @@ def get_pdfs(options: OptionsType) -> None:
     task_name = "downloading"
     if index:
         task_name += " and indexing"
-    logger.info("%s %s items from PACER." % (task_name, count))
+    logger.info(f"{task_name} {count} items from PACER.")
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     for row in rows.iterator():
@@ -227,8 +227,7 @@ def get_pdfs(options: OptionsType) -> None:
         completed += 1
         if completed % 1000 == 0:
             logger.info(
-                "Sent %s/%s tasks to celery for %s so "
-                "far." % (completed, count, task_name)
+                f"Sent {completed}/{count} tasks to celery for {task_name} so far."
             )
 
 
@@ -252,7 +251,7 @@ def ocr_available(options: OptionsType) -> None:
                 add_docket_to_solr_by_rds.s().set(queue=q),
             ).apply_async()
         if i % 1000 == 0:
-            logger.info("Sent %s/%s tasks to celery so far." % (i + 1, count))
+            logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
 
 def do_everything(options: OptionsType):

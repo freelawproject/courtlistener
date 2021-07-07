@@ -80,12 +80,12 @@ def create_cited_html(
         new_html = annotate(
             plain_text=opinion.cleaned_text,
             annotations=[
-                [a[0], "</pre>" + a[1], a[2] + '<pre class="inline">']
+                [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
             source_text=opinion.source_text,
         )
-        new_html = '<pre class="inline">%s</pre>' % new_html
+        new_html = f'<pre class="inline">{new_html}</pre>'
 
     # Return the newly-annotated text
     return new_html

@@ -220,7 +220,7 @@ class Command(VerboseCommand):
             return
 
         if site.cookies:
-            logger.info("Using cookies: %s" % site.cookies)
+            logger.info(f"Using cookies: {site.cookies}")
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
@@ -269,8 +269,7 @@ class Command(VerboseCommand):
 
             # Not a duplicate, carry on
             logger.info(
-                "Adding new document found at: %s"
-                % item["download_urls"].encode()
+                f"Adding new document found at: {item['download_urls'].encode()}"
             )
             dup_checker.reset()
 
@@ -292,13 +291,11 @@ class Command(VerboseCommand):
             )
 
             logger.info(
-                "Successfully added doc {pk}: {name}".format(
-                    pk=opinion.pk, name=item["case_names"].encode()
-                )
+                f"Successfully added doc {opinion.pk}: {item['case_names'].encode()}"
             )
 
         # Update the hash if everything finishes properly.
-        logger.info("%s: Successfully crawled opinions." % site.court_id)
+        logger.info(f"{site.court_id}: Successfully crawled opinions.")
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
@@ -332,7 +329,7 @@ class Command(VerboseCommand):
             package, module = module_strings[i].rsplit(".", 1)
 
             mod = __import__(
-                "%s.%s" % (package, module), globals(), locals(), [module]
+                f"{package}.{module}", globals(), locals(), [module]
             )
             try:
                 self.parse_and_scrape_site(mod, options["full_crawl"])

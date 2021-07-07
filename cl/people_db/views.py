@@ -17,7 +17,7 @@ def make_title_str(person):
     )
     title = person.name_full
     if locations:
-        title = "%s (%s)" % (title, locations)
+        title = f"{title} ({locations})"
     return title
 
 
@@ -26,14 +26,14 @@ def make_img_path(person):
 
     img_path = None
     if person.has_photo:
-        p = slugify(("%s-%s" % (person.name_last, person.name_first)).lower())
+        p = slugify(f"{person.name_last}-{person.name_first}".lower())
         if person.date_dob:
             img_path = static(
                 "judge_pics/%s-%s.jpeg"
                 % (p, granular_date(person, "date_dob", iso=True, default=""))
             )
         else:
-            img_path = static("judge_pics/%s.jpeg" % p)
+            img_path = static(f"judge_pics/{p}.jpeg")
 
     return img_path
 
@@ -93,7 +93,7 @@ def view_person(request, pk, slug):
     # Use Solr to get the oral arguments for the judge
     conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
     q = {
-        "q": "panel_ids:{p}".format(p=person.pk),
+        "q": f"panel_ids:{person.pk}",
         "fl": [
             "id",
             "absolute_url",

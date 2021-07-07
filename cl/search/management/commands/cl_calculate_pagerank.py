@@ -51,13 +51,12 @@ def make_sorted_pr_file(pr_results, result_file_path):
                 # Happens because some items don't have citations, thus aren't
                 # in network.
                 score = min_value
-            f.write("{}={}\n".format(pk, score))
+            f.write(f"{pk}={score}\n")
 
     # For improved Solr performance, sort the temp file, creating a new file
     # without the temp_extension value.
     os.system(
-        "sort -n %s%s > %s"
-        % (result_file_path, temp_extension, result_file_path)
+        f"sort -n {result_file_path}{temp_extension} > {result_file_path}"
     )
     os.remove(result_file_path + temp_extension)
 
@@ -77,7 +76,7 @@ class Command(VerboseCommand):
         pr_results = self.do_pagerank()
         pr_dest_dir = settings.SOLR_PAGERANK_DEST_DIR
         make_sorted_pr_file(pr_results, pr_dest_dir)
-        normal_dest_dir = get_data_dir("collection1") + "external_pagerank"
+        normal_dest_dir = f"{get_data_dir('collection1')}external_pagerank"
         print(
             "Pagerank file created at %s. Because of distributed servers, "
             "you may need to copy it to its final destination. Somewhere "

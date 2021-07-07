@@ -23,7 +23,7 @@ app.autodiscover_tasks()
 @app.task(bind=True)
 @throttle_task("2/4s")
 def debug_task(self) -> None:
-    print("Request: {0!r}".format(self.request))
+    print(f"Request: {self.request!r}")
 
 
 @app.task(bind=True)

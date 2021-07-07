@@ -31,7 +31,7 @@ def make_cache_key(request: HttpRequest, section: str) -> str:
     :return a key that can be used to cache the request
     """
     url = hashlib.md5(force_bytes(iri_to_uri(request.build_absolute_uri())))
-    return "sitemap.%s.%s" % (section, url.hexdigest())
+    return f"sitemap.{section}.{url.hexdigest()}"
 
 
 @ratelimiter_all_2_per_m
@@ -53,7 +53,7 @@ def cached_sitemap(
     req_site = get_current_site(request)
 
     if section not in sitemaps:
-        raise Http404("No sitemap available for section: %r" % section)
+        raise Http404(f"No sitemap available for section: {section!r}")
     site = sitemaps[section]
     page = request.GET.get("p", 1)
 
@@ -68,9 +68,9 @@ def cached_sitemap(
                 page=page, site=req_site, protocol=req_protocol
             )
         except EmptyPage:
-            raise Http404("Page %s empty" % page)
+            raise Http404(f"Page {page} empty")
         except PageNotAnInteger:
-            raise Http404("No page '%s'" % page)
+            raise Http404(f"No page '{page}'")
 
         if len(urls) == site.limit:
             # Full sitemap. Cache it a long time.

@@ -82,8 +82,8 @@ def price_sample(options, de_upper_bound):
 
 def get_content_by_year(options, year):
     items = get_fjc_rows()
-    start = "%s-01-01" % year
-    end = "%s-12-31" % year
+    start = f"{year}-01-01"
+    end = f"{year}-12-31"
     items = items.filter(date_filed__gte=start, date_filed__lte=end)
     tags = [TAG]
     get_dockets(options, items, tags)
@@ -140,7 +140,7 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
                 docket_number=row.docket_number,
                 court_id=row.district_id,
                 cookies=session.cookies,
-                **params
+                **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
@@ -152,7 +152,7 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
                     "show_terminated_parties": True,
                     "show_list_of_member_cases": False,
                     "doc_num_end": doc_num_end,
-                }
+                },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -189,7 +189,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "everything":
             get_everything_full(options)
         elif options["task"] == "everything_sample_50":
@@ -213,4 +213,4 @@ class Command(VerboseCommand):
             # Done and billed.
             get_content_by_year(options, 2016)
         else:
-            print("Unknown task: %s" % options["task"])
+            print(f"Unknown task: {options['task']}")

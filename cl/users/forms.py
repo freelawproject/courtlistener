@@ -113,7 +113,7 @@ class UserForm(ModelForm):
         user_part, domain_part = email.rsplit("@", 1)
         if domain_part in blocklist:
             raise forms.ValidationError(
-                "%s is a blocked email provider" % domain_part,
+                f"{domain_part} is a blocked email provider",
                 code="bad_email_domain",
             )
         return email
@@ -173,7 +173,7 @@ class UserCreationFormExtended(UserCreationForm):
         user_part, domain_part = email.rsplit("@", 1)
         if domain_part in blocklist:
             raise forms.ValidationError(
-                "%s is a blocked email provider" % domain_part,
+                f"{domain_part} is a blocked email provider",
                 code="bad_email_domain",
             )
         return email

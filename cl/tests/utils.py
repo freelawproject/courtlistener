@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 def make_client(user_pk):
     user = User.objects.get(pk=user_pk)
     token, created = Token.objects.get_or_create(user=user)
-    token_header = "Token %s" % token
+    token_header = f"Token {token}"
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=token_header)
     return client

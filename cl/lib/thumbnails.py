@@ -64,7 +64,7 @@ def make_png_thumbnail_for_instance(
         return item.pk
 
     item.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
-    filename = "%s.thumb.%s.jpeg" % (pk, max_dimension)
+    filename = f"{pk}.thumb.{max_dimension}.jpeg"
     item.thumbnail.save(filename, ContentFile(stdout))
 
     return item.pk

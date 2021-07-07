@@ -17,7 +17,7 @@ def process_citations(data, debug):
     updated_ids = set()
     for index, item in data.iterrows():
         logger.info(
-            "\nAdding citation from %s to %s" % (item["citing"], item["cited"])
+            f"\nAdding citation from {item['citing']} to {item['cited']}"
         )
         try:
             cite = OpinionsCited.objects.get(
@@ -77,5 +77,5 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         data, length = load_csv(options["csv"])
-        logger.info("Found %s citations to add." % length)
+        logger.info(f"Found {length} citations to add.")
         process_citations(data, options["debug"])

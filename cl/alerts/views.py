@@ -20,7 +20,7 @@ def edit_alert_redirect(request, pk):
     """
     # check if the user can edit this, or if they are url hacking
     alert = get_object_or_404(Alert, pk=pk, user=request.user)
-    return HttpResponseRedirect("/?%s&edit_alert=%s" % (alert.query, alert.pk))
+    return HttpResponseRedirect(f"/?{alert.query}&edit_alert={alert.pk}")
 
 
 @login_required
@@ -38,8 +38,7 @@ def delete_alert(request, pk):
     messages.add_message(
         request,
         messages.SUCCESS,
-        "Your alert <strong>%s</strong> was deleted successfully."
-        % alert.name,
+        f"Your alert <strong>{alert.name}</strong> was deleted successfully.",
     )
     return HttpResponseRedirect(reverse("profile_alerts"))
 
@@ -150,7 +149,7 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             pacer_case_id=pacer_case_id, court_id=court_id
         ).earliest("date_created")
 
-    title = "New Docket Alert for %s" % make_docket_title(docket)
+    title = f"New Docket Alert for {make_docket_title(docket)}"
     has_alert = user_has_alert(request.user, docket)
     return render(
         request,

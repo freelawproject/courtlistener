@@ -63,7 +63,7 @@ def get_dockets(options):
                         "show_panel_info": True,
                         "show_party_atty_info": True,
                         "show_caption": True,
-                    }
+                    },
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
@@ -84,7 +84,7 @@ def get_dockets(options):
                         "show_parties_and_counsel": True,
                         "show_terminated_parties": True,
                         "show_list_of_member_cases": True,
-                    }
+                    },
                 ).set(queue=q),
                 add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
@@ -149,7 +149,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] in ["district", "appellate"]:
             if not options["file"]:
                 raise argparse.ArgumentError(

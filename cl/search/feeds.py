@@ -54,14 +54,14 @@ class SearchFeed(Feed):
             )
             main_params.update(
                 {
-                    "sort": "%s desc" % order_by,
+                    "sort": f"{order_by} desc",
                     "rows": "20",
                     "start": "0",
                     "caller": "SearchFeed",
                 }
             )
             # Eliminate items that lack the ordering field.
-            main_params["fq"].append("%s:[* TO *]" % order_by)
+            main_params["fq"].append(f"{order_by}:[* TO *]")
             items = solr.query().add_extra(**main_params).execute()
             solr.conn.http_connection.close()
             return items
@@ -94,7 +94,7 @@ class JurisdictionFeed(Feed):
     description_template = "feeds/solr_desc_template.html"
 
     def title(self, obj):
-        return "CourtListener.com: All opinions for the " + obj.full_name
+        return f"CourtListener.com: All opinions for the {obj.full_name}"
 
     def get_object(self, request, court):
         return get_object_or_404(Court, pk=court)
@@ -104,7 +104,7 @@ class JurisdictionFeed(Feed):
         solr = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         params = {
             "q": "*",
-            "fq": "court_exact:%s" % obj.pk,
+            "fq": f"court_exact:{obj.pk}",
             "sort": "dateFiled desc",
             "rows": "20",
             "start": "0",

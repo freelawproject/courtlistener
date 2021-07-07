@@ -295,7 +295,7 @@ def contact(
                 "\n\n{message}\n\n"
                 "Browser: {browser}".format(
                     browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
-                    **cd
+                    **cd,
                 ),
                 to=["info@free.law"],
                 reply_to=[cd.get("email", default_from) or default_from],
@@ -326,7 +326,7 @@ def advanced_search(request: HttpRequest) -> HttpResponse:
 def old_terms(request: HttpRequest, v: str) -> HttpResponse:
     return render(
         request,
-        "terms/%s.html" % v,
+        f"terms/{v}.html",
         {
             "title": "Archived Terms of Service and Policies, v%s – "
             "CourtListener.com" % v,

@@ -254,8 +254,7 @@ class Audio(AbstractDateTimeModel):
             out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url: %s"
-                % self.pk
+                f"Unable to save to index due to missing absolute_url: {self.pk}"
             )
 
         text_template = loader.get_template("indexes/audio_text.txt")

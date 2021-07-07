@@ -17,7 +17,7 @@ class Site(OpinionSite):
 
     def _get_download_urls(self):
         path = "//url/text()"
-        return ["test/search/%s" % url for url in self.html.xpath(path)]
+        return [f"test/search/{url}" for url in self.html.xpath(path)]
 
     def _get_case_names(self):
         path = "//name/text()"

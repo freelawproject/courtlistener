@@ -66,8 +66,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             # "undefined"
             if attrs.get(attr_name) == "undefined":
                 raise ValidationError(
-                    "'%s' field cannot have the literal value 'undefined'."
-                    % attr_name
+                    f"'{attr_name}' field cannot have the literal value 'undefined'."
                 )
 
         if attrs["upload_type"] in [
@@ -191,7 +190,7 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
 
         if court_id not in all_court_ids:
             raise ValidationError(
-                "%s is not a PACER court ID." % attrs["court"].pk
+                f"{attrs['court'].pk} is not a PACER court ID."
             )
 
         for attr_name in ["timestamp", "source", "destination", "headers"]:
@@ -200,8 +199,7 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
                 or mail.get(attr_name) == "undefined"
             ):
                 raise ValidationError(
-                    "The JSON value at key 'mail' should include '%s'."
-                    % attr_name
+                    f"The JSON value at key 'mail' should include '{attr_name}'."
                 )
 
         for attr_name in ["timestamp", "recipients"]:
@@ -210,8 +208,7 @@ class EmailProcessingQueueSerializer(serializers.ModelSerializer):
                 or receipt.get(attr_name) == "undefined"
             ):
                 raise ValidationError(
-                    "The JSON value at key 'receipt' should include '%s'."
-                    % attr_name
+                    f"The JSON value at key 'receipt' should include '{attr_name}'."
                 )
 
         return attrs
@@ -257,7 +254,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
             )
         )
         if attrs.get("court") and attrs["court"].pk not in district_court_ids:
-            raise ValidationError("Invalid court id: %s" % attrs["court"].pk)
+            raise ValidationError(f"Invalid court id: {attrs['court'].pk}")
 
         # Docket validations
         if attrs.get("pacer_case_id") and not attrs.get("court"):
@@ -311,7 +308,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 password=attrs.pop("pacer_password"),
             )
         except PacerLoginException as e:
-            raise ValidationError("PacerLoginException: %s" % e)
+            raise ValidationError(f"PacerLoginException: {e}")
 
         return attrs
 

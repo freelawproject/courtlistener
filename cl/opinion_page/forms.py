@@ -241,11 +241,7 @@ class TennWorkersForm(forms.Form):
                     )
                 ),
             )
-        self.cleaned_data["neutral_citation"] = "%s %s %s" % (
-            volume,
-            reporter,
-            page,
-        )
+        self.cleaned_data["neutral_citation"] = f"{volume} {reporter} {page}"
 
     def verify_unique_judges(self):
         if self.pk == "tennworkcompapp":

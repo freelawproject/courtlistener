@@ -75,7 +75,7 @@ class Command(VerboseCommand):
                     payment_id=response["payment_id"],
                     # Only applies to PayPal
                     transaction_id=response.get("transaction_id"),
-                    referrer="monthly_donation_%s" % m_donation.pk,
+                    referrer=f"monthly_donation_{m_donation.pk}",
                 )
                 # Thank you email is triggered later when the stripe callback
                 # is triggered.

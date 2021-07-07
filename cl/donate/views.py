@@ -84,9 +84,7 @@ def route_and_process_payment(
             stripe_args["customer"] = customer.id
             stripe_args["metadata"].update({"recurring": True})
         else:
-            raise NotImplementedError(
-                "Unknown frequency value: %s" % frequency
-            )
+            raise NotImplementedError(f"Unknown frequency value: {frequency}")
 
         if cd_donation_form["reference"]:
             stripe_args["metadata"].update(

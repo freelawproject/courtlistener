@@ -32,11 +32,11 @@ def add_items_to_solr(item_pks, app_label, force_commit=False):
             else:
                 search_dicts.append(item.as_search_dict())
         except AttributeError as e:
-            print("AttributeError trying to add: %s\n  %s" % (item, e))
+            print(f"AttributeError trying to add: {item}\n  {e}")
         except ValueError as e:
-            print("ValueError trying to add: %s\n  %s" % (item, e))
+            print(f"ValueError trying to add: {item}\n  {e}")
         except InvalidDocumentError:
-            print("Unable to parse: %s" % item)
+            print(f"Unable to parse: {item}")
 
     si = scorched.SolrInterface(settings.SOLR_URLS[app_label], mode="w")
     try:

@@ -39,8 +39,7 @@ def get_pacer_doc_ids(options):
             )
             session.login()
             logger.info(
-                "Sent %s tasks to celery so far. Latest pk: %s"
-                % (completed, row_pk)
+                f"Sent {completed} tasks to celery so far. Latest pk: {row_pk}"
             )
         get_pacer_doc_id_with_show_case_doc_url.apply_async(
             args=(row_pk, session.cookies), queue=q

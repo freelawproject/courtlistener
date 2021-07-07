@@ -41,7 +41,7 @@ class Command(VerboseCommand):
         xml_error_ids = []
         for i, d in enumerate(queryset_generator(ds, chunksize=50000)):
             sys.stdout.write(
-                "\rDoing docket: %s of %s, with pk: %s" % (i, count, d.pk)
+                f"\rDoing docket: {i} of {count}, with pk: {d.pk}"
             )
             sys.stdout.flush()
 
@@ -56,4 +56,4 @@ class Command(VerboseCommand):
                 xml_error_ids.append(d.pk)
                 continue
 
-        print("Encountered XMLSyntaxErrors/IOErrors for: %s" % xml_error_ids)
+        print(f"Encountered XMLSyntaxErrors/IOErrors for: {xml_error_ids}")

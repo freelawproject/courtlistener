@@ -74,8 +74,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(
             r.status_code,
             status,
-            msg="Didn't get a {expected} status code. Got {got} "
-            "instead.".format(expected=status, got=r.status_code),
+            msg=f"Didn't get a {status} status code. Got {r.status_code} instead.",
         )
 
     def test_with_and_without_a_citation(self) -> None:

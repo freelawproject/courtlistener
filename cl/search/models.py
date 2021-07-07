@@ -595,9 +595,9 @@ class Docket(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         if self.case_name:
-            return force_str("%s: %s" % (self.pk, self.case_name))
+            return force_str(f"{self.pk}: {self.case_name}")
         else:
-            return "{pk}".format(pk=self.pk)
+            return f"{self.pk}"
 
     def save(self, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
@@ -609,8 +609,7 @@ class Docket(AbstractDateTimeModel):
             for field in ["pacer_case_id", "docket_number"]:
                 if not getattr(self, field, None):
                     raise ValidationError(
-                        "'%s' cannot be Null or empty in "
-                        "RECAP dockets." % field
+                        f"'{field}' cannot be Null or empty in RECAP dockets."
                     )
 
         super(Docket, self).save(*args, **kwargs)
@@ -802,8 +801,7 @@ class Docket(AbstractDateTimeModel):
             out["docket_absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
-                "Unable to save to index due to "
-                "missing absolute_url: %s" % self.pk
+                f"Unable to save to index due to missing absolute_url: {self.pk}"
             )
 
         # Judges
@@ -1326,8 +1324,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             out["docket_absolute_url"] = docket.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url: %s"
-                % self.pk
+                f"Unable to save to index due to missing absolute_url: {self.pk}"
             )
 
         # Judges
@@ -1408,8 +1405,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             out["absolute_url"] = self.get_absolute_url()
         except NoReverseMatch:
             raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url: %s"
-                % self.pk
+                f"Unable to save to index due to missing absolute_url: {self.pk}"
             )
 
         # Docket Entry
@@ -1466,7 +1462,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         verbose_name_plural = "Bankruptcy Information"
 
     def __str__(self) -> str:
-        return "Bankruptcy Info for docket %s" % self.docket_id
+        return f"Bankruptcy Info for docket {self.docket_id}"
 
 
 class Claim(AbstractDateTimeModel):
@@ -1604,7 +1600,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "The type of document that is used in the history row for "
             "the claim. One of: %s"
         )
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in CLAIM_TYPES]),
+        % ", ".join([f"{t[0]} ({t[1]})" for t in CLAIM_TYPES]),
         choices=CLAIM_TYPES,
     )
     description = models.TextField(
@@ -1865,7 +1861,7 @@ class Court(models.Model):
     federal_courts = FederalCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
-        return "{name}".format(name=self.full_name)
+        return f"{self.full_name}"
 
     @property
     def is_terminated(self):
@@ -1905,9 +1901,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
                     remove_ambiguous=False,
                 )[0]
             except IndexError:
-                raise ValueError(
-                    "Unable to parse citation '%s'" % citation_str
-                )
+                raise ValueError(f"Unable to parse citation '{citation_str}'")
             else:
                 clone.query.add_q(
                     Q(
@@ -2193,10 +2187,10 @@ class OpinionCluster(AbstractDateTimeModel):
         citations = sorted(self.citations.all(), key=sort_cites)
         if not citations:
             if self.docket.docket_number:
-                caption += ", %s" % self.docket.docket_number
+                caption += f", {self.docket.docket_number}"
         else:
             if citations[0].type == Citation.NEUTRAL:
-                caption += ", %s" % citations[0]
+                caption += f", {citations[0]}"
                 # neutral cites lack the parentheses, so we're done here.
                 return caption
             elif (
@@ -2204,17 +2198,15 @@ class OpinionCluster(AbstractDateTimeModel):
                 and citations[0].type == Citation.WEST
                 and citations[1].type == Citation.LEXIS
             ):
-                caption += ", %s, %s" % (citations[0], citations[1])
+                caption += f", {citations[0]}, {citations[1]}"
             else:
-                caption += ", %s" % citations[0]
+                caption += f", {citations[0]}"
 
         if self.docket.court_id != "scotus":
             court = re.sub(" ", "&nbsp;", self.docket.court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
             year = self.date_filed.isoformat().split("-")[0]
-            caption += "&nbsp;({court}&nbsp;{year})".format(
-                court=court, year=year
-            )
+            caption += f"&nbsp;({court}&nbsp;{year})"
         return caption
 
     @property
@@ -2286,9 +2278,9 @@ class OpinionCluster(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         if self.case_name:
-            return "%s: %s" % (self.pk, self.case_name)
+            return f"{self.pk}: {self.case_name}"
         else:
-            return "%s" % self.pk
+            return f"{self.pk}"
 
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
@@ -2699,11 +2691,9 @@ class Opinion(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         try:
-            return "{pk} - {cn}".format(
-                pk=getattr(self, "pk", None), cn=self.cluster.case_name
-            )
+            return f"{getattr(self, 'pk', None)} - {self.cluster.case_name}"
         except AttributeError:
-            return "Orphan opinion with ID: %s" % self.pk
+            return f"Orphan opinion with ID: {self.pk}"
 
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.cluster.pk, self.cluster.slug])
@@ -2851,10 +2841,7 @@ class OpinionsCited(models.Model):
     #
 
     def __str__(self) -> str:
-        return "%s ⤜--cites⟶  %s" % (
-            self.citing_opinion.id,
-            self.cited_opinion.id,
-        )
+        return f"{self.citing_opinion.id} ⤜--cites⟶  {self.cited_opinion.id}"
 
     class Meta:
         verbose_name_plural = "Opinions cited"
@@ -2873,7 +2860,7 @@ class Tag(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: %s" % (self.pk, self.name)
+        return f"{self.pk}: {self.name}"
 
     def tag_object(self, thing: TaggableType) -> Tuple["Tag", bool]:
         """Atomically add a tag to an item.

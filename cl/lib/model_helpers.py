@@ -37,12 +37,12 @@ def make_docket_number_core(docket_number: Optional[str]) -> str:
 
     district_m = re.search(r"(?:\d:)?(\d\d)-..-(\d+)", docket_number)
     if district_m:
-        return district_m.group(1) + "{:05d}".format(int(district_m.group(2)))
+        return f"{district_m.group(1)}{int(district_m.group(2)):05d}"
 
     bankr_m = re.search(r"(\d\d)-(\d+)", docket_number)
     if bankr_m:
         # Pad to six characters because some courts have a LOT of bankruptcies
-        return bankr_m.group(1) + "{:06d}".format(int(bankr_m.group(2)))
+        return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"
 
     return ""
 
@@ -54,7 +54,7 @@ def make_path(root: str, filename: str) -> str:
     """
     d = now()
     return os.path.join(
-        root, "%s" % d.year, "%02d" % d.month, "%02d" % d.day, filename
+        root, f"{d.year}", "%02d" % d.month, "%02d" % d.day, filename
     )
 
 
@@ -64,7 +64,7 @@ def make_lasc_path(instance, filename):
     Start with the `root` node, and use the current date as the subdirectories.
     """
     return os.path.join(
-        "lasc-data", "%s" % instance.sha1[0:2], "%s.json" % instance.sha1[2:]
+        "lasc-data", f"{instance.sha1[0:2]}", f"{instance.sha1[2:]}.json"
     )
 
 
@@ -74,7 +74,7 @@ def make_recap_path(instance, filename):
     This dumps them all into the same directory, which seems to be OK, at least
     so far.
     """
-    return "recap/%s" % get_valid_filename(filename)
+    return f"recap/{get_valid_filename(filename)}"
 
 
 def base_recap_path(instance, filename, base_dir):
@@ -106,7 +106,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         pacer_case_id = instance.pacer_case_id
     elif type(instance) == LASCPDF:
         slug = slugify(trunc(filename, 40))
-        root = "/us/state/ca/lasc/%s/" % instance.docket_number
+        root = f"/us/state/ca/lasc/{instance.docket_number}/"
         file_name = "gov.ca.lasc.%s.%s.%s.pdf" % (
             instance.docket_number,
             instance.document_id,
@@ -116,12 +116,11 @@ def make_pdf_path(instance, filename, thumbs=False):
         return os.path.join(root, file_name)
     else:
         raise ValueError(
-            "Unknown model type in make_pdf_path "
-            "function: %s" % type(instance)
+            f"Unknown model type in make_pdf_path function: {type(instance)}"
         )
 
     if thumbs:
-        root = root + "-thumbnails"
+        root = f"{root}-thumbnails"
     return os.path.join(
         root, get_bucket_name(court_id, pacer_case_id), filename
     )
@@ -180,14 +179,13 @@ def validate_partial_date(instance, fields):
     from cl.people_db.models import GRANULARITY_MONTH, GRANULARITY_YEAR
 
     for field in fields:
-        d = getattr(instance, "date_%s" % field)
-        granularity = getattr(instance, "date_granularity_%s" % field)
+        d = getattr(instance, f"date_{field}")
+        granularity = getattr(instance, f"date_granularity_{field}")
 
         if any([d, granularity]) and not all([d, granularity]):
             raise ValidationError(
                 {
-                    "date_%s"
-                    % field: "Date and granularity must both be complete "
+                    f"date_{field}": "Date and granularity must both be complete "
                     "or blank. Hint: The values are: date: %s, "
                     "granularity: %s" % (d, granularity)
                 }
@@ -204,8 +202,7 @@ def validate_partial_date(instance, fields):
         if bad_date:
             raise ValidationError(
                 {
-                    "date_%s"
-                    % field: "Granularity was set as partial, but date "
+                    f"date_{field}": "Granularity was set as partial, but date "
                     "appears to include month/day other than 1."
                 }
             )
@@ -337,8 +334,7 @@ def validate_not_all(instance, fields):
     if num_completed_fields == num_fields:
         # They're all completed. Boo!
         raise ValidationError(
-            "All of the following fields cannot be completed: %s"
-            % ", ".join(fields)
+            f"All of the following fields cannot be completed: {', '.join(fields)}"
         )
 
 

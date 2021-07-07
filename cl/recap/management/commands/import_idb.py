@@ -45,7 +45,7 @@ def create_or_update_row(values: Dict[str, str]) -> FjcIntegratedDatabase:
         elif existing_row_count == 1:
             existing_rows.update(date_modified=now(), **values)
             fjc_row = existing_rows[0]
-            logger.info("Updated row: %s" % fjc_row)
+            logger.info(f"Updated row: {fjc_row}")
             break
     else:
         # Didn't hit a break b/c too many matches.
@@ -101,8 +101,7 @@ class Command(VerboseCommand, CommandUtils):
         allowed_types = [d[0] for d in DATASET_SOURCES]
         if filetype not in allowed_types:
             raise CommandError(
-                "%s not a valid filetype. Valid types are: %s"
-                % (filetype, allowed_types)
+                f"{filetype} not a valid filetype. Valid types are: {allowed_types}"
             )
 
     # noinspection PySingleQuotedDocstring
@@ -184,13 +183,13 @@ class Command(VerboseCommand, CommandUtils):
         self.filetype = options["filetype"]
         self.build_field_data()
 
-        logger.info("Importing IDB file at: %s" % options["input_file"])
+        logger.info(f"Importing IDB file at: {options['input_file']}")
         f = io.open(
             options["input_file"], mode="r", encoding="cp1252", newline="\r\n"
         )
         col_headers = f.next().strip().split("\t")
         for i, line in enumerate(f):
-            sys.stdout.write("\rDoing line: %s" % i)
+            sys.stdout.write(f"\rDoing line: {i}")
             sys.stdout.flush()
             if i < options["start_line"]:
                 continue

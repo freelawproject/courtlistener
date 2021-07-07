@@ -118,7 +118,7 @@ class UserTag(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return "%s: %s by user %s" % (self.pk, self.name, self.user_id)
+        return f"{self.pk}: {self.name} by user {self.user_id}"
 
     class Meta:
         unique_together = (("user", "name"),)

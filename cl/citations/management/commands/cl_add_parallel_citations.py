@@ -84,7 +84,7 @@ class Command(VerboseCommand):
         main_params = {
             "fq": [
                 "status:Precedential",
-                'citation:("%s"~5)' % citation.base_citation(),
+                f'citation:("{citation.base_citation()}"~5)',
             ],
             "caller": "citation.add_parallel_citations",
         }
@@ -94,11 +94,11 @@ class Command(VerboseCommand):
         else:
             start_year, end_year = get_years_from_reporter(citation)
         main_params["fq"].append(
-            "dateFiled:%s" % build_date_range(start_year, end_year)
+            f"dateFiled:{build_date_range(start_year, end_year)}"
         )
 
         if citation.court:
-            main_params["fq"].append("court_exact:%s" % citation.court)
+            main_params["fq"].append(f"court_exact:{citation.court}")
 
         # Query Solr
         return self.conn.query().add_extra(**main_params).execute()
@@ -326,6 +326,6 @@ class Command(VerboseCommand):
         for sub_graph in nx.connected_component_subgraphs(self.g):
             self.handle_subgraph(sub_graph, options)
 
-        logger.info("\n\n## Done. Added %s new citations." % self.update_count)
+        logger.info(f"\n\n## Done. Added {self.update_count} new citations.")
 
         self.do_solr(options)

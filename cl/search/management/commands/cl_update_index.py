@@ -33,8 +33,7 @@ def proceed_with_deletion(out, count, noinput):
     proceed = True
     out.write("\n")
     yes_or_no = input(
-        "WARNING: Are you **sure** you want to delete all %s "
-        "items? [y/N] " % count
+        f"WARNING: Are you **sure** you want to delete all {count} items? [y/N] "
     )
     out.write("\n")
     if not yes_or_no.lower().startswith("y"):
@@ -271,7 +270,7 @@ class Command(VerboseCommand):
         """
         Given a list of items, delete them.
         """
-        self.stdout.write("Deleting items(s): %s\n" % items)
+        self.stdout.write(f"Deleting items(s): {items}\n")
         delete_items.delay(items, self.type)
 
     def delete_all(self):
@@ -289,8 +288,7 @@ class Command(VerboseCommand):
             self.stdout.write("  Committing the deletion...\n")
             self.si.commit()
             self.stdout.write(
-                "\nDone. The index located at: %s\n"
-                "is now empty.\n" % self.solr_url
+                f"\nDone. The index located at: {self.solr_url}\nis now empty.\n"
             )
 
     @print_timing
@@ -308,7 +306,7 @@ class Command(VerboseCommand):
         )
         count = qs.count()
         if proceed_with_deletion(self.stdout, count, self.noinput):
-            self.stdout.write("Deleting all item(s) newer than %s\n" % dt)
+            self.stdout.write(f"Deleting all item(s) newer than {dt}\n")
             self.si.delete(list(qs))
             self.si.commit()
 
@@ -321,7 +319,7 @@ class Command(VerboseCommand):
         count = self.si.query(self.si.Q(**query_dict)).count()
         if proceed_with_deletion(self.stdout, count, self.noinput):
             self.stdout.write(
-                "Deleting all item(s) that match the query: %s\n" % query
+                f"Deleting all item(s) that match the query: {query}\n"
             )
             self.si.delete(queries=self.si.Q(**query_dict))
             self.si.commit()
@@ -332,7 +330,7 @@ class Command(VerboseCommand):
         Given an item, adds it to the index, or updates it if it's already
         in the index.
         """
-        self.stdout.write("Adding or updating item(s): %s\n" % list(items))
+        self.stdout.write(f"Adding or updating item(s): {list(items)}\n")
         add_items_to_solr(items, self.type)
 
     @print_timing
@@ -340,7 +338,7 @@ class Command(VerboseCommand):
         """
         Given a datetime, adds or updates all items newer than that time.
         """
-        self.stdout.write("Adding or updating items(s) newer than %s\n" % dt)
+        self.stdout.write(f"Adding or updating items(s) newer than {dt}\n")
         model = apps.get_model(self.type)
         qs = (
             model.objects.filter(date_created__gte=dt)
@@ -392,9 +390,9 @@ class Command(VerboseCommand):
     def optimize_everything(self):
         """Run the optimize command on all indexes."""
         urls = set(settings.SOLR_URLS.values())
-        self.stdout.write("Found %s indexes. Optimizing...\n" % len(urls))
+        self.stdout.write(f"Found {len(urls)} indexes. Optimizing...\n")
         for url in urls:
-            self.stdout.write(" - {url}\n".format(url=url))
+            self.stdout.write(f" - {url}\n")
             try:
                 si = ExtraSolrInterface(url)
             except EnvironmentError:
