@@ -53,14 +53,12 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         Does the feeds page show all the proper links for each jurisdiction?
         """
         courts = Court.objects.filter(in_use=True, has_opinion_scraper=True)
-        self.browser.get(
-            "%s%s" % (self.live_server_url, reverse("feeds_info"))
-        )
+        self.browser.get(f"{self.live_server_url}{reverse('feeds_info')}")
         self.assert_text_in_node("Jurisdiction Feeds for Opinions", "body")
 
         for court in courts:
             link = self.browser.find_element(By.LINK_TEXT, court.full_name)
-            print("Testing link to %s..." % court.full_name, end=" ")
+            print(f"Testing link to {court.full_name}...", end=" ")
             self.assertEqual(
                 link.get_attribute("href"),
                 f"/feed/court/{court.pk}/",
@@ -81,7 +79,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         Can the RSS feed for ALL jurisdictions render properly in an RSS reader?
         """
         f = feedparser.parse(
-            "%s%s" % (self.live_server_url, reverse("all_jurisdictions_feed"))
+            f"{self.live_server_url}{reverse('all_jurisdictions_feed')}"
         )
         self.assertEqual(
             "CourtListener.com: All Opinions (High Volume)", f.feed.title
@@ -111,7 +109,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         to the CourtListener copy of the original PDF?
         """
         f = feedparser.parse(
-            "%s%s" % (self.live_server_url, reverse("all_jurisdictions_feed"))
+            f"{self.live_server_url}{reverse('all_jurisdictions_feed')}"
         )
         for entry in f.entries:
             if entry.enclosures is not None:
@@ -123,8 +121,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         For Oral Arguments, does the feed provide valid links to MP3 content?
         """
         f = feedparser.parse(
-            "%s%s"
-            % (self.live_server_url, reverse("all_jurisdictions_podcast"))
+            f"{self.live_server_url}{reverse('all_jurisdictions_podcast')}"
         )
         for entry in f.entries:
             if entry.enclosures is not None:
@@ -173,5 +170,5 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                     found_similar_title = True
             self.assertTrue(
                 found_similar_title,
-                "Should have seen a search result similar to %s" % entry.title,
+                f"Should have seen a search result similar to {entry.title}",
             )

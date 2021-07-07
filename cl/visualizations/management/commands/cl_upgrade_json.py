@@ -27,7 +27,7 @@ class Command(VerboseCommand):
         self.options = options
         self.json_objects = JSONVersion.objects.all()
         self.num_objects = self.json_objects.count()
-        logger.info("Acting on %s objects" % self.num_objects)
+        logger.info(f"Acting on {self.num_objects} objects")
         self.upgrade_json(
             start=options["start"],
             end=options["end"],
@@ -46,7 +46,7 @@ class Command(VerboseCommand):
         Throw an exception of the version types mismatch.
         """
         for obj in json_objects:
-            logger.info("Reworking %s" % obj)
+            logger.info(f"Reworking {obj}")
             if start == 1.0 and end == 1.1:
                 j = json.loads(obj.json_data)
                 j = self._upgrade_version_number(j, end)
@@ -63,5 +63,5 @@ class Command(VerboseCommand):
 
             else:
                 raise NotImplementedError(
-                    "Cannot upgrade from %s to %s" % (start, end)
+                    f"Cannot upgrade from {start} to {end}"
                 )

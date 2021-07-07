@@ -152,7 +152,7 @@ class Command(VerboseCommand):
         sys.stdout.flush()
 
     def update_documents(self, opinion_pks: Iterable, queue_name: str) -> None:
-        sys.stdout.write("Graph size is {0:d} nodes.\n".format(self.count))
+        sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
         index_during_subtask = False

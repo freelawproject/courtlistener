@@ -74,7 +74,7 @@ def get_school(schoolname, testing=False):
             return school
     if len(schools) > 1:
         # print('Multiple matches:',schoolname,[x.name for x in schools])
-        C[schoolname + "," + ",".join([x.name for x in schools])] += 1
+        C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
         return None
 
     # print('No fuzzy matches: ' + schoolname )
@@ -85,7 +85,7 @@ def get_school(schoolname, testing=False):
     normwords = schoolname.lower().split()
     for f in normwords:
         if f not in filterwords:
-            normname = normname + " " + f
+            normname = f"{normname} {f}"
     normname = normname.strip()
 
     if normname.isspace():
@@ -103,10 +103,10 @@ def get_school(schoolname, testing=False):
             return school
     if len(schools) > 1:
         # print('Multiple normalized matches:',schoolname,[x.name for x in schools])
-        C[schoolname + "," + ",".join([x.name for x in schools])] += 1
+        C[f"{schoolname},{','.join([x.name for x in schools])}"] += 1
         return None
     # print('No matches:',schoolname,normname)
-    C[schoolname + ",no-matches"] += 1
+    C[f"{schoolname},no-matches"] += 1
     return None
 
 
@@ -183,7 +183,7 @@ def get_degree_level(degstr):
         return "ma"
     if deg.startswith("dipl"):
         return "ma"
-    print(degstr + " not in degdict.")
+    print(f"{degstr} not in degdict.")
     return ""
 
 

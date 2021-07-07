@@ -7,27 +7,25 @@ import sys
 def application(environ, start_response):
     status = "200 OK"
 
-    output = u""
-    output += u"sys.version = %s\n" % repr(sys.version)
-    output += u"sys.prefix = %s\n" % repr(sys.prefix)
-    output += u"sys.path = %s\n" % repr(sys.path)
-    output += u"locale.getlocale() = %s\n" % repr(locale.getlocale())
-    output += u"locale.getdefaultlocale() = %s\n" % repr(
-        locale.getdefaultlocale()
+    output = ""
+    output += f"sys.version = {repr(sys.version)}\n"
+    output += f"sys.prefix = {repr(sys.prefix)}\n"
+    output += f"sys.path = {repr(sys.path)}\n"
+    output += f"locale.getlocale() = {repr(locale.getlocale())}\n"
+    output += (
+        f"locale.getdefaultlocale() = {repr(locale.getdefaultlocale())}\n"
     )
-    output += u"sys.getfilesystemencoding() = %s\n" % repr(
-        sys.getfilesystemencoding()
+    output += (
+        f"sys.getfilesystemencoding() = {repr(sys.getfilesystemencoding())}\n"
     )
-    output += u"sys.getdefaultencoding() = %s\n" % repr(
-        sys.getdefaultencoding()
-    )
-    output += u"locale.getpreferredencoding(False): %s\n" % repr(
+    output += f"sys.getdefaultencoding() = {repr(sys.getdefaultencoding())}\n"
+    output += "locale.getpreferredencoding(False): %s\n" % repr(
         locale.getpreferredencoding(False)
     )
 
     output += "\n\n"
-    output += "mod_wsgi.process_group = %s" % repr(
-        environ["mod_wsgi.process_group"]
+    output += (
+        f"mod_wsgi.process_group = {repr(environ['mod_wsgi.process_group'])}"
     )
 
     response_headers = [

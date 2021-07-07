@@ -64,7 +64,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--task",
             type=str,
-            help="The task to perform. One of %s" % ", ".join(self.tasks),
+            help=f"The task to perform. One of {', '.join(self.tasks)}",
             required=True,
         )
         parser.add_argument(

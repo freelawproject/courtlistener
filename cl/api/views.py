@@ -67,7 +67,7 @@ def rest_docs(request, version=None):
     court_count = len(courts)
     context = {"court_count": court_count, "courts": courts, "private": False}
     try:
-        return render(request, "rest-docs-%s.html" % version, context)
+        return render(request, f"rest-docs-{version}.html", context)
     except TemplateDoesNotExist:
         return render(request, "rest-docs-vlatest.html", context)
 

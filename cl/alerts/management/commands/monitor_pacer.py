@@ -42,7 +42,7 @@ class Command(VerboseCommand):
         super(Command, self).handle(*args, **options)
 
         recipients = options["recipients"].split(",")
-        print("Recipients list is: %s" % recipients)
+        print(f"Recipients list is: {recipients}")
 
         s = PacerSession(
             username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
@@ -58,7 +58,7 @@ class Command(VerboseCommand):
                 filed_to=datetime.date(2019, 1, 30),
             )
             num_results = len(report.data)
-            print("Checked '%s' and got %s results" % (query, num_results))
+            print(f"Checked '{query}' and got {num_results} results")
             if num_results > 0:
                 print("Sending emails and exiting!")
                 send_emails(report, recipients)
@@ -71,7 +71,7 @@ class Command(VerboseCommand):
                 filed_to=datetime.date(2019, 1, 30),
             )
             num_results = len(report.data)
-            print("Checked '%s' and got %s results" % (query, num_results))
+            print(f"Checked '{query}' and got {num_results} results")
             if num_results > 0:
                 print("Sending emails and exiting!")
                 send_emails(report, recipients)

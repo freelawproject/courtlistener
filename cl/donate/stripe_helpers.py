@@ -277,7 +277,7 @@ def process_stripe_payment(
             "redirect": stripe_redirect_url,
         }
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.info("Stripe was unable to process the payment: %s" % e)
+        logger.info(f"Stripe was unable to process the payment: {e}")
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]
@@ -299,7 +299,7 @@ def create_stripe_customer(source: str, email: str) -> StripeObject:
     try:
         return stripe.Customer.create(source=source, email=email)
     except (stripe.error.CardError, stripe.error.InvalidRequestError) as e:
-        logger.warning("Stripe was unable to create the customer: %s" % e)
+        logger.warning(f"Stripe was unable to create the customer: {e}")
         message = (
             "Oops, we had an error with your donation: "
             "<strong>%s</strong>" % e.json_body["error"]["message"]

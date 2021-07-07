@@ -85,7 +85,7 @@ def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
     elif search_type == SEARCH_TYPES.PEOPLE:
         si = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
     else:
-        raise NotImplementedError("Unknown search type: %s" % search_type)
+        raise NotImplementedError(f"Unknown search type: {search_type}")
 
     return si
 
@@ -238,7 +238,7 @@ def merge_form_with_courts(
             for court in courts:
                 # We're merging two lists, so we have to do a nested loop
                 # to find the right value.
-                if "court_%s" % court.pk == field.html_name:
+                if f"court_{court.pk}" == field.html_name:
                     court.checked = field.value()
                     break
 
@@ -326,11 +326,11 @@ def make_fq(
 
     if q.startswith('"') and q.endswith('"'):
         # User used quotes. Just pass it through.
-        return "%s:(%s)" % (field, q)
+        return f"{field}:({q})"
 
     if make_phrase:
         # No need to mess with conjunctions. Just wrap in quotes.
-        return '%s:("%s")' % (field, q)
+        return f'{field}:("{q}")'
 
     # Iterate over the query word by word. If the word is a conjunction
     # word, detect that and use the user's request. Else, make sure there's
@@ -347,12 +347,12 @@ def make_fq(
                 clean_q.append("AND")
             clean_q.append(word)
             needs_default_conjunction = True
-    fq = "%s:(%s)" % (field, " ".join(clean_q))
+    fq = f"{field}:({' '.join(clean_q)})"
     return fq
 
 
 def make_boolean_fq(cd: CleanData, field: str, key: str) -> str:
-    return "%s:%s" % (field, str(cd[key]).lower())
+    return f"{field}:{str(cd[key]).lower()}"
 
 
 def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
@@ -374,7 +374,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     for token in q.split():
         if token not in ["AND", "OR", "NOT", "TO"]:
             tokens.append(token)
-    return '%s:("%s"~5)' % (field, " ".join(tokens))
+    return f"{field}:(\"{' '.join(tokens)}\"~5)"
 
 
 def make_date_query(
@@ -385,17 +385,17 @@ def make_date_query(
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
         if hasattr(after, "strftime"):
-            date_filter = "[%sT00:00:00Z TO " % after.isoformat()
+            date_filter = f"[{after.isoformat()}T00:00:00Z TO "
         else:
             date_filter = "[* TO "
         if hasattr(before, "strftime"):
-            date_filter = "%s%sT23:59:59Z]" % (date_filter, before.isoformat())
+            date_filter = f"{date_filter}{before.isoformat()}T23:59:59Z]"
         else:
-            date_filter = "%s*]" % date_filter
+            date_filter = f"{date_filter}*]"
     else:
         # No date filters were requested
         return ""
-    return "%s:%s" % (query_field, date_filter)
+    return f"{query_field}:{date_filter}"
 
 
 def make_cite_count_query(cd: CleanData) -> str:
@@ -405,7 +405,7 @@ def make_cite_count_query(cd: CleanData) -> str:
     if start == "*" and end == "*":
         return ""
     else:
-        return "citeCount:[%s TO %s]" % (start, end)
+        return f"citeCount:[{start} TO {end}]"
 
 
 def get_selected_field_string(cd: CleanData, prefix: str) -> str:
@@ -417,11 +417,11 @@ def get_selected_field_string(cd: CleanData, prefix: str) -> str:
     are spaces in the values.
     """
     selected_fields = [
-        '"%s"' % k.replace(prefix, "")
+        f"\"{k.replace(prefix, '')}\""
         for k, v in cd.items()
         if (k.startswith(prefix) and v is True)
     ]
-    if len(selected_fields) == cd["_%scount" % prefix]:
+    if len(selected_fields) == cd[f"_{prefix}count"]:
         # All the boxes are checked. No need for filtering.
         return ""
     else:
@@ -432,7 +432,7 @@ def get_selected_field_string(cd: CleanData, prefix: str) -> str:
 def make_boost_string(fields: Dict[str, float]) -> str:
     qf_array = []
     for k, v in fields.items():
-        qf_array.append("%s^%s" % (k, v))
+        qf_array.append(f"{k}^{v}")
     return " ".join(qf_array)
 
 
@@ -598,8 +598,8 @@ def add_highlighting(
     for field in hlfl:
         if field == "text":
             continue
-        main_params["f.%s.hl.fragListBuilder" % field] = "single"  # type: ignore
-        main_params["f.%s.hl.alternateField" % field] = field  # type: ignore
+        main_params[f"f.{field}.hl.fragListBuilder"] = "single"  # type: ignore
+        main_params[f"f.{field}.hl.alternateField"] = field  # type: ignore
 
 
 def add_filter_queries(main_params: SearchParam, cd) -> None:
@@ -712,7 +712,7 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
 
     selected_courts_string = get_selected_field_string(cd, "court_")
     if len(selected_courts_string) > 0:
-        main_fq.append("court_exact:(%s)" % selected_courts_string)
+        main_fq.append(f"court_exact:({selected_courts_string})")
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
@@ -859,7 +859,7 @@ def cleanup_main_query(query_string: str) -> str:
 
         # Some sort of number, probably a docket number.
         # Wrap in quotes to do a phrase search
-        cleaned_items.append('"' + item + '"')
+        cleaned_items.append(f'"{item}"')
     return "".join(cleaned_items)
 
 
@@ -943,7 +943,7 @@ def build_coverage_query(court: str, q: str, facet_field: str) -> SearchParam:
         },
     )
     if court.lower() != "all":
-        params["fq"] = ["court_exact:%s" % court]
+        params["fq"] = [f"court_exact:{court}"]
     return params
 
 
@@ -1042,7 +1042,7 @@ def get_citing_clusters_with_cache(
     :type cluster: OpinionCluster
     :return: A tuple of the list of solr results and the number of results
     """
-    cache_key = "citing:%s" % cluster.pk
+    cache_key = f"citing:{cluster.pk}"
     cache = caches["db_cache"]
     cached_results = cache.get(cache_key)
     if cached_results is not None:
@@ -1052,7 +1052,7 @@ def get_citing_clusters_with_cache(
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
     ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
     q = {
-        "q": "cites:(%s)" % ids_str,
+        "q": f"cites:({ids_str})",
         "rows": 5,
         "start": 0,
         "sort": "citeCount desc",
@@ -1084,7 +1084,7 @@ def get_related_clusters_with_cache(
 
     # By default all statuses are included
     available_statuses = dict(DOCUMENT_STATUSES).values()
-    url_search_params = {"stat_" + v: "on" for v in available_statuses}
+    url_search_params = {f"stat_{v}": "on" for v in available_statuses}
 
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
@@ -1096,7 +1096,7 @@ def get_related_clusters_with_cache(
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Use cache if enabled
-    mlt_cache_key = "mlt-cluster:%s" % cluster.pk
+    mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
         caches["db_cache"].get(mlt_cache_key)
         if settings.RELATED_USE_CACHE
@@ -1142,7 +1142,7 @@ def get_related_clusters_with_cache(
 
             # Update URL parameters accordingly
             url_search_params = {
-                "stat_" + settings.RELATED_FILTER_BY_STATUS: "on"
+                f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"
             }
 
         mlt_res = mlt_query.execute()
@@ -1215,7 +1215,7 @@ def get_mlt_query(
     q.update(
         {
             "caller": "mlt_query",
-            "q": "id:(" + (" OR ".join(seed_pks)) + ")",
+            "q": f"id:({' OR '.join(seed_pks)})",
             "mlt": "true",  # Python boolean does not work here
             "mlt.fl": "text",
             "mlt.maxqt": settings.RELATED_MLT_MAXQT,
@@ -1224,7 +1224,7 @@ def get_mlt_query(
             "mlt.maxwl": settings.RELATED_MLT_MAXWL,
             "mlt.maxdf": settings.RELATED_MLT_MAXDF,
             # Retrieve fields as highlight replacement
-            "fl": q["fl"] + "," + (",".join(hl_fields)),
+            "fl": f"{q['fl']},{','.join(hl_fields)}",
             # Original query as filter query
             "fq": q["fq"] + [cleaned_fq],
             # unset fields not used for MLT

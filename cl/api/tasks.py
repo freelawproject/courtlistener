@@ -28,21 +28,18 @@ def make_bulk_data_and_swap_it_in(
     # Create a directory where we'll put temporary files
     tmp_bulk_dir = join(bulk_dir, "tmp")
 
-    print(" - Creating bulk %s files..." % kwargs["obj_type_str"])
+    print(f" - Creating bulk {kwargs['obj_type_str']} files...")
     num_written = write_json_to_disk(courts, bulk_dir=tmp_bulk_dir, **kwargs)
 
     if num_written > 0:
         print(
-            "   - Tarring and compressing all %s files..."
-            % kwargs["obj_type_str"]
+            f"   - Tarring and compressing all {kwargs['obj_type_str']} files..."
         )
         targz_json_files(
             courts, tmp_bulk_dir, kwargs["obj_type_str"], kwargs["court_attr"]
         )
 
-        print(
-            "   - Swapping in the new %s archives..." % kwargs["obj_type_str"]
-        )
+        print(f"   - Swapping in the new {kwargs['obj_type_str']} archives...")
         swap_archives(kwargs["obj_type_str"], bulk_dir, tmp_bulk_dir)
 
 
@@ -82,7 +79,7 @@ def targz_json_files(
     root_path = join(bulk_dir, obj_type_str)
     if court_attr is not None:
         for court in courts:
-            tar_path = join(root_path, "%s.tar.gz" % court.pk)
+            tar_path = join(root_path, f"{court.pk}.tar.gz")
             tar = tarfile.open(tar_path, "w:gz", compresslevel=3)
             for name in glob.glob(join(root_path, court.pk, "*.json")):
                 tar.add(name, arcname=os.path.basename(name))
@@ -100,7 +97,7 @@ def targz_json_files(
         # Non-court-centric objects already did this.
         tar = tarfile.open(join(root_path, "all.tar"), "w")
         for court in courts:
-            targz = join(root_path, "%s.tar.gz" % court.pk)
+            targz = join(root_path, f"{court.pk}.tar.gz")
             tar.add(targz, arcname=os.path.basename(targz))
         tar.close()
 
@@ -187,7 +184,7 @@ def write_json_to_disk(
         context = dict(request=r)
         for item in item_list:
             if i % 1000 == 0:
-                print("Completed %s items so far." % i)
+                print(f"Completed {i} items so far.")
             json_str = renderer.render(
                 serializer(item, context=context).data,
                 accepted_media_type="application/json; indent=2",
@@ -198,17 +195,17 @@ def write_json_to_disk(
                     bulk_dir,
                     obj_type_str,
                     deepgetattr(item, court_attr),
-                    "%s.json" % item.pk,
+                    f"{item.pk}.json",
                 )
             else:
                 # A non-jurisdiction-centric object.
-                loc = join(bulk_dir, obj_type_str, "%s.json" % item.pk)
+                loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
 
             with open(loc, "wb") as f:
                 f.write(json_str)
             i += 1
 
-        print("   - %s %s json files created." % (i, obj_type_str))
+        print(f"   - {i} {obj_type_str} json files created.")
 
         history.mark_success_and_save()
         return i

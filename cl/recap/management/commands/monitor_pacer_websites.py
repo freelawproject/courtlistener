@@ -52,7 +52,7 @@ def make_simple_url(court):
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
     else:
-        return "https://ecf.%s.uscourts.gov/" % map_cl_to_pacer_id(court.pk)
+        return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
 
 
 def down_for_only_me(session, url):

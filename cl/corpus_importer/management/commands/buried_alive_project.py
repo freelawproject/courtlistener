@@ -35,7 +35,7 @@ def get_docket_ids(main_query):
     for result in results:
         docket_ids.add(result["docket_id"])
 
-    logger.info("Got %s docket IDs back from Solr." % len(docket_ids))
+    logger.info(f"Got {len(docket_ids)} docket IDs back from Solr.")
     return docket_ids
 
 
@@ -55,7 +55,7 @@ def get_pacer_dockets(options, docket_pks, tags):
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
-            logger.info("Sent %s tasks to celery so far." % i)
+            logger.info(f"Sent {i} tasks to celery so far.")
         d = Docket.objects.get(pk=docket_pk)
         chain(
             get_docket_by_pacer_case_id.s(
@@ -67,7 +67,7 @@ def get_pacer_dockets(options, docket_pks, tags):
                     "show_parties_and_counsel": True,
                     "show_terminated_parties": True,
                     "show_list_of_member_cases": False,
-                }
+                },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -99,7 +99,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         main_query = build_main_query_from_query_string(
             QUERY_STRING,
             {"rows": 10000, "fl": ["id", "docket_id"]},

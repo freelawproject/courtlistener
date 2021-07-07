@@ -21,7 +21,7 @@ class UrlHash(models.Model):
     )
 
     def __str__(self) -> str:
-        return "{pk}".format(pk=self.pk)
+        return f"{self.pk}"
 
     class Meta:
         verbose_name_plural = "URL Hashes"
@@ -48,12 +48,7 @@ class ErrorLog(models.Model):
     )
 
     def __str__(self) -> str:
-        return "%s - %s@%s %s" % (
-            self.log_time,
-            self.log_level,
-            self.court.pk,
-            self.message,
-        )
+        return f"{self.log_time} - {self.log_level}@{self.court.pk} {self.message}"
 
 
 class PACERFreeDocumentLog(models.Model):

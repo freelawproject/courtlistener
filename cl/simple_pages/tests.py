@@ -145,7 +145,7 @@ class SimplePagesTest(TestCase):
         :return: None
         """
         path = reverse(**reverse_param)
-        print("Testing basic load of: {path}...".format(path=path), end="")
+        print(f"Testing basic load of: {path}...", end="")
         r = self.client.get(path)
         self.assertEqual(
             r.status_code,

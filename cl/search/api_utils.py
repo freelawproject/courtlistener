@@ -14,8 +14,7 @@ def get_object_list(request, cd, paginator):
         page_number = int(request.GET.get(paginator.page_query_param, 1))
     except ValueError:
         raise ParseError(
-            "Invalid page number: %s"
-            % request.GET.get(paginator.page_query_param)
+            f"Invalid page number: {request.GET.get(paginator.page_query_param)}"
         )
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40

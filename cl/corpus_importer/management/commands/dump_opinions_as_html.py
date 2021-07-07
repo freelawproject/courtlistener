@@ -41,6 +41,6 @@ class Command(VerboseCommand):
                 str(op.cluster.date_filed.day),
             )
             mkdir_p(output_dir)
-            output_path = os.path.join(output_dir, "%s.html" % op.pk)
+            output_path = os.path.join(output_dir, f"{op.pk}.html")
             with open(output_path, "w") as f:
                 f.write(content.encode())

@@ -50,18 +50,15 @@ class DisclosureIngestionTest(TestCase):
         non_investments = NonInvestmentIncome.objects.all()
         self.assertTrue(
             investments.count() == 19,
-            "Should have 19 ingested investments, not %s"
-            % investments.count(),
+            f"Should have 19 ingested investments, not {investments.count()}",
         )
         self.assertTrue(
             reimbursements.count() == 5,
-            "Should have 5 ingested reimbursements, not %s"
-            % reimbursements.count(),
+            f"Should have 5 ingested reimbursements, not {reimbursements.count()}",
         )
         self.assertTrue(
             non_investments.count() == 2,
-            "Should have 2 ingested non-investments, not %s"
-            % non_investments.count(),
+            f"Should have 2 ingested non-investments, not {non_investments.count()}",
         )
 
     def test_extraction_and_ingestion_jef(self) -> None:

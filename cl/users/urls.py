@@ -134,7 +134,7 @@ urlpatterns = [
     ),
     # Webhooks
     path(
-        "webhook/mailchimp/%s/" % settings.MAILCHIMP_SECRET,
+        f"webhook/mailchimp/{settings.MAILCHIMP_SECRET}/",
         views.mailchimp_webhook,
     ),
 ]

@@ -7,7 +7,7 @@ from cl.scrapers.management.commands import cl_scrape_oral_arguments
 class Command(cl_scrape_oral_arguments.Command):
     def parse_and_scrape_site(self, mod, full_crawl):
         court_str = mod.__name__.split(".")[-1].split("_")[0]
-        logger.info('Using court_str: "%s"' % court_str)
+        logger.info(f'Using court_str: "{court_str}"')
 
         for site in site_yielder(mod.Site().back_scrape_iterable, mod):
             site.parse()

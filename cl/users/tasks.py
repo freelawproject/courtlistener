@@ -30,7 +30,7 @@ def abort_or_retry(task, exc):
     bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
 )
 def subscribe_to_mailchimp(self, email):
-    path = "/3.0/lists/%s/members/" % MC_LIST_ID
+    path = f"/3.0/lists/{MC_LIST_ID}/members/"
     try:
         r = requests.post(
             urljoin(MC_BASE_URL, path),
@@ -39,9 +39,7 @@ def subscribe_to_mailchimp(self, email):
                 "status": "subscribed",
                 "merge_fields": {},
             },
-            headers={
-                "Authorization": "apikey %s" % settings.MAILCHIMP_API_KEY
-            },
+            headers={"Authorization": f"apikey {settings.MAILCHIMP_API_KEY}"},
             timeout=30,
         )
     except requests.RequestException as exc:
@@ -71,18 +69,14 @@ def subscribe_to_mailchimp(self, email):
 )
 def update_mailchimp(self, email, status):
     allowed_statuses = ["unsubscribed", "subscribed"]
-    assert status in allowed_statuses, (
-        "'%s' is not an allowed status." % status
-    )
+    assert status in allowed_statuses, f"'{status}' is not an allowed status."
     md5_hash = md5(email)
-    path = "/3.0/lists/%s/members/%s" % (MC_LIST_ID, md5_hash)
+    path = f"/3.0/lists/{MC_LIST_ID}/members/{md5_hash}"
     try:
         r = requests.patch(
             urljoin(MC_BASE_URL, path),
             json={"status": status},
-            headers={
-                "Authorization": "apikey %s" % settings.MAILCHIMP_API_KEY
-            },
+            headers={"Authorization": f"apikey {settings.MAILCHIMP_API_KEY}"},
             timeout=30,
         )
     except requests.RequestException as exc:

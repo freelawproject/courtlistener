@@ -29,7 +29,7 @@ def get_docketxml_url_from_path(path):
     """
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
-    return "%s/%s/%s" % (BASE_DOWNLOAD_URL, bucket, filename)
+    return f"{BASE_DOWNLOAD_URL}/{bucket}/{filename}"
 
 
 def get_ia_document_url_from_path(path, document_number, attachment_number):
@@ -48,17 +48,11 @@ def get_local_document_url_from_path(path, document_number, attachment_number):
     """Make a path to a local copy of a PDF."""
     filename = path.rsplit("/", 1)[-1]
     bucket = ".".join(filename.split(".")[0:4])
-    return "{bucket}.{doc_num}.{att_num}.pdf".format(
-        bucket=bucket, doc_num=document_number, att_num=attachment_number
-    )
+    return f"{bucket}.{document_number}.{attachment_number}.pdf"
 
 
 def get_pdf_url(court, pacer_case_id, filename):
-    return "%s/%s/%s" % (
-        BASE_DOWNLOAD_URL,
-        get_bucket_name(court, pacer_case_id),
-        filename,
-    )
+    return f"{BASE_DOWNLOAD_URL}/{get_bucket_name(court, pacer_case_id)}/{filename}"
 
 
 def get_docket_filename(court, pacer_case_id, ext):
@@ -68,7 +62,7 @@ def get_docket_filename(court, pacer_case_id, ext):
             "uscourts",
             str(court),
             str(pacer_case_id),
-            "docket.%s" % ext,
+            f"docket.{ext}",
         ]
     )
 

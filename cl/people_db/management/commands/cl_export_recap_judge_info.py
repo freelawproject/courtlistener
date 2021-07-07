@@ -58,12 +58,10 @@ class Command(VerboseCommand):
                 .filter(source__in=Docket.RECAP_SOURCES)
                 .only("assigned_to_str", "referred_to_str", "date_filed")
             )
-            logger.info(
-                "Processing %s dockets in %s" % (dockets.count(), court.pk)
-            )
+            logger.info(f"Processing {dockets.count()} dockets in {court.pk}")
             for docket in dockets:
                 for judge_type in ["assigned", "referred"]:
-                    judge = getattr(docket, "%s_to_str" % judge_type)
+                    judge = getattr(docket, f"{judge_type}_to_str")
                     if not judge:
                         continue
 

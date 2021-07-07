@@ -107,7 +107,7 @@ def get_dockets(options):
                     "show_parties_and_counsel": True,
                     "show_terminated_parties": True,
                     "show_list_of_member_cases": False,
-                }
+                },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
@@ -167,7 +167,7 @@ Limitations:
         )
 
     def handle(self, *args, **options):
-        logger.info("Using PACER username: %s" % PACER_USERNAME)
+        logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "iquery":
             # Run iquery for all of the cases in the district during the time
             # period.
@@ -176,4 +176,4 @@ Limitations:
             # Get dockets for all of the relevant cases
             get_dockets(options)
         else:
-            print("Unknown task: %s" % options["task"])
+            print(f"Unknown task: {options['task']}")

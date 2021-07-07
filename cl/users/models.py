@@ -158,7 +158,7 @@ class UserProfile(models.Model):
         return data[self.user.pk]
 
     def __str__(self) -> str:
-        return "{name}".format(name=self.user.username)
+        return f"{self.user.username}"
 
     class Meta:
         verbose_name = "user profile"

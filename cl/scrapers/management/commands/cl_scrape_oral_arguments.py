@@ -93,7 +93,7 @@ def make_objects(
     cf = ContentFile(content)
     extension = get_extension(content)
     if extension not in [".mp3", ".wma"]:
-        extension = "." + item["download_urls"].lower().rsplit(".", 1)[1]
+        extension = f".{item['download_urls'].lower().rsplit('.', 1)[1]}"
     file_name = trunc(item["case_names"].lower(), 75) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
@@ -119,7 +119,7 @@ class Command(cl_scrape_opinions.Command):
             return
 
         if site.cookies:
-            logger.info("Using cookies: %s" % site.cookies)
+            logger.info(f"Using cookies: {site.cookies}")
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
@@ -155,8 +155,7 @@ class Command(cl_scrape_opinions.Command):
             if onwards:
                 # Not a duplicate, carry on
                 logger.info(
-                    "Adding new document found at: %s"
-                    % item["download_urls"].encode()
+                    f"Adding new document found at: {item['download_urls'].encode()}"
                 )
                 dup_checker.reset()
 
@@ -181,7 +180,7 @@ class Command(cl_scrape_opinions.Command):
                 )
 
         # Update the hash if everything finishes properly.
-        logger.info("%s: Successfully crawled oral arguments." % site.court_id)
+        logger.info(f"{site.court_id}: Successfully crawled oral arguments.")
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)

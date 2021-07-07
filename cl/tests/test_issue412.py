@@ -36,8 +36,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Then she loads up a blocked case
         self.browser.get(
-            "%s%s"
-            % (self.live_server_url, reverse("view_case", args=("11", "asdf")))
+            f"{self.live_server_url}{reverse('view_case', args=('11', 'asdf'))}"
         )
 
         # She notices a widget letting her know it's blocked by search engines
@@ -53,8 +52,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Then she loads up a blocked case
         self.browser.get(
-            "%s%s"
-            % (self.live_server_url, reverse("view_case", args=("11", "asdf")))
+            f"{self.live_server_url}{reverse('view_case', args=('11', 'asdf'))}"
         )
 
         # She does NOT see a widget telling her the page is blocked
@@ -70,8 +68,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Then she loads up a case that's not blocked
         self.browser.get(
-            "%s%s"
-            % (self.live_server_url, reverse("view_case", args=("10", "asdf")))
+            f"{self.live_server_url}{reverse('view_case', args=('10', 'asdf'))}"
         )
 
         # She does NOT see a widget telling her the page is blocked
@@ -102,9 +99,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
-        self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url())
-        )
+        self.browser.get(f"{self.live_server_url}{docket.get_absolute_url()}")
 
         # And sees a badge that lets her know it's blocked
         self.assertIn(BLOCKED_MSG, self.browser.page_source)
@@ -118,9 +113,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Pulls up a page for a Docket that is blocked to search engines
         docket = Docket.objects.get(pk=11)
-        self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url())
-        )
+        self.browser.get(f"{self.live_server_url}{docket.get_absolute_url()}")
 
         # And does not see a badge indicating that it's blocked.
         btns = self.browser.find_elements(
@@ -145,9 +138,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
         # Pulls up a page for a Docket that is not blocked to search engines
         docket = Docket.objects.get(pk=10)
-        self.browser.get(
-            "%s%s" % (self.live_server_url, docket.get_absolute_url())
-        )
+        self.browser.get(f"{self.live_server_url}{docket.get_absolute_url()}")
 
         # And does not see a badge that lets her know it's blocked
         btn = self.browser.find_element(By.CSS_SELECTOR, ".btn.btn-success")

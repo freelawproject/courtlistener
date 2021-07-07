@@ -108,9 +108,7 @@ class Command(VerboseCommand):
                 new_value_not_blank,
             ]
         ):
-            logger.info(
-                "Updating %s with %s." % (attribute, new_value.encode())
-            )
+            logger.info(f"Updating {attribute} with {new_value.encode()}.")
             setattr(obj, attribute, new_value)
         else:
             # Report if there's a difference -- that might spell trouble.
@@ -309,9 +307,9 @@ class Command(VerboseCommand):
                 )
             )
             logger.info(
-                "https://www.courtlistener.com%s" % cluster.get_absolute_url()
+                f"https://www.courtlistener.com{cluster.get_absolute_url()}"
             )
-            logger.info("%s" % cluster.case_name.encode())
+            logger.info(f"{cluster.case_name.encode()}")
             if cluster.docket.docket_number:
                 logger.info(cluster.docket.docket_number.encode())
             logger.info(cluster.date_filed)
@@ -329,7 +327,7 @@ class Command(VerboseCommand):
             return clusters[0]
         else:
             choice = input(
-                "Which item should we update? [0-%s] " % (len(clusters) - 1)
+                f"Which item should we update? [0-{len(clusters) - 1}] "
             )
 
             try:

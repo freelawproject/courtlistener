@@ -74,7 +74,7 @@ class RecapUploadsTest(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
-        token = "Token " + self.user.auth_token.key
+        token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
         f = SimpleUploadedFile("file.txt", b"file content more content")
@@ -210,7 +210,7 @@ class RecapUploadsTest(TestCase):
 
     def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
-        self.data["pacer_case_id"] = u"☠☠☠"
+        self.data["pacer_case_id"] = "☠☠☠"
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
@@ -421,7 +421,7 @@ class ProcessingQueueApiFilterTest(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
-        token = "Token " + self.user.auth_token.key
+        token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
         # Set up for making PQ objects.
@@ -472,7 +472,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap-email")
-        token = "Token " + self.user.auth_token.key
+        token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
         test_dir = os.path.join(
@@ -1532,7 +1532,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         self.assertTrue(og_info)
         self.assertIn("Gloria", og_info.court_reporter)
         self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
-        self.assertEqual(og_info.docket_number, u"1:17-cv-00050")
+        self.assertEqual(og_info.docket_number, "1:17-cv-00050")
 
 
 class RecapCriminalDataUploadTaskTest(TestCase):
@@ -1697,7 +1697,7 @@ class IdbImportTest(SimpleTestCase):
             ),
         )
         for qa in qa:
-            print("Testing CSV parser on: %s" % qa[0])
+            print(f"Testing CSV parser on: {qa[0]}")
             self.assertEqual(
                 self.cmd.make_csv_row_dict(qa[0], ["1", "2", "3"]), qa[1]
             )

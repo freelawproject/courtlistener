@@ -292,7 +292,7 @@ def make_and_save(
     )
 
     if main_date is None:
-        raise Exception("Failed to get a date for " + item["file"])
+        raise Exception(f"Failed to get a date for {item['file']}")
 
     # special rule for Kentucky
     if item["court_id"] == "kycourtapp" and main_date <= date(1975, 12, 31):
@@ -431,7 +431,7 @@ def make_and_save(
             if skipdupes:
                 print("Duplicate. skipping.")
             else:
-                raise Exception("Found %s duplicate(s)." % len(dups))
+                raise Exception(f"Found {len(dups)} duplicate(s).")
 
     # save all the objects
     if not testing:
@@ -453,9 +453,7 @@ def make_and_save(
                 domain = "http://127.0.0.1:8000"
             else:
                 domain = "https://www.courtlistener.com"
-            print(
-                "Created item at: %s%s" % (domain, cluster.get_absolute_url())
-            )
+            print(f"Created item at: {domain}{cluster.get_absolute_url()}")
         except:
             # if anything goes wrong, try to delete everything
             try:
@@ -478,7 +476,7 @@ def find_dups(docket, cluster):
 
     params = {
         "fq": [
-            "court_id:%s" % docket.court_id,
+            f"court_id:{docket.court_id}",
             "citation:(%s)"
             % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
         ],

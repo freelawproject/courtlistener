@@ -10,8 +10,7 @@ class Stat(models.Model):
 
     def __str__(self) -> str:
         return force_str(
-            "%s: %s on %s: %s"
-            % (self.pk, self.name, self.date_logged, self.count)
+            f"{self.pk}: {self.name} on {self.date_logged}: {self.count}"
         )
 
     class Meta:
@@ -35,4 +34,4 @@ class Event(models.Model):
     )
 
     def __str__(self) -> str:
-        return "%s: Event Object" % self.pk
+        return f"{self.pk}: Event Object"

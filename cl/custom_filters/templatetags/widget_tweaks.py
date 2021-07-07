@@ -34,9 +34,9 @@ def set_attr(field, attr):
 def append_attr(field, attr):
     def process(widget, attrs, attribute, value):
         if attrs.get(attribute):
-            attrs[attribute] += " " + value
+            attrs[attribute] += f" {value}"
         elif widget.attrs.get(attribute):
-            attrs[attribute] = widget.attrs[attribute] + " " + value
+            attrs[attribute] = f"{widget.attrs[attribute]} {value}"
         else:
             attrs[attribute] = value
 
@@ -45,7 +45,7 @@ def append_attr(field, attr):
 
 @register.filter
 def add_class(field, css_class):
-    return append_attr(field, "class:" + css_class)
+    return append_attr(field, f"class:{css_class}")
 
 
 @register.filter
@@ -57,10 +57,10 @@ def add_error_class(field, css_class):
 
 @register.filter
 def set_data(field, data):
-    return set_attr(field, "data-" + data)
+    return set_attr(field, f"data-{data}")
 
 
 @register.filter
 def behave(field, names):
     """https://github.com/anutron/behavior support"""
-    return set_data(field, "filters:" + names)
+    return set_data(field, f"filters:{names}")

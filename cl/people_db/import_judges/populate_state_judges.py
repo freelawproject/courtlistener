@@ -39,7 +39,7 @@ def make_state_judge(item, testing=False):
         return
     if not pd.isnull(item["midname"]):
         if len(item["midname"]) == 1:
-            item["midname"] = item["midname"] + "."
+            item["midname"] = f"{item['midname']}."
 
     had_alias_result = False
     check = Person.objects.filter(
@@ -47,20 +47,17 @@ def make_state_judge(item, testing=False):
         name_last=item["lastname"],
         date_dob=date_dob,
     )
-    name = "%s: %s %s %s" % (
-        item["cl_id"],
-        item["firstname"],
-        item["lastname"],
-        date_dob,
+    name = (
+        f"{item['cl_id']}: {item['firstname']} {item['lastname']} {date_dob}"
     )
     if check.count() > 0:
-        print("Warning: %s exists." % name)
+        print(f"Warning: {name} exists.")
         person = check[0]
         if person.is_alias:
             # Grab the correct person and set our alias variable to True
             person = person.is_alias_of
     else:
-        print("Now processing: %s" % name)
+        print(f"Now processing: {name}")
 
         person = Person(
             gender=item["gender"],
@@ -83,7 +80,7 @@ def make_state_judge(item, testing=False):
 
         if not pd.isnull(item["nickname"]):
             person_alias = Person(
-                cl_id=item["cl_id"] + "-alias-1",
+                cl_id=f"{item['cl_id']}-alias-1",
                 name_first=item["nickname"],
                 name_middle=item["midname"],
                 name_last=item["lastname"],
@@ -94,9 +91,7 @@ def make_state_judge(item, testing=False):
                 person_alias.save()
 
     if "colr" in item["cl_id"]:
-        courtid = get_state_court_object(
-            item["court"] + " of " + item["state"]
-        )
+        courtid = get_state_court_object(f"{item['court']} of {item['state']}")
     else:
         courtid = get_state_court_object(item["court"])
 

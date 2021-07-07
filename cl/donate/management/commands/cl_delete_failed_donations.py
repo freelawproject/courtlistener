@@ -25,12 +25,12 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        self.stdout.write("%s\n" % "#" * 25)
+        self.stdout.write(f"{'#'}\n" * 25)
         if options["simulate"]:
             self.stdout.write("# SIMULATE MODE IS ON.  #\n")
         else:
             self.stdout.write("# SIMULATE MODE IS OFF. #\n")
-        self.stdout.write("%s\n" % "#" * 25)
+        self.stdout.write(f"{'#'}\n" * 25)
 
         # The statuses here are rather conservative and will likely need
         # updating as further failed payments trickle in.
@@ -52,7 +52,7 @@ class Command(VerboseCommand):
         }
 
         for provider, q in qs.items():
-            self.stdout.write("Processing %s:\n" % provider)
-            self.stdout.write("  Deleted %s items.\n" % q.count())
+            self.stdout.write(f"Processing {provider}:\n")
+            self.stdout.write(f"  Deleted {q.count()} items.\n")
             if not options["simulate"]:
                 q.delete()
