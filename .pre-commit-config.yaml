@@ -3,7 +3,7 @@
 exclude: migrations
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v4.0.1
     hooks:
      - id: check-added-large-files
      - id: check-ast
@@ -19,13 +19,19 @@ repos:
      - id: trailing-whitespace
        args: [--markdown-linebreak-ext=md]
 
+  - repo: https://github.com/ikamensh/flynt/
+    rev: '0.63'
+    hooks:
+     - id: flynt
+       args: [--line-length=79, --transform-concats]
+
   - repo: https://github.com/psf/black
-    rev: 20.8b1
+    rev: 21.6b0
     hooks:
      - id: black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.8.0
+    rev: 5.9.1
     hooks:
      - id: isort
        name: isort (python)

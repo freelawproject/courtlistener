@@ -100,7 +100,7 @@ nameparser = "^1.0.6"
 pylint = "^2.7.2"
 pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.10.*"
-black = {version = "^20.8b1", allow-prereleases = true}
+black = {version = "21.6b0", allow-prereleases = true}
 flake8 = "^3.9.0"
 mypy = "^0.812"
 exrex = "^0.10.5"
@@ -109,6 +109,7 @@ django-stubs = "^1.7.0"
 lxml-stubs = "^0.1.1"
 tblib = "^1.7.0"
 pre-commit = "^2.13.0"
+flynt = "^0.65"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
