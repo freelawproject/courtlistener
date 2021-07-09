@@ -93,9 +93,15 @@ def get_stripe_event(fingerprint):
     events = stripe.Event.list()
     event = None
     for obj in events.data:
-        if obj.data.object.card.fingerprint == fingerprint:
-            event = obj
-            break
+        try:
+            if obj.data.object.card.fingerprint == fingerprint:
+                event = obj
+                break
+        except AttributeError:
+            # Events don't all have the same attributes, and if we run tests in
+            # parallel, we can get different types of events here than the ones
+            # we're expecting. Instead of crashing, just try the next event.
+            pass
 
     return event
 

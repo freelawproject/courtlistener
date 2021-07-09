@@ -113,8 +113,6 @@ class DocketAlertTest(TestCase):
         Docket.objects.all().delete()
         DocketAlert.objects.all().delete()
         DocketEntry.objects.all().delete()
-        # Clear the outbox
-        mail.outbox = []
 
     def test_triggering_docket_alert(self) -> None:
         """Does the alert trigger when it should?"""
