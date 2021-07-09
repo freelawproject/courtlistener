@@ -148,10 +148,8 @@ def send_thank_you_if_needed(d: Donation, charge: StripeChargeObject) -> None:
         return
 
     payment_type = charge["metadata"]["type"]
-    if charge["metadata"].get("recurring"):
-        send_thank_you_email(d, payment_type, recurring=True)
-    else:
-        send_thank_you_email(d, payment_type)
+    recurring = charge["metadata"].get("recurring", False)
+    send_thank_you_email(d, payment_type, recurring=recurring)
 
 
 def update_donation_for_event(
