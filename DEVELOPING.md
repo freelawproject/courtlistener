@@ -239,12 +239,14 @@ Any time you're contributing to or hacking on code base, whether adding features
 In general, the easiest way to run the test suite is via Django's `test` command. In docker, that's:
 
 ```bash
-docker exec -it cl-django python /opt/courtlistener/manage.py test cl --exclude-tag selenium
+docker exec -it cl-django python /opt/courtlistener/manage.py test cl --exclude-tag selenium --keepdb
 ```
 
 The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
 
 `--exclude-tag selenium` is used to exclude selenium tests during local development. They'll be run on CI and they take awhile, so it's sort of best not to bother with them most of the time.
+
+`--keepdb` will keep your database between tests, a big speed up.
 
 We use a custom test runner to make our tests a bit faster:
 
@@ -254,7 +256,7 @@ We use a custom test runner to make our tests a bit faster:
 
  1. No matter how many databases you have configured in your settings, only one is used during tests. This makes tests faster since they don't have to mess around with transactions in databases that aren't even used.
 
- 1. `--keepdb` is on by default and if your database was not deleted because the last run crashed, it will delete it for you. Ahhh.
+ 1. When you use `--keepdb`, if your database was not deleted because the last run crashed, it will delete it for you. Ahhh.
 
  1. We use custom test classes (see below) and our runner blocks you from using other test classes.
 
