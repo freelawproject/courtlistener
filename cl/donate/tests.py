@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import Optional
 from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
@@ -294,17 +294,21 @@ class DonationIntegrationTest(TestCase):
         MonthlyDonation.objects.all().delete()
         User.objects.filter(email=self.new_email).delete()
 
-    def do_post_and_assert(self, url, target=None):
+    def do_post_and_assert(
+        self,
+        url: str,
+        target: Optional[str] = None,
+    ) -> None:
         r = self.client.post(url, data=self.params, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
         if target is not None:
             self.assertRedirects(r, target)
 
-    def assertEmailSubject(self, subject):
+    def assertEmailSubject(self, subject: str) -> None:
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, subject)
 
-    def make_stripe_token(self):
+    def make_stripe_token(self) -> None:
         stripe.api_key = settings.STRIPE_SECRET_KEY
         self.token = stripe.Token.create(
             card={
@@ -315,21 +319,21 @@ class DonationIntegrationTest(TestCase):
             }
         )
 
-    def set_stripe_params(self):
+    def set_stripe_params(self) -> None:
         self.params["payment_provider"] = PROVIDERS.CREDIT_CARD
         self.make_stripe_token()
         self.params["stripeToken"] = self.token.id
 
-    def set_new_stub_params(self):
+    def set_new_stub_params(self) -> None:
         self.params["email"] = self.new_email
 
-    def set_monthly_params(self):
+    def set_monthly_params(self) -> None:
         self.params["frequency"] = FREQUENCIES.MONTHLY
 
-    def check_monthly_donation_created(self):
+    def check_monthly_donation_created(self) -> None:
         self.assertEqual(MonthlyDonation.objects.count(), 1)
 
-    def do_stripe_callback(self):
+    def do_stripe_callback(self) -> None:
         event = get_stripe_event(self.token.card.fingerprint)
         self.client.post(
             reverse("stripe_callback"),
