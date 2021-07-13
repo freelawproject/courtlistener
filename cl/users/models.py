@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Dict
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -116,7 +117,7 @@ class UserProfile(models.Model):
     )
 
     @property
-    def total_donated_last_year(self):
+    def total_donated_last_year(self) -> Decimal:
         one_year_ago = now() - timedelta(days=365)
         total = (
             self.user.donations.filter(date_created__gte=one_year_ago)
@@ -128,7 +129,7 @@ class UserProfile(models.Model):
         return total
 
     @property
-    def total_donated(self):
+    def total_donated(self) -> Decimal:
         total = self.user.donations.exclude(
             status__in=donation_exclusion_codes
         ).aggregate(Sum("amount"))["amount__sum"]
@@ -137,7 +138,7 @@ class UserProfile(models.Model):
         return total
 
     @property
-    def is_monthly_donor(self):
+    def is_monthly_donor(self) -> bool:
         """Does the profile have any monthly donations set up and running?
 
         :return bool: True if so, False if not.
@@ -145,7 +146,7 @@ class UserProfile(models.Model):
         return bool(self.user.monthly_donations.filter(enabled=True).count())
 
     @property
-    def recent_api_usage(self):
+    def recent_api_usage(self) -> Dict[str, int]:
         """Get stats about API usage for the user for the past 14 days
 
         :return: A dict of date-count pairs indicating the amount of times the
