@@ -1,4 +1,5 @@
-from typing import Dict
+from decimal import Decimal
+from typing import Dict, Optional, Tuple
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -6,6 +7,7 @@ from django.urls import reverse
 
 from cl.donate.models import PAYMENT_TYPES, Donation, MonthlyDonation
 from cl.lib.types import EmailType
+from cl.users.models import UserProfile
 
 
 class PaymentFailureException(Exception):
@@ -205,3 +207,15 @@ def send_failed_subscription_email(m_donation: MonthlyDonation) -> None:
     send_mail(
         email["subject"], body, email["from_email"], [m_donation.donor.email]
     )
+
+
+def get_donation_totals_by_email(email: str) -> Optional[Tuple[Decimal, ...]]:
+    """Get the total donations for somebody if they've made any
+
+    :return None if no user, else the amount
+    """
+    try:
+        profile = UserProfile.objects.get(user__email=email)
+    except UserProfile.DoesNotExist:
+        return None
+    return profile.total_donated, profile.total_donated_last_year
