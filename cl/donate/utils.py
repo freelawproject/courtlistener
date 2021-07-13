@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, TypedDict
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -209,13 +209,21 @@ def send_failed_subscription_email(m_donation: MonthlyDonation) -> None:
     )
 
 
-def get_donation_totals_by_email(email: str) -> Optional[Tuple[Decimal, ...]]:
+class TotalResponseType(TypedDict):
+    total: Optional[Decimal]
+    last_year: Optional[Decimal]
+
+
+def get_donation_totals_by_email(email: str) -> TotalResponseType:
     """Get the total donations for somebody if they've made any
 
-    :return None if no user, else the amount
+    :return Dict with None for each value if no user, else the amount
     """
     try:
         profile = UserProfile.objects.get(user__email=email)
     except UserProfile.DoesNotExist:
-        return None
-    return profile.total_donated, profile.total_donated_last_year
+        return {"total": None, "last_year": None}
+    return {
+        "total": profile.total_donated,
+        "last_year": profile.total_donated_last_year,
+    }
