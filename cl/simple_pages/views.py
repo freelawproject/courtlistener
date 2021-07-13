@@ -299,8 +299,8 @@ def contact(
                 "{message}\n\n"
                 "Browser: {browser}".format(
                     browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
-                    total_donated=donation_totals[0],
-                    total_last_year=donation_totals[1],
+                    total_donated=donation_totals["total"],
+                    total_last_year=donation_totals["last_year"],
                     **cd,
                 ),
                 to=["info@free.law"],
