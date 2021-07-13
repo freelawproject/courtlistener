@@ -29,7 +29,8 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.lib.ratelimiter import ratelimiter_unsafe_1_per_m
+from cl.donate.utils import get_donation_totals_by_email
+from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.people_db.models import Person
 from cl.search.forms import SearchForm
 from cl.search.models import Court, Docket, OpinionCluster, RECAPDocument
@@ -257,7 +258,7 @@ def contribute(request: HttpRequest) -> HttpResponse:
     return render(request, "contribute.html", {"private": False})
 
 
-@ratelimiter_unsafe_1_per_m
+@ratelimiter_unsafe_3_per_m
 def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
@@ -286,15 +287,20 @@ def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
+            donation_totals = get_donation_totals_by_email(cd["email"])
             default_from = settings.DEFAULT_FROM_EMAIL
             EmailMessage(
                 subject="[CourtListener] Contact: "
                 "{phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
                 "From: {name} ({email})\n"
-                "\n\n{message}\n\n"
+                "Total donated: {total_donated}\n"
+                "Total last year: {total_last_year}\n\n\n"
+                "{message}\n\n"
                 "Browser: {browser}".format(
                     browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
+                    total_donated=donation_totals[0],
+                    total_last_year=donation_totals[1],
                     **cd,
                 ),
                 to=["info@free.law"],

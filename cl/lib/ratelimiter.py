@@ -19,14 +19,14 @@ ratelimiter_all_250_per_h = ratelimit(
 # check if we're doing a test and adjust the decorator accordingly.
 if "test" in sys.argv:
     ratelimiter_all_2_per_m = lambda func: func
-    ratelimiter_unsafe_1_per_m = lambda func: func
+    ratelimiter_unsafe_3_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
         key="header:x-real-ip", rate="2/m", block=True
     )
-    ratelimiter_unsafe_1_per_m = ratelimit(
-        key="header:x-real-ip", rate="1/m", method=UNSAFE, block=True
+    ratelimiter_unsafe_3_per_m = ratelimit(
+        key="header:x-real-ip", rate="3/m", method=UNSAFE, block=True
     )
     ratelimiter_unsafe_10_per_m = ratelimit(
         key="header:x-real-ip", rate="10/m", method=UNSAFE, block=True
