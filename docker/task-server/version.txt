@@ -1,5 +1,6 @@
-1.0.39
+1.0.40
 
+1.0.40 - Update Juriscraper
 1.0.39 - Update juriscraper
 1.0.38 - Adds nameparser
 1.0.37 - Adds precommit
