@@ -15,6 +15,7 @@ from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
+from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
@@ -211,6 +212,16 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             logger.warning(str(exc))
             abort_or_retry(self, feed_status, exc)
             return
+
+    try:
+        rss_feed.response.raise_for_status()
+    except HTTPError as exc:
+        logger.warning(
+            f"RSS feed down at '{court_pk}' "
+            f"({rss_feed.response.status_code}). {exc}"
+        )
+        abort_or_retry(self, feed_status, exc)
+        return
 
     current_build_date = get_last_build_date(content)
     if current_build_date:
