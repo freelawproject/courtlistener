@@ -125,7 +125,7 @@ def alert_on_staleness(
     # If it's really stale, don't send alerts except during hours evenly
     # divisible by six to slow down alerts.
     on_a_sixth = _now.hour % 6 == 0
-    really_stale = timedelta(minutes=60 * 60 * 24)
+    really_stale = timedelta(minutes=60 * 24)
     if (staleness > really_stale) and not on_a_sixth:
         return
 
