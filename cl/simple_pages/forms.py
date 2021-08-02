@@ -35,8 +35,8 @@ class ContactForm(forms.Form):
         message = cleaned_data.get("message", "")
         regex = re.compile(
             r"block (from)?search engines?|block pages|ccpa|de-?index|"
-            r"delete link|dmca|expunge|opt out|no ?index|remov(e|al)|"
-            r"take down request",
+            r"delete link|dmca|expunge|opt out|no ?index|stop posting|"
+            r"remov(e|al)|take down",
             re.I,
         )
         if re.search(regex, subject) and "http" not in message.lower():
