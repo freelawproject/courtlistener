@@ -291,7 +291,8 @@ class Command(VerboseCommand):
             )
 
             logger.info(
-                f"Successfully added doc {opinion.pk}: {item['case_names'].encode()}"
+                f"Successfully added opinion {opinion.pk}: "
+                f"{item['case_names'].encode()}"
             )
 
         # Update the hash if everything finishes properly.
