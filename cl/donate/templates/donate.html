@@ -36,6 +36,9 @@
       donor_info.show("fast");
       check_info.hide();
       cc_info.show();
+      //Change button title to reflect monthly contribution
+      $("#donate-button-text").html("&nbsp;Make a recurring donation to Free Law Project");
+
     });
     $("#id_frequency_1").parent("label").on("click", function () {
       $("#annual-reminder").show("fast");
@@ -47,6 +50,8 @@
       $("#how-donate label[for=id_payment_provider_0]").addClass('active');
       $("#how-donate label[for=id_payment_provider_1]").removeClass('active');
       cc_info.hide();
+      //Change button title to reflect regular one-time contribution
+      $("#donate-button-text").html("&nbsp;Donate to Free Law Project");
     });
 
 
@@ -195,7 +200,7 @@
 <button type="submit"
         class="btn btn-primary btn-lg"
         name="donate"
-        id="donate-button"><i class="fa fa-heart"></i>&nbsp;Donate to Free Law Project
+        id="donate-button"><i class="fa fa-heart"></i><span id="donate-button-text">&nbsp;Donate to Free Law Project</span>
 </button>
 {% endblock %}
 
