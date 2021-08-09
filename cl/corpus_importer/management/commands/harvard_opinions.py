@@ -6,7 +6,7 @@ import itertools
 import json
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from glob import glob
 from typing import List, Dict, Optional, Any
 
@@ -547,7 +547,7 @@ def match_based_text(
 
 def find_previously_imported_cases(
     court_id: str,
-    date_filed: datetime.date,
+    date_filed: Optional[date],
     case_body: str,
     docket_number: str,
 ) -> Optional[OpinionCluster]:
