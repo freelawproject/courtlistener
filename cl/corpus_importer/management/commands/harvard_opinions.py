@@ -6,9 +6,9 @@ import itertools
 import json
 import os
 import re
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from glob import glob
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from bs4 import BeautifulSoup
 from django.conf import settings
