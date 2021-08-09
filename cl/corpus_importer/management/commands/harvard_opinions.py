@@ -13,7 +13,7 @@ from typing import List, Dict, Optional, Any
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
-from django.db.utils import OperationalError, IntegrityError
+from django.db.utils import OperationalError
 from eyecite.find_citations import get_citations
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
