@@ -8,7 +8,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, TypedDict
 
 from bs4 import BeautifulSoup
 from django.conf import settings
@@ -202,7 +202,14 @@ def parse_extra_fields(soup, fields, long_field=False):
     return data_set
 
 
-def parse_harvard_opinions(options: Dict[str, Any]) -> None:
+class OptionsType(TypedDict):
+    reporter: str
+    volume: str
+    court_id: str
+    make_searchable: bool
+
+
+def parse_harvard_opinions(options: OptionsType) -> None:
     """Parse Harvard Opinions
 
     Parse downloaded CaseLaw Corpus from internet archive and add them to our
@@ -222,8 +229,8 @@ def parse_harvard_opinions(options: Dict[str, Any]) -> None:
 
     reporter = options["reporter"]
     volume = options["volume"]
-    make_searchable = options["make_searchable"]
     court_id = options["court_id"]
+    make_searchable = options["make_searchable"]
 
     if not reporter and volume:
         logger.error("You provided a volume but no reporter. Exiting.")
