@@ -528,7 +528,12 @@ class HarvardTests(TestCase):
     def assertSuccessfulParse(self, expected_count_diff):
         pre_install_count = OpinionCluster.objects.all().count()
         parse_harvard_opinions(
-            reporter=None, volume=None, make_searchable=False
+            {
+                "reporter": None,
+                "volume": None,
+                "make_searchable": False,
+                "court_id": None,
+            }
         )
         post_install_count = OpinionCluster.objects.all().count()
         self.assertEqual(
@@ -574,7 +579,7 @@ class HarvardTests(TestCase):
         # Test some docket attributes
         docket = cite.cluster.docket
 
-        expected_docket_number = "105739"
+        expected_docket_number = "Docket No. 105739"
         self.assertEqual(docket.docket_number, expected_docket_number)
 
     @patch(
