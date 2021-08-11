@@ -601,7 +601,7 @@ def match_based_text(
             if not overlaps:
                 # Require a name overlap for good but not great matches.
                 continue
-        elif percent_match < 99 and len(harvard_characters) < 500:
+        elif percent_match < 98 and len(harvard_characters) < 500:
             """Require a very close match - with name overlap and
             docket number for very small cases."""
             if percent_match < 90:
