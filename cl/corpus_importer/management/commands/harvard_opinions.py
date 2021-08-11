@@ -314,7 +314,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             citation,
             court_id,
             file_path,
-            make_searchable
+            make_searchable,
         )
 
 
@@ -329,7 +329,7 @@ def add_new_case(
     citation: Citation,
     court_id: str,
     file_path: str,
-    make_searchable: bool
+    make_searchable: bool,
 ):
     """Add new case to Courtlistener.com
 
