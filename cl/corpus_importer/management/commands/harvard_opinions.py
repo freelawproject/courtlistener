@@ -328,7 +328,7 @@ def add_new_case(
     date_filed: date,
     is_approximate: bool,
     citation: Citation,
-    court_id: str,
+    court_id: Optional[str],
     file_path: str,
     make_searchable: bool,
 ) -> None:
@@ -623,7 +623,7 @@ def match_based_text(
 
 
 def find_previously_imported_cases(
-    court_id: str,
+    court_id: Optional[str],
     date_filed: date,
     case_body: str,
     docket_number: str,
