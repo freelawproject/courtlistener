@@ -737,7 +737,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     """
 
     start, stop, count = 0, 0, 0
-    matched_substring = None
+    matched_substring = ''
     found_overlaps = []
     while stop < len(harvard_characters):
         stop += 1
@@ -745,13 +745,14 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         if harvard_substring in cl_characters:
             matched_substring = harvard_substring
         else:
-            if len(harvard_substring) > 10:
+            if len(matched_substring) > 10:
                 subset = make_subset_range(cl_characters, matched_substring)
                 found_overlaps.append(subset)
+            matched_substring = ''
             start = stop - 1
-
-    subset = make_subset_range(cl_characters, matched_substring)
-    found_overlaps.append(subset)
+    if len(matched_substring) > 10:
+        subset = make_subset_range(cl_characters, matched_substring)
+        found_overlaps.append(subset)
 
     # If we checked our subsets as we parsed- we wouldnt need to do this
     # filtering here. This is a good candiate for refactoring.
