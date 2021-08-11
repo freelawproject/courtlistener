@@ -578,9 +578,9 @@ def clean_body_content(case_body: str) -> str:
 
 def match_based_text(
     case_body: str,
-    possible_cases: List,
     docket_number: str,
     case_name_full: str,
+    possible_cases: List,
 ) -> Optional[OpinionCluster]:
     """Compare CL text to Harvard content to establish duplicates
 
@@ -643,7 +643,7 @@ def find_previously_imported_cases(
     ).order_by("id")
 
     match = match_based_text(
-        case_body, possible_cases, docket_number, case_name_full
+        case_body, docket_number, case_name_full, possible_cases
     )
     if not match:
         month = timedelta(days=31)
@@ -655,7 +655,7 @@ def find_previously_imported_cases(
             case for case in broad_search if case.date_filed != date_filed
         ]
         match = match_based_text(
-            case_body, possible_cases, docket_number, case_name_full
+            case_body, docket_number, case_name_full, possible_cases
         )
     return match
 
@@ -673,12 +673,8 @@ def overlap_case_names(cl_case_name: str, harvard_case_name: str) -> List[str]:
     """
     cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
     harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
-    cl_case_name_list = (
-        cl_case_name.lower().split()
-    )
-    harvard_case_name_list = (
-        harvard_case_name.strip().lower().split()
-    )
+    cl_case_name_list = cl_case_name.lower().split()
+    harvard_case_name_list = harvard_case_name.strip().lower().split()
 
     overlaps = list(
         set(cl_case_name_list).intersection(harvard_case_name_list)
