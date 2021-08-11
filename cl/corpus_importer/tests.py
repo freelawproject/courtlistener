@@ -13,6 +13,8 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
+    clean_body_content,
+    compare_documents,
     parse_harvard_opinions,
     validate_dt,
 )
@@ -697,3 +699,20 @@ class HarvardTests(TestCase):
             dt_obj = datetime.strptime(test["a"], "%Y-%m-%d").date()
             self.assertEqual(dt_obj, got[0])
             print("Success ✓")
+
+    def test_short_opinion_matching(self) -> None:
+        """Can we match opinions successfully when very small"""
+        aspby_case_body = '<casebody firstpage="1007" lastpage="1007" xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n  <parties id="b985-7">State, Respondent, v. Aspby, Petitioner,</parties>\n  <docketnumber id="Apx">No. 73722-3.</docketnumber>\n  <opinion type="majority">\n    <p id="AJ6">Petition for review of a decision of the Court of Appeals, No. 48369-2-1, September 19, 2002. <em>Denied </em>September 30, 2003.</p>\n  </opinion>\n</casebody>\n'
+
+        matching_cl_case = "Petition for review of a decision of the Court of Appeals, No. 48369-2-1, September 19, 2002. Denied September 30, 2003."
+        nonmatch_cl_case = "Petition for review of a decision of the Court of Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
+
+        harvard_characters = clean_body_content(aspby_case_body)
+        good_characters = clean_body_content(matching_cl_case)
+        bad_characters = clean_body_content(nonmatch_cl_case)
+
+        good_match = compare_documents(harvard_characters, good_characters)
+        self.assertEqual(good_match, 98)
+
+        bad_match = compare_documents(harvard_characters, bad_characters)
+        self.assertEqual(bad_match, 52)
