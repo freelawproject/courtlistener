@@ -646,7 +646,7 @@ def find_previously_imported_cases(
                 citations__reporter=found_cite[0].reporter,
                 citations__volume=found_cite[0].volume,
                 citations__page=found_cite[0].page,
-            )
+            ).order_by("id")
             match = match_based_text(
                 case_body,
                 data["docket_number"],
