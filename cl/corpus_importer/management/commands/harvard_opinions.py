@@ -588,7 +588,8 @@ def match_based_text(
     for case in possible_cases:
         cl_case_body = get_opinion_content(case)
         cl_characters = clean_body_content(cl_case_body)
-        if 0.3 > len(harvard_characters) / len(cl_characters) > 3:
+        diff = len(harvard_characters) / len(cl_characters)
+        if diff < 0.3 or diff > 3:
             # Content too dissimilar in length to compare
             continue
 
