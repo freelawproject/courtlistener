@@ -712,7 +712,7 @@ class HarvardTests(TestCase):
         bad_characters = clean_body_content(nonmatch_cl_case)
 
         good_match = compare_documents(harvard_characters, good_characters)
-        self.assertEqual(good_match, 98)
+        self.assertEqual(good_match, 100)
 
         bad_match = compare_documents(harvard_characters, bad_characters)
-        self.assertEqual(bad_match, 52)
+        self.assertEqual(bad_match, 80)
