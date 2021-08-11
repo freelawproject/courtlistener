@@ -745,7 +745,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     return percent_match
 
 
-def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
+def make_subset_range(cl_characters: Optional[str], max_string: Optional[str]) -> List[int]:
     """Find indices for matching max_string in CL opinion
 
     :param cl_characters: The stripped down CL characters
