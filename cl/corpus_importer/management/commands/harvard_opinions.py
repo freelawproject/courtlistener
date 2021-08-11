@@ -328,7 +328,7 @@ def add_new_case(
     date_filed: date,
     is_approximate: bool,
     citation: Citation,
-    court_id: str,
+    court_id: Optional[str],
     file_path: str,
     make_searchable: bool,
 ) -> None:
@@ -623,7 +623,7 @@ def match_based_text(
 
 
 def find_previously_imported_cases(
-    court_id: str,
+    court_id: Optional[str],
     date_filed: date,
     case_body: str,
     docket_number: str,
@@ -745,7 +745,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     return percent_match
 
 
-def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
+def make_subset_range(cl_characters: Optional[str], max_string: Optional[str]) -> List[int]:
     """Find indices for matching max_string in CL opinion
 
     :param cl_characters: The stripped down CL characters
