@@ -674,10 +674,10 @@ def overlap_case_names(cl_case_name: str, harvard_case_name: str) -> List[str]:
     cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
     harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
     cl_case_name_list = (
-        cl_case_name.replace("  ", " ").strip().lower().split(" ")
+        cl_case_name.lower().split()
     )
     harvard_case_name_list = (
-        harvard_case_name.replace("  ", " ").strip().lower().split(" ")
+        harvard_case_name.strip().lower().split()
     )
 
     overlaps = list(
