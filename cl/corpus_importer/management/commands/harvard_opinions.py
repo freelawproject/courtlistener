@@ -205,7 +205,7 @@ def parse_extra_fields(soup, fields, long_field=False):
 class OptionsType(TypedDict):
     reporter: str
     volume: str
-    court_id: str
+    court_id: Optional[str]
     make_searchable: bool
 
 
@@ -275,15 +275,15 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         # TODO: Generalize this to handle all court types somehow.
         if not options["court_id"]:
-            # Sometimes courts can't match just one court
-            # This is used to alleviate certain circumstances
+            # Sometimes the court string doesn't match just one court
+            # This is used to alleviate certain circumstances.
             court_id = match_court_string(
                 data["court"]["name"],
                 state=True,
                 federal_appeals=True,
                 federal_district=True,
             )
-        # Handle partial dates by adding -01v to YYYY-MM dates
+        # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         case_body = data["casebody"]["data"]
 
@@ -295,7 +295,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             case_name_full,
         )
         if previously_imported_case:
-            # Simply add citations to our matched case for now.
+            # Simply add citations to our matched case for now. Later, we'll
+            # upgrade this to do a full merge.
             with transaction.atomic():
                 add_citations(
                     data["citations"], cluster_id=previously_imported_case.id
@@ -330,11 +331,11 @@ def add_new_case(
     court_id: str,
     file_path: str,
     make_searchable: bool,
-):
+) -> None:
     """Add new case to Courtlistener.com
 
     :param data: The Harvard data JSON object
-    :param case_body: the Harvard Case body
+    :param case_body: The Harvard Case body
     :param case_name: The case name
     :param case_name_full: The full case name
     :param case_name_short: The case name abbreviation
@@ -459,8 +460,13 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
             continue
 
         # Because of non-canonical reporters this code breaks for states like
-        # Washington.  This is a temporary solution.
-        # This should be looked at in future updates to fix this 'hack'
+        # Washington, where there are reporter abbreviations like "wash", that
+        # refer to more than one reporter series. The fix here is to eventually
+        # look up the abbreviation in e reporters DB and see if the cite_type
+        # varies across the reporter series it refers to. If so, we have a hard
+        # problem -- maybe unsolveable -- if not, we can just use the value we
+        # get. In the case of Wash., it refers to two reporter series, both of
+        # which are of type "state", so it's easy.
         if not citation[0].canonical_reporter:
             reporter_type = Citation.STATE
         else:
@@ -597,13 +603,13 @@ def match_based_text(
         if percent_match < 45:
             continue
         if percent_match < 75 and len(harvard_characters) > 500:
+            # Require a name overlap for good but not great matches.
             overlaps = overlap_case_names(case.case_name, case_name_full)
             if not overlaps:
-                # Require a name overlap for good but not great matches.
                 continue
         elif percent_match < 98 and len(harvard_characters) < 500:
-            """Require a very close match - with name overlap and
-            docket number for very small cases."""
+            # Require a very close match - with name overlap and
+            # docket number for very small cases.
             if percent_match < 90:
                 continue
             overlaps = overlap_case_names(case.case_name, case_name_full)
@@ -626,8 +632,8 @@ def find_previously_imported_cases(
     """Check if opinion is in Courtlistener
 
     :param court_id: Court ID
-    :param date-filed: The date filed
-    :param case_body: Date of opinion
+    :param date_filed: The date filed
+    :param case_body: Harvard XML of the opinion
     :param docket_number: The docket number
     :return: The matching opinion cluster in CL or None
     """
@@ -635,12 +641,12 @@ def find_previously_imported_cases(
         date_filed=date_filed,
         docket__court_id=court_id,
     ).order_by("id")
-    month = timedelta(days=31)
 
     match = match_based_text(
         case_body, possible_cases, docket_number, case_name_full
     )
     if not match:
+        month = timedelta(days=31)
         broad_search = OpinionCluster.objects.filter(
             date_filed__range=[date_filed - month, date_filed + month],
             docket__court_id=court_id,
