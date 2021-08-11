@@ -288,10 +288,10 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         case_body = data["casebody"]["data"]
 
         previously_imported_case = find_previously_imported_cases(
+            data,
             court_id,
             date_filed,
             case_body,
-            data["docket_number"],
             case_name_full,
         )
         if previously_imported_case:
@@ -623,10 +623,10 @@ def match_based_text(
 
 
 def find_previously_imported_cases(
+    data: Dict[str, Any],
     court_id: Optional[str],
     date_filed: date,
     case_body: str,
-    docket_number: str,
     case_name_full: str,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
@@ -637,11 +637,30 @@ def find_previously_imported_cases(
     :param docket_number: The docket number
     :return: The matching opinion cluster in CL or None
     """
+
+    # Match against known citations.
+    for cite in data["citations"]:
+        found_cite = get_citations(cite["cite"])
+        if found_cite:
+            possible_cases = OpinionCluster.objects.filter(
+                citations__reporter=found_cite[0].reporter,
+                citations__volume=found_cite[0].volume,
+                citations__page=found_cite[0].page,
+            )
+            match = match_based_text(
+                case_body,
+                data["docket_number"],
+                case_name_full,
+                possible_cases,
+            )
+            return match
+
     possible_cases = OpinionCluster.objects.filter(
         date_filed=date_filed,
         docket__court_id=court_id,
     ).order_by("id")
 
+    docket_number = data["docket_number"]
     match = match_based_text(
         case_body, docket_number, case_name_full, possible_cases
     )
@@ -745,7 +764,9 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     return percent_match
 
 
-def make_subset_range(cl_characters: Optional[str], max_string: Optional[str]) -> List[int]:
+def make_subset_range(
+    cl_characters: Optional[str], max_string: Optional[str]
+) -> List[int]:
     """Find indices for matching max_string in CL opinion
 
     :param cl_characters: The stripped down CL characters
