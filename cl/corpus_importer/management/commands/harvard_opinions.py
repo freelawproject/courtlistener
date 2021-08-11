@@ -8,7 +8,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 from bs4 import BeautifulSoup
 from django.conf import settings
@@ -295,6 +295,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             case_name_full,
         )
         if previously_imported_case:
+            # Simply add citations to our matched case for now.
             with transaction.atomic():
                 add_citations(
                     data["citations"], cluster_id=previously_imported_case.id
@@ -439,20 +440,27 @@ def add_new_case(
     logger.info("Finished: %s", citation.base_citation())
 
 
-def add_citations(cites: List, cluster_id: int) -> None:
+class CitationType(TypedDict):
+    cite: str
+    type: str
+
+
+def add_citations(cites: List[CitationType], cluster_id: int) -> None:
     """Add citations to OpinionClusters
 
     :param cites: Harvard Citation data
     :param cluster_id: Cluster of found opinion in DB
-    :return:
+    :return: None
     """
     for cite in cites:
         citation = get_citations(cite["cite"])
         if not citation:
+            logger.warning(f"Citation parsing failed for {cite['cite']}")
             continue
 
         # Because of non-canonical reporters this code breaks for states like
         # Washington.  This is a temporary solution.
+        # This should be looked at in future updates to fix this 'hack'
         if not citation[0].canonical_reporter:
             reporter_type = Citation.STATE
         else:
@@ -474,7 +482,7 @@ def add_opinions(
 ) -> List[int]:
     """Add opinions to Cluster
 
-    :param soup: The bs4 representaion of the case data xml
+    :param soup: The bs4 representation of the case data xml
     :param cluster_id: The cluster ID
     :param citation: Citation object
     :return: Opinion IDs in a list
@@ -553,7 +561,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 
 def clean_body_content(case_body: str) -> str:
-    """Strip all non alphanumeric characters
+    """Strip all non-alphanumeric characters
 
     :param case_body: Opinion text
     :return:Opinion text with only alphanumeric characters
