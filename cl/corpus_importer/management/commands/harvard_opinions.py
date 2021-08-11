@@ -737,7 +737,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     """
 
     start, stop, count = 0, 0, 0
-    matched_substring = ''
+    matched_substring = ""
     found_overlaps = []
     while stop < len(harvard_characters):
         stop += 1
@@ -748,7 +748,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
             if len(matched_substring) > 10:
                 subset = make_subset_range(cl_characters, matched_substring)
                 found_overlaps.append(subset)
-            matched_substring = ''
+            matched_substring = ""
             start = stop - 1
     if len(matched_substring) > 10:
         subset = make_subset_range(cl_characters, matched_substring)
@@ -765,9 +765,7 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     return percent_match
 
 
-def make_subset_range(
-    cl_characters: str, max_string: str
-) -> List[int]:
+def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
     """Find indices for matching max_string in CL opinion
 
     :param cl_characters: The stripped down CL characters
