@@ -8,7 +8,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, TypedDict
 
 from bs4 import BeautifulSoup
 from django.conf import settings
@@ -667,12 +667,16 @@ def overlap_case_names(cl_case_name: str, harvard_case_name: str) -> List[str]:
     """
     cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
     harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
-    cl_case_name = cl_case_name.replace("  ", " ").strip().lower().split(" ")
-    harvard_case_name = (
+    cl_case_name_list = (
+        cl_case_name.replace("  ", " ").strip().lower().split(" ")
+    )
+    harvard_case_name_list = (
         harvard_case_name.replace("  ", " ").strip().lower().split(" ")
     )
 
-    overlaps = list(set(cl_case_name).intersection(harvard_case_name))
+    overlaps = list(
+        set(cl_case_name_list).intersection(harvard_case_name_list)
+    )
     false_positive_list = [
         "et",
         "al",
@@ -780,7 +784,7 @@ def is_subset(match: List[int], other_match: List[int]) -> bool:
         return True
 
 
-def filter_subsets(lists: List[List[int]]) -> List[List[int]]:
+def filter_subsets(lists: List[List[int]]) -> Iterator[List[int]]:
     """Filter subsets from matches
 
     Given list of lists, return new list of lists without subsets
