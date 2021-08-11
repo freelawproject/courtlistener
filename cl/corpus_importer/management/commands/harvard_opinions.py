@@ -297,102 +297,142 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 )
             continue
 
-        soup = BeautifulSoup(case_body, "lxml")
-
-        # Some documents contain images in the HTML
-        # Flag them for a later crawl by using the placeholder '[[Image]]'
-        judge_list = [
-            extract_judge_last_name(x.text) for x in soup.find_all("judges")
-        ]
-        author_list = [
-            extract_judge_last_name(x.text) for x in soup.find_all("author")
-        ]
-        # Flatten and dedupe list of judges
-        judges = ", ".join(
-            sorted(
-                list(
-                    set(
-                        itertools.chain.from_iterable(judge_list + author_list)
-                    )
-                )
-            )
+        # This case appears new to CL - lets add it.
+        add_new_case(
+            data,
+            case_body,
+            case_name,
+            case_name_full,
+            case_name_short,
+            date_filed,
+            is_approximate,
+            citation,
+            court_id,
+            file_path,
+            make_searchable
         )
-        judges = titlecase(judges)
-        docket_string = data["docket_number"].strip()
 
-        short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
 
-        long_fields = [
-            "syllabus",
-            "summary",
-            "history",
-            "headnotes",
-            "correction",
-        ]
+def add_new_case(
+    data: Dict[str, Any],
+    case_body: str,
+    case_name: str,
+    case_name_full: str,
+    case_name_short: str,
+    date_filed: date,
+    is_approximate: bool,
+    citation: Citation,
+    court_id: str,
+    file_path: str,
+    make_searchable: bool
+):
+    """Add new case to Courtlistener.com
 
-        short_data = parse_extra_fields(soup, short_fields, False)
-        long_data = parse_extra_fields(soup, long_fields, True)
+    :param data: The Harvard data JSON object
+    :param case_body: the Harvard Case body
+    :param case_name: The case name
+    :param case_name_full: The full case name
+    :param case_name_short: The case name abbreviation
+    :param date_filed: The date the case was filed
+    :param is_approximate: Is the case date filed approximate
+    :param citation: The citation we use in logging and first citation parsed
+    :param court_id: The CL Court ID
+    :param file_path: The path to the Harvard JSON
+    :param make_searchable: Should we add this case to SOLR
+    :return: None
+    """
+    soup = BeautifulSoup(case_body, "lxml")
 
-        with transaction.atomic():
-            logger.info(
-                f"Adding docket for {case_name}: {citation.base_citation()}"
-            )
-            docket = Docket(
-                case_name=case_name,
-                case_name_short=case_name_short,
-                case_name_full=case_name_full,
-                docket_number=docket_string,
-                court_id=court_id,
-                source=Docket.HARVARD,
-                ia_needs_upload=False,
-            )
-            try:
-                with transaction.atomic():
-                    docket.save()
-            except OperationalError as e:
-                if "exceeds maximum" in str(e):
-                    docket.docket_number = (
-                        "%s, See Corrections for full Docket Number"
-                        % trunc(docket_string, length=5000, ellipsis="...")
-                    )
-                    docket.save()
-                    long_data["correction"] = "%s <br> %s" % (
-                        data["docket_number"],
-                        long_data["correction"],
-                    )
+    # Some documents contain images in the HTML
+    # Flag them for a later crawl by using the placeholder '[[Image]]'
+    judge_list = [
+        extract_judge_last_name(x.text) for x in soup.find_all("judges")
+    ]
+    author_list = [
+        extract_judge_last_name(x.text) for x in soup.find_all("author")
+    ]
+    # Flatten and dedupe list of judges
+    judges = ", ".join(
+        sorted(
+            list(set(itertools.chain.from_iterable(judge_list + author_list)))
+        )
+    )
+    judges = titlecase(judges)
+    docket_string = data["docket_number"].strip()
 
-            logger.info("Adding cluster for: %s", citation.base_citation())
-            cluster = OpinionCluster(
-                case_name=case_name,
-                case_name_short=case_name_short,
-                case_name_full=case_name_full,
-                precedential_status="Published",
-                docket_id=docket.id,
-                source="U",
-                date_filed=date_filed,
-                date_filed_is_approximate=is_approximate,
-                attorneys=short_data["attorneys"],
-                disposition=short_data["disposition"],
-                syllabus=long_data["syllabus"],
-                summary=long_data["summary"],
-                history=long_data["history"],
-                other_dates=short_data["otherdate"],
-                cross_reference=short_data["seealso"],
-                headnotes=long_data["headnotes"],
-                correction=long_data["correction"],
-                judges=judges,
-                filepath_json_harvard=file_path,
-            )
-            cluster.save(index=False)
+    short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
 
-            logger.info("Adding citation for: %s", citation.base_citation())
-            add_citations(data["citations"], cluster.id)
-            new_op_pks = add_opinions(soup, cluster.id, citation)
+    long_fields = [
+        "syllabus",
+        "summary",
+        "history",
+        "headnotes",
+        "correction",
+    ]
 
-        if make_searchable:
-            add_items_to_solr.delay(new_op_pks, "search.Opinion")
+    short_data = parse_extra_fields(soup, short_fields, False)
+    long_data = parse_extra_fields(soup, long_fields, True)
 
-        logger.info("Finished: %s", citation.base_citation())
+    with transaction.atomic():
+        logger.info(
+            f"Adding docket for {case_name}: {citation.base_citation()}"
+        )
+        docket = Docket(
+            case_name=case_name,
+            case_name_short=case_name_short,
+            case_name_full=case_name_full,
+            docket_number=docket_string,
+            court_id=court_id,
+            source=Docket.HARVARD,
+            ia_needs_upload=False,
+        )
+        try:
+            with transaction.atomic():
+                docket.save()
+        except OperationalError as e:
+            if "exceeds maximum" in str(e):
+                docket.docket_number = (
+                    "%s, See Corrections for full Docket Number"
+                    % trunc(docket_string, length=5000, ellipsis="...")
+                )
+                docket.save()
+                long_data["correction"] = "%s <br> %s" % (
+                    data["docket_number"],
+                    long_data["correction"],
+                )
+
+        logger.info("Adding cluster for: %s", citation.base_citation())
+        cluster = OpinionCluster(
+            case_name=case_name,
+            case_name_short=case_name_short,
+            case_name_full=case_name_full,
+            precedential_status="Published",
+            docket_id=docket.id,
+            source="U",
+            date_filed=date_filed,
+            date_filed_is_approximate=is_approximate,
+            attorneys=short_data["attorneys"],
+            disposition=short_data["disposition"],
+            syllabus=long_data["syllabus"],
+            summary=long_data["summary"],
+            history=long_data["history"],
+            other_dates=short_data["otherdate"],
+            cross_reference=short_data["seealso"],
+            headnotes=long_data["headnotes"],
+            correction=long_data["correction"],
+            judges=judges,
+            filepath_json_harvard=file_path,
+        )
+        cluster.save(index=False)
+
+        logger.info("Adding citation for: %s", citation.base_citation())
+        add_citations(data["citations"], cluster.id)
+        new_op_pks = add_opinions(soup, cluster.id, citation)
+
+    if make_searchable:
+        add_items_to_solr.delay(new_op_pks, "search.Opinion")
+
+    logger.info("Finished: %s", citation.base_citation())
 
 
 def add_citations(cites: List, cluster_id: int) -> None:
