@@ -718,44 +718,24 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     """
 
     start, stop, count = 0, 0, 0
-    max_string = ""
-    hit = False
+    matched_substring = None
     found_overlaps = []
-    while start < len(harvard_characters):
-        if start > len(harvard_characters) or stop > len(harvard_characters):
-            break
+    while stop < len(harvard_characters):
         stop += 1
-        if harvard_characters[start:stop] in cl_characters:
-            if len(harvard_characters) - start < len(max_string):
-                break
-            max_string = harvard_characters[start:stop]
-            hit = True
+        harvard_substring = harvard_characters[start:stop]
+        if harvard_substring in cl_characters:
+            matched_substring = harvard_substring
         else:
-            if hit == True:
-                # Only count strings 10 characters or longer
-                if len(max_string) > 10:
-                    found_overlaps.append(
-                        list(
-                            range(
-                                cl_characters.find(max_string),
-                                cl_characters.find(max_string)
-                                + (stop - start),
-                            )
-                        )
-                    )
-                hit = False
-            start = stop + 1
-            stop = start + 1
+            if len(harvard_substring) > 10:
+                subset = make_subset_range(cl_characters, matched_substring)
+                found_overlaps.append(subset)
+            start = stop - 1
 
-    if len(max_string) > 10:
-        found_overlaps.append(
-            list(
-                range(
-                    cl_characters.find(max_string),
-                    cl_characters.find(max_string) + (stop - start),
-                )
-            )
-        )
+    subset = make_subset_range(cl_characters, matched_substring)
+    found_overlaps.append(subset)
+
+    # If we checked our subsets as we parsed- we wouldnt need to do this
+    # filtering here. This is a good candiate for refactoring.
     filtered_subset = list(filter_subsets(found_overlaps))
     for overlap in filtered_subset:
         count += len(overlap)
@@ -763,6 +743,18 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         100 * (count / min([len(harvard_characters), len(cl_characters)]))
     )
     return percent_match
+
+
+def make_subset_range(cl_characters: str, max_string: str) -> List[int]:
+    """Find indices for matching max_string in CL opinion
+
+    :param cl_characters: The stripped down CL characters
+    :param max_string: The current largest identified substring
+    :return: Range of indicies of match to CL as list
+    """
+    string_index_start = cl_characters.find(max_string)
+    string_index_end = string_index_start + len(max_string)
+    return list(range(string_index_start, string_index_end))
 
 
 def is_subset(match: List[int], other_match: List[int]) -> bool:
