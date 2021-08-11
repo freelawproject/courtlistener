@@ -288,7 +288,11 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         case_body = data["casebody"]["data"]
 
         previously_imported_case = find_previously_imported_cases(
-            court_id, date_filed, case_body, data["docket_number"]
+            court_id,
+            date_filed,
+            case_body,
+            data["docket_number"],
+            case_name_full,
         )
         if previously_imported_case:
             with transaction.atomic():
@@ -555,35 +559,45 @@ def clean_body_content(case_body: str) -> str:
     :return:Opinion text with only alphanumeric characters
     """
     soup = BeautifulSoup(case_body, "lxml")
-    return re.sub(r"[^[a-zA-Z]", "", soup.text)
+    return re.sub(r"[^a-zA-Z0-9]", "", soup.text)
 
 
 def match_based_text(
-    case_body: str, possible_cases: List, docket_number: str
+    case_body: str,
+    possible_cases: List,
+    docket_number: str,
+    case_name_full: str,
 ) -> Optional[OpinionCluster]:
     """Compare CL text to Harvard content to establish duplicates
 
     :param case_body: Harvard case body to compare
     :param possible_cases: List of opinions to check against
     :param docket_number: The docket number
+    :param case_name_full: The full case name
     :return: OpinionCluster or None
     """
     harvard_characters = clean_body_content(case_body)
     for case in possible_cases:
         cl_case_body = get_opinion_content(case)
         cl_characters = clean_body_content(cl_case_body)
-        if (
-            len(harvard_characters) / len(cl_characters) < 0.3
-            or len(harvard_characters) / len(cl_characters) > 3
-        ):
+        if 0.3 > len(harvard_characters) / len(cl_characters) > 3:
             # Content too dissimilar in length to compare
             continue
 
         percent_match = compare_documents(harvard_characters, cl_characters)
         if percent_match < 45:
             continue
-        if len(harvard_characters) < 500:
-            if not percent_match in range(98, 102):
+        if percent_match < 75 and len(harvard_characters) > 500:
+            overlaps = overlap_case_names(case.case_name, case_name_full)
+            if not overlaps:
+                # Require a name overlap for good but not great matches.
+                continue
+        elif percent_match < 99 and len(harvard_characters) < 500:
+            """Require a very close match - with name overlap and docket number
+            for very small cases.
+            """
+            overlaps = overlap_case_names(case.case_name, case_name_full)
+            if not overlaps:
                 continue
             clean_docket = clean_docket_number(docket_number)
             if clean_docket not in case.docket.docket_number:
@@ -597,6 +611,7 @@ def find_previously_imported_cases(
     date_filed: date,
     case_body: str,
     docket_number: str,
+    case_name_full: str,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
 
@@ -604,25 +619,75 @@ def find_previously_imported_cases(
     :param date-filed: The date filed
     :param case_body: Date of opinion
     :param docket_number: The docket number
-    :return:
+    :return: The matching opinion cluster in CL or None
     """
     possible_cases = OpinionCluster.objects.filter(
         date_filed=date_filed,
         docket__court_id=court_id,
     ).order_by("id")
     month = timedelta(days=31)
-    broad_search = OpinionCluster.objects.filter(
-        date_filed__range=[date_filed - month, date_filed + month],
-        docket__court_id=court_id,
-    ).order_by("id")
 
-    match = match_based_text(case_body, possible_cases, docket_number)
+    match = match_based_text(
+        case_body, possible_cases, docket_number, case_name_full
+    )
     if not match:
+        broad_search = OpinionCluster.objects.filter(
+            date_filed__range=[date_filed - month, date_filed + month],
+            docket__court_id=court_id,
+        ).order_by("id")
         possible_cases = [
             case for case in broad_search if case.date_filed != date_filed
         ]
-        match = match_based_text(case_body, possible_cases, docket_number)
+        match = match_based_text(
+            case_body, possible_cases, docket_number, case_name_full
+        )
     return match
+
+
+def overlap_case_names(cl_case_name: str, harvard_case_name: str) -> List[str]:
+    """Find overlapping case names - excluding certain words.
+
+    Convert each string to a list - stripped of punctuation and compares for
+    overlapping case title words.  After which we remove superflous words that
+    create false positives
+
+    :param cl_case_name: The CL case name
+    :param harvard_case_name: The Harvard case name full
+    :return: List of overlapping case names
+    """
+    cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
+    harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
+    cl_case_name = cl_case_name.replace("  ", " ").strip().lower().split(" ")
+    harvard_case_name = (
+        harvard_case_name.replace("  ", " ").strip().lower().split(" ")
+    )
+
+    overlaps = list(set(cl_case_name).intersection(harvard_case_name))
+    false_positive_list = [
+        "et",
+        "al",
+        "respondent",
+        "respondents",
+        "appellant",
+        "and",
+        "personal",
+        "restraint",
+        "matter",
+        "washington",
+        "city",
+        "appellants",
+        "of",
+        "the",
+        "state",
+        "estate",
+        "in",
+        "inc",
+    ]
+    return [
+        word
+        for word in overlaps
+        if len(word) > 1 and word not in false_positive_list
+    ]
 
 
 def compare_documents(harvard_characters: str, cl_characters: str) -> int:
@@ -639,36 +704,88 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
     start, stop, count = 0, 0, 0
     max_string = ""
     hit = False
+    found_overlaps = []
     while start < len(harvard_characters):
         if start > len(harvard_characters) or stop > len(harvard_characters):
             break
         stop += 1
         if harvard_characters[start:stop] in cl_characters:
             if len(harvard_characters) - start < len(max_string):
-                percent_match = int(
-                    100
-                    * (
-                        count
-                        / min([len(harvard_characters), len(cl_characters)])
-                    )
-                )
-                return percent_match
+                break
             max_string = harvard_characters[start:stop]
             hit = True
         else:
             if hit == True:
                 # Only count strings 10 characters or longer
                 if len(max_string) > 10:
-                    count += len(max_string)
+                    found_overlaps.append(
+                        list(
+                            range(
+                                cl_characters.find(max_string),
+                                cl_characters.find(max_string)
+                                + (stop - start),
+                            )
+                        )
+                    )
                 hit = False
             start = stop + 1
             stop = start + 1
+
     if len(max_string) > 10:
-        count += len(max_string)
+        found_overlaps.append(
+            list(
+                range(
+                    cl_characters.find(max_string),
+                    cl_characters.find(max_string) + (stop - start),
+                )
+            )
+        )
+    filtered_subset = list(filter_subsets(found_overlaps))
+    for overlap in filtered_subset:
+        count += len(overlap)
     percent_match = int(
         100 * (count / min([len(harvard_characters), len(cl_characters)]))
     )
     return percent_match
+
+
+def is_subset(match: List[int], other_match: List[int]) -> bool:
+    """Check if match is a subset of other matches
+
+    Check if needle is ordered subset of haystack in O(n)
+    :param match: Matching range of text as the indices
+    :param other_match: Other matching range of text as indices
+    :return: Is match a subset of other match
+    """
+
+    if len(other_match) < len(match):
+        return False
+    index = 0
+    for element in match:
+        try:
+            index = other_match.index(element, index) + 1
+        except ValueError:
+            return False
+    else:
+        return True
+
+
+def filter_subsets(lists: List[List[int]]) -> List[List[int]]:
+    """Filter subsets from matches
+
+    Given list of lists, return new list of lists without subsets
+
+    :param lists: List of matched lists ranges
+    :return: Reduced list of matches
+    """
+
+    for match in lists:
+        if not any(
+            is_subset(match, other_matches)
+            for other_matches in lists
+            if match is not other_matches
+        ):
+            yield match
 
 
 class MissingDocumentError(Exception):
