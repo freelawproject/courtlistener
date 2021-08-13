@@ -4,11 +4,14 @@
 import difflib
 import itertools
 import json
+import logging
+import math
 import os
 import re
+from collections import Counter
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, Iterator, List, Optional, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, Tuple, TypedDict
 
 from bs4 import BeautifulSoup
 from courts_db import find_court_ids_by_name
@@ -21,7 +24,6 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.corpus_importer.court_regexes import match_court_string
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import extract_judge_last_name
@@ -31,7 +33,7 @@ from cl.search.tasks import add_items_to_solr
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str):
+def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -43,12 +45,12 @@ def validate_dt(date_str):
     :returns: Tuple of date obj or date obj estimate
     and boolean indicating estimated date or actual date.
     """
+    date_obj = None
     date_approx = False
     add_ons = ["", "-15", "-07-01"]
     for add_on in add_ons:
         try:
             date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
-            break
         except ValueError:
             # Failed parsing at least once, ∴ an approximate date
             date_approx = True
@@ -323,8 +325,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         case_name_full = harmonize(data["name"])
 
         citation = cites[0]
-        if skip_processing(citation, case_name, file_path):
-            continue
 
         # TODO: Generalize this to handle all court types somehow.
         if not options["court_id"]:
@@ -343,13 +343,19 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         case_body = data["casebody"]["data"]
+        harvard_characters = clean_body_content(case_body, harvard=True)
 
+        if not harvard_characters:
+            # Unfortunately, some harvard cases have no opinions.
+            # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
+            continue
         previously_imported_case = find_previously_imported_cases(
             data,
             court_id,
             date_filed,
-            case_body,
+            harvard_characters,
             case_name_full,
+            citation,
         )
         if previously_imported_case:
             # Simply add citations to our matched case for now. Later, we'll
@@ -358,8 +364,12 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 add_citations(
                     data["citations"], cluster_id=previously_imported_case.id
                 )
+                logger.info(
+                    f"Adding citations for case at https://www.courtlistener.com/opinion/{previously_imported_case.id}/{previously_imported_case.slug}"
+                )
             continue
 
+        logger.info(f"Adding case {case_name_full}")
         # This case appears new to CL - lets add it.
         add_new_case(
             data,
@@ -464,7 +474,6 @@ def add_new_case(
                     long_data["correction"],
                 )
 
-        logger.info("Adding cluster for: %s", citation.base_citation())
         cluster = OpinionCluster(
             case_name=case_name,
             case_name_short=case_name_short,
@@ -487,6 +496,7 @@ def add_new_case(
             filepath_json_harvard=file_path,
         )
         cluster.save(index=False)
+        logger.info("Saving cluster for: %s", cluster.id)
 
         logger.info("Adding citation for: %s", citation.base_citation())
         add_citations(data["citations"], cluster.id)
@@ -496,6 +506,9 @@ def add_new_case(
         add_items_to_solr.delay(new_op_pks, "search.Opinion")
 
     logger.info("Finished: %s", citation.base_citation())
+    logger.info(
+        f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
+    )
 
 
 class CitationType(TypedDict):
@@ -643,14 +656,16 @@ def clean_body_content(case_body: str, harvard: bool = False) -> str:
 
 
 def match_based_text(
-    case_body: str,
+    harvard_characters: str,
     docket_number: str,
     case_name_full: str,
     possible_cases: List,
+    case_name_abbreviation: str,
+    citation: Citation,
 ) -> Optional[OpinionCluster]:
     """Compare CL text to Harvard content to establish duplicates
 
-    :param case_body: Harvard case body to compare
+    :param harvard_characters: Harvard stripped characters to compare
     :param possible_cases: List of opinions to check against
     :param docket_number: The docket number
     :param case_name_full: The full case name
@@ -669,7 +684,7 @@ def match_based_text(
             continue
 
         percent_match = compare_documents(harvard_characters, cl_characters)
-        if percent_match < 45:
+        if percent_match < 60:
             continue
 
         # Require some overlapping case title
@@ -700,11 +715,23 @@ def match_based_text(
             # docket number for very small cases.
             if percent_match < 90:
                 continue
-            overlaps = overlap_case_names(case.case_name, case_name_full)
-            if not overlaps:
-                continue
-            clean_docket = clean_docket_number(docket_number)
-            if clean_docket not in case.docket.docket_number:
+
+            # If a docket number exists: check against it.
+            if case.docket.docket_number is not None:
+                clean_docket = clean_docket_number(docket_number)
+                if clean_docket not in case.docket.docket_number:
+                    continue
+
+            # If you make it this far - we should check if this small case has
+            # an identifical volume reporter citation attached to it already.
+            # I think this may help us with the wilder v. state issue of having
+            # four identical opinions only differentiated by page number
+
+            similar_cites = Citation.objects.filter(
+                cluster_id=case.id,
+                reporter=citation.reporter,
+            ).exclude(page=citation.page, volume=citation.volume)
+            if similar_cites:
                 continue
         return case
     return None
@@ -714,15 +741,17 @@ def find_previously_imported_cases(
     data: Dict[str, Any],
     court_id: Optional[str],
     date_filed: date,
-    case_body: str,
+    harvard_characters: str,
     case_name_full: str,
+    citation: Citation,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
-
+    :param data: The harvard data
     :param court_id: Court ID
     :param date_filed: The date filed
-    :param case_body: Harvard XML of the opinion
-    :param docket_number: The docket number
+    :param harvard_characters: Harvard stripped down characters
+    :param case_name_full: The full case name from Harvard
+    :param citation: CL Citation object
     :return: The matching opinion cluster in CL or None
     """
 
@@ -736,12 +765,16 @@ def find_previously_imported_cases(
                 citations__page=found_cite[0].page,
             ).order_by("id")
             match = match_based_text(
-                case_body,
+                harvard_characters,
                 data["docket_number"],
                 case_name_full,
                 possible_cases,
+                data["name_abbreviation"],
+                citation,
             )
-            return match
+            # If a match is found - return it.  Else keep searching.
+            if match:
+                return match
 
     possible_cases = OpinionCluster.objects.filter(
         date_filed=date_filed,
@@ -750,7 +783,12 @@ def find_previously_imported_cases(
 
     docket_number = data["docket_number"]
     match = match_based_text(
-        case_body, docket_number, case_name_full, possible_cases
+        harvard_characters,
+        docket_number,
+        case_name_full,
+        possible_cases,
+        data["name_abbreviation"],
+        citation,
     )
     if not match:
         month = timedelta(days=31)
@@ -762,55 +800,72 @@ def find_previously_imported_cases(
             case for case in broad_search if case.date_filed != date_filed
         ]
         match = match_based_text(
-            case_body, docket_number, case_name_full, possible_cases
+            harvard_characters,
+            docket_number,
+            case_name_full,
+            possible_cases,
+            data["name_abbreviation"],
+            citation,
         )
     return match
 
 
-def overlap_case_names(cl_case_name: str, harvard_case_name: str) -> List[str]:
+def overlap_case_names(
+    cl_case_name: str, harvard_case_names: List[str]
+) -> List[str]:
     """Find overlapping case names - excluding certain words.
 
     Convert each string to a list - stripped of punctuation and compares for
     overlapping case title words.  After which we remove superflous words that
     create false positives
 
+    We use two differnet title types because of the variety of abbreviations
+    and usage across case names.
+
     :param cl_case_name: The CL case name
-    :param harvard_case_name: The Harvard case name full
+    :param harvard_case_names: The Harvard case name and abbreviation in a list
     :return: List of overlapping case names
     """
-    cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
-    harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
-    cl_case_name_list = cl_case_name.lower().split()
-    harvard_case_name_list = harvard_case_name.strip().lower().split()
+    overlaps = []
+    for harvard_case_name in harvard_case_names:
+        cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
+        harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
+        cl_case_name_list = cl_case_name.lower().split()
+        harvard_case_name_list = harvard_case_name.strip().lower().split()
 
-    overlaps = list(
-        set(cl_case_name_list).intersection(harvard_case_name_list)
-    )
-    false_positive_list = [
-        "et",
-        "al",
-        "respondent",
-        "respondents",
-        "appellant",
-        "and",
-        "personal",
-        "restraint",
-        "matter",
-        "washington",
-        "city",
-        "appellants",
-        "of",
-        "the",
-        "state",
-        "estate",
-        "in",
-        "inc",
-    ]
-    return [
-        word
-        for word in overlaps
-        if len(word) > 1 and word not in false_positive_list
-    ]
+        matches = list(
+            set(cl_case_name_list).intersection(harvard_case_name_list)
+        )
+        false_positive_list = [
+            "et",
+            "al",
+            "respondent",
+            "respondents",
+            "appellant",
+            "and",
+            "personal",
+            "restraint",
+            "matter",
+            "washington",
+            "florida",
+            "county" "city",
+            "appellants",
+            "of",
+            "the",
+            "state",
+            "estate",
+            "in",
+            "inc",
+            "st",
+            "ex",
+            "rel",
+        ]
+        overlaps = overlaps + [
+            word
+            for word in matches
+            if len(word) > 1 and word not in false_positive_list
+        ]
+    return list(set(overlaps))
 
 
 def compare_documents(harvard_characters: str, cl_characters: str) -> int:
@@ -833,12 +888,12 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         if harvard_substring in cl_characters:
             matched_substring = harvard_substring
         else:
-            if len(matched_substring) > 10:
+            if len(matched_substring) > 5:
                 subset = make_subset_range(cl_characters, matched_substring)
                 found_overlaps.append(subset)
             matched_substring = ""
             start = stop - 1
-    if len(matched_substring) > 10:
+    if len(matched_substring) > 5:
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
@@ -940,13 +995,19 @@ class Command(VerboseCommand):
             help="The CL Court ID",
             required=False,
         )
-
         parser.add_argument(
             "--make-searchable",
             action="store_true",
             help="Add items to solr as we create opinions. "
             "Items are not searchable unless flag is raised.",
         )
+        parser.add_argument(
+            "--no-debug",
+            action="store_true",
+            help="Turn off debug logging",
+        )
 
     def handle(self, *args, **options):
+        if options['no_debug']:
+            logging.disable(logging.DEBUG)
         parse_harvard_opinions(options)
