@@ -623,14 +623,23 @@ def clean_docket_number(docket_number: str) -> str:
     return docket_number
 
 
-def clean_body_content(case_body: str) -> str:
+def clean_body_content(case_body: str, harvard: bool = False) -> str:
     """Strip all non-alphanumeric characters
 
     :param case_body: Opinion text
+    :param harvard: Are we harvard xml data
     :return:Opinion text with only alphanumeric characters
     """
     soup = BeautifulSoup(case_body, "lxml")
-    return re.sub(r"[^a-zA-Z0-9]", "", soup.text)
+    if not harvard:
+        opinion_text = soup.text
+    else:
+        opinions = []
+        for op in soup.find_all("opinion"):
+            opinions.append(op.text)
+        opinion_text = "".join([op.text for op in soup.find_all("opinion")])
+
+    return re.sub(r"[^a-zA-Z0-9]", "", opinion_text.lower())
 
 
 def match_based_text(
@@ -647,10 +656,13 @@ def match_based_text(
     :param case_name_full: The full case name
     :return: OpinionCluster or None
     """
-    harvard_characters = clean_body_content(case_body)
     for case in possible_cases:
         cl_case_body = get_opinion_content(case)
         cl_characters = clean_body_content(cl_case_body)
+        if len(cl_characters) == 0:
+            logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
+            continue
+
         diff = len(harvard_characters) / len(cl_characters)
         if not (0.3 < diff < 3):
             # Content too dissimilar in length to compare
