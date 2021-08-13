@@ -11,6 +11,7 @@ from glob import glob
 from typing import Any, Dict, Iterator, List, Optional, TypedDict
 
 from bs4 import BeautifulSoup
+from courts_db import find_court_ids_by_name
 from django.conf import settings
 from django.db import transaction
 from django.db.utils import OperationalError
@@ -329,12 +330,16 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not options["court_id"]:
             # Sometimes the court string doesn't match just one court
             # This is used to alleviate certain circumstances.
-            court_id = match_court_string(
-                data["court"]["name"],
-                state=True,
-                federal_appeals=True,
-                federal_district=True,
+            found_court = find_court_ids_by_name(
+                data["court"]["name"], bankruptcy=False
             )
+            if len(found_court) != 1:
+                logging.info(
+                    f"Court not found for {data['court']['name']} at {file_path}"
+                )
+                continue
+
+            court_id = found_court[0]
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         case_body = data["casebody"]["data"]
