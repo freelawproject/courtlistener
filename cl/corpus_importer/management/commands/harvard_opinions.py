@@ -86,7 +86,59 @@ def filepath_list(reporter, volume):
     return sorted(glob(glob_path))
 
 
-def check_for_match(new_case, possibilities):
+def get_cosine(vec1: Counter, vec2: Counter) -> float:
+    """Get cosine simililarity between two counter dictionaries
+
+    :param vec1: A vectorized string to compare
+    :param vec2: A vectorized string to compare
+    :return: The cosine similarity
+    """
+    intersection = set(vec1.keys()) & set(vec2.keys())
+    numerator = sum([vec1[x] * vec2[x] for x in intersection])
+
+    sum1 = sum([vec1[x] ** 2 for x in list(vec1.keys())])
+    sum2 = sum([vec2[x] ** 2 for x in list(vec2.keys())])
+    denominator = math.sqrt(sum1) * math.sqrt(sum2)
+
+    if not denominator:
+        return 0.0
+    else:
+        return float(numerator) / denominator
+
+
+WORD = re.compile(r"\w+")
+
+
+def text_to_vector(text: str) -> Counter:
+    """Convert text line to collections dictionary
+
+    :param text: Case title to compare
+    :return: Counter for all words
+    """
+    words = WORD.findall(text)
+    return Counter(words)
+
+
+def get_cosine_similarity(cl_case: str, possibilities: List[str]):
+    """Calculate cosine similarity between harvard and cl case names
+
+    Generally anything around 1 is good - but matches as low as .3 could
+    be good.  This is generally my favorite way to identify similar text
+
+    :param cl_case: Courtlistener Case title
+    :param possibilities: List of case names from the harvard data set
+    :return: Largest cosine match
+    """
+    cosines = []
+    for possibilty in possibilities:
+        vector_match = get_cosine(
+            text_to_vector(cl_case), text_to_vector(possibilty)
+        )
+        cosines.append(vector_match)
+    return max(cosines)
+
+
+def check_for_match(new_case: str, possibilities: List[str]) -> bool:
     """Check for matches based on case names
 
     This code is a variation of get_closest_match_index used in juriscraper.
@@ -602,12 +654,31 @@ def match_based_text(
         percent_match = compare_documents(harvard_characters, cl_characters)
         if percent_match < 45:
             continue
-        if percent_match < 75 and len(harvard_characters) > 500:
-            # Require a name overlap for good but not great matches.
-            overlaps = overlap_case_names(case.case_name, case_name_full)
-            if not overlaps:
-                continue
-        elif percent_match < 98 and len(harvard_characters) < 500:
+
+        # Require some overlapping case title
+        overlaps = overlap_case_names(
+            case.case_name, [case_name_full, case_name_abbreviation]
+        )
+        if not overlaps:
+            continue
+
+        vector_match = get_cosine_similarity(
+            case.case_name, [case_name_full, case_name_abbreviation]
+        )
+        if vector_match < 0.3:
+            continue
+
+        # The threshold for washington state cases was around 500 but for florida
+        # it appears to be around 650.  Bumping the threshold for more intense
+        # comparisons to 1000 to be safe.
+        if len(harvard_characters) < 1000:
+            # Florida uses some pretty rote language in the ~650 character
+            # length that requires a bump in the length for stricter checking.
+
+            # This also means the matching threshold has to go for small cases
+            # completely so a 98% match in washington is not the
+            # same as a 99% match in Florida
+
             # Require a very close match - with name overlap and
             # docket number for very small cases.
             if percent_match < 90:
