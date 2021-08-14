@@ -45,7 +45,6 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     :returns: Tuple of date obj or date obj estimate
     and boolean indicating estimated date or actual date.
     """
-    date_obj = None
     date_approx = False
     add_ons = ["", "-15", "-07-01"]
     for add_on in add_ons:
