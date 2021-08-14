@@ -158,10 +158,10 @@ def check_for_match(new_case: str, possibilities: List[str]) -> bool:
         match = difflib.get_close_matches(
             new_case, possibilities, n=1, cutoff=0.7
         )[0]
-        return match
+        return True if match else False
     except IndexError:
         # No good matches.
-        return None
+        return False
 
 
 def skip_processing(citation, case_name, file_path):
@@ -392,7 +392,7 @@ def add_new_case(
     case_name: str,
     case_name_full: str,
     case_name_short: str,
-    date_filed: date,
+    date_filed: Optional[date],
     is_approximate: bool,
     citation: Citation,
     court_id: Optional[str],
@@ -740,7 +740,7 @@ def match_based_text(
 def find_previously_imported_cases(
     data: Dict[str, Any],
     court_id: Optional[str],
-    date_filed: date,
+    date_filed: Optional[date],
     harvard_characters: str,
     case_name_full: str,
     citation: Citation,
@@ -826,7 +826,7 @@ def overlap_case_names(
     :param harvard_case_names: The Harvard case name and abbreviation in a list
     :return: List of overlapping case names
     """
-    overlaps = []
+    overlaps: List[str] = []
     for harvard_case_name in harvard_case_names:
         cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
         harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
