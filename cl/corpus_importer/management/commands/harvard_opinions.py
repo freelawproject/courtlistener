@@ -577,6 +577,7 @@ def length_too_different(
     if not (0.3 < diff < 3):
         # Content too dissimilar in length to compare
         return True
+    return False
 
 
 def content_too_different(
