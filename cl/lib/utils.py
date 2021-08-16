@@ -3,7 +3,7 @@ import errno
 import os
 import re
 from itertools import chain, islice, tee
-from typing import Any, Iterator
+from typing import Any, List
 
 from django.db.models import QuerySet
 
@@ -109,7 +109,7 @@ def remove_duplicate_dicts(l):
 
 def alphanumeric_sort(
     query: QuerySet, sort_key: str
-) -> Iterator[QuerySet[Any]]:
+) -> List[Any]:
     """Sort a django queryset by a particular field value
 
     :param query: The django queryset
