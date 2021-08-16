@@ -625,12 +625,14 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = OpinionCluster.objects.filter(
-        citations__reporter=reporter, citations__volume=volume
-    ).annotate(
-        cite_page=(F('citations__page'))
-    ).order_by('cite_page')
-    cases_in_volume = alphanumeric_sort(cases_in_volume, 'cite_page')
+    cases_in_volume = (
+        OpinionCluster.objects.filter(
+            citations__reporter=reporter, citations__volume=volume
+        )
+        .annotate(cite_page=(F("citations__page")))
+        .order_by("cite_page")
+    )
+    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
 
     if not cases_in_volume:
         return throw_404(
