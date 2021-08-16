@@ -1,7 +1,11 @@
 import collections
 import errno
 import os
+import re
 from itertools import chain, islice, tee
+from typing import Iterator
+
+from django.db.models import QuerySet
 
 
 class _UNSPECIFIED(object):
@@ -101,3 +105,17 @@ def remove_duplicate_dicts(l):
     See: http://stackoverflow.com/a/9427216/64911
     """
     return [dict(t) for t in set([tuple(d.items()) for d in l])]
+
+
+def alphanumeric_sort(query: QuerySet, sort_key: str) -> Iterator[QuerySet]:
+    """Sort a django queryset by a particular field value
+
+    :param query: The django queryset
+    :param sort_key: The field to sort naturally
+    :return:
+    """
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [
+        convert(c) for c in re.split("([0-9]+)", getattr(key, sort_key))
+    ]
+    return sorted(query, key=alphanum_key)
