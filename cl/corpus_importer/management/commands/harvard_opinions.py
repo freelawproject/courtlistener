@@ -5,13 +5,11 @@ import difflib
 import itertools
 import json
 import logging
-import math
 import os
 import re
-from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from glob import glob
-from typing import Any, Dict, Iterator, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
 
 from bs4 import BeautifulSoup
 from courts_db import find_court_ids_by_name
@@ -88,58 +86,6 @@ def filepath_list(reporter, volume):
     return sorted(glob(glob_path))
 
 
-def get_cosine(vec1: Counter, vec2: Counter) -> float:
-    """Get cosine simililarity between two counter dictionaries
-
-    :param vec1: A vectorized string to compare
-    :param vec2: A vectorized string to compare
-    :return: The cosine similarity
-    """
-    intersection = set(vec1.keys()) & set(vec2.keys())
-    numerator = sum([vec1[x] * vec2[x] for x in intersection])
-
-    sum1 = sum([vec1[x] ** 2 for x in list(vec1.keys())])
-    sum2 = sum([vec2[x] ** 2 for x in list(vec2.keys())])
-    denominator = math.sqrt(sum1) * math.sqrt(sum2)
-
-    if not denominator:
-        return 0.0
-    else:
-        return float(numerator) / denominator
-
-
-WORD = re.compile(r"\w+")
-
-
-def text_to_vector(text: str) -> Counter:
-    """Convert text line to collections dictionary
-
-    :param text: Case title to compare
-    :return: Counter for all words
-    """
-    words = WORD.findall(text)
-    return Counter(words)
-
-
-def get_cosine_similarity(cl_case: str, possibilities: List[str]):
-    """Calculate cosine similarity between harvard and cl case names
-
-    Generally anything around 1 is good - but matches as low as .3 could
-    be good.  This is generally my favorite way to identify similar text
-
-    :param cl_case: Courtlistener Case title
-    :param possibilities: List of case names from the harvard data set
-    :return: Largest cosine match
-    """
-    cosines = []
-    for possibilty in possibilities:
-        vector_match = get_cosine(
-            text_to_vector(cl_case), text_to_vector(possibilty)
-        )
-        cosines.append(vector_match)
-    return max(cosines)
-
-
 def check_for_match(new_case: str, possibilities: List[str]) -> bool:
     """Check for matches based on case names
 
@@ -163,50 +109,7 @@ def check_for_match(new_case: str, possibilities: List[str]) -> bool:
         return False
 
 
-def skip_processing(citation, case_name, file_path):
-    """Run checks for whether to skip the item from being added to the DB
-
-    Checks include:
-     - Is the reporter one we know about in the reporter DB?
-     - Can we properly extract the reporter?
-     - Can we find a duplicate of the item already in CL?
-     - If we think we have a match - check if all matches are harvard cases
-       and compare against filepaths.
-
-    :param citation: CL citation object
-    :param case_name: The name of the case
-    :param file_path: The file_path of our case
-    :return: True if the item should be skipped; else False
-    """
-
-    # Handle duplicate citations by checking for identical citations and
-    # overly similar case names
-    cite_search = Citation.objects.filter(
-        reporter=citation.reporter, page=citation.page, volume=citation.volume
-    )
-    if cite_search.count() > 0:
-        case_data = OpinionCluster.objects.filter(
-            citations__in=cite_search
-        ).values_list("case_name", "filepath_json_harvard")
-        case_names = [s[0] for s in case_data]
-        found_filepaths = [s[1] for s in case_data]
-        if check_for_match(case_name, case_names) is not None:
-
-            for found_filepath in found_filepaths:
-                if found_filepath == file_path:
-                    # Check if all same citations are Harvard imports
-                    # If all Harvard data - match on file_path
-                    # If no match assume different case
-                    logger.info(f"Looks like we already have {case_name}.")
-                    return True
-
-        logger.info(
-            f"Duplicate cite string but appears to be a new case {case_name}"
-        )
-    return False
-
-
-def map_opinion_type(harvard_opinion_type):
+def map_opinion_type(harvard_opinion_type: str) -> str:
     """Map Harvard opinion types to CL ones
 
     :param harvard_opinion_type: The type field of the Harvard opinion
@@ -347,6 +250,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
+            logger.info(f"No opinion in Harvard XML at {file_path}")
             continue
         previously_imported_case = find_previously_imported_cases(
             data,
@@ -721,10 +625,10 @@ def match_based_text(
                 if clean_docket not in case.docket.docket_number:
                     continue
 
-            # If you make it this far - we should check if this small case has
-            # an identifical volume reporter citation attached to it already.
-            # I think this may help us with the wilder v. state issue of having
-            # four identical opinions only differentiated by page number
+        # If you make it this far - we should check if this small case has
+        # an identical volume reporter citation attached to it already.
+        # I think this may help us with the wilder v. state issue of having
+        # four identical opinions only differentiated by page number
 
             similar_cites = Citation.objects.filter(
                 cluster_id=case.id,
@@ -810,20 +714,21 @@ def find_previously_imported_cases(
 
 
 def overlap_case_names(
-    cl_case_name: str, harvard_case_names: List[str]
-) -> List[str]:
+    cl_case_name: str, harvard_short: str, harvard_long: str
+) -> Set:
     """Find overlapping case names - excluding certain words.
 
     Convert each string to a list - stripped of punctuation and compares for
     overlapping case title words.  After which we remove superflous words that
     create false positives
 
-    We use two differnet title types because of the variety of abbreviations
+    We use two different title types because of the variety of abbreviations
     and usage across case names.
 
     :param cl_case_name: The CL case name
-    :param harvard_case_names: The Harvard case name and abbreviation in a list
-    :return: List of overlapping case names
+    :param harvard_short: The Harvard case name abbreviation
+    :param harvard_long: The Harvard case name full
+    :return: Set of overlapping case name words
     """
     overlaps: List[str] = []
     for harvard_case_name in harvard_case_names:
@@ -1007,6 +912,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        if options['no_debug']:
+        if options["no_debug"]:
             logging.disable(logging.DEBUG)
         parse_harvard_opinions(options)
