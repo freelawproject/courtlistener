@@ -559,6 +559,140 @@ def clean_body_content(case_body: str, harvard: bool = False) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "", opinion_text.lower())
 
 
+def length_too_different(
+    case: OpinionCluster, harvard_characters: str, cl_characters: str
+) -> bool:
+    """Check if length is too different between texts
+
+    :param case: The opinion cluster for the case
+    :param harvard_characters: The Harvard opinion content characters
+    :param cl_characters: The CL opinion content characters
+    :return: Whether the content is too different in length
+    """
+    if len(cl_characters) == 0:
+        logger.warn(f"Empty Courtlistener opinion cluster: {case.id}")
+        return True
+
+    diff = len(harvard_characters) / len(cl_characters)
+    if not (0.3 < diff < 3):
+        # Content too dissimilar in length to compare
+        return True
+
+
+def content_too_different(
+    case: OpinionCluster,
+    harvard_characters: str,
+    cl_characters: str,
+    docket: str,
+) -> bool:
+    """Is the content too different
+
+    Check the percentage overlap of two blocks of text
+
+    Florida uses some pretty rote language in the ~650 character
+    length that requires a bump in the length for stricter checking.
+
+    This also means the matching threshold has to go for small cases
+    completely so a 98% match in washington is not the
+    same as a 99% match in Florida
+
+    Require a very close match - with name overlap and
+    docket number for very small cases.
+
+    :param case: Opinion cluster for case
+    :param harvard_characters: The Harvard opinion content characters
+    :param cl_characters: The CL opinion content characters
+    :param docket: The Harvard docket number
+    :return: Whether the opinion content is too dissimilar
+    """
+
+    percent_match = compare_documents(harvard_characters, cl_characters)
+    if percent_match < 60:
+        return True
+
+    if len(harvard_characters) > 1000:
+        return False
+
+    if percent_match < 90:
+        return True
+
+    # If a docket number exists: check against it.
+    if case.docket.docket_number is not None:
+        clean_docket = clean_docket_number(docket)
+        if clean_docket not in case.docket.docket_number:
+            return True
+    return False
+
+
+def case_names_dont_overlap(
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+) -> bool:
+    """Case names not overlap
+
+    Check if the case names have quality overlapping case name words.
+    Excludes 'bad words' and other common words.
+
+    :param case: The case opinion cluster
+    :param case_name_full: The case name full from Harvard
+    :param case_name_abbreviation: The case name abbreviation from Harvard
+    :return: Do the case names share quality overlapping words
+    """
+
+    harvard_case = f"{case_name_full} {case_name_abbreviation}"
+    overlap = winnow_case_name(case.case_name) & winnow_case_name(harvard_case)
+
+    if not overlap:
+        return True
+    return False
+
+
+def cosine_similarity_too_different(
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+) -> bool:
+    """Cosine similarity comparison between case names
+
+    Checks the cosine similarity between a case in CL and Harvard
+
+    :param case: The case opinion cluster
+    :param case_name_full: The case name full from Harvard
+    :param case_name_abbreviation: The case name abbreviation from Harvard
+    :return: Is the cosine similarity too different
+    """
+
+    similarities = []
+    for title in [case_name_full, case_name_abbreviation]:
+        similarity = get_cosine_similarity(title, case.case_name)
+        similarities.append(similarity)
+    max_similarity = max(similarities)
+
+    if max_similarity < 0.3:
+        return True
+    return False
+
+
+def has_too_similar_citation(case: OpinionCluster, citation: Citation) -> bool:
+    """Has a citation associated with cluster in same volume
+
+    If you make it this far - we should check if this small case has
+    an identical volume reporter citation attached to it already.
+    I think this may help us with the wilder v. state issue of having
+    four identical opinions only differentiated by page number
+
+    :param case:
+    :param citation:
+    :return:
+    """
+
+    return (
+        Citation.objects.filter(
+            cluster_id=case.id,
+            reporter=citation.reporter,
+        )
+        .exclude(page=citation.page, volume=citation.volume)
+        .exists()
+    )
+
+
 def match_based_text(
     harvard_characters: str,
     docket_number: str,
@@ -578,67 +712,18 @@ def match_based_text(
     for case in possible_cases:
         cl_case_body = get_opinion_content(case)
         cl_characters = clean_body_content(cl_case_body)
-        if len(cl_characters) == 0:
-            logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
-            continue
 
-        diff = len(harvard_characters) / len(cl_characters)
-        if not (0.3 < diff < 3):
-            # Content too dissimilar in length to compare
-            continue
-
-        percent_match = compare_documents(harvard_characters, cl_characters)
-        if percent_match < 60:
-            continue
-
-        # Require some overlapping case title
-        overlaps = overlap_case_names(
-            case.case_name, case_name_full, case_name_abbreviation
-        )
-        if not overlaps:
-            continue
-
-        similarities = []
-        for title in [case_name_full, case_name_abbreviation]:
-            similarity = get_cosine_similarity(title, case.case_name)
-            similarities.append(similarity)
-        max_similarity = max(similarities)
-
-        if max_similarity < 0.3:
-            continue
-
-        # The threshold for washington state cases was around 500 but for florida
-        # it appears to be around 650.  Bumping the threshold for more intense
-        # comparisons to 1000 to be safe.
-        if len(harvard_characters) < 1000:
-            # Florida uses some pretty rote language in the ~650 character
-            # length that requires a bump in the length for stricter checking.
-
-            # This also means the matching threshold has to go for small cases
-            # completely so a 98% match in washington is not the
-            # same as a 99% match in Florida
-
-            # Require a very close match - with name overlap and
-            # docket number for very small cases.
-            if percent_match < 90:
-                continue
-
-            # If a docket number exists: check against it.
-            if case.docket.docket_number is not None:
-                clean_docket = clean_docket_number(docket_number)
-                if clean_docket not in case.docket.docket_number:
-                    continue
-
-        # If you make it this far - we should check if this small case has
-        # an identical volume reporter citation attached to it already.
-        # I think this may help us with the wilder v. state issue of having
-        # four identical opinions only differentiated by page number
-
-        similar_cites = Citation.objects.filter(
-            cluster_id=case.id,
-            reporter=citation.reporter,
-        ).exclude(page=citation.page, volume=citation.volume)
-        if similar_cites:
+        case_and_texts = [case, harvard_characters, cl_characters]
+        case_and_titles = [case, case_name_full, case_name_abbreviation]
+        if any(
+            [
+                length_too_different(*case_and_texts),
+                has_too_similar_citation(case, citation),
+                case_names_dont_overlap(*case_and_titles),
+                content_too_different(*case_and_texts, docket=docket_number),
+                cosine_similarity_too_different(*case_and_titles),
+            ]
+        ):
             continue
         return case
     return None
@@ -737,27 +822,6 @@ def winnow_case_name(case_name: str) -> Set:
     # Lastly remove our ever growing set of false positive words
     # This is different from bad words, but may have some overlap.
     return cleaned_set - (cleaned_set & false_positive_set)
-
-
-def overlap_case_names(
-    cl_case_name: str, harvard_short: str, harvard_long: str
-) -> Set:
-    """Find overlapping case names - excluding certain words.
-
-    Convert each string to a list - stripped of punctuation and compares for
-    overlapping case title words.  After which we remove superflous words that
-    create false positives
-
-    We use two different title types because of the variety of abbreviations
-    and usage across case names.
-
-    :param cl_case_name: The CL case name
-    :param harvard_short: The Harvard case name abbreviation
-    :param harvard_long: The Harvard case name full
-    :return: Set of overlapping case name words
-    """
-    harvard_case = f"{harvard_short} {harvard_long}"
-    return winnow_case_name(cl_case_name) & winnow_case_name(harvard_case)
 
 
 def compare_documents(harvard_characters: str, cl_characters: str) -> int:
