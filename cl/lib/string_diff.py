@@ -93,13 +93,18 @@ def find_confidences(results, case_name):
     return diff_ratios
 
 
-def string_to_vector(text):
+def string_to_vector(text: str) -> Counter:
+    """Convert strings to counter dict.
+
+    :param text: Text to vectorize
+    :return: A dictionary of words by count
+    """
     WORD = re.compile(r"\w+")
     words = WORD.findall(text)
     return Counter(words)
 
 
-def get_cosine_similarity(left, right):
+def get_cosine_similarity(left: str, right: str) -> float:
     """Calculate the cosine similarity of two strings.
 
     This can be useful in circumstances when the counts of the words in the
