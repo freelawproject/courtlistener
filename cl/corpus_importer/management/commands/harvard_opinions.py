@@ -23,6 +23,7 @@ from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
@@ -592,15 +593,18 @@ def match_based_text(
 
         # Require some overlapping case title
         overlaps = overlap_case_names(
-            case.case_name, [case_name_full, case_name_abbreviation]
+            case.case_name, case_name_full, case_name_abbreviation
         )
         if not overlaps:
             continue
 
-        vector_match = get_cosine_similarity(
-            case.case_name, [case_name_full, case_name_abbreviation]
-        )
-        if vector_match < 0.3:
+        similarities = []
+        for title in [case_name_full, case_name_abbreviation]:
+            similarity = get_cosine_similarity(title, case.case_name)
+            similarities.append(similarity)
+        max_similarity = max(similarities)
+
+        if max_similarity < 0.3:
             continue
 
         # The threshold for washington state cases was around 500 but for florida
@@ -630,12 +634,12 @@ def match_based_text(
         # I think this may help us with the wilder v. state issue of having
         # four identical opinions only differentiated by page number
 
-            similar_cites = Citation.objects.filter(
-                cluster_id=case.id,
-                reporter=citation.reporter,
-            ).exclude(page=citation.page, volume=citation.volume)
-            if similar_cites:
-                continue
+        similar_cites = Citation.objects.filter(
+            cluster_id=case.id,
+            reporter=citation.reporter,
+        ).exclude(page=citation.page, volume=citation.volume)
+        if similar_cites:
+            continue
         return case
     return None
 
@@ -693,24 +697,46 @@ def find_previously_imported_cases(
         data["name_abbreviation"],
         citation,
     )
-    if not match:
-        month = timedelta(days=31)
-        broad_search = OpinionCluster.objects.filter(
-            date_filed__range=[date_filed - month, date_filed + month],
-            docket__court_id=court_id,
-        ).order_by("id")
-        possible_cases = [
-            case for case in broad_search if case.date_filed != date_filed
-        ]
-        match = match_based_text(
-            harvard_characters,
-            docket_number,
-            case_name_full,
-            possible_cases,
-            data["name_abbreviation"],
-            citation,
-        )
     return match
+
+
+def winnow_case_name(case_name: str) -> Set:
+    """Reduce each case title to a set of words worth comparing
+
+    :param case_name: The name of a case or combination of case names
+    :return: A set of words worth comparing
+    """
+    false_positive_set = {
+        "and",
+        "personal",
+        "restraint",
+        "matter",
+        "washington",
+        "florida",
+        "county",
+        "city",
+        "of",
+        "the",
+        "state",
+        "estate",
+        "in",
+        "inc",
+        "st",
+        "ex",
+        "rel",
+    }
+
+    # Remove all non alphanumeric characters
+    case_name = harmonize(case_name)
+    case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
+
+    # Remove one letter words, initials etc.
+    case_title = re.sub(r"\b[^ ]\b", "", case_title)
+    cleaned_set = set(case_title.split())
+
+    # Lastly remove our ever growing set of false positive words
+    # This is different from bad words, but may have some overlap.
+    return cleaned_set - (cleaned_set & false_positive_set)
 
 
 def overlap_case_names(
@@ -730,46 +756,8 @@ def overlap_case_names(
     :param harvard_long: The Harvard case name full
     :return: Set of overlapping case name words
     """
-    overlaps: List[str] = []
-    for harvard_case_name in harvard_case_names:
-        cl_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", cl_case_name)
-        harvard_case_name = re.sub(r"[^a-zA-Z0-9 ]", " ", harvard_case_name)
-        cl_case_name_list = cl_case_name.lower().split()
-        harvard_case_name_list = harvard_case_name.strip().lower().split()
-
-        matches = list(
-            set(cl_case_name_list).intersection(harvard_case_name_list)
-        )
-        false_positive_list = [
-            "et",
-            "al",
-            "respondent",
-            "respondents",
-            "appellant",
-            "and",
-            "personal",
-            "restraint",
-            "matter",
-            "washington",
-            "florida",
-            "county" "city",
-            "appellants",
-            "of",
-            "the",
-            "state",
-            "estate",
-            "in",
-            "inc",
-            "st",
-            "ex",
-            "rel",
-        ]
-        overlaps = overlaps + [
-            word
-            for word in matches
-            if len(word) > 1 and word not in false_positive_list
-        ]
-    return list(set(overlaps))
+    harvard_case = f"{harvard_short} {harvard_long}"
+    return winnow_case_name(cl_case_name) & winnow_case_name(harvard_case)
 
 
 def compare_documents(harvard_characters: str, cl_characters: str) -> int:
