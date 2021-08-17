@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from courts_db import find_court_ids_by_name
 from django.conf import settings
 from django.db import transaction
+from django.db.models import QuerySet
 from django.db.utils import OperationalError
 from eyecite.find_citations import get_citations
 from juriscraper.lib.diff_tools import normalize_phrase
@@ -698,7 +699,7 @@ def match_based_text(
     harvard_characters: str,
     docket_number: str,
     case_name_full: str,
-    possible_cases: List,
+    possible_cases: QuerySet,
     case_name_abbreviation: str,
     citation: Citation,
 ) -> Optional[OpinionCluster]:
