@@ -722,7 +722,7 @@ def match_based_text(
                 length_too_different(*case_and_texts),
                 has_too_similar_citation(case, citation),
                 case_names_dont_overlap(*case_and_titles),
-                content_too_different(*case_and_texts, docket=docket_number), # type: ignore
+                content_too_different(*case_and_texts, docket=docket_number),  # type: ignore
                 cosine_similarity_too_different(*case_and_titles),
             ]
         ):
