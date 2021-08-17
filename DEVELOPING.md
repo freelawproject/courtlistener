@@ -50,7 +50,7 @@ To set up a development server, do the following:
 
 1. Clone the [courtlistener](https://github.com/freelawproject/courtlistener) and [courtlistener-solr-server](https://github.com/freelawproject/courtlistener-solr-server) repositories so that they are side-by-side in the same folder.
 
-1. Install the React dependencies and get hot-reloading going. Install node, and then:
+1. Install the React dependencies and get hot-reloading going. Install node, and then `cd` into courtlistener/cl and run:
 
     ```bash
     npm install

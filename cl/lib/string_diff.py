@@ -93,13 +93,18 @@ def find_confidences(results, case_name):
     return diff_ratios
 
 
-def string_to_vector(text):
+def string_to_vector(text: str) -> Counter:
+    """Convert strings to counter dict.
+
+    :param text: Text to vectorize
+    :return: A dictionary of words by count
+    """
     WORD = re.compile(r"\w+")
     words = WORD.findall(text)
     return Counter(words)
 
 
-def get_cosine_similarity(left, right):
+def get_cosine_similarity(left_str: str, right_str: str) -> float:
     """Calculate the cosine similarity of two strings.
 
     This can be useful in circumstances when the counts of the words in the
@@ -109,7 +114,7 @@ def get_cosine_similarity(left, right):
     Better for long strings with sentence-length differences, where diff_lib's
     ratio() can fall down.
     """
-    left, right = string_to_vector(left), string_to_vector(right)
+    left, right = string_to_vector(left_str), string_to_vector(right_str)
     intersection = set(left.keys()) & set(right.keys())
     numerator = sum([left[x] * right[x] for x in intersection])
 

@@ -203,7 +203,7 @@
             {% if cluster.syllabus %}
                 <div class="well well-sm">
                     <h4>Summary of Opinion</h4>
-                    <p>{{ cluster.syllabus }}</p>
+                    <p>{{ cluster.syllabus | safe }} </p>
                 </div>
             {% endif %}
 
