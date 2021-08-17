@@ -218,7 +218,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
-            logger.info(
+            logger.warning(
                 f"No citation found for {data['citations'][0]['cite']}."
             )
             continue
@@ -237,7 +237,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                 data["court"]["name"], bankruptcy=False
             )
             if len(found_court) != 1:
-                logging.info(
+                logging.warning(
                     f"Court not found for {data['court']['name']} at {file_path}"
                 )
                 continue
@@ -251,7 +251,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not harvard_characters:
             # Unfortunately, some harvard cases have no opinions.
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
-            logger.info(f"No opinion in Harvard XML at {file_path}")
+            logger.warning(f"No opinion in Harvard XML at {file_path}")
             continue
         previously_imported_case = find_previously_imported_cases(
             data,
@@ -570,7 +570,7 @@ def length_too_different(
     :return: Whether the content is too different in length
     """
     if len(cl_characters) == 0:
-        logger.warn(f"Empty Courtlistener opinion cluster: {case.id}")
+        logger.warning(f"Empty Courtlistener opinion cluster: {case.id}")
         return True
 
     diff = len(harvard_characters) / len(cl_characters)
