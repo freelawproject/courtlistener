@@ -70,7 +70,9 @@ def get_extension(content: str) -> str:
         mime = "text/plain"
     elif file_str.startswith("WordPerfect document"):
         mime = "application/vnd.wordperfect"
-    elif re.match(file_str, r"Audio file with ID3.*MPEG.*layer III"):
+    elif re.findall(
+        r"(Audio file with ID3.*MPEG.*layer III)|(.*Audio Media.*)", file_str
+    ):
         mime = "audio/mpeg"
     else:
         # No workaround necessary
