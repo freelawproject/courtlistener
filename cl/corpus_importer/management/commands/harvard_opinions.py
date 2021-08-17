@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from glob import glob
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
 
@@ -784,6 +784,23 @@ def find_previously_imported_cases(
         data["name_abbreviation"],
         citation,
     )
+    if not match:
+        month = timedelta(days=31)
+        broad_search = OpinionCluster.objects.filter(
+            date_filed__range=[date_filed - month, date_filed + month],
+            docket__court_id=court_id,
+        ).order_by("id")
+        possible_cases = [
+            case for case in broad_search if case.date_filed != date_filed
+        ]
+        match = match_based_text(
+            harvard_characters,
+            docket_number,
+            case_name_full,
+            possible_cases,  # type: ignore
+            data["name_abbreviation"],
+            citation,
+        )
     return match
 
 
