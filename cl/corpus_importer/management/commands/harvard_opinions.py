@@ -33,7 +33,7 @@ from cl.search.tasks import add_items_to_solr
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
+def validate_dt(date_str: str) -> Tuple[date, bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -734,7 +734,7 @@ def match_based_text(
 def find_previously_imported_cases(
     data: Dict[str, Any],
     court_id: Optional[str],
-    date_filed: Optional[date],
+    date_filed: date,
     harvard_characters: str,
     case_name_full: str,
     citation: Citation,
