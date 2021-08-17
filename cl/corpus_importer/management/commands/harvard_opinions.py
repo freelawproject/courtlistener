@@ -680,9 +680,9 @@ def has_too_similar_citation(case: OpinionCluster, citation: Citation) -> bool:
     I think this may help us with the wilder v. state issue of having
     four identical opinions only differentiated by page number
 
-    :param case:
-    :param citation:
-    :return:
+    :param case: The case opinion cluster
+    :param citation: The citation of a potential matching
+    :return: Whether the citation matches to the reporter and volume.
     """
 
     return (
