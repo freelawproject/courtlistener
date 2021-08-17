@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Prefetch
+from django.db.models import F, Prefetch
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
@@ -43,6 +43,7 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
+from cl.lib.utils import alphanumeric_sort
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -624,9 +625,14 @@ def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = OpinionCluster.objects.filter(
-        citations__reporter=reporter, citations__volume=volume
-    ).order_by("date_filed", "citations__page")
+    cases_in_volume = (
+        OpinionCluster.objects.filter(
+            citations__reporter=reporter, citations__volume=volume
+        )
+        .annotate(cite_page=(F("citations__page")))
+        .order_by("cite_page")
+    )
+    cases_in_volume = alphanumeric_sort(cases_in_volume, "cite_page")
 
     if not cases_in_volume:
         return throw_404(
