@@ -209,6 +209,17 @@
     "model": "search.citation",
     "pk": 5
   },
+  {
+    "fields": {
+      "volume": 56,
+      "reporter": "F.2d",
+      "page": "11",
+      "type": 1,
+      "cluster": 3
+    },
+    "model": "search.citation",
+    "pk": 6
+  },
 
 
   {
