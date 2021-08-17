@@ -872,7 +872,11 @@ class TestLibUtils(TestCase):
             .annotate(cite_page=(F("citations__page")))
             .order_by("cite_page")
         )
-        sorted_cases = alphanumeric_sort(cases_in_volume, "cite_page")
+        # Cases are sorted out of order.
+        self.assertIn("56 F.2d 11", cases_in_volume[0].citation_string)
+        self.assertIn("56 F.2d 9", cases_in_volume[1].citation_string)
 
+        # Cases are now sorted in alpha-numerical order.
+        sorted_cases = alphanumeric_sort(cases_in_volume, "cite_page")
         self.assertIn("56 F.2d 9", sorted_cases[0].citation_string)
         self.assertIn("56 F.2d 11", sorted_cases[1].citation_string)
