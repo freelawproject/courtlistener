@@ -7,9 +7,8 @@ from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Prefetch
+from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
-from django.db.models import IntegerField
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
