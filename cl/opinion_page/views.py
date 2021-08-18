@@ -794,7 +794,7 @@ def citation_redirector(
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
-            # Redirect to the page with the right values
+            # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=cd)
@@ -808,7 +808,7 @@ def citation_redirector(
             )
 
     if all(_ is None for _ in (reporter, volume, page)):
-        # No parameters. Show the standard page.
+        # No parameters. Show the citation lookup homepage.
         form = CitationRedirectorForm()
         reporter_dict = make_reporter_dict()
         return render(
@@ -823,17 +823,15 @@ def citation_redirector(
         )
 
     if reporter and reporter != slugify(reporter):
-        cd = {"reporter": slugify(reporter)}
-        if volume:
-            cd["volume"] = volume
-        if page:
-            cd["page"] = page
+        # Reporter provided in non-slugified form. Redirect to slugified
+        # version.
+        cd = {"reporter": slugify(reporter), "volume": volume, "page": page}
         return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
 
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if reporter and volume and page:
-        slug_edition = {slugify(item): item for item in EDITIONS}
+        slug_edition = {slugify(item): item for item in EDITIONS.keys()}
         real_reporter = slug_edition[SafeText(reporter)]
         return citation_handler(request, real_reporter, volume, page)
     elif reporter and volume and page is None:
