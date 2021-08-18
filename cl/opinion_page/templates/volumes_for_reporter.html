@@ -89,10 +89,12 @@
           <span class="meta-data-header">Citations:</span>
           <span class="meta-data-value">{{ case.citation_string }}</span>
         </div>
-        <div class="inline-block">
-          <span class="meta-data-header">Docket Number:</span>
-          <span class="meta-data-value">{{ case.docket.docket_number }}</span>
-        </div>
+        {% if case.docket.docket_number %}
+          <div class="inline-block">
+            <span class="meta-data-header">Docket Number:</span>
+            <span class="meta-data-value">{{ case.docket.docket_number }}</span>
+          </div>
+        {% endif %}
       </div>
       </article>
     {% endfor %}
