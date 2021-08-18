@@ -715,6 +715,12 @@ def match_based_text(
         cl_case_body = get_opinion_content(case)
         cl_characters = clean_body_content(cl_case_body)
 
+        if len(cl_characters) == 0:
+            logger.warning(
+                f"Empty opinion at https://www.courtlistener.com/opinion/{case.id}/{case.slug}"
+            )
+            continue
+
         case_and_texts = [case, harvard_characters, cl_characters]
         case_and_titles = [case, case_name_full, case_name_abbreviation]
         if any(
