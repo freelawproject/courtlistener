@@ -43,7 +43,7 @@ from cl.lib.search_utils import (
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_404
-from cl.lib.utils import alphanumeric_sort
+from cl.lib.utils import alphanumeric_sort, find_reporters
 from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -578,6 +578,12 @@ def reporter_or_volume_handler(
     2. We want to also show off that we know all these reporter abbreviations.
     """
     root_reporter = EDITIONS.get(reporter)
+
+    if not root_reporter:
+        # If no reporter found - attempt to find it without case sensitivity
+        # and periods and allow hyphens instead of spaces
+        reporter, root_reporter = find_reporters(reporter)
+
     if not root_reporter:
         return throw_404(
             request,
@@ -758,6 +764,10 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+
+    import logging
+    logging.disable(logging.DEBUG)
+
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
