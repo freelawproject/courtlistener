@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.template.defaultfilters import slugify
 from django.urls import reverse
+from django.utils.safestring import SafeText
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -790,16 +791,6 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    slug_edition = {slugify(item): item for item in EDITIONS}
-    slug_reporter = slugify(reporter)
-
-    if reporter and slug_reporter != reporter:
-        cd = {"reporter": slug_reporter}
-        if volume:
-            cd["volume"] = volume
-        if page:
-            cd["page"] = page
-        return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
 
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
@@ -832,11 +823,20 @@ def citation_redirector(
             },
         )
 
+    if reporter and reporter != slugify(reporter):
+        cd = {"reporter": slugify(reporter)}
+        if volume:
+            cd["volume"] = volume
+        if page:
+            cd["page"] = page
+        return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
+
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if reporter and volume and page:
-        reporter = slug_edition[slug_reporter]
-        return citation_handler(request, reporter, volume, page)
+        slug_edition = {slugify(item): item for item in EDITIONS}
+        real_reporter = slug_edition[SafeText(reporter)]
+        return citation_handler(request, real_reporter, volume, page)
     elif reporter and volume and page is None:
         return reporter_or_volume_handler(request, reporter, volume)
     elif reporter and volume is None and page is None:
