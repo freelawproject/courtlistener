@@ -716,6 +716,29 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
+    if cluster_count == 0:
+        # Do a second pass for the closest opinion and check if we have
+        # a page cite that matches -- if it does give the requested opinion
+        possible_match = (
+            OpinionCluster.objects.filter(
+                citations__reporter=reporter,
+                citations__volume=volume,
+            )
+            .annotate(as_integer=Cast("citations__page", IntegerField()))
+            .exclude(as_integer__gte=page)
+            .order_by("-as_integer")
+            .first()
+        )
+
+        if possible_match:
+            # There may be different page cite formats that aren't yet
+            # accounted for by this code.
+            clusters = OpinionCluster.objects.filter(
+                id=possible_match.id,
+                sub_opinions__html_with_citations__contains=f"*{page}",
+            )
+            cluster_count = 1 if clusters else 0
+
     # Show the correct page....
     if cluster_count == 0:
         # No results for an otherwise valid citation.
