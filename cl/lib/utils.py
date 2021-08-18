@@ -3,10 +3,9 @@ import errno
 import os
 import re
 from itertools import chain, islice, tee
-from typing import Any, List, Optional, Tuple
+from typing import Any, List
 
 from django.db.models import QuerySet
-from reporters_db import EDITIONS
 
 
 class _UNSPECIFIED(object):
@@ -120,31 +119,3 @@ def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
         convert(c) for c in re.split("([0-9]+)", getattr(key, sort_key))
     ]
     return sorted(query, key=alphanum_key)
-
-
-def find_reporters(reporter: str) -> Tuple[str, Optional[str]]:
-    """A convenience method to find reporter from url slug
-
-    :param EDITIONS: The reporter editions from reporters-db
-    :param reporter: The reporter in the URL slug
-    :return: The proper reporter string or original with root reporter if found
-    """
-    reporter_editions = EDITIONS.keys()
-    reporter_editions = [
-        rep.replace("(", "\\(").replace(")", "\\)")
-        for rep in reporter_editions
-    ]
-    reporter_editions = [
-        f"({rep.replace('.', '.?').replace(' ', ' ?-?')})"
-        for rep in reporter_editions
-    ]
-    rep_regex_pattern = "|".join(reporter_editions)
-    rep_regex = re.compile(r"^(%s)$" % rep_regex_pattern, re.I)
-    m = re.match(rep_regex, reporter)
-    if m and m.groups():
-        g = m.groups()
-        if g[0]:
-            reporter = list(EDITIONS.keys())[g[1:].index(g[0])]
-            root_reporter = EDITIONS.get(reporter)
-            return reporter, root_reporter
-    return reporter, None
