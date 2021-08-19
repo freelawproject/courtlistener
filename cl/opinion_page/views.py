@@ -650,20 +650,18 @@ def reporter_or_volume_handler(
             },
         )
 
-    volume_int = int(volume)
     volumes = list(
         (
-            OpinionCluster.objects.filter(
-                citations__reporter=reporter,
-            )
-            .annotate(as_integer=Cast("citations__volume", IntegerField()))
-            .filter(as_integer__range=[volume_int - 1, volume_int + 1])
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
             .values_list("as_integer", flat=True)
             .distinct()
+            .order_by("as_integer")
         )
     )
-    volume_previous = volumes[0] if volumes[0] != volume_int else None
-    volume_next = volumes[-1] if volumes[-1] != volume_int else None
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if len(volumes) < index else None
 
     paginator = Paginator(cases_in_volume, 250, orphans=5)
     page = request.GET.get("page", 1)
