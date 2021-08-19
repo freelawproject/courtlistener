@@ -145,6 +145,37 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_200_OK)
 
+    def test_link_to_page_in_citation(self) -> None:
+        """Test link to page with star pagination"""
+        # Here opinion cluster 2 has the citation 56 F.2d 9, but the
+        # HTML with citations contains star pagination for pages 9 and 10.
+        # This tests if we can find opinion cluster 2 with page 9 and 10
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56", "page": "9"},
+            )
+        )
+        self.assertEqual(r.url, "/opinion/2/case-name-cluster/")
+
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56", "page": "10"},
+            )
+        )
+        self.assertEqual(r.url, "/opinion/2/case-name-cluster/")
+
+    def test_slugifying_reporters(self) -> None:
+        """Test reporter slugification"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "F.2d", "volume": "56", "page": "9"},
+            )
+        )
+        self.assertEqual(r.url, "/c/f2d/56/9/")
+
 
 class ViewRecapDocketTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
