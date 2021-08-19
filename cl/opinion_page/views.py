@@ -848,15 +848,16 @@ def citation_redirector(
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
     slug_edition = {slugify(item): item for item in EDITIONS.keys()}
-    proper_reporter = slug_edition[SafeText(reporter)]
-
+    proper_reporter = slug_edition.get(SafeText(reporter), None)
+    if not proper_reporter:
+        return HttpResponse(status=404)
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
-    if reporter and volume and page:
+    if proper_reporter and volume and page:
         return citation_handler(request, proper_reporter, volume, page)
-    elif reporter and volume and page is None:
+    elif proper_reporter and volume and page is None:
         return reporter_or_volume_handler(request, proper_reporter, volume)
-    elif reporter and volume is None and page is None:
+    elif proper_reporter and volume is None and page is None:
         return reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
