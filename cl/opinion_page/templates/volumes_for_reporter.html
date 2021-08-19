@@ -45,8 +45,8 @@
     </div>
   {% elif volumes %}
     {# This lists the volumes in a given reporter #}
-    <div class="col-xs-12 col-md-10 col-lg-8">
-      <h1>Volumes of {{ volume_names|oxford_join }}&nbsp;({{ reporter|nbsp }})</h1>
+    <div class="col-xs-12 col-md-10 col-lg-8 text-center">
+      <h1>Volumes</h1> <h3 class="alt gray">&mdash; of the &mdash;</h3> <h1>{{ volume_names|oxford_join }}&nbsp; ({{ reporter|nbsp }})</h1>
       {% include "includes/reporter_variations.html" %}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
@@ -55,7 +55,7 @@
     <div class="col-xs-12 col-md-10 col-lg-8">
       <div class="row v-offset-above-2">
         {% for volume in volumes %}
-          <div class="col-xs-2">
+          <div class="col-xs-2 text-center">
             <h4><a href="{% url "citation_redirector" reporter volume %}">{{ volume }}</a></h4>
           </div>
         {% endfor %}
@@ -63,21 +63,23 @@
     </div>
   {% elif cases.paginator.count %}
     {# This lists the cases in a given reporter & volume #}
-    <div class="col-xs-1 col-md-1 col-lg-1">
+    <div class="col-xs-12 col-md-8 col-lg-8 text-center">
+      <h1>Volume
       {% if volume_previous %}
-        <a href="{% url "citation_redirector" reporter|slugify volume_previous %}" class="btn btn-sm btn-primary"><i class="fa fa-chevron-left"></i> {{ volume_previous }}</a>
+        <a title="Vol. {{ volume_previous }}" href="{% url "citation_redirector" reporter|slugify volume_previous %}" class="btn btn-xs btn-default"><i class="fa fa-chevron-left"></i> </a>
       {% endif %}
-    </div>
-    <div class="col-xs-10 col-md-8 col-lg-6 text-center">
-      <h1>Volume {{ volume }} of <a href="{% url "citation_redirector" reporter|slugify %}">{{ volume_names|oxford_join }}&nbsp;({{ reporter|nbsp }})</a></h1>
+        {{ volume }}
+      {% if volume_next %}
+        <a title="Vol. {{ volume_next }}" href="{% url "citation_redirector" reporter|slugify volume_next %}" class="btn btn-xs btn-default"><i class="fa fa-chevron-right"></i> </a>
+      {% endif %}
+      </h1>
+      <h3 class="alt gray">&mdash; of the &mdash;</h3>
+      <h1>
+        <a href="{% url "citation_redirector" reporter|slugify %}">{{ volume_names|oxford_join }}</a>&nbsp;({{ reporter|nbsp }})
+      </h1>
       {% include "includes/reporter_variations.html" %}
       {% if cases.paginator.num_pages > 1 %}
         {% include "includes/pagination.html" with results=cases %}
-      {% endif %}
-    </div>
-    <div class="col-xs-1 col-md-1 col-lg-1">
-      {% if volume_next %}
-        <a href="{% url "citation_redirector" reporter|slugify volume_next %}" class="btn btn-sm btn-primary pull-right">{{ volume_next }} <i class="fa fa-chevron-right"></i></a>
       {% endif %}
     </div>
     <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>
