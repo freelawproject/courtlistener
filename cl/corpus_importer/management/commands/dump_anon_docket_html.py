@@ -8,7 +8,7 @@ from cl.lib.command_utils import VerboseCommand
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 
 
-def make_html(options: Dict[str:str]) -> None:
+def make_html(options: Dict[str, str]) -> None:
     pacer_files = (
         PacerHtmlFiles.objects.filter(upload_type=UPLOAD_TYPE.DOCKET)
         .order_by("pk")
