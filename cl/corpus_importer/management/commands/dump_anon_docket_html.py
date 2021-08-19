@@ -22,7 +22,11 @@ def make_html(options: Dict[str, str]) -> None:
             with open(pacer_file.filepath.path, "r") as f:
                 text = f.read()
             report._parse_text(text)
-            anon_text = report.get_anonymized_text()
+            try:
+                anon_text = report.get_anonymized_text()
+            except IndexError:
+                print(f"Index error. Skipping: {pacer_file.filepath.path}")
+                continue
 
             # Save anonymized text to disk
             basename = os.path.basename(pacer_file.filepath.name)
