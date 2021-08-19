@@ -842,7 +842,9 @@ def citation_redirector(
             cd = {"reporter": reporter_slug, "volume": volume}
             if page:
                 cd["page"] = page
-            return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
+            return HttpResponseRedirect(
+                reverse("citation_redirector", kwargs=cd)
+            )
 
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
