@@ -35,13 +35,13 @@ def make_html(options: Dict[str, int]) -> None:
         upload_type=UPLOAD_TYPE.DOCKET
     ).order_by("pk")[options["offset"] :]
     total = pacer_files.count()
-    progress_bar = tqdm(total=total, ncols=40)
     process_map(
         _write_anon_item_to_disk,
         pacer_files,
         max_workers=options["processes"],
-        tqdm_class=progress_bar,
         chunksize=100,
+        total=total,
+        ncols=80,
     )
 
 
