@@ -10,13 +10,13 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 
 
 def make_html(options: Dict[str, str]) -> None:
-    pacer_files = (
-        PacerHtmlFiles.objects.filter(upload_type=UPLOAD_TYPE.DOCKET)
-        .order_by("pk")
-        .iterator()
-    )
+    pacer_files = PacerHtmlFiles.objects.filter(
+        upload_type=UPLOAD_TYPE.DOCKET
+    ).order_by("pk")
+    total = pacer_files.count()
+    pacer_files = pacer_files.iterator()
     report = DocketReport("cand")
-    with tqdm(total=pacer_files.count()) as progress_bar:
+    with tqdm(total=total) as progress_bar:
         for pacer_file in pacer_files:
             # Get the text and anonymize it
             with open(pacer_file.filepath.path, "r") as f:
