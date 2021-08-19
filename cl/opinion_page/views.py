@@ -7,12 +7,15 @@ from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Prefetch
+from django.db.models import F, IntegerField, Prefetch
+from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, render
 from django.template import loader
+from django.template.defaultfilters import slugify
 from django.urls import reverse
+from django.utils.safestring import SafeText
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -578,10 +581,11 @@ def reporter_or_volume_handler(
     2. We want to also show off that we know all these reporter abbreviations.
     """
     root_reporter = EDITIONS.get(reporter)
+
     if not root_reporter:
         return throw_404(
             request,
-            {"no_reporters": True, "reporter": reporter, "private": True},
+            {"no_reporters": True, "reporter": reporter, "private": False},
         )
 
     volume_names = [r["name"] for r in REPORTERS[root_reporter]]
@@ -608,7 +612,7 @@ def reporter_or_volume_handler(
                     "no_volumes": True,
                     "reporter": reporter,
                     "volume_names": volume_names,
-                    "private": True,
+                    "private": False,
                 },
             )
 
@@ -642,9 +646,22 @@ def reporter_or_volume_handler(
                 "reporter": reporter,
                 "volume_names": volume_names,
                 "volume": volume,
-                "private": True,
+                "private": False,
             },
         )
+
+    volumes = list(
+        (
+            Citation.objects.filter(reporter=reporter)
+            .annotate(as_integer=Cast("volume", IntegerField()))
+            .values_list("as_integer", flat=True)
+            .distinct()
+            .order_by("as_integer")
+        )
+    )
+    index = volumes.index(int(volume))
+    volume_previous = volumes[index - 1] if index > 0 else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
 
     paginator = Paginator(cases_in_volume, 250, orphans=5)
     page = request.GET.get("page", 1)
@@ -664,7 +681,9 @@ def reporter_or_volume_handler(
             "variation_names": variation_names,
             "volume": volume,
             "volume_names": volume_names,
-            "private": True,
+            "volume_previous": volume_previous,
+            "volume_next": volume_next,
+            "private": any([case.blocked for case in cases_in_volume]),
         },
     )
 
@@ -710,6 +729,29 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
+    if cluster_count == 0:
+        # Do a second pass for the closest opinion and check if we have
+        # a page cite that matches -- if it does give the requested opinion
+        possible_match = (
+            OpinionCluster.objects.filter(
+                citations__reporter=reporter,
+                citations__volume=volume,
+            )
+            .annotate(as_integer=Cast("citations__page", IntegerField()))
+            .exclude(as_integer__gte=page)
+            .order_by("-as_integer")
+            .first()
+        )
+
+        if possible_match:
+            # There may be different page cite formats that aren't yet
+            # accounted for by this code.
+            clusters = OpinionCluster.objects.filter(
+                id=possible_match.id,
+                sub_opinions__html_with_citations__contains=f"*{page}",
+            )
+            cluster_count = 1 if clusters else 0
+
     # Show the correct page....
     if cluster_count == 0:
         # No results for an otherwise valid citation.
@@ -719,7 +761,7 @@ def citation_handler(
             {
                 "none_found": True,
                 "citation_str": citation_str,
-                "private": True,
+                "private": False,
             },
             status=HTTP_404_NOT_FOUND,
         )
@@ -737,7 +779,7 @@ def citation_handler(
                     "too_many": True,
                     "citation_str": citation_str,
                     "clusters": clusters,
-                    "private": True,
+                    "private": any([cluster.blocked for cluster in clusters]),
                 },
                 request=request,
             ),
@@ -758,10 +800,11 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
-            # Redirect to the page with the right values
+            # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=cd)
@@ -771,11 +814,11 @@ def citation_redirector(
             return render(
                 request,
                 "citation_redirect_info_page.html",
-                {"show_homepage": True, "form": form, "private": True},
+                {"show_homepage": True, "form": form, "private": False},
             )
 
     if all(_ is None for _ in (reporter, volume, page)):
-        # No parameters. Show the standard page.
+        # No parameters. Show the citation lookup homepage.
         form = CitationRedirectorForm()
         reporter_dict = make_reporter_dict()
         return render(
@@ -789,14 +832,32 @@ def citation_redirector(
             },
         )
 
+    if reporter:
+        reporter_slug = slugify(reporter)
+        if reporter != reporter_slug:
+            # Reporter provided in non-slugified form. Redirect to slugified
+            # version.
+            cd = {"reporter": reporter_slug}
+            if volume:
+                cd["volume"] = volume
+            if page:
+                cd["page"] = page
+            return HttpResponseRedirect(
+                reverse("citation_redirector", kwargs=cd)
+            )
+
+    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
+    slug_edition = {slugify(item): item for item in EDITIONS.keys()}
+    proper_reporter = slug_edition[SafeText(reporter)]
+
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if reporter and volume and page:
-        return citation_handler(request, reporter, volume, page)
+        return citation_handler(request, proper_reporter, volume, page)
     elif reporter and volume and page is None:
-        return reporter_or_volume_handler(request, reporter, volume)
+        return reporter_or_volume_handler(request, proper_reporter, volume)
     elif reporter and volume is None and page is None:
-        return reporter_or_volume_handler(request, reporter)
+        return reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
 
