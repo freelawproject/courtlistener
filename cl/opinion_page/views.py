@@ -837,7 +837,9 @@ def citation_redirector(
         if reporter != reporter_slug:
             # Reporter provided in non-slugified form. Redirect to slugified
             # version.
-            cd = {"reporter": reporter_slug, "volume": volume}
+            cd = {"reporter": reporter_slug}
+            if volume:
+                cd["volume"] = volume
             if page:
                 cd["page"] = page
             return HttpResponseRedirect(
