@@ -581,11 +581,6 @@ def reporter_or_volume_handler(
     2. We want to also show off that we know all these reporter abbreviations.
     """
     root_reporter = EDITIONS.get(reporter)
-    if not root_reporter:
-        slug_edition = {slugify(item): item for item in EDITIONS}
-        slug_reporter = slugify(reporter)
-        reporter = slug_edition[slug_reporter]
-        root_reporter = EDITIONS.get(reporter)
 
     if not root_reporter:
         return throw_404(
@@ -822,22 +817,27 @@ def citation_redirector(
             },
         )
 
-    if reporter and reporter != slugify(reporter):
-        # Reporter provided in non-slugified form. Redirect to slugified
-        # version.
-        cd = {"reporter": slugify(reporter), "volume": volume, "page": page}
-        return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
+    if reporter:
+        reporter_slug = slugify(reporter)
+        if reporter != reporter_slug:
+            # Reporter provided in non-slugified form. Redirect to slugified
+            # version.
+            cd = {"reporter": reporter_slug, "volume": volume}
+            if page:
+                cd["page"] = page
+            return HttpResponseRedirect(reverse("citation_redirector", kwargs=cd))
 
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
+    slug_edition = {slugify(item): item for item in EDITIONS.keys()}
+    proper_reporter = slug_edition[SafeText(reporter)]
+
     if reporter and volume and page:
-        slug_edition = {slugify(item): item for item in EDITIONS.keys()}
-        real_reporter = slug_edition[SafeText(reporter)]
-        return citation_handler(request, real_reporter, volume, page)
+        return citation_handler(request, proper_reporter, volume, page)
     elif reporter and volume and page is None:
-        return reporter_or_volume_handler(request, reporter, volume)
+        return reporter_or_volume_handler(request, proper_reporter, volume)
     elif reporter and volume is None and page is None:
-        return reporter_or_volume_handler(request, reporter)
+        return reporter_or_volume_handler(request, proper_reporter)
     return HttpResponse(status=500)
 
 
