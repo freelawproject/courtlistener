@@ -254,7 +254,7 @@
       "html": "",
       "download_url": null,
       "cluster": 2,
-      "html_with_citations": "",
+      "html_with_citations": "yadda yadda <span class=\"star-pagination\">*9</span> this is page 9 <span class=\"star-pagination\">*10</span> this is content on page 10 can we link to it...",
       "local_path": "test/search/opinion_pdf_image_based.pdf",
       "html_columbia": "",
       "joined_by": [2],
