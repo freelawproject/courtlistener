@@ -41,6 +41,7 @@ def make_html(options: Dict[str, int]) -> None:
         pacer_files,
         max_workers=options["processes"],
         tqdm_class=progress_bar,
+        chunksize=100,
     )
 
 
