@@ -661,7 +661,7 @@ def reporter_or_volume_handler(
     )
     index = volumes.index(int(volume))
     volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if len(volumes) < index else None
+    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
 
     paginator = Paginator(cases_in_volume, 250, orphans=5)
     page = request.GET.get("page", 1)
