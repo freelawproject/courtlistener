@@ -31,17 +31,25 @@ def _write_anon_item_to_disk(pacer_file: PacerHtmlFiles) -> None:
 
 
 def make_html(options: Dict[str, int]) -> None:
+    offset = options["offset"]
     pacer_files = PacerHtmlFiles.objects.filter(
         upload_type=UPLOAD_TYPE.DOCKET
-    ).order_by("pk")[options["offset"] :]
+    ).order_by("pk")[offset:]
     total = pacer_files.count()
+    pacer_files = pacer_files.iterator()
+    progress_bar = tqdm(
+        total=total,
+        dynamic_ncols=True,
+        smoothing=0,
+        initial=offset,
+    )
     process_map(
         _write_anon_item_to_disk,
         pacer_files,
         max_workers=options["processes"],
-        chunksize=100,
+        tqdm_class=progress_bar,
+        chunksize=500,
         total=total,
-        ncols=80,
     )
 
 
