@@ -723,14 +723,12 @@ def match_based_text(
 
         case_and_texts = [case, harvard_characters, cl_characters]
         case_and_titles = [case, case_name_full, case_name_abbreviation]
-        if any(
-            [
-                length_too_different(*case_and_texts),
-                has_too_similar_citation(case, citation),
-                case_names_dont_overlap(*case_and_titles),
-                content_too_different(*case_and_texts, docket=docket_number),  # type: ignore
-                cosine_similarity_too_different(*case_and_titles),
-            ]
+        if (
+            length_too_different(*case_and_texts)
+            or has_too_similar_citation(case, citation)
+            or case_names_dont_overlap(*case_and_titles)
+            or cosine_similarity_too_different(*case_and_titles)
+            or content_too_different(*case_and_texts, docket=docket_number)
         ):
             continue
         return case
