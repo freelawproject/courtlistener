@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.11"
+version = "0.9.14"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -911,7 +911,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "juriscraper"
-version = "2.3.15"
+version = "2.3.16"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -2030,8 +2030,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.11.tar.gz", hash = "sha256:5c1b626893d644052c2307904f5b73f274932a5f101dd637a7a6d883d25d6aac"},
-    {file = "courts_db-0.9.11-py2.py3-none-any.whl", hash = "sha256:b3ebfcae196dd332e725fa7ec7ba80dabd8e555968abae56cc874b9198674ee2"},
+    {file = "courts-db-0.9.14.tar.gz", hash = "sha256:5ecb08706576fbd61ca77b1b4efde570ed3246f95dae54c1d7c1630ef6dc5e9f"},
+    {file = "courts_db-0.9.14-py2.py3-none-any.whl", hash = "sha256:3107928ac22cee765bd9aa61a0c8ad99eda219eb05667ac4c7ff79cb1b054632"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
@@ -2242,8 +2242,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.3.15-py27-none-any.whl", hash = "sha256:6a23214d66009469c890776d0ee1bd33892ccfa17fd1906f0e877a9762009455"},
-    {file = "juriscraper-2.3.15.tar.gz", hash = "sha256:2f17b234ad71a371d0bffdf37c23c5d4878dcab558367ecac8d81313e481dd69"},
+    {file = "juriscraper-2.3.16-py27-none-any.whl", hash = "sha256:c6a891c549c21d785d843c8ac93e4715869fa49d7ad8cfc6182af87abc8c88cc"},
+    {file = "juriscraper-2.3.16.tar.gz", hash = "sha256:d9c424a69a0da7906fa45d572330c1a903e68accc54b5d03907193552d0f702e"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
