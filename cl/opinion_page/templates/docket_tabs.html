@@ -105,6 +105,9 @@
               <a href="{% url "docket_feed" docket.pk %}"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
+              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
+            </li>
+            <li>
               <a href="{% url "alert_help" %}#recap-alerts"><i class="fa fa-question-circle-o fa-fw gray"></i> Learn More</a>
             </li>
           </ul>
