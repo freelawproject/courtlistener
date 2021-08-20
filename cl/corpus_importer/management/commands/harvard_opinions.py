@@ -722,13 +722,14 @@ def match_based_text(
             continue
 
         case_and_texts = [case, harvard_characters, cl_characters]
+        case_and_texts_and_docket = case_and_texts + [docket_number]
         case_and_titles = [case, case_name_full, case_name_abbreviation]
         if (
             length_too_different(*case_and_texts)
             or has_too_similar_citation(case, citation)
             or case_names_dont_overlap(*case_and_titles)
             or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts, docket=docket_number)
+            or content_too_different(*case_and_texts_and_docket)
         ):
             continue
         return case
