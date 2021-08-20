@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import Client
 from django.urls import reverse
+from django.utils.text import slugify
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_300_MULTIPLE_CHOICES,
@@ -100,6 +101,7 @@ class CitationRedirectorTest(TestCase):
         f2_cite.pk = None
         f2_cite.cluster_id = 3
         f2_cite.save()
+        self.citation["reporter"] = slugify(self.citation["reporter"])
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
@@ -125,14 +127,14 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse(
                 "citation_redirector",
-                kwargs={"reporter": "WL", "volume": "2012", "page": "2995064"},
+                kwargs={"reporter": "wl", "volume": "2012", "page": "2995064"},
             ),
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
     def test_volume_page(self) -> None:
         r = self.client.get(
-            reverse("citation_redirector", kwargs={"reporter": "F.2d"})
+            reverse("citation_redirector", kwargs={"reporter": "f2d"})
         )
         self.assertStatus(r, HTTP_200_OK)
 
@@ -140,10 +142,41 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse(
                 "citation_redirector",
-                kwargs={"reporter": "F.2d", "volume": "56"},
+                kwargs={"reporter": "f2d", "volume": "56"},
             )
         )
         self.assertStatus(r, HTTP_200_OK)
+
+    def test_link_to_page_in_citation(self) -> None:
+        """Test link to page with star pagination"""
+        # Here opinion cluster 2 has the citation 56 F.2d 9, but the
+        # HTML with citations contains star pagination for pages 9 and 10.
+        # This tests if we can find opinion cluster 2 with page 9 and 10
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56", "page": "9"},
+            )
+        )
+        self.assertEqual(r.url, "/opinion/2/case-name-cluster/")
+
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56", "page": "10"},
+            )
+        )
+        self.assertEqual(r.url, "/opinion/2/case-name-cluster/")
+
+    def test_slugifying_reporters(self) -> None:
+        """Test reporter slugification"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "F.2d", "volume": "56", "page": "9"},
+            )
+        )
+        self.assertEqual(r.url, "/c/f2d/56/9/")
 
 
 class ViewRecapDocketTest(TestCase):
