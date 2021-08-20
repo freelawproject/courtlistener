@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import Client
 from django.urls import reverse
+from django.utils.text import slugify
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_300_MULTIPLE_CHOICES,
@@ -100,6 +101,7 @@ class CitationRedirectorTest(TestCase):
         f2_cite.pk = None
         f2_cite.cluster_id = 3
         f2_cite.save()
+        self.citation["reporter"] = slugify(self.citation["reporter"])
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
@@ -125,14 +127,14 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse(
                 "citation_redirector",
-                kwargs={"reporter": "WL", "volume": "2012", "page": "2995064"},
+                kwargs={"reporter": "wl", "volume": "2012", "page": "2995064"},
             ),
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
     def test_volume_page(self) -> None:
         r = self.client.get(
-            reverse("citation_redirector", kwargs={"reporter": "F.2d"})
+            reverse("citation_redirector", kwargs={"reporter": "f2d"})
         )
         self.assertStatus(r, HTTP_200_OK)
 
@@ -140,7 +142,7 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse(
                 "citation_redirector",
-                kwargs={"reporter": "F.2d", "volume": "56"},
+                kwargs={"reporter": "f2d", "volume": "56"},
             )
         )
         self.assertStatus(r, HTTP_200_OK)
