@@ -63,7 +63,7 @@
     </div>
   {% elif cases.paginator.count %}
     {# This lists the cases in a given reporter & volume #}
-    <div class="col-xs-12 col-md-8 col-lg-8 text-center">
+    <div class="col-xs-12 col-md-10 col-lg-8 text-center">
       <h1>Volume
       {% if volume_previous %}
         <a title="Vol. {{ volume_previous }}" href="{% url "citation_redirector" reporter|slugify volume_previous %}" class="btn btn-xs btn-default"><i class="fa fa-chevron-left"></i> </a>
