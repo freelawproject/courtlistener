@@ -616,6 +616,8 @@ def content_too_different(
         cosine_sim = get_cosine_similarity(harvard_characters, cl_characters)
         if cosine_sim > 0.97:
             return False
+        else:
+            return True
 
     percent_match = compare_documents(harvard_characters, cl_characters)
     if percent_match < 60:
