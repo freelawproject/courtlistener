@@ -520,8 +520,12 @@ def get_opinion_content(cluster):
             opinions.append(op.html_with_citations)
         elif len(op.html_columbia) > 1:
             opinions.append(op.html_columbia)
+        elif len(op.html_lawbox) > 1:
+            opinions.append(op.html_lawbox)
         elif len(op.plain_text) > 1:
             opinions.append(op.plain_text)
+        elif len(op.html) > 1:
+            opinions.append(op.html)
         elif len(op.xml_harvard) > 1:
             opinions.append(op.xml_harvard)
     op = " ".join(opinions)
@@ -557,7 +561,7 @@ def clean_body_content(case_body: str, harvard: bool = False) -> str:
             opinions.append(op.text)
         opinion_text = "".join([op.text for op in soup.find_all("opinion")])
 
-    return re.sub(r"[^a-zA-Z0-9]", "", opinion_text.lower())
+    return re.sub(r"[^a-zA-Z0-9 ]", "", opinion_text.lower())
 
 
 def length_too_different(
@@ -607,6 +611,11 @@ def content_too_different(
     :param docket: The Harvard docket number
     :return: Whether the opinion content is too dissimilar
     """
+
+    if len(harvard_characters) > 10000:
+        cosine_sim = get_cosine_similarity(harvard_characters, cl_characters)
+        if cosine_sim > 0.97:
+            return False
 
     percent_match = compare_documents(harvard_characters, cl_characters)
     if percent_match < 60:
@@ -775,11 +784,14 @@ def find_previously_imported_cases(
             if match:
                 return match
 
-    possible_cases = OpinionCluster.objects.filter(
-        date_filed=date_filed,
-        docket__court_id=court_id,
-    ).order_by("id")
-
+    possible_cases = (
+        OpinionCluster.objects.filter(
+            date_filed=date_filed,
+            docket__court_id=court_id,
+        )
+        .exclude(citations__reporter=citation.reporter)
+        .order_by("id")
+    )
     docket_number = data["docket_number"]
     match = match_based_text(
         harvard_characters,
@@ -791,13 +803,15 @@ def find_previously_imported_cases(
     )
     if not match:
         month = timedelta(days=31)
-        broad_search = OpinionCluster.objects.filter(
-            date_filed__range=[date_filed - month, date_filed + month],
-            docket__court_id=court_id,
-        ).order_by("id")
-        possible_cases = [
-            case for case in broad_search if case.date_filed != date_filed
-        ]
+        possible_cases = (
+            OpinionCluster.objects.filter(
+                date_filed__range=[date_filed - month, date_filed + month],
+                docket__court_id=court_id,
+            )
+            .exclude(citations__reporter=citation.reporter)
+            .exclude(date_filed=date_filed)
+            .order_by("id")
+        )
         match = match_based_text(
             harvard_characters,
             docket_number,
