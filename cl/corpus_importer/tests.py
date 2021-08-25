@@ -715,4 +715,4 @@ class HarvardTests(TestCase):
         self.assertEqual(good_match, 100)
 
         bad_match = compare_documents(harvard_characters, bad_characters)
-        self.assertEqual(bad_match, 80)
+        self.assertEqual(bad_match, 81)
