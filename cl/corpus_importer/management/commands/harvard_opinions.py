@@ -518,6 +518,8 @@ def get_opinion_content(cluster):
     for op in Opinion.objects.filter(cluster_id=cluster.id):
         if len(op.html_with_citations) > 1:
             opinions.append(op.html_with_citations)
+        elif len(op.html_lawbox) > 1:
+            opinions.append(op.html_lawbox)
         elif len(op.html_columbia) > 1:
             opinions.append(op.html_columbia)
         elif len(op.plain_text) > 1:
