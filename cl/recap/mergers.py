@@ -599,6 +599,7 @@ def add_docket_entries(d, docket_entries, tags=None):
     rds_created = []
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries)
+    known_filing_dates = [d.date_last_filing]
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
         if response is None:
@@ -627,6 +628,7 @@ def add_docket_entries(d, docket_entries, tags=None):
 
         if de_created:
             content_updated = True
+            known_filing_dates.append(de.date_filed)
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -681,6 +683,10 @@ def add_docket_entries(d, docket_entries, tags=None):
         if tags:
             for tag in tags:
                 tag.tag_object(rd)
+
+    Docket.objects.filter(pk=d.pk).update(
+        date_last_filing=max(_ for _ in known_filing_dates if _)
+    )
 
     return rds_created, content_updated
 
