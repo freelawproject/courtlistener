@@ -684,9 +684,11 @@ def add_docket_entries(d, docket_entries, tags=None):
             for tag in tags:
                 tag.tag_object(rd)
 
-    Docket.objects.filter(pk=d.pk).update(
-        date_last_filing=max(_ for _ in known_filing_dates if _)
-    )
+    known_filing_dates = set(filter(None, known_filing_dates))
+    if known_filing_dates:
+        Docket.objects.filter(pk=d.pk).update(
+            date_last_filing=max(known_filing_dates)
+        )
 
     return rds_created, content_updated
 
