@@ -3,7 +3,7 @@ import errno
 import os
 import re
 from itertools import chain, islice, tee
-from typing import Any, List
+from typing import Any, List, Optional, Tuple, Union
 
 from django.db.models import QuerySet
 
@@ -119,3 +119,24 @@ def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
         convert(c) for c in re.split("([0-9]+)", getattr(key, sort_key))
     ]
     return sorted(query, key=alphanum_key)
+
+
+def human_sort(
+    unordered_list: List[Union[str, Tuple[str, Any]]],
+    key: Optional[str] = None,
+) -> List[Union[str, Tuple[str, Any]]]:
+    """Human sort Lists of strings or list of dictionaries
+
+    :param unordered_list: The list we want to sort
+    :param key: A key (if any) to sort the dictionary with.
+    :return: An ordered list
+    """
+    convert = lambda text: int(text) if text.isdigit() else text
+    if key:
+        sorter = lambda item: [
+            convert(c) for c in re.split("([0-9]+)", item[key])
+        ]
+    else:
+        sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
+
+    return sorted(unordered_list, key=sorter)

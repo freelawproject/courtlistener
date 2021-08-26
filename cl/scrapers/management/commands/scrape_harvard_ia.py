@@ -13,28 +13,12 @@ from django.conf import settings
 from internetarchive import ArchiveSession
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.utils import mkdir_p
-
-
-def human_sort(
-    unordered_list: List[Dict[str, str]], key: str
-) -> List[Dict[str, str]]:
-    """Sort dictionary alphanumerically using value
-
-    :param unordered_list: The list of items we want to sort
-    :param key: The dictionary key we want to sort against
-    :return: Human sorted list
-    """
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda item: [
-        convert(c) for c in re.split("([0-9]+)", item[key])
-    ]
-    return sorted(unordered_list, key=alphanum_key)
+from cl.lib.utils import human_sort, mkdir_p
 
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: Optional[str]
+    volumes: Optional[range]
 
 
 def fetch_ia_volumes(
@@ -64,23 +48,9 @@ def fetch_ia_volumes(
         return results
 
     # Return only the volumes requested, if specified
-    if "," not in volumes:
-        start, stop = volumes, volumes
-    else:
-        start, stop = volumes.split(",")
-    if not start:
-        start = 1
-    if not stop:
-        # I havent seen a reporter with 1000+ volumes but they may exist
-        stop = 1000
-
-    volume_range = range(int(start), int(stop) + 1)
-    volume_pattern = "|".join(
-        f"(.*{reporter}.{volume}$)" for volume in volume_range
-    )
-
+    vol_pattern = "|".join(f"(.*{reporter}.{volume}$)" for volume in volumes)
     results = [
-        res for res in results if re.match(volume_pattern, res["identifier"])
+        res for res in results if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
     return results
 
@@ -153,6 +123,14 @@ class Command(VerboseCommand):
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        def _parse_volumes(s: str) -> range:
+            volumes = [int(e) if e.strip() else 2000 for e in s.split(":")]
+            if len(volumes) == 1:
+                start = stop = volumes[0]
+            else:
+                start, stop = volumes[0], volumes[1] + 1
+            return range(start, stop)
+
         parser.add_argument(
             "--reporter",
             help="Reporter abbreviation as saved on IA.",
@@ -161,8 +139,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--volumes",
             required=False,
-            help="Volume range. Ex. 1,10 will fetch volumes 1 to 10 inclusive"
-            "1, will start at 1 and go; ,10 will go until 10th volume",
+            type=_parse_volumes,
+            help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
 
     def handle(self, *args, **options):

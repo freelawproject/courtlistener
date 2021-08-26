@@ -26,6 +26,7 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
+from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
@@ -56,7 +57,38 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def filepath_list(reporter: str, volumes: str) -> List:
+def _make_glob_from_args(reporter: str, volumes: Optional[range]) -> List[str]:
+    """Make list of glob paths
+
+    :param reporter: The reporter to filter to (optional)
+    :param volumes: The volumes of the reporter to filter to (optional)
+    :return: A list of glob paths
+    """
+    glob_paths = []
+    if reporter and volumes:
+        for volume in volumes:
+            reporter_key = f"law.free.cap.{reporter}.{volume}"
+            glob_path = (
+                f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
+            )
+            glob_paths.append(glob_path)
+    else:
+        if reporter:
+            reporter_key = ".".join(["law.free.cap", reporter])
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                f"{reporter_key}.*/*.json",
+            )
+        else:
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
+            )
+        glob_paths.append(glob_path)
+    return glob_paths
+
+
+def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -72,42 +104,11 @@ def filepath_list(reporter: str, volumes: str) -> List:
     :return: A sorted list of file paths
     """
 
-    if reporter and volumes:
-        files = []
-        if "," not in volumes:
-            start, stop = volumes, volumes
-        else:
-            start, stop = volumes.split(",")
-        start = "1" if not start else start
-        stop = "1000" if not stop else stop
-
-        for volume in range(int(start), int(stop) + 1):
-            reporter_key = f"law.free.cap.{reporter}.{volume}"
-            glob_path = (
-                f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
-            )
-            files.extend(glob(glob_path))
-    else:
-        if reporter:
-            reporter_key = ".".join(["law.free.cap", reporter])
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"{reporter_key}.*/*.json",
-            )
-        else:
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-            )
-
-        files = glob(glob_path)
-
-    # Human sort our files now.
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda item: [
-        convert(c) for c in re.split("([0-9]+)", item)
-    ]
-    files = sorted(files, key=alphanum_key)
+    files = []
+    glob_paths = _make_glob_from_args(reporter, volumes)
+    for glob_path in glob_paths:
+        files.extend(glob(glob_path))
+    files = human_sort(files, key=None)
     return files
 
 
@@ -186,7 +187,7 @@ def parse_extra_fields(soup, fields, long_field=False):
 
 class OptionsType(TypedDict):
     reporter: str
-    volumes: str
+    volumes: Optional[range]
     court_id: Optional[str]
     make_searchable: bool
 
@@ -996,11 +997,20 @@ class Command(VerboseCommand):
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
+        def _parse_volumes(s: str) -> range:
+            volumes = [int(e) if e.strip() else 2000 for e in s.split(":")]
+            if len(volumes) == 1:
+                start = stop = volumes[0]
+            else:
+                start, stop = volumes[0], volumes[1] + 1
+            return range(start, stop)
+
         parser.add_argument(
             "--volumes",
-            type=str,
-            help="Volume number. If none provided, "
-            "code will cycle through all volumes of reporter on IA.",
+            required=False,
+            type=_parse_volumes,
+            help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
