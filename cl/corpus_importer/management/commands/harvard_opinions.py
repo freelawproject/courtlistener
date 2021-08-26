@@ -57,11 +57,11 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def _make_glob_from_args(reporter: str, volumes: Optional[range]) -> List[str]:
+def _make_glob_from_args(reporter: Optional[str], volumes: Optional[range]) -> List[str]:
     """Make list of glob paths
 
-    :param reporter: The reporter to filter to (optional)
-    :param volumes: The volumes of the reporter to filter to (optional)
+    :param reporter: The reporter to filter if any
+    :param volumes: The volumes of the reporter to filter to, if any
     :return: A list of glob paths
     """
     glob_paths = []
