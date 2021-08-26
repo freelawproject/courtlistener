@@ -532,7 +532,7 @@ class HarvardTests(TestCase):
         parse_harvard_opinions(
             {
                 "reporter": None,
-                "volume": None,
+                "volumes": None,
                 "make_searchable": False,
                 "court_id": None,
             }
