@@ -56,7 +56,7 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def filepath_list(reporter, volume):
+def filepath_list(reporter: str, volumes: str) -> Optional[List]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -68,24 +68,50 @@ def filepath_list(reporter, volume):
        of that reporter.
 
     :param reporter: The reporter to filter to (optional)
-    :param volume: The volume of the reporter to filter to (optional)
+    :param volumes: The volumes of the reporter to filter to (optional)
     :return: A sorted list of file paths
     """
-    if reporter and volume:
-        reporter_key = ".".join(["law.free.cap", reporter, volume])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}/*.json"
-        )
-    elif reporter:
-        reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}.*/*.json"
-        )
+
+    if reporter and volumes:
+        files = []
+        if "," not in volumes:
+            start, stop = volumes, volumes
+        else:
+            start, stop = volumes.split(",")
+        if not start:
+            start = 1
+        if not stop:
+            # I havent seen a reporter with 1000+ volumes but they may exist
+            stop = 1000
+
+        for volume in range(int(start), int(stop) + 1):
+            reporter_key = f"law.free.cap.{reporter}.{volume}"
+            glob_path = (
+                f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
+            )
+            files.extend(glob(glob_path))
     else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-        )
-    return sorted(glob(glob_path))
+        if reporter:
+            reporter_key = ".".join(["law.free.cap", reporter])
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                f"{reporter_key}.*/*.json",
+            )
+        else:
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
+            )
+
+        files = glob(glob_path)
+
+    # Human sort our files now.
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda item: [
+        convert(c) for c in re.split("([0-9]+)", item)
+    ]
+    files = sorted(files, key=alphanum_key)
+    return files
 
 
 def check_for_match(new_case: str, possibilities: List[str]) -> bool:
@@ -163,7 +189,7 @@ def parse_extra_fields(soup, fields, long_field=False):
 
 class OptionsType(TypedDict):
     reporter: str
-    volume: str
+    volumes: str
     court_id: Optional[str]
     make_searchable: bool
 
@@ -177,7 +203,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     Optionally uses a reporter abbreviation to identify cases to download as
     used by IA.  (Ex. T.C. => tc)
 
-    Optionally uses a volume integer.
+    Optionally uses a volumes integer.
 
     If neither is provided, code will cycle through all downloaded files.
 
@@ -187,15 +213,15 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     """
 
     reporter = options["reporter"]
-    volume = options["volume"]
+    volumes = options["volumes"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
 
-    if not reporter and volume:
-        logger.error("You provided a volume but no reporter. Exiting.")
+    if not reporter and volumes:
+        logger.error("You provided volume(s) but no reporter. Exiting.")
         return
 
-    for file_path in filepath_list(reporter, volume):
+    for file_path in filepath_list(reporter, volumes):
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
@@ -974,7 +1000,7 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--volume",
+            "--volumes",
             type=str,
             help="Volume number. If none provided, "
             "code will cycle through all volumes of reporter on IA.",
