@@ -124,7 +124,7 @@ def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
 def human_sort(
     unordered_list: Iterable[Union[str, Tuple[str, Any]]],
     key: Optional[str] = None,
-) -> List[Union[str, Tuple[str, Any]]]:
+) -> Iterable[Union[str, Tuple[str, Any]]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort
