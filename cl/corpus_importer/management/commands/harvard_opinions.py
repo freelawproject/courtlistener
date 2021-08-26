@@ -108,7 +108,7 @@ def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
     glob_paths = _make_glob_from_args(reporter, volumes)
     for glob_path in glob_paths:
         files.extend(glob(glob_path))
-    files = human_sort(files, key=None)
+    files = human_sort(files, key=None)  # type: ignore
     return files  # type: ignore
 
 
