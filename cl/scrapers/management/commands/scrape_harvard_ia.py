@@ -39,7 +39,7 @@ class OptionsType(TypedDict):
 def fetch_ia_volumes(
     ia_session: ArchiveSession,
     options: OptionsType,
-) -> List:
+) -> List[str]:
     """Find and order volumes for a reporter (if found).
 
     :param ia_session: The IA archive session object
