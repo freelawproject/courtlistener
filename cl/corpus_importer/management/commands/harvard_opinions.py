@@ -26,7 +26,7 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
-from cl.lib.utils import human_sort
+from cl.lib.utils import _arg_parse_volumes, human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
@@ -997,18 +997,10 @@ class Command(VerboseCommand):
     help = "Download and save Harvard corpus on IA to disk."
 
     def add_arguments(self, parser):
-        def _parse_volumes(s: str) -> range:
-            volumes = [int(e) if e.strip() else 2000 for e in s.split(":")]
-            if len(volumes) == 1:
-                start = stop = volumes[0]
-            else:
-                start, stop = volumes[0], volumes[1] + 1
-            return range(start, stop)
-
         parser.add_argument(
             "--volumes",
             required=False,
-            type=_parse_volumes,
+            type=_arg_parse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
             "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
