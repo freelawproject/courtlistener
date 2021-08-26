@@ -4,6 +4,7 @@
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict
 
 import internetarchive as ia
@@ -92,14 +93,9 @@ def download_file(ia_key: str, file_name) -> None:
     :return: None
     """
     url = f"https://archive.org/download/{ia_key}/{file_name}"
+    directory = Path(settings.MEDIA_ROOT, "harvard_corpus", ia_key)
+    file_path = Path(directory, file_name)
 
-    file_path = os.path.join(
-        settings.MEDIA_ROOT,
-        "harvard_corpus",
-        f"{ia_key}",
-        f"{file_name}",
-    )
-    directory = file_path.rsplit("/", 1)[0]
     if os.path.exists(file_path):
         logger.info("Already captured: %s", url)
         return
