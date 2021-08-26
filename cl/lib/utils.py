@@ -3,7 +3,7 @@ import errno
 import os
 import re
 from itertools import chain, islice, tee
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Iterable, List, Optional, Tuple, Union
 
 from django.db.models import QuerySet
 
@@ -122,7 +122,7 @@ def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
 
 
 def human_sort(
-    unordered_list: List[Union[str, Tuple[str, Any]]],
+    unordered_list: Iterable[Union[str, Tuple[str, Any]]],
     key: Optional[str] = None,
 ) -> List[Union[str, Tuple[str, Any]]]:
     """Human sort Lists of strings or list of dictionaries
