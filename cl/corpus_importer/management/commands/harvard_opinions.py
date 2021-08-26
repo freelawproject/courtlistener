@@ -56,7 +56,7 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def filepath_list(reporter: str, volumes: str) -> Optional[List]:
+def filepath_list(reporter: str, volumes: str) -> List:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -78,11 +78,8 @@ def filepath_list(reporter: str, volumes: str) -> Optional[List]:
             start, stop = volumes, volumes
         else:
             start, stop = volumes.split(",")
-        if not start:
-            start = 1
-        if not stop:
-            # I havent seen a reporter with 1000+ volumes but they may exist
-            stop = 1000
+        start = "1" if not start else start
+        stop = "1000" if not stop else stop
 
         for volume in range(int(start), int(stop) + 1):
             reporter_key = f"law.free.cap.{reporter}.{volume}"
