@@ -9,7 +9,8 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from glob import glob
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict, \
+    Iterable
 
 from bs4 import BeautifulSoup
 from courts_db import find_court_ids_by_name
@@ -88,7 +89,7 @@ def _make_glob_from_args(reporter: str, volumes: Optional[range]) -> List[str]:
     return glob_paths
 
 
-def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
+def filepath_list(reporter: str, volumes: Optional[range]) -> Iterable[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
