@@ -3,77 +3,121 @@
 
 import json
 import os
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, TypedDict
 
 import internetarchive as ia
 import requests
 from django.conf import settings
+from internetarchive import ArchiveSession
 
+from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.utils import mkdir_p
+from cl.lib.utils import human_sort, mkdir_p
 
 
-def get_from_ia(reporter, volume):
+class OptionsType(TypedDict):
+    reporter: str
+    volumes: Optional[range]
+
+
+def fetch_ia_volumes(
+    ia_session: ArchiveSession,
+    options: OptionsType,
+) -> List[str]:
+    """Find and order volumes for a reporter (if found).
+
+    :param ia_session: The IA archive session object
+    :param options: The reporter and volume dictionary from argparse
+    :return: List of volumes to download from IA
     """
-    Download cases from internet archive via case law and write them to
-    disk.
 
-    :param reporter: (str) Requires a reporter abbreviation to identify
-    cases to download as used by IA.  (Ex. T.C. => tc)
-    :param volume: (int) Specific volume number of the reporter.  If blank
-    function will cycle through all volumes of the reporter on IA.
+    reporter = options["reporter"]
+    volumes = options["volumes"]
+
+    reporter_key = f"law.free.cap.{reporter}"
+    query = ia_session.search_items(reporter_key)
+
+    # Remove partial matches
+    filtered_query = [
+        row for row in query if f".{reporter}." in row["identifier"]
+    ]
+    results = human_sort(filtered_query, "identifier")
+
+    if not volumes:
+        return results
+
+    # Return only the volumes requested, if specified
+    vol_pattern = "|".join(f"(.*{reporter}.{volume}$)" for volume in volumes)
+    results = [
+        res for res in results if re.match(vol_pattern, res["identifier"])  # type: ignore
+    ]
+    return results
+
+
+def download_file(ia_key: str, file_name) -> None:
+    """Check if we have file, and download new files
+
+    :param ia_key: The IA key
+    :param file_name: The file name
     :return: None
     """
+    url = f"https://archive.org/download/{ia_key}/{file_name}"
+    directory = Path(settings.MEDIA_ROOT, "harvard_corpus", ia_key)
+    file_path = Path(directory, file_name)
 
+    if os.path.exists(file_path):
+        logger.info("Already captured: %s", url)
+        return
+
+    logger.info("Capturing: %s", url)
+    mkdir_p(directory)
+    data = requests.get(url, timeout=10).json()
+    with open(file_path, "w") as outfile:
+        json.dump(data, outfile, indent=2)
+
+
+def create_ia_session() -> ArchiveSession:
+    """Generate IA Session object
+
+    :return: IA session object
+    """
     logger.info("Creating IA session...")
     access_key = settings.IA_ACCESS_KEY
     secret_key = settings.IA_SECRET_KEY
-    ia_session = ia.get_session(
-        {"s3": {"access": access_key, "secret": secret_key}}
-    )
+    return ia.get_session({"s3": {"access": access_key, "secret": secret_key}})
 
-    reporter_key = ".".join(["law.free.cap", reporter])
 
-    # Checks that the returned reporter is the requested one.
-    # Ex. searching for Mich will return both Mich-app. and Mich.
-    for ia_identifier in ia_session.search_items(reporter_key):
-        logger.info(f"Got ia identifier: {ia_identifier}")
-        ia_key = ia_identifier["identifier"]
-        if ia_key.split(".")[3] != reporter:
-            continue
+def get_from_ia(options: OptionsType) -> None:
+    """Find and download files from IA
 
-        # Checks if we requested a specific volume of the
-        # reporter and if so skips all other volumes of that reporter
-        ia_volume = ia_key.split(".")[-1]
-        if volume is not None:
-            if volume != ia_volume:
-                continue
+    Download cases from internet archive via case law and write them to
+    disk.
 
-        ia_item = ia_session.get_item(ia_key)
-        for item in ia_item.get_files():
-            logger.info(f"Got item with name: {item.name}")
-            if "json.json" in item.name:
-                continue
+    :param options: Pass the reporter and volume parameters from command line
+    :return: None
+    """
+    ia_session = create_ia_session()
+    volumes_ids_for_reporter = fetch_ia_volumes(ia_session, options)
 
-            if "json" not in item.name:
-                continue
+    if not volumes_ids_for_reporter:
+        logger.info("No volumes found.")
+        return
 
-            url = f"https://archive.org/download/{ia_key}/{item.name}"
-            file_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"{ia_key}",
-                f"{item.name}",
-            )
-            directory = file_path.rsplit("/", 1)[0]
-            if os.path.exists(file_path):
-                logger.info("Already captured: %s", url)
-                continue
+    for ia_volume in volumes_ids_for_reporter:
+        ia_key = ia_volume["identifier"]
+        ia_items = ia_session.get_item(ia_key)
 
-            logger.info("Capturing: %s", url)
-            mkdir_p(directory)
-            data = requests.get(url, timeout=10).json()
-            with open(file_path, "w") as outfile:
-                json.dump(data, outfile, indent=2)
+        # Fetch items from archive - glob pattern excludes metadata
+        # and the curious double-json files.
+        files = ia_items.get_files(glob_pattern="[0-9]*")
+        # Convert to dict to use human sort
+        files = [file.__dict__ for file in files]
+        files = human_sort(files, "name")
+
+        for file in files:
+            download_file(ia_key, file["name"])
 
 
 class Command(VerboseCommand):
@@ -81,17 +125,17 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--volume",
-            help="Volume number. If none provided, code will cycle through "
-            "all volumes of reporter on IA.",
-        )
-        parser.add_argument(
             "--reporter",
             help="Reporter abbreviation as saved on IA.",
             required=True,
         )
+        parser.add_argument(
+            "--volumes",
+            required=False,
+            type=_argparse_volumes,
+            help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
+        )
 
     def handle(self, *args, **options):
-        reporter = options["reporter"]
-        volume = options["volume"]
-        get_from_ia(reporter, volume)
+        get_from_ia(options)
