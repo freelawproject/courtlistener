@@ -23,9 +23,11 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
+from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
+from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
@@ -56,7 +58,40 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def filepath_list(reporter, volume):
+def _make_glob_from_args(
+    reporter: Optional[str], volumes: Optional[range]
+) -> List[str]:
+    """Make list of glob paths
+
+    :param reporter: The reporter to filter if any
+    :param volumes: The volumes of the reporter to filter to, if any
+    :return: A list of glob paths
+    """
+    glob_paths = []
+    if reporter and volumes:
+        for volume in volumes:
+            reporter_key = f"law.free.cap.{reporter}.{volume}"
+            glob_path = (
+                f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
+            )
+            glob_paths.append(glob_path)
+    else:
+        if reporter:
+            reporter_key = ".".join(["law.free.cap", reporter])
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                f"{reporter_key}.*/*.json",
+            )
+        else:
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
+            )
+        glob_paths.append(glob_path)
+    return glob_paths
+
+
+def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -68,24 +103,16 @@ def filepath_list(reporter, volume):
        of that reporter.
 
     :param reporter: The reporter to filter to (optional)
-    :param volume: The volume of the reporter to filter to (optional)
+    :param volumes: The volumes of the reporter to filter to (optional)
     :return: A sorted list of file paths
     """
-    if reporter and volume:
-        reporter_key = ".".join(["law.free.cap", reporter, volume])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}/*.json"
-        )
-    elif reporter:
-        reporter_key = ".".join(["law.free.cap", reporter])
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", f"{reporter_key}.*/*.json"
-        )
-    else:
-        glob_path = os.path.join(
-            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-        )
-    return sorted(glob(glob_path))
+
+    files = []
+    glob_paths = _make_glob_from_args(reporter, volumes)
+    for glob_path in glob_paths:
+        files.extend(glob(glob_path))
+    files = human_sort(files, key=None)  # type: ignore
+    return files  # type: ignore
 
 
 def check_for_match(new_case: str, possibilities: List[str]) -> bool:
@@ -163,7 +190,7 @@ def parse_extra_fields(soup, fields, long_field=False):
 
 class OptionsType(TypedDict):
     reporter: str
-    volume: str
+    volumes: Optional[range]
     court_id: Optional[str]
     make_searchable: bool
 
@@ -177,7 +204,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     Optionally uses a reporter abbreviation to identify cases to download as
     used by IA.  (Ex. T.C. => tc)
 
-    Optionally uses a volume integer.
+    Optionally uses a volumes integer.
 
     If neither is provided, code will cycle through all downloaded files.
 
@@ -187,15 +214,15 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     """
 
     reporter = options["reporter"]
-    volume = options["volume"]
+    volumes = options["volumes"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
 
-    if not reporter and volume:
-        logger.error("You provided a volume but no reporter. Exiting.")
+    if not reporter and volumes:
+        logger.error("You provided volume(s) but no reporter. Exiting.")
         return
 
-    for file_path in filepath_list(reporter, volume):
+    for file_path in filepath_list(reporter, volumes):
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
@@ -974,10 +1001,11 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--volume",
-            type=str,
-            help="Volume number. If none provided, "
-            "code will cycle through all volumes of reporter on IA.",
+            "--volumes",
+            required=False,
+            type=_argparse_volumes,
+            help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
