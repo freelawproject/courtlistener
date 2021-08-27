@@ -626,22 +626,28 @@ class Position(AbstractDateTimeModel):
         ("rec_postpone", "Recommendation Postponed"),
         ("rec_bad", "Recommended Unfavorably"),
     )
+    ELECTION_PARTISAN = "e_part"
+    ELECTION_NON_PARTISAN = "e_non_part"
+    APPOINTMENT_PRESEDENT = "a_pres"
+    APPOINTMENT_GOVERNOR = "a_gov"
+    APPOINTMENT_LEGISLATURE = "a_legis"
+    APPOINTMENT_JUDGE = "a_judge"
     SELECTION_METHODS = (
         (
             "Election",
             (
-                ("e_part", "Partisan Election"),
-                ("e_non_part", "Non-Partisan Election"),
+                (ELECTION_PARTISAN, "Partisan Election"),
+                (ELECTION_NON_PARTISAN, "Non-Partisan Election"),
             ),
         ),
         (
             "Appointment",
             (
-                ("a_pres", "Appointment (President)"),
-                ("a_gov", "Appointment (Governor)"),
-                ("a_legis", "Appointment (Legislature)"),
+                (APPOINTMENT_PRESEDENT, "Appointment (President)"),
+                (APPOINTMENT_GOVERNOR, "Appointment (Governor)"),
+                (APPOINTMENT_LEGISLATURE, "Appointment (Legislature)"),
                 # FISC appointments are made by the chief justice of SCOTUS
-                ("a_judge", "Appointment (Judge)"),
+                (APPOINTMENT_JUDGE, "Appointment (Judge)"),
             ),
         ),
     )
