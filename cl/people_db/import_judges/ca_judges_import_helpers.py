@@ -136,7 +136,6 @@ def find_or_create_judge(judgeJson, counties):
 # def parse_name(last_first_middle, first, last):
 # examples
 
-# Lookup court by name
 def find_court(position, counties):
     # Association
     # County Counsel
@@ -191,13 +190,13 @@ def find_court(position, counties):
         return None
 
 
-# given an org_name for a court that is county based
-# i.e., Municipal, Superior, Justice
-# e.g., "Butte Justice Court", "Los Angeles Municipal Court", "Santa Clara Superior Court"
-# split by space and if 2nd to last is "Superior" or "Justice" or "Municipal"
-# and last is "Court"
-# find the corresponding court in the abbreviations
 def lookup_court_abbr(org_name, counties):
+    # given an org_name for a court that is county based
+    # i.e., Municipal, Superior, Justice
+    # e.g., "Butte Justice Court", "Los Angeles Municipal Court", "Santa Clara Superior Court"
+    # split by space and if 2nd to last is "Superior" or "Justice" or "Municipal"
+    # and last is "Court"
+    # find the corresponding court in the abbreviations
     state_courts = ["Justice", "Municipal", "Superior"]
     parts = org_name.split(" ")
     if parts[-1] == "Court" and parts[-2] in state_courts:
