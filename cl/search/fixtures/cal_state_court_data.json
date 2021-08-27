@@ -286,7 +286,7 @@
   },
   {
     "fields": {
-      "position": 350.71,
+      "position": 350.710,
       "short_name": "California Municipal Court, Fresno County",
       "full_name": "Municipal Court of California, County of Fresno",
       "citation_string": "Cal. Mun. Ct. (Fresno)",
@@ -476,7 +476,7 @@
   },
   {
     "fields": {
-      "position": 350.72,
+      "position": 350.720,
       "short_name": "California Municipal Court, Madera County",
       "full_name": "Municipal Court of California, County of Madera",
       "citation_string": "Cal. Mun. Ct. (Madera)",
@@ -666,7 +666,7 @@
   },
   {
     "fields": {
-      "position": 350.73,
+      "position": 350.730,
       "short_name": "California Municipal Court, Orange County",
       "full_name": "Municipal Court of California, County of Orange",
       "citation_string": "Cal. Mun. Ct. (Orange)",
@@ -856,7 +856,7 @@
   },
   {
     "fields": {
-      "position": 350.74,
+      "position": 350.740,
       "short_name": "California Municipal Court, San Luis Obispo County",
       "full_name": "Municipal Court of California, County of San Luis Obispo",
       "citation_string": "Cal. Mun. Ct. (San Luis Obispo)",
@@ -1046,7 +1046,7 @@
   },
   {
     "fields": {
-      "position": 350.75,
+      "position": 350.750,
       "short_name": "California Municipal Court, Stanislaus County",
       "full_name": "Municipal Court of California, County of Stanislaus",
       "citation_string": "Cal. Mun. Ct. (Stanislaus)",
@@ -1388,7 +1388,7 @@
   },
   {
     "fields": {
-      "position": 350.61,
+      "position": 350.610,
       "short_name": "California Superior Court, Fresno County",
       "full_name": "Superior Court of California, County of Fresno",
       "citation_string": "Cal. Supp. Ct. (Fresno)",
@@ -1578,7 +1578,7 @@
   },
   {
     "fields": {
-      "position": 350.62,
+      "position": 350.620,
       "short_name": "California Superior Court, Madera County",
       "full_name": "Superior Court of California, County of Madera",
       "citation_string": "Cal. Supp. Ct. (Madera)",
@@ -1768,7 +1768,7 @@
   },
   {
     "fields": {
-      "position": 350.63,
+      "position": 350.630,
       "short_name": "California Superior Court, Orange County",
       "full_name": "Superior Court of California, County of Orange",
       "citation_string": "Cal. Supp. Ct. (Orange)",
@@ -1958,7 +1958,7 @@
   },
   {
     "fields": {
-      "position": 350.64,
+      "position": 350.640,
       "short_name": "California Superior Court, San Luis Obispo County",
       "full_name": "Superior Court of California, County of San Luis Obispo",
       "citation_string": "Cal. Supp. Ct. (San Luis Obispo)",
@@ -2148,7 +2148,7 @@
   },
   {
     "fields": {
-      "position": 350.65,
+      "position": 350.650,
       "short_name": "California Superior Court, Stanislaus County",
       "full_name": "Superior Court of California, County of Stanislaus",
       "citation_string": "Cal. Supp. Ct. (Stanislaus)",
@@ -2316,5 +2316,423 @@
     },
     "model": "search.Court",
     "pk": "calsuppctyub"
+  },
+  {
+    "fields": {
+      "position": 350.801,
+      "short_name": "California Justice Court, Butte County",
+      "full_name": "Califonia Justice Court, Butte County",
+      "citation_string": "Cal. Just. Ct. (Butte)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctbut"
+  },
+  {
+    "fields": {
+      "position": 350.802,
+      "short_name": "California Justice Court, Colusa County",
+      "full_name": "Califonia Justice Court, Colusa County",
+      "citation_string": "Cal. Just. Ct. (Colusa)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctcol"
+  },
+  {
+    "fields": {
+      "position": 350.803,
+      "short_name": "California Justice Court, Fresno County",
+      "full_name": "Califonia Justice Court, Fresno County",
+      "citation_string": "Cal. Just. Ct. (Fresno)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctfre"
+  },
+  {
+    "fields": {
+      "position": 350.804,
+      "short_name": "California Justice Court, Glenn County",
+      "full_name": "Califonia Justice Court, Glenn County",
+      "citation_string": "Cal. Just. Ct. (Glenn)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctgle"
+  },
+  {
+    "fields": {
+      "position": 350.805,
+      "short_name": "California Justice Court, Humboldt County",
+      "full_name": "Califonia Justice Court, Humboldt County",
+      "citation_string": "Cal. Just. Ct. (Humboldt)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcthum"
+  },
+  {
+    "fields": {
+      "position": 350.806,
+      "short_name": "California Justice Court, Kern County",
+      "full_name": "Califonia Justice Court, Kern County",
+      "citation_string": "Cal. Just. Ct. (Kern)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctker"
+  },
+  {
+    "fields": {
+      "position": 350.807,
+      "short_name": "California Justice Court, Kings County",
+      "full_name": "Califonia Justice Court, Kings County",
+      "citation_string": "Cal. Just. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctkin"
+  },
+  {
+    "fields": {
+      "position": 350.808,
+      "short_name": "California Justice Court, Kings County",
+      "full_name": "Califonia Justice Court, Kings County",
+      "citation_string": "Cal. Just. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctkin"
+  },
+  {
+    "fields": {
+      "position": 350.809,
+      "short_name": "California Justice Court, Lake County",
+      "full_name": "Califonia Justice Court, Lake County",
+      "citation_string": "Cal. Just. Ct. (Lake)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctlak"
+  },
+  {
+    "fields": {
+      "position": 350.810,
+      "short_name": "California Justice Court, Los Angeles County",
+      "full_name": "Califonia Justice Court, Los Angeles County",
+      "citation_string": "Cal. Just. Ct. (Los Angeles)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctla"
+  },
+  {
+    "fields": {
+      "position": 350.811,
+      "short_name": "California Justice Court, Madera County",
+      "full_name": "Califonia Justice Court, Madera County",
+      "citation_string": "Cal. Just. Ct. (Madera)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmad"
+  },
+  {
+    "fields": {
+      "position": 350.812,
+      "short_name": "California Justice Court, Mariposa County",
+      "full_name": "Califonia Justice Court, Mariposa County",
+      "citation_string": "Cal. Just. Ct. (Mariposa)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmpa"
+  },
+  {
+    "fields": {
+      "position": 350.813,
+      "short_name": "California Justice Court, Mendocino County",
+      "full_name": "Califonia Justice Court, Mendocino County",
+      "citation_string": "Cal. Just. Ct. (Mendocino)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmen"
+  },
+  {
+    "fields": {
+      "position": 350.814,
+      "short_name": "California Justice Court, Mono County",
+      "full_name": "Califonia Justice Court, Mono County",
+      "citation_string": "Cal. Just. Ct. (Mono)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmno"
+  },
+  {
+    "fields": {
+      "position": 350.815,
+      "short_name": "California Justice Court, Nevada County",
+      "full_name": "Califonia Justice Court, Nevada County",
+      "citation_string": "Cal. Just. Ct. (Nevada)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctnev"
+  },
+  {
+    "fields": {
+      "position": 350.816,
+      "short_name": "California Justice Court, Placer County",
+      "full_name": "Califonia Justice Court, Placer County",
+      "citation_string": "Cal. Just. Ct. (Placer)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctpla"
+  },
+  {
+    "fields": {
+      "position": 350.817,
+      "short_name": "California Justice Court, Plumas County",
+      "full_name": "Califonia Justice Court, Plumas County",
+      "citation_string": "Cal. Just. Ct. (Plumas)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctplu"
+  },
+  {
+    "fields": {
+      "position": 350.818,
+      "short_name": "California Justice Court, San Benito County",
+      "full_name": "Califonia Justice Court, San Benito County",
+      "citation_string": "Cal. Just. Ct. (San Benito)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsbt"
+  },
+  {
+    "fields": {
+      "position": 350.819,
+      "short_name": "California Justice Court, San Bernardino County",
+      "full_name": "Califonia Justice Court, San Bernardino County",
+      "citation_string": "Cal. Just. Ct. (San Bernardino)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsbd"
+  },
+  {
+    "fields": {
+      "position": 350.820,
+      "short_name": "California Justice Court, Siskiyou County",
+      "full_name": "Califonia Justice Court, Siskiyou County",
+      "citation_string": "Cal. Just. Ct. (Siskiyou)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsis"
+  },
+  {
+    "fields": {
+      "position": 350.821,
+      "short_name": "California Justice Court, Tulare County",
+      "full_name": "Califonia Justice Court, Tulare County",
+      "citation_string": "Cal. Just. Ct. (Tulare)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcttul"
+  },
+  {
+    "fields": {
+      "position": 350.822,
+      "short_name": "California Justice Court, Tuolumne County",
+      "full_name": "Califonia Justice Court, Tuolumne County",
+      "citation_string": "Cal. Just. Ct. (Tuolumne)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcttuo"
   }
 ]
