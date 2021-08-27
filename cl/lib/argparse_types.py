@@ -35,3 +35,17 @@ def readable_dir(prospective_dir):
         raise argparse.ArgumentTypeError(
             f"readable_dir:{prospective_dir} is not a readable dir"
         )
+
+
+def _argparse_volumes(volumes_arg: str) -> range:
+    """Custom argparse handling for volumes
+
+    :param volumes_arg: The volume argparse for harvard imports
+    :return: Range of values
+    """
+    volumes = [int(e) if e.strip() else 2000 for e in volumes_arg.split(":")]
+    if len(volumes) == 1:
+        start = stop = volumes[0]
+    else:
+        start, stop = volumes[0], volumes[1] + 1
+    return range(start, stop)

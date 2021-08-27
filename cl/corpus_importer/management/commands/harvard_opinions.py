@@ -23,10 +23,11 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
+from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
-from cl.lib.utils import _arg_parse_volumes, human_sort
+from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
@@ -57,7 +58,9 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     return date_obj, date_approx
 
 
-def _make_glob_from_args(reporter: Optional[str], volumes: Optional[range]) -> List[str]:
+def _make_glob_from_args(
+    reporter: Optional[str], volumes: Optional[range]
+) -> List[str]:
     """Make list of glob paths
 
     :param reporter: The reporter to filter if any
@@ -1000,7 +1003,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--volumes",
             required=False,
-            type=_arg_parse_volumes,
+            type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
             "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )

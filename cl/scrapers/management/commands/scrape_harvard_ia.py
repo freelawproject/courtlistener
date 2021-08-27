@@ -12,8 +12,9 @@ import requests
 from django.conf import settings
 from internetarchive import ArchiveSession
 
+from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.utils import _arg_parse_volumes, human_sort, mkdir_p
+from cl.lib.utils import human_sort, mkdir_p
 
 
 class OptionsType(TypedDict):
@@ -131,7 +132,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--volumes",
             required=False,
-            type=_arg_parse_volumes,
+            type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
             "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )

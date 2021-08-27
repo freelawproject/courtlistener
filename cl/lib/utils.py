@@ -140,12 +140,3 @@ def human_sort(
         sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
 
     return sorted(unordered_list, key=sorter)
-
-
-def _arg_parse_volumes(s: str) -> range:
-    volumes = [int(e) if e.strip() else 2000 for e in s.split(":")]
-    if len(volumes) == 1:
-        start = stop = volumes[0]
-    else:
-        start, stop = volumes[0], volumes[1] + 1
-    return range(start, stop)
