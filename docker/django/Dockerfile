@@ -33,13 +33,14 @@ ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
 # `builder-base` stage is used to build deps + create our virtual environment
 FROM python-base as builder-base
+
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
         --no-install-recommends \
         --assume-yes \
         --quiet=2 \
         # So we can use Python-slim
-        build-essential gcc python-dev\
+        build-essential gcc python3-dev\
         # So postgres can compile and users can use dbshell
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
@@ -53,7 +54,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # Image & OCR tools
         imagemagick tesseract-ocr tesseract-ocr-eng \
         # Other dependencies
-        libffi-dev libxml2-dev libxslt-dev procps vim
+        libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
@@ -68,8 +69,8 @@ RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
 RUN apt purge --assume-yes \
-        build-essential curl gcc git python-dev \
-        libffi-dev libxml2-dev libxslt-dev \
+        build-essential curl gcc git python3-dev \
+        libffi-dev libxml2-dev libxslt-dev cmake\
     && apt autoremove --assume-yes
 
 # will become mountpoint of our code
