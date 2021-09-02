@@ -717,9 +717,3 @@ class HarvardTests(TestCase):
 
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
-
-    def test_florida_court_addition(self):
-        """Can we find a court from our new fixture?"""
-
-        result = courts_db.find_court("Broward County Judges' Court")
-        self.assertEqual(result[0], "flajudct9", msg="Missing Florida Court")
