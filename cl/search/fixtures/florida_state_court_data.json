@@ -22,8 +22,8 @@
     "fields": {
       "jurisdiction": "ST",
       "position": 355.0501,
-      "short_name": "Broward County Judges' Court",
-      "full_name": "Broward County Judges' Court",
+      "short_name": "Broward County Judge's Court",
+      "full_name": "Broward County Judge's Court",
       "citation_string": "Broward Cty. J. Ct.",
       "end_date": "1972-12-31",
       "in_use": false,
@@ -98,8 +98,8 @@
     "fields": {
       "jurisdiction": "ST",
       "position": 355.0505,
-      "short_name": "Hamilton County Judges' Court",
-      "full_name": "Hamilton County Judges' Court",
+      "short_name": "Hamilton County Judge's Court",
+      "full_name": "Hamilton County Judge's Court",
       "citation_string": "Hamilton Cty. J. Ct.",
       "end_date": "1972-12-31",
       "in_use": false,
