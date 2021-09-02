@@ -5,6 +5,7 @@ from glob import iglob
 from pathlib import Path
 from unittest.mock import patch
 
+import courts_db
 import pytest
 from django.conf import settings
 
