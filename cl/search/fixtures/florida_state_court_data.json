@@ -1,0 +1,3726 @@
+[
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.05,
+      "short_name": "Florida Judge's Courts",
+      "full_name": "Florida Judge's Courts",
+      "citation_string": "Fla. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0501,
+      "short_name": "Broward County Judge's Court",
+      "full_name": "Broward County Judge's Court",
+      "citation_string": "Broward Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct9"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0502,
+      "short_name": "Charlotte County Judge's Court",
+      "full_name": "Charlotte County Judge's Court",
+      "citation_string": "Charlotte Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0503,
+      "short_name": "Dade County Judge's Court",
+      "full_name": "Dade County Judge's Court",
+      "citation_string": "Dade Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0504,
+      "short_name": "Duval County Judge's Court",
+      "full_name": "Duval County Judge's Court",
+      "citation_string": "Duval Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct13"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0505,
+      "short_name": "Hamilton County Judge's Court",
+      "full_name": "Hamilton County Judge's Court",
+      "citation_string": "Hamilton Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0506,
+      "short_name": "Lake County Judge's Court",
+      "full_name": "Lake County Judge's Court",
+      "citation_string": "Lake Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct8"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0507,
+      "short_name": "Lee County Judge's Court",
+      "full_name": "Lee County Judge's Court",
+      "citation_string": "Lee Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct5"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0508,
+      "short_name": "Monroe County Judge Court",
+      "full_name": "Monroe County Judge Court",
+      "citation_string": "Monroe Cty. Judge Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct11"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0509,
+      "short_name": "Orange County Judge's Court",
+      "full_name": "Orange County Judge's Court",
+      "citation_string": "Orange Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.051,
+      "short_name": "Palm Beach County Judge's Court",
+      "full_name": "Palm Beach County Judge's Court",
+      "citation_string": "Palm Beach Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct12"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0511,
+      "short_name": "Pinellas County Judge's Court",
+      "full_name": "Pinellas County Judge's Court",
+      "citation_string": "Pinellas Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct10"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0512,
+      "short_name": "Sarasota County Judge's Court",
+      "full_name": "Sarasota County Judge's Court",
+      "citation_string": "Sarasota Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct14"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0513,
+      "short_name": "Suwannee County Judge's Court",
+      "full_name": "Suwannee County Judge's Court",
+      "citation_string": "Suwannee Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct7"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0514,
+      "short_name": "Volusia County Judge's Court",
+      "full_name": "Volusia County Judge's Court",
+      "citation_string": "Volusia Cty. J. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajudct6"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.06,
+      "short_name": "Florida Small Claims Courts",
+      "full_name": "Florida Small Claims Courts",
+      "citation_string": "Fla. Sm. Cl. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flasmclct"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0601,
+      "short_name": "Broward County Small Claims Court",
+      "full_name": "Broward County Small Claims Court",
+      "citation_string": "Broward Cty. Sm. Cl. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flasmclct1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0602,
+      "short_name": "Dade County Small Claims Court",
+      "full_name": "Dade County Small Claims Court",
+      "citation_string": "Dade Cty. Sm. Cl. Ct",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flasmclct3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0603,
+      "short_name": "Palm Beach County Small Claims Court",
+      "full_name": "Palm Beach County Small Claims Court",
+      "citation_string": "Palm Beach Cty. Sm Cl. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flasmclct2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0604,
+      "short_name": "St. Lucie County Small Claims Court",
+      "full_name": "St. Lucie County Small Claims Court",
+      "citation_string": "St. Lucie Cty. Sm. Cl. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flasmclct4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SS",
+      "position": 355.09,
+      "short_name": "Florida Public Service Commission",
+      "full_name": "Florida Public Service Commission",
+      "citation_string": "Fla. Pub. Serv. Comm'n",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.psc.state.fl.us/",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1887-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flapubserv"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SS",
+      "position": 355.0901,
+      "short_name": "Florida Industrial Commission",
+      "full_name": "Florida Industrial Commission",
+      "citation_string": "Fla. Indus. Comm'n",
+      "end_date": "1969-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1935-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flaindcommn"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SS",
+      "position": 355.0902,
+      "short_name": "Florida Real Estate Commission",
+      "full_name": "Florida Real Estate Commission",
+      "citation_string": "Fla. Real Est. Comm'n",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flarealestcommn"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.01,
+      "short_name": "Florida First District Court of Appeal",
+      "full_name": "Florida First District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 1st Dist.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": true,
+      "start_date": "1957-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.011,
+      "short_name": "Florida Second District Court of Appeal",
+      "full_name": "Florida Second District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 2d Dist.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": true,
+      "start_date": "1957-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.012,
+      "short_name": "Florida Third District Court of Appeal",
+      "full_name": "Florida Third District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 3d Dist.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": true,
+      "start_date": "1957-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.013,
+      "short_name": "Florida Fourth District Court of Appeal",
+      "full_name": "Florida Fourth District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 4th Dist.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": true,
+      "start_date": "1957-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.014,
+      "short_name": "Florida Fifth District Court of Appeal",
+      "full_name": "Florida Fifth District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 5th Dist.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": true,
+      "start_date": "1957-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp5"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.08,
+      "short_name": "Florida Juvenile and Domestic Relations Court",
+      "full_name": "Florida Juvenile and Domestic Relations Court",
+      "citation_string": "Fla. Juv. & Dom. Rel. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajuv"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0801,
+      "short_name": "Palm Beach County Juvenile and Domestic Relations Court",
+      "full_name": "Palm Beach County Juvenile and Domestic Relations Court",
+      "citation_string": "Palm Beach Cty. Juv. & Dom. Rel. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flajuv1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.04,
+      "short_name": "Florida's Civil and Criminal Court of Records",
+      "full_name": "Florida's Civil and Criminal Court of Records",
+      "citation_string": "Fla. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.041,
+      "short_name": "Brevard County Court of Record",
+      "full_name": "Brevard County Civil and Criminal Court of Record",
+      "citation_string": "Brevard Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec5"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.042,
+      "short_name": "Broward County Court of Record",
+      "full_name": "Broward County Civil and Criminal Court of Record",
+      "citation_string": "Broward Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec7"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.043,
+      "short_name": "Dade County Court of Record",
+      "full_name": "Dade County Civil and Criminal Court of Record",
+      "citation_string": "Dade Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec6"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.044,
+      "short_name": "Duval County Court of Record",
+      "full_name": "Duval County Civil and Criminal Court of Record",
+      "citation_string": "Duval Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.045,
+      "short_name": "Escambia County Court of Record",
+      "full_name": "Escambia County Civil and Criminal Court of Record",
+      "citation_string": "Escambia Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.046,
+      "short_name": "Palm Beach County Court of Record",
+      "full_name": "Palm Beach County Civil and Criminal Court of Record",
+      "citation_string": "Palm Beach Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.047,
+      "short_name": "Pinellas County Court of Record",
+      "full_name": "Pinellas County Civil and Criminal Court of Record",
+      "citation_string": "Pinellas Cty. Civ. & Crim. Ct. Rec.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyctrec3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.03,
+      "short_name": "Alachua County Court",
+      "full_name": "Alachua County Court",
+      "citation_string": "Fla. Alachua Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0301,
+      "short_name": "Baker County Court",
+      "full_name": "Baker County Court",
+      "citation_string": "Fla. Baker Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0302,
+      "short_name": "Bay County Court",
+      "full_name": "Bay County Court",
+      "citation_string": "Fla. Bay Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0303,
+      "short_name": "Bradford County Court",
+      "full_name": "Bradford County Court",
+      "citation_string": "Fla. Bradford Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0304,
+      "short_name": "Brevard County Court",
+      "full_name": "Brevard County Court",
+      "citation_string": "Fla. Brevard Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct5"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0305,
+      "short_name": "Broward County Court",
+      "full_name": "Broward County Court",
+      "citation_string": "Fla. Broward Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct6"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0306,
+      "short_name": "Calhoun County Court",
+      "full_name": "Calhoun County Court",
+      "citation_string": "Fla. Calhoun Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct7"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0307,
+      "short_name": "Charlotte County Court",
+      "full_name": "Charlotte County Court",
+      "citation_string": "Fla. Charlotte Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct8"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0308,
+      "short_name": "Citrus County Court",
+      "full_name": "Citrus County Court",
+      "citation_string": "Fla. Citrus Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct9"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0309,
+      "short_name": "Clay County Court",
+      "full_name": "Clay County Court",
+      "citation_string": "Fla. Clay Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct10"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.031,
+      "short_name": "Collier County Court",
+      "full_name": "Collier County Court",
+      "citation_string": "Fla. Collier Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct11"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0311,
+      "short_name": "Columbia County Court",
+      "full_name": "Columbia County Court",
+      "citation_string": "Fla. Columbia Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct12"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0312,
+      "short_name": "De Soto County Court",
+      "full_name": "De Soto County Court",
+      "citation_string": "Fla. De Soto Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct13"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0313,
+      "short_name": "Dixie County Court",
+      "full_name": "Dixie County Court",
+      "citation_string": "Fla. Dixie Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct14"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0314,
+      "short_name": "Duval County Court",
+      "full_name": "Duval County Court",
+      "citation_string": "Fla. Duval Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct15"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0315,
+      "short_name": "Escambia County Court",
+      "full_name": "Escambia County Court",
+      "citation_string": "Fla. Escambia Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct16"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0316,
+      "short_name": "Flagler County Court",
+      "full_name": "Flagler County Court",
+      "citation_string": "Fla. Flagler Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct17"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0317,
+      "short_name": "Franklin County Court",
+      "full_name": "Franklin County Court",
+      "citation_string": "Fla. Franklin Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct18"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0318,
+      "short_name": "Gadsden County Court",
+      "full_name": "Gadsden County Court",
+      "citation_string": "Fla. Gadsden Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct19"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0319,
+      "short_name": "Gilchrist County Court",
+      "full_name": "Gilchrist County Court",
+      "citation_string": "Fla. Gilchrist Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct20"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.032,
+      "short_name": "Glades County Court",
+      "full_name": "Glades County Court",
+      "citation_string": "Fla. Glades Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct21"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0321,
+      "short_name": "Gulf County Court",
+      "full_name": "Gulf County Court",
+      "citation_string": "Fla. Gulf Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct22"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0322,
+      "short_name": "Hamilton County Court",
+      "full_name": "Hamilton County Court",
+      "citation_string": "Fla. Hamilton Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct23"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0323,
+      "short_name": "Hardee County Court",
+      "full_name": "Hardee County Court",
+      "citation_string": "Fla. Hardee Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct24"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0324,
+      "short_name": "Hendry County Court",
+      "full_name": "Hendry County Court",
+      "citation_string": "Fla. Hendry Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct25"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0325,
+      "short_name": "Hernando County Court",
+      "full_name": "Hernando County Court",
+      "citation_string": "Fla. Hernando Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct26"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0326,
+      "short_name": "Highlands County Court",
+      "full_name": "Highlands County Court",
+      "citation_string": "Fla. Highlands Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct27"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0327,
+      "short_name": "Hillsborough County Court",
+      "full_name": "Hillsborough County Court",
+      "citation_string": "Fla. Hillsborough Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct28"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0328,
+      "short_name": "Holmes County Court",
+      "full_name": "Holmes County Court",
+      "citation_string": "Fla. Holmes Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct29"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0329,
+      "short_name": "Indian River County Court",
+      "full_name": "Indian River County Court",
+      "citation_string": "Fla. Indian River Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct30"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.033,
+      "short_name": "Jackson County Court",
+      "full_name": "Jackson County Court",
+      "citation_string": "Fla. Jackson Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct31"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0331,
+      "short_name": "Jefferson County Court",
+      "full_name": "Jefferson County Court",
+      "citation_string": "Fla. Jefferson Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct32"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0332,
+      "short_name": "Lafayette County Court",
+      "full_name": "Lafayette County Court",
+      "citation_string": "Fla. Lafayette Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct33"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0333,
+      "short_name": "Lake County Court",
+      "full_name": "Lake County Court",
+      "citation_string": "Fla. Lake Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct34"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0334,
+      "short_name": "Lee County Court",
+      "full_name": "Lee County Court",
+      "citation_string": "Fla. Lee Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct35"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0335,
+      "short_name": "Leon County Court",
+      "full_name": "Leon County Court",
+      "citation_string": "Fla. Leon Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct36"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0336,
+      "short_name": "Levy County Court",
+      "full_name": "Levy County Court",
+      "citation_string": "Fla. Levy Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct37"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0337,
+      "short_name": "Liberty County Court",
+      "full_name": "Liberty County Court",
+      "citation_string": "Fla. Liberty Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct38"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0338,
+      "short_name": "Madison County Court",
+      "full_name": "Madison County Court",
+      "citation_string": "Fla. Madison Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct39"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0339,
+      "short_name": "Manatee County Court",
+      "full_name": "Manatee County Court",
+      "citation_string": "Fla. Manatee Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct40"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.034,
+      "short_name": "Marion County Court",
+      "full_name": "Marion County Court",
+      "citation_string": "Fla. Marion Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct41"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0341,
+      "short_name": "Martin County Court",
+      "full_name": "Martin County Court",
+      "citation_string": "Fla. Martin Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct42"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0342,
+      "short_name": "Miami-Dade County Court",
+      "full_name": "Miami-Dade County Court",
+      "citation_string": "Fla. Miami-Dade Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct43"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0343,
+      "short_name": "Monroe County Court",
+      "full_name": "Monroe County Court",
+      "citation_string": "Fla. Monroe Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct44"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0344,
+      "short_name": "Nassau County Court",
+      "full_name": "Nassau County Court",
+      "citation_string": "Fla. Nassau Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct45"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0345,
+      "short_name": "Okaloosa County Court",
+      "full_name": "Okaloosa County Court",
+      "citation_string": "Fla. Okaloosa Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct46"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0346,
+      "short_name": "Okeechobee County Court",
+      "full_name": "Okeechobee County Court",
+      "citation_string": "Fla. Okeechobee Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct47"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0347,
+      "short_name": "Orange County Court",
+      "full_name": "Orange County Court",
+      "citation_string": "Fla. Orange Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct48"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0348,
+      "short_name": "Osceola County Court",
+      "full_name": "Osceola County Court",
+      "citation_string": "Fla. Osceola Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct49"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0349,
+      "short_name": "Palm Beach County Court",
+      "full_name": "Palm Beach County Court",
+      "citation_string": "Fla. Palm Beach Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct50"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.035,
+      "short_name": "Pasco County Court",
+      "full_name": "Pasco County Court",
+      "citation_string": "Fla. Pasco Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct51"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0351,
+      "short_name": "Pinellas County Court",
+      "full_name": "Pinellas County Court",
+      "citation_string": "Fla. Pinellas Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct52"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0352,
+      "short_name": "Polk County Court",
+      "full_name": "Polk County Court",
+      "citation_string": "Fla. Polk Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct53"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0353,
+      "short_name": "Putnam County Court",
+      "full_name": "Putnam County Court",
+      "citation_string": "Fla. Putnam Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct54"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0354,
+      "short_name": "St. Johns County Court",
+      "full_name": "St. Johns County Court",
+      "citation_string": "Fla. St. Johns Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct55"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0355,
+      "short_name": "St. Lucie County Court",
+      "full_name": "St. Lucie County Court",
+      "citation_string": "Fla. St. Lucie Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct56"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0356,
+      "short_name": "Santa Rosa County Court",
+      "full_name": "Santa Rosa County Court",
+      "citation_string": "Fla. Santa Rosa Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct57"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0357,
+      "short_name": "Sarasota County Court",
+      "full_name": "Sarasota County Court",
+      "citation_string": "Fla. Sarasota Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct58"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0358,
+      "short_name": "Seminole County Court",
+      "full_name": "Seminole County Court",
+      "citation_string": "Fla. Seminole Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct59"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0359,
+      "short_name": "Sumter County Court",
+      "full_name": "Sumter County Court",
+      "citation_string": "Fla. Sumter Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct60"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.036,
+      "short_name": "Suwannee County Court",
+      "full_name": "Suwannee County Court",
+      "citation_string": "Fla. Suwannee Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct61"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0361,
+      "short_name": "Taylor County Court",
+      "full_name": "Taylor County Court",
+      "citation_string": "Fla. Taylor Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct62"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0362,
+      "short_name": "Union County Court",
+      "full_name": "Union County Court",
+      "citation_string": "Fla. Union Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct63"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0363,
+      "short_name": "Volusia County Court",
+      "full_name": "Volusia County Court",
+      "citation_string": "Fla. Volusia Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct64"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0364,
+      "short_name": "Wakulla County Court",
+      "full_name": "Wakulla County Court",
+      "citation_string": "Fla. Wakulla Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct65"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0365,
+      "short_name": "Walton County Court",
+      "full_name": "Walton County Court",
+      "citation_string": "Fla. Walton Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct66"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0366,
+      "short_name": "Washington County Court",
+      "full_name": "Washington County Court",
+      "citation_string": "Fla. Washington Cty. Ct.",
+      "end_date": "1972-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flactyct67"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.02,
+      "short_name": "Circuit Court of the 1st Judicial Circuit",
+      "full_name": "Circuit Court of the 1st Judicial Circuit of Florida",
+      "citation_string": "1st",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0201,
+      "short_name": "Escambia County Circuit Court",
+      "full_name": "Circuit Court of the 1st Judicial Circuit of Florida, Escambia County",
+      "citation_string": "Fla. Cir. Ct., Escambia Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct1esc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0202,
+      "short_name": "Okaloosa County Circuit Court",
+      "full_name": "Circuit Court of the 1st Judicial Circuit of Florida, Okaloosa County",
+      "citation_string": "Fla. Cir. Ct., Okaloosa Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct1oka"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0203,
+      "short_name": "Santa Rosa County Circuit Court",
+      "full_name": "Circuit Court of the 1st Judicial Circuit of Florida, Santa Rosa County",
+      "citation_string": "Fla. Cir. Ct., Santa Rosa Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct1san"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0204,
+      "short_name": "Walton County Circuit Court",
+      "full_name": "Circuit Court of the 1st Judicial Circuit of Florida, Walton County",
+      "citation_string": "Fla. Cir. Ct., Walton Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct1wal"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0205,
+      "short_name": "Circuit Court of the 2nd Judicial Circuit",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida",
+      "citation_string": "2nd",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0206,
+      "short_name": "Franklin County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Franklin County",
+      "citation_string": "Fla. Cir. Ct., Franklin Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2fra"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0207,
+      "short_name": "Gadsden County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Gadsden County",
+      "citation_string": "Fla. Cir. Ct., Gadsden Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2gad"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0208,
+      "short_name": "Jefferson County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Jefferson County",
+      "citation_string": "Fla. Cir. Ct., Jefferson Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2jef"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0209,
+      "short_name": "Leon County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Leon County",
+      "citation_string": "Fla. Cir. Ct., Leon Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2leo"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.021,
+      "short_name": "Liberty County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Liberty County",
+      "citation_string": "Fla. Cir. Ct., Liberty Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2lib"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0211,
+      "short_name": "Wakulla County Circuit Court",
+      "full_name": "Circuit Court of the 2nd Judicial Circuit of Florida, Wakulla County",
+      "citation_string": "Fla. Cir. Ct., Wakulla Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct2wak"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0212,
+      "short_name": "Circuit Court of the 3rd Judicial Circuit",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida",
+      "citation_string": "3rd",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0213,
+      "short_name": "Columbia County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Columbia County",
+      "citation_string": "Fla. Cir. Ct., Columbia Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3col"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0214,
+      "short_name": "Dixie County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Dixie County",
+      "citation_string": "Fla. Cir. Ct., Dixie Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3dix"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0215,
+      "short_name": "Hamilton County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Hamilton County",
+      "citation_string": "Fla. Cir. Ct., Hamilton Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3ham"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0216,
+      "short_name": "Lafayette County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Lafayette County",
+      "citation_string": "Fla. Cir. Ct., Lafayette Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3laf"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0217,
+      "short_name": "Madison County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Madison County",
+      "citation_string": "Fla. Cir. Ct., Madison Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3mad"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0218,
+      "short_name": "Suwannee County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Suwannee County",
+      "citation_string": "Fla. Cir. Ct., Suwannee Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3suw"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0219,
+      "short_name": "Taylor County Circuit Court",
+      "full_name": "Circuit Court of the 3rd Judicial Circuit of Florida, Taylor County",
+      "citation_string": "Fla. Cir. Ct., Taylor Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct3tay"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.022,
+      "short_name": "Circuit Court of the 4th Judicial Circuit",
+      "full_name": "Circuit Court of the 4th Judicial Circuit of Florida",
+      "citation_string": "4th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct4"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0221,
+      "short_name": "Clay County Circuit Court",
+      "full_name": "Circuit Court of the 4th Judicial Circuit of Florida, Clay County",
+      "citation_string": "Fla. Cir. Ct., Clay Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct4cla"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0222,
+      "short_name": "Duval County Circuit Court",
+      "full_name": "Circuit Court of the 4th Judicial Circuit of Florida, Duval County",
+      "citation_string": "Fla. Cir. Ct., Duval Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct4duv"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0223,
+      "short_name": "Nassau County Circuit Court",
+      "full_name": "Circuit Court of the 4th Judicial Circuit of Florida, Nassau County",
+      "citation_string": "Fla. Cir. Ct., Nassau Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct4nas"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0224,
+      "short_name": "Circuit Court of the 5th Judicial Circuit",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida",
+      "citation_string": "5th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0225,
+      "short_name": "Citrus County Circuit Court",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida, Citrus County",
+      "citation_string": "Fla. Cir. Ct., Citrus Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5cit"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0226,
+      "short_name": "Hernando County Circuit Court",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida, Hernando County",
+      "citation_string": "Fla. Cir. Ct., Hernando Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5her"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0227,
+      "short_name": "Lake County Circuit Court",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida, Lake County",
+      "citation_string": "Fla. Cir. Ct., Lake Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5lak"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0228,
+      "short_name": "Marion County Circuit Court",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida, Marion County",
+      "citation_string": "Fla. Cir. Ct., Marion Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5mar"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0229,
+      "short_name": "Sumter County Circuit Court",
+      "full_name": "Circuit Court of the 5th Judicial Circuit of Florida, Sumter County",
+      "citation_string": "Fla. Cir. Ct., Sumter Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct5sum"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.023,
+      "short_name": "Circuit Court of the 6th Judicial Circuit",
+      "full_name": "Circuit Court of the 6th Judicial Circuit of Florida",
+      "citation_string": "6th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct6"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0231,
+      "short_name": "Pasco County Circuit Court",
+      "full_name": "Circuit Court of the 6th Judicial Circuit of Florida, Pasco County",
+      "citation_string": "Fla. Cir. Ct., Pasco Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct6pas"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0232,
+      "short_name": "Pinellas County Circuit Court",
+      "full_name": "Circuit Court of the 6th Judicial Circuit of Florida, Pinellas County",
+      "citation_string": "Fla. Cir. Ct., Pinellas Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct6pin"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0233,
+      "short_name": "Circuit Court of the 7th Judicial Circuit",
+      "full_name": "Circuit Court of the 7th Judicial Circuit of Florida",
+      "citation_string": "7th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct7"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0234,
+      "short_name": "Flagler County Circuit Court",
+      "full_name": "Circuit Court of the 7th Judicial Circuit of Florida, Flagler County",
+      "citation_string": "Fla. Cir. Ct., Flagler Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct7fla"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0235,
+      "short_name": "Putnam County Circuit Court",
+      "full_name": "Circuit Court of the 7th Judicial Circuit of Florida, Putnam County",
+      "citation_string": "Fla. Cir. Ct., Putnam Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct7put"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0236,
+      "short_name": "St. Johns County Circuit Court",
+      "full_name": "Circuit Court of the 7th Judicial Circuit of Florida, St. Johns County",
+      "citation_string": "Fla. Cir. Ct., St. Johns Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct7stj"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0237,
+      "short_name": "Volusia County Circuit Court",
+      "full_name": "Circuit Court of the 7th Judicial Circuit of Florida, Volusia County",
+      "citation_string": "Fla. Cir. Ct., Volusia Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct7vol"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0238,
+      "short_name": "Circuit Court of the 8th Judicial Circuit",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida",
+      "citation_string": "8th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0239,
+      "short_name": "Alachua County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Alachua County",
+      "citation_string": "Fla. Cir. Ct., Alachua Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8ala"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.024,
+      "short_name": "Baker County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Baker County",
+      "citation_string": "Fla. Cir. Ct., Baker Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8bak"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0241,
+      "short_name": "Bradford County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Bradford County",
+      "citation_string": "Fla. Cir. Ct., Bradford Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8bra"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0242,
+      "short_name": "Gilchrist County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Gilchrist County",
+      "citation_string": "Fla. Cir. Ct., Gilchrist Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8gil"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0243,
+      "short_name": "Levy County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Levy County",
+      "citation_string": "Fla. Cir. Ct., Levy Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8lev"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0244,
+      "short_name": "Union County Circuit Court",
+      "full_name": "Circuit Court of the 8th Judicial Circuit of Florida, Union County",
+      "citation_string": "Fla. Cir. Ct., Union Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct8uni"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0245,
+      "short_name": "Circuit Court of the 9th Judicial Circuit",
+      "full_name": "Circuit Court of the 9th Judicial Circuit of Florida",
+      "citation_string": "9th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct9"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0246,
+      "short_name": "Orange County Circuit Court",
+      "full_name": "Circuit Court of the 9th Judicial Circuit of Florida, Orange County",
+      "citation_string": "Fla. Cir. Ct., Orange Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct9ora"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0247,
+      "short_name": "Osceola County Circuit Court",
+      "full_name": "Circuit Court of the 9th Judicial Circuit of Florida, Osceola County",
+      "citation_string": "Fla. Cir. Ct., Osceola Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct9osc"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0248,
+      "short_name": "Circuit Court of the 10th Judicial Circuit",
+      "full_name": "Circuit Court of the 10th Judicial Circuit of Florida",
+      "citation_string": "10th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct10"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0249,
+      "short_name": "Hardee County Circuit Court",
+      "full_name": "Circuit Court of the 10th Judicial Circuit of Florida, Hardee County",
+      "citation_string": "Fla. Cir. Ct., Hardee Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct10har"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.025,
+      "short_name": "Highlands County Circuit Court",
+      "full_name": "Circuit Court of the 10th Judicial Circuit of Florida, Highlands County",
+      "citation_string": "Fla. Cir. Ct., Highlands Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct10hig"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0251,
+      "short_name": "Polk County Circuit Court",
+      "full_name": "Circuit Court of the 10th Judicial Circuit of Florida, Polk County",
+      "citation_string": "Fla. Cir. Ct., Polk Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct10pol"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0252,
+      "short_name": "Circuit Court of the 11th Judicial Circuit",
+      "full_name": "Circuit Court of the 11th Judicial Circuit of Florida",
+      "citation_string": "11th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct11"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0253,
+      "short_name": "Miami-Dade County Circuit Court",
+      "full_name": "Circuit Court of the 11th Judicial Circuit of Florida, Miami-Dade County",
+      "citation_string": "Fla. Cir. Ct., Miami-Dade Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct11mia"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0254,
+      "short_name": "Circuit Court of the 12th Judicial Circuit",
+      "full_name": "Circuit Court of the 12th Judicial Circuit of Florida",
+      "citation_string": "12th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct12"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0255,
+      "short_name": "De Soto County Circuit Court",
+      "full_name": "Circuit Court of the 12th Judicial Circuit of Florida, De Soto County",
+      "citation_string": "Fla. Cir. Ct., De Soto Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct12des"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0256,
+      "short_name": "Manatee County Circuit Court",
+      "full_name": "Circuit Court of the 12th Judicial Circuit of Florida, Manatee County",
+      "citation_string": "Fla. Cir. Ct., Manatee Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct12man"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0257,
+      "short_name": "Sarasota County Circuit Court",
+      "full_name": "Circuit Court of the 12th Judicial Circuit of Florida, Sarasota County",
+      "citation_string": "Fla. Cir. Ct., Sarasota Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct12sar"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0258,
+      "short_name": "Circuit Court of the 13th Judicial Circuit",
+      "full_name": "Circuit Court of the 13th Judicial Circuit of Florida",
+      "citation_string": "13th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct13"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0259,
+      "short_name": "Hillsborough County Circuit Court",
+      "full_name": "Circuit Court of the 13th Judicial Circuit of Florida, Hillsborough County",
+      "citation_string": "Fla. Cir. Ct., Hillsborough Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct13hil"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.026,
+      "short_name": "Circuit Court of the 14th Judicial Circuit",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida",
+      "citation_string": "14th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0261,
+      "short_name": "Bay County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Bay County",
+      "citation_string": "Fla. Cir. Ct., Bay Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14bay"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0262,
+      "short_name": "Calhoun County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Calhoun County",
+      "citation_string": "Fla. Cir. Ct., Calhoun Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14cal"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0263,
+      "short_name": "Gulf County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Gulf County",
+      "citation_string": "Fla. Cir. Ct., Gulf Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14gul"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0264,
+      "short_name": "Holmes County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Holmes County",
+      "citation_string": "Fla. Cir. Ct., Holmes Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14hol"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0265,
+      "short_name": "Jackson County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Jackson County",
+      "citation_string": "Fla. Cir. Ct., Jackson Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14jac"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0266,
+      "short_name": "Washington County Circuit Court",
+      "full_name": "Circuit Court of the 14th Judicial Circuit of Florida, Washington County",
+      "citation_string": "Fla. Cir. Ct., Washington Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct14was"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0267,
+      "short_name": "Circuit Court of the 15th Judicial Circuit",
+      "full_name": "Circuit Court of the 15th Judicial Circuit of Florida",
+      "citation_string": "15th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct15"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0268,
+      "short_name": "Palm Beach County Circuit Court",
+      "full_name": "Circuit Court of the 15th Judicial Circuit of Florida, Palm Beach County",
+      "citation_string": "Fla. Cir. Ct., Palm Beach Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct15pal"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0269,
+      "short_name": "Circuit Court of the 16th Judicial Circuit",
+      "full_name": "Circuit Court of the 16th Judicial Circuit of Florida",
+      "citation_string": "16th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct16"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.027,
+      "short_name": "Monroe County Circuit Court",
+      "full_name": "Circuit Court of the 16th Judicial Circuit of Florida, Monroe County",
+      "citation_string": "Fla. Cir. Ct., Monroe Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct16mon"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0271,
+      "short_name": "Circuit Court of the 17th Judicial Circuit",
+      "full_name": "Circuit Court of the 17th Judicial Circuit of Florida",
+      "citation_string": "17th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct17"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0272,
+      "short_name": "Broward County Circuit Court",
+      "full_name": "Circuit Court of the 17th Judicial Circuit of Florida, Broward County",
+      "citation_string": "Fla. Cir. Ct., Broward Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct17bro"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0273,
+      "short_name": "Circuit Court of the 18th Judicial Circuit",
+      "full_name": "Circuit Court of the 18th Judicial Circuit of Florida",
+      "citation_string": "18th",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://flcourts18.org/",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct18"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0274,
+      "short_name": "Brevard County Circuit Court",
+      "full_name": "Circuit Court of the 18th Judicial Circuit of Florida, Brevard County",
+      "citation_string": "Fla. Cir. Ct., Brevard Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct18bre"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0275,
+      "short_name": "Seminole County Circuit Court",
+      "full_name": "Circuit Court of the 18th Judicial Circuit of Florida, Seminole County",
+      "citation_string": "Fla. Cir. Ct., Seminole Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct18sem"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0276,
+      "short_name": "Circuit Court of the 19th Judicial Circuit",
+      "full_name": "Circuit Court of the 19th Judicial Circuit of Florida",
+      "citation_string": "19th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct19"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0277,
+      "short_name": "Indian River County Circuit Court",
+      "full_name": "Circuit Court of the 19th Judicial Circuit of Florida, Indian River County",
+      "citation_string": "Fla. Cir. Ct., Indian River Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct19ind"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0278,
+      "short_name": "Martin County Circuit Court",
+      "full_name": "Circuit Court of the 19th Judicial Circuit of Florida, Martin County",
+      "citation_string": "Fla. Cir. Ct., Martin Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct19mar"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0279,
+      "short_name": "Okeechobee County Circuit Court",
+      "full_name": "Circuit Court of the 19th Judicial Circuit of Florida, Okeechobee County",
+      "citation_string": "Fla. Cir. Ct., Okeechobee Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct19oke"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.028,
+      "short_name": "St. Lucie County Circuit Court",
+      "full_name": "Circuit Court of the 19th Judicial Circuit of Florida, St. Lucie County",
+      "citation_string": "Fla. Cir. Ct., St. Lucie Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct19stl"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0281,
+      "short_name": "Circuit Court of the 20th Judicial Circuit",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida",
+      "citation_string": "20th",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0282,
+      "short_name": "Charlotte County Circuit Court",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida, Charlotte County",
+      "citation_string": "Fla. Cir. Ct., Charlotte Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20cha"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0283,
+      "short_name": "Collier County Circuit Court",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida, Collier County",
+      "citation_string": "Fla. Cir. Ct., Collier Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20col"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0284,
+      "short_name": "Glades County Circuit Court",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida, Glades County",
+      "citation_string": "Fla. Cir. Ct., Glades Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20gla"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0285,
+      "short_name": "Hendry County Circuit Court",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida, Hendry County",
+      "citation_string": "Fla. Cir. Ct., Hendry Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20hen"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0286,
+      "short_name": "Lee County Circuit Court",
+      "full_name": "Circuit Court of the 20th Judicial Circuit of Florida, Lee County",
+      "citation_string": "Fla. Cir. Ct., Lee Cty.",
+      "end_date": null,
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "1973-01-01",
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flacirct20lee"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.07,
+      "short_name": "Florida Municipal Courts",
+      "full_name": "Florida Municipal Courts",
+      "citation_string": "Fla. Mun. Ct.",
+      "end_date": "1977-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flamunict"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0701,
+      "short_name": "Miami Beach Municipal Court",
+      "full_name": "Miami Beach Municipal Court",
+      "citation_string": "Fla. Mun. Ct., Miami Beach",
+      "end_date": "1977-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flamunict1"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0702,
+      "short_name": "Miami Municipal Court",
+      "full_name": "Miami Municipal Court",
+      "citation_string": "Fla. Mun. Ct., Miami",
+      "end_date": "1977-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flamunict3"
+  },
+  {
+    "fields": {
+      "jurisdiction": "ST",
+      "position": 355.0703,
+      "short_name": "Surfside Municipal Court",
+      "full_name": "Surfside Municipal Court",
+      "citation_string": "Fla. Mun. Ct., Surfside",
+      "end_date": "1977-12-31",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-09-01T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of import of Case.Law data."
+    },
+    "model": "search.court",
+    "pk": "flamunict2"
+  }
+]
