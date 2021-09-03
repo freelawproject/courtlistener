@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.19"
+version = "0.9.21"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -1843,7 +1843,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f1370a798eb0815f920026adba3904b797489a1701ead98d70bb294e0a80c3a7"
+content-hash = "e79eb38ab7380dda5f00061b94984581000733c578fcc5feaa7a5b230f7505cf"
 
 [metadata.files]
 amqp = [
@@ -2030,8 +2030,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.19.tar.gz", hash = "sha256:51c9f5e33edef40a6887ce8e0e6aa3858800d52ecaaa52858a8cebc26e7bfb25"},
-    {file = "courts_db-0.9.19-py2.py3-none-any.whl", hash = "sha256:c793c0d8a6e425bcab52475c9afcf84a2fd4d49731c2b30ab267a6242216d7f7"},
+    {file = "courts-db-0.9.21.tar.gz", hash = "sha256:ac9ab6df17ecdc175a16096f77771887c4e2353a7785d5ecf4de95c107d8a50c"},
+    {file = "courts_db-0.9.21-py2.py3-none-any.whl", hash = "sha256:754839b65f2c8bc423774c6d0f591c0a8cf8a55445ba6e21547649b5f46a9898"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
