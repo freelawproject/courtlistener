@@ -628,7 +628,7 @@ class Position(AbstractDateTimeModel):
     )
     ELECTION_PARTISAN = "e_part"
     ELECTION_NON_PARTISAN = "e_non_part"
-    APPOINTMENT_PRESEDENT = "a_pres"
+    APPOINTMENT_PRESIDENT = "a_pres"
     APPOINTMENT_GOVERNOR = "a_gov"
     APPOINTMENT_LEGISLATURE = "a_legis"
     APPOINTMENT_JUDGE = "a_judge"

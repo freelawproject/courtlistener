@@ -76,12 +76,55 @@ def get_how_selected(jud_exp_pending_status):
         return Position.ELECTION_NON_PARTISAN
 
 
+def find_or_create_appointer(name):
+    """Search for a position with a person who has the last name
+
+    :param name string from the field jud_exp_pending_sub_type
+    :return Position
+    """
+
+
+
+
+    appointer = None
+
+
+
+
+    # TODO: LOOKUP APPOINTER FOREIGN KEY
+    # search positions for the appointer's name
+    # handle stupid multiple "Brown" govs
+
+
 def get_appointer(jud_exp_pending_sub_type):
     """Extracts Appointer Name from the pending sub_type
 
     :param jud_exp_pending_sub_type: string
-    :return string
+        # Edge cases
+        "Board of Supv",
+        "Unknown",
+        "Consolidation",
+        "(Blanks)",
+        "Chief Justice", (For "Administrative Presiding Justice[s]"),
+        "Lucas", (Maybe Malcom Lucas, Chief Justice of Cal SCOTUS)
+
+        # Govs
+        "Rolph",
+        "Olson",
+        "Warren",
+        "Knight",
+        "Brown",
+        "Reagan",
+        "Brown Jr.",
+        "Deukmejian",
+        "Wilson",
+        "Davis",
+        "Schwarzenegger",
+        "Newsom"
+
+    :return string | None
     """
+    appointer_pos = None
 
     # if type is 'Unknown' or 'Board of Supv' or 'Consolidation' or '(Blanks)'
     # or 'Chief Judge' it is an edge case
@@ -90,15 +133,18 @@ def get_appointer(jud_exp_pending_sub_type):
         "Board of Supv",
         "Consolidation",
         "(Blanks)",
-        "Chief Judge",
     ]
 
     if jud_exp_pending_sub_type in edge_cases:
-        return ""
+        return appointer_pos
 
-    # TODO: LOOKUP APPOINTER FOREIGN KEY
-    # search positions for the appointer's name
-    # handle stupid multiple "Brown" govs
+    if jud_exp_pending_sub_type = "Reagan":
+        appointer = Person(cl_id="pres-038")
+        # check to see if gov positione exists
+
+    elif jud_exp_pending_sub_type = "Warren":
+        appointer = Person(cl_id="fjc_0420")
+
     return jud_exp_pending_sub_type
 
 
@@ -126,23 +172,17 @@ def find_judge(lfm, positions, counties):
     :return Judge or None
     """
 
-    # iterate over the positions and for each
     courts = []
     judge = None
     for position in positions:
         c = find_court(position, counties)
         if c:
             courts.append(c)
-    # find the court id
-    # search for the judge
     for court in courts:
         found = lookup_judge_by_full_name(lfm, court)
         if found:
             judge = found
             break
-    # if judge exists, break and return the judge
-    # else keep going
-    # return none if nothing found
     if judge is None:
         logging.info(f"Unable to find a judge for name {lfm}")
     else:
@@ -222,8 +262,16 @@ def find_court(position, counties):
         # name will be in format
         # Court of Appeal First Appellate District
         # Court of Appeal Fifth Appellate District
+        appellate_court_districts = {
+            "First": "1",
+            "Second": "2",
+            "Third": "3",
+            "Fourth": "4",
+            "Fifth": "5",
+            "Sixth": "6",
+        }
         parts = org_name.split(" ")
-        lookup = lookup_appellate_court_district(parts[3])
+        abbrev = appellate_court_districts(parts[3])
         if lookup:
             return f"calctapp{lookup}d"
         else:
@@ -278,23 +326,6 @@ def lookup_court_abbr(org_name, counties):
         return abbrev
 
 
-def lookup_appellate_court_district(fourth_word):
-    """Get a number from an ordinal
-
-    :param fourth_word: string
-    :return string
-    """
-
-    appellate_courts = {
-        "First": "1",
-        "Second": "2",
-        "Third": "3",
-        "Fourth": "4",
-        "Fifth": "5",
-        "Sixth": "6",
-    }
-    lookup = appellate_courts[fourth_word]
-    return lookup
 
 
 # TODO: WRITE THIS FUNCTION
