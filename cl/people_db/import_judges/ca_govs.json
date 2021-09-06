@@ -1,0 +1,234 @@
+[
+  {
+    "cl_id": "cal-gov-01",
+    "name_first": "James",
+    "name_last": "Rolph",
+    "date_dob": "08/23/1869",
+    "date_dod": "06/02/1934",
+    "is_alias_of": "Sunny Jim",
+    "dob_city": "San Francisco",
+    "dob_state": "CA",
+    "gender": "m",
+
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/06/1931",
+        "date_end": "06/02/1934",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-02",
+    "name_first": "Culbert",
+    "name_last": "Olson",
+    "name_middle": "Levy",
+    "date_dob": "11/07/1876",
+    "date_dod": "04/13/1962",
+    "dob_city": "Filmore",
+    "dob_state": "UT",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/02/1939",
+        "date_end": "01/04/1943",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "fjc-0420",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/04/1943",
+        "date_end": "10/05/1953",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-03",
+    "name_first": "Goodwin",
+    "name_last": "Knight",
+    "name_middle": "Jess",
+    "is_alias_of": "Goodie",
+    "date_dob": "12/09/1896",
+    "date_dod": "05/22/1970",
+    "dob_city": "Provo",
+    "dob_state": "UT",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "10/05/1953",
+        "date_end": "01/05/1959",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-04",
+    "name_first": "Edmund",
+    "name_last": "Brown",
+    "name_middle": "Gerald",
+    "is_alias_of": "Pat",
+    "date_dob": "04/21/1905",
+    "date_dod": "02/16/1996",
+    "dob_city": "San Francisco",
+    "dob_state": "CA",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/05/1959",
+        "date_end": "01/02/1967",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "pres-038",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/02/1967",
+        "date_end": "01/06/1975",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-05",
+    "name_first": "Edmund",
+    "name_last": "Brown",
+    "name_middle": "Gerald",
+    "name_suffix": "Jr.",
+    "is_alias_of": "Jerry",
+    "date_dob": "04/07/1938",
+    "dob_city": "San Francisco",
+    "dob_state": "CA",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/06/1975",
+        "date_end": "01/03/1983",
+        "organization_name": "State of California"
+      },
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/03/2011",
+        "date_end": "01/07/2019",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-06",
+    "name_first": "Courken",
+    "name_last": "Deukmejian",
+    "name_middle": "George",
+    "name_suffix": "Jr.",
+    "date_dob": "06/06/1928",
+    "date_dod": "05/08/2018",
+    "dob_city": "Menands",
+    "dob_state": "NY",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/03/1983",
+        "date_end": "01/07/1991",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-07",
+    "name_first": "Peter",
+    "name_last": "Wilson",
+    "name_middle": "Barton",
+    "date_dob": "08/23/1933",
+    "dob_city": "Lake Forest",
+    "dob_state": "IL",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/07/1991",
+        "date_end": "01/04/1999",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-08",
+    "name_first": "Joseph",
+    "name_last": "Davis",
+    "name_middle": "Graham",
+    "name_suffix": "Jr.",
+    "is_alias_of": "Gray",
+    "date_dob": "12/26/1942",
+    "dob_city": "Bronx",
+    "dob_state": "NY",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/04/1999",
+        "date_end": "11/17/2003",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-09",
+    "name_first": "Arnold",
+    "name_middle": "Alois",
+    "name_last": "Schwarzenegger",
+    "date_dob": "07/30/1947",
+    "dob_country": "Austria",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "11/17/2003",
+        "date_end": "01/03/2011",
+        "organization_name": "State of California"
+      }
+    ]
+  },
+  {
+    "cl_id": "cal-gov-10",
+    "name_first": "Gavin",
+    "name_middle": "Christopher",
+    "name_last": "Newsom",
+    "date_dob": "10/10/1967",
+    "dob_city": "San Francisco",
+    "dob_state": "CA",
+    "gender": "m",
+    "positions": [
+      {
+        "position_type": "gov",
+        "job_title": "Governor",
+        "date_start": "01/07/2019",
+        "organization_name": "State of California"
+      }
+    ]
+  }
+]
