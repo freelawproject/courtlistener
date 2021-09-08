@@ -11,9 +11,8 @@ DOCKER_TAG = $(shell head -1 docker/django/version.txt)
 all: image
 
 image:
-	$(DOCKER) buildx create --use
-	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) -t $(DOCKER_REPOSITORY):latest --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --cache-from=type=local,src=cache -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --load --file docker/django/Dockerfile .
 
 push: image
-	$(DOCKER) push $(DOCKER_REPOSITORY):$(DOCKER_TAG)
-	$(DOCKER) push $(DOCKER_REPOSITORY):latest
+	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t flooie/m1-test:m2 --file docker/django/Dockerfile .
