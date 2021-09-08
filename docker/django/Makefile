@@ -15,4 +15,4 @@ image:
 	$(DOCKER) buildx build --cache-from=type=local,src=cache -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --load --file docker/django/Dockerfile .
 
 push: image
-	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t flooie/m1-test:m2 --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --file docker/django/Dockerfile .
