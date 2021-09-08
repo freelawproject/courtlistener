@@ -32,7 +32,11 @@ from cl.recap.models import (
     PacerFetchQueue,
     ProcessingQueue,
 )
-from cl.recap.tasks import do_pacer_fetch, process_recap_upload
+from cl.recap.tasks import (
+    do_pacer_fetch,
+    do_recap_document_fetch,
+    process_recap_upload,
+)
 from cl.search.filters import RECAPDocumentFilter
 from cl.search.models import RECAPDocument
 
@@ -58,20 +62,16 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
 
-    def get_stream_for_mail_and_receipt(self, mail, receipt) -> StringIO:
-        payload = {"mail": mail, "receipt": receipt}
-        stream: StringIO = StringIO()
-        stream.write(json.dumps(payload))
-        return stream
+    def get_message_id_from_request_data(self):
+        return self.request.data.get("mail", {}).get("message_id")
 
     def perform_create(self, serializer):
-        filepath_stream = self.get_stream_for_mail_and_receipt(
-            self.request.data["mail"], self.request.data["receipt"]
-        )
         recap_email_user = User.objects.get(username="recap-email")
         epq = serializer.save(
-            filepath=File(filepath_stream), uploader=recap_email_user
+            message_id=self.get_message_id_from_request_data(),
+            uploader=recap_email_user,
         )
+        do_recap_document_fetch(epq)
         return epq
 
 

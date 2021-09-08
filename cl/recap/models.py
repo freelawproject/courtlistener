@@ -23,6 +23,7 @@ class UPLOAD_TYPE:
     CASE_REPORT_PAGE = 8
     CLAIMS_REGISTER = 9
     DOCUMENT_ZIP = 10
+    SES_EMAIL = 11
 
     NAMES = (
         (DOCKET, "HTML Docket"),
@@ -35,6 +36,7 @@ class UPLOAD_TYPE:
         (CASE_REPORT_PAGE, "Case report (iquery.pl) page"),
         (CLAIMS_REGISTER, "Claims register page"),
         (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
+        (SES_EMAIL, "Email in the SES storage format"),
     )
 
 
@@ -231,6 +233,10 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         help_text="The court where the upload was from",
         related_name="recap_email_processing_queue",
         on_delete=models.CASCADE,
+    )
+    message_id = models.TextField(
+        help_text="The S3 message identifier, used to pull the file in the processing tasks.",
+        default=None,
     )
     filepath = models.FileField(
         help_text="The S3 filepath to the email and receipt stored as JSON text.",
