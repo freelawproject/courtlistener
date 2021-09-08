@@ -2,6 +2,8 @@
 
 1. Remember to log into docker with `docker login` command
 
+2. Initialize a build instance `docker buildx create --use` if new.
+
 # Push new image with:
 
 1. Updating version.txt
