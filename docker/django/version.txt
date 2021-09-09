@@ -1,6 +1,7 @@
-1.0.48
+1.0.49
 
-1.9.48 - Update Juriscraper
+1.0.49 - Update Courts-DB
+1.0.48 - Update Juriscraper
 1.0.47 - Update Juriscraper
 1.0.46 - Update courts-db and mimetypes
 1.0.45 - Update Juriscraper
