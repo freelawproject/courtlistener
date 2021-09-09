@@ -20,7 +20,7 @@ Or :
 
     docker build --tag=freelawproject/courtlistener-django:latest --file docker/django/Dockerfile .
 
- 
+
 # In Practice
 
 1. It is convenient to deploy both django and task-server together.  
