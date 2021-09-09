@@ -2,11 +2,11 @@
   "mail": {
     "timestamp": "2019-08-05T21:30:02.028Z",
     "source": "prvs=144d0cba7=sender@example.com",
-    "messageId": "EXAMPLE7c191be45-e9aedb9a-02f9-4d12-a87d-dd0099a07f8a-000000",
+    "message_id": "EXAMPLE7c191be45-e9aedb9a-02f9-4d12-a87d-dd0099a07f8a-000000",
     "destination": [
       "recipient@example.com"
     ],
-    "headersTruncated": false,
+    "headers_truncated": false,
     "headers": [
       {
         "name": "Return-Path",
@@ -125,8 +125,8 @@
         "value": "Bulk"
       }
     ],
-    "commonHeaders": {
-      "returnPath": "prvs=144d0cba7=sender@example.com",
+    "common_headers": {
+      "return_path": "prvs=144d0cba7=sender@example.com",
       "from": [
         "\"Doe, John\" <sender@example.com>"
       ],
@@ -134,35 +134,35 @@
       "to": [
         "\"recipient@example.com\" <recipient@example.com>"
       ],
-      "messageId": "<F8098FDD-49A3-442D-9935-F6112B195BDA@example.com>",
+      "message_id": "<F8098FDD-49A3-442D-9935-F6112B195BDA@example.com>",
       "subject": "This is a test"
     }
   },
   "receipt": {
     "timestamp": "2019-08-05T21:30:02.028Z",
-    "processingTimeMillis": 1205,
+    "processing_time_millis": 1205,
     "recipients": [
       "recipient@example.com"
     ],
-    "spamVerdict": {
+    "spam_verdict": {
       "status": "PASS"
     },
-    "virusVerdict": {
+    "virus_verdict": {
       "status": "PASS"
     },
-    "spfVerdict": {
+    "spf_verdict": {
       "status": "PASS"
     },
-    "dkimVerdict": {
+    "dkim_verdict": {
       "status": "PASS"
     },
-    "dmarcVerdict": {
+    "dmarc_verdict": {
       "status": "PASS"
     },
     "action": {
       "type": "Lambda",
-      "functionArn": "arn:aws:lambda:us-east-1:123456789012:function:IncomingEmail",
-      "invocationType": "Event"
+      "function_arn": "arn:aws:lambda:us-east-1:123456789012:function:IncomingEmail",
+      "invocation_type": "Event"
     }
   }
 }
