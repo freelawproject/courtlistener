@@ -223,6 +223,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         return
 
     for file_path in filepath_list(reporter, volumes):
+        logger.info(f"Processing opinion at {file_path}")
+
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
