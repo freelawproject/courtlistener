@@ -9,17 +9,16 @@ from dateutil import parser
 from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import VerboseCommand
-from cl.people_db.models import Person
-from cl.search.models import Court, Position
-
 from cl.people_db.import_judges.ca_judges_import_helpers import (
     find_court,
     find_or_create_judge,
     get_appointer,
-    get_position_type,
     get_how_selected,
+    get_position_type,
     load_json_file,
 )
+from cl.people_db.models import Person
+from cl.search.models import Court, Position
 
 
 def build_position_from_json(json, counties):
