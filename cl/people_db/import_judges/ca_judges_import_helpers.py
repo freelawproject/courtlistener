@@ -445,5 +445,3 @@ def get_position_type(jobTitle):
 
     else:
         return None
-
-
