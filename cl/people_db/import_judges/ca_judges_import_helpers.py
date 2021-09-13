@@ -133,12 +133,35 @@ def get_appointer(jud_exp_pending_sub_type):
     return appointer_pos_fk
 
 
-# TODO: WRITE THIS FUNCTION
-# def get_date_termination_and_termination_reason(position):
-# status = position["experienceStatus"]
-# reason = position["experienceReason"]
-# date = position["experienceStatusEffectiveDate"]
-#
+def get_termination_reason(status):
+    """Convert inactive status reason to TERMINATION_REASONS enum
+
+    :param status - one of
+        Deceased
+        Defeated
+        Non-Voluntary
+        Other
+        Promoted
+        Resigned
+        Retired
+        Term Ended
+        Transferred
+        [Blank]
+
+    :return enum | None
+    """
+
+    status_to_enum = {
+        "Deceased": TERMINATION_REASONS.ded,
+        "Defeated": TERMINATION_REASONS.lost,
+        "Non-Voluntary": TERMINATION_REASONS.retire_mand,
+        "Promoted": TERMINATION_REASONS.other_pos,
+        "Resigned": TERMINATION_REASONS.resign,
+        "Retired": TERMINATION_REASONS.retire_vol,
+        "Term Ended": TERMINATION_REASONS.termed_out,
+        "Transferred": TERMINATION_REASONS.other_pos,
+    }
+    return status_to_enum[status]
 
 
 def find_judge(lfm, positions, counties):
@@ -205,13 +228,13 @@ def find_or_create_judge(judgeJson, counties):
         logging.info(f"name_middle: {name_middle}")
         logging.info(f"date_dod: {date_dod}")
 
-        # judge = Person(
-        #   name_first=name_first
-        #   name_last=name_last
-        #   name_middle=name_middle
-        #   date_dod=date_dod
-        # )
-        # judge.save()
+        judge = Person(
+            name_first=name_first
+            name_last=name_last
+            name_middle=name_middle
+            date_dod=date_dod
+        )
+        judge.save()
 
     return judge
 
@@ -422,3 +445,5 @@ def get_position_type(jobTitle):
 
     else:
         return None
+
+

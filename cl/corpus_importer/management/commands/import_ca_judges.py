@@ -16,6 +16,7 @@ from cl.people_db.import_judges.ca_judges_import_helpers import (
     get_how_selected,
     get_position_type,
     load_json_file,
+    get_termination_reason
 )
 from cl.people_db.models import Person
 from cl.search.models import Court, Position
@@ -84,8 +85,7 @@ def build_position_from_json(json, counties):
     if how_selected == Position.APPOINTMENT_GOVERNOR:
         appointer = get_appointer(json["judicialExperiencePendingSubType"])
 
-    # [date_termination, termination_reason] =
-    # get_termination_date_and_reason(json)
+    termination_reason = get_termination_reason(json["judicialExperienceInactiveStatus"])
 
     position = {
         "court": court,
@@ -94,9 +94,9 @@ def build_position_from_json(json, counties):
         "position_type": position_type,
         "job_title": json["jobTitle"],
         "organization_name": json["orgName"],
-        "date_start": json["experienceStatusEffectiveDate"],
-        # "date_termination": date_termination,
-        # "termination_reason": termination_reason
+        "date_start": json["judicialExperienceActiveDate"],
+        "date_termination": json["judicialExperienceInactiveDate"],
+        termination_reason: termination_reason
     }
     logging.info(f"Built Position object {position}")
     return position
@@ -137,7 +137,6 @@ def import_ca_judges(
     # Handle election as Presiding Judge
     # the spreadsheet lists the Presiding Position as concurrent
     # rather than sequential
-    # Get termination_date and termination_reason
 
     for info in judge_info:
         fullname = info["fullName"]
