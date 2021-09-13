@@ -76,22 +76,8 @@ def get_how_selected(jud_exp_pending_status):
         return Position.ELECTION_NON_PARTISAN
 
 
-def find_or_create_appointer(name):
-    """Search for a position with a person who has the last name
-
-    :param name string from the field jud_exp_pending_sub_type
-    :return Position
-    """
-
-    appointer = None
-
-    # TODO: LOOKUP APPOINTER FOREIGN KEY
-    # search positions for the appointer's name
-    # handle stupid multiple "Brown" govs
-
-
 def get_appointer(jud_exp_pending_sub_type):
-    """Extracts Appointer Name from the pending sub_type
+    """Extracts Appointer Position FK from the pending sub_type
 
     :param jud_exp_pending_sub_type: string
         # Edge cases
@@ -118,28 +104,33 @@ def get_appointer(jud_exp_pending_sub_type):
 
     :return string | None
     """
-    appointer_pos = None
+    appointer_pos_fk = None
 
-    # if type is 'Unknown' or 'Board of Supv' or 'Consolidation' or '(Blanks)'
-    # or 'Chief Judge' it is an edge case
-    edge_cases = [
-        "Unknown",
-        "Board of Supv",
-        "Consolidation",
-        "(Blanks)",
-    ]
+    name_to_cl_id = {
+        "Rolph": "cal-gov-27",
+        "Olson": "cal-gov-29",
+        "Warren": "fjc-0420",
+        "Knight": "cal-gov-31",
+        "Brown": "cal-gov-32",
+        "Reagan": "pres-038",
+        "Brown Jr.": "cal-gov-34",
+        "Deukmejian": "cal-gov-35",
+        "Wilson": "cal-gov-36",
+        "Davis": "cal-gov-37",
+        "Schwarzenegger": "cal-gov-38",
+        "Newsom": "cal-gov-40",
+    }
 
-    if jud_exp_pending_sub_type in edge_cases:
-        return appointer_pos
+    cl_id = name_to_cl_id[jud_exp_pending_sub_type]
 
-    if jud_exp_pending_sub_type == "Reagan":
-        appointer = Person(cl_id="pres-038")
-        # check to see if gov positione exists
+    if cl_id:
+        person = Person(cl_id=cl_id)
+        all_positions = person.positions_set.all()
+        for position in all_positions:
+            if position.position_type == Position.GOVERNOR:
+                appointer_pos_fk = position.pk
 
-    elif jud_exp_pending_sub_type == "Warren":
-        appointer = Person(cl_id="fjc_0420")
-
-    return jud_exp_pending_sub_type
+    return appointer_pos_fk
 
 
 # TODO: WRITE THIS FUNCTION
@@ -252,7 +243,15 @@ def find_court(position, counties):
     org_type = position["orgType"]
     org_name = position["orgName"]
 
-    if re.search(r"Appeal$", org_type):
+    # If the orgType is "Court Not CA Judiciary" it's
+    # a Federal District Court Position
+    # for either "Lucy Koh" or "Gary Austin"
+    # whose District Court positions are already in
+    # the database, so re return None
+    if re.search(r"Court\sNot\sCA", org_type):
+        return None
+
+    elif re.search(r"Appeal$", org_type):
         # name will be in format
         # Court of Appeal First Appellate District
         # Court of Appeal Fifth Appellate District
@@ -287,14 +286,57 @@ def find_court(position, counties):
     elif re.search(r"Supreme\sCourt", org_type):
         return "cal"
 
-    # if no court matches, but org_name contains district regex
-    # it's a District Federal Court (exact district not provided)
-    elif re.search(r"U\.[\s]?S\.\sDistrict", org_name):
+    elif re.search(r"Association", org_type):
+        # TODO
+        # The edge case "Association" has two entries,
+        # both for "B. Tam Nomoto Schumann" who was
+        # "promoted" to "Superior Court" in 1997 and who
+        # "retired" in 2013
+        return None
 
-        return "district_federal"
+    elif re.search(r"County\sCounsel", org_type):
+        # TODO
+        # The edge case "County Counsel" has one entry
+        # for "Dennis W. Bunting" who "retired" from his
+        # Superior Court Post in Solano County in 1994
+        return None
+
+    elif re.search(r"JCC\sAgency", org_type):
+        # TODO
+        # The edge case "JCC Agency" has three entries
+        # all for "Leonard P. Edwards" who served as a
+        # Municipal Court Judge in Santa Clara until 09/1981,
+        # when he was was "promoted" to Superior Court Judge
+        # for Santa Clara County, and who "retired" in 2006
+        return None
+
+    elif re.search(r"Law\sFirm", org_type):
+        # TODO
+        # The edge case "Law Firm" has one entry for
+        # "Elaine M. Rushing" who "retired" from her post
+        # as a Superior Court Judge for Sonomy County in 2011
+        return None
+
+    elif re.search(r"Non-Judicial", org_type):
+        # TODO
+        # The edge case "Non-Judicial Other" has eight entries
+        # Four are for "Candace D. Cooper"
+        # Was to "Municipal LA County Judge" prior to 1987
+        # "Promoted" to Superior LA County Judge in 1987
+        # "Promoted" to Court of Appeals District 2 in 1999
+        # "Transferred" to Court of Appeals District 4 in 2001
+
+        # One for "Judith C. Chirlin"
+        # She "retired" from the Superior Court for LA County in 2009
+
+        # Three for "Jamie A. Jacobs-May"
+        # Was Municipal Court for Santa Clara from 89 on
+        # "Non-Volunary" became a Superior Court judge (due to merger) in 1998
+        # "Selected" as "Presiding Judge" in 2009
+        # "Retired" in 2010
+        return None
 
     else:
-        # TODO: HANDLE EDGE CASES
         return None
 
 
@@ -320,7 +362,6 @@ def lookup_court_abbr(org_name, counties):
         return abbrev
 
 
-# TODO: WRITE THIS FUNCTION
 def get_position_type(jobTitle):
     """Map the provided jobTitle string to the Position Type Enum
 
@@ -337,5 +378,47 @@ def get_position_type(jobTitle):
         Supreme Court Associate Justice
         Supreme Court Chief Justice
 
-    :return Position enum / string
+    :return enum \ None
     """
+
+    if (re.search(r"^Court of Appeal"), jobTitle):
+
+        if (re.search(r"Administrative\sPresiding\sJustice"), jobTitle):
+            return POSITION_TYPES.ADMINISTRATIVE_PRESIDING_JUSTICE
+
+        elif (re.search(r"Presiding\sJustice"), jobTitle):
+            return POSITION_TYPES.PRESIDING_JUSTICE
+
+        elif (re.search(r"Associate\sJustice"), jobTitle):
+            return POSITION_TYPES.ASSOCIATE_JUSTICE
+
+    elif (re.search(r"^Supreme\sCourt"), jobTitle):
+
+        if (re.search(r"Associate"), jobTitle):
+            return POSITION_TYPES.ASSOCIATE_JUSTICE
+
+        elif (re.search(r"Chief"), jobTitle):
+            return POSITION_TYPES.CHIEF_JUSTICE
+
+    elif (re.search(r"^Superior\sCourt"), jobTitle):
+
+        if (re.search(r"Supervising"), jobTitle):
+            return POSITION_TYPES.SUPERVISING_JUDGE
+
+        elif (re.search(r"Assistant\sPresiding"), jobTitle):
+            return POSITION_TYPES.ASSISTANT_PRESIDING_JUDGE
+
+        elif (re.search(r"Presiding"), jobTitle):
+            return POSITION_TYPES.PRESIDING_JUDGE
+
+        else:
+            return POSITION_TYPES.JUDGE
+
+    elif (re.search(r"^Justice\sCourt"), jobTitle):
+        return POSITION_TYPES.TRIAL_JUDGE
+
+    elif (re.search(r"^Municipal\sCourt"), jobTitle):
+        return POSITION_TYPES.TRIAL_JUDGE
+
+    else:
+        return None

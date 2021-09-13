@@ -76,7 +76,7 @@ def build_position_from_json(json, counties):
     }
     """
 
-    court = find_court(json, counties)
+    court = find_court(json, counties, lastName)
 
     position_type = get_position_type(json["judicialPositionJobClass"])
     how_selected = get_how_selected(json["judicialExperiencePendingStatus"])
@@ -132,6 +132,13 @@ def import_ca_judges(
     # shape of judgeJson
     # { fullName: string, positions: Position[] }
     judge_info = all_judges_json["judges"]
+
+    # TODO: Create Person Pre-Processing
+    # Check that date periods don't overlap
+    # Handle election as Presiding Judge
+    # the spreadsheet lists the Presiding Position as concurrent
+    # rather than sequential
+    # Get termination_date and termination_reason
 
     for info in judge_info:
         fullname = info["fullName"]
