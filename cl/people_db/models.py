@@ -643,7 +643,7 @@ class Position(AbstractDateTimeModel):
         (
             "Appointment",
             (
-                (APPOINTMENT_PRESEDENT, "Appointment (President)"),
+                (APPOINTMENT_PRESIDENT, "Appointment (President)"),
                 (APPOINTMENT_GOVERNOR, "Appointment (Governor)"),
                 (APPOINTMENT_LEGISLATURE, "Appointment (Legislature)"),
                 # FISC appointments are made by the chief justice of SCOTUS

@@ -11,9 +11,7 @@
       "name_suffix": "",
       "date_granularity_dod": "",
       "name_middle": "",
-      "race": [
-        1
-      ],
+      "race": [1],
       "dod_city": "",
       "dod_state": "",
       "dob_city": "",
@@ -39,10 +37,7 @@
       "name_suffix": "",
       "date_granularity_dod": "",
       "name_middle": "Susan",
-      "race": [
-        1,
-        2
-      ],
+      "race": [1, 2],
       "dod_city": "",
       "dod_state": "",
       "dob_city": "Brookyln",
