@@ -82,7 +82,7 @@ def build_position_from_json(json, counties):
     how_selected = get_how_selected(json["judicialExperiencePendingStatus"])
 
     appointer = None
-    if (how_selected == Position.APPOINTMENT_GOVERNOR):
+    if how_selected == Position.APPOINTMENT_GOVERNOR:
         appointer = get_appointer(json["judicialExperiencePendingSubType"])
 
     # [date_termination, termination_reason] =

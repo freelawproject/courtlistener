@@ -83,13 +83,7 @@ def find_or_create_appointer(name):
     :return Position
     """
 
-
-
-
     appointer = None
-
-
-
 
     # TODO: LOOKUP APPOINTER FOREIGN KEY
     # search positions for the appointer's name
@@ -138,11 +132,11 @@ def get_appointer(jud_exp_pending_sub_type):
     if jud_exp_pending_sub_type in edge_cases:
         return appointer_pos
 
-    if jud_exp_pending_sub_type = "Reagan":
+    if jud_exp_pending_sub_type == "Reagan":
         appointer = Person(cl_id="pres-038")
         # check to see if gov positione exists
 
-    elif jud_exp_pending_sub_type = "Warren":
+    elif jud_exp_pending_sub_type == "Warren":
         appointer = Person(cl_id="fjc_0420")
 
     return jud_exp_pending_sub_type
@@ -324,8 +318,6 @@ def lookup_court_abbr(org_name, counties):
         new_name = " ".join(name_parts)
         abbrev = counties[new_name]
         return abbrev
-
-
 
 
 # TODO: WRITE THIS FUNCTION
