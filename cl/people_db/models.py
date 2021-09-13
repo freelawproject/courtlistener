@@ -437,9 +437,12 @@ class Position(AbstractDateTimeModel):
     # Acting
     ACTING_JUDGE = "act-jud"
     ACTING_PRESIDING_JUDGE = "act-pres-jud"
+    ADMINISTRATIVE_PRESIDING_JUSTICE = "ad-pres-jus"
     # Associate
     ASSOCIATE_JUDGE = "ass-jud"
+    ASSOCIATE_JUSTICE = "ass-jus"
     ASSOCIATE_CHIEF_JUDGE = "ass-c-jud"
+    ASSISTANT_PRESIDING_JUDGE = "asst-pres-jud"
     ASSOCIATE_PRESIDING_JUDGE = "ass-pres-jud"
     JUSTICE = "jus"
     # Chief
@@ -448,6 +451,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
+    SUPERVISING_JUDGE = "sup-jud"
     # Commissioner
     COMMISSIONER = "com"
     DEPUTY_COMMISSIONER = "com-dep"
@@ -514,8 +518,10 @@ class Position(AbstractDateTimeModel):
                 ),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
+                (ASSOCIATE_JUSTICE, "Associate Justice"),
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
                 (ASSOCIATE_PRESIDING_JUDGE, "Associate Presiding Judge"),
+                (ASSISTANT_PRESIDING_JUDGE, "Assistant Presiding Judge"),
                 (JUDGE, "Judge"),
                 (JUSTICE, "Justice"),
                 # Chief
@@ -524,6 +530,11 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
+                (SUPERVISING_JUDGE, "Supervising Judge"),
+                (
+                    ADMINISTRATIVE_PRESIDING_JUSTICE,
+                    "Administrative Presiding Justice",
+                ),
                 # Commissioner
                 (COMMISSIONER, "Commissioner"),
                 (DEPUTY_COMMISSIONER, "Deputy Commissioner"),
