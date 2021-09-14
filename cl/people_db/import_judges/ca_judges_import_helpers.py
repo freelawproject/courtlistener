@@ -2,6 +2,8 @@ import json
 import os
 import re
 
+from datetime import date
+
 from django.db import transaction
 from django.db.models import Count
 
@@ -445,5 +447,4 @@ def get_position_type(jobTitle):
 
     else:
         return None
-
 

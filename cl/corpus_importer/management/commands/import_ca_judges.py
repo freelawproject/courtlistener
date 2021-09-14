@@ -76,9 +76,9 @@ def build_position_from_json(json, counties):
     }
     """
 
-    court = find_court(json, counties, lastName)
+    court = find_court(json, counties)
 
-    position_type = get_position_type(json["judicialPositionJobClass"])
+    position_type = get_position_type(json["judicialPositionJobTitle"])
     how_selected = get_how_selected(json["judicialExperiencePendingStatus"])
 
     appointer = None
@@ -92,7 +92,7 @@ def build_position_from_json(json, counties):
         "appointer": appointer,
         "how_selected": how_selected,
         "position_type": position_type,
-        "job_title": json["jobTitle"],
+        "job_title": json["judicialPositionJobTitle"],
         "organization_name": json["orgName"],
         "date_start": json["judicialExperienceActiveDate"],
         "date_termination": json["judicialExperienceInactiveDate"],
