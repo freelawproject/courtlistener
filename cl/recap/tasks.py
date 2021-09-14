@@ -1,5 +1,3 @@
-import base64
-import json
 import logging
 from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional, Tuple, Union
@@ -1431,10 +1429,10 @@ def mark_fq_status(fq, msg, status):
 
 @app.task(bind=True, max_retries=5, interval_start=5 * 60)
 def process_recap_email(
-    self: Task, pk: int
+    self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:
     start_time = now()
-    epq = EmailProcessingQueue.objects.get(pk=pk)
+    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
 
     message_id = epq.message_id
@@ -1480,6 +1478,12 @@ def process_recap_email(
         docket, data["docket_entries"]
     )
 
+    for rd in rds_created:
+        fq = PacerFetchQueue.objects.create(
+            user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
+        )
+        fetch_pacer_doc_by_rd(rd.pk, fq.pk)
+
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
@@ -1491,7 +1495,7 @@ def process_recap_email(
     }
 
 
-def do_recap_document_fetch(epq: EmailProcessingQueue) -> None:
+def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
-        process_recap_email.si(epq.pk),
+        process_recap_email.si(epq.pk, user.pk),
     ).apply_async()

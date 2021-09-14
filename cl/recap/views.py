@@ -27,6 +27,7 @@ from cl.recap.filters import (
     ProcessingQueueFilter,
 )
 from cl.recap.models import (
+    REQUEST_TYPE,
     EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
@@ -71,7 +72,7 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
             message_id=self.get_message_id_from_request_data(),
             uploader=recap_email_user,
         )
-        do_recap_document_fetch(epq)
+        do_recap_document_fetch(epq, recap_email_user)
         return epq
 
 
