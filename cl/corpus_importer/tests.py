@@ -638,10 +638,10 @@ class HarvardTests(TestCase):
     def test_per_curiam(self, mock):
         """Did we identify the per curiam case."""
         self.assertSuccessfulParse(1)
-        # cite = Citation.objects.get(volume=381, reporter="A.2d", page=3)
-        # ops = cite.cluster.sub_opinions.all()
-        # self.assertEqual(ops[0].author_str, "Per Curiam")
-        # self.assertTrue(ops[0].per_curiam)
+        cite = Citation.objects.get(volume=381, reporter="A.2d", page=3)
+        ops = cite.cluster.sub_opinions.all()
+        self.assertEqual(ops[0].author_str, "Per Curiam")
+        self.assertTrue(ops[0].per_curiam)
         print("Success ✓")
 
     @patch(
