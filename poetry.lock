@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.21"
+version = "0.9.23"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -1485,7 +1485,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.1.1"
+version = "3.2.4"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -1843,7 +1843,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e79eb38ab7380dda5f00061b94984581000733c578fcc5feaa7a5b230f7505cf"
+content-hash = "ccbc84173c1d99ec5dce470d0343afdca6db0e70ba9e3c682c75367dd9688390"
 
 [metadata.files]
 amqp = [
@@ -2030,8 +2030,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.21.tar.gz", hash = "sha256:ac9ab6df17ecdc175a16096f77771887c4e2353a7785d5ecf4de95c107d8a50c"},
-    {file = "courts_db-0.9.21-py2.py3-none-any.whl", hash = "sha256:754839b65f2c8bc423774c6d0f591c0a8cf8a55445ba6e21547649b5f46a9898"},
+    {file = "courts-db-0.9.23.tar.gz", hash = "sha256:bcd0e3eeb3f2f9b9dcfbcbae2b67da049313d699de365de9d70576f179545c89"},
+    {file = "courts_db-0.9.23-py2.py3-none-any.whl", hash = "sha256:938ab8e57fef39a38692d1a9ce22e33518e4885cbd078a7323f8dedddf18a181"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
@@ -2798,8 +2798,8 @@ regex = [
     {file = "regex-2021.3.17.tar.gz", hash = "sha256:4b8a1fb724904139149a43e172850f35aa6ea97fb0545244dc0b805e0154ed68"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.1.1.tar.gz", hash = "sha256:d3da82e7a1520746d110afee994e1c470534d9d54536ea1fca2ea5a457b5c056"},
-    {file = "reporters_db-3.1.1-py2.py3-none-any.whl", hash = "sha256:4b2d49c9d0b48cdc875c6b998ffce69f0cff1058dd89c28041578776329a1c08"},
+    {file = "reporters-db-3.2.4.tar.gz", hash = "sha256:84634ae2f90d135e7df4362421bce3b029f254343d481b0f1b9d7f90365c6f29"},
+    {file = "reporters_db-3.2.4-py2.py3-none-any.whl", hash = "sha256:e6868abc638948730031b363614fb5221709b4474ec2a5b76798546e1a32307a"},
 ]
 requests = [
     {file = "requests-2.25.1-py2.py3-none-any.whl", hash = "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"},

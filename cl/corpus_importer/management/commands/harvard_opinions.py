@@ -12,7 +12,7 @@ from glob import glob
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
 
 from bs4 import BeautifulSoup
-from courts_db import find_court_ids_by_name
+from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
@@ -192,6 +192,7 @@ class OptionsType(TypedDict):
     reporter: str
     volumes: Optional[range]
     court_id: Optional[str]
+    location: Optional[str]
     make_searchable: bool
 
 
@@ -223,6 +224,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         return
 
     for file_path in filepath_list(reporter, volumes):
+        logger.info(f"Processing opinion at {file_path}")
+
         ia_download_url = "/".join(
             ["https://archive.org/download", file_path.split("/", 9)[-1]]
         )
@@ -261,8 +264,10 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         if not options["court_id"]:
             # Sometimes the court string doesn't match just one court
             # This is used to alleviate certain circumstances.
-            found_court = find_court_ids_by_name(
-                data["court"]["name"], bankruptcy=False
+            found_court = find_court(
+                data["court"]["name"],
+                bankruptcy=False,
+                location=options["location"],
             )
             if len(found_court) != 1:
                 logging.warning(
@@ -1018,6 +1023,14 @@ class Command(VerboseCommand):
             type=str,
             help="The CL Court ID",
             required=False,
+        )
+        parser.add_argument(
+            "--location",
+            type=str,
+            help="The location of the court (if applicable) ex. Florida"
+            "for courts-db differentiation.",
+            required=False,
+            default=None,
         )
         parser.add_argument(
             "--make-searchable",
