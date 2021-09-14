@@ -205,6 +205,18 @@ class ProfileTest(TestCase):
             reverse("delete_profile_done"),
         )
 
+    def test_generate_recap_email_with_non_email_username(self) -> None:
+        user_profile = UserProfile.objects.get(
+            recap_email="pandora@recap.email"
+        )
+        self.assertEqual(user_profile.user.pk, 1001)
+
+    def test_generate_recap_email_with_email_username(self) -> None:
+        user_profile = UserProfile.objects.get(
+            recap_email="pandora.gmail.com@recap.email"
+        )
+        self.assertEqual(user_profile.user.pk, 1006)
+
 
 class DisposableEmailTest(TestCase):
     fixtures = ["authtest_data.json"]

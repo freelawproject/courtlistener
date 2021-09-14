@@ -194,5 +194,44 @@
             "is_tester": true,
             "zip_code": null
         }
-    }
+    },
+    {
+        "pk": "1006",
+        "model": "auth.user",
+        "fields": {
+            "username": "pandora@gmail.com",
+            "first_name": "Dora with password 'password'",
+            "last_name": "☠☠☠☠☠☠☠☠☠☠☠",
+            "is_active": true,
+            "is_superuser": false,
+            "is_staff": false,
+            "last_login": "2006-12-17T16:46:30Z",
+            "groups": [],
+            "user_permissions": [],
+            "password": "md5$2IsfDnR3BYXP$38863162cac753cbdccb369fb2da193c",
+            "email": "pandora@gmail.com",
+            "date_joined": "2006-12-17T16:46:30Z"
+        }
+  },
+  {
+      "pk": 1006,
+      "model": "users.userprofile",
+      "fields": {
+          "barmembership": [],
+          "city": "Berkeley",
+          "activation_key": "301efc12443eb62d708ef57e2715fc5c22c82f2a",
+          "stub_account": false,
+          "avatar": "",
+          "key_expires": "2013-07-20T18:31:04.327Z",
+          "address1": null,
+          "address2": null,
+          "employer": "",
+          "plaintext_preferred": false,
+          "wants_newsletter": false,
+          "state": "CA",
+          "user": 1006,
+          "email_confirmed": true,
+          "zip_code": null
+      }
+  }
 ]

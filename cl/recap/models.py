@@ -238,6 +238,9 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         help_text="The S3 message identifier, used to pull the file in the processing tasks.",
         default=None,
     )
+    destination_emails = models.JSONField(
+        help_text="The emails that received the notification.", default=list
+    )
     filepath = models.FileField(
         help_text="The S3 filepath to the email and receipt stored as JSON text.",
         upload_to=make_recap_email_processing_queue_aws_path,
