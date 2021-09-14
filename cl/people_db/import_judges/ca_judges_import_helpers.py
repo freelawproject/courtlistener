@@ -1,7 +1,6 @@
 import json
 import os
 import re
-
 from datetime import date
 
 from django.db import transaction
