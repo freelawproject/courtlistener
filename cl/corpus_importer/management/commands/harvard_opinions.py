@@ -267,13 +267,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             found_court = find_court(
                 data["court"]["name"],
                 bankruptcy=False,
+                location=options["location"]
             )
-            if len(found_court) > 1 and options["location"]:
-                found_court = find_court(
-                    data["court"]["name"],
-                    bankruptcy=False,
-                    location=options["location"],
-                )
             if len(found_court) != 1:
                 logging.warning(
                     f"Court not found for {data['court']['name']} at {file_path}"
@@ -1035,6 +1030,7 @@ class Command(VerboseCommand):
             help="The location of the court (if applicable) ex. Florida"
             "for courts-db differentiation.",
             required=False,
+            default=None
         )
         parser.add_argument(
             "--make-searchable",
