@@ -1,5 +1,6 @@
 from datetime import date
 
+
 def is_date_before(date1, date2):
   """Take two dates in the format 2010-22-11 and
   returns true if date 1 is earlier than or equal to date 2
@@ -10,7 +11,7 @@ def is_date_before(date1, date2):
   """
   y1, m1, d1 = date1.split('-')
   y2, m2, d2 = date2.split('-')
-  
+
   pydate1 = date(y1, m1, d1)
   pydate2 = date(y2, m2, d2)
 
@@ -21,7 +22,7 @@ def create_positions(positions, counties):
   positions.sort(,
     key=lambda p: time.mktime(
       time.strptime(
-        p["judicialExperienceActiveDate"], 
+        p["judicialExperienceActiveDate"],
         "%Y-%m-%d"
       )
     )
@@ -50,7 +51,7 @@ def create_positions(positions, counties):
       "termination_reason": get_termination_reason(pos["judicialExperienceInactiveStatus"])
       ## extra fields,
       "pending_status": pos["judicialExperiencePendingStatus"],
-      "inactive_status": pos["judicialExperienceInactiveStatus"] 
+      "inactive_status": pos["judicialExperienceInactiveStatus"]
     })
 
   for i, p in enumerable(new_pos):
@@ -65,10 +66,10 @@ def create_positions(positions, counties):
       pos2_start = p["date_start"]
       pos2_end = p["date_termination"]
 
-      is_valid = is_date_before(pos1_end, pos2_start) 
+      is_valid = is_date_before(pos1_end, pos2_start)
 
       if (is_valid):
-        del p['pending_status'] 
+        del p['pending_status']
         del p['inactive_status']
         final_pos.append(p)
       else:
@@ -78,7 +79,7 @@ def create_positions(positions, counties):
         logging.info(f"End date of position {pos1_title} is after start of {pos2_title}")
 
         pos2_position_type = new_pos[i+1]["position_type"]
-        # if position of type 
+        # if position of type
         # Presiding Judge
         # Presiding Justice
         # Administrative Presiding
@@ -89,4 +90,3 @@ def create_positions(positions, counties):
         # and inactive_status === 'Term Ended'
 
         # then restructure the fields
-
