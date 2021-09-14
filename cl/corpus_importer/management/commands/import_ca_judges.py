@@ -15,8 +15,8 @@ from cl.people_db.import_judges.ca_judges_import_helpers import (
     get_appointer,
     get_how_selected,
     get_position_type,
+    get_termination_reason,
     load_json_file,
-    get_termination_reason
 )
 from cl.people_db.models import Person
 from cl.search.models import Court, Position
@@ -85,7 +85,9 @@ def build_position_from_json(json, counties):
     if how_selected == Position.APPOINTMENT_GOVERNOR:
         appointer = get_appointer(json["judicialExperiencePendingSubType"])
 
-    termination_reason = get_termination_reason(json["judicialExperienceInactiveStatus"])
+    termination_reason = get_termination_reason(
+        json["judicialExperienceInactiveStatus"]
+    )
 
     position = {
         "court": court,
@@ -96,7 +98,7 @@ def build_position_from_json(json, counties):
         "organization_name": json["orgName"],
         "date_start": json["judicialExperienceActiveDate"],
         "date_termination": json["judicialExperienceInactiveDate"],
-        termination_reason: termination_reason
+        termination_reason: termination_reason,
     }
     logging.info(f"Built Position object {position}")
     return position
