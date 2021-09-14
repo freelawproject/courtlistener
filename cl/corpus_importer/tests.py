@@ -535,6 +535,7 @@ class HarvardTests(TestCase):
                 "volumes": None,
                 "make_searchable": False,
                 "court_id": None,
+                "location": None,
             }
         )
         post_install_count = OpinionCluster.objects.all().count()
