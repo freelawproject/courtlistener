@@ -2,6 +2,7 @@ from datetime import date
 
 from cl.people_db.models import Position
 
+
 def is_date_before(date1, date2):
   """Take two dates in the format 2010-22-11 and
   returns true if date 1 is earlier than or equal to date 2
@@ -48,10 +49,10 @@ def create_positions(positions, counties):
 
   sorted_positions = recursively_sort(new_pos)
 
-  
+
 
 def is_supervising_position(position_type):
-    # if position of type 
+    # if position of type
     # Presiding Judge
     # Presiding Justice
     # Administrative Presiding
@@ -92,7 +93,7 @@ def recursively_sort(old_array, new_array = []):
     old_array.sort(
       key=lambda p: time.mktime(
         time.strptime(
-          p["date_started"], 
+          p["date_started"],
           "%Y-%m-%d"
         )
       )
@@ -105,7 +106,7 @@ def recursively_sort(old_array, new_array = []):
       new_array.append(first)
       recursively_sort(old_array, new_array)
     else:
-      # we check if the next item to add is 
+      # we check if the next item to add is
       # before the end date of the last item in the new_array
       # prev_entry = pos1
       # current_entry = pos2
@@ -122,7 +123,7 @@ def recursively_sort(old_array, new_array = []):
         # we remove the last date from the new_array to split into
         # item 1 (before the promotion) and item 3 (after the promotion)
         pos_to_split = new_array.pop()
-        
+
         new_pos_1 = pos_to_split
         # set the new termination date for position
         new_pos_1["date_termination"] = pos2["start_date"]
@@ -139,9 +140,9 @@ def recursively_sort(old_array, new_array = []):
         new_pos_3["date_started"] = pos2["date_termination"]
 
         new_array.append(new_pos_3)
-        
+
         # recurse
-        recursively_sort(old_array, new_array) 
+        recursively_sort(old_array, new_array)
 
   else:
     # recursion over, return array
