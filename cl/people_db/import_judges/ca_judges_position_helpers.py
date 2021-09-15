@@ -1,5 +1,7 @@
 from datetime import date
 
+from cl.people_db.models import Position
+
 def is_date_before(date1, date2):
   """Take two dates in the format 2010-22-11 and
   returns true if date 1 is earlier than or equal to date 2
@@ -17,15 +19,6 @@ def is_date_before(date1, date2):
   return pydate1 <= pydate2
 
 def create_positions(positions, counties):
-
-  positions.sort(,
-    key=lambda p: time.mktime(
-      time.strptime(
-        p["judicialExperienceActiveDate"], 
-        "%Y-%m-%d"
-      )
-    )
-  )
 
   new_pos = []
   final_pos = []
@@ -53,40 +46,135 @@ def create_positions(positions, counties):
       "inactive_status": pos["judicialExperienceInactiveStatus"] 
     })
 
-  for i, p in enumerable(new_pos):
-    if i === 0:
-      del p['pending_status']
-      del p['inactive_status']
-      final_pos.append(p)
-    else:
-      # check to see if restructuring is needed
-      pos1_start = new_pos[i+1]["date_start"]
-      pos1_end = new_pos[i+1]["date_termination"]
-      pos2_start = p["date_start"]
-      pos2_end = p["date_termination"]
+
+  for i, pos2 in enumerable(new_pos):
+    # if the first element, do nothing and return position
+    if i > 0:
+      pos1 = new_pos[i-1] 
+
+      pos1_start = pos1["date_start"]
+      pos1_end = pos1["date_termination"]
+
+      pos2_start = pos2["date_start"]
+      pos2_end = pos2["date_termination"]
 
       is_valid = is_date_before(pos1_end, pos2_start) 
 
-      if (is_valid):
-        del p['pending_status'] 
-        del p['inactive_status']
-        final_pos.append(p)
-      else:
-        pos1_title = new_pos[i+1]["job_title"]
-        pos2_title = p["job_title"]
+      if (!is_valid):
+        pos1_title = pos1["job_title"]
+        pos2_title = pos2["job_title"]
 
         logging.info(f"End date of position {pos1_title} is after start of {pos2_title}")
 
-        pos2_position_type = new_pos[i+1]["position_type"]
-        # if position of type 
-        # Presiding Judge
-        # Presiding Justice
-        # Administrative Presiding
-        # Supervising
-        # Assistant Presiding
 
-        # and pending_status === 'Selected'
-        # and inactive_status === 'Term Ended'
+        if has_supervising_position and pos2["pending_status"] == "Selected" and pos2["inactive_status"] == "Term Ended":
+          # create three positions from the group
+          new_pos_a = pos1
+          new_pos_c = pos1
+          # with the first position, change the date_termination to the beginning of the second position
+          # and the termination_reason to "other_pos"
+          new_pos_a["date_termination"] = pos2_start 
+          new_pos_a["termination_reason"] = "other_pos"
 
-        # then restructure the fields
+          # second position will be the unedited pos2
+          new_pos_b = pos2
 
+
+  final_pos.append(p)
+
+def is_supervising_position(position_type):
+    # if position of type 
+    # Presiding Judge
+    # Presiding Justice
+    # Administrative Presiding
+    # Supervising
+    # Assistant Presiding
+    # and pending_status === 'Selected'
+    # and inactive_status === 'Term Ended'
+    # then restructure the fields
+
+    selected_positions = [
+      Position.PRESIDING_JUDGE,
+      Position.PRESIDING_JUSTICE,
+      Position.ADMINISTRATIVE_PRESIDING_JUSTICE,
+      Position.SUPERVISING_JUDGE,
+      Position.ASSISTANT_PRESIDING_JUDGE
+    ]
+    return position_type in selected_positions
+
+
+def positions_need_restructuring(position1, position2):
+  # check if position date_start is after the prior date_termination
+  dates_valid = is_date_before(position1["date_termination"], position2["date_start"])
+  # check if the new position is a supervisory one
+  is_supervisor = is_supervising_position(position2["position_type"])
+
+  # sanity check -- make sure the pending status is "Selected" and inactive status is "Term Ended"
+  # as this indicates that it was likely a supervisory promotion
+  has_right_statuses = position2["pending_status"] == "Selected" and position2["inactive_status"] == "Term Ended"
+
+  return dates_valid and is_supervisor and has_right_statuses
+
+
+def recursively_sort(old_array, new_array = []):
+
+  if len(old_array) > 0:
+
+    # sort the old_array by date started
+    old_array.sort(
+      key=lambda p: time.mktime(
+        time.strptime(
+          p["date_started"], 
+          "%Y-%m-%d"
+        )
+      )
+    )
+
+    # if this is the first item in the new array, return it
+    if (len(new_array) == 0):
+      # add the earliest item to the new_array and recurse
+      first = old_array.pop(0)
+      new_array.append(first)
+      recursively_sort(old_array, new_array)
+    else:
+      # we check if the next item to add is 
+      # before the end date of the last item in the new_array
+      # prev_entry = pos1
+      # current_entry = pos2
+      pos1 = new_array[-1]
+      pos2 = old_array.pop(0)
+
+      dates_valid = is_date_before(pos1["date_termination"], pos2["date_start"])
+
+      if dates_valid:
+        new_array.append(pos2)
+        recursively_sort(old_array, new_array)
+
+      else:
+        # we remove the last date from the new_array to split into
+        # item 1 (before the promotion) and item 3 (after the promotion)
+        pos_to_split = new_array.pop()
+        
+        new_pos_1 = pos_to_split
+        # set the new termination date for position
+        new_pos_1["date_termination"] = pos2["start_date"]
+        # set the new termination reason
+        new_pos_1["termination_reason"] = "other_pos"
+        # push to new_array
+        new_array.append(new_pos_1)
+
+        # push the middle item
+        new_array.append(pos2)
+
+        # build item 3 by replacing the start date with item 2 end date
+        new_pos_3 = pos_to_split
+        new_pos_3["date_started"] = pos2["date_termination"]
+
+        new_array.append(new_pos_3)
+        
+        # recurse
+        recursively_sort(old_array, new_array) 
+
+  else:
+    # recursion over, return array
+    return new_array
