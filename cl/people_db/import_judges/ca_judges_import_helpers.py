@@ -230,10 +230,10 @@ def find_or_create_judge(judgeJson, counties):
         logging.info(f"date_dod: {date_dod}")
 
         judge = Person(
-            name_first=name_first
-            name_last=name_last
-            name_middle=name_middle
-            date_dod=date_dod
+            name_first=name_first,
+            name_last=name_last,
+            name_middle=name_middle,
+            date_dod=date_dod,
         )
         judge.save()
 
