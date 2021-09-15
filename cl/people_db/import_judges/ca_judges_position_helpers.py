@@ -12,7 +12,7 @@ def is_date_before(date1, date2):
   """
   y1, m1, d1 = date1.split('-')
   y2, m2, d2 = date2.split('-')
-  
+
   pydate1 = date(y1, m1, d1)
   pydate2 = date(y2, m2, d2)
 
@@ -43,44 +43,12 @@ def create_positions(positions, counties):
       "termination_reason": get_termination_reason(pos["judicialExperienceInactiveStatus"])
       ## extra fields,
       "pending_status": pos["judicialExperiencePendingStatus"],
-      "inactive_status": pos["judicialExperienceInactiveStatus"] 
+      "inactive_status": pos["judicialExperienceInactiveStatus"]
     })
 
+  sorted_positions = recursively_sort(new_pos)
 
-  for i, pos2 in enumerable(new_pos):
-    # if the first element, do nothing and return position
-    if i > 0:
-      pos1 = new_pos[i-1] 
-
-      pos1_start = pos1["date_start"]
-      pos1_end = pos1["date_termination"]
-
-      pos2_start = pos2["date_start"]
-      pos2_end = pos2["date_termination"]
-
-      is_valid = is_date_before(pos1_end, pos2_start) 
-
-      if (!is_valid):
-        pos1_title = pos1["job_title"]
-        pos2_title = pos2["job_title"]
-
-        logging.info(f"End date of position {pos1_title} is after start of {pos2_title}")
-
-
-        if has_supervising_position and pos2["pending_status"] == "Selected" and pos2["inactive_status"] == "Term Ended":
-          # create three positions from the group
-          new_pos_a = pos1
-          new_pos_c = pos1
-          # with the first position, change the date_termination to the beginning of the second position
-          # and the termination_reason to "other_pos"
-          new_pos_a["date_termination"] = pos2_start 
-          new_pos_a["termination_reason"] = "other_pos"
-
-          # second position will be the unedited pos2
-          new_pos_b = pos2
-
-
-  final_pos.append(p)
+  
 
 def is_supervising_position(position_type):
     # if position of type 
