@@ -81,6 +81,13 @@ def is_supervising_position(position_type):
 
 
 def positions_need_restructuring(position1, position2):
+    """returns true if the dates overlap, it is a supervisory position,
+    and the status categories match a selected position
+
+    :param position1
+    :param position2
+    :return boolean
+    """
     # check if position date_start is after the prior date_termination
     dates_valid = is_date_before(
         position1["date_termination"], position2["date_start"]
@@ -95,7 +102,10 @@ def positions_need_restructuring(position1, position2):
         and position2["inactive_status"] == "Term Ended"
     )
 
-    return dates_valid and is_supervisor and has_right_statuses
+    if not dates_valid and is_supervisor and has_right_statuses:
+        return true
+    else:
+        return false
 
 
 def recursively_sort(old_array, new_array=[]):
@@ -123,15 +133,9 @@ def recursively_sort(old_array, new_array=[]):
             pos1 = new_array[-1]
             pos2 = old_array.pop(0)
 
-            dates_valid = is_date_before(
-                pos1["date_termination"], pos2["date_start"]
-            )
+            needs_restructuring = positions_need_restructuring(pos1, pos2)
 
-            if dates_valid:
-                new_array.append(pos2)
-                recursively_sort(old_array, new_array)
-
-            else:
+            if needs_restructuring:
                 # we remove the last date from the new_array to split into
                 # item 1 (before the promotion) and item 3 (after the promotion)
                 pos_to_split = new_array.pop()
@@ -156,6 +160,9 @@ def recursively_sort(old_array, new_array=[]):
                 # recurse
                 recursively_sort(old_array, new_array)
 
+            else:
+                new_array.append(pos2)
+                recursively_sort(old_array, new_array)
     else:
         # recursion over, return array
         return new_array
