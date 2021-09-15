@@ -28,7 +28,7 @@ def create_positions(positions, counties):
     for pos in positions:
 
         how_selected = get_how_selected(
-            json["judicialExperiencePendingStatus"]
+            pos["judicialExperiencePendingStatus"]
         )
 
         appointer = None
