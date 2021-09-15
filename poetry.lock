@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.23"
+version = "0.9.24"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -2030,8 +2030,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.23.tar.gz", hash = "sha256:bcd0e3eeb3f2f9b9dcfbcbae2b67da049313d699de365de9d70576f179545c89"},
-    {file = "courts_db-0.9.23-py2.py3-none-any.whl", hash = "sha256:938ab8e57fef39a38692d1a9ce22e33518e4885cbd078a7323f8dedddf18a181"},
+    {file = "courts-db-0.9.24.tar.gz", hash = "sha256:30111408276496b7c8ecf46ba318f98bb4a3163ee66e956e2af7d95570c1ec2a"},
+    {file = "courts_db-0.9.24-py2.py3-none-any.whl", hash = "sha256:db6ea9971706f751071ae22c68a4f1f10c2ba1c5ed6bb1ca57ea15d76de5d81c"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
