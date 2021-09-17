@@ -1,5 +1,6 @@
-1.0.50
+1.0.51
 
+1.0.51 - Update Courts-DB
 1.0.50 - Update Reporter-DB and Courts-DB
 1.0.49 - Update Courts-DB
 1.0.48 - Update Juriscraper
