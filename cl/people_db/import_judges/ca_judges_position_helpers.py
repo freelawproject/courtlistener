@@ -1,7 +1,6 @@
 import logging
 import time
 from datetime import date
-import time
 
 from cl.people_db.import_judges.ca_judges_import_helpers import (
     find_court,
@@ -11,16 +10,11 @@ from cl.people_db.import_judges.ca_judges_import_helpers import (
     get_termination_reason,
 )
 from cl.people_db.models import Position
-from cl.people_db.import_judges.ca_judges_import_helpers import (
-    get_how_selected,
-    get_appointer,
-    find_court,
-    get_position_type,
-    get_termination_reason,
-)
+
 
 def convert_date_to_gran_format(date_text):
-    return time.strftime("%Y-%m-%d", time.strptime(date_text, "%m/%d/%Y") )
+    return time.strftime("%Y-%m-%d", time.strptime(date_text, "%m/%d/%Y"))
+
 
 def string_to_date(date_text, format):
     return time.mktime(time.strptime(date_text, format))
