@@ -19,11 +19,11 @@ from cl.people_db.import_judges.ca_judges_import_helpers import (
     load_json_file,
 )
 from cl.people_db.import_judges.ca_judges_position_helpers import (
+    convert_date_to_gran_format,
     process_positions,
     string_to_date,
-    convert_date_to_gran_format
 )
-from cl.people_db.models import Person, Position, GRANULARITY_DAY
+from cl.people_db.models import GRANULARITY_DAY, Person, Position
 from cl.search.models import Court
 
 
@@ -73,18 +73,22 @@ def import_ca_judges(
             del pos["inactive_status"]
 
             if pos["court"]:
-                del pos["organization_name"]        
-            
+                del pos["organization_name"]
+
             if pos["position_type"]:
-                del pos["job_title"]    
+                del pos["job_title"]
 
             # convert date start to proper format
             if pos["date_start"]:
-                pos["date_start"] = convert_date_to_gran_format(pos["date_start"]) 
+                pos["date_start"] = convert_date_to_gran_format(
+                    pos["date_start"]
+                )
                 pos["date_granularity_start"] = GRANULARITY_DAY
 
             if pos["date_termination"]:
-                pos["date_termination"] = convert_date_to_gran_format(pos["date_termination"])
+                pos["date_termination"] = convert_date_to_gran_format(
+                    pos["date_termination"]
+                )
                 pos["date_granularity_termination"] = GRANULARITY_DAY
             Position.objects.create(**pos, person=judge)
 
