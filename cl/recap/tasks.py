@@ -17,14 +17,13 @@ from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
-from juriscraper.pacer import (
+from juriscraper.pacer import (  # S3NotificationEmail,
     AppellateDocketReport,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
     PacerSession,
     PossibleCaseNumberApi,
-    # S3NotificationEmail,
 )
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
