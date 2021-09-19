@@ -203,7 +203,7 @@
             {% if cluster.syllabus %}
                 <div class="well well-sm">
                     <h4>Summary of Opinion</h4>
-                    <p>{{ cluster.syllabus }}</p>
+                    <p>{{ cluster.syllabus | safe }} </p>
                 </div>
             {% endif %}
 
@@ -401,9 +401,7 @@
                         {% endif %}
                         {% if sub_opinion.extracted_by_ocr %}
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
-                                <p class="bottom">The text of this document was
-                                    obtained by analyzing a scanned document
-                                    provided by the court and may have typos.
+                                <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
                                   {% if sub_opinion.download_url %}
                                     You may prefer <a href="{{ sub_opinion.download_url }}"
                                                       class="visitable">reading the original</a>.

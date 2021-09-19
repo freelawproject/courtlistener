@@ -1,5 +1,11 @@
-1.0.40
+1.0.46
 
+1.0.46 - Update Courts-DB
+1.0.45 - Update Reporter-DB and Courts-DB
+1.0.44 - Update Courts-DB
+1.0.43 - Update Juriscraper
+1.0.42 - Update Juriscraper
+1.0.41 - Update courts-db and mimetypes
 1.0.40 - Update Juriscraper
 1.0.39 - Update juriscraper
 1.0.38 - Adds nameparser

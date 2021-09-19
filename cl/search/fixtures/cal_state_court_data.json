@@ -1,0 +1,2738 @@
+[
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.31,
+      "short_name": "California Court of Appeals, 1st District",
+      "full_name": "California Court of Appeals, 1st District",
+      "citation_string": "Cal. Ct. App. 1st",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/1dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp1d"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.32,
+      "short_name": "California Court of Appeals, 2nd District",
+      "full_name": "California Court of Appeals, 2nd District",
+      "citation_string": "Cal. Ct. App. 2nd",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/2dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp2d"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.33,
+      "short_name": "California Court of Appeals, 3rd District",
+      "full_name": "California Court of Appeals, 3rd District",
+      "citation_string": "Cal. Ct. App. 3rd",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/3dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp3d"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.34,
+      "short_name": "California Court of Appeals, 4th District",
+      "full_name": "California Court of Appeals, 4th District",
+      "citation_string": "Cal. Ct. App. 4th",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/4dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp4d"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.35,
+      "short_name": "California Court of Appeals, 5th District",
+      "full_name": "California Court of Appeals, 5th District",
+      "citation_string": "Cal. Ct. App. 5th",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/5dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp5d"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 350.36,
+      "short_name": "California Court of Appeals, 6th District",
+      "full_name": "California Court of Appeals, 6th District",
+      "citation_string": "Cal. Ct. App. 6th",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://courts.ca.gov/6dca.htm",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null,
+      "notes": "Created as part of importation of California Judges Data Set."
+    },
+    "model": "search.court",
+    "pk": "calctapp6d"
+  },
+  {
+    "fields": {
+      "position": 350.701,
+      "short_name": "California Municipal Court, Alameda County",
+      "full_name": "Municipal Court of California, County of Alameda",
+      "citation_string": "Cal. Mun. Ct. (Alameda)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.alameda.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctala"
+  },
+  {
+    "fields": {
+      "position": 350.702,
+      "short_name": "California Municipal Court, Alpine County",
+      "full_name": "Municipal Court of California, County of Alpine",
+      "citation_string": "Cal. Mun. Ct. (Alpine)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.alpine.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctalp"
+  },
+  {
+    "fields": {
+      "position": 350.703,
+      "short_name": "California Municipal Court, Amador County",
+      "full_name": "Municipal Court of California, County of Amador",
+      "citation_string": "Cal. Mun. Ct. (Amador)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.amadorcourt.org",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctama"
+  },
+  {
+    "fields": {
+      "position": 350.704,
+      "short_name": "California Municipal Court, Butte County",
+      "full_name": "Municipal Court of California, County of Butte",
+      "citation_string": "Cal. Mun. Ct. (Butte)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.buttecourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctbut"
+  },
+  {
+    "fields": {
+      "position": 350.705,
+      "short_name": "California Municipal Court, Calaveras County",
+      "full_name": "Municipal Court of California, County of Calaveras",
+      "citation_string": "Cal. Mun. Ct. (Calaveras)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.calaveras.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctcal"
+  },
+  {
+    "fields": {
+      "position": 350.706,
+      "short_name": "California Municipal Court, Colusa County",
+      "full_name": "Municipal Court of California, County of Colusa",
+      "citation_string": "Cal. Mun. Ct. (Colusa)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.colusa.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctcol"
+  },
+  {
+    "fields": {
+      "position": 350.707,
+      "short_name": "California Municipal Court, Contra Costa County",
+      "full_name": "Municipal Court of California, County of Contra Costa",
+      "citation_string": "Cal. Mun. Ct. (Contra Costa)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.cc-courts.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctcc"
+  },
+  {
+    "fields": {
+      "position": 350.708,
+      "short_name": "California Municipal Court, Del Norte County",
+      "full_name": "Municipal Court of California, County of Del Norte",
+      "citation_string": "Cal. Mun. Ct. (Del Norte)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.delnorte.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctdn"
+  },
+  {
+    "fields": {
+      "position": 350.709,
+      "short_name": "California Municipal Court, El Dorado County",
+      "full_name": "Municipal Court of California, County of El Dorado",
+      "citation_string": "Cal. Mun. Ct. (El Dorado)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.eldoradocourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmuncted"
+  },
+  {
+    "fields": {
+      "position": 350.710,
+      "short_name": "California Municipal Court, Fresno County",
+      "full_name": "Municipal Court of California, County of Fresno",
+      "citation_string": "Cal. Mun. Ct. (Fresno)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.fresno.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctfre"
+  },
+  {
+    "fields": {
+      "position": 350.711,
+      "short_name": "California Municipal Court, Glenn County",
+      "full_name": "Municipal Court of California, County of Glenn",
+      "citation_string": "Cal. Mun. Ct. (Glenn)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.glenncourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctgle"
+  },
+  {
+    "fields": {
+      "position": 350.712,
+      "short_name": "California Municipal Court, Humboldt County",
+      "full_name": "Municipal Court of California, County of Humboldt",
+      "citation_string": "Cal. Mun. Ct. (Humboldt)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.humboldt.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmuncthum"
+  },
+  {
+    "fields": {
+      "position": 350.713,
+      "short_name": "California Municipal Court, Imperial County",
+      "full_name": "Municipal Court of California, County of Imperial",
+      "citation_string": "Cal. Mun. Ct. (Imperial)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.imperial.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctimp"
+  },
+  {
+    "fields": {
+      "position": 350.714,
+      "short_name": "California Municipal Court, Inyo County",
+      "full_name": "Municipal Court of California, County of Inyo",
+      "citation_string": "Cal. Mun. Ct. (Inyo)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.inyocourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctiny"
+  },
+  {
+    "fields": {
+      "position": 350.715,
+      "short_name": "California Municipal Court, Kern County",
+      "full_name": "Municipal Court of California, County of Kern",
+      "citation_string": "Cal. Mun. Ct. (Kern)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.kern.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctker"
+  },
+  {
+    "fields": {
+      "position": 350.716,
+      "short_name": "California Municipal Court, Kings County",
+      "full_name": "Municipal Court of California, County of Kings",
+      "citation_string": "Cal. Mun. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.kings.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctkin"
+  },
+  {
+    "fields": {
+      "position": 350.717,
+      "short_name": "California Municipal Court, Lake County",
+      "full_name": "Municipal Court of California, County of Lake",
+      "citation_string": "Cal. Mun. Ct. (Lake)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.lake.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctlak"
+  },
+  {
+    "fields": {
+      "position": 350.718,
+      "short_name": "California Municipal Court, Lassen County",
+      "full_name": "Municipal Court of California, County of Lassen",
+      "citation_string": "Cal. Mun. Ct. (Lassen)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.lassencourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctlas"
+  },
+  {
+    "fields": {
+      "position": 350.719,
+      "short_name": "California Municipal Court, Los Angeles County",
+      "full_name": "Municipal Court of California, County of Los Angeles",
+      "citation_string": "Cal. Mun. Ct. (Los Angeles)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.lacourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctla"
+  },
+  {
+    "fields": {
+      "position": 350.720,
+      "short_name": "California Municipal Court, Madera County",
+      "full_name": "Municipal Court of California, County of Madera",
+      "citation_string": "Cal. Mun. Ct. (Madera)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://madera.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmad"
+  },
+  {
+    "fields": {
+      "position": 350.721,
+      "short_name": "California Municipal Court, Marin County",
+      "full_name": "Municipal Court of California, County of Marin",
+      "citation_string": "Cal. Mun. Ct. (Marin)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.marincourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmrn"
+  },
+  {
+    "fields": {
+      "position": 350.722,
+      "short_name": "California Municipal Court, Mariposa County",
+      "full_name": "Municipal Court of California, County of Mariposa",
+      "citation_string": "Cal. Mun. Ct. (Mariposa)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.mariposacourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmpa"
+  },
+  {
+    "fields": {
+      "position": 350.723,
+      "short_name": "California Municipal Court, Mendocino County",
+      "full_name": "Municipal Court of California, County of Mendocino",
+      "citation_string": "Cal. Mun. Ct. (Mendocino)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.mendocino.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmen"
+  },
+  {
+    "fields": {
+      "position": 350.724,
+      "short_name": "California Municipal Court, Merced County",
+      "full_name": "Municipal Court of California, County of Merced",
+      "citation_string": "Cal. Mun. Ct. (Merced)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.mercedcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmer"
+  },
+  {
+    "fields": {
+      "position": 350.725,
+      "short_name": "California Municipal Court, Modoc County",
+      "full_name": "Municipal Court of California, County of Modoc",
+      "citation_string": "Cal. Mun. Ct. (Modoc)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.modoc.courts.ca.gov",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmod"
+  },
+  {
+    "fields": {
+      "position": 350.726,
+      "short_name": "California Municipal Court, Mono County",
+      "full_name": "Municipal Court of California, County of Mono",
+      "citation_string": "Cal. Mun. Ct. (Mono)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.mono.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmno"
+  },
+  {
+    "fields": {
+      "position": 350.727,
+      "short_name": "California Municipal Court, Monterey County",
+      "full_name": "Municipal Court of California, County of Monterey",
+      "citation_string": "Cal. Mun. Ct. (Monterey)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.monterey.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctmon"
+  },
+  {
+    "fields": {
+      "position": 350.728,
+      "short_name": "California Municipal Court, Napa County",
+      "full_name": "Municipal Court of California, County of Napa",
+      "citation_string": "Cal. Mun. Ct. (Napa)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.napa.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctnap"
+  },
+  {
+    "fields": {
+      "position": 350.729,
+      "short_name": "California Municipal Court, Nevada County",
+      "full_name": "Municipal Court of California, County of Nevada",
+      "citation_string": "Cal. Mun. Ct. (Nevada)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://nccourt.net/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctnev"
+  },
+  {
+    "fields": {
+      "position": 350.730,
+      "short_name": "California Municipal Court, Orange County",
+      "full_name": "Municipal Court of California, County of Orange",
+      "citation_string": "Cal. Mun. Ct. (Orange)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.occourts.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctora"
+  },
+  {
+    "fields": {
+      "position": 350.731,
+      "short_name": "California Municipal Court, Placer County",
+      "full_name": "Municipal Court of California, County of Placer",
+      "citation_string": "Cal. Mun. Ct. (Placer)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.placer.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctpla"
+  },
+  {
+    "fields": {
+      "position": 350.732,
+      "short_name": "California Municipal Court, Plumas County",
+      "full_name": "Municipal Court of California, County of Plumas",
+      "citation_string": "Cal. Mun. Ct. (Plumas)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.plumascourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctplu"
+  },
+  {
+    "fields": {
+      "position": 350.733,
+      "short_name": "California Municipal Court, Riverside County",
+      "full_name": "Municipal Court of California, County of Riverside",
+      "citation_string": "Cal. Mun. Ct. (Riverside)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.riverside.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctriv"
+  },
+  {
+    "fields": {
+      "position": 350.734,
+      "short_name": "California Municipal Court, Sacramento County",
+      "full_name": "Municipal Court of California, County of Sacramento",
+      "citation_string": "Cal. Mun. Ct. (Sacramento)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.saccourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsac"
+  },
+  {
+    "fields": {
+      "position": 350.735,
+      "short_name": "California Municipal Court, San Benito County",
+      "full_name": "Municipal Court of California, County of San Benito",
+      "citation_string": "Cal. Mun. Ct. (San Benito)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.sanbenito.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsbt"
+  },
+  {
+    "fields": {
+      "position": 350.736,
+      "short_name": "California Municipal Court, San Bernardino County",
+      "full_name": "Municipal Court of California, County of San Bernardino",
+      "citation_string": "Cal. Mun. Ct. (San Bernardino)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.sb-court.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsbd"
+  },
+  {
+    "fields": {
+      "position": 350.737,
+      "short_name": "California Municipal Court, San Diego County",
+      "full_name": "Municipal Court of California, County of San Diego",
+      "citation_string": "Cal. Mun. Ct. (San Diego)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.sdcourt.ca.gov/portal/page?_pageid=55,1&_dad=portal&_schema=PORTAL",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsd"
+  },
+  {
+    "fields": {
+      "position": 350.738,
+      "short_name": "California Municipal Court, San Francisco County",
+      "full_name": "Municipal Court of California, County of San Francisco",
+      "citation_string": "Cal. Mun. Ct. (San Francisco)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.sfsuperiorcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsf"
+  },
+  {
+    "fields": {
+      "position": 350.739,
+      "short_name": "California Municipal Court, San Joaquin County",
+      "full_name": "Municipal Court of California, County of San Joaquin",
+      "citation_string": "Cal. Mun. Ct. (San Joaquin)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.sjcourts.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsj"
+  },
+  {
+    "fields": {
+      "position": 350.740,
+      "short_name": "California Municipal Court, San Luis Obispo County",
+      "full_name": "Municipal Court of California, County of San Luis Obispo",
+      "citation_string": "Cal. Mun. Ct. (San Luis Obispo)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.slo.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctslo"
+  },
+  {
+    "fields": {
+      "position": 350.741,
+      "short_name": "California Municipal Court, San Mateo County",
+      "full_name": "Municipal Court of California, County of San Mateo",
+      "citation_string": "Cal. Mun. Ct. (San Mateo)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.sanmateocourt.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsm"
+  },
+  {
+    "fields": {
+      "position": 350.742,
+      "short_name": "California Municipal Court, Santa Barbara County",
+      "full_name": "Municipal Court of California, County of Santa Barbara",
+      "citation_string": "Cal. Mun. Ct. (Santa Barbara)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.sbcourts.org/",
+      "date_modified": "2021-08-20T21:54:53.114Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsb"
+  },
+  {
+    "fields": {
+      "position": 350.743,
+      "short_name": "California Municipal Court, Santa Clara County",
+      "full_name": "Municipal Court of California, County of Santa Clara",
+      "citation_string": "Cal. Mun. Ct. (Santa Clara)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.scscourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctscl"
+  },
+  {
+    "fields": {
+      "position": 350.744,
+      "short_name": "California Municipal Court, Santa Cruz County",
+      "full_name": "Municipal Court of California, County of Santa Cruz",
+      "citation_string": "Cal. Mun. Ct. (Santa Cruz)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.santacruzcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctscr"
+  },
+  {
+    "fields": {
+      "position": 350.745,
+      "short_name": "California Municipal Court, Shasta County",
+      "full_name": "Municipal Court of California, County of Shasta",
+      "citation_string": "Cal. Mun. Ct. (Shasta)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.shasta.courts.ca.gov",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsha"
+  },
+  {
+    "fields": {
+      "position": 350.746,
+      "short_name": "California Municipal Court, Sierra County",
+      "full_name": "Municipal Court of California, County of Sierra",
+      "citation_string": "Cal. Mun. Ct. (Sierra)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://sierra.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsie"
+  },
+  {
+    "fields": {
+      "position": 350.747,
+      "short_name": "California Municipal Court, Siskiyou County",
+      "full_name": "Municipal Court of California, County of Siskiyou",
+      "citation_string": "Cal. Mun. Ct. (Siskiyou)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.siskiyou.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsis"
+  },
+  {
+    "fields": {
+      "position": 350.748,
+      "short_name": "California Municipal Court, Solano County",
+      "full_name": "Municipal Court of California, County of Solano",
+      "citation_string": "Cal. Mun. Ct. (Solano)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.solano.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsol"
+  },
+  {
+    "fields": {
+      "position": 350.749,
+      "short_name": "California Municipal Court, Sonoma County",
+      "full_name": "Municipal Court of California, County of Sonoma",
+      "citation_string": "Cal. Mun. Ct. (Sonoma)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://sonoma.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctson"
+  },
+  {
+    "fields": {
+      "position": 350.750,
+      "short_name": "California Municipal Court, Stanislaus County",
+      "full_name": "Municipal Court of California, County of Stanislaus",
+      "citation_string": "Cal. Mun. Ct. (Stanislaus)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.stanct.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsta"
+  },
+  {
+    "fields": {
+      "position": 350.751,
+      "short_name": "California Municipal Court, Sutter County",
+      "full_name": "Municipal Court of California, County of Sutter",
+      "citation_string": "Cal. Mun. Ct. (Sutter)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.suttercourts.com/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctsut"
+  },
+  {
+    "fields": {
+      "position": 350.752,
+      "short_name": "California Municipal Court, Tehama County",
+      "full_name": "Municipal Court of California, County of Tehama",
+      "citation_string": "Cal. Mun. Ct. (Tehama)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.tehamacourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctteh"
+  },
+  {
+    "fields": {
+      "position": 350.753,
+      "short_name": "California Municipal Court, Trinity County",
+      "full_name": "Municipal Court of California, County of Trinity",
+      "citation_string": "Cal. Mun. Ct. (Trinity)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.trinity.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmuncttri"
+  },
+  {
+    "fields": {
+      "position": 350.754,
+      "short_name": "California Municipal Court, Tulare County",
+      "full_name": "Municipal Court of California, County of Tulare",
+      "citation_string": "Cal. Mun. Ct. (Tulare)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.tularesuperiorcourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmuncttul"
+  },
+  {
+    "fields": {
+      "position": 350.755,
+      "short_name": "California Municipal Court, Tuolumne County",
+      "full_name": "Municipal Court of California, County of Tuolumne",
+      "citation_string": "Cal. Mun. Ct. (Tuolumne)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.tuolumne.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmuncttuo"
+  },
+  {
+    "fields": {
+      "position": 350.756,
+      "short_name": "California Municipal Court, Ventura County",
+      "full_name": "Municipal Court of California, County of Ventura",
+      "citation_string": "Cal. Mun. Ct. (Ventura)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.ventura.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctven"
+  },
+  {
+    "fields": {
+      "position": 350.757,
+      "short_name": "California Municipal Court, Yolo County",
+      "full_name": "Municipal Court of California, County of Yolo",
+      "citation_string": "Cal. Mun. Ct. (Yolo)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "https://www.yolo.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctyol"
+  },
+  {
+    "fields": {
+      "position": 350.758,
+      "short_name": "California Municipal Court, Yuba County",
+      "full_name": "Municipal Court of California, County of Yuba",
+      "citation_string": "Cal. Mun. Ct. (Yuba)",
+      "notes": "Created as part of importation of California Judges Data Set. Municipal Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "http://www.yuba.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calmunctyub"
+  },
+  {
+    "fields": {
+      "position": 350.601,
+      "short_name": "California Superior Court, Alameda County",
+      "full_name": "Superior Court of California, County of Alameda",
+      "citation_string": "Cal. Supp. Ct. (Alameda)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.alameda.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctala"
+  },
+  {
+    "fields": {
+      "position": 350.602,
+      "short_name": "California Superior Court, Alpine County",
+      "full_name": "Superior Court of California, County of Alpine",
+      "citation_string": "Cal. Supp. Ct. (Alpine)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.alpine.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctalp"
+  },
+  {
+    "fields": {
+      "position": 350.603,
+      "short_name": "California Superior Court, Amador County",
+      "full_name": "Superior Court of California, County of Amador",
+      "citation_string": "Cal. Supp. Ct. (Amador)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.amadorcourt.org",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctama"
+  },
+  {
+    "fields": {
+      "position": 350.604,
+      "short_name": "California Superior Court, Butte County",
+      "full_name": "Superior Court of California, County of Butte",
+      "citation_string": "Cal. Supp. Ct. (Butte)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.buttecourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctbut"
+  },
+  {
+    "fields": {
+      "position": 350.605,
+      "short_name": "California Superior Court, Calaveras County",
+      "full_name": "Superior Court of California, County of Calaveras",
+      "citation_string": "Cal. Supp. Ct. (Calaveras)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.calaveras.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctcal"
+  },
+  {
+    "fields": {
+      "position": 350.606,
+      "short_name": "California Superior Court, Colusa County",
+      "full_name": "Superior Court of California, County of Colusa",
+      "citation_string": "Cal. Supp. Ct. (Colusa)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.colusa.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctcol"
+  },
+  {
+    "fields": {
+      "position": 350.607,
+      "short_name": "California Superior Court, Contra Costa County",
+      "full_name": "Superior Court of California, County of Contra Costa",
+      "citation_string": "Cal. Supp. Ct. (Contra Costa)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.cc-courts.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctcc"
+  },
+  {
+    "fields": {
+      "position": 350.608,
+      "short_name": "California Superior Court, Del Norte County",
+      "full_name": "Superior Court of California, County of Del Norte",
+      "citation_string": "Cal. Supp. Ct. (Del Norte)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.delnorte.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctdn"
+  },
+  {
+    "fields": {
+      "position": 350.609,
+      "short_name": "California Superior Court, El Dorado County",
+      "full_name": "Superior Court of California, County of El Dorado",
+      "citation_string": "Cal. Supp. Ct. (El Dorado)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.eldoradocourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppcted"
+  },
+  {
+    "fields": {
+      "position": 350.610,
+      "short_name": "California Superior Court, Fresno County",
+      "full_name": "Superior Court of California, County of Fresno",
+      "citation_string": "Cal. Supp. Ct. (Fresno)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.fresno.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctfre"
+  },
+  {
+    "fields": {
+      "position": 350.611,
+      "short_name": "California Superior Court, Glenn County",
+      "full_name": "Superior Court of California, County of Glenn",
+      "citation_string": "Cal. Supp. Ct. (Glenn)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.glenncourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctgle"
+  },
+  {
+    "fields": {
+      "position": 350.612,
+      "short_name": "California Superior Court, Humboldt County",
+      "full_name": "Superior Court of California, County of Humboldt",
+      "citation_string": "Cal. Supp. Ct. (Humboldt)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.humboldt.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppcthum"
+  },
+  {
+    "fields": {
+      "position": 350.613,
+      "short_name": "California Superior Court, Imperial County",
+      "full_name": "Superior Court of California, County of Imperial",
+      "citation_string": "Cal. Supp. Ct. (Imperial)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.imperial.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctimp"
+  },
+  {
+    "fields": {
+      "position": 350.614,
+      "short_name": "California Superior Court, Inyo County",
+      "full_name": "Superior Court of California, County of Inyo",
+      "citation_string": "Cal. Supp. Ct. (Inyo)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.inyocourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctiny"
+  },
+  {
+    "fields": {
+      "position": 350.615,
+      "short_name": "California Superior Court, Kern County",
+      "full_name": "Superior Court of California, County of Kern",
+      "citation_string": "Cal. Supp. Ct. (Kern)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.kern.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctker"
+  },
+  {
+    "fields": {
+      "position": 350.616,
+      "short_name": "California Superior Court, Kings County",
+      "full_name": "Superior Court of California, County of Kings",
+      "citation_string": "Cal. Supp. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.kings.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctkin"
+  },
+  {
+    "fields": {
+      "position": 350.617,
+      "short_name": "California Superior Court, Lake County",
+      "full_name": "Superior Court of California, County of Lake",
+      "citation_string": "Cal. Supp. Ct. (Lake)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.lake.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctlak"
+  },
+  {
+    "fields": {
+      "position": 350.618,
+      "short_name": "California Superior Court, Lassen County",
+      "full_name": "Superior Court of California, County of Lassen",
+      "citation_string": "Cal. Supp. Ct. (Lassen)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.lassencourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctlas"
+  },
+  {
+    "fields": {
+      "position": 350.619,
+      "short_name": "California Superior Court, Los Angeles County",
+      "full_name": "Superior Court of California, County of Los Angeles",
+      "citation_string": "Cal. Supp. Ct. (Los Angeles)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.lacourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctla"
+  },
+  {
+    "fields": {
+      "position": 350.620,
+      "short_name": "California Superior Court, Madera County",
+      "full_name": "Superior Court of California, County of Madera",
+      "citation_string": "Cal. Supp. Ct. (Madera)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://madera.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmad"
+  },
+  {
+    "fields": {
+      "position": 350.621,
+      "short_name": "California Superior Court, Marin County",
+      "full_name": "Superior Court of California, County of Marin",
+      "citation_string": "Cal. Supp. Ct. (Marin)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.marincourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmrn"
+  },
+  {
+    "fields": {
+      "position": 350.622,
+      "short_name": "California Superior Court, Mariposa County",
+      "full_name": "Superior Court of California, County of Mariposa",
+      "citation_string": "Cal. Supp. Ct. (Mariposa)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.mariposacourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmpa"
+  },
+  {
+    "fields": {
+      "position": 350.623,
+      "short_name": "California Superior Court, Mendocino County",
+      "full_name": "Superior Court of California, County of Mendocino",
+      "citation_string": "Cal. Supp. Ct. (Mendocino)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.mendocino.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmen"
+  },
+  {
+    "fields": {
+      "position": 350.624,
+      "short_name": "California Superior Court, Merced County",
+      "full_name": "Superior Court of California, County of Merced",
+      "citation_string": "Cal. Supp. Ct. (Merced)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.mercedcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmer"
+  },
+  {
+    "fields": {
+      "position": 350.625,
+      "short_name": "California Superior Court, Modoc County",
+      "full_name": "Superior Court of California, County of Modoc",
+      "citation_string": "Cal. Supp. Ct. (Modoc)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.modoc.courts.ca.gov",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmod"
+  },
+  {
+    "fields": {
+      "position": 350.626,
+      "short_name": "California Superior Court, Mono County",
+      "full_name": "Superior Court of California, County of Mono",
+      "citation_string": "Cal. Supp. Ct. (Mono)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.mono.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmno"
+  },
+  {
+    "fields": {
+      "position": 350.627,
+      "short_name": "California Superior Court, Monterey County",
+      "full_name": "Superior Court of California, County of Monterey",
+      "citation_string": "Cal. Supp. Ct. (Monterey)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.monterey.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctmon"
+  },
+  {
+    "fields": {
+      "position": 350.628,
+      "short_name": "California Superior Court, Napa County",
+      "full_name": "Superior Court of California, County of Napa",
+      "citation_string": "Cal. Supp. Ct. (Napa)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.napa.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctnap"
+  },
+  {
+    "fields": {
+      "position": 350.629,
+      "short_name": "California Superior Court, Nevada County",
+      "full_name": "Superior Court of California, County of Nevada",
+      "citation_string": "Cal. Supp. Ct. (Nevada)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://nccourt.net/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctnev"
+  },
+  {
+    "fields": {
+      "position": 350.630,
+      "short_name": "California Superior Court, Orange County",
+      "full_name": "Superior Court of California, County of Orange",
+      "citation_string": "Cal. Supp. Ct. (Orange)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.occourts.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctora"
+  },
+  {
+    "fields": {
+      "position": 350.631,
+      "short_name": "California Superior Court, Placer County",
+      "full_name": "Superior Court of California, County of Placer",
+      "citation_string": "Cal. Supp. Ct. (Placer)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.placer.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctpla"
+  },
+  {
+    "fields": {
+      "position": 350.632,
+      "short_name": "California Superior Court, Plumas County",
+      "full_name": "Superior Court of California, County of Plumas",
+      "citation_string": "Cal. Supp. Ct. (Plumas)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.plumascourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctplu"
+  },
+  {
+    "fields": {
+      "position": 350.633,
+      "short_name": "California Superior Court, Riverside County",
+      "full_name": "Superior Court of California, County of Riverside",
+      "citation_string": "Cal. Supp. Ct. (Riverside)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.riverside.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctriv"
+  },
+  {
+    "fields": {
+      "position": 350.634,
+      "short_name": "California Superior Court, Sacramento County",
+      "full_name": "Superior Court of California, County of Sacramento",
+      "citation_string": "Cal. Supp. Ct. (Sacramento)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.saccourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsac"
+  },
+  {
+    "fields": {
+      "position": 350.635,
+      "short_name": "California Superior Court, San Benito County",
+      "full_name": "Superior Court of California, County of San Benito",
+      "citation_string": "Cal. Supp. Ct. (San Benito)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.sanbenito.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsbt"
+  },
+  {
+    "fields": {
+      "position": 350.636,
+      "short_name": "California Superior Court, San Bernardino County",
+      "full_name": "Superior Court of California, County of San Bernardino",
+      "citation_string": "Cal. Supp. Ct. (San Bernardino)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.sb-court.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsbd"
+  },
+  {
+    "fields": {
+      "position": 350.637,
+      "short_name": "California Superior Court, San Diego County",
+      "full_name": "Superior Court of California, County of San Diego",
+      "citation_string": "Cal. Supp. Ct. (San Diego)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.sdcourt.ca.gov/portal/page?_pageid=55,1&_dad=portal&_schema=PORTAL",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsd"
+  },
+  {
+    "fields": {
+      "position": 350.638,
+      "short_name": "California Superior Court, San Francisco County",
+      "full_name": "Superior Court of California, County of San Francisco",
+      "citation_string": "Cal. Supp. Ct. (San Francisco)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.sfsuperiorcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsf"
+  },
+  {
+    "fields": {
+      "position": 350.639,
+      "short_name": "California Superior Court, San Joaquin County",
+      "full_name": "Superior Court of California, County of San Joaquin",
+      "citation_string": "Cal. Supp. Ct. (San Joaquin)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.sjcourts.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsj"
+  },
+  {
+    "fields": {
+      "position": 350.640,
+      "short_name": "California Superior Court, San Luis Obispo County",
+      "full_name": "Superior Court of California, County of San Luis Obispo",
+      "citation_string": "Cal. Supp. Ct. (San Luis Obispo)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.slo.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctslo"
+  },
+  {
+    "fields": {
+      "position": 350.641,
+      "short_name": "California Superior Court, San Mateo County",
+      "full_name": "Superior Court of California, County of San Mateo",
+      "citation_string": "Cal. Supp. Ct. (San Mateo)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.sanmateocourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsm"
+  },
+  {
+    "fields": {
+      "position": 350.642,
+      "short_name": "California Superior Court, Santa Barbara County",
+      "full_name": "Superior Court of California, County of Santa Barbara",
+      "citation_string": "Cal. Supp. Ct. (Santa Barbara)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.sbcourts.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsb"
+  },
+  {
+    "fields": {
+      "position": 350.643,
+      "short_name": "California Superior Court, Santa Clara County",
+      "full_name": "Superior Court of California, County of Santa Clara",
+      "citation_string": "Cal. Supp. Ct. (Santa Clara)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.scscourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctscl"
+  },
+  {
+    "fields": {
+      "position": 350.644,
+      "short_name": "California Superior Court, Santa Cruz County",
+      "full_name": "Superior Court of California, County of Santa Cruz",
+      "citation_string": "Cal. Supp. Ct. (Santa Cruz)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.santacruzcourt.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctscr"
+  },
+  {
+    "fields": {
+      "position": 350.645,
+      "short_name": "California Superior Court, Shasta County",
+      "full_name": "Superior Court of California, County of Shasta",
+      "citation_string": "Cal. Supp. Ct. (Shasta)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.shasta.courts.ca.gov",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsha"
+  },
+  {
+    "fields": {
+      "position": 350.646,
+      "short_name": "California Superior Court, Sierra County",
+      "full_name": "Superior Court of California, County of Sierra",
+      "citation_string": "Cal. Supp. Ct. (Sierra)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://sierra.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsie"
+  },
+  {
+    "fields": {
+      "position": 350.647,
+      "short_name": "California Superior Court, Siskiyou County",
+      "full_name": "Superior Court of California, County of Siskiyou",
+      "citation_string": "Cal. Supp. Ct. (Siskiyou)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.siskiyou.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsis"
+  },
+  {
+    "fields": {
+      "position": 350.648,
+      "short_name": "California Superior Court, Solano County",
+      "full_name": "Superior Court of California, County of Solano",
+      "citation_string": "Cal. Supp. Ct. (Solano)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.solano.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsol"
+  },
+  {
+    "fields": {
+      "position": 350.649,
+      "short_name": "California Superior Court, Sonoma County",
+      "full_name": "Superior Court of California, County of Sonoma",
+      "citation_string": "Cal. Supp. Ct. (Sonoma)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://sonoma.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctson"
+  },
+  {
+    "fields": {
+      "position": 350.650,
+      "short_name": "California Superior Court, Stanislaus County",
+      "full_name": "Superior Court of California, County of Stanislaus",
+      "citation_string": "Cal. Supp. Ct. (Stanislaus)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.stanct.org/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsta"
+  },
+  {
+    "fields": {
+      "position": 350.651,
+      "short_name": "California Superior Court, Sutter County",
+      "full_name": "Superior Court of California, County of Sutter",
+      "citation_string": "Cal. Supp. Ct. (Sutter)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.suttercourts.com/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctsut"
+  },
+  {
+    "fields": {
+      "position": 350.652,
+      "short_name": "California Superior Court, Tehama County",
+      "full_name": "Superior Court of California, County of Tehama",
+      "citation_string": "Cal. Supp. Ct. (Tehama)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.tehamacourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctteh"
+  },
+  {
+    "fields": {
+      "position": 350.653,
+      "short_name": "California Superior Court, Trinity County",
+      "full_name": "Superior Court of California, County of Trinity",
+      "citation_string": "Cal. Supp. Ct. (Trinity)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.trinity.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppcttri"
+  },
+  {
+    "fields": {
+      "position": 350.654,
+      "short_name": "California Superior Court, Tulare County",
+      "full_name": "Superior Court of California, County of Tulare",
+      "citation_string": "Cal. Supp. Ct. (Tulare)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.tularesuperiorcourt.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppcttul"
+  },
+  {
+    "fields": {
+      "position": 350.655,
+      "short_name": "California Superior Court, Tuolumne County",
+      "full_name": "Superior Court of California, County of Tuolumne",
+      "citation_string": "Cal. Supp. Ct. (Tuolumne)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.tuolumne.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppcttuo"
+  },
+  {
+    "fields": {
+      "position": 350.656,
+      "short_name": "California Superior Court, Ventura County",
+      "full_name": "Superior Court of California, County of Ventura",
+      "citation_string": "Cal. Supp. Ct. (Ventura)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.ventura.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctven"
+  },
+  {
+    "fields": {
+      "position": 350.657,
+      "short_name": "California Superior Court, Yolo County",
+      "full_name": "Superior Court of California, County of Yolo",
+      "citation_string": "Cal. Supp. Ct. (Yolo)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "https://www.yolo.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctyol"
+  },
+  {
+    "fields": {
+      "position": 350.658,
+      "short_name": "California Superior Court, Yuba County",
+      "full_name": "Superior Court of California, County of Yuba",
+      "citation_string": "Cal. Supp. Ct. (Yuba)",
+      "notes": "Created as part of importation of California Judges Data Set.",
+      "jurisdiction": "ST",
+      "end_date": null,
+      "in_use": false,
+      "url": "http://www.yuba.courts.ca.gov/",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "calsuppctyub"
+  },
+  {
+    "fields": {
+      "position": 350.801,
+      "short_name": "California Justice Court, Butte County",
+      "full_name": "Califonia Justice Court, Butte County",
+      "citation_string": "Cal. Just. Ct. (Butte)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctbut"
+  },
+  {
+    "fields": {
+      "position": 350.802,
+      "short_name": "California Justice Court, Colusa County",
+      "full_name": "Califonia Justice Court, Colusa County",
+      "citation_string": "Cal. Just. Ct. (Colusa)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctcol"
+  },
+  {
+    "fields": {
+      "position": 350.803,
+      "short_name": "California Justice Court, Fresno County",
+      "full_name": "Califonia Justice Court, Fresno County",
+      "citation_string": "Cal. Just. Ct. (Fresno)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctfre"
+  },
+  {
+    "fields": {
+      "position": 350.804,
+      "short_name": "California Justice Court, Glenn County",
+      "full_name": "Califonia Justice Court, Glenn County",
+      "citation_string": "Cal. Just. Ct. (Glenn)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctgle"
+  },
+  {
+    "fields": {
+      "position": 350.805,
+      "short_name": "California Justice Court, Humboldt County",
+      "full_name": "Califonia Justice Court, Humboldt County",
+      "citation_string": "Cal. Just. Ct. (Humboldt)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcthum"
+  },
+  {
+    "fields": {
+      "position": 350.806,
+      "short_name": "California Justice Court, Kern County",
+      "full_name": "Califonia Justice Court, Kern County",
+      "citation_string": "Cal. Just. Ct. (Kern)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctker"
+  },
+  {
+    "fields": {
+      "position": 350.807,
+      "short_name": "California Justice Court, Kings County",
+      "full_name": "Califonia Justice Court, Kings County",
+      "citation_string": "Cal. Just. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctkin"
+  },
+  {
+    "fields": {
+      "position": 350.808,
+      "short_name": "California Justice Court, Kings County",
+      "full_name": "Califonia Justice Court, Kings County",
+      "citation_string": "Cal. Just. Ct. (Kings)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctkin"
+  },
+  {
+    "fields": {
+      "position": 350.809,
+      "short_name": "California Justice Court, Lake County",
+      "full_name": "Califonia Justice Court, Lake County",
+      "citation_string": "Cal. Just. Ct. (Lake)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctlak"
+  },
+  {
+    "fields": {
+      "position": 350.810,
+      "short_name": "California Justice Court, Los Angeles County",
+      "full_name": "Califonia Justice Court, Los Angeles County",
+      "citation_string": "Cal. Just. Ct. (Los Angeles)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctla"
+  },
+  {
+    "fields": {
+      "position": 350.811,
+      "short_name": "California Justice Court, Madera County",
+      "full_name": "Califonia Justice Court, Madera County",
+      "citation_string": "Cal. Just. Ct. (Madera)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmad"
+  },
+  {
+    "fields": {
+      "position": 350.812,
+      "short_name": "California Justice Court, Mariposa County",
+      "full_name": "Califonia Justice Court, Mariposa County",
+      "citation_string": "Cal. Just. Ct. (Mariposa)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmpa"
+  },
+  {
+    "fields": {
+      "position": 350.813,
+      "short_name": "California Justice Court, Mendocino County",
+      "full_name": "Califonia Justice Court, Mendocino County",
+      "citation_string": "Cal. Just. Ct. (Mendocino)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmen"
+  },
+  {
+    "fields": {
+      "position": 350.814,
+      "short_name": "California Justice Court, Mono County",
+      "full_name": "Califonia Justice Court, Mono County",
+      "citation_string": "Cal. Just. Ct. (Mono)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctmno"
+  },
+  {
+    "fields": {
+      "position": 350.815,
+      "short_name": "California Justice Court, Nevada County",
+      "full_name": "Califonia Justice Court, Nevada County",
+      "citation_string": "Cal. Just. Ct. (Nevada)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctnev"
+  },
+  {
+    "fields": {
+      "position": 350.816,
+      "short_name": "California Justice Court, Placer County",
+      "full_name": "Califonia Justice Court, Placer County",
+      "citation_string": "Cal. Just. Ct. (Placer)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctpla"
+  },
+  {
+    "fields": {
+      "position": 350.817,
+      "short_name": "California Justice Court, Plumas County",
+      "full_name": "Califonia Justice Court, Plumas County",
+      "citation_string": "Cal. Just. Ct. (Plumas)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctplu"
+  },
+  {
+    "fields": {
+      "position": 350.818,
+      "short_name": "California Justice Court, San Benito County",
+      "full_name": "Califonia Justice Court, San Benito County",
+      "citation_string": "Cal. Just. Ct. (San Benito)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsbt"
+  },
+  {
+    "fields": {
+      "position": 350.819,
+      "short_name": "California Justice Court, San Bernardino County",
+      "full_name": "Califonia Justice Court, San Bernardino County",
+      "citation_string": "Cal. Just. Ct. (San Bernardino)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsbd"
+  },
+  {
+    "fields": {
+      "position": 350.820,
+      "short_name": "California Justice Court, Siskiyou County",
+      "full_name": "Califonia Justice Court, Siskiyou County",
+      "citation_string": "Cal. Just. Ct. (Siskiyou)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustctsis"
+  },
+  {
+    "fields": {
+      "position": 350.821,
+      "short_name": "California Justice Court, Tulare County",
+      "full_name": "Califonia Justice Court, Tulare County",
+      "citation_string": "Cal. Just. Ct. (Tulare)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcttul"
+  },
+  {
+    "fields": {
+      "position": 350.822,
+      "short_name": "California Justice Court, Tuolumne County",
+      "full_name": "Califonia Justice Court, Tuolumne County",
+      "citation_string": "Cal. Just. Ct. (Tuolumne)",
+      "notes": "Created as part of importation of California Judges Data Set. Justice Courts refer to pre-2001 trial courts that were merged into the Superior Courts",
+      "jurisdiction": "ST",
+      "end_date": "2001-01-01",
+      "in_use": false,
+      "url": "",
+      "date_modified": "2021-08-20T21:54:53.115Z",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": null
+    },
+    "model": "search.Court",
+    "pk": "caljustcttuo"
+  }
+]
