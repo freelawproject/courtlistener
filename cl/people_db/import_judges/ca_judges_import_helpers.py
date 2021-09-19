@@ -1,17 +1,18 @@
+import logging
 import json
 import os
 import re
 from datetime import date
+from dateutil.parser import parse
 
+from dateutil.relativedelta import relativedelta
+from typing import List, Optional, Union
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
+from nameparser import HumanName
 
-from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.lookup_utils import lookup_judge_by_full_name
-from cl.people_db.models import Attorney
-from cl.people_db.models import AttorneyOrganizationAssociation as AttyOrgAss
-from cl.people_db.models import Position, Role
-from cl.search.models import Docket
+from cl.search.models import Court
+from cl.people_db.models import Person, Position, Role
 
 
 def load_json_file(file_name):
@@ -114,7 +115,7 @@ def get_appointer(jud_exp_pending_sub_type):
         "Knight": "cal-gov-31",
         "Brown": "cal-gov-32",
         "Reagan": "pres-038",
-        "Brown Jr.": "cal-gov-34",
+        "Brown, Jr.": "cal-gov-34",
         "Deukmejian": "cal-gov-35",
         "Wilson": "cal-gov-36",
         "Davis": "cal-gov-37",
@@ -122,11 +123,11 @@ def get_appointer(jud_exp_pending_sub_type):
         "Newsom": "cal-gov-40",
     }
 
-    cl_id = name_to_cl_id[jud_exp_pending_sub_type]
+    cl_id = name_to_cl_id.get(jud_exp_pending_sub_type)
 
     if cl_id:
         person = Person(cl_id=cl_id)
-        all_positions = person.positions_set.all()
+        all_positions = person.positions.all()
         for position in all_positions:
             if position.position_type == Position.GOVERNOR:
                 appointer_pos_fk = position.pk
@@ -153,16 +154,16 @@ def get_termination_reason(status):
     """
 
     status_to_enum = {
-        "Deceased": TERMINATION_REASONS.ded,
-        "Defeated": TERMINATION_REASONS.lost,
-        "Non-Voluntary": TERMINATION_REASONS.retire_mand,
-        "Promoted": TERMINATION_REASONS.other_pos,
-        "Resigned": TERMINATION_REASONS.resign,
-        "Retired": TERMINATION_REASONS.retire_vol,
-        "Term Ended": TERMINATION_REASONS.termed_out,
-        "Transferred": TERMINATION_REASONS.other_pos,
+        "Deceased": "ded",
+        "Defeated": "lost",
+        "Non-Voluntary": "retire_mand",
+        "Promoted": "other_pos",
+        "Resigned": "resign",
+        "Retired": "retire_vol",
+        "Term Ended": "termed_out",
+        "Transferred": "other_pos",
     }
-    return status_to_enum[status]
+    return status_to_enum.get(status)
 
 
 def find_judge(lfm, positions, counties):
@@ -171,9 +172,7 @@ def find_judge(lfm, positions, counties):
     Using the lookup_judge_by_full_name function we can pass in a
     humanname string in the last_first_middle format.
 
-    We thus iterate over the courts, and try to find the judge. If we
-    find one, we break and return the judge. If no judge is found, we
-    return None
+    We search for a match of first, middle, or last and
 
     :param lfm: string
     :param positions: PositionJson[]
@@ -181,25 +180,37 @@ def find_judge(lfm, positions, counties):
     :return Judge or None
     """
 
-    courts = []
     judge = None
     for position in positions:
-        c = find_court(position, counties)
-        if c:
-            courts.append(c)
-    for court in courts:
-        found = lookup_judge_by_full_name(lfm, court)
+        date_text = position["judicialExperienceActiveDate"]
+        event_date = validate_string_date(date_text)
+        found = lookup_judge_by_full_name(lfm, event_date)
         if found:
             judge = found
             break
-    if judge is None:
-        logging.info(f"Unable to find a judge for name {lfm}")
-    else:
+    if judge is not None:
         logging.info(f"Found judge with id {judge.id}")
     return judge
 
 
-def find_or_create_judge(judgeJson, counties):
+def validate_string_date(date_text):
+    """returns either a datetime object or None
+
+    try to parse the date_text. Return None if not valid
+
+    :param date_text
+    :returns datetime object | None
+    """
+    date_obj = None
+    if date_text != "":
+        try:
+            date_obj = parse(date_text)
+        except ValueError:
+            logging.info("Deceased Date {date_text} not a valid date")
+    return date_obj
+
+
+def find_or_create_judge(judgeJson, counties, index):
     """Find Judge in db
 
     Check to see if a judge exists by running the find_judge function.
@@ -208,34 +219,44 @@ def find_or_create_judge(judgeJson, counties):
 
     :param judgeJson: JudgeJson
     :param counties: CountiesJson {[countyName]: countyAbbreviation}[]
+    :param index (for the cl_id)
     :return Judge
     """
 
     positions = judgeJson["positions"]
-    # from the positions, grab the name in the format "last, first middle"
-    lfm = positions[0]["lastFirstMiddleName"]
+
+    first_position = positions[0]
+
+    name_first = first_position["firstName"]
+    name_last = first_position["lastName"]
+    lfm = first_position["lastFirstMiddleName"]
+
     logging.info(f"Searching for judge with last, first middle {lfm}")
     judge = find_judge(lfm, positions, counties)
     # if no judge, create it
     if judge is None:
-        first_position = positions[0]
-        name_first = first_position["firstName"]
-        name_last = first_position["lastName"]
+        logging.info("No judge found. Creating ...")
+
+        judge_info = {
+            # start at 00001
+            "cl_id": "cal-jud-" + format(index + 1, "05d"),
+            "name_first": name_first,
+            "name_last": name_last,
+        }
+
         name_middle = get_middle_name(lfm, name_first, name_last)
-        date_dod = first_position["deceasedDate"]
 
-        logging.info(f"name_first: {name_first}")
-        logging.info(f"name_last: {name_last}")
-        logging.info(f"name_middle: {name_middle}")
-        logging.info(f"date_dod: {date_dod}")
+        if name_middle:
+            judge_info["name_middle"] = name_middle
 
-        judge = Person(
-            name_first=name_first,
-            name_last=name_last,
-            name_middle=name_middle,
-            date_dod=date_dod,
-        )
-        judge.save()
+        # deceased date in format of 09/04/2000
+        date_dod = validate_string_date(first_position["deceasedDate"])
+        if date_dod:
+            judge_info["date_dod"] = date_dod.strftime("%Y-%m-%d")
+            judge_info["date_granularity_dod"] = "%Y-%m-%d"
+
+        logging.info(f"Judge info %s", json.dumps(judge_info))
+        judge = Person.objects.create(**judge_info)
 
     return judge
 
@@ -287,28 +308,27 @@ def find_court(position, counties):
             "Fifth": "5",
             "Sixth": "6",
         }
-        parts = org_name.split(" ")
-        abbrev = appellate_court_districts(parts[3])
-        if lookup:
-            return f"calctapp{lookup}d"
+        name_parts = org_name.split(" ")
+        abbrev = appellate_court_districts.get(name_parts[3])
+        if abbrev:
+            return Court(id=f"calctapp{abbrev}d")
         else:
-            return
-            # throw error
+            raise Exception("Invalid appellate court name: {org_name}}")
 
     elif re.search(r"Justice\sCourt", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return f"caljustct{county}"
+        return Court(id=f"caljustct{county}")
 
     elif re.search(r"Municipal", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return f"calmunct{county}"
+        return Court(id=f"calmunct{county}")
 
     elif re.search(r"Superior\sCourt", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return f"calsuppct{county}"
+        return Court(id=f"calsuppct{county}")
 
     elif re.search(r"Supreme\sCourt", org_type):
-        return "cal"
+        return Court(id="cal")
 
     elif re.search(r"Association", org_type):
         # TODO
@@ -405,44 +425,125 @@ def get_position_type(jobTitle):
     :return enum \ None
     """
 
-    if (re.search(r"^Court of Appeal"), jobTitle):
+    if re.search(r"^Court of Appeal", jobTitle):
 
-        if (re.search(r"Administrative\sPresiding\sJustice"), jobTitle):
-            return POSITION_TYPES.ADMINISTRATIVE_PRESIDING_JUSTICE
+        if re.search(r"Administrative\sPresiding\sJustice", jobTitle):
+            return Position.ADMINISTRATIVE_PRESIDING_JUSTICE
 
-        elif (re.search(r"Presiding\sJustice"), jobTitle):
-            return POSITION_TYPES.PRESIDING_JUSTICE
+        elif re.search(r"Presiding\sJustice", jobTitle):
+            return Position.PRESIDING_JUSTICE
 
-        elif (re.search(r"Associate\sJustice"), jobTitle):
-            return POSITION_TYPES.ASSOCIATE_JUSTICE
+        elif re.search(r"Associate\sJustice", jobTitle):
+            return Position.ASSOCIATE_JUSTICE
 
-    elif (re.search(r"^Supreme\sCourt"), jobTitle):
+    elif re.search(r"^Supreme\sCourt", jobTitle):
 
-        if (re.search(r"Associate"), jobTitle):
-            return POSITION_TYPES.ASSOCIATE_JUSTICE
+        if re.search(r"Associate", jobTitle):
+            return Position.ASSOCIATE_JUSTICE
 
-        elif (re.search(r"Chief"), jobTitle):
-            return POSITION_TYPES.CHIEF_JUSTICE
+        elif re.search(r"Chief", jobTitle):
+            return Position.CHIEF_JUSTICE
 
-    elif (re.search(r"^Superior\sCourt"), jobTitle):
+    elif re.search(r"^Superior\sCourt", jobTitle):
 
-        if (re.search(r"Supervising"), jobTitle):
-            return POSITION_TYPES.SUPERVISING_JUDGE
+        if re.search(r"Supervising", jobTitle):
+            return Position.SUPERVISING_JUDGE
 
-        elif (re.search(r"Assistant\sPresiding"), jobTitle):
-            return POSITION_TYPES.ASSISTANT_PRESIDING_JUDGE
+        elif re.search(r"Assistant\sPresiding", jobTitle):
+            return Position.ASSISTANT_PRESIDING_JUDGE
 
-        elif (re.search(r"Presiding"), jobTitle):
-            return POSITION_TYPES.PRESIDING_JUDGE
+        elif re.search(r"Presiding", jobTitle):
+            return Position.PRESIDING_JUDGE
 
         else:
-            return POSITION_TYPES.JUDGE
+            return Position.JUDGE
 
-    elif (re.search(r"^Justice\sCourt"), jobTitle):
-        return POSITION_TYPES.TRIAL_JUDGE
+    elif re.search(r"^Justice\sCourt", jobTitle):
+        return Position.TRIAL_JUDGE
 
-    elif (re.search(r"^Municipal\sCourt"), jobTitle):
-        return POSITION_TYPES.TRIAL_JUDGE
+    elif re.search(r"^Municipal\sCourt", jobTitle):
+        return Position.TRIAL_JUDGE
 
     else:
         return None
+
+
+def lookup_judge_by_full_name(
+    lfm: str,
+    event_date: Optional[date] = None,
+) -> Optional[Person]:
+    """Uniquely identifies a judge by name and event_date.
+
+    :param name: The judge's name, either as a str of the full name or as
+    a HumanName object. Do NOT provide just the last name of the judge. If you
+    do, it will be considered the judge's first name. You MUST provide their
+    full name or a HumanName object. To look up a judge by last name, see the
+    look_up_judge_by_last_name function. The str parsing used here is the
+    heuristic approach used by nameparser.HumanName.
+
+    :param event_date: The date when the judge did something
+    :return Either the judge that matched the name in the court at the right
+    time, or None.
+    """
+    name = HumanName(lfm)
+
+    # check based on last name and court first
+    filter_sets = [
+        [Q(name_last__iexact=name.last)],
+    ]
+    # Then narrow by date
+    if event_date is not None:
+        filter_sets.append(
+            [
+                Q(
+                    positions__date_start__lt=event_date
+                    + relativedelta(years=1)
+                )
+                | Q(positions__date_start=None),
+                Q(
+                    positions__date_termination__gt=event_date
+                    - relativedelta(years=1)
+                )
+                | Q(positions__date_termination=None),
+            ]
+        )
+
+    # Then by first name
+    if name.first:
+        filter_sets.append([Q(name_first__iexact=name.first)])
+
+    # Do middle name or initial next.
+    if name.middle:
+        initial = len(name.middle.strip(".,")) == 1
+        if initial:
+            filter_sets.append(
+                [Q(name_middle__istartswith=name.middle.strip(".,"))]
+            )
+        else:
+            filter_sets.append([Q(name_middle__iexact=name.middle)])
+
+    # And finally, by suffix
+    if name.suffix:
+        suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
+        if suffix:
+            filter_sets.append([Q(name_suffix__iexact=suffix)])
+
+    # Query people DB, slowly adding more filters to the query. If we get zero
+    # results, no luck. If we get one, great. If we get more than one, continue
+    # filtering. If we expend all our filters and still have more than one,
+    # just return None.
+    applied_filters = []
+    for filter_set in filter_sets:
+        applied_filters.extend(filter_set)
+        candidates = Person.objects.filter(*applied_filters)
+        if len(candidates) == 0:
+            # No luck finding somebody. Abort.
+            return None
+        elif len(candidates) == 1:
+            # Got somebody unique!
+            return candidates.first()
+        elif len(candidates) > 1:
+            logging.info(
+                f"Found %s candidates, returning None", len(candidates)
+            )
+    return None

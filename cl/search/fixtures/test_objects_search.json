@@ -209,6 +209,17 @@
     "model": "search.citation",
     "pk": 5
   },
+  {
+    "fields": {
+      "volume": 56,
+      "reporter": "F.2d",
+      "page": "11",
+      "type": 1,
+      "cluster": 3
+    },
+    "model": "search.citation",
+    "pk": 6
+  },
 
 
   {
@@ -243,7 +254,7 @@
       "html": "",
       "download_url": null,
       "cluster": 2,
-      "html_with_citations": "",
+      "html_with_citations": "yadda yadda <span class=\"star-pagination\">*9</span> this is page 9 <span class=\"star-pagination\">*10</span> this is content on page 10 can we link to it...",
       "local_path": "test/search/opinion_pdf_image_based.pdf",
       "html_columbia": "",
       "joined_by": [2],

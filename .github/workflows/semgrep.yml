@@ -6,6 +6,8 @@ jobs:
     name: Check
     steps:
       - uses: actions/checkout@v1
+        with:
+          ref: main
       - name: Semgrep
         id: semgrep
         uses: returntocorp/semgrep-action@v1

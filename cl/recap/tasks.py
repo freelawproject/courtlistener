@@ -1,14 +1,18 @@
+import base64
+import json
 import logging
 from tempfile import NamedTemporaryFile
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from zipfile import ZipFile
 
 import requests
 from celery import Task
 from celery.canvas import chain
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
@@ -20,6 +24,7 @@ from juriscraper.pacer import (
     DocketReport,
     PacerSession,
     PossibleCaseNumberApi,
+    # S3NotificationEmail,
 )
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -38,6 +43,7 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_pacer_cookie_from_cache
 from cl.lib.recap_utils import get_document_filename
+from cl.lib.storage import RecapEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -57,6 +63,7 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
+    EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
@@ -156,19 +163,20 @@ def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
     return pq.status, pq.error_message
 
 
-def mark_pq_status(pq, msg, status):
+def mark_pq_status(pq, msg, status, message_property_name="error_message"):
     """Mark the processing queue item as some process, and log the message.
 
     :param pq: The ProcessingQueue object to manipulate
     :param msg: The message to log and to save to pq's error_message field.
     :param status: A pq status code as defined on the ProcessingQueue model.
+    :param message_property_name: The message property to attach the msg argument to.
     """
     if msg:
         logger.info(msg)
-    pq.error_message = msg
+    setattr(pq, message_property_name, msg)
     pq.status = status
     pq.save()
-    return pq.status, pq.error_message
+    return pq.status, getattr(pq, message_property_name)
 
 
 @app.task(
@@ -1419,3 +1427,71 @@ def mark_fq_status(fq, msg, status):
     if status == PROCESSING_STATUS.SUCCESSFUL:
         fq.date_completed = now()
     fq.save()
+
+
+@app.task(bind=True, max_retries=5, interval_start=5 * 60)
+def process_recap_email(
+    self: Task, pk: int
+) -> Optional[Dict[str, Union[int, bool]]]:
+    start_time = now()
+    epq = EmailProcessingQueue.objects.get(pk=pk)
+    mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
+
+    message_id = epq.message_id
+    bucket = RecapEmailSESStorage()
+    with bucket.open(message_id, "r") as f:
+        body = f.read()
+
+    # report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
+    report._parse_text(body)
+    data = report.data
+
+    if data == {} or len(data["docket_entries"]) == 0:
+        msg = "Not a valid notification email. No message content."
+        mark_pq_status(
+            epq, msg, PROCESSING_STATUS.INVALID_CONTENT, "status_message"
+        )
+        self.request.chain = None
+        return None
+
+    docket_entry = data["docket_entries"][0]
+    docket = find_docket_object(
+        epq.court_id, docket_entry["pacer_case_id"], data["docket_number"]
+    )
+
+    docket.add_recap_source()
+    update_docket_metadata(docket, data)
+
+    if not docket.pacer_case_id:
+        docket.pacer_case_id = docket_entry["pacer_case_id"]
+
+    docket.save()
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(
+        content_object=docket, upload_type=UPLOAD_TYPE.SES_EMAIL
+    )
+    pacer_file.filepath.save(
+        "docket.txt",  # We only care about the ext w/UUIDFileSystemStorage
+        ContentFile(body),
+    )
+
+    rds_created, content_updated = add_docket_entries(
+        docket, data["docket_entries"]
+    )
+
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(docket.pk)
+        if newly_enqueued:
+            send_docket_alert(docket.pk, start_time)
+
+    return {
+        "docket_pk": docket.pk,
+        "content_updated": bool(rds_created or content_updated),
+    }
+
+
+def do_recap_document_fetch(epq: EmailProcessingQueue) -> None:
+    return chain(
+        process_recap_email.si(epq.pk),
+    ).apply_async()

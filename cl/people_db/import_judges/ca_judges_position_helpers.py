@@ -1,6 +1,21 @@
+import logging
 from datetime import date
+import time
 
 from cl.people_db.models import Position
+from cl.people_db.import_judges.ca_judges_import_helpers import (
+    get_how_selected,
+    get_appointer,
+    find_court,
+    get_position_type,
+    get_termination_reason,
+)
+
+def convert_date_to_gran_format(date_text):
+    return time.strftime("%Y-%m-%d", time.strptime(date_text, "%m/%d/%Y") )
+
+def string_to_date(date_text, format):
+    return time.mktime(time.strptime(date_text, format))
 
 
 def is_date_before(date1, date2):
@@ -11,25 +26,20 @@ def is_date_before(date1, date2):
     :param date2
     :return boolean
     """
-    y1, m1, d1 = date1.split("-")
-    y2, m2, d2 = date2.split("-")
-
-    pydate1 = date(y1, m1, d1)
-    pydate2 = date(y2, m2, d2)
+    pydate1 = string_to_date(date1, "%m/%d/%Y")
+    pydate2 = string_to_date(date2, "%m/%d/%Y")
 
     return pydate1 <= pydate2
 
 
-def create_positions(positions, counties):
+def process_positions(positions, counties):
 
     new_pos = []
-    final_pos = []
     # first, parse the position objects
+    logging.info(f"Processing %s positions", len(positions))
     for pos in positions:
 
-        how_selected = get_how_selected(
-            pos["judicialExperiencePendingStatus"]
-        )
+        how_selected = get_how_selected(pos["judicialExperiencePendingStatus"])
 
         appointer = None
         if how_selected == Position.APPOINTMENT_GOVERNOR:
@@ -55,8 +65,9 @@ def create_positions(positions, counties):
                 "inactive_status": pos["judicialExperienceInactiveStatus"],
             }
         )
+        continue
 
-    sorted_positions = recursively_sort(new_pos)
+    return recursively_sort(new_pos, [])
 
 
 def is_supervising_position(position_type):
@@ -103,20 +114,22 @@ def positions_need_restructuring(position1, position2):
     )
 
     if not dates_valid and is_supervisor and has_right_statuses:
-        return true
+        return True
     else:
-        return false
+        return False
 
 
-def recursively_sort(old_array, new_array=[]):
+def recursively_sort(old_array, new_array):
 
-    if len(old_array) > 0:
+    logging.info("recursively sorting - %s items remaining", len(old_array))
+    logging.info("recursively sorting - %s items added", len(new_array))
 
+    if len(old_array) == 0:
+        return new_array
+    else:
         # sort the old_array by date started
         old_array.sort(
-            key=lambda p: time.mktime(
-                time.strptime(p["date_started"], "%Y-%m-%d")
-            )
+            key=lambda p: string_to_date(p["date_start"], "%m/%d/%Y")
         )
 
         # if this is the first item in the new array, return it
@@ -124,7 +137,7 @@ def recursively_sort(old_array, new_array=[]):
             # add the earliest item to the new_array and recurse
             first = old_array.pop(0)
             new_array.append(first)
-            recursively_sort(old_array, new_array)
+            return recursively_sort(old_array, new_array)
         else:
             # we check if the next item to add is
             # before the end date of the last item in the new_array
@@ -136,13 +149,14 @@ def recursively_sort(old_array, new_array=[]):
             needs_restructuring = positions_need_restructuring(pos1, pos2)
 
             if needs_restructuring:
+                logging.info("Positions need restructuring")
                 # we remove the last date from the new_array to split into
                 # item 1 (before the promotion) and item 3 (after the promotion)
                 pos_to_split = new_array.pop()
 
                 new_pos_1 = pos_to_split
                 # set the new termination date for position
-                new_pos_1["date_termination"] = pos2["start_date"]
+                new_pos_1["date_termination"] = pos2["date_start"]
                 # set the new termination reason
                 new_pos_1["termination_reason"] = "other_pos"
                 # push to new_array
@@ -153,16 +167,13 @@ def recursively_sort(old_array, new_array=[]):
 
                 # build item 3 by replacing the start date with item 2 end date
                 new_pos_3 = pos_to_split
-                new_pos_3["date_started"] = pos2["date_termination"]
+                new_pos_3["date_start"] = pos2["date_termination"]
 
                 new_array.append(new_pos_3)
 
                 # recurse
-                recursively_sort(old_array, new_array)
+                return recursively_sort(old_array, new_array)
 
             else:
                 new_array.append(pos2)
-                recursively_sort(old_array, new_array)
-    else:
-        # recursion over, return array
-        return new_array
+                return recursively_sort(old_array, new_array)
