@@ -1,18 +1,19 @@
 import logging
 import json
+import logging
 import os
 import re
 from datetime import date
-from dateutil.parser import parse
-
-from dateutil.relativedelta import relativedelta
 from typing import List, Optional, Union
+
+from dateutil.parser import parse
+from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.db.models import Count, Q
 from nameparser import HumanName
 
-from cl.search.models import Court
 from cl.people_db.models import Person, Position, Role
+from cl.search.models import Court
 
 
 def load_json_file(file_name):
@@ -239,7 +240,7 @@ def find_or_create_judge(judgeJson, counties, index):
 
         judge_info = {
             # start at 00001
-            "cl_id": "cal-jud-" + format(index + 1, "05d"),
+            "cl_id": f"cal-jud-{format(index + 1, '05d')}",
             "name_first": name_first,
             "name_last": name_last,
         }
