@@ -639,6 +639,7 @@ class Position(AbstractDateTimeModel):
     )
     ELECTION_PARTISAN = "e_part"
     ELECTION_NON_PARTISAN = "e_non_part"
+    COURT_TRANSFER = "ct_trans"
     APPOINTMENT_PRESIDENT = "a_pres"
     APPOINTMENT_GOVERNOR = "a_gov"
     APPOINTMENT_LEGISLATURE = "a_legis"
@@ -660,6 +661,10 @@ class Position(AbstractDateTimeModel):
                 # FISC appointments are made by the chief justice of SCOTUS
                 (APPOINTMENT_JUDGE, "Appointment (Judge)"),
             ),
+        ),
+        (
+            "Other",
+            ((COURT_TRANSFER, "Transferred (Court Restructuring)"),),
         ),
     )
     SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)

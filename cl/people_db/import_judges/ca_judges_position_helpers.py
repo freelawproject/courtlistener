@@ -1,5 +1,7 @@
 import logging
 import time
+import json
+import copy
 from datetime import date
 
 from cl.people_db.import_judges.ca_judges_import_helpers import (
@@ -20,17 +22,9 @@ def string_to_date(date_text, format):
     return time.mktime(time.strptime(date_text, format))
 
 
-def convert_date_to_gran_format(date_text):
-    return time.strftime("%Y-%m-%d", time.strptime(date_text, "%m/%d/%Y"))
-
-
-def string_to_date(date_text, format):
-    return time.mktime(time.strptime(date_text, format))
-
-
 def is_date_before(date1, date2):
     """Take two dates in the format 2010-22-11 and
-    returns true if date 1 is earlier than or equal to date 2
+    returns true if date 1 is earlier than date 2
 
     :param date1
     :param date2
@@ -39,7 +33,7 @@ def is_date_before(date1, date2):
     pydate1 = string_to_date(date1, "%m/%d/%Y")
     pydate2 = string_to_date(date2, "%m/%d/%Y")
 
-    return pydate1 <= pydate2
+    return pydate1 < pydate2
 
 
 def process_positions(positions, counties):
@@ -75,7 +69,6 @@ def process_positions(positions, counties):
                 "inactive_status": pos["judicialExperienceInactiveStatus"],
             }
         )
-        continue
 
     return recursively_sort(new_pos, [])
 
@@ -99,34 +92,6 @@ def is_supervising_position(position_type):
         Position.ASSISTANT_PRESIDING_JUDGE,
     ]
     return position_type in selected_positions
-
-
-def positions_need_restructuring(position1, position2):
-    """returns true if the dates overlap, it is a supervisory position,
-    and the status categories match a selected position
-
-    :param position1
-    :param position2
-    :return boolean
-    """
-    # check if position date_start is after the prior date_termination
-    dates_valid = is_date_before(
-        position1["date_termination"], position2["date_start"]
-    )
-    # check if the new position is a supervisory one
-    is_supervisor = is_supervising_position(position2["position_type"])
-
-    # sanity check -- make sure the pending status is "Selected" and inactive status is "Term Ended"
-    # as this indicates that it was likely a supervisory promotion
-    has_right_statuses = (
-        position2["pending_status"] == "Selected"
-        and position2["inactive_status"] == "Term Ended"
-    )
-
-    if not dates_valid and is_supervisor and has_right_statuses:
-        return True
-    else:
-        return False
 
 
 def recursively_sort(old_array, new_array):
@@ -153,37 +118,60 @@ def recursively_sort(old_array, new_array):
             # before the end date of the last item in the new_array
             # prev_entry = pos1
             # current_entry = pos2
-            pos1 = new_array[-1]
+            pos1 = copy.copy(new_array[-1])
             pos2 = old_array.pop(0)
 
-            needs_restructuring = positions_need_restructuring(pos1, pos2)
+            # if no termination date on both, it means both positions are still open
+            # e.g., judge is likely currently serving as presiding judge
+            if not pos1["date_termination"] and not pos2["date_termination"]:
+                # if pos 1 started before position 2, then we shorten pos1
+                # to end when pos2 started
+                og_pos1 = new_array.pop()
 
-            if needs_restructuring:
-                logging.info("Positions need restructuring")
-                # we remove the last date from the new_array to split into
-                # item 1 (before the promotion) and item 3 (after the promotion)
-                pos_to_split = new_array.pop()
+                if is_date_before(pos1["date_start"], pos2["date_start"]):
+                    og_pos1["date_termination"] = pos2["date_start"]
+                    og_pos1["termination_reason"] = "other_pos"
 
-                new_pos_1 = pos_to_split
-                # set the new termination date for position
-                new_pos_1["date_termination"] = pos2["date_start"]
-                # set the new termination reason
-                new_pos_1["termination_reason"] = "other_pos"
-                # push to new_array
-                new_array.append(new_pos_1)
+                new_array.append(og_pos1)
+                new_array.append(pos2)
+            # if position2 has no date_termination it means that the person is still serving in the current
+            # position but hte last position has ended
+            elif not pos2["date_termination"]:
+                # if the pos2 date start is after the position1 termination_date, we fix
+                if is_date_before(
+                    pos1["date_termination"], pos2["date_start"]
+                ):
+                    pos2["date_start"] = pos1["date_termination"]
 
-                # push the middle item
                 new_array.append(pos2)
 
-                # build item 3 by replacing the start date with item 2 end date
-                new_pos_3 = pos_to_split
+            # since we sort in order, if position 2 has a date_termination but pos 1 doesn't
+            # that means that pos 1 definitely ended
+            # need to make the end date of pos 1 the start date of pos 2
+            elif not pos1["date_termination"]:
+                og_pos1 = new_array.pop()
+
+                og_pos1["date_termination"] = pos2["date_start"]
+                og_pos1["termination_reason"] = "other_pos"
+
+                new_array.append(og_pos1)
+                new_array.append(pos2)
+
+            # if the pos date_start is earlier than the pos1_termination date, fix
+            elif is_date_before(pos2["date_start"], pos1["date_termination"]):
+                new_pos_1 = new_array.pop()
+                new_pos_3 = copy.copy(new_pos_1)
+
+                new_pos_1["date_termination"] = pos2["date_start"]
+                new_pos_1["termination_reason"] = "other_pos"
+
                 new_pos_3["date_start"] = pos2["date_termination"]
 
-                new_array.append(new_pos_3)
-
-                # recurse
-                return recursively_sort(old_array, new_array)
-
-            else:
+                new_array.append(new_pos_1)
                 new_array.append(pos2)
-                return recursively_sort(old_array, new_array)
+                new_array.append(new_pos_3)
+            else:
+                # if we're all good, just add the second pos to the array
+                new_array.append(pos2)
+
+            return recursively_sort(old_array, new_array)

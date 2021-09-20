@@ -84,12 +84,18 @@ def import_ca_judges(
                     pos["date_start"]
                 )
                 pos["date_granularity_start"] = GRANULARITY_DAY
+                logging.info("date start is %s", pos["date_start"])
 
             if pos["date_termination"]:
                 pos["date_termination"] = convert_date_to_gran_format(
                     pos["date_termination"]
                 )
                 pos["date_granularity_termination"] = GRANULARITY_DAY
+            else:
+                # if the date is empty, delete the key from the po
+                del pos["date_termination"]
+                del pos["termination_reason"]
+
             Position.objects.create(**pos, person=judge)
 
 

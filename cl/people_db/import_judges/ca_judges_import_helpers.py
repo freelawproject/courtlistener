@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from nameparser import HumanName
 
-from cl.people_db.models import Person, Position, Role
+from cl.people_db.models import Person, Position, Role, SUFFIX_LOOKUP
 from cl.search.models import Court
 
 
@@ -62,20 +62,27 @@ def get_middle_name(last_first_middle_name, first_name, last_name):
 def get_how_selected(jud_exp_pending_status):
     """Maps pending status to the Selection Method Enum
 
+    Possible options are
+    Appointed
+    Elected
+    Hired (applies only to Hon. Gerald Mohun who was elected)
+    Selected (i.e., appointed by judges to be a Presiding or Administrative Judge)
+    Unification (i.e. courts were restructured)
+
+
     :param jud_exp_pending_status: string
     :return enum / string
     """
 
-    if jud_exp_pending_status == "Appointed":
-        # SELECTION_METHODS['Appointment']
-        # need to check to make sure legislatures don't appoint
-        # returns 'a_gov' or 'a_legis'
-        return Position.APPOINTMENT_GOVERNOR
-    elif jud_exp_pending_status == "Elected":
-        # SELECTION_METHODS['Election']
-        # need to figure out if party or non-party
-        # returns 'e_part' or 'e_non_part'
-        return Position.ELECTION_NON_PARTISAN
+    how_selected_map = {
+        "Appointed": Position.APPOINTMENT_GOVERNOR,
+        "Elected": Position.ELECTION_NON_PARTISAN,
+        "Hired": Position.ELECTION_NON_PARTISAN,
+        "Selected": Position.APPOINTMENT_JUDGE,
+        "Unification": Position.COURT_TRANSFER,
+    }
+
+    return how_selected_map.get(jud_exp_pending_status)
 
 
 def get_appointer(jud_exp_pending_sub_type):
@@ -148,7 +155,6 @@ def get_termination_reason(status):
         Retired
         Term Ended
         Transferred
-        [Blank]
 
     :return enum | None
     """
@@ -157,6 +163,8 @@ def get_termination_reason(status):
         "Deceased": "ded",
         "Defeated": "lost",
         "Non-Voluntary": "retire_mand",
+        # edge case Other refers to consolidated courts
+        "Other": "abolished",
         "Promoted": "other_pos",
         "Resigned": "resign",
         "Retired": "retire_vol",

@@ -17,13 +17,14 @@ from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
-from juriscraper.pacer import (  # S3NotificationEmail,
+from juriscraper.pacer import (
     AppellateDocketReport,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
     PacerSession,
     PossibleCaseNumberApi,
+    S3NotificationEmail,
 )
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
@@ -1441,7 +1442,7 @@ def process_recap_email(
     with bucket.open(message_id, "r") as f:
         body = f.read()
 
-    # report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
+    report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
 
