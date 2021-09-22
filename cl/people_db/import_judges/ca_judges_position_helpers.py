@@ -1,7 +1,7 @@
+import copy
+import json
 import logging
 import time
-import json
-import copy
 from datetime import date
 
 from cl.people_db.import_judges.ca_judges_import_helpers import (

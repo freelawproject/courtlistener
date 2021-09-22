@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from nameparser import HumanName
 
-from cl.people_db.models import Person, Position, Role, SUFFIX_LOOKUP
+from cl.people_db.models import SUFFIX_LOOKUP, Person, Position, Role
 from cl.search.models import Court
 
 
