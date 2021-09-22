@@ -17,7 +17,6 @@ from cl.people_db.import_judges.ca_judges_position_helpers import (
     convert_date_to_gran_format,
     process_positions,
 )
-
 from cl.people_db.models import GRANULARITY_DAY, Person, Position
 from cl.search.models import Court
 
