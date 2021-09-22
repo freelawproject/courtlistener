@@ -10,19 +10,14 @@ from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import VerboseCommand
 from cl.people_db.import_judges.ca_judges_import_helpers import (
-    find_court,
     find_or_create_judge,
-    get_appointer,
-    get_how_selected,
-    get_position_type,
-    get_termination_reason,
     load_json_file,
 )
 from cl.people_db.import_judges.ca_judges_position_helpers import (
     convert_date_to_gran_format,
     process_positions,
-    string_to_date,
 )
+
 from cl.people_db.models import GRANULARITY_DAY, Person, Position
 from cl.search.models import Court
 

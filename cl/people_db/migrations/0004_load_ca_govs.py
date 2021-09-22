@@ -27,9 +27,12 @@ def load_fixture(apps, schema_editor):
     # not present in the fixtures, we can't import their positions here.
     # You will need to manually add the two positions at the bottom to the db
     # using the admin panel
-    load_migration_fixture(
-        apps, schema_editor, "ca_govs_positions", "people_db"
-    )
+    if "test" in sys.argv:
+        return
+    else:
+        load_migration_fixture(
+            apps, schema_editor, "ca_govs_positions", "people_db"
+        )
 
 
 def unload_fixture(apps, schema_editor):
