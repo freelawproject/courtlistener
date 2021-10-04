@@ -4,6 +4,8 @@ import { BrowserRouter, Switch, Route } from 'react-router-dom';
 import TagSelect from './TagSelect';
 import TagList from './TagList';
 import { TagMarkdown } from './TagPage';
+import DisclosureList from "./DisclosureList";
+import DisclosureViewer from "./DisclosureViewer";
 
 const App = () => {
   const root = document.getElementById('react-root');
@@ -21,6 +23,13 @@ const App = () => {
         <Route path={`/tags/:userName/:id`}>
           <TagMarkdown {...data} />
         </Route>
+        <Route path={`/financial-disclosures/`}>
+          <DisclosureList {...data} />
+        </Route>
+        <Route path={`/person/:judge_id/:slug/financial-disclosures/`}>
+          <DisclosureViewer {...data}  />
+        </Route>
+
       </Switch>
     </BrowserRouter>
   );

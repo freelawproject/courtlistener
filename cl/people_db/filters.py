@@ -1,4 +1,5 @@
 import rest_framework_filters as filters
+from django.db.models import Q
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
@@ -8,6 +9,7 @@ from cl.api.utils import (
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
 )
+from cl.people_db.lookup_utils import lookup_judge_by_first_or_last_name
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -198,6 +200,11 @@ class PersonFilter(FilterSet):
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES, method="filter_race"
     )
+
+    fullname = filters.Filter(method='filter_fullname')
+
+    def filter_fullname(self, queryset, name, value):
+        return lookup_judge_by_first_or_last_name(queryset, value)
 
     def filter_race(self, queryset, name, value):
         return queryset.filter(race__race__in=value)

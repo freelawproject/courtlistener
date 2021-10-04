@@ -1,0 +1,22 @@
+/*Disclosure Table Viewer CSS*/
+
+.fa-exclamation-triangle {
+  font-size: 100px;
+}
+
+.search-panel-td {
+  border-bottom: 0.5px #cecece solid;
+}
+
+.search-panel-table {
+  width: 100%
+}
+
+
+/*Disclosure List Homepage CSS*/
+
+.tr-results {
+  border-bottom: 1px solid black;
+  padding: 10px;
+  background: white;
+}
