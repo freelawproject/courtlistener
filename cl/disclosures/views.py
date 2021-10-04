@@ -2,6 +2,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from cl.disclosures.models import FinancialDisclosure
+from cl.disclosures.utils import make_disclosure_data
 from cl.people_db.models import Person
 from cl.people_db.views import make_title_str
 
@@ -31,7 +32,7 @@ def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     )
 
 
-def financial_disclosures_for_somebody(
+def financial_disclosures_viewer(
     request: HttpRequest,
     pk: int,
     slug: str,

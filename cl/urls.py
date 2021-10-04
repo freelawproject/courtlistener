@@ -32,6 +32,7 @@ urlpatterns = [
     path("", include("cl.audio.urls")),
     path("", include("cl.opinion_page.urls")),
     path("", include("cl.simple_pages.urls")),
+    path("", include("cl.disclosures.urls")),
     path("", include("cl.users.urls")),
     path("", include("cl.favorites.urls")),
     path("", include("cl.people_db.urls")),
