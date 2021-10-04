@@ -153,7 +153,7 @@ const TableMaker = (data, key, is_admin) => {
 
                     {Object.entries(fields).map(([key, value]) => {
                       return (
-                        <td>{convertTD(entry[value], title, value)}</td>
+                        <td>{convertTD(entry[value], title, value)}{ entry[value] == -1 ? <i className="fa fa-eye-slash black"/> : ""}</td>
                         )
                       })
                     }
@@ -220,13 +220,15 @@ const Sidebar = (data, is_admin, judge, fetchJudge) => {
 
 const Notes = () => {
   return (
-    <div className={"v-offset-below-2"}>
+    <div className={"v-offset-below-4"}>
       <h3><span>Notes <i className="fa fa-sticky-note-o"/></span></h3>
       <hr/>
-      <span>This disclosure was generated and text extracted by OCR.</span><br/><br/>
-      <span>For more information about individual fields ... go here...</span><br/><br/>
-      <span>The ⬛ icon indicates a redaction in the table row may exist.</span>
-      <br/><br/><br/><br/>
+      <span>The data in this file was extracted with OCR technology. </span>
+      <ul className={"v-offset-above-1"}>
+        <li><i className="fa fa-file-text-o gray"/> Links to the PDF row (if possible).</li>
+        <li><i className="fa fa-file-excel-o black"/> The row may contain a redaction</li>
+        <li><i className="fa fa-eye-slash black"/> Indicates the OCR identified data in the row but could not extract it</li>
+      </ul>
     </div>
   )
 }
