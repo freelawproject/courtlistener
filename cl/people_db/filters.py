@@ -201,7 +201,7 @@ class PersonFilter(FilterSet):
         choices=Race.RACES, method="filter_race"
     )
 
-    fullname = filters.Filter(method='filter_fullname')
+    fullname = filters.Filter(method="filter_fullname")
 
     def filter_fullname(self, queryset, name, value):
         return lookup_judge_by_first_or_last_name(queryset, value)

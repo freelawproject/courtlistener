@@ -50,7 +50,11 @@ def make_disclosure_data(person) -> Tuple:
     :param person:
     :return:
     """
-    forms = person.financial_disclosures.all().order_by("-year").values_list("year", "id")
+    forms = (
+        person.financial_disclosures.all()
+        .order_by("-year")
+        .values_list("year", "id")
+    )
     years = []
     ids = []
     for yr, id in forms:

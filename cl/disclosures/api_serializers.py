@@ -105,7 +105,13 @@ class FinancialDisclosureSerializer(
         exclude = ("download_filepath",)
 
     def to_representation(self, data):
-        data = super(FinancialDisclosureSerializer, self).to_representation(data)
-        data['filepath'] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['filepath']}"
-        data['thumbnail'] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['thumbnail']}"
+        data = super(FinancialDisclosureSerializer, self).to_representation(
+            data
+        )
+        data[
+            "filepath"
+        ] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['filepath']}"
+        data[
+            "thumbnail"
+        ] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['thumbnail']}"
         return data
