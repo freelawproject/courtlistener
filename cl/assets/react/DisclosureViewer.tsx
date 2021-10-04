@@ -32,6 +32,7 @@ const MainSection = (disclosures) => {
   const years = disclosures['years'].split(",")
   const doc_ids = disclosures['ids'].split(",")
   const is_admin =  disclosures['admin'] == "True" ? true : false
+  const judge_name = disclosures['judge']
 
   const [data, setData] = React.useState("");
   const [judge, setJudge] = React.useState([]);
@@ -91,7 +92,7 @@ const MainSection = (disclosures) => {
           <div>
             <div className={"v-offset-below-3 v-offset-above-3"}>
               <div className={"col-lg-9"}>
-                {Tabs(data, years, year, fetchDisclosure, doc_ids)}
+                {Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}
                 <div className="tabcontent">
                     {TableMaker(data, "investments", is_admin)}
                     {TableMaker(data, "gifts", is_admin)}
@@ -120,7 +121,7 @@ const MainSection = (disclosures) => {
         <div>
           <div className={"v-offset-below-3 v-offset-above-3"}>
             <div className={"col-lg-9"}>
-              {Tabs(data, years, year, fetchDisclosure, doc_ids)}
+              {Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}
               <div className="tabcontent">
                 <div className={"text-center v-offset-above-4"}>
                   <i className="fa fa-exclamation-triangle gray"></i>
@@ -134,7 +135,7 @@ const MainSection = (disclosures) => {
             </div>
           </div>
         </div>
-      ) : (<div class={"row"}><h3 className={"text-center"}> Loading ...</h3></div>)}
+      ) : (<div className={"row"}><h3 className={"text-center"}> Loading ...</h3></div>)}
     </div>
   )
 };
@@ -262,7 +263,6 @@ const Thumb = (data) => {
 const Sidebar = (data, is_admin, judge, fetchJudge) => {
   return (
     <div>
-
       {is_admin == true ? AdminPanel(data): ""}
       {Thumb(data)}
       {Notes()}
@@ -330,11 +330,11 @@ const AdminPanel = (data) => {
   )
 }
 
-const Tabs = (data, years, year, fetchDisclosure, doc_ids) => {
+const Tabs = (data, years, year, fetchDisclosure, doc_ids, judge_name) => {
   return (
     <div>
-      <h1 className="text-center">Financial Disclosures for J.
-        <a href={".."}> {data.person.name_first + " " + data.person.name_last}</a> </h1>
+      <h1 className="text-center">Financial Disclosures for J.&nbsp;
+        <a href={".."}>{judge_name}</a> </h1>
         <ul className="nav nav-tabs v-offset-below-2 v-offset-above-3" role="">
           {years.map((yr, index) => {
                 return (

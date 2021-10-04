@@ -76,12 +76,10 @@ class SpouseIncomeSerializer(
 
 
 class JudgeSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    race = serializers.StringRelatedField(many=True)
     positions = PositionSerializer
-
     class Meta:
         model = Person
-        fields = "__all__"
+        exclude = ("race",)
 
 
 class FinancialDisclosureSerializer(
