@@ -42,3 +42,25 @@ def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
     return FinancialDisclosure.objects.filter(
         download_filepath=url, has_been_extracted=True
     ).exists()
+
+
+def make_disclosure_data(person) -> Tuple:
+    """
+
+    :param person:
+    :return:
+    """
+    forms = person.financial_disclosures.all().order_by("-year").values_list("year", "id")
+    years = []
+    ids = []
+    for yr, id in forms:
+        years.append((str(yr)))
+        ids.append(str(id))
+    for x in set(years):
+        number = 0
+        for i in range(0, len(years)):
+            if years[i] == x:
+                number += 1
+                if number >= 2:
+                    years[i] += f" ({number})"
+    return ",".join(years), ",".join(ids)

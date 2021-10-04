@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block og_title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock, containing thousands of judicial financial disclosure forms.
+{% endblock %}
+{% block og_description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock, containing thousands of judicial financial disclosure forms.
+{% endblock %}
+
+{% block navbar-fd %}active{% endblock %}
+
+{% block footer-scripts %}
+  <script type="text/javascript" src="{% static "js/react/main.js" %}"></script>
+  <script type="text/javascript" src="{% static "js/react/vendor.js" %}"></script>
+{% endblock %}
+
+{% block content %}
+    <div id="react-root"
+         data-years="{{ disclosure_years }}"
+         data-admin="{{ user.is_staff }}"
+         data-ids="{{ disclosure_ids }}"
+    > </div>
+{% endblock %}
