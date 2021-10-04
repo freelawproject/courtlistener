@@ -40,8 +40,14 @@ def financial_disclosures_viewer(
     """Show the financial disclosures for a particular person"""
     person = get_object_or_404(Person, pk=pk)
     title = make_title_str(person)
+    years, ids = make_disclosure_data(person)
+
     return render(
         request,
-        "financial_disclosures_for_somebody.html",
-        {"person": person, "title": title, "private": False},
+        "financial_disclosures_viewer.html",
+        {"person": person,
+         "title": title,
+         "disclosure_years": years,
+         "disclosure_ids": ids,
+         "private": False},
     )
