@@ -77,6 +77,7 @@ class SpouseIncomeSerializer(
 
 class JudgeSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     positions = PositionSerializer
+
     class Meta:
         model = Person
         exclude = ("race",)
