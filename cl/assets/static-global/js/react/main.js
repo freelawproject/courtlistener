@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "59963eede4733338b301";
+/******/ 	var hotCurrentHash = "89dcf7499d0db3dc614d";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1165,6 +1165,7 @@ var MainSection = function MainSection(disclosures) {
   var years = disclosures['years'].split(",");
   var doc_ids = disclosures['ids'].split(",");
   var is_admin = disclosures['admin'] == "True" ? true : false;
+  var judge_name = disclosures['judge'];
 
   var _React$useState = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(""),
       _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_3___default()(_React$useState, 2),
@@ -1294,7 +1295,7 @@ var MainSection = function MainSection(disclosures) {
     className: "v-offset-below-3 v-offset-above-3"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "col-lg-9"
-  }, Tabs(data, years, year, fetchDisclosure, doc_ids), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "tabcontent"
   }, TableMaker(data, "investments", is_admin), TableMaker(data, "gifts", is_admin), TableMaker(data, "reimbursements", is_admin), TableMaker(data, "spouse_incomes", is_admin), TableMaker(data, "debts", is_admin), TableMaker(data, "non_investment_incomes", is_admin), TableMaker(data, "agreements", is_admin), TableMaker(data, "positions", is_admin), data.addendum_content_raw != "" ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("article", null, data.addendum_content_raw), " ") : "")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "col-lg-3"
@@ -1302,7 +1303,7 @@ var MainSection = function MainSection(disclosures) {
     className: "v-offset-below-3 v-offset-above-3"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "col-lg-9"
-  }, Tabs(data, years, year, fetchDisclosure, doc_ids), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "tabcontent"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "text-center v-offset-above-4"
@@ -1311,7 +1312,7 @@ var MainSection = function MainSection(disclosures) {
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "You can still view this Financial Disclosure by clicking the thumbnail.")))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "col-lg-3"
   }, Sidebar(data, is_admin, judge, fetchJudge)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    "class": "row"
+    className: "row"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", {
     className: "text-center"
   }, " Loading ...")));
@@ -1488,12 +1489,12 @@ var AdminPanel = function AdminPanel(data) {
   }, "Admin Page"));
 };
 
-var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids) {
+var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name) {
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
     className: "text-center"
-  }, "Financial Disclosures for J.", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
     href: ".."
-  }, " ", data.person.name_first + " " + data.person.name_last), " "), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("ul", {
+  }, judge_name), " "), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("ul", {
     className: "nav nav-tabs v-offset-below-2 v-offset-above-3",
     role: ""
   }, years.map(function (yr, index) {
@@ -3108,7 +3109,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3245,7 +3246,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
