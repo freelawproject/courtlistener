@@ -3,19 +3,11 @@ import {appFetch} from "./_fetch";
 import {Table} from "react-bootstrap";
 import './disclosure-page.css';
 import {useParams} from "react-router-dom";
-import {disclosureModel, GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS} from "./_disclosure_models";
+import {disclosureModel} from "./_disclosure_models";
+import {convertTD, fetch_year_index} from "./_disclosure_helpers";
 
 interface TableNavigationInnerProps {
   disclosures: String;
-}
-
-const getIndex = (value, arr) => {
-    for(var i = 0; i < arr.length; i++) {
-        if(arr[i] === value.toString()) {
-            return i;
-        }
-    }
-    return 0
 }
 
 
@@ -31,30 +23,15 @@ const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
 const MainSection = (disclosures) => {
   const years = disclosures['years'].split(",")
   const doc_ids = disclosures['ids'].split(",")
-  const is_admin =  disclosures['admin'] == "True" ? true : false
+  const is_admin =  disclosures['admin'] == "True"
   const judge_name = disclosures['judge']
 
   const [data, setData] = React.useState("");
   const [judge, setJudge] = React.useState([]);
 
   let { judge_id } = useParams();
-  const search = window.location.search;
-  const params = new URLSearchParams(search);
-  var optional_doc_id = params.get('id');
-
-  var start;
-  var index;
-
-  if (optional_doc_id == null ) {
-    start = years[0]
-    index = 0
-  } else {
-    index = getIndex(optional_doc_id, doc_ids)
-    start = years[index]
-  }
-  const [year, setYear] = React.useState(start);
-  const [id, setId] = React.useState(index);
-
+  var year_index = fetch_year_index(years, doc_ids)
+  const [year, setYear] = React.useState(year_index[0]);
 
   const fetchDisclosure = async (year: string, index: Number) => {
     try {
@@ -74,7 +51,6 @@ const MainSection = (disclosures) => {
       else {
         try {
           const response = await appFetch(`/api/rest/v3/financial-disclosures/?person__fullname=${query}`)
-          // console.log("resp", response['results'])
           setJudge(response['results']);
         } catch (error) {
           setJudge([]);
@@ -83,7 +59,7 @@ const MainSection = (disclosures) => {
     };
 
   if (data == '') {
-    fetchDisclosure(year, id)
+    fetchDisclosure(year, year_index[1])
   }
 
   return (
@@ -102,7 +78,6 @@ const MainSection = (disclosures) => {
                     {TableMaker(data, "non_investment_incomes", is_admin)}
                     {TableMaker(data, "agreements", is_admin)}
                     {TableMaker(data, "positions", is_admin)}
-
                     {data.addendum_content_raw != "" ? (<>
                       <h3>Addendum</h3>
                       <article>{data.addendum_content_raw}</article> </>) : ("")
@@ -113,18 +88,16 @@ const MainSection = (disclosures) => {
               <div className={"col-lg-3"}>
                   {Sidebar(data, is_admin, judge, fetchJudge)}
               </div>
-
             </div>
           </div>
       ) : data.has_been_extracted == false ? (
-
         <div>
           <div className={"v-offset-below-3 v-offset-above-3"}>
             <div className={"col-lg-9"}>
               {Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}
               <div className="tabcontent">
                 <div className={"text-center v-offset-above-4"}>
-                  <i className="fa fa-exclamation-triangle gray"></i>
+                  <i className="fa fa-exclamation-triangle gray"/>
                   <h1>Table extraction failed.</h1>
                   <p>You can still view this Financial Disclosure by clicking the thumbnail.</p>
                 </div>
@@ -139,33 +112,6 @@ const MainSection = (disclosures) => {
     </div>
   )
 };
-
-const convertTD = (value, table, key) => {
-  if (value == -1) {
-    return "[Failed OCR]"
-  }
-
-  if (table == "Investments" && key == "transaction_value_code" && value) {
-    return `${GROSS_VALUE[value]} (${value})`
-  }
-  if (table == "Debts" && key == "value_code" && value) {
-    return `${GROSS_VALUE[value]} (${value})`
-  }
-  if (table == "Investments" && key == "income_during_reporting_period_code" && value) {
-    return `${INCOME_GAIN[value]} (${value})`
-  }
-  if (table == "Investments" && key == "gross_value_method" && value) {
-    return `${VALUATION_METHODS[value]} (${value})`
-  }
-  if (table == "Investments" && key == "gross_value_code" && value) {
-    return `${GROSS_VALUE[value]} (${value})`
-  }
-  if (table == "Investments" && key == "transaction_gain_code" && value) {
-    return `${INCOME_GAIN[value]} (${value})`
-  }
-
-  return value
-}
 
 const TableMaker = (data, key, is_admin) => {
 
@@ -198,10 +144,10 @@ const TableMaker = (data, key, is_admin) => {
                 return (
                   <tr key={entry.id} className={""}>
                     <td>
-                      <a href={url + "#page=" + entry.page_number}>
-                        <i className="fa fa-file-text-o gray"></i>
-                      </a>
-                      {entry.redacted == true ? (<i className="fa fa-file-excel-o black"></i>): ("")}
+                      <a title={"Go to PDF"} href={url + "#page=" + entry.page_number}>
+                        <i className="fa fa-file-text-o gray"/>
+                      </a>&nbsp;
+                      {entry.redacted == true ? (<i title={"Redaction present in row"} className="fa fa-file-excel-o black"/>): ("")}
                     </td>
                     {is_admin == true ? (<td><a href={`/admin/disclosures/${key.replaceAll("_","").slice(0, -1)}/${entry.id}/`}><i className="fa fa-pencil gray"></i></a></td>) : ("")}
 
@@ -227,7 +173,7 @@ const TableMaker = (data, key, is_admin) => {
 const Support = () => {
   return (
     <div id={"support"}>
-    <h3><span>Support FLP <i className="fa fa-heart-o red"></i></span></h3>
+    <h3><span>Support FLP <i className="fa fa-heart-o red"/></span></h3>
       <p className="v-offset-above-1">
         CourtListener is a project of <a
         href="https://free.law" target="_blank">Free
@@ -246,14 +192,14 @@ const Support = () => {
 const Thumb = (data) => {
   return (
     <div className="v-offset-below-4">
-      <h3><span>Download <i className="fa fa-download gray"></i></span></h3>
+      <h3><span>Download <i className="fa fa-download gray"/></span></h3>
       <hr/>
-        <a href={data.filepath }>
+        <a href={ data.filepath }>
           <img src={data.thumbnail }
                alt="Thumbnail of disclosure form"
                width={"200"}
                className="img-responsive thumbnail shadow img-thumbnail img-rounded"
-          ></img>
+          />
         </a>
     </div>
   )
@@ -275,7 +221,7 @@ const Sidebar = (data, is_admin, judge, fetchJudge) => {
 const Notes = () => {
   return (
     <div className={"v-offset-below-2"}>
-      <h3><span>Notes <i className="fa fa-sticky-note-o"></i></span></h3>
+      <h3><span>Notes <i className="fa fa-sticky-note-o"/></span></h3>
       <hr/>
       <span>This disclosure was generated and text extracted by OCR.</span><br/><br/>
       <span>For more information about individual fields ... go here...</span><br/><br/>
@@ -294,9 +240,9 @@ const SearchPanel = (judge, fetchJudge) => {
 
   return (
     <div className={"v-offset-below-4 "}>
-      <h3><span>Search <i className="fa fa-search gray"></i></span></h3>
+      <h3><span>Search <i className="fa fa-search gray"/></span></h3>
       <hr/>
-      <input onChange={update} className={"form-control input-sm"} placeholder={"Filter disclosures by typing a judge's name here…"}></input><br/>
+      <input onChange={update} className={"form-control input-sm"} placeholder={"Filter disclosures by typing a judge's name here…"}/><br/>
       <table className="search-panel-table">
         <tbody>
         {judge.map((row) => {
@@ -322,7 +268,7 @@ const AdminPanel = (data) => {
 
   return (
     <div className={"v-offset-below-4"}>
-      <h3><span>Admin <i className="fa fa-key red"></i></span></h3>
+      <h3><span>Admin <i className="fa fa-key red"/></span></h3>
       <hr/>
       <span>If Admin provide special links to things</span>
       <a href={`/admin/disclosures/financialdisclosure/${data.id}/`}>Admin Page</a>
@@ -341,7 +287,7 @@ const Tabs = (data, years, year, fetchDisclosure, doc_ids, judge_name) => {
                   <li className={(year == yr) ? "active" : ""}
                       role="presentation">
                     <a href={`?id=${doc_ids[index]}`} onClick={() => { fetchDisclosure(yr, index)}}>
-                     <i className="fa fa-file-text-o gray"></i>&nbsp; {yr}
+                     <i className="fa fa-file-text-o gray"/>&nbsp; {yr}
                     </a>
                   </li>
                 )
