@@ -223,8 +223,8 @@ const Notes = () => {
     <div className={"v-offset-below-4"}>
       <h3><span>Notes <i className="fa fa-sticky-note-o"/></span></h3>
       <hr/>
-      <span>The data in this file was extracted with OCR technology. </span>
-      <ul className={"v-offset-above-1"}>
+      <span>The data in this file was extracted with OCR technology and may contain typos.</span>
+      <ul className={"v-offset-above-2 v-offset-below-2"}>
         <li><i className="fa fa-file-text-o gray"/> Links to the PDF row (if possible).</li>
         <li><i className="fa fa-file-excel-o black"/> The row may contain a redaction</li>
         <li><i className="fa fa-eye-slash black"/> Indicates the OCR identified data in the row but could not extract it</li>
