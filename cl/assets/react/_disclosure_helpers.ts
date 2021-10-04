@@ -2,7 +2,7 @@ import {GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS} from "./_disclosure_models"
 
 export const convertTD = (value, table, key) => {
   if (value == -1) {
-    return "[Failed OCR]"
+    return ""
   }
   if (table == "Investments" && key == "transaction_value_code" && value) {
     return `${GROSS_VALUE[value]} (${value})`
