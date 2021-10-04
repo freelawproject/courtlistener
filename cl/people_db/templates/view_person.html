@@ -3,6 +3,7 @@
 {% load admin_urls %}
 {% load humanize %}
 {% load text_filters %}
+{% load waffle_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -628,6 +629,23 @@
             </div>
         </div>
         {% endif %}
+
+        {% flag "financial-disclosures" %}
+          {% if disclosures %}
+            <h3 class="bottom">
+              <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
+            </h3>
+              <p class="gray">An annual financial disclosure by Federal judges, magistrates and clerks of the court.</p>
+            <hr class="top">
+            {% for disclosure in disclosures %}
+              <div class="col-xs-3">
+                <h4 class="text">
+                  <a href="financial-disclosures/?id={{ disclosure.id }}">{{ disclosure.year }} </a>
+                  </h4>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endflag %}
 
         {% if oral_arguments_heard.result.numFound > 0 %}
         <div class="row v-offset-below-3">
