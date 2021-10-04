@@ -1,6 +1,7 @@
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
+from django.conf import settings
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.disclosures.models import (
     Agreement,
@@ -74,6 +75,15 @@ class SpouseIncomeSerializer(
         fields = "__all__"
 
 
+class JudgeSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    race = serializers.StringRelatedField(many=True)
+    positions = PositionSerializer
+
+    class Meta:
+        model = Person
+        fields = "__all__"
+
+
 class FinancialDisclosureSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
@@ -88,13 +98,14 @@ class FinancialDisclosureSerializer(
     positions = PositionSerializer(many=True, read_only=True)
     reimbursements = ReimbursementSerializer(many=True, read_only=True)
     spouse_incomes = SpouseIncomeSerializer(many=True, read_only=True)
-    person = serializers.HyperlinkedRelatedField(
-        many=False,
-        view_name="person-detail",
-        queryset=Person.objects.all(),
-        style={"base_template": "input.html"},
-    )
+    person = JudgeSerializer(many=False, read_only=True)
 
     class Meta:
         model = FinancialDisclosure
         exclude = ("download_filepath",)
+
+    def to_representation(self, data):
+        data = super(FinancialDisclosureSerializer, self).to_representation(data)
+        data['filepath'] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['filepath']}"
+        data['thumbnail'] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['thumbnail']}"
+        return data
