@@ -23,10 +23,10 @@ const App = () => {
         <Route path={`/tags/:userName/:id`}>
           <TagMarkdown {...data} />
         </Route>
-        <Route path={`/financial-disclosures/`}>
+        <Route exact path={`/financial-disclosures/`}>
           <DisclosureList {...data} />
         </Route>
-        <Route path={`/person/:judge_id/:slug/financial-disclosures/`}>
+        <Route path={`/financial-disclosures/:judge_id/:slug/`}>
           <DisclosureViewer {...data}  />
         </Route>
 
