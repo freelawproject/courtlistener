@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "46490bb9d79dc7a356be";
+/******/ 	var hotCurrentHash = "cd8185efad38059fb634";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1063,9 +1063,7 @@ var DisclosureSearch = function DisclosureSearch(data, query, update) {
     type: "text",
     placeholder: "Filter disclosures by typing a judge's name here\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    style: {
-      "width": "100%"
-    }
+    className: "table-instant-results"
   }, query != "" ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
       className: "col-xs-7 col-md-8 col-lg-12 tr-results"
@@ -3133,7 +3131,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3271,7 +3269,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
@@ -3360,7 +3358,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-td {\n  border-bottom: 0.5px #cecece solid;\n}\n\n.search-panel-table {\n  width: 100%\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  border-bottom: 1px solid black;\n  padding: 10px;\n  background: white;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;AACpC;;AAEA;EACE;AACF;;;AAGA,+BAA+B;;AAE/B;EACE,8BAA8B;EAC9B,aAAa;EACb,iBAAiB;AACnB","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-td {\n  border-bottom: 0.5px #cecece solid;\n}\n\n.search-panel-table {\n  width: 100%\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  border-bottom: 1px solid black;\n  padding: 10px;\n  background: white;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-td {\n  border-bottom: 0.5px #cecece solid;\n}\n\n.search-panel-table {\n  width: 100%\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  border-bottom: 1px solid black;\n  padding: 10px;\n  /*background: rgba(255, 255, 255, 0.98);*/\n  width: 100%;\n\n}\n\n.table-instant-results {\n  width: 95%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  background: rgba(255, 255, 255, 0.95);\n  z-index: 9;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;AACpC;;AAEA;EACE;AACF;;;AAGA,+BAA+B;;AAE/B;EACE,8BAA8B;EAC9B,aAAa;EACb,yCAAyC;EACzC,WAAW;;AAEb;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,qCAAqC;EACrC,UAAU;AACZ","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-td {\n  border-bottom: 0.5px #cecece solid;\n}\n\n.search-panel-table {\n  width: 100%\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  border-bottom: 1px solid black;\n  padding: 10px;\n  /*background: rgba(255, 255, 255, 0.98);*/\n  width: 100%;\n\n}\n\n.table-instant-results {\n  width: 95%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  background: rgba(255, 255, 255, 0.95);\n  z-index: 9;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 
