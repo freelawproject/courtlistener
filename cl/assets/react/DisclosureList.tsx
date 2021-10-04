@@ -70,7 +70,7 @@ const DisclosureSearch = (data, query, update) => {
                  type="text"
                  placeholder="Filter disclosures by typing a judge's name here…"/>
             <div>
-              <table style={{"width": "100%"}}>
+              <table className={"table-instant-results"}>
               {query != "" ? (
                 <tbody>
                     {data.map((row) => {
