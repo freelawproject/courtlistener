@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
 

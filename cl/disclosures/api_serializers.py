@@ -1,7 +1,7 @@
+from django.conf import settings
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
-from django.conf import settings
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.disclosures.models import (
     Agreement,

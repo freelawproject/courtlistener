@@ -1,8 +1,8 @@
 from django.urls import path
 
 from cl.disclosures.views import (
-    financial_disclosures_viewer,
     financial_disclosures_home,
+    financial_disclosures_viewer,
 )
 
 urlpatterns = [
