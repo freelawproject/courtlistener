@@ -427,6 +427,7 @@ def lookup_judges_by_messy_str(
     last_names = extract_judge_last_name(s)
     return lookup_judges_by_last_name_list(last_names, court_id, event_date)
 
+
 def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
     """Find judge by first or last name
 

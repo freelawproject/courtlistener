@@ -45,9 +45,11 @@ def financial_disclosures_viewer(
     return render(
         request,
         "financial_disclosures_viewer.html",
-        {"person": person,
-         "title": title,
-         "disclosure_years": years,
-         "disclosure_ids": ids,
-         "private": False},
+        {
+            "person": person,
+            "title": title,
+            "disclosure_years": years,
+            "disclosure_ids": ids,
+            "private": False,
+        },
     )
