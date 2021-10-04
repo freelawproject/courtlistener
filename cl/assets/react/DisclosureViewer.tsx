@@ -251,7 +251,7 @@ const SearchPanel = (judge, fetchJudge) => {
             return (
                 <tr key={row.id}>
                   <td className={"search-panel-td"}>
-                    <a href={`/person/${row.person.id}/${row.person.slug}/financial-disclosures/?id=${row.id}`}>
+                    <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
                           <h4 className={"text-left"}>Judge {row.person.name_first} {row.person.name_last}</h4>
                         </a>
                     <p className={"text-left"}>{row.year}</p>
@@ -282,7 +282,7 @@ const Tabs = (data, years, year, fetchDisclosure, doc_ids, judge_name) => {
   return (
     <div>
       <h1 className="text-center">Financial Disclosures for J.&nbsp;
-        <a href={".."}>{judge_name}</a> </h1>
+        <a href={window.location.pathname.replace("financial-disclosures", "person")}>{judge_name}</a></h1>
         <ul className="nav nav-tabs v-offset-below-2 v-offset-above-3" role="">
           {years.map((yr, index) => {
                 return (

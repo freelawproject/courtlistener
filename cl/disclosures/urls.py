@@ -7,7 +7,7 @@ from cl.disclosures.views import (
 
 urlpatterns = [
     path(
-        "person/<int:pk>/<blank-slug:slug>/financial-disclosures/",
+        "financial-disclosures/<int:pk>/<blank-slug:slug>/",
         financial_disclosures_viewer,
         name="financial_disclosures_viewer",
     ),

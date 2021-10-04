@@ -622,7 +622,6 @@
                 </div>
                 </div>
                 {% endfor %}
-
                 <p>
                     <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }}</a>
                 </p>
@@ -640,8 +639,8 @@
             {% for disclosure in disclosures %}
               <div class="col-xs-3">
                 <h4 class="text">
-                  <a href="financial-disclosures/?id={{ disclosure.id }}">{{ disclosure.year }} </a>
-                  </h4>
+                  <a href="/financial-disclosures/{{ person.id }}/{{ person.slug }}/?id={{ disclosure.id }}">{{ disclosure.year }}</a>
+                </h4>
               </div>
             {% endfor %}
           {% endif %}

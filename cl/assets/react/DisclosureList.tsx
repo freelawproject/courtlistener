@@ -77,7 +77,7 @@ const DisclosureSearch = (data, query, update) => {
                       return (
                         <tr className="col-xs-7 col-md-8 col-lg-12 tr-results">
                           <td className="col-md-9">
-                            <a href={`/person/${row.person.id}/${row.person.slug}/financial-disclosures/?id=${row.id}`}>
+                            <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
                               <h4 className={"text-left"}>Judge {row.person.name_first} {row.person.name_last}</h4>
                             </a>
                             <p className={"text-left"}>{row.year}</p>
@@ -89,7 +89,7 @@ const DisclosureSearch = (data, query, update) => {
                                      width={"100"}
                                      height={"150"}
                                      className="img-responsive thumbnail shadow img-thumbnail"
-                                ></img>
+                                />
                               </a>
                             </td>
                         </tr>
