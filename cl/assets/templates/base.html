@@ -224,30 +224,23 @@
                   <a href="{% url "citation_redirector" %}"
                      tabindex="102">Citation Look Up</a>
                 </li>
-                <hr>
                 <li>
-                  <a href="{% url "viz_gallery" %}" tabindex="102">Gallery</a>
-                </li>
-                <li>
-                  <a href="{% url "mapper_homepage" %}" tabindex="103">SCOTUS Networks</a>
-                </li>
-                <li>
-                  <a href="{% url "new_visualization" %}" tabindex="104">New Network</a>
+                  <a href="{% url "new_visualization" %}" tabindex="102">Citation Visualizations</a>
                 </li>
               </ul>
             </li>
             <li class="{% block navbar-r %}inactive{% endblock %}" id="navbar-r">
-              <a href="{% url "advanced_r" %}" tabindex="105">RECAP Archive</a>
+              <a href="{% url "advanced_r" %}" tabindex="103">RECAP Archive</a>
             </li>
             <li class="{% block navbar-oa %}inactive{% endblock %}" id="navbar-oa">
-              <a href="{% url "advanced_oa" %}" tabindex="106">Oral Arguments</a>
+              <a href="{% url "advanced_oa" %}" tabindex="104">Oral Arguments</a>
             </li>
             <li class="{% block navbar-p %}inactive{% endblock %}" id="navbar-p">
-              <a href="{% url "advanced_p" %}" tabindex="107">Judges</a>
+              <a href="{% url "advanced_p" %}" tabindex="105">Judges</a>
             </li>
             {% flag "financial-disclosures" %}
               <li class="{% block navbar-fd %}inactive{% endblock %}" id="navbar-fd">
-                <a href="{% url "advanced_fd" %}" tabindex="108">Financial Disclosures</a>
+                <a href="{% url "advanced_fd" %}" tabindex="106">Financial Disclosures</a>
               </li>
             {% endflag %}
           </ul>
