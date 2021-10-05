@@ -1,28 +1,21 @@
 import {GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS} from "./_disclosure_models";
 
 export const convertTD = (value, table, key) => {
-  if (value == -1) {
+  if (value == -1 || !value) {
     return ""
   }
-  if (table == "Investments" && key == "transaction_value_code" && value) {
+  if (["Investments", "Debts"].indexOf(table) == -1) {
+    return value
+  }
+  if (["transaction_value_code", "value_code", "gross_value_code"].indexOf(key) > -1) {
     return `${GROSS_VALUE[value]} (${value})`
   }
-  if (table == "Debts" && key == "value_code" && value) {
-    return `${GROSS_VALUE[value]} (${value})`
-  }
-  if (table == "Investments" && key == "income_during_reporting_period_code" && value) {
+  if (["income_during_reporting_period_code", "transaction_gain_code"].indexOf(key) > -1) {
     return `${INCOME_GAIN[value]} (${value})`
   }
-  if (table == "Investments" && key == "gross_value_method" && value) {
+  if (key == "gross_value_method" && value) {
     return `${VALUATION_METHODS[value]} (${value})`
   }
-  if (table == "Investments" && key == "gross_value_code" && value) {
-    return `${GROSS_VALUE[value]} (${value})`
-  }
-  if (table == "Investments" && key == "transaction_gain_code" && value) {
-    return `${INCOME_GAIN[value]} (${value})`
-  }
-
   return value
 }
 
