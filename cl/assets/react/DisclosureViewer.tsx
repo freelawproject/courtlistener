@@ -319,12 +319,11 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
         className={'form-control input-sm'}
         placeholder={"Filter disclosures by typing a judge's name here…"}
       />
-      <br />
       <table className="search-panel-table">
         <tbody>
           {judge.map((row: Row) => {
             return (
-              <tr key={row.id}>
+              <tr className={"search-panel-row"} key={row.id}>
                 <td className={'search-panel-td'}>
                   <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
                     <h4 className={'text-left'}>

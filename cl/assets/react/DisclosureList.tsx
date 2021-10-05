@@ -102,8 +102,9 @@ const DisclosureSearch = (
                           </a>
                           <p className={'text-left'}>{row.year}</p>
                         </td>
+
                         <td className="col-md-3">
-                          <a href={row.filepath}>
+                          { data.length < 6 ? (<a href={row.filepath}>
                             <img
                               src={row.thumbnail}
                               alt="Thumbnail of disclosure form"
@@ -111,7 +112,8 @@ const DisclosureSearch = (
                               height={'150'}
                               className="img-responsive thumbnail shadow img-thumbnail"
                             />
-                          </a>
+                          </a>) : ""}
+
                         </td>
                       </tr>
                     );

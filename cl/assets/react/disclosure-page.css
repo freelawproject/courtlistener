@@ -6,26 +6,36 @@
 
 .search-panel-td {
   border-bottom: 0.5px #cecece solid;
+  padding: 10px;
 }
 
 .search-panel-table {
-  width: 100%
+  width: 89%;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  position: absolute;
+  z-index: 9;
+  background: white;
+  border-color: gainsboro;
+  border: 1px solid;
+  padding: 10px;
+  border-color: gainsboro;
+  box-shadow: 2px 2px 5px #000000
 }
 
 
 /*Disclosure List Homepage CSS*/
 
 .tr-results {
-  border-bottom: 1px solid black;
   padding: 10px;
   width: 100%;
   background: white;
+  border-bottom: 2px solid gainsboro;
 }
 
 .table-instant-results {
-  width: 95%;
-  border-left: 1px solid;
-  border-right: 1px solid;
+  width: 94%;
   position: absolute;
   z-index: 9;
+  box-shadow: 2px 2px 5px #acacac;
 }
