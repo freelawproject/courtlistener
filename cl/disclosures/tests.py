@@ -108,7 +108,7 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
         """Can we query the financial disclosures?"""
         url = reverse("financialdisclosure-list", kwargs={"version": "v3"})
         # 4 of the queries are from the setup
-        with self.assertNumQueries(13):
+        with self.assertNumQueries(14):
             r = self.client.get(url)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count.")
