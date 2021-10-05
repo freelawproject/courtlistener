@@ -65,6 +65,7 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
             "positions",
             "reimbursements",
             "spouse_incomes",
+            "person",
         )
         .order_by("-id")
     )
