@@ -2,15 +2,9 @@ import React from 'react';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
 
-const scrollToRef = (ref) => {
-  window.scrollTo(0, ref.current.offsetTop);
-};
-
 const DisclosureList: React.FC<UserState> = () => {
   const [data, setData] = React.useState<any>([]);
   const [query, setQuery] = React.useState('');
-  const myRef = React.useRef(null);
-  const executeScroll = () => scrollToRef(myRef);
 
   const fetchData = async (query: string) => {
     try {
@@ -31,28 +25,19 @@ const DisclosureList: React.FC<UserState> = () => {
 
   return (
     <div>
-      {DisclosureHeader(executeScroll)}
+      {DisclosureHeader()}
       {DisclosureSearch(data, query, update)}
-      {DisclosureFooter(myRef)}
+      {DisclosureFooter()}
     </div>
   );
 };
 
-const DisclosureHeader = (executeScroll) => {
+const DisclosureHeader = () => {
   return (
     <div>
       <h1 className="text-center">Judicial Financial Disclosures Database</h1>
       <p className="text-center gray large">
-        A collaboration of
-        <a href="https://demandprogress.org">&#32;Demand Progress</a>,
-        <a href="https://fixthecourt.com">&#32;Fix the Court</a>,<a href="https://free.law">&#32;Free Law Project</a>,
-        and
-        <a href="https://muckrock.com">&#32;MuckRock</a>.
-      </p>
-      <p className="text-center">
-        <a onClick={executeScroll} className="btn btn-default">
-          Learn More
-        </a>
+        Search and review the biggest database of judicial disclosures ever made.
       </p>
     </div>
   );
@@ -62,7 +47,7 @@ const DisclosureSearch = (data, query, update) => {
   return (
     <div>
       <div className="row v-offset-above-2">
-        <div className="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
+        <div className="hidden-xs col-sm-1 col-md-2 col-lg-3" />
         <div className="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group" id="main-query-box">
           <label className="sr-only" htmlFor="id_disclosures_filter">
             Filter disclosures…
@@ -107,7 +92,7 @@ const DisclosureSearch = (data, query, update) => {
                   })}
                 </tbody>
               ) : (
-                <tbody></tbody>
+                <tbody />
               )}
             </table>
           </div>
@@ -117,31 +102,78 @@ const DisclosureSearch = (data, query, update) => {
   );
 };
 
-const DisclosureFooter = (myRef) => {
+const DisclosureFooter = () => {
   return (
-    <div className="row v-offset-above-4 abcd" ref={myRef}>
-      <div className="col-xs-12 col-sm-6">
-        <p className="lead">Yadda Yadda Yadda</p>
-        <p> Honestly this is where I think we could explain about collaborators?</p>
+    <div className="row v-offset-above-4">
+      <div className="col-md-4">
+        <h3>About this Database</h3>
         <p>
-          Our financial disclosure database is a collection of over 250,000 pages of financial records drawn from over
-          26,000 tiff and PDF files. We requested these files from the federal judiciary beginning in 2017 and have been
-          gathering them since that time.
+          Every year, federal judges must complete lengthy documents listing any investments or other potential sources
+          of conflict that they may have. By statute, these documents are available to the public for six years before
+          they must be destroyed.
         </p>
-      </div>
-      <div className="col-xs-12 col-sm-6">
-        <p className="lead">The Data</p>
         <p>
-          Financial Disclosures by federal judges is mandated by law. Starting int 1974 Judges have been required to
-          make thier financial records available for 6 years. Beginning in 2017 we began requesting the financial
-          records of every federal judge.{' '}
+          In 2017, we began collecting these documents so they would not be thrown away. After extracting the data from
+          the files we&apos;ve collected, we have build a first-of-its-kind database of over a million investment
+          transactions, and more than 250,000 pages of judicial records.
         </p>
-        <p>To learn more about how you can use API endpoints click this link.</p>
+        <p>All of the information you find here is available via our APIs or by browsing our database of judges.</p>
         <p>
-          <a href={'https://www.courtlistener.com/api/rest-info/#financialdisclosure-endpoint'}>
-            https://www.courtlistener.com/api/rest-info/#financialdisclosure-endpoint
+          Creating this database was an expensive project for our organization. If you find this work valuable, please
+          consider making a donation
+        </p>
+        <p>
+          <a href="/donate/?referrer=fds-homepage" className="btn btn-danger btn-lg">
+            Donate Now
           </a>
         </p>
+      </div>
+      <div className="col-md-4">
+        <h3>Coverage</h3>
+        <p>This database is a collection of every disclosure we could find online or request under the law.</p>
+        <p>To learn more about what we have found, please see our coverage page dedicated to the topic.</p>
+        <p>
+          If you know of sources of disclosures that we do not already have, please get in touch and we will be pleased
+          to add it to our collection.
+        </p>
+        <p>
+          <a href="/coverage/financial-disclosures/" className="btn btn-primary btn-lg">
+            See Coverage
+          </a>
+        </p>
+      </div>
+      <div className="col-md-4">
+        <h3>Learn More</h3>
+        <ul>
+          <li>
+            <a href="https://free.law/2021/09/28/announcing-federal-financial-disclosures">
+              Our blog post announcing the database
+            </a>
+          </li>
+          <li>
+            <a href="https://www.wsj.com/articles/131-federal-judges-broke-the-law-by-hearing-cases-where-they-had-a-financial-interest-11632834421?st=wm0bzo39zzjts1v">
+              The Wall Street Journal&apos;s investigation using this data
+            </a>
+          </li>
+          <li>
+            <a href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">
+              The official policies guiding financial disclosures
+            </a>
+          </li>
+          <li>
+            <a href="https://www.gao.gov/assets/gao-18-406.pdf">A GAO report on disclosures</a>
+          </li>
+          <li>
+            <a href="https://www.govtrack.us/congress/bills/95/s555">
+              The Ethics in Government Act establishing disclosure rules
+            </a>
+          </li>
+          <li>
+            <a href="https://web.archive.org/web/20190614103410/https://famguardian.org/PublishedAuthors/Media/KCStar/30da0058.404,.htm">
+              Early investigative work on disclosures from 1998
+            </a>
+          </li>
+        </ul>
       </div>
     </div>
   );
