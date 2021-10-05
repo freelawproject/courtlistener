@@ -5,6 +5,7 @@ import './disclosure-page.css';
 import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
 import { convertTD, fetch_year_index } from './_disclosure_helpers';
+import debounce from 'lodash.debounce';
 
 interface TableNavigationInnerProps {
   disclosures: string;
@@ -76,6 +77,14 @@ const MainSection = (disclosures) => {
     }
   };
 
+  const changeHandler = (event: string) => {
+    fetchJudge(event)
+  };
+
+  const debounceFetchJudge = React.useMemo(
+    () => debounce(changeHandler, 300)
+  , []);
+
   if (data == null) {
     fetchDisclosure(year, year_index[1]);
   }
@@ -106,7 +115,7 @@ const MainSection = (disclosures) => {
                 )}
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, fetchJudge)}</div>
+            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge)}</div>
           </div>
         </div>
       ) : (data != null && data.has_been_extracted == false) ? (
@@ -122,7 +131,7 @@ const MainSection = (disclosures) => {
                 </div>
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, fetchJudge)}</div>
+            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge)}</div>
           </div>
         </div>
       ) : (
@@ -148,7 +157,6 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
           <h3>
             {title}
             <a href={`/api/rest/v3/${key.replaceAll('_', '-')}/?financial_disclosure__id=${disclosure_id}`}>
-              {' '}
               <i className="fa fa-code gray pull-right"></i>
             </a>
           </h3>
@@ -217,7 +225,7 @@ const Support = () => {
     <div id={'support'}>
       <h3>
         <span>
-          Support FLP <i className="fa fa-heart-o red" />
+          Support FLP <i className="fa fa-heart-o red pull-right" />
         </span>
       </h3>
       <p className="v-offset-above-1">
@@ -242,7 +250,8 @@ const Thumb = (data: Data) => {
     <div className="v-offset-below-4">
       <h3>
         <span>
-          Download <i className="fa fa-download gray" />
+          Download
+          <a href={`/api/rest/v3/financial-disclosures/?id=${data.id}`}><i className="fa fa-code gray pull-right" /></a>
         </span>
       </h3>
       <hr />
@@ -280,7 +289,7 @@ const Notes = () => {
     <div className={'v-offset-below-4'}>
       <h3>
         <span>
-          Notes <i className="fa fa-sticky-note-o" />
+          Notes <i className="fa fa-sticky-note-o pull-right" />
         </span>
       </h3>
       <hr />
@@ -310,7 +319,7 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
     <div className={'v-offset-below-4 '}>
       <h3>
         <span>
-          Search <i className="fa fa-search gray" />
+          Search <i className="fa fa-search gray pull-right" />
         </span>
       </h3>
       <hr />
