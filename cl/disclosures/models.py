@@ -251,7 +251,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse(
             "financial_disclosures_viewer",
-            args=(self.person.pk, self.person.slug),
+            args=(self.person.pk, self.pk, self.person.slug),
         )
 
     def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:

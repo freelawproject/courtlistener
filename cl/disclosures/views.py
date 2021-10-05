@@ -34,11 +34,12 @@ def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
 
 def financial_disclosures_viewer(
     request: HttpRequest,
+    person_pk: int,
     pk: int,
     slug: str,
 ) -> HttpResponse:
     """Show the financial disclosures for a particular person"""
-    person = get_object_or_404(Person, pk=pk)
+    person = get_object_or_404(Person, pk=person_pk)
     title = make_title_str(person)
     years, ids = make_disclosure_data(person)
 

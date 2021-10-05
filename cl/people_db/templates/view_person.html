@@ -636,13 +636,15 @@
             </h3>
               <p class="gray">An annual financial disclosure by Federal judges, magistrates and clerks of the court.</p>
             <hr class="top">
-            {% for disclosure in disclosures %}
-              <div class="col-xs-3">
-                <h4 class="text">
-                  <a href="{% url 'financial_disclosures_viewer' person.id person.slug %}?id={{ disclosure.id }}">{{ disclosure.year }}</a>
-                </h4>
-              </div>
-            {% endfor %}
+            <div class="row">
+              {% for disclosure in disclosures %}
+                <div class="col-xs-3">
+                  <h4 class="text">
+                    <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
+                  </h4>
+                </div>
+              {% endfor %}
+            </div>
           {% endif %}
         {% endflag %}
 
