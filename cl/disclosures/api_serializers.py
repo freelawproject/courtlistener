@@ -109,4 +109,6 @@ class FinancialDisclosureSerializer(
         return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
 
     def get_thumbnail(self, disclosure):
-        return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.thumbnail}"
+        return (
+            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.thumbnail}"
+        )
