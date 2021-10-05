@@ -44,11 +44,12 @@ def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
     ).exists()
 
 
-def make_disclosure_data(person) -> Tuple:
-    """
+def make_disclosure_data(person: Person) -> Tuple[str, str]:
+    """Make a CSV of the years and the IDs of somebody's disclosures
 
-    :param person:
-    :return:
+    :param person: The Person we're making data for
+    :return: A tuple that can be passed to an HTML data attribute, and which
+    contains a CSV of the years of the disclosures and their associated IDs.
     """
     forms = (
         person.financial_disclosures.all()
