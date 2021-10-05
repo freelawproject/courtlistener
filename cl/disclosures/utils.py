@@ -2,6 +2,8 @@ from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
 
+from cl.people_db.models import Person
+
 
 def has_been_pdfed(disclosure_url: str) -> Optional[str]:
     """Has file been PDFd from tiff and saved to AWS.
