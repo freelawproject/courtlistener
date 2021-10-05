@@ -2,15 +2,37 @@ import React from 'react';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
 
+interface Person {
+  id: number;
+  name_first: string;
+  name_last: string;
+  slug: string;
+}
+
+interface Row {
+  id: number;
+  filepath: string;
+  person: Person;
+  year: string;
+  thumbnail: string;
+}
+
+// interface Response {
+//   previous: null;
+//   next: null;
+//   results: Row[];
+// }
+
 const DisclosureList: React.FC<UserState> = () => {
-  const [data, setData] = React.useState<any>([]);
+  const [data, setData] = React.useState<Row[]>([]);
   const [query, setQuery] = React.useState('');
 
   const fetchData = async (query: string) => {
     try {
-      const response = await appFetch(`/api/rest/v3/financial-disclosures/?person__fullname=${query}`);
+      const response: any = await appFetch(`/api/rest/v3/financial-disclosures/?person__fullname=${query}`);
+      const results: Row[] = response['results'];
       setQuery(query);
-      setData(response['results']);
+      setData(results);
 
       console.log(response['results']);
     } catch (error) {
@@ -43,7 +65,11 @@ const DisclosureHeader = () => {
   );
 };
 
-const DisclosureSearch = (data, query, update) => {
+const DisclosureSearch = (
+  data: Row[],
+  query: string,
+  update: React.ChangeEventHandler<HTMLInputElement> | undefined
+) => {
   return (
     <div>
       <div className="row v-offset-above-2">
@@ -65,9 +91,9 @@ const DisclosureSearch = (data, query, update) => {
             <table className={'table-instant-results'}>
               {query != '' ? (
                 <tbody>
-                  {data.map((row) => {
+                  {data.map((row: Row) => {
                     return (
-                      <tr className="col-xs-7 col-md-8 col-lg-12 tr-results">
+                      <tr key={row.id} className="col-xs-7 col-md-8 col-lg-12 tr-results">
                         <td className="col-md-9">
                           <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
                             <h4 className={'text-left'}>
