@@ -98,19 +98,15 @@ class FinancialDisclosureSerializer(
     reimbursements = ReimbursementSerializer(many=True, read_only=True)
     spouse_incomes = SpouseIncomeSerializer(many=True, read_only=True)
     person = JudgeSerializer(many=False, read_only=True)
+    filepath = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = FinancialDisclosure
         exclude = ("download_filepath",)
 
-    def to_representation(self, data):
-        data = super(FinancialDisclosureSerializer, self).to_representation(
-            data
-        )
-        data[
-            "filepath"
-        ] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['filepath']}"
-        data[
-            "thumbnail"
-        ] = f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{data['thumbnail']}"
-        return data
+    def get_filepath(self, disclosure):
+        return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
+
+    def get_thumbnail(self, disclosure):
+        return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.thumbnail}"
