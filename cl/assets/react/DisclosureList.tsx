@@ -1,6 +1,7 @@
 import React from 'react';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
+import debounce from 'lodash.debounce';
 
 interface Person {
   id: number;
@@ -16,12 +17,6 @@ interface Row {
   year: string;
   thumbnail: string;
 }
-
-// interface Response {
-//   previous: null;
-//   next: null;
-//   results: Row[];
-// }
 
 const DisclosureList: React.FC<UserState> = () => {
   const [data, setData] = React.useState<Row[]>([]);
@@ -40,15 +35,16 @@ const DisclosureList: React.FC<UserState> = () => {
     }
   };
 
-  function update({ ...data }) {
-    const query = data.target.value;
-    fetchData(query);
-  }
+  const changeHandler = (event: string) => {
+    fetchData(event);
+  };
+
+  const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
 
   return (
     <div>
       {DisclosureHeader()}
-      {DisclosureSearch(data, query, update)}
+      {DisclosureSearch(data, query, debounceFetchJudge)}
       {DisclosureFooter()}
     </div>
   );
@@ -68,8 +64,13 @@ const DisclosureHeader = () => {
 const DisclosureSearch = (
   data: Row[],
   query: string,
-  update: React.ChangeEventHandler<HTMLInputElement> | undefined
+  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined
 ) => {
+  function update({ ...data }) {
+    const query: string = data.target.value;
+    fetchJudge(query);
+  }
+
   return (
     <div>
       <div className="row v-offset-above-2">
@@ -104,16 +105,19 @@ const DisclosureSearch = (
                         </td>
 
                         <td className="col-md-3">
-                          { data.length < 6 ? (<a href={row.filepath}>
-                            <img
-                              src={row.thumbnail}
-                              alt="Thumbnail of disclosure form"
-                              width={'100'}
-                              height={'150'}
-                              className="img-responsive thumbnail shadow img-thumbnail"
-                            />
-                          </a>) : ""}
-
+                          {data.length < 6 ? (
+                            <a href={row.filepath}>
+                              <img
+                                src={row.thumbnail}
+                                alt="Thumbnail of disclosure form"
+                                width={'100'}
+                                height={'150'}
+                                className="img-responsive thumbnail shadow img-thumbnail"
+                              />
+                            </a>
+                          ) : (
+                            ''
+                          )}
                         </td>
                       </tr>
                     );
