@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 
-from cl.api.utils import DisclosureAPIUsers, LoggingMixin
+from cl.api.utils import LoggingMixin
 from cl.disclosures.api_serializers import (
     AgreementSerializer,
     DebtSerializer,
@@ -37,7 +37,6 @@ from cl.disclosures.models import (
 
 
 class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Agreement.objects.all().order_by("-id")
     serializer_class = AgreementSerializer
     ordering_fields = ("id", "date_created", "date_modified")
@@ -45,7 +44,6 @@ class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Debt.objects.all().order_by("-id")
     serializer_class = DebtSerializer
     ordering_fields = ("id", "date_created", "date_modified")
@@ -53,7 +51,6 @@ class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = (
         FinancialDisclosure.objects.all()
         .prefetch_related(
@@ -75,7 +72,6 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Gift.objects.all().order_by("-id")
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
@@ -83,7 +79,6 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Investment.objects.all().order_by("-id")
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter
@@ -91,7 +86,6 @@ class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = NonInvestmentIncome.objects.all().order_by("-id")
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
@@ -99,7 +93,6 @@ class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
@@ -107,7 +100,6 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = Reimbursement.objects.all().order_by("-id")
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
@@ -115,7 +107,6 @@ class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (DisclosureAPIUsers,)
     queryset = SpouseIncome.objects.all().order_by("-id")
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter
