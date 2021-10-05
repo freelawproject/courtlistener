@@ -437,6 +437,7 @@ def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
     """
     query_parts = [str for str in s.split()]
     if len(query_parts) > 7:
+        # Possible DOS attack. Don't hit the DB.
         return queryset
     for part in query_parts:
         q = queryset.filter(
