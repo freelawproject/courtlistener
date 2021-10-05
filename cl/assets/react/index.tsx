@@ -29,7 +29,6 @@ const App = () => {
         <Route path={`/financial-disclosures/:judge_id/:slug/`}>
           <DisclosureViewer {...data}  />
         </Route>
-
       </Switch>
     </BrowserRouter>
   );
