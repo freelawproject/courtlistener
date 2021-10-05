@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.forms import ModelForm
+from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline
 from cl.search.models import (
@@ -201,6 +203,34 @@ class DocketAdmin(admin.ModelAdmin):
         "originating_court_information",
         "idb_data",
     )
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Docket,
+        form: ModelForm,
+        change: bool,
+    ) -> None:
+        obj.save()
+        from cl.search.tasks import add_items_to_solr
+
+        ids = list(
+            RECAPDocument.objects.filter(
+                docket_entry__docket_id=obj.pk,
+            ).values_list("id", flat=True)
+        )
+        add_items_to_solr.delay(ids, "search.RECAPDocument")
+
+    def delete_model(self, request: HttpRequest, obj: Docket) -> None:
+        obj.delete()
+        from cl.search.tasks import delete_items
+
+        ids = list(
+            RECAPDocument.objects.filter(
+                docket_entry__docket_id=obj.pk
+            ).values_list("id", flat=True)
+        )
+        delete_items.delay(ids, "search.RECAPDocument")
 
 
 @admin.register(OpinionsCited)
