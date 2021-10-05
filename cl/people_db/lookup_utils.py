@@ -435,7 +435,8 @@ def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
     :param s: Query string to parse
     :return: Filter Queryset
     """
-    for part in [str for str in s.split(" ") if str.strip()]:
+    query_parts = [str for str in s.split()]
+    for part in query_parts:
         q = queryset.filter(
             Q(name_first__icontains=part) | Q(name_last__icontains=part)
         )
