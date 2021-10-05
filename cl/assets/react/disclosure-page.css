@@ -18,9 +18,8 @@
 .tr-results {
   border-bottom: 1px solid black;
   padding: 10px;
-  /*background: rgba(255, 255, 255, 0.98);*/
   width: 100%;
-
+  background: white;
 }
 
 .table-instant-results {
@@ -28,6 +27,5 @@
   border-left: 1px solid;
   border-right: 1px solid;
   position: absolute;
-  background: rgba(255, 255, 255, 0.95);
   z-index: 9;
 }
