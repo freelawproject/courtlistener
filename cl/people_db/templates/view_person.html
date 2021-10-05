@@ -639,7 +639,7 @@
             {% for disclosure in disclosures %}
               <div class="col-xs-3">
                 <h4 class="text">
-                  <a href="/financial-disclosures/{{ person.id }}/{{ person.slug }}/?id={{ disclosure.id }}">{{ disclosure.year }}</a>
+                  <a href="{% url 'financial_disclosures_viewer' person.id person.slug %}?id={{ disclosure.id }}">{{ disclosure.year }}</a>
                 </h4>
               </div>
             {% endfor %}
