@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Union
 
 from django.db import models
+from django.urls import reverse
 
 from cl.lib.models import THUMBNAIL_STATUSES, AbstractDateTimeModel
 from cl.lib.storage import IncrementingAWSMediaStorage
@@ -246,6 +247,12 @@ class FinancialDisclosure(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk}, person: {self.person_id}, year: {self.year}"
+
+    def get_absolute_url(self) -> str:
+        return reverse(
+            "financial_disclosures_viewer",
+            args=(self.person.pk, self.person.slug),
+        )
 
     def calculate_wealth(self, field_name: str) -> Dict[str, Union[str, int]]:
         """Calculate gross value of all investments in disclosure
