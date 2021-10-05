@@ -20,6 +20,8 @@ export const convertTD = (value, table, key) => {
 }
 
 const getIndex = (value, arr) => {
+    // Sadly we need this method to check the index of an item in a list
+    // This helps us select the correct tab on page load
     for(var i = 0; i < arr.length; i++) {
         if(arr[i] === value.toString()) {
             return i;
@@ -29,6 +31,9 @@ const getIndex = (value, arr) => {
 }
 
 export const fetch_year_index = (years, doc_ids) => {
+  // Given a list of years, doc-ids identify the index of the year
+  // to select in the tab array of years
+  //Fetch year index is not pretty.
   const search = window.location.search;
   const params = new URLSearchParams(search);
   var optional_doc_id = params.get('id');
