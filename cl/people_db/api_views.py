@@ -60,6 +60,7 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
         "date_dob",
         "date_dod",
+        "name_last",
     )
 
 
