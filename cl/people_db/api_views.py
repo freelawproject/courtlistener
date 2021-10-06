@@ -40,7 +40,18 @@ from cl.people_db.models import (
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Person.objects.all().order_by("-id")
+    queryset = (
+        Person.objects.all()
+        .prefetch_related(
+            "positions",
+            "educations",
+            "political_affiliations",
+            "sources",
+            "aba_ratings",
+            "race",
+        )
+        .order_by("-id")
+    )
     serializer_class = PersonSerializer
     filterset_class = PersonFilter
     ordering_fields = (
