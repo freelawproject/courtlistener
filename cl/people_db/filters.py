@@ -205,10 +205,20 @@ class PersonFilter(FilterSet):
     fullname = filters.Filter(method="filter_fullname")
     has_disclosures = filters.BooleanFilter(method="filter_has_disclosures")
 
-    def filter_fullname(self, queryset, name, value):
+    def filter_fullname(
+        self,
+        queryset: QuerySet,
+        name: str,
+        value: str,
+    ) -> QuerySet:
         return lookup_judge_by_first_or_last_name(queryset, value)
 
-    def filter_race(self, queryset, name, value):
+    def filter_race(
+        self,
+        queryset: QuerySet,
+        name: str,
+        value: str,
+    ) -> QuerySet:
         return queryset.filter(race__race__in=value)
 
     def filter_has_disclosures(
