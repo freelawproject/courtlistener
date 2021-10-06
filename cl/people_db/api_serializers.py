@@ -18,6 +18,7 @@ from cl.people_db.models import (
     School,
     Source,
 )
+from cl.people_db.utils import make_person_picture_path
 from cl.search.api_serializers import CourtSerializer
 
 
@@ -113,6 +114,10 @@ class PersonSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    thumbnail_path = serializers.SerializerMethodField()
+
+    def get_thumbnail_path(self, obj) -> str:
+        return make_person_picture_path(obj)
 
     class Meta:
         model = Person
