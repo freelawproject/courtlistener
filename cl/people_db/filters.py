@@ -1,5 +1,5 @@
 import rest_framework_filters as filters
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, QuerySet
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
@@ -9,6 +9,7 @@ from cl.api.utils import (
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
 )
+from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.lookup_utils import lookup_judge_by_first_or_last_name
 from cl.people_db.models import (
     ABARating,
@@ -197,17 +198,37 @@ class PersonFilter(FilterSet):
         queryset=Opinion.objects.all(),
     )
 
+    # Custom filters
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES, method="filter_race"
     )
-
     fullname = filters.Filter(method="filter_fullname")
+    has_disclosures = filters.BooleanFilter(method="filter_has_disclosures")
 
     def filter_fullname(self, queryset, name, value):
         return lookup_judge_by_first_or_last_name(queryset, value)
 
     def filter_race(self, queryset, name, value):
         return queryset.filter(race__race__in=value)
+
+    def filter_has_disclosures(
+        self,
+        queryset: QuerySet,
+        name: str,
+        value: bool,
+    ) -> QuerySet:
+        """If truthy, filter to people that have disclosures"""
+        # See: https://stackoverflow.com/a/51879399/64911
+        fds_filter = FinancialDisclosure.objects.filter(
+            person=OuterRef("pk")
+        ).only("pk")
+        if value:
+            exists = Exists(fds_filter)
+        else:
+            exists = ~Exists(fds_filter)
+
+        queryset = queryset.filter(exists)
+        return queryset
 
     class Meta:
         model = Person
