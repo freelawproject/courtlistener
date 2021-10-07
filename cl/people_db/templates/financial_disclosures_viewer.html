@@ -27,6 +27,6 @@
          data-years="{{ disclosure_years }}"
          data-admin="{{ user.is_staff }}"
          data-ids="{{ disclosure_ids }}"
-         data-judge="{{ person.name_first }} {{ person.name_last }}"
+         data-judge="{{ person.name_first }} {{ person.name_middle }} {{ person.name_last }} {{ person.name_suffix }}"
     > </div>
 {% endblock %}

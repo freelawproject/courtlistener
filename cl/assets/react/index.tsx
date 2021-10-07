@@ -26,8 +26,8 @@ const App = () => {
         <Route exact path={`/financial-disclosures/`}>
           <DisclosureList {...data} />
         </Route>
-        <Route path={`/financial-disclosures/:judge_id/:slug/`}>
-          <DisclosureViewer {...data}  />
+        <Route path={'/person/:judge_id/disclosure/:disclosure_id/:slug/'}>
+          <DisclosureViewer {...data} />
         </Route>
       </Switch>
     </BrowserRouter>
