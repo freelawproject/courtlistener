@@ -59,9 +59,9 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
             # Prefetch disclosures and positions to avoid query floods
             Prefetch(
                 "financial_disclosures",
-                queryset=FinancialDisclosure.objects.all().only(
-                    "year", "id", "person_id"
-                ),
+                queryset=FinancialDisclosure.objects.all()
+                .only("year", "id", "person_id")
+                .order_by("-year"),
                 to_attr="disclosures",
             ),
             Prefetch(
@@ -81,6 +81,7 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
             "has_photo",
             "date_dob",
             "date_granularity_dob",
+            "slug",
         )
         .order_by("-id")
     )
