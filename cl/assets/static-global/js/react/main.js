@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "66e08d41d81cbf5924b4";
+/******/ 	var hotCurrentHash = "779e4cef143e09658e64";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1069,7 +1069,7 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchJudge) {
     onChange: update,
     type: "text",
     placeholder: "Filter disclosures by typing a judge's name\u2026"
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: 'table-instant-results'
   }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
@@ -1091,11 +1091,10 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchJudge) {
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
       src: row.thumbnail_path,
       alt: "Thumbnail of disclosure form",
-      width: '100',
       height: '150',
-      className: "img-responsive thumbnail shadow img-thumbnail"
+      className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
     }))));
-  })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null))))));
+  })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null)))));
 };
 
 var DisclosureFooter = function DisclosureFooter() {
@@ -1450,7 +1449,7 @@ var SearchPanel = function SearchPanel(judge, fetchJudge) {
     className: 'form-control input-sm',
     placeholder: "Filter disclosures by typing a judge's name here…"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: "table-instant-results"
+    className: "search-panel-table"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, judge.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
       className: 'tr-results',
@@ -3397,7 +3396,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #000000\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 94%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB;AACF;;;AAGA,+BAA+B;;AAE/B;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #000000\n}\n\n\n/*Disclosure List Homepage CSS*/\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 94%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 
