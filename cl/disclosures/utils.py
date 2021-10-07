@@ -2,6 +2,7 @@ from typing import Dict, Optional, Tuple, Union
 
 from django.conf import settings
 
+from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.people_db.models import Person
 
 
@@ -71,3 +72,35 @@ def make_disclosure_data(person: Person) -> Tuple[str, str]:
                 if number >= 2:
                     years[i] += f" ({number})"
     return ",".join(years), ",".join(ids)
+
+
+def make_disclosure_year_range(person: Person) -> str:
+    """Make a string representing the range of years a judge has disclosures
+
+    For example, a judge with just one disclosure returns:
+        "2000"
+
+    A judge with just two disclosures returns:
+        "2000 and 2010"
+
+    A judge with three becomes:
+        "2000, 2001, and 2003"
+
+    A judge with four or more returns:
+        "2000-2010"
+
+    :param: person: The judge to inspect with their disclosures prefetched to
+    the `disclosures` attribute.
+    :returns: A string of the years of their disclosures
+    """
+    years = []
+    for fd in person.disclosures:
+        years.append(fd.year)
+
+    years.sort()
+    year_count = len(years)
+    if year_count <= 3:
+        # "2000", "2000 and 2001", "2000, 2001, and 2002"
+        return oxford_join(years)
+    else:
+        return f"{years[0]}-{years[-1]}"
