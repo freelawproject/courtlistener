@@ -20,11 +20,13 @@
   border: 1px solid;
   padding: 10px;
   border-color: gainsboro;
-  box-shadow: 2px 2px 5px #000000
+  box-shadow: 2px 2px 5px #acacac;
 }
 
-
 /*Disclosure List Homepage CSS*/
+.judge-pic {
+  margin-top: 10px;
+}
 
 .tr-results {
   padding: 10px;
@@ -34,7 +36,7 @@
 }
 
 .table-instant-results {
-  width: 94%;
+  width: 95%;
   position: absolute;
   z-index: 9;
   box-shadow: 2px 2px 5px #acacac;

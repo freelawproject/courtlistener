@@ -334,7 +334,7 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
         className={'form-control input-sm'}
         placeholder={"Filter disclosures by typing a judge's name here…"}
       />
-      <table className="table-instant-results">
+      <table className="search-panel-table">
         <tbody>
           {judge.map((row: Row) => {
             return (

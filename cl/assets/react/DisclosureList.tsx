@@ -105,7 +105,6 @@ const DisclosureSearch = (
             type="text"
             placeholder="Filter disclosures by typing a judge's name…"
           />
-          <div>
             <table className={'table-instant-results'}>
               {query != '' ? (
                 <tbody>
@@ -123,9 +122,8 @@ const DisclosureSearch = (
                             <img
                               src={row.thumbnail_path}
                               alt="Thumbnail of disclosure form"
-                              width={'100'}
                               height={'150'}
-                              className="img-responsive thumbnail shadow img-thumbnail"
+                              className="img-responsive thumbnail shadow img-thumbnail judge-pic"
                             />
                           </td>
                         </a>
@@ -139,7 +137,6 @@ const DisclosureSearch = (
             </table>
           </div>
         </div>
-      </div>
     </div>
   );
 };
