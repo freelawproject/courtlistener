@@ -1,7 +1,11 @@
 from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    LoggingMixin,
+    RECAPUsersReadOnly,
+    TinyAdjustablePagination,
+)
 from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
@@ -59,9 +63,9 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
             # Prefetch disclosures and positions to avoid query floods
             Prefetch(
                 "financial_disclosures",
-                queryset=FinancialDisclosure.objects.all().only(
-                    "year", "id", "person_id"
-                ),
+                queryset=FinancialDisclosure.objects.all()
+                .only("year", "id", "person_id")
+                .order_by("-year"),
                 to_attr="disclosures",
             ),
             Prefetch(
@@ -81,11 +85,13 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
             "has_photo",
             "date_dob",
             "date_granularity_dob",
+            "slug",
         )
         .order_by("-id")
     )
     serializer_class = PersonDisclosureSerializer
     filterset_class = PersonDisclosureFilter
+    pagination_class = TinyAdjustablePagination
     ordering_fields = (
         "id",
         "date_created",

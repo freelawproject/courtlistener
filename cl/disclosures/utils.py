@@ -93,11 +93,11 @@ def make_disclosure_year_range(person: Person) -> str:
     the `disclosures` attribute.
     :returns: A string of the years of their disclosures
     """
-    years = []
+    years = set()
     for fd in person.disclosures:
-        years.append(fd.year)
+        years.add(fd.year)
 
-    years.sort()
+    years = sorted(list(years))
     year_count = len(years)
     if year_count <= 3:
         # "2000", "2000 and 2001", "2000, 2001, and 2002"
