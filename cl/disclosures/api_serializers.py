@@ -75,14 +75,6 @@ class SpouseIncomeSerializer(
         fields = "__all__"
 
 
-class JudgeSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    positions = PositionSerializer
-
-    class Meta:
-        model = Person
-        exclude = ("race",)
-
-
 class FinancialDisclosureSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
@@ -97,7 +89,12 @@ class FinancialDisclosureSerializer(
     positions = PositionSerializer(many=True, read_only=True)
     reimbursements = ReimbursementSerializer(many=True, read_only=True)
     spouse_incomes = SpouseIncomeSerializer(many=True, read_only=True)
-    person = JudgeSerializer(many=False, read_only=True)
+    person = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="person-detail",
+        queryset=Person.objects.all(),
+        style={"base_template": "input.html"},
+    )
     filepath = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
 
