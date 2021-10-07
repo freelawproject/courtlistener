@@ -38,11 +38,17 @@ class VisualizationCrudTests(BaseSeleniumTest):
 
         # She selects "New Visualization" from the new Visualization menu
         menu = self.browser.find_element(
-            By.PARTIAL_LINK_TEXT, "Visualizations"
+            By.PARTIAL_LINK_TEXT, "Opinions"
         )
         menu.click()
-        menu_item = self.browser.find_element(By.LINK_TEXT, "New Network")
+        menu_item = self.browser.find_element(By.LINK_TEXT, "Citation Visualizations")
         menu_item.click()
+
+        button = self.browser.find_element(
+            By.PARTIAL_LINK_TEXT, "Make a Network"
+        )
+        button.click()
+
         self.assertIn("Create a New Citation Network", self.browser.title)
 
         # Once there, she notices inputs for a First and Second Case
