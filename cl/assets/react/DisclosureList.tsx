@@ -22,9 +22,21 @@ const DisclosureList: React.FC<UserState> = () => {
   const [data, setData] = React.useState<Row[]>([]);
   const [query, setQuery] = React.useState('');
 
+  React.useEffect(() => {
+    const handleEsc = (event) => {
+      if (event.keyCode === 27) {
+        setQuery('');
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, []);
+
   const fetchData = async (query: string) => {
     try {
-      const response: any = await appFetch(`/api/rest/v3/financial-disclosures/?person__fullname=${query}`);
+      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
       const results: Row[] = response['results'];
       setQuery(query);
       setData(results);
@@ -68,7 +80,9 @@ const DisclosureSearch = (
 ) => {
   function update({ ...data }) {
     const query: string = data.target.value;
-    fetchJudge(query);
+    if (query.length > 1) {
+      fetchJudge(query);
+    }
   }
 
   return (
@@ -83,7 +97,10 @@ const DisclosureSearch = (
             className="form-control input-lg"
             name="disclosures-filter"
             id="id_disclosures_filter"
-            autoComplete="off"
+            autoComplete={'off'}
+            autoCorrect={'off'}
+            autoCapitalize={'off'}
+            spellCheck={'false'}
             onChange={update}
             type="text"
             placeholder="Filter disclosures by typing a judge's name…"
@@ -94,31 +111,24 @@ const DisclosureSearch = (
                 <tbody>
                   {data.map((row: Row) => {
                     return (
-                      <tr key={row.id} className="col-xs-7 col-md-8 col-lg-12 tr-results">
-                        <td className="col-md-9">
-                          <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
-                            <h4 className={'text-left'}>
-                              Judge {row.person.name_first} {row.person.name_last}
-                            </h4>
-                          </a>
-                          <p className={'text-left'}>{row.year}</p>
-                        </td>
+                      <tr key={row.id} className="tr-results">
+                        <a className={'table-row-link'} href={`${row.latest_disclosure_url}`}>
+                          <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10">
+                            <h4 className={'text-left'}>{row.name_full}</h4>
+                            <p className={'text-left'}>{row.position_str}</p>
+                            <p className={'text-left'}>{row.disclosure_years}</p>
+                          </td>
 
-                        <td className="col-md-3">
-                          {data.length < 6 ? (
-                            <a href={row.filepath}>
-                              <img
-                                src={row.thumbnail}
-                                alt="Thumbnail of disclosure form"
-                                width={'100'}
-                                height={'150'}
-                                className="img-responsive thumbnail shadow img-thumbnail"
-                              />
-                            </a>
-                          ) : (
-                            ''
-                          )}
-                        </td>
+                          <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
+                            <img
+                              src={row.thumbnail_path}
+                              alt="Thumbnail of disclosure form"
+                              width={'100'}
+                              height={'150'}
+                              className="img-responsive thumbnail shadow img-thumbnail"
+                            />
+                          </td>
+                        </a>
                       </tr>
                     );
                   })}

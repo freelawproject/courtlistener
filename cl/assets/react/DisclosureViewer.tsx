@@ -4,7 +4,7 @@ import { Table } from 'react-bootstrap';
 import './disclosure-page.css';
 import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
-import { convertTD, fetch_year_index } from './_disclosure_helpers';
+import { convertTD, fetch_year_index, getIndex } from './_disclosure_helpers';
 import debounce from 'lodash.debounce';
 
 interface TableNavigationInnerProps {
@@ -43,59 +43,51 @@ const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
 const MainSection = (disclosures) => {
   const years = disclosures['years'].split(',');
   const doc_ids = disclosures['ids'].split(',');
-  const is_admin = disclosures['admin'] == 'True';
-  const judge_name = disclosures['judge'];
-
-  const [data, setData] = React.useState<Data | null>();
-  const [judge, setJudge] = React.useState([]);
-
+  const { disclosure_id } = useParams();
   const { judge_id } = useParams();
-  const year_index = fetch_year_index(years, doc_ids);
-  const [year, setYear] = React.useState(year_index[0]);
+  const [data, setData] = React.useState('');
+  const [judge, setJudge] = React.useState([]);
+  const judge_name = disclosures['judge'];
+  const is_admin = disclosures['admin'] == 'True';
+  const indx = getIndex(disclosure_id, doc_ids);
 
-  const fetchDisclosure = async (year: string, index: number) => {
+  const fetchDisclosure = async (doc_id: number) => {
     try {
-      const doc_id = doc_ids[index];
       const response = await appFetch(`/api/rest/v3/financial-disclosures/?person=${judge_id}&id=${doc_id}`);
+      console.log(response);
       setData(response['results'][0]);
-      setYear(year);
     } catch (error) {
       console.log(error);
     }
   };
 
+  if (data == '') {
+    fetchDisclosure(disclosure_id);
+  }
+
   const fetchJudge = async (query: string) => {
-    if (query == '') {
+    try {
+      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
+      setJudge(response['results']);
+    } catch (error) {
       setJudge([]);
-    } else {
-      try {
-        const response = await appFetch(`/api/rest/v3/financial-disclosures/?person__fullname=${query}`);
-        setJudge(response['results']);
-      } catch (error) {
-        setJudge([]);
-      }
     }
   };
 
   const changeHandler = (event: string) => {
-    fetchJudge(event)
+    fetchJudge(event);
   };
 
-  const debounceFetchJudge = React.useMemo(
-    () => debounce(changeHandler, 300)
-  , []);
-
-  if (data == null) {
-    fetchDisclosure(year, year_index[1]);
-  }
-
+  const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
+  const urlList = window.location.pathname.split('/');
+  const judgeUrl = [urlList[0], urlList[1], urlList[2], urlList[5], urlList[6]].join('/');
   return (
     <div>
-      {data != null && data.has_been_extracted ? (
+      {data != '' && data.has_been_extracted ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-lg-9'}>
-              {Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}
+              {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
               <div className="tabcontent">
                 {TableMaker(data, 'investments', is_admin)}
                 {TableMaker(data, 'gifts', is_admin)}
@@ -118,11 +110,12 @@ const MainSection = (disclosures) => {
             <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge)}</div>
           </div>
         </div>
-      ) : (data != null && data.has_been_extracted == false) ? (
+      ) : data != '' && data.has_been_extracted == false ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-lg-9'}>
-              {Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}
+              {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
+              {/*{Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}*/}
               <div className="tabcontent">
                 <div className={'text-center v-offset-above-4'}>
                   <i className="fa fa-exclamation-triangle gray" />
@@ -135,9 +128,7 @@ const MainSection = (disclosures) => {
           </div>
         </div>
       ) : (
-        <div className={'row'}>
-          <h3 className={'text-center'}> Loading ...</h3>
-        </div>
+        <h1 className={'text-center'}>Loading...</h1>
       )}
     </div>
   );
@@ -149,6 +140,10 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
   const rows = data[key];
   const fields = disclosureModel[key]['fields'];
   const title: string = disclosureModel[key]['title'];
+  let api_key = key.replaceAll('_', '-');
+  if (api_key == 'positions') {
+    api_key = `disclosure-${api_key}`;
+  }
 
   return (
     <div>
@@ -156,7 +151,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
         <div className="table-responsive">
           <h3>
             {title}
-            <a href={`/api/rest/v3/${key.replaceAll('_', '-')}/?financial_disclosure__id=${disclosure_id}`}>
+            <a href={`/api/rest/v3/${api_key}/?financial_disclosure__id=${disclosure_id}`}>
               <i className="fa fa-code gray pull-right"></i>
             </a>
           </h3>
@@ -172,7 +167,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
             </thead>
             <tbody>
               {rows
-                .sort((x:Data, y:Data) => {
+                .sort((x: Data, y: Data) => {
                   return x.id > y.id ? 1 : -1;
                 })
                 .map((entry: Row) => {
@@ -201,7 +196,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
 
                       {Object.entries(fields).map(([key, value]) => {
                         return (
-                          <td>
+                          <td key={key}>
                             {convertTD(entry[value], title, value)}
                             {entry[value] == -1 ? <i className="fa fa-eye-slash black" /> : ''}
                           </td>
@@ -251,7 +246,9 @@ const Thumb = (data: Data) => {
       <h3>
         <span>
           Download
-          <a href={`/api/rest/v3/financial-disclosures/?id=${data.id}`}><i className="fa fa-code gray pull-right" /></a>
+          <a href={`/api/rest/v3/financial-disclosures/?id=${data.id}`}>
+            <i className="fa fa-code gray pull-right" />
+          </a>
         </span>
       </h3>
       <hr />
@@ -305,6 +302,13 @@ const Notes = () => {
           <i className="fa fa-eye-slash black" /> Indicates the OCR identified data in the row but could not extract it
         </li>
       </ul>
+      <span>
+        You can read more about financial disclosures at the{' '}
+        <a href={'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'}>
+          Guide to Judiciary Policy on Ethics and Judicial Conduct
+        </a>
+        .
+      </span>
     </div>
   );
 };
@@ -312,7 +316,9 @@ const Notes = () => {
 const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined) => {
   function update({ ...data }) {
     const query: string = data.target.value;
-    fetchJudge(query);
+    if (query.length > 1) {
+      fetchJudge(query);
+    }
   }
 
   return (
@@ -328,19 +334,21 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
         className={'form-control input-sm'}
         placeholder={"Filter disclosures by typing a judge's name here…"}
       />
-      <table className="search-panel-table">
+      <table className="table-instant-results">
         <tbody>
           {judge.map((row: Row) => {
             return (
-              <tr className={"search-panel-row"} key={row.id}>
-                <td className={'search-panel-td'}>
-                  <a href={`/financial-disclosures/${row.person.id}/${row.person.slug}/?id=${row.id}`}>
-                    <h4 className={'text-left'}>
-                      Judge {row.person.name_first} {row.person.name_last}
-                    </h4>
-                  </a>
-                  <p className={'text-left'}>{row.year}</p>
-                </td>
+              <tr className={'tr-results'} key={row.id}>
+                <a href={`${row.latest_disclosure_url}`}>
+                  <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
+                    <h4 className={'text-left'}>{row.name_full}</h4>
+                    <p className={'text-left'}>{row.position_str}</p>
+                    <p className={'text-left'}>{row.disclosure_years}</p>
+                  </td>
+                  <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2'}>
+                    <img src={row.thumbnail_path} width={'50'} />
+                  </td>
+                </a>
               </tr>
             );
           })}
@@ -355,29 +363,36 @@ const AdminPanel = (data: Data) => {
     <div className={'v-offset-below-4'}>
       <h3>
         <span>
-          Admin <i className="fa fa-key red" />
+          Admin <i className="fa fa-key red pull-right" />
         </span>
       </h3>
       <hr />
-      <span>If Admin provide special links to things</span>
-      <a href={`/admin/disclosures/financialdisclosure/${data.id}/`}>Admin Page</a>
+      <a href={`/admin/disclosures/financialdisclosure/${data.id}/`}>Disclosure Admin Page</a>
     </div>
   );
 };
 
-const Tabs = (data: Data, years: [string], year: string, fetchDisclosure, doc_ids:[number], judge_name: string) => {
+const Tabs = (
+  data: Data,
+  years: [string],
+  year: string,
+  fetchDisclosure,
+  doc_ids: [number],
+  judge_name: string,
+  judgeUrl: string
+) => {
   return (
     <div>
       <h1 className="text-center">
         Financial Disclosures for J.&nbsp;
-        <a href={window.location.pathname.replace('financial-disclosures', 'person')}>{judge_name}</a>
+        <a href={judgeUrl}>{judge_name}</a>
       </h1>
       <ul className="nav nav-tabs v-offset-below-2 v-offset-above-3" role="">
         {years.map((yr, index) => {
           return (
             <li key={`${yr}_${index}`} className={year == yr ? 'active' : ''} role="presentation">
               <a
-                href={`?id=${doc_ids[index]}`}
+                href={`/person/${data.person.id}/disclosure/${doc_ids[index]}/${data.person.slug}/`}
                 onClick={() => {
                   fetchDisclosure(yr, index);
                 }}
