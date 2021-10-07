@@ -1,7 +1,11 @@
 from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    LoggingMixin,
+    RECAPUsersReadOnly,
+    TinyAdjustablePagination,
+)
 from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
@@ -87,6 +91,7 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
     )
     serializer_class = PersonDisclosureSerializer
     filterset_class = PersonDisclosureFilter
+    pagination_class = TinyAdjustablePagination
     ordering_fields = (
         "id",
         "date_created",
