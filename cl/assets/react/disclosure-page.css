@@ -4,7 +4,7 @@
   font-size: 100px;
 }
 
-.search-panel-td {
+.search-panel-row {
   border-bottom: 0.5px #cecece solid;
   padding: 10px;
 }
@@ -38,4 +38,14 @@
   position: absolute;
   z-index: 9;
   box-shadow: 2px 2px 5px #acacac;
+}
+
+tr:hover {
+  background-color: whitesmoke;
+  text-decoration: none;
+}
+
+.table-row-link {
+  text-decoration: none;
+  color: black;
 }
