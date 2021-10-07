@@ -127,13 +127,13 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 9, msg="Wrong API count")
 
-    def test_unauthorized_user(self) -> None:
-        """Can a regular user access forbidden content?"""
+    def test_anonymous_user(self) -> None:
+        """Can an anonymous user access disclosure content?"""
         self.client.logout()
         url = reverse("gift-list", kwargs={"version": "v3"})
         r = self.client.get(url)
         self.assertEqual(
-            r.status_code, 401, msg="Unauthorized content exposed."
+            r.status_code, 200, msg="Unauthorized content exposed."
         )
 
     def test_access_to_content_outside_authorization(self) -> None:
