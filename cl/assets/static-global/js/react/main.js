@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "779e4cef143e09658e64";
+/******/ 	var hotCurrentHash = "b0a49996f9f4078e21fa";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1019,12 +1019,8 @@ var DisclosureList = function DisclosureList() {
     };
   }();
 
-  var changeHandler = function changeHandler(event) {
-    fetchData(event);
-  };
-
   var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
-    return lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default()(changeHandler, 300);
+    return lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default()(fetchData, 300);
   }, []);
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge), DisclosureFooter());
 };
@@ -1037,14 +1033,14 @@ var DisclosureHeader = function DisclosureHeader() {
   }, "Search and review the biggest database of judicial disclosures ever made."));
 };
 
-var DisclosureSearch = function DisclosureSearch(data, query, fetchJudge) {
+var DisclosureSearch = function DisclosureSearch(data, query, fetchData) {
   function update(_ref2) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref2);
 
     var query = data.target.value;
 
-    if (query.length > 1) {
-      fetchJudge(query);
+    if (query.length > 1 || query == '') {
+      fetchData(query);
     }
   }
 
@@ -1068,7 +1064,7 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchJudge) {
     spellCheck: 'false',
     onChange: update,
     type: "text",
-    placeholder: "Filter disclosures by typing a judge's name\u2026"
+    placeholder: "Start typing to begin\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: 'table-instant-results'
   }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
@@ -1088,11 +1084,15 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchJudge) {
       className: 'text-left'
     }, row.disclosure_years)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
-      src: row.thumbnail_path,
-      alt: "Thumbnail of disclosure form",
+    }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
+      src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
+      alt: "Thumbnail of Judge Portrait",
       height: '150',
       className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
+    }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+      height: '150',
+      alt: "Thumbnail of Future Judge Portrait",
+      className: 'well img-responsive thumbnail shadow img-thumbnail judge-pic'
     }))));
   })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null)))));
 };
@@ -1399,11 +1399,15 @@ var Thumb = function Thumb(data) {
     className: "fa fa-code gray pull-right"
   })))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
     href: data.filepath
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
+  }, data.thumbnail != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
     src: data.thumbnail,
-    alt: "Thumbnail of disclosure form",
-    width: '200',
-    className: "img-responsive thumbnail shadow img-thumbnail img-rounded"
+    alt: "Thumbnail of Judge Portrait",
+    height: '150',
+    className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
+  }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+    height: '150',
+    alt: "Thumbnail of Future Judge Portrait",
+    className: 'well img-responsive thumbnail shadow img-thumbnail judge-pic'
   })));
 };
 
@@ -1446,8 +1450,9 @@ var SearchPanel = function SearchPanel(judge, fetchJudge) {
     className: "fa fa-search gray pull-right"
   }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
     onChange: update,
+    autoComplete: 'off',
     className: 'form-control input-sm',
-    placeholder: "Filter disclosures by typing a judge's name here…"
+    placeholder: 'Start typing to begin…'
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: "search-panel-table"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, judge.map(function (row) {
@@ -1484,6 +1489,8 @@ var AdminPanel = function AdminPanel(data) {
 };
 
 var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name, judgeUrl) {
+  var pathname = window.location.pathname;
+  var slug = pathname.split('/')[5];
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
     className: "text-center"
   }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
@@ -1497,7 +1504,7 @@ var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name
       className: year == yr ? 'active' : '',
       role: "presentation"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
-      href: "/person/".concat(data.person.id, "/disclosure/").concat(doc_ids[index], "/").concat(data.person.slug, "/"),
+      href: "../../".concat(doc_ids[index], "/").concat(slug, "/"),
       onClick: function onClick() {
         fetchDisclosure(yr, index);
       }
@@ -3396,7 +3403,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 
