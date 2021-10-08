@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
 import { convertTD, fetch_year_index, getIndex } from './_disclosure_helpers';
 import debounce from 'lodash.debounce';
+import {on} from "cluster";
 
 interface TableNavigationInnerProps {
   disclosures: string;
@@ -40,6 +41,8 @@ const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
   return <React.Fragment>{MainSection(disclosures)}</React.Fragment>;
 };
 
+
+
 const MainSection = (disclosures) => {
   const years = disclosures['years'].split(',');
   const doc_ids = disclosures['ids'].split(',');
@@ -50,6 +53,7 @@ const MainSection = (disclosures) => {
   const judge_name = disclosures['judge'];
   const is_admin = disclosures['admin'] == 'True';
   const indx = getIndex(disclosure_id, doc_ids);
+  const [visible, setVisible] = React.useState(true);
 
   const fetchDisclosure = async (doc_id: number) => {
     try {
@@ -67,7 +71,7 @@ const MainSection = (disclosures) => {
 
   const fetchJudge = async (query: string) => {
     try {
-      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
+      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`);
       setJudge(response['results']);
     } catch (error) {
       setJudge([]);
@@ -107,7 +111,7 @@ const MainSection = (disclosures) => {
                 )}
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge)}</div>
+            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
       ) : data != '' && data.has_been_extracted == false ? (
@@ -124,7 +128,7 @@ const MainSection = (disclosures) => {
                 </div>
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge)}</div>
+            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
       ) : (
@@ -276,14 +280,16 @@ const Sidebar = (
   data: Data,
   is_admin: boolean,
   judge: Row[],
-  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined
+  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
+  visible,
+  setVisible
 ) => {
   return (
     <div>
       {is_admin ? AdminPanel(data) : ''}
       {Thumb(data)}
       {Notes()}
-      {SearchPanel(judge, fetchJudge)}
+      {SearchPanel(judge, fetchJudge, visible, setVisible)}
       {Support()}
     </div>
   );
@@ -321,13 +327,30 @@ const Notes = () => {
   );
 };
 
-const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined) => {
+const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined, visible, setVisible) => {
   function update({ ...data }) {
     const query: string = data.target.value;
     if (query.length > 1) {
       fetchJudge(query);
+      setVisible(true)
+
+    }
+    if (query.length == 0){
+      fetchJudge("");
+      setVisible(false)
     }
   }
+
+
+  const onBlur = (e) => {
+    setVisible(false)
+  };
+  const onFocus = (e) => {
+    setVisible(true)
+  };
+  const onFocusClick = (url: string) => {
+    window.location = url;
+  };
 
   return (
     <div className={'v-offset-below-4 '}>
@@ -338,26 +361,45 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
       </h3>
       <hr />
       <input
+        onBlur={onBlur}
+        onFocus={onFocus}
         onChange={update}
         autoComplete={'off'}
         className={'form-control input-sm'}
         placeholder={'Start typing to begin…'}
       />
-      <table className="search-panel-table">
+      <table className={visible ? "search-panel-table" : "hide-table"}>
         <tbody>
           {judge.map((row: Row) => {
             return (
-              <tr className={'tr-results'} key={row.id}>
-                <a href={`${row.latest_disclosure_url}`}>
+              <tr className={'tr-results'} key={row.id} onMouseDown={() => onFocusClick(row.latest_disclosure_url)}>
+                {/*<a href={`${row.latest_disclosure_url}`}>*/}
                   <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
                     <h4 className={'text-left'}>{row.name_full}</h4>
                     <p className={'text-left'}>{row.position_str}</p>
                     <p className={'text-left'}>{row.disclosure_years}</p>
                   </td>
-                  <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2'}>
-                    <img src={row.thumbnail_path} width={'50'} />
+                  <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2 '}>
+
+                    {row.thumbnail_path != null ? (
+                          <img
+                            src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
+                            alt="Thumbnail of Judge Portrait"
+                            height={'50'}
+                            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+                          />
+                        ) : (
+                          <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
+                            <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
+                          </div>
+                        )}
+
+                    {/*<img src={row.thumbnail_path} width={'50'} />*/}
+                    {/*<div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>*/}
+                    {/*  <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>*/}
+                    {/*</div>*/}
                   </td>
-                </a>
+                {/*</a>*/}
               </tr>
             );
           })}

@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "b0a49996f9f4078e21fa";
+/******/ 	var hotCurrentHash = "5f8db4f5697d95daef34";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -990,7 +990,7 @@ var DisclosureList = function DisclosureList() {
             case 0:
               _context.prev = 0;
               _context.next = 3;
-              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query));
+              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
 
             case 3:
               response = _context.sent;
@@ -1022,7 +1022,7 @@ var DisclosureList = function DisclosureList() {
   var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
     return lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default()(fetchData, 300);
   }, []);
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge), DisclosureFooter());
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge, setQuery), DisclosureFooter());
 };
 
 var DisclosureHeader = function DisclosureHeader() {
@@ -1033,7 +1033,7 @@ var DisclosureHeader = function DisclosureHeader() {
   }, "Search and review the biggest database of judicial disclosures ever made."));
 };
 
-var DisclosureSearch = function DisclosureSearch(data, query, fetchData) {
+var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuery) {
   function update(_ref2) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref2);
 
@@ -1043,6 +1043,18 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData) {
       fetchData(query);
     }
   }
+
+  var onBlur = function onBlur(e) {
+    setQuery('');
+  };
+
+  var onFocus = function onFocus(e) {
+    setQuery(e.target.value);
+  };
+
+  var onFocusClick = function onFocusClick(url) {
+    window.location = url;
+  };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "row v-offset-above-2"
@@ -1063,26 +1075,26 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData) {
     autoCapitalize: 'off',
     spellCheck: 'false',
     onChange: update,
+    onBlur: onBlur,
+    onFocus: onFocus,
     type: "text",
     placeholder: "Start typing to begin\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: 'table-instant-results'
   }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
+      onMouseDown: function onMouseDown() {
+        return onFocusClick(row.latest_disclosure_url);
+      },
       key: row.id,
       className: "tr-results"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
-      className: 'table-row-link',
-      href: "".concat(row.latest_disclosure_url)
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: "col-xs-8 col-sm-8 col-md-10 col-lg-10"
+      className: "col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
-      className: 'text-left'
+      className: 'text-left judge-name'
     }, row.name_full), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
-      className: 'text-left'
-    }, row.position_str), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
-      className: 'text-left'
-    }, row.disclosure_years)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
+      className: 'text-left judge-court'
+    }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
     }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
       src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
@@ -1090,9 +1102,10 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData) {
       height: '150',
       className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
     }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+      className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
       height: '150',
-      alt: "Thumbnail of Future Judge Portrait",
-      className: 'well img-responsive thumbnail shadow img-thumbnail judge-pic'
+      className: 'fa fa-user fa-10x missing-judge'
     }))));
   })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null)))));
 };
@@ -1199,6 +1212,11 @@ var MainSection = function MainSection(disclosures) {
   var is_admin = disclosures['admin'] == 'True';
   var indx = Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_10__["getIndex"])(disclosure_id, doc_ids);
 
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(true),
+      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
+      visible = _React$useState6[0],
+      setVisible = _React$useState6[1];
+
   var fetchDisclosure = /*#__PURE__*/function () {
     var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee(doc_id) {
       var response;
@@ -1248,7 +1266,7 @@ var MainSection = function MainSection(disclosures) {
             case 0:
               _context2.prev = 0;
               _context2.next = 3;
-              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query));
+              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
 
             case 3:
               response = _context2.sent;
@@ -1291,7 +1309,7 @@ var MainSection = function MainSection(disclosures) {
     className: "tabcontent"
   }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'col-lg-3'
-  }, Sidebar(data, is_admin, judge, debounceFetchJudge)))) : data != '' && data.has_been_extracted == false ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : data != '' && data.has_been_extracted == false ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'col-lg-9'
@@ -1303,7 +1321,7 @@ var MainSection = function MainSection(disclosures) {
     className: "fa fa-exclamation-triangle gray"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "You can still view this Financial Disclosure by clicking the thumbnail.")))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'col-lg-3'
-  }, Sidebar(data, is_admin, judge, debounceFetchJudge)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
+  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
     className: 'text-center'
   }, "Loading..."));
 };
@@ -1411,8 +1429,8 @@ var Thumb = function Thumb(data) {
   })));
 };
 
-var Sidebar = function Sidebar(data, is_admin, judge, fetchJudge) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', Thumb(data), Notes(), SearchPanel(judge, fetchJudge), Support());
+var Sidebar = function Sidebar(data, is_admin, judge, fetchJudge, visible, setVisible) {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', Thumb(data), Notes(), SearchPanel(judge, fetchJudge, visible, setVisible), Support());
 };
 
 var Notes = function Notes() {
@@ -1433,7 +1451,7 @@ var Notes = function Notes() {
   }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."));
 };
 
-var SearchPanel = function SearchPanel(judge, fetchJudge) {
+var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
   function update(_ref7) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref7);
 
@@ -1441,26 +1459,47 @@ var SearchPanel = function SearchPanel(judge, fetchJudge) {
 
     if (query.length > 1) {
       fetchJudge(query);
+      setVisible(true);
+    }
+
+    if (query.length == 0) {
+      fetchJudge("");
+      setVisible(false);
     }
   }
+
+  var onBlur = function onBlur(e) {
+    setVisible(false);
+  };
+
+  var onFocus = function onFocus(e) {
+    setVisible(true);
+  };
+
+  var onFocusClick = function onFocusClick(url) {
+    window.location = url;
+  };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'v-offset-below-4 '
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Search ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
     className: "fa fa-search gray pull-right"
   }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
+    onBlur: onBlur,
+    onFocus: onFocus,
     onChange: update,
     autoComplete: 'off',
     className: 'form-control input-sm',
     placeholder: 'Start typing to begin…'
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: "search-panel-table"
+    className: visible ? "search-panel-table" : "hide-table"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, judge.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
       className: 'tr-results',
-      key: row.id
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
-      href: "".concat(row.latest_disclosure_url)
+      key: row.id,
+      onMouseDown: function onMouseDown() {
+        return onFocusClick(row.latest_disclosure_url);
+      }
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: 'col-lg-9 col-md-9 col-sm-11 col-xs-10'
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
@@ -1470,10 +1509,17 @@ var SearchPanel = function SearchPanel(judge, fetchJudge) {
     }, row.position_str), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
       className: 'text-left'
     }, row.disclosure_years)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: 'col-lg-3 col-md-3 col-sm-1 col-xs-2'
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
-      src: row.thumbnail_path,
-      width: '50'
+      className: 'col-lg-3 col-md-3 col-sm-1 col-xs-2 '
+    }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
+      src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
+      alt: "Thumbnail of Judge Portrait",
+      height: '50',
+      className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
+    }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+      className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+      height: '150',
+      className: 'fa fa-user fa-10x missing-judge'
     }))));
   }))));
 };
@@ -3403,7 +3449,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 

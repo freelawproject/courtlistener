@@ -51,9 +51,34 @@ tr:hover {
 
 tr > a:hover {
   text-decoration: none;
+  color: black;
 }
 
 .table-row-link {
   text-decoration: none;
   color: black;
+}
+
+.table-data-name {
+  width: 100%
+}
+
+.missing-judge {
+  font-size: 40px;
+  border: solid;
+  border-width: 1px;
+  margin: 0px;
+  padding: 12px;
+}
+
+.judge-name {
+  font-size: 20px;
+}
+
+.judge-court {
+  color: gray;
+}
+
+.hide-table {
+  display: None;
 }

@@ -30,7 +30,9 @@ const DisclosureList: React.FC<UserState> = () => {
 
   const fetchData = async (query: string) => {
     try {
-      const response: { results: Row[] } = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
+      const response: { results: Row[] } = await appFetch(
+        `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`
+      );
       const results: Row[] = response['results'];
       setQuery(query);
       setData(results);
@@ -46,7 +48,7 @@ const DisclosureList: React.FC<UserState> = () => {
   return (
     <div>
       {DisclosureHeader()}
-      {DisclosureSearch(data, query, debounceFetchJudge)}
+      {DisclosureSearch(data, query, debounceFetchJudge, setQuery)}
       {DisclosureFooter()}
     </div>
   );
@@ -63,13 +65,27 @@ const DisclosureHeader = () => {
   );
 };
 
-const DisclosureSearch = (data: Row[], query: string, fetchData: React.ChangeEventHandler<HTMLInputElement>) => {
+const DisclosureSearch = (
+  data: Row[],
+  query: string,
+  fetchData: React.ChangeEventHandler<HTMLInputElement>,
+  setQuery
+) => {
   function update({ ...data }) {
     const query: string = data.target.value;
     if (query.length > 1 || query == '') {
       fetchData(query);
     }
   }
+  const onBlur = (e) => {
+    setQuery('');
+  };
+  const onFocus = (e) => {
+    setQuery(e.target.value);
+  };
+  const onFocusClick = (url: string) => {
+    window.location = url;
+  };
 
   return (
     <div>
@@ -88,6 +104,8 @@ const DisclosureSearch = (data: Row[], query: string, fetchData: React.ChangeEve
             autoCapitalize={'off'}
             spellCheck={'false'}
             onChange={update}
+            onBlur={onBlur}
+            onFocus={onFocus}
             type="text"
             placeholder="Start typing to begin…"
           />
@@ -96,32 +114,25 @@ const DisclosureSearch = (data: Row[], query: string, fetchData: React.ChangeEve
               <tbody>
                 {data.map((row: Row) => {
                   return (
-                    <tr key={row.id} className="tr-results">
-                      <a className={'table-row-link'} href={`${row.latest_disclosure_url}`}>
-                        <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10">
-                          <h4 className={'text-left'}>{row.name_full}</h4>
-                          <p className={'text-left'}>{row.position_str}</p>
-                          <p className={'text-left'}>{row.disclosure_years}</p>
-                        </td>
-                        <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
-                          {row.thumbnail_path != null ? (
-                            <img
-                              src={
-                                row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'
-                              }
-                              alt="Thumbnail of Judge Portrait"
-                              height={'150'}
-                              className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-                            />
-                          ) : (
-                            <div
-                              height={'150'}
-                              alt="Thumbnail of Future Judge Portrait"
-                              className={'well img-responsive thumbnail shadow img-thumbnail judge-pic'}
-                            />
-                          )}
-                        </td>
-                      </a>
+                    <tr onMouseDown={() => onFocusClick(row.latest_disclosure_url)} key={row.id} className="tr-results">
+                      <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name">
+                        <h4 className={'text-left judge-name'}>{row.name_full}</h4>
+                        <p className={'text-left judge-court'}>{row.position_str}</p>
+                      </td>
+                      <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
+                        {row.thumbnail_path != null ? (
+                          <img
+                            src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
+                            alt="Thumbnail of Judge Portrait"
+                            height={'150'}
+                            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+                          />
+                        ) : (
+                          <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
+                            <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
