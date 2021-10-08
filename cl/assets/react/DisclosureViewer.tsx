@@ -341,7 +341,6 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
     }
   }
 
-
   const onBlur = (e) => {
     setVisible(false)
   };
