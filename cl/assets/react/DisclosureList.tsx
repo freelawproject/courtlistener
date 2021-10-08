@@ -3,19 +3,13 @@ import { appFetch } from './_fetch';
 import { UserState } from './_types';
 import debounce from 'lodash.debounce';
 
-interface Person {
-  id: number;
-  name_first: string;
-  name_last: string;
-  slug: string;
-}
-
 interface Row {
   id: number;
-  filepath: string;
-  person: Person;
-  year: string;
-  thumbnail: string;
+  latest_disclosure_url: string;
+  name_full: string;
+  position_str: string;
+  disclosure_years: string;
+  thumbnail_path: string;
 }
 
 const DisclosureList: React.FC<UserState> = () => {
@@ -23,7 +17,7 @@ const DisclosureList: React.FC<UserState> = () => {
   const [query, setQuery] = React.useState('');
 
   React.useEffect(() => {
-    const handleEsc = (event) => {
+    const handleEsc = (event: { keyCode: number }) => {
       if (event.keyCode === 27) {
         setQuery('');
       }
@@ -36,7 +30,7 @@ const DisclosureList: React.FC<UserState> = () => {
 
   const fetchData = async (query: string) => {
     try {
-      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
+      const response: { results: Row[] } = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}`);
       const results: Row[] = response['results'];
       setQuery(query);
       setData(results);
@@ -47,11 +41,7 @@ const DisclosureList: React.FC<UserState> = () => {
     }
   };
 
-  const changeHandler = (event: string) => {
-    fetchData(event);
-  };
-
-  const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
+  const debounceFetchJudge = React.useMemo(() => debounce(fetchData, 300), []);
 
   return (
     <div>
@@ -73,15 +63,11 @@ const DisclosureHeader = () => {
   );
 };
 
-const DisclosureSearch = (
-  data: Row[],
-  query: string,
-  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined
-) => {
+const DisclosureSearch = (data: Row[], query: string, fetchData: React.ChangeEventHandler<HTMLInputElement>) => {
   function update({ ...data }) {
     const query: string = data.target.value;
-    if (query.length > 1) {
-      fetchJudge(query);
+    if (query.length > 1 || query == '') {
+      fetchData(query);
     }
   }
 
@@ -103,40 +89,49 @@ const DisclosureSearch = (
             spellCheck={'false'}
             onChange={update}
             type="text"
-            placeholder="Filter disclosures by typing a judge's name…"
+            placeholder="Start typing to begin…"
           />
-            <table className={'table-instant-results'}>
-              {query != '' ? (
-                <tbody>
-                  {data.map((row: Row) => {
-                    return (
-                      <tr key={row.id} className="tr-results">
-                        <a className={'table-row-link'} href={`${row.latest_disclosure_url}`}>
-                          <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10">
-                            <h4 className={'text-left'}>{row.name_full}</h4>
-                            <p className={'text-left'}>{row.position_str}</p>
-                            <p className={'text-left'}>{row.disclosure_years}</p>
-                          </td>
-
-                          <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
+          <table className={'table-instant-results'}>
+            {query != '' ? (
+              <tbody>
+                {data.map((row: Row) => {
+                  return (
+                    <tr key={row.id} className="tr-results">
+                      <a className={'table-row-link'} href={`${row.latest_disclosure_url}`}>
+                        <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10">
+                          <h4 className={'text-left'}>{row.name_full}</h4>
+                          <p className={'text-left'}>{row.position_str}</p>
+                          <p className={'text-left'}>{row.disclosure_years}</p>
+                        </td>
+                        <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
+                          {row.thumbnail_path != null ? (
                             <img
-                              src={row.thumbnail_path}
-                              alt="Thumbnail of disclosure form"
+                              src={
+                                row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'
+                              }
+                              alt="Thumbnail of Judge Portrait"
                               height={'150'}
                               className="img-responsive thumbnail shadow img-thumbnail judge-pic"
                             />
-                          </td>
-                        </a>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              ) : (
-                <tbody />
-              )}
-            </table>
-          </div>
+                          ) : (
+                            <div
+                              height={'150'}
+                              alt="Thumbnail of Future Judge Portrait"
+                              className={'well img-responsive thumbnail shadow img-thumbnail judge-pic'}
+                            />
+                          )}
+                        </td>
+                      </a>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            ) : (
+              <tbody />
+            )}
+          </table>
         </div>
+      </div>
     </div>
   );
 };

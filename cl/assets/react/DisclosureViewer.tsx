@@ -253,12 +253,20 @@ const Thumb = (data: Data) => {
       </h3>
       <hr />
       <a href={data.filepath}>
-        <img
-          src={data.thumbnail}
-          alt="Thumbnail of disclosure form"
-          width={'200'}
-          className="img-responsive thumbnail shadow img-thumbnail img-rounded"
-        />
+        {data.thumbnail != null ? (
+          <img
+            src={data.thumbnail}
+            alt="Thumbnail of Judge Portrait"
+            height={'150'}
+            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+          />
+        ) : (
+          <div
+            height={'150'}
+            alt="Thumbnail of Future Judge Portrait"
+            className={'well img-responsive thumbnail shadow img-thumbnail judge-pic'}
+          />
+        )}
       </a>
     </div>
   );
@@ -331,8 +339,9 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
       <hr />
       <input
         onChange={update}
+        autoComplete={'off'}
         className={'form-control input-sm'}
-        placeholder={"Filter disclosures by typing a judge's name here…"}
+        placeholder={'Start typing to begin…'}
       />
       <table className="search-panel-table">
         <tbody>
@@ -381,6 +390,8 @@ const Tabs = (
   judge_name: string,
   judgeUrl: string
 ) => {
+  const pathname = window.location.pathname;
+  const slug = pathname.split('/')[5];
   return (
     <div>
       <h1 className="text-center">
@@ -392,7 +403,7 @@ const Tabs = (
           return (
             <li key={`${yr}_${index}`} className={year == yr ? 'active' : ''} role="presentation">
               <a
-                href={`/person/${data.person.id}/disclosure/${doc_ids[index]}/${data.person.slug}/`}
+                href={`../../${doc_ids[index]}/${slug}/`}
                 onClick={() => {
                   fetchDisclosure(yr, index);
                 }}

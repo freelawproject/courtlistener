@@ -26,6 +26,8 @@
 /*Disclosure List Homepage CSS*/
 .judge-pic {
   margin-top: 10px;
+  min-width: 64px;
+  min-height: 64px;
 }
 
 .tr-results {
@@ -44,6 +46,10 @@
 
 tr:hover {
   background-color: whitesmoke;
+  text-decoration: none;
+}
+
+tr > a:hover {
   text-decoration: none;
 }
 
