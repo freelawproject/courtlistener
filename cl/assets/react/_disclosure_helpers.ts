@@ -43,5 +43,3 @@ export const fetch_year_index = (years, doc_ids) => {
   }
   return [years[index], index];
 };
-
-
