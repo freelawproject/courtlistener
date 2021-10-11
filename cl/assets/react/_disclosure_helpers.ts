@@ -1,4 +1,4 @@
-import {GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS} from "./_disclosure_models";
+import { GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS } from './_disclosure_models';
 
 export const convertTD = (value, table, key) => {
   if (value == -1 || !value) {
@@ -17,29 +17,4 @@ export const convertTD = (value, table, key) => {
     return `${VALUATION_METHODS[value]} (${value})`;
   }
   return value;
-};
-
-export const getIndex = (value, arr) => {
-  // Sadly we need this method to check the index of an item in a list
-  // This helps us select the correct tab on page load
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] === value.toString()) {
-      return i;
-    }
-  }
-  return 0;
-};
-
-export const fetch_year_index = (years, doc_ids) => {
-  // Given a list of years, doc-ids identify the index of the year
-  // to select in the tab array of years
-  //Fetch year index is not pretty.
-  const search = window.location.search;
-  const params = new URLSearchParams(search);
-  const optional_doc_id = params.get('id');
-  let index = 0;
-  if (optional_doc_id != null) {
-    index = getIndex(optional_doc_id, doc_ids);
-  }
-  return [years[index], index];
 };
