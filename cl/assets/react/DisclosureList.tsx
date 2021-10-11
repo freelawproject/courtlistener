@@ -92,13 +92,13 @@ const DisclosureSearch = (
       <div className="row v-offset-above-2">
         <div className="hidden-xs col-sm-1 col-md-2 col-lg-3" />
         <div className="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group" id="main-query-box">
-          <label className="sr-only" htmlFor="id_disclosures_filter">
+          <label className="sr-only" htmlFor="id_disclosures_search">
             Filter disclosures…
           </label>
           <input
             className="form-control input-lg"
             name="disclosures-filter"
-            id="id_disclosures_filter"
+            id="id_disclosures_search"
             autoComplete={'off'}
             autoCorrect={'off'}
             autoCapitalize={'off'}
@@ -106,8 +106,8 @@ const DisclosureSearch = (
             onChange={update}
             onBlur={onBlur}
             onFocus={onFocus}
-            type="text"
-            placeholder="Start typing to begin…"
+            type="search"
+            placeholder="Search for judges by name…"
           />
           <table className={'table-instant-results'}>
             {query != '' ? (
