@@ -101,9 +101,7 @@ def view_person(request, pk, slug):
             "political_affiliations": (
                 person.political_affiliations.all().order_by("-date_start")
             ),
-            "disclosures": person.financial_disclosures.all().order_by(
-                "year"
-            ),
+            "disclosures": person.financial_disclosures.all().order_by("year"),
             "positions": positions,
             "educations": person.educations.all().order_by("-degree_year"),
             "authored_opinions": authored_opinions,
