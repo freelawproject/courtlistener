@@ -4,9 +4,8 @@ import { Table } from 'react-bootstrap';
 import './disclosure-page.css';
 import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
-import { convertTD, fetch_year_index, getIndex } from './_disclosure_helpers';
+import { convertTD } from './_disclosure_helpers';
 import debounce from 'lodash.debounce';
-import {on} from "cluster";
 
 interface TableNavigationInnerProps {
   disclosures: string;
@@ -41,8 +40,6 @@ const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
   return <React.Fragment>{MainSection(disclosures)}</React.Fragment>;
 };
 
-
-
 const MainSection = (disclosures) => {
   const years = disclosures['years'].split(',');
   const doc_ids = disclosures['ids'].split(',');
@@ -52,7 +49,7 @@ const MainSection = (disclosures) => {
   const [judge, setJudge] = React.useState([]);
   const judge_name = disclosures['judge'];
   const is_admin = disclosures['admin'] == 'True';
-  const indx = getIndex(disclosure_id, doc_ids);
+  const indx = doc_ids.indexOf(disclosure_id);
   const [visible, setVisible] = React.useState(true);
 
   const fetchDisclosure = async (doc_id: number) => {
@@ -156,14 +153,14 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
           <h3>
             {title}
             <a href={`/api/rest/v3/${api_key}/?financial_disclosure__id=${disclosure_id}`}>
-              <i className="fa fa-code gray pull-right"></i>
+              <i className="fa fa-code gray pull-right" />
             </a>
           </h3>
           <Table striped bordered hover responsive>
             <thead>
               <tr>
                 <th key={''}> </th>
-                {is_admin == true ? <th>Admin</th> : ''}
+                {is_admin ? <th>Admin</th> : ''}
                 {Object.entries(fields).map(([key, value]) => {
                   return <th key={value}>{key}</th>;
                 })}
@@ -182,16 +179,16 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
                           <i className="fa fa-file-text-o gray" />
                         </a>
                         &nbsp;
-                        {entry.redacted == true ? (
+                        {entry.redacted ? (
                           <i title={'Redaction present in row'} className="fa fa-file-excel-o black" />
                         ) : (
                           ''
                         )}
                       </td>
-                      {is_admin == true ? (
+                      {is_admin ? (
                         <td>
                           <a href={`/admin/disclosures/${key.replaceAll('_', '').slice(0, -1)}/${entry.id}/`}>
-                            <i className="fa fa-pencil gray"></i>
+                            <i className="fa fa-pencil gray" />
                           </a>
                         </td>
                       ) : (
@@ -260,7 +257,7 @@ const Thumb = (data: Data) => {
         {data.thumbnail != null ? (
           <img
             src={data.thumbnail}
-            alt="Thumbnail of Judge Portrait"
+            alt="Thumbnail of first page of disclosure"
             height={'150'}
             className="img-responsive thumbnail shadow img-thumbnail judge-pic"
           />
@@ -310,10 +307,10 @@ const Notes = () => {
           <i className="fa fa-file-text-o gray" /> Links to the PDF row (if possible).
         </li>
         <li>
-          <i className="fa fa-file-excel-o black" /> The row may contain a redaction
+          <i className="fa fa-file-excel-o black" /> The row may contain a redaction.
         </li>
         <li>
-          <i className="fa fa-eye-slash black" /> Indicates the OCR identified data in the row but could not extract it
+          <i className="fa fa-eye-slash black" /> Indicates failed extraction in the cell.
         </li>
       </ul>
       <span>
@@ -327,25 +324,29 @@ const Notes = () => {
   );
 };
 
-const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined, visible, setVisible) => {
+const SearchPanel = (
+  judge: Row[],
+  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
+  visible,
+  setVisible
+) => {
   function update({ ...data }) {
     const query: string = data.target.value;
     if (query.length > 1) {
       fetchJudge(query);
-      setVisible(true)
-
+      setVisible(true);
     }
-    if (query.length == 0){
-      fetchJudge("");
-      setVisible(false)
+    if (query.length == 0) {
+      fetchJudge('');
+      setVisible(false);
     }
   }
 
   const onBlur = (e) => {
-    setVisible(false)
+    setVisible(false);
   };
   const onFocus = (e) => {
-    setVisible(true)
+    setVisible(true);
   };
   const onFocusClick = (url: string) => {
     window.location = url;
@@ -365,40 +366,35 @@ const SearchPanel = (judge: Row[], fetchJudge: React.ChangeEventHandler<HTMLInpu
         onChange={update}
         autoComplete={'off'}
         className={'form-control input-sm'}
-        placeholder={'Start typing to begin…'}
+        placeholder={'Search for judges…'}
       />
-      <table className={visible ? "search-panel-table" : "hide-table"}>
-        <tbody>
+      <table className={visible ? 'search-panel-table' : 'hide-table'}>
+        <tbody className={'cursor'}>
           {judge.map((row: Row) => {
             return (
-              <tr className={'tr-results'} key={row.id} onMouseDown={() => onFocusClick(row.latest_disclosure_url)}>
-                {/*<a href={`${row.latest_disclosure_url}`}>*/}
-                  <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
-                    <h4 className={'text-left'}>{row.name_full}</h4>
-                    <p className={'text-left'}>{row.position_str}</p>
-                    <p className={'text-left'}>{row.disclosure_years}</p>
-                  </td>
-                  <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2 '}>
-
-                    {row.thumbnail_path != null ? (
-                          <img
-                            src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
-                            alt="Thumbnail of Judge Portrait"
-                            height={'50'}
-                            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-                          />
-                        ) : (
-                          <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
-                            <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
-                          </div>
-                        )}
-
-                    {/*<img src={row.thumbnail_path} width={'50'} />*/}
-                    {/*<div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>*/}
-                    {/*  <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>*/}
-                    {/*</div>*/}
-                  </td>
-                {/*</a>*/}
+              <tr
+                className={'tr-results cursor'}
+                key={row.id}
+                onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
+              >
+                <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
+                  <h4 className={'text-left'}>{row.name_full}</h4>
+                  <p className={'text-left'}>{row.position_str}</p>
+                </td>
+                <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2 '}>
+                  {row.thumbnail_path != null ? (
+                    <img
+                      src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
+                      alt="Thumbnail of first page of disclosure"
+                      height={'50'}
+                      className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+                    />
+                  ) : (
+                    <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
+                      <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
+                    </div>
+                  )}
+                </td>
               </tr>
             );
           })}

@@ -114,7 +114,11 @@ const DisclosureSearch = (
               <tbody>
                 {data.map((row: Row) => {
                   return (
-                    <tr onMouseDown={() => onFocusClick(row.latest_disclosure_url)} key={row.id} className="tr-results">
+                    <tr
+                      onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
+                      key={row.id}
+                      className="tr-results cursor"
+                    >
                       <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name">
                         <h4 className={'text-left judge-name'}>{row.name_full}</h4>
                         <p className={'text-left judge-court'}>{row.position_str}</p>
@@ -123,7 +127,7 @@ const DisclosureSearch = (
                         {row.thumbnail_path != null ? (
                           <img
                             src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
-                            alt="Thumbnail of Judge Portrait"
+                            alt="Thumbnail of first page of disclosure"
                             height={'150'}
                             className="img-responsive thumbnail shadow img-thumbnail judge-pic"
                           />
