@@ -1,26 +1,21 @@
 /*Disclosure Table Viewer CSS*/
 
-.fa-exclamation-triangle {
+.disclosure-page .fa-exclamation-triangle {
   font-size: 100px;
 }
 
-.search-panel-row {
-  border-bottom: 0.5px #cecece solid;
-  padding: 10px;
-}
-
 .search-panel-table {
-  width: 89%;
-  border-left: 1px solid;
-  border-right: 1px solid;
   position: absolute;
   z-index: 9;
   background: white;
-  border-color: gainsboro;
   border: 1px solid;
   padding: 10px;
-  border-color: gainsboro;
+  border-color: lightgrey;
   box-shadow: 2px 2px 5px #acacac;
+}
+
+.table-parent {
+  position: relative;
 }
 
 /*Disclosure List Homepage CSS*/
@@ -34,7 +29,7 @@
   padding: 10px;
   width: 100%;
   background: white;
-  border-bottom: 2px solid gainsboro;
+  border-bottom: 2px solid lightgrey;
 }
 
 .table-instant-results {

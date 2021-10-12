@@ -56,7 +56,7 @@ def make_disclosure_data(person: Person) -> Tuple[str, str]:
     """
     forms = (
         person.financial_disclosures.all()
-        .order_by("-year")
+        .order_by("year")
         .values_list("year", "id")
     )
     years = []

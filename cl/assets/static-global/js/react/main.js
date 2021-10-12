@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "b10b3404195488f70fc8";
+/******/ 	var hotCurrentHash = "9a9b2a5ae316e42cff1c";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -957,6 +957,20 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+function isDescendant(parent, child) {
+  var node = child.parentNode;
+
+  while (node != null) {
+    if (node == parent) {
+      return true;
+    }
+
+    node = node.parentNode;
+  }
+
+  return false;
+}
+
 var DisclosureList = function DisclosureList() {
   var _React$useState = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState([]),
       _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState, 2),
@@ -968,17 +982,30 @@ var DisclosureList = function DisclosureList() {
       query = _React$useState4[0],
       setQuery = _React$useState4[1];
 
-  react__WEBPACK_IMPORTED_MODULE_4___default.a.useEffect(function () {
-    var handleEsc = function handleEsc(event) {
-      if (event.keyCode === 27) {
-        setQuery('');
-      }
-    };
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(false),
+      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
+      visible = _React$useState6[0],
+      setVisible = _React$useState6[1];
 
+  var handleClickOutside = function handleClickOutside(event) {
+    var query_container = document.getElementById('main-query-box');
+
+    if (isDescendant(query_container, event.target)) {
+      setVisible(true);
+    } else {
+      setVisible(false);
+    }
+  };
+
+  var handleEsc = function handleEsc(event) {
+    if (event.keyCode === 27) {
+      setVisible(false);
+    }
+  };
+
+  react__WEBPACK_IMPORTED_MODULE_4___default.a.useEffect(function () {
+    document.addEventListener('click', handleClickOutside, true);
     window.addEventListener('keydown', handleEsc);
-    return function () {
-      window.removeEventListener('keydown', handleEsc);
-    };
   }, []);
 
   var fetchData = /*#__PURE__*/function () {
@@ -1022,7 +1049,7 @@ var DisclosureList = function DisclosureList() {
   var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
     return lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default()(fetchData, 300);
   }, []);
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge, setQuery), DisclosureFooter());
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge, visible, setVisible), DisclosureFooter());
 };
 
 var DisclosureHeader = function DisclosureHeader() {
@@ -1033,27 +1060,35 @@ var DisclosureHeader = function DisclosureHeader() {
   }, "Search and review the biggest database of judicial disclosures ever made."));
 };
 
-var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuery) {
+var DisclosureSearch = function DisclosureSearch(data, query, fetchData, visible, setVisible) {
   function update(_ref2) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref2);
 
     var query = data.target.value;
 
-    if (query.length > 1 || query == '') {
+    if (query.length > 1) {
       fetchData(query);
+      setVisible(true);
+    } else {
+      setVisible(false);
     }
   }
 
-  var onBlur = function onBlur(e) {
-    setQuery('');
-  };
-
-  var onFocus = function onFocus(e) {
-    setQuery(e.target.value);
-  };
-
   var onFocusClick = function onFocusClick(url) {
-    window.location = url;
+    if (event.button == 2) {
+      event.preventDefault();
+    }
+
+    if (event.button == 0 || event.keyCode == 13) {
+      event.preventDefault();
+      window.location = url;
+    }
+  };
+
+  var onReturn = function onReturn() {
+    if (data.length == 1 && event.keyCode == 13) {
+      onFocusClick(data[0].latest_disclosure_url);
+    }
   };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
@@ -1075,14 +1110,18 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
     autoCapitalize: 'off',
     spellCheck: 'false',
     onChange: update,
-    onBlur: onBlur,
-    onFocus: onFocus,
+    onKeyDown: onReturn,
     type: "search",
+    tabIndex: 300,
     placeholder: "Search for judges by name\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: 'table-instant-results'
+    className: visible ? 'table-instant-results' : 'hide-table'
   }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
+      tabIndex: 301,
+      onKeyDown: function onKeyDown() {
+        return onFocusClick(row.latest_disclosure_url);
+      },
       onMouseDown: function onMouseDown() {
         return onFocusClick(row.latest_disclosure_url);
       },
@@ -1097,14 +1136,13 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
     }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
     }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
-      src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
+      src: row.thumbnail_path,
       alt: "Thumbnail of first page of disclosure",
-      height: '150',
+      width: '100%',
       className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
     }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
       className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
-      height: '150',
       className: 'fa fa-user fa-10x missing-judge'
     }))));
   })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null)))));
@@ -1188,8 +1226,23 @@ var TableNavigation = function TableNavigation(disclosures) {
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, MainSection(disclosures));
 };
 
+function isDescendant(parent, child) {
+  var node = child.parentNode;
+
+  while (node != null) {
+    if (node == parent) {
+      return true;
+    }
+
+    node = node.parentNode;
+  }
+
+  return false;
+}
+
 var MainSection = function MainSection(disclosures) {
   var years = disclosures['years'].split(',');
+  console.log(years);
   var doc_ids = disclosures['ids'].split(',');
 
   var _useParams = Object(react_router_dom__WEBPACK_IMPORTED_MODULE_8__["useParams"])(),
@@ -1212,10 +1265,33 @@ var MainSection = function MainSection(disclosures) {
   var is_admin = disclosures['admin'] == 'True';
   var indx = doc_ids.indexOf(disclosure_id);
 
-  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(true),
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(false),
       _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
       visible = _React$useState6[0],
       setVisible = _React$useState6[1];
+
+  var handleClickOutside = function handleClickOutside(event) {
+    var query_container = document.getElementById('sidebar-query-box');
+
+    if (!isDescendant(query_container, event.target)) {
+      setVisible(false);
+    }
+
+    if (query_container == event.target) {
+      setVisible(true);
+    }
+  };
+
+  var handleEsc = function handleEsc(event) {
+    if (event.keyCode === 27) {
+      setVisible(false);
+    }
+  };
+
+  react__WEBPACK_IMPORTED_MODULE_4___default.a.useEffect(function () {
+    document.addEventListener('click', handleClickOutside, true);
+    window.addEventListener('keydown', handleEsc);
+  }, []);
 
   var fetchDisclosure = /*#__PURE__*/function () {
     var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee(doc_id) {
@@ -1293,7 +1369,12 @@ var MainSection = function MainSection(disclosures) {
   }();
 
   var changeHandler = function changeHandler(event) {
-    fetchJudge(event);
+    if (event.length < 2) {
+      setVisible(false);
+    } else {
+      fetchJudge(event);
+      setVisible(true);
+    }
   };
 
   var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
@@ -1304,23 +1385,25 @@ var MainSection = function MainSection(disclosures) {
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, data != '' && data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'col-lg-9'
+    className: 'col-md-9'
   }, Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "tabcontent"
   }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'col-lg-3'
-  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : data != '' && data.has_been_extracted == false ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+    className: 'col-md-3'
+  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible)))) : data != '' && data.has_been_extracted == false ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'col-lg-9'
+    className: 'col-sm-9'
   }, Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: "tabcontent"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
     className: 'text-center v-offset-above-4'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
     className: "fa fa-exclamation-triangle gray"
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "You can still view this Financial Disclosure by clicking the thumbnail.")))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'col-lg-3'
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+    href: data.filepath
+  }, "Click here to view the disclsoure as a PDF document"))))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+    className: 'col-sm-3'
   }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
     className: 'text-center'
   }, "Loading..."));
@@ -1417,20 +1500,16 @@ var Thumb = function Thumb(data) {
     className: "fa fa-code gray pull-right"
   })))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
     href: data.filepath
-  }, data.thumbnail != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
     src: data.thumbnail,
     alt: "Thumbnail of first page of disclosure",
-    height: '150',
-    className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
-  }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    height: '150',
-    alt: "Thumbnail of Future Judge Portrait",
-    className: 'well img-responsive thumbnail shadow img-thumbnail judge-pic'
+    className: "img-responsive thumbnail shadow img-thumbnail judge-pic",
+    width: '100%'
   })));
 };
 
-var Sidebar = function Sidebar(data, is_admin, judge, fetchJudge, visible, setVisible) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', Thumb(data), Notes(), SearchPanel(judge, fetchJudge, visible, setVisible), Support());
+var Sidebar = function Sidebar(data, is_admin, judge, fetchJudge, visible) {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', data.thumbnail ? Thumb(data) : '', Notes(), SearchPanel(judge, fetchJudge, visible), Support());
 };
 
 var Notes = function Notes() {
@@ -1451,46 +1530,49 @@ var Notes = function Notes() {
   }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."));
 };
 
-var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
+var SearchPanel = function SearchPanel(judge, fetchJudge, visible) {
   function update(_ref7) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref7);
 
     var query = data.target.value;
-
-    if (query.length > 1) {
-      fetchJudge(query);
-      setVisible(true);
-    }
-
-    if (query.length == 0) {
-      fetchJudge('');
-      setVisible(false);
-    }
+    fetchJudge(query);
   }
 
-  var onBlur = function onBlur(e) {
-    setVisible(false);
-  };
-
-  var onFocus = function onFocus(e) {
-    setVisible(true);
-  };
-
   var onFocusClick = function onFocusClick(url) {
-    window.location = url;
+    if (event.button == 2) {
+      event.preventDefault();
+    }
+
+    if (event.button == 0 || event.keyCode == 13) {
+      event.preventDefault();
+      window.location = url;
+    }
+  };
+
+  var onReturn = function onReturn() {
+    console.log(judge.length);
+    console.log(event.keyCode);
+
+    if (judge.length == 1 && event.keyCode == 13) {
+      onFocusClick(judge[0].latest_disclosure_url);
+    }
   };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'v-offset-below-4 '
+    className: 'v-offset-below-4 table-parent'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Search ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
     className: "fa fa-search gray pull-right"
   }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
-    onBlur: onBlur,
-    onFocus: onFocus,
+    id: 'sidebar-query-box',
     onChange: update,
     autoComplete: 'off',
+    autoCorrect: 'off',
+    autoCapitalize: 'off',
+    spellCheck: 'false',
     className: 'form-control input-sm',
-    placeholder: 'Search for judges…'
+    onKeyDown: onReturn,
+    placeholder: 'Search for judges by name…',
+    tabIndex: 300
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: visible ? 'search-panel-table' : 'hide-table'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", {
@@ -1499,9 +1581,13 @@ var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
       className: 'tr-results cursor',
       key: row.id,
+      onKeyDown: function onKeyDown() {
+        return onFocusClick(row.latest_disclosure_url);
+      },
       onMouseDown: function onMouseDown() {
         return onFocusClick(row.latest_disclosure_url);
-      }
+      },
+      tabIndex: 301
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: 'col-lg-9 col-md-9 col-sm-11 col-xs-10'
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
@@ -1537,6 +1623,7 @@ var AdminPanel = function AdminPanel(data) {
 var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name, judgeUrl) {
   var pathname = window.location.pathname;
   var slug = pathname.split('/')[5];
+  console.log(years, "YEARS");
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
     className: "text-center"
   }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
@@ -3194,7 +3281,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3332,7 +3419,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
@@ -3421,7 +3508,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kCAAkC;EAClC,aAAa;AACf;;AAEA;EACE,UAAU;EACV,sBAAsB;EACtB,uBAAuB;EACvB,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,uBAAuB;EACvB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-row {\n  border-bottom: 0.5px #cecece solid;\n  padding: 10px;\n}\n\n.search-panel-table {\n  width: 89%;\n  border-left: 1px solid;\n  border-right: 1px solid;\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border-color: gainsboro;\n  border: 1px solid;\n  padding: 10px;\n  border-color: gainsboro;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid gainsboro;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 
@@ -3493,8 +3580,8 @@ webpackContext.id = "./node_modules/webpack/hot sync ^\\.\\/log$";
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! /home/mlissner/Programming/courtlistener/cl/node_modules/webpack-dev-server/client/index.js?http://localhost:3000 */"./node_modules/webpack-dev-server/client/index.js?http://localhost:3000");
-__webpack_require__(/*! /home/mlissner/Programming/courtlistener/cl/node_modules/webpack/hot/dev-server.js */"./node_modules/webpack/hot/dev-server.js");
+__webpack_require__(/*! /Users/palin/Code/courtlistener/cl/node_modules/webpack-dev-server/client/index.js?http://localhost:3000 */"./node_modules/webpack-dev-server/client/index.js?http://localhost:3000");
+__webpack_require__(/*! /Users/palin/Code/courtlistener/cl/node_modules/webpack/hot/dev-server.js */"./node_modules/webpack/hot/dev-server.js");
 module.exports = __webpack_require__(/*! ./assets/react/index */"./assets/react/index.tsx");
 
 

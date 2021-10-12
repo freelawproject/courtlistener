@@ -40,8 +40,20 @@ const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
   return <React.Fragment>{MainSection(disclosures)}</React.Fragment>;
 };
 
+function isDescendant(parent: HTMLElement, child: HTMLElement) {
+  let node = child.parentNode;
+  while (node != null) {
+    if (node == parent) {
+      return true;
+    }
+    node = node.parentNode;
+  }
+  return false;
+}
+
 const MainSection = (disclosures) => {
   const years = disclosures['years'].split(',');
+  console.log(years)
   const doc_ids = disclosures['ids'].split(',');
   const { disclosure_id } = useParams();
   const { judge_id } = useParams();
@@ -50,7 +62,28 @@ const MainSection = (disclosures) => {
   const judge_name = disclosures['judge'];
   const is_admin = disclosures['admin'] == 'True';
   const indx = doc_ids.indexOf(disclosure_id);
-  const [visible, setVisible] = React.useState(true);
+  const [visible, setVisible] = React.useState(false);
+
+  const handleClickOutside = (event: Event) => {
+    const query_container = document.getElementById('sidebar-query-box');
+    if (!isDescendant(query_container, event.target)) {
+      setVisible(false);
+    }
+    if (query_container == event.target) {
+      setVisible(true);
+    }
+  };
+
+  const handleEsc = (event: { keyCode: number }) => {
+    if (event.keyCode === 27) {
+      setVisible(false);
+    }
+  };
+
+  React.useEffect(() => {
+    document.addEventListener('click', handleClickOutside, true);
+    window.addEventListener('keydown', handleEsc);
+  }, []);
 
   const fetchDisclosure = async (doc_id: number) => {
     try {
@@ -76,7 +109,12 @@ const MainSection = (disclosures) => {
   };
 
   const changeHandler = (event: string) => {
-    fetchJudge(event);
+    if (event.length < 2) {
+      setVisible(false)
+    } else {
+      fetchJudge(event);
+      setVisible(true)
+    }
   };
 
   const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
@@ -87,7 +125,7 @@ const MainSection = (disclosures) => {
       {data != '' && data.has_been_extracted ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
-            <div className={'col-lg-9'}>
+            <div className={'col-md-9'}>
               {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
               <div className="tabcontent">
                 {TableMaker(data, 'investments', is_admin)}
@@ -108,24 +146,25 @@ const MainSection = (disclosures) => {
                 )}
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
+            <div className={'col-md-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible)}</div>
           </div>
         </div>
       ) : data != '' && data.has_been_extracted == false ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
-            <div className={'col-lg-9'}>
+            <div className={'col-sm-9'}>
               {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
-              {/*{Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name)}*/}
               <div className="tabcontent">
                 <div className={'text-center v-offset-above-4'}>
                   <i className="fa fa-exclamation-triangle gray" />
                   <h1>Table extraction failed.</h1>
-                  <p>You can still view this Financial Disclosure by clicking the thumbnail.</p>
+                  <p>
+                    <a href={data.filepath}>Click here to view the disclsoure as a PDF document</a>
+                  </p>
                 </div>
               </div>
             </div>
-            <div className={'col-lg-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
+            <div className={'col-sm-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
       ) : (
@@ -254,20 +293,12 @@ const Thumb = (data: Data) => {
       </h3>
       <hr />
       <a href={data.filepath}>
-        {data.thumbnail != null ? (
-          <img
-            src={data.thumbnail}
-            alt="Thumbnail of first page of disclosure"
-            height={'150'}
-            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-          />
-        ) : (
-          <div
-            height={'150'}
-            alt="Thumbnail of Future Judge Portrait"
-            className={'well img-responsive thumbnail shadow img-thumbnail judge-pic'}
-          />
-        )}
+        <img
+          src={data.thumbnail}
+          alt="Thumbnail of first page of disclosure"
+          className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+          width={'100%'}
+        />
       </a>
     </div>
   );
@@ -279,14 +310,13 @@ const Sidebar = (
   judge: Row[],
   fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
   visible,
-  setVisible
 ) => {
   return (
     <div>
       {is_admin ? AdminPanel(data) : ''}
-      {Thumb(data)}
+      {data.thumbnail ? Thumb(data) : ''}
       {Notes()}
-      {SearchPanel(judge, fetchJudge, visible, setVisible)}
+      {SearchPanel(judge, fetchJudge, visible)}
       {Support()}
     </div>
   );
@@ -327,33 +357,33 @@ const Notes = () => {
 const SearchPanel = (
   judge: Row[],
   fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
-  visible,
-  setVisible
+  visible: boolean
 ) => {
   function update({ ...data }) {
     const query: string = data.target.value;
-    if (query.length > 1) {
-      fetchJudge(query);
-      setVisible(true);
-    }
-    if (query.length == 0) {
-      fetchJudge('');
-      setVisible(false);
-    }
+    fetchJudge(query);
   }
 
-  const onBlur = (e) => {
-    setVisible(false);
-  };
-  const onFocus = (e) => {
-    setVisible(true);
-  };
   const onFocusClick = (url: string) => {
-    window.location = url;
+    if (event.button == 2) {
+      event.preventDefault();
+    }
+    if (event.button == 0 || event.keyCode == 13) {
+      event.preventDefault();
+      window.location = url;
+    }
+  };
+
+  const onReturn = () => {
+    console.log(judge.length)
+    console.log(event.keyCode)
+    if (judge.length == 1 && event.keyCode == 13) {
+      onFocusClick(judge[0].latest_disclosure_url);
+    }
   };
 
   return (
-    <div className={'v-offset-below-4 '}>
+    <div className={'v-offset-below-4 table-parent'}>
       <h3>
         <span>
           Search <i className="fa fa-search gray pull-right" />
@@ -361,12 +391,16 @@ const SearchPanel = (
       </h3>
       <hr />
       <input
-        onBlur={onBlur}
-        onFocus={onFocus}
+        id={'sidebar-query-box'}
         onChange={update}
         autoComplete={'off'}
+        autoCorrect={'off'}
+        autoCapitalize={'off'}
+        spellCheck={'false'}
         className={'form-control input-sm'}
-        placeholder={'Search for judges…'}
+        onKeyDown={onReturn}
+        placeholder={'Search for judges by name…'}
+        tabIndex={300}
       />
       <table className={visible ? 'search-panel-table' : 'hide-table'}>
         <tbody className={'cursor'}>
@@ -375,7 +409,9 @@ const SearchPanel = (
               <tr
                 className={'tr-results cursor'}
                 key={row.id}
+                onKeyDown={() => onFocusClick(row.latest_disclosure_url)}
                 onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
+                tabIndex={301}
               >
                 <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
                   <h4 className={'text-left'}>{row.name_full}</h4>
@@ -429,6 +465,7 @@ const Tabs = (
 ) => {
   const pathname = window.location.pathname;
   const slug = pathname.split('/')[5];
+  console.log(years, "YEARS")
   return (
     <div>
       <h1 className="text-center">

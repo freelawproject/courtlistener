@@ -12,20 +12,40 @@ interface Row {
   thumbnail_path: string;
 }
 
+function isDescendant(parent: HTMLElement, child: HTMLElement) {
+  let node = child.parentNode;
+  while (node != null) {
+    if (node == parent) {
+      return true;
+    }
+    node = node.parentNode;
+  }
+  return false;
+}
+
 const DisclosureList: React.FC<UserState> = () => {
   const [data, setData] = React.useState<Row[]>([]);
   const [query, setQuery] = React.useState('');
+  const [visible, setVisible] = React.useState(false);
+
+  const handleClickOutside = (event: Event) => {
+    const query_container = document.getElementById('main-query-box');
+    if (isDescendant(query_container, event.target)) {
+      setVisible(true);
+    } else {
+      setVisible(false);
+    }
+  };
+
+  const handleEsc = (event: { keyCode: number }) => {
+    if (event.keyCode === 27) {
+      setVisible(false);
+    }
+  };
 
   React.useEffect(() => {
-    const handleEsc = (event: { keyCode: number }) => {
-      if (event.keyCode === 27) {
-        setQuery('');
-      }
-    };
+    document.addEventListener('click', handleClickOutside, true);
     window.addEventListener('keydown', handleEsc);
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-    };
   }, []);
 
   const fetchData = async (query: string) => {
@@ -48,7 +68,7 @@ const DisclosureList: React.FC<UserState> = () => {
   return (
     <div>
       {DisclosureHeader()}
-      {DisclosureSearch(data, query, debounceFetchJudge, setQuery)}
+      {DisclosureSearch(data, query, debounceFetchJudge, visible, setVisible)}
       {DisclosureFooter()}
     </div>
   );
@@ -69,22 +89,31 @@ const DisclosureSearch = (
   data: Row[],
   query: string,
   fetchData: React.ChangeEventHandler<HTMLInputElement>,
-  setQuery
+  visible,
+  setVisible
 ) => {
   function update({ ...data }) {
     const query: string = data.target.value;
-    if (query.length > 1 || query == '') {
+    if (query.length > 1) {
       fetchData(query);
+      setVisible(true);
+    } else {
+      setVisible(false);
     }
   }
-  const onBlur = (e) => {
-    setQuery('');
-  };
-  const onFocus = (e) => {
-    setQuery(e.target.value);
-  };
   const onFocusClick = (url: string) => {
-    window.location = url;
+    if (event.button == 2) {
+      event.preventDefault();
+    }
+    if (event.button == 0 || event.keyCode == 13) {
+      event.preventDefault();
+      window.location = url;
+    }
+  };
+  const onReturn = () => {
+    if (data.length == 1 && event.keyCode == 13) {
+      onFocusClick(data[0].latest_disclosure_url);
+    }
   };
 
   return (
@@ -104,17 +133,19 @@ const DisclosureSearch = (
             autoCapitalize={'off'}
             spellCheck={'false'}
             onChange={update}
-            onBlur={onBlur}
-            onFocus={onFocus}
+            onKeyDown={onReturn}
             type="search"
+            tabIndex={300}
             placeholder="Search for judges by name…"
           />
-          <table className={'table-instant-results'}>
+          <table className={visible ? 'table-instant-results' : 'hide-table'}>
             {query != '' ? (
               <tbody>
                 {data.map((row: Row) => {
                   return (
                     <tr
+                      tabIndex={301}
+                      onKeyDown={() => onFocusClick(row.latest_disclosure_url)}
                       onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
                       key={row.id}
                       className="tr-results cursor"
@@ -126,14 +157,14 @@ const DisclosureSearch = (
                       <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
                         {row.thumbnail_path != null ? (
                           <img
-                            src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
+                            src={row.thumbnail_path}
                             alt="Thumbnail of first page of disclosure"
-                            height={'150'}
+                            width={'100%'}
                             className="img-responsive thumbnail shadow img-thumbnail judge-pic"
                           />
                         ) : (
                           <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
-                            <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
+                            <i className={'fa fa-user fa-10x missing-judge'}></i>
                           </div>
                         )}
                       </td>

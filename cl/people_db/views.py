@@ -21,7 +21,6 @@ def make_title_str(person):
 
 def view_person(request, pk, slug):
     person = get_object_or_404(Person, pk=pk)
-
     # Redirect the user if they're trying to check out an alias.
     if person.is_alias:
         return HttpResponseRedirect(
@@ -103,7 +102,7 @@ def view_person(request, pk, slug):
                 person.political_affiliations.all().order_by("-date_start")
             ),
             "disclosures": person.financial_disclosures.all().order_by(
-                "-year"
+                "year"
             ),
             "positions": positions,
             "educations": person.educations.all().order_by("-degree_year"),
