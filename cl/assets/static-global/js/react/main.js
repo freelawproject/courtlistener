@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "5f8db4f5697d95daef34";
+/******/ 	var hotCurrentHash = "b10b3404195488f70fc8";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1065,11 +1065,11 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
     id: "main-query-box"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("label", {
     className: "sr-only",
-    htmlFor: "id_disclosures_filter"
+    htmlFor: "id_disclosures_search"
   }, "Filter disclosures\u2026"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
     className: "form-control input-lg",
     name: "disclosures-filter",
-    id: "id_disclosures_filter",
+    id: "id_disclosures_search",
     autoComplete: 'off',
     autoCorrect: 'off',
     autoCapitalize: 'off',
@@ -1077,8 +1077,8 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
     onChange: update,
     onBlur: onBlur,
     onFocus: onFocus,
-    type: "text",
-    placeholder: "Start typing to begin\u2026"
+    type: "search",
+    placeholder: "Search for judges by name\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
     className: 'table-instant-results'
   }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
@@ -1087,7 +1087,7 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
         return onFocusClick(row.latest_disclosure_url);
       },
       key: row.id,
-      className: "tr-results"
+      className: "tr-results cursor"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: "col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
@@ -1098,7 +1098,7 @@ var DisclosureSearch = function DisclosureSearch(data, query, fetchData, setQuer
       className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
     }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
       src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
-      alt: "Thumbnail of Judge Portrait",
+      alt: "Thumbnail of first page of disclosure",
       height: '150',
       className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
     }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
@@ -1210,7 +1210,7 @@ var MainSection = function MainSection(disclosures) {
 
   var judge_name = disclosures['judge'];
   var is_admin = disclosures['admin'] == 'True';
-  var indx = Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_10__["getIndex"])(disclosure_id, doc_ids);
+  var indx = doc_ids.indexOf(disclosure_id);
 
   var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(true),
       _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
@@ -1351,7 +1351,7 @@ var TableMaker = function TableMaker(data, key, is_admin) {
     responsive: true
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("thead", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", {
     key: ''
-  }, " "), is_admin == true ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", null, "Admin") : '', Object.entries(fields).map(function (_ref3) {
+  }, " "), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", null, "Admin") : '', Object.entries(fields).map(function (_ref3) {
     var _ref4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_ref3, 2),
         key = _ref4[0],
         value = _ref4[1];
@@ -1370,10 +1370,10 @@ var TableMaker = function TableMaker(data, key, is_admin) {
       href: url + '#page=' + entry.page_number
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
       className: "fa fa-file-text-o gray"
-    })), "\xA0", entry.redacted == true ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+    })), "\xA0", entry.redacted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
       title: 'Redaction present in row',
       className: "fa fa-file-excel-o black"
-    }) : ''), is_admin == true ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+    }) : ''), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
       href: "/admin/disclosures/".concat(key.replaceAll('_', '').slice(0, -1), "/").concat(entry.id, "/")
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
       className: "fa fa-pencil gray"
@@ -1419,7 +1419,7 @@ var Thumb = function Thumb(data) {
     href: data.filepath
   }, data.thumbnail != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
     src: data.thumbnail,
-    alt: "Thumbnail of Judge Portrait",
+    alt: "Thumbnail of first page of disclosure",
     height: '150',
     className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
   }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
@@ -1444,9 +1444,9 @@ var Notes = function Notes() {
     className: "fa fa-file-text-o gray"
   }), " Links to the PDF row (if possible)."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
     className: "fa fa-file-excel-o black"
-  }), " The row may contain a redaction"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }), " The row may contain a redaction."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
     className: "fa fa-eye-slash black"
-  }), " Indicates the OCR identified data in the row but could not extract it")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }), " Indicates failed extraction in the cell.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
     href: 'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'
   }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."));
 };
@@ -1463,7 +1463,7 @@ var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
     }
 
     if (query.length == 0) {
-      fetchJudge("");
+      fetchJudge('');
       setVisible(false);
     }
   }
@@ -1490,12 +1490,14 @@ var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
     onChange: update,
     autoComplete: 'off',
     className: 'form-control input-sm',
-    placeholder: 'Start typing to begin…'
+    placeholder: 'Search for judges…'
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: visible ? "search-panel-table" : "hide-table"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, judge.map(function (row) {
+    className: visible ? 'search-panel-table' : 'hide-table'
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", {
+    className: 'cursor'
+  }, judge.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
-      className: 'tr-results',
+      className: 'tr-results cursor',
       key: row.id,
       onMouseDown: function onMouseDown() {
         return onFocusClick(row.latest_disclosure_url);
@@ -1506,13 +1508,11 @@ var SearchPanel = function SearchPanel(judge, fetchJudge, visible, setVisible) {
       className: 'text-left'
     }, row.name_full), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
       className: 'text-left'
-    }, row.position_str), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
-      className: 'text-left'
-    }, row.disclosure_years)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
+    }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
       className: 'col-lg-3 col-md-3 col-sm-1 col-xs-2 '
     }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
       src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
-      alt: "Thumbnail of Judge Portrait",
+      alt: "Thumbnail of first page of disclosure",
       height: '50',
       className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
     }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
@@ -2531,14 +2531,12 @@ var TagSelect = function TagSelect(_ref) {
 /*!*********************************************!*\
   !*** ./assets/react/_disclosure_helpers.ts ***!
   \*********************************************/
-/*! exports provided: convertTD, getIndex, fetch_year_index */
+/*! exports provided: convertTD */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "convertTD", function() { return convertTD; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "getIndex", function() { return getIndex; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "fetch_year_index", function() { return fetch_year_index; });
 /* harmony import */ var _disclosure_models__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./_disclosure_models */ "./assets/react/_disclosure_models.ts");
 
 var convertTD = function convertTD(value, table, key) {
@@ -2564,32 +2562,6 @@ var convertTD = function convertTD(value, table, key) {
 
   return value;
 };
-var getIndex = function getIndex(value, arr) {
-  // Sadly we need this method to check the index of an item in a list
-  // This helps us select the correct tab on page load
-  for (var i = 0; i < arr.length; i++) {
-    if (arr[i] === value.toString()) {
-      return i;
-    }
-  }
-
-  return 0;
-};
-var fetch_year_index = function fetch_year_index(years, doc_ids) {
-  // Given a list of years, doc-ids identify the index of the year
-  // to select in the tab array of years
-  //Fetch year index is not pretty.
-  var search = window.location.search;
-  var params = new URLSearchParams(search);
-  var optional_doc_id = params.get('id');
-  var index = 0;
-
-  if (optional_doc_id != null) {
-    index = getIndex(optional_doc_id, doc_ids);
-  }
-
-  return [years[index], index];
-};
 
 /***/ }),
 
@@ -2607,118 +2579,118 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "VALUATION_METHODS", function() { return VALUATION_METHODS; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "disclosureModel", function() { return disclosureModel; });
 var INCOME_GAIN = {
-  "A": "1‑1,000",
-  "B": "1,001‑2,500",
-  "C": "2,501‑5,000",
-  "D": "5,001‑15,000",
-  "E": "15,001‑50,000",
-  "F": "50,001‑100,000",
-  "G": "100,001‑1,000,000",
-  "H1": "1,000,001‑5,000,000",
-  "H2": "5,000,001+",
-  "-1": "Failed Extraction"
+  A: '1‑1,000',
+  B: '1,001‑2,500',
+  C: '2,501‑5,000',
+  D: '5,001‑15,000',
+  E: '15,001‑50,000',
+  F: '50,001‑100,000',
+  G: '100,001‑1,000,000',
+  H1: '1,000,001‑5,000,000',
+  H2: '5,000,001+',
+  '-1': 'Failed Extraction'
 };
 var GROSS_VALUE = {
-  "J": "1‑15,000",
-  "K": "15,001‑50,000",
-  "L": "50,001‑100,000",
-  "M": "100,001‑250,000",
-  "N": "250,001‑500,000",
-  "O": "500,001‑1,000,000",
-  "P1": "1,000,001‑5,000,000",
-  "P2": "5,000,001‑25,000,000",
-  "P3": "25,000,001‑50,000,000",
-  "P4": "50,000,00+",
-  "-1": "Failed Extraction"
+  J: '1‑15,000',
+  K: '15,001‑50,000',
+  L: '50,001‑100,000',
+  M: '100,001‑250,000',
+  N: '250,001‑500,000',
+  O: '500,001‑1,000,000',
+  P1: '1,000,001‑5,000,000',
+  P2: '5,000,001‑25,000,000',
+  P3: '25,000,001‑50,000,000',
+  P4: '50,000,00+',
+  '-1': 'Failed Extraction'
 };
 var VALUATION_METHODS = {
-  "Q": "Appraisal",
-  "R": "Cost (Real Estate Only)",
-  "S": "Assessment",
-  "T": "Cash Market",
-  "U": "Book Value",
-  "V": "Other",
-  "W": "Estimated",
-  "-1": "Failed Extraction"
+  Q: 'Appraisal',
+  R: 'Cost (Real Estate Only)',
+  S: 'Assessment',
+  T: 'Cash Market',
+  U: 'Book Value',
+  V: 'Other',
+  W: 'Estimated',
+  '-1': 'Failed Extraction'
 };
 var investmentFields = {
-  "Description": "description",
-  "Gross Val. Code": "gross_value_code",
-  "Gross Val. Method": "gross_value_method",
-  "Income Code": "income_during_reporting_period_code",
-  "Income Type": "income_during_reporting_period_type",
-  "Trans. Date": "transaction_date_raw",
-  "Trans. Value": "transaction_value_code",
-  "Trans. Gain": "transaction_gain_code",
-  "Trans. Partner": "transaction_partner"
+  Description: 'description',
+  'Gross Val. Code': 'gross_value_code',
+  'Gross Val. Method': 'gross_value_method',
+  'Income Code': 'income_during_reporting_period_code',
+  'Income Type': 'income_during_reporting_period_type',
+  'Trans. Date': 'transaction_date_raw',
+  'Trans. Value': 'transaction_value_code',
+  'Trans. Gain': 'transaction_gain_code',
+  'Trans. Partner': 'transaction_partner'
 };
 var giftFields = {
-  "Source": "source",
-  "Value": "value",
-  "Description": "description"
+  Source: 'source',
+  Value: 'value',
+  Description: 'description'
 };
 var reimbursementsFields = {
-  "Dates": "date_raw",
-  "Location": "location",
-  "Source": "source",
-  "Purpose": "purpose",
-  "Items": "items_paid_or_provided"
+  Dates: 'date_raw',
+  Location: 'location',
+  Source: 'source',
+  Purpose: 'purpose',
+  Items: 'items_paid_or_provided'
 };
 var noninvestmentFields = {
-  "Dates": "date_raw",
-  "Source": "source_type",
-  "Income Amount": "income_amount"
+  Dates: 'date_raw',
+  Source: 'source_type',
+  'Income Amount': 'income_amount'
 };
 var agreementFields = {
-  "Dates": "date_raw",
-  "Source": "parties_and_terms",
-  "Income Amount": "parties_and_terms"
+  Dates: 'date_raw',
+  Source: 'parties_and_terms',
+  'Income Amount': 'parties_and_terms'
 };
 var positionFields = {
-  "Position": "position",
-  "Organization": "organization_name"
+  Position: 'position',
+  Organization: 'organization_name'
 };
 var debtFields = {
-  "Creditor Name": "creditor_name",
-  "Description": "description",
-  "Value Code": "value_code"
+  'Creditor Name': 'creditor_name',
+  Description: 'description',
+  'Value Code': 'value_code'
 };
 var spouseFields = {
-  "Date": "date_raw",
-  "Location": "source_type"
+  Date: 'date_raw',
+  Location: 'source_type'
 };
 var disclosureModel = {
-  "investments": {
-    "fields": investmentFields,
-    "title": "Investments"
+  investments: {
+    fields: investmentFields,
+    title: 'Investments'
   },
-  "gifts": {
-    "fields": giftFields,
-    "title": "Gifts"
+  gifts: {
+    fields: giftFields,
+    title: 'Gifts'
   },
-  "debts": {
-    "fields": debtFields,
-    "title": "Debts"
+  debts: {
+    fields: debtFields,
+    title: 'Debts'
   },
-  "positions": {
-    "fields": positionFields,
-    "title": "Positions"
+  positions: {
+    fields: positionFields,
+    title: 'Positions'
   },
-  "spouse_incomes": {
-    "fields": spouseFields,
-    "title": "Spousal Income"
+  spouse_incomes: {
+    fields: spouseFields,
+    title: 'Spousal Income'
   },
-  "agreements": {
-    "fields": agreementFields,
-    "title": "Agreements"
+  agreements: {
+    fields: agreementFields,
+    title: 'Agreements'
   },
-  "non_investment_incomes": {
-    "fields": noninvestmentFields,
-    "title": "Non Investment Income"
+  non_investment_incomes: {
+    fields: noninvestmentFields,
+    title: 'Non Investment Income'
   },
-  "reimbursements": {
-    "fields": reimbursementsFields,
-    "title": "Reimbursements"
+  reimbursements: {
+    fields: reimbursementsFields,
+    title: 'Reimbursements'
   }
 };
 
@@ -3521,8 +3493,8 @@ webpackContext.id = "./node_modules/webpack/hot sync ^\\.\\/log$";
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! /Users/palin/Code/courtlistener/cl/node_modules/webpack-dev-server/client/index.js?http://localhost:3000 */"./node_modules/webpack-dev-server/client/index.js?http://localhost:3000");
-__webpack_require__(/*! /Users/palin/Code/courtlistener/cl/node_modules/webpack/hot/dev-server.js */"./node_modules/webpack/hot/dev-server.js");
+__webpack_require__(/*! /home/mlissner/Programming/courtlistener/cl/node_modules/webpack-dev-server/client/index.js?http://localhost:3000 */"./node_modules/webpack-dev-server/client/index.js?http://localhost:3000");
+__webpack_require__(/*! /home/mlissner/Programming/courtlistener/cl/node_modules/webpack/hot/dev-server.js */"./node_modules/webpack/hot/dev-server.js");
 module.exports = __webpack_require__(/*! ./assets/react/index */"./assets/react/index.tsx");
 
 
