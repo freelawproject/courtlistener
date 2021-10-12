@@ -56,8 +56,6 @@ const DisclosureList: React.FC<UserState> = () => {
       const results: Row[] = response['results'];
       setQuery(query);
       setData(results);
-
-      console.log(response['results']);
     } catch (error) {
       console.log(error);
     }

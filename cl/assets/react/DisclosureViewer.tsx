@@ -88,7 +88,6 @@ const MainSection = (disclosures) => {
   const fetchDisclosure = async (doc_id: number) => {
     try {
       const response = await appFetch(`/api/rest/v3/financial-disclosures/?person=${judge_id}&id=${doc_id}`);
-      console.log(response);
       setData(response['results'][0]);
     } catch (error) {
       console.log(error);
