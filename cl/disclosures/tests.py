@@ -146,13 +146,18 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
 
 class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_disclosure_position_api(self) -> None:
-        """Can we query the financial disclosure API?"""
+        """Can we query the financial disclosure position API?"""
         self.path = reverse(
             "disclosureposition-list", kwargs={"version": "v3"}
         )
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
+        self.assertIn(
+            "disclosure-positions",
+            r.json()["results"][0]["resource_uri"],
+            msg="Incorrect resource URI",
+        )
 
     def test_investment_filtering(self) -> None:
         """Can we filter investments by transaction value codes?"""
