@@ -51,12 +51,13 @@ const InstantSearchResults = (
   visible: boolean,
   data: Row[],
   onFocusClick: (event: React.MouseEvent<HTMLTableRowElement>, url: string) => void,
-  onFocusKeyPress: (event: React.KeyboardEvent<HTMLTableRowElement>, url: string) => void
+  onFocusKeyPress: (event: React.KeyboardEvent<HTMLTableRowElement>, url: string) => void,
+  input_size: string
 ) => {
   return (
     <React.Fragment>
       <input
-        className="form-control input-lg"
+        className={input_size}
         name="disclosures-filter"
         id="id_disclosures_search"
         autoComplete={'off'}
@@ -80,11 +81,11 @@ const InstantSearchResults = (
                 key={row.id}
                 className="tr-results cursor"
               >
-                <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name">
+                <td className="col-xs-10 col-sm-10 col-lg-10 table-data-name">
                   <h4 className={'text-left judge-name'}>{row.name_full}</h4>
                   <p className={'text-left gray'}>{row.position_str}</p>
                 </td>
-                <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
+                <td className="col-xs-2 col-sm-2 col-lg-2 table-data-portrait">
                   {row.thumbnail_path != null ? (
                     <img
                       src={row.thumbnail_path}
@@ -157,7 +158,7 @@ export const DisclosureSearch = (
             </span>
           </h3>
           <hr />
-          {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress)}
+          {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, 'form-control input-md')}
         </div>
       ) : (
         <div className="v-offset-above-2 row">
@@ -166,7 +167,7 @@ export const DisclosureSearch = (
             <label className="sr-only" htmlFor="id_disclosures_search">
               Filter disclosures…
             </label>
-            {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress)}
+            {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, 'form-control input-lg')}
           </div>
         </div>
       )}
