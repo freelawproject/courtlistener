@@ -31,7 +31,7 @@ interface Row {
   thumbnail: string;
   page_number: number;
   redacted: boolean;
-  latest_disclosure_url: string;
+  oldest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;

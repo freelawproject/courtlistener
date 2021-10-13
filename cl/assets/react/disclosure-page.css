@@ -8,9 +8,8 @@
   position: absolute;
   z-index: 9;
   background: white;
-  border: 1px solid;
   padding: 10px;
-  border-color: lightgrey;
+  border: 1px solid lightgrey;
   box-shadow: 2px 2px 5px #acacac;
 }
 
@@ -63,16 +62,11 @@ tr > a:hover {
 
 .missing-judge {
   font-size: 40px;
-  border: solid;
-  border-width: 1px;
-  margin: 0px;
+  border: 1px solid;
+  margin: 0;
   padding: 12px;
 }
 
 .judge-name {
   font-size: 20px;
-}
-
-.hide-table {
-  display: None;
 }

@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "f0e04b1739eb97b101b6";
+/******/ 	var hotCurrentHash = "3554f4332843b7210459";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -2493,15 +2493,15 @@ var InstantSearchResults = function InstantSearchResults(update, onReturn, visib
     tabIndex: 300,
     placeholder: "Search for judges by name\u2026"
   }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("table", {
-    className: visible ? 'table-instant-results' : 'hide-table'
+    className: visible ? 'table-instant-results' : 'hide'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("tbody", null, data.map(function (row) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("tr", {
       tabIndex: 301,
       onKeyDown: function onKeyDown(e) {
-        return onFocusKeyPress(e, row.latest_disclosure_url);
+        return onFocusKeyPress(e, row.oldest_disclosure_url);
       },
       onMouseDown: function onMouseDown(e) {
-        return onFocusClick(e, row.latest_disclosure_url);
+        return onFocusClick(e, row.oldest_disclosure_url);
       },
       key: row.id,
       className: "tr-results cursor"
@@ -2547,7 +2547,7 @@ var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVi
 
     if (event.button == 0) {
       event.preventDefault();
-      window.location = url;
+      window.location.pathname = url;
     }
   };
 
@@ -2560,7 +2560,7 @@ var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVi
 
   var onReturn = function onReturn(e) {
     if (data.length == 1 && e.keyCode == 13) {
-      var location = data[0].latest_disclosure_url;
+      var location = data[0].oldest_disclosure_url;
       onFocusKeyPress(e, location);
     }
   };
@@ -3213,7 +3213,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3351,7 +3351,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
@@ -3440,7 +3440,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE;AACF;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,aAAa;EACb,2BAA2B;EAC3B,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE;AACF;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,iBAAiB;EACjB,SAAS;EACT,aAAa;AACf;;AAEA;EACE,eAAe;AACjB","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 

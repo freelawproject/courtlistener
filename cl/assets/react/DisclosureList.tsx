@@ -2,11 +2,11 @@ import React from 'react';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
 import debounce from 'lodash.debounce';
-import {DisclosureSearch, isDescendant} from './_disclosure_helpers';
+import { DisclosureSearch, isDescendant } from './_disclosure_helpers';
 
 interface Row {
   id: number;
-  latest_disclosure_url: string;
+  oldest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;
@@ -25,7 +25,7 @@ const DisclosureList: React.FC<UserState> = () => {
 
   const handleClickOutside = (event: Event) => {
     const query_container = document.getElementById('main-query-box');
-    const child: HTMLElement = event.target as HTMLInputElement
+    const child: HTMLElement = event.target as HTMLInputElement;
     if (isDescendant(query_container, child)) {
       setVisible(true);
     } else {

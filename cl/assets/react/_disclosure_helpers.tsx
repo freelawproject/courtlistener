@@ -4,7 +4,7 @@ import { DebouncedFunc } from 'lodash';
 
 interface Row {
   id: number;
-  latest_disclosure_url: string;
+  oldest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;
@@ -69,14 +69,14 @@ const InstantSearchResults = (
         tabIndex={300}
         placeholder="Search for judges by name…"
       />
-      <table className={visible ? 'table-instant-results' : 'hide-table'}>
+      <table className={visible ? 'table-instant-results' : 'hide'}>
         <tbody>
           {data.map((row: Row) => {
             return (
               <tr
                 tabIndex={301}
-                onKeyDown={(e) => onFocusKeyPress(e, row.latest_disclosure_url)}
-                onMouseDown={(e) => onFocusClick(e, row.latest_disclosure_url)}
+                onKeyDown={(e) => onFocusKeyPress(e, row.oldest_disclosure_url)}
+                onMouseDown={(e) => onFocusClick(e, row.oldest_disclosure_url)}
                 key={row.id}
                 className="tr-results cursor"
               >
@@ -129,7 +129,7 @@ export const DisclosureSearch = (
     }
     if (event.button == 0) {
       event.preventDefault();
-      window.location = url;
+      window.location.pathname = url;
     }
   };
 
@@ -142,7 +142,7 @@ export const DisclosureSearch = (
 
   const onReturn = (e: KeyboardEvent) => {
     if (data.length == 1 && e.keyCode == 13) {
-      const location: string = data[0].latest_disclosure_url;
+      const location: string = data[0].oldest_disclosure_url;
       onFocusKeyPress(e, location);
     }
   };
