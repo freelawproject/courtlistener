@@ -12,16 +12,16 @@ export const INCOME_GAIN = {
 };
 
 export const GROSS_VALUE = {
-  'J': '1‑15,000',
-  'K': '15,001‑50,000',
-  'L': '50,001‑100,000',
-  'M': '100,001‑250,000',
-  'N': '250,001‑500,000',
-  'O': '500,001‑1,000,000',
-  'P1': '1,000,001‑5,000,000',
-  'P2': '5,000,001‑25,000,000',
-  'P3': '25,000,001‑50,000,000',
-  'P4': '50,000,00+',
+  J: '1‑15,000',
+  K: '15,001‑50,000',
+  L: '50,001‑100,000',
+  M: '100,001‑250,000',
+  N: '250,001‑500,000',
+  O: '500,001‑1,000,000',
+  P1: '1,000,001‑5,000,000',
+  P2: '5,000,001‑25,000,000',
+  P3: '25,000,001‑50,000,000',
+  P4: '50,000,00+',
   '-1': 'Failed Extraction',
 };
 
@@ -87,33 +87,49 @@ export const disclosureModel = {
   investments: {
     fields: investmentFields,
     title: 'Investments',
+    api: 'investments',
+    admin_key: 'investment',
   },
   gifts: {
     fields: giftFields,
     title: 'Gifts',
+    api: 'gifts',
+    admin_key: 'gift',
   },
   debts: {
     fields: debtFields,
     title: 'Debts',
+    api: 'debts',
+    admin_key: 'debt',
   },
   positions: {
     fields: positionFields,
     title: 'Positions',
+    api: 'disclosure-positions',
+    admin_key: 'position',
   },
   spouse_incomes: {
     fields: spouseFields,
     title: 'Spousal Income',
+    api: 'spouse-incomes',
+    admin_key: 'spouse-income',
   },
   agreements: {
     fields: agreementFields,
     title: 'Agreements',
+    api: 'agreements',
+    admin_key: 'agreement',
   },
   non_investment_incomes: {
     fields: noninvestmentFields,
     title: 'Non Investment Income',
+    api: 'non-investment-incomes',
+    admin_key: 'non-investment-income',
   },
   reimbursements: {
     fields: reimbursementsFields,
     title: 'Reimbursements',
+    api: 'reimbursements',
+    admin_key: 'reimbursement',
   },
 };

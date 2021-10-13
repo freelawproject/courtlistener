@@ -196,11 +196,8 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
   const rows = data[key];
   const fields: string[] = disclosureModel[key]['fields'];
   const title: string = disclosureModel[key]['title'];
-  let api_key = key.replaceAll('_', '-');
-  if (api_key == 'positions') {
-    api_key = `disclosure-${api_key}`;
-  }
-
+  const api_key: string = disclosureModel[key]['api'];
+  const admin_key: string = disclosureModel[key]['admin_key']
   return (
     <div>
       {rows.length > 0 ? (
@@ -242,7 +239,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
                       </td>
                       {is_admin ? (
                         <td>
-                          <a href={`/admin/disclosures/${key.replaceAll('_', '').slice(0, -1)}/${entry.id}/`}>
+                          <a href={`/admin/disclosures/${admin_key}/${entry.id}/`}>
                             <i className="fa fa-pencil gray" />
                           </a>
                         </td>

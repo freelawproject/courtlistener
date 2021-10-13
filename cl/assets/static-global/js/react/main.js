@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "3554f4332843b7210459";
+/******/ 	var hotCurrentHash = "47dff3b97a46f9ad2398";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1299,12 +1299,8 @@ var TableMaker = function TableMaker(data, key, is_admin) {
   var rows = data[key];
   var fields = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['fields'];
   var title = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['title'];
-  var api_key = key.replaceAll('_', '-');
-
-  if (api_key == 'positions') {
-    api_key = "disclosure-".concat(api_key);
-  }
-
+  var api_key = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['api'];
+  var admin_key = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['admin_key'];
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, rows.length > 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "table-responsive"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, title, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
@@ -1341,7 +1337,7 @@ var TableMaker = function TableMaker(data, key, is_admin) {
       title: 'Redaction present in row',
       className: "fa fa-file-excel-o black"
     }) : ''), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
-      href: "/admin/disclosures/".concat(key.replaceAll('_', '').slice(0, -1), "/").concat(entry.id, "/")
+      href: "/admin/disclosures/".concat(admin_key, "/").concat(entry.id, "/")
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       className: "fa fa-pencil gray"
     }))) : '', Object.entries(fields).map(function (_ref5) {
@@ -2610,16 +2606,16 @@ var INCOME_GAIN = {
   '-1': 'Failed Extraction'
 };
 var GROSS_VALUE = {
-  'J': '1‑15,000',
-  'K': '15,001‑50,000',
-  'L': '50,001‑100,000',
-  'M': '100,001‑250,000',
-  'N': '250,001‑500,000',
-  'O': '500,001‑1,000,000',
-  'P1': '1,000,001‑5,000,000',
-  'P2': '5,000,001‑25,000,000',
-  'P3': '25,000,001‑50,000,000',
-  'P4': '50,000,00+',
+  J: '1‑15,000',
+  K: '15,001‑50,000',
+  L: '50,001‑100,000',
+  M: '100,001‑250,000',
+  N: '250,001‑500,000',
+  O: '500,001‑1,000,000',
+  P1: '1,000,001‑5,000,000',
+  P2: '5,000,001‑25,000,000',
+  P3: '25,000,001‑50,000,000',
+  P4: '50,000,00+',
   '-1': 'Failed Extraction'
 };
 var VALUATION_METHODS = {
@@ -2681,35 +2677,51 @@ var spouseFields = {
 var disclosureModel = {
   investments: {
     fields: investmentFields,
-    title: 'Investments'
+    title: 'Investments',
+    api: 'investments',
+    admin_key: 'investment'
   },
   gifts: {
     fields: giftFields,
-    title: 'Gifts'
+    title: 'Gifts',
+    api: 'gifts',
+    admin_key: 'gift'
   },
   debts: {
     fields: debtFields,
-    title: 'Debts'
+    title: 'Debts',
+    api: 'debts',
+    admin_key: 'debt'
   },
   positions: {
     fields: positionFields,
-    title: 'Positions'
+    title: 'Positions',
+    api: 'disclosure-positions',
+    admin_key: 'position'
   },
   spouse_incomes: {
     fields: spouseFields,
-    title: 'Spousal Income'
+    title: 'Spousal Income',
+    api: 'spouse-incomes',
+    admin_key: 'spouse-income'
   },
   agreements: {
     fields: agreementFields,
-    title: 'Agreements'
+    title: 'Agreements',
+    api: 'agreements',
+    admin_key: 'agreement'
   },
   non_investment_incomes: {
     fields: noninvestmentFields,
-    title: 'Non Investment Income'
+    title: 'Non Investment Income',
+    api: 'non-investment-incomes',
+    admin_key: 'non-investment-income'
   },
   reimbursements: {
     fields: reimbursementsFields,
-    title: 'Reimbursements'
+    title: 'Reimbursements',
+    api: 'reimbursements',
+    admin_key: 'reimbursement'
   }
 };
 
@@ -3213,7 +3225,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3351,7 +3363,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
