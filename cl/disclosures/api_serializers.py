@@ -54,6 +54,11 @@ class NonInvestmentIncomeSerializer(
 
 
 class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    resource_uri = serializers.SerializerMethodField()
+    def get_resource_uri(self, _):
+        path = self.context['request'].path
+        return self.context['request'].build_absolute_uri(path)
+
     class Meta:
         model = Position
         fields = "__all__"
