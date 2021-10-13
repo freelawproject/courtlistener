@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "52eb2ae6841306bba15b";
+/******/ 	var hotCurrentHash = "f0e04b1739eb97b101b6";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1266,13 +1266,11 @@ var MainSection = function MainSection(disclosures) {
   var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_3___default.a.useMemo(function () {
     return lodash_debounce__WEBPACK_IMPORTED_MODULE_10___default()(changeHandler, 300);
   }, []);
-  var urlList = window.location.pathname.split('/');
-  var judgeUrl = [urlList[0], urlList[1], urlList[2], urlList[5], urlList[6]].join('/');
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-md-9'
-  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
+  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "tabcontent"
   }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_3___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-md-3'
@@ -1280,7 +1278,7 @@ var MainSection = function MainSection(disclosures) {
     className: 'v-offset-below-3 v-offset-above-3'
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-sm-9'
-  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
+  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "tabcontent"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'text-center v-offset-above-4 disclosure-page'
@@ -1426,29 +1424,27 @@ var AdminPanel = function AdminPanel(data) {
   }, "Disclosure Admin Page"));
 };
 
-var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name, judgeUrl) {
-  var pathname = window.location.pathname;
-  var slug = pathname.split('/')[5];
+var Tabs = function Tabs(data, years, active_year, fetchDisclosure, doc_ids, judge_name, parameters) {
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h1", {
     className: "text-center"
   }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
-    href: judgeUrl
+    href: "/person/".concat(parameters['judge_id'], "/").concat(parameters['slug'], "/")
   }, judge_name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("ul", {
     className: "nav nav-tabs v-offset-below-2 v-offset-above-3",
     role: ""
-  }, years.map(function (yr, index) {
+  }, years.map(function (year, index) {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", {
-      key: "".concat(yr, "_").concat(index),
-      className: year == yr ? 'active' : '',
+      key: "".concat(year, "_").concat(index),
+      className: active_year == year ? 'active' : '',
       role: "presentation"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
-      href: "../../".concat(doc_ids[index], "/").concat(slug, "/"),
+      href: "../../".concat(doc_ids[index], "/").concat(parameters['slug'], "/"),
       onClick: function onClick() {
-        fetchDisclosure(yr, index);
+        fetchDisclosure(year, index);
       }
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       className: "fa fa-file-text-o gray"
-    }), "\xA0 ", yr));
+    }), "\xA0 ", year));
   })));
 };
 
@@ -3217,7 +3213,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3355,7 +3351,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 

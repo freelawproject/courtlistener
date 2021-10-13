@@ -55,6 +55,7 @@ interface Query {
 interface IDs {
   judge_id: string;
   disclosure_id: string;
+  slug: string;
 }
 
 const TableNavigation: React.FC<DisclosureParams> = (disclosures) => {
@@ -135,16 +136,13 @@ const MainSection = (disclosures: DisclosureParams) => {
 
   const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
 
-  const urlList = window.location.pathname.split('/');
-  const judgeUrl = [urlList[0], urlList[1], urlList[2], urlList[5], urlList[6]].join('/');
-
   return (
     <div>
       {data.has_been_extracted ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-md-9'}>
-              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
+              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
               <div className="tabcontent">
                 {TableMaker(data, 'investments', is_admin)}
                 {TableMaker(data, 'gifts', is_admin)}
@@ -171,7 +169,7 @@ const MainSection = (disclosures: DisclosureParams) => {
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-sm-9'}>
-              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
+              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
               <div className="tabcontent">
                 <div className={'text-center v-offset-above-4 disclosure-page'}>
                   <i className="fa fa-exclamation-triangle gray" />
@@ -395,7 +393,7 @@ const AdminPanel = (data: Data) => {
 const Tabs = (
   data: Data,
   years: string[],
-  year: string,
+  active_year: string,
   fetchDisclosure: {
     (doc_id: string): Promise<void>;
     (doc_id: string): Promise<void>;
@@ -403,28 +401,26 @@ const Tabs = (
   },
   doc_ids: string[],
   judge_name: string,
-  judgeUrl: string
+  parameters: IDs
 ) => {
-  const pathname = window.location.pathname;
-  const slug = pathname.split('/')[5];
   return (
     <div>
       <h1 className="text-center">
         Financial Disclosures for J.&nbsp;
-        <a href={judgeUrl}>{judge_name}</a>
+        <a href={`/person/${parameters['judge_id']}/${parameters['slug']}/`}>{judge_name}</a>
       </h1>
       <ul className="nav nav-tabs v-offset-below-2 v-offset-above-3" role="">
-        {years.map((yr, index) => {
+        {years.map((year, index) => {
           return (
-            <li key={`${yr}_${index}`} className={year == yr ? 'active' : ''} role="presentation">
+            <li key={`${year}_${index}`} className={active_year == year ? 'active' : ''} role="presentation">
               <a
-                href={`../../${doc_ids[index]}/${slug}/`}
+                href={`../../${doc_ids[index]}/${parameters['slug']}/`}
                 onClick={() => {
-                  fetchDisclosure(yr, index);
+                  fetchDisclosure(year, index);
                 }}
               >
                 <i className="fa fa-file-text-o gray" />
-                &nbsp; {yr}
+                &nbsp; {year}
               </a>
             </li>
           );
