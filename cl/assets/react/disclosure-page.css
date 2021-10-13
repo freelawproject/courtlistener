@@ -33,10 +33,13 @@
 }
 
 .table-instant-results {
-  width: 95%;
   position: absolute;
   z-index: 9;
   box-shadow: 2px 2px 5px #acacac;
+}
+
+#main-query-box .table-instant-results {
+  width: 95%
 }
 
 tr:hover {
@@ -68,10 +71,6 @@ tr > a:hover {
 
 .judge-name {
   font-size: 20px;
-}
-
-.judge-court {
-  color: gray;
 }
 
 .hide-table {

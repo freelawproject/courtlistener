@@ -4,11 +4,16 @@ import { Table } from 'react-bootstrap';
 import './disclosure-page.css';
 import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
-import { convertTD } from './_disclosure_helpers';
+import { convertTD, DisclosureSearch, isDescendant } from './_disclosure_helpers';
 import debounce from 'lodash.debounce';
+import { DebouncedFunc } from 'lodash';
 
-interface TableNavigationInnerProps {
+interface DisclosureParams {
   disclosures: string;
+  years: string;
+  admin: string;
+  ids: string;
+  judge: string;
 }
 
 interface Person {
@@ -26,6 +31,11 @@ interface Row {
   thumbnail: string;
   page_number: number;
   redacted: boolean;
+  latest_disclosure_url: string;
+  name_full: string;
+  position_str: string;
+  disclosure_years: string;
+  thumbnail_path: string;
 }
 
 interface Data {
@@ -36,37 +46,39 @@ interface Data {
   id: number;
 }
 
-const TableNavigation: React.FC<TableNavigationInnerProps> = (disclosures) => {
+interface Query {
+  results: Data[];
+  previous: boolean;
+  next: boolean;
+}
+
+interface IDs {
+  judge_id: string;
+  disclosure_id: string;
+}
+
+const TableNavigation: React.FC<DisclosureParams> = (disclosures) => {
   return <React.Fragment>{MainSection(disclosures)}</React.Fragment>;
 };
 
-function isDescendant(parent: HTMLElement, child: HTMLElement) {
-  let node = child.parentNode;
-  while (node != null) {
-    if (node == parent) {
-      return true;
-    }
-    node = node.parentNode;
-  }
-  return false;
-}
-
-const MainSection = (disclosures) => {
+const MainSection = (disclosures: DisclosureParams) => {
+  const empty_dict: Data = { addendum_content_raw: '', filepath: '', has_been_extracted: false, thumbnail: '', id: 0 };
   const years = disclosures['years'].split(',');
-  console.log(years)
   const doc_ids = disclosures['ids'].split(',');
-  const { disclosure_id } = useParams();
-  const { judge_id } = useParams();
-  const [data, setData] = React.useState('');
+  const parameters: IDs = useParams();
+  const judge_id: string = parameters['judge_id'];
+  const disclosure_id: string = parameters['disclosure_id'];
+  const [data, setData] = React.useState(empty_dict);
   const [judge, setJudge] = React.useState([]);
   const judge_name = disclosures['judge'];
   const is_admin = disclosures['admin'] == 'True';
-  const indx = doc_ids.indexOf(disclosure_id);
+  const index = doc_ids.indexOf(disclosure_id);
   const [visible, setVisible] = React.useState(false);
 
   const handleClickOutside = (event: Event) => {
     const query_container = document.getElementById('sidebar-query-box');
-    if (!isDescendant(query_container, event.target)) {
+    const child: HTMLElement = event.target as HTMLInputElement;
+    if (!isDescendant(query_container, child)) {
       setVisible(false);
     }
     if (query_container == event.target) {
@@ -85,16 +97,21 @@ const MainSection = (disclosures) => {
     window.addEventListener('keydown', handleEsc);
   }, []);
 
-  const fetchDisclosure = async (doc_id: number) => {
+  const fetchDisclosure = async (doc_id: string) => {
     try {
-      const response = await appFetch(`/api/rest/v3/financial-disclosures/?person=${judge_id}&id=${doc_id}`);
-      setData(response['results'][0]);
+      const response: boolean | Query = await appFetch(
+        `/api/rest/v3/financial-disclosures/?person=${judge_id}&id=${doc_id}`
+      );
+      if (typeof response != 'boolean') {
+        const result = response['results'][0];
+        setData(result);
+      }
     } catch (error) {
       console.log(error);
     }
   };
 
-  if (data == '') {
+  if (data.id == 0) {
     fetchDisclosure(disclosure_id);
   }
 
@@ -109,23 +126,25 @@ const MainSection = (disclosures) => {
 
   const changeHandler = (event: string) => {
     if (event.length < 2) {
-      setVisible(false)
+      setVisible(false);
     } else {
       fetchJudge(event);
-      setVisible(true)
+      setVisible(true);
     }
   };
 
   const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
+
   const urlList = window.location.pathname.split('/');
   const judgeUrl = [urlList[0], urlList[1], urlList[2], urlList[5], urlList[6]].join('/');
+
   return (
     <div>
-      {data != '' && data.has_been_extracted ? (
+      {data.has_been_extracted ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-md-9'}>
-              {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
+              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
               <div className="tabcontent">
                 {TableMaker(data, 'investments', is_admin)}
                 {TableMaker(data, 'gifts', is_admin)}
@@ -145,20 +164,20 @@ const MainSection = (disclosures) => {
                 )}
               </div>
             </div>
-            <div className={'col-md-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible)}</div>
+            <div className={'col-md-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
-      ) : data != '' && data.has_been_extracted == false ? (
+      ) : data.id != 0 && !data.has_been_extracted ? (
         <div>
           <div className={'v-offset-below-3 v-offset-above-3'}>
             <div className={'col-sm-9'}>
-              {Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
+              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl)}
               <div className="tabcontent">
-                <div className={'text-center v-offset-above-4'}>
+                <div className={'text-center v-offset-above-4 disclosure-page'}>
                   <i className="fa fa-exclamation-triangle gray" />
                   <h1>Table extraction failed.</h1>
                   <p>
-                    <a href={data.filepath}>Click here to view the disclsoure as a PDF document</a>
+                    <a href={data.filepath}>Click here to view the disclosure as a PDF document</a>
                   </p>
                 </div>
               </div>
@@ -177,7 +196,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
   const url = data.filepath;
   const disclosure_id = data.id;
   const rows = data[key];
-  const fields = disclosureModel[key]['fields'];
+  const fields: string[] = disclosureModel[key]['fields'];
   const title: string = disclosureModel[key]['title'];
   let api_key = key.replaceAll('_', '-');
   if (api_key == 'positions') {
@@ -306,16 +325,22 @@ const Thumb = (data: Data) => {
 const Sidebar = (
   data: Data,
   is_admin: boolean,
-  judge: Row[],
-  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
-  visible,
+  judge_data: Row[],
+  fetchJudge: DebouncedFunc<(query: string) => Promise<void>> | React.ChangeEventHandler<HTMLInputElement>,
+  visible: boolean,
+  setVisible: {
+    (value: React.SetStateAction<boolean>): void;
+    (value: React.SetStateAction<boolean>): void;
+    (value: React.SetStateAction<boolean>): void;
+    (arg0: boolean): void;
+  }
 ) => {
   return (
     <div>
       {is_admin ? AdminPanel(data) : ''}
       {data.thumbnail ? Thumb(data) : ''}
       {Notes()}
-      {SearchPanel(judge, fetchJudge, visible)}
+      {DisclosureSearch(judge_data, fetchJudge, visible, setVisible, true)}
       {Support()}
     </div>
   );
@@ -353,92 +378,6 @@ const Notes = () => {
   );
 };
 
-const SearchPanel = (
-  judge: Row[],
-  fetchJudge: React.ChangeEventHandler<HTMLInputElement> | undefined,
-  visible: boolean
-) => {
-  function update({ ...data }) {
-    const query: string = data.target.value;
-    fetchJudge(query);
-  }
-
-  const onFocusClick = (url: string) => {
-    if (event.button == 2) {
-      event.preventDefault();
-    }
-    if (event.button == 0 || event.keyCode == 13) {
-      event.preventDefault();
-      window.location = url;
-    }
-  };
-
-  const onReturn = () => {
-    console.log(judge.length)
-    console.log(event.keyCode)
-    if (judge.length == 1 && event.keyCode == 13) {
-      onFocusClick(judge[0].latest_disclosure_url);
-    }
-  };
-
-  return (
-    <div className={'v-offset-below-4 table-parent'}>
-      <h3>
-        <span>
-          Search <i className="fa fa-search gray pull-right" />
-        </span>
-      </h3>
-      <hr />
-      <input
-        id={'sidebar-query-box'}
-        onChange={update}
-        autoComplete={'off'}
-        autoCorrect={'off'}
-        autoCapitalize={'off'}
-        spellCheck={'false'}
-        className={'form-control input-sm'}
-        onKeyDown={onReturn}
-        placeholder={'Search for judges by name…'}
-        tabIndex={300}
-      />
-      <table className={visible ? 'search-panel-table' : 'hide-table'}>
-        <tbody className={'cursor'}>
-          {judge.map((row: Row) => {
-            return (
-              <tr
-                className={'tr-results cursor'}
-                key={row.id}
-                onKeyDown={() => onFocusClick(row.latest_disclosure_url)}
-                onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
-                tabIndex={301}
-              >
-                <td className={'col-lg-9 col-md-9 col-sm-11 col-xs-10'}>
-                  <h4 className={'text-left'}>{row.name_full}</h4>
-                  <p className={'text-left'}>{row.position_str}</p>
-                </td>
-                <td className={'col-lg-3 col-md-3 col-sm-1 col-xs-2 '}>
-                  {row.thumbnail_path != null ? (
-                    <img
-                      src={row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png'}
-                      alt="Thumbnail of first page of disclosure"
-                      height={'50'}
-                      className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-                    />
-                  ) : (
-                    <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
-                      <i height={'150'} className={'fa fa-user fa-10x missing-judge'}></i>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
 const AdminPanel = (data: Data) => {
   return (
     <div className={'v-offset-below-4'}>
@@ -455,16 +394,19 @@ const AdminPanel = (data: Data) => {
 
 const Tabs = (
   data: Data,
-  years: [string],
+  years: string[],
   year: string,
-  fetchDisclosure,
-  doc_ids: [number],
+  fetchDisclosure: {
+    (doc_id: string): Promise<void>;
+    (doc_id: string): Promise<void>;
+    (arg0: string, arg1: number): void;
+  },
+  doc_ids: string[],
   judge_name: string,
   judgeUrl: string
 ) => {
   const pathname = window.location.pathname;
   const slug = pathname.split('/')[5];
-  console.log(years, "YEARS")
   return (
     <div>
       <h1 className="text-center">

@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "9a9b2a5ae316e42cff1c";
+/******/ 	var hotCurrentHash = "52eb2ae6841306bba15b";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -936,19 +936,18 @@
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/helpers/extends */ "./node_modules/@babel/runtime/helpers/extends.js");
-/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @babel/runtime/helpers/asyncToGenerator */ "./node_modules/@babel/runtime/helpers/asyncToGenerator.js");
-/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @babel/runtime/helpers/slicedToArray */ "./node_modules/@babel/runtime/helpers/slicedToArray.js");
-/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
-/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3__);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var _fetch__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./_fetch */ "./assets/react/_fetch.ts");
-/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! lodash.debounce */ "./node_modules/lodash.debounce/index.js");
-/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(lodash_debounce__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/helpers/asyncToGenerator */ "./node_modules/@babel/runtime/helpers/asyncToGenerator.js");
+/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @babel/runtime/helpers/slicedToArray */ "./node_modules/@babel/runtime/helpers/slicedToArray.js");
+/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _fetch__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./_fetch */ "./assets/react/_fetch.ts");
+/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! lodash.debounce */ "./node_modules/lodash.debounce/index.js");
+/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(lodash_debounce__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _disclosure_helpers__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./_disclosure_helpers */ "./assets/react/_disclosure_helpers.tsx");
 
 
 
@@ -956,41 +955,23 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
-function isDescendant(parent, child) {
-  var node = child.parentNode;
-
-  while (node != null) {
-    if (node == parent) {
-      return true;
-    }
-
-    node = node.parentNode;
-  }
-
-  return false;
-}
 
 var DisclosureList = function DisclosureList() {
-  var _React$useState = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState([]),
-      _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState, 2),
+  var _React$useState = react__WEBPACK_IMPORTED_MODULE_3___default.a.useState([]),
+      _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState, 2),
       data = _React$useState2[0],
       setData = _React$useState2[1];
 
-  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(''),
-      _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState3, 2),
-      query = _React$useState4[0],
-      setQuery = _React$useState4[1];
-
-  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(false),
-      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
-      visible = _React$useState6[0],
-      setVisible = _React$useState6[1];
+  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_3___default.a.useState(false),
+      _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState3, 2),
+      visible = _React$useState4[0],
+      setVisible = _React$useState4[1];
 
   var handleClickOutside = function handleClickOutside(event) {
     var query_container = document.getElementById('main-query-box');
+    var child = event.target;
 
-    if (isDescendant(query_container, event.target)) {
+    if (Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_6__["isDescendant"])(query_container, child)) {
       setVisible(true);
     } else {
       setVisible(false);
@@ -1003,42 +984,44 @@ var DisclosureList = function DisclosureList() {
     }
   };
 
-  react__WEBPACK_IMPORTED_MODULE_4___default.a.useEffect(function () {
+  react__WEBPACK_IMPORTED_MODULE_3___default.a.useEffect(function () {
     document.addEventListener('click', handleClickOutside, true);
     window.addEventListener('keydown', handleEsc);
   }, []);
 
   var fetchData = /*#__PURE__*/function () {
-    var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee(query) {
+    var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.mark(function _callee(query) {
       var response, results;
-      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.wrap(function _callee$(_context) {
+      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
               _context.prev = 0;
               _context.next = 3;
-              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
+              return Object(_fetch__WEBPACK_IMPORTED_MODULE_4__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
 
             case 3:
               response = _context.sent;
-              results = response['results'];
-              setQuery(query);
-              setData(results);
-              console.log(response['results']);
-              _context.next = 13;
+
+              if (typeof response != 'boolean') {
+                results = response['results'];
+                setData(results);
+              }
+
+              _context.next = 10;
               break;
 
-            case 10:
-              _context.prev = 10;
+            case 7:
+              _context.prev = 7;
               _context.t0 = _context["catch"](0);
               console.log(_context.t0);
 
-            case 13:
+            case 10:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 10]]);
+      }, _callee, null, [[0, 7]]);
     }));
 
     return function fetchData(_x) {
@@ -1046,134 +1029,46 @@ var DisclosureList = function DisclosureList() {
     };
   }();
 
-  var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
-    return lodash_debounce__WEBPACK_IMPORTED_MODULE_6___default()(fetchData, 300);
+  var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_3___default.a.useMemo(function () {
+    return lodash_debounce__WEBPACK_IMPORTED_MODULE_5___default()(fetchData, 300);
   }, []);
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, DisclosureHeader(), DisclosureSearch(data, query, debounceFetchJudge, visible, setVisible), DisclosureFooter());
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, DisclosureHeader(), Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_6__["DisclosureSearch"])(data, debounceFetchJudge, visible, setVisible, false), DisclosureFooter());
 };
 
 var DisclosureHeader = function DisclosureHeader() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h1", {
     className: "text-center"
-  }, "Judicial Financial Disclosures Database"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
+  }, "Judicial Financial Disclosures Database"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", {
     className: "text-center gray large"
   }, "Search and review the biggest database of judicial disclosures ever made."));
 };
 
-var DisclosureSearch = function DisclosureSearch(data, query, fetchData, visible, setVisible) {
-  function update(_ref2) {
-    var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref2);
-
-    var query = data.target.value;
-
-    if (query.length > 1) {
-      fetchData(query);
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }
-
-  var onFocusClick = function onFocusClick(url) {
-    if (event.button == 2) {
-      event.preventDefault();
-    }
-
-    if (event.button == 0 || event.keyCode == 13) {
-      event.preventDefault();
-      window.location = url;
-    }
-  };
-
-  var onReturn = function onReturn() {
-    if (data.length == 1 && event.keyCode == 13) {
-      onFocusClick(data[0].latest_disclosure_url);
-    }
-  };
-
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: "row v-offset-above-2"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: "hidden-xs col-sm-1 col-md-2 col-lg-3"
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: "col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group",
-    id: "main-query-box"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("label", {
-    className: "sr-only",
-    htmlFor: "id_disclosures_search"
-  }, "Filter disclosures\u2026"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
-    className: "form-control input-lg",
-    name: "disclosures-filter",
-    id: "id_disclosures_search",
-    autoComplete: 'off',
-    autoCorrect: 'off',
-    autoCapitalize: 'off',
-    spellCheck: 'false',
-    onChange: update,
-    onKeyDown: onReturn,
-    type: "search",
-    tabIndex: 300,
-    placeholder: "Search for judges by name\u2026"
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: visible ? 'table-instant-results' : 'hide-table'
-  }, query != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, data.map(function (row) {
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
-      tabIndex: 301,
-      onKeyDown: function onKeyDown() {
-        return onFocusClick(row.latest_disclosure_url);
-      },
-      onMouseDown: function onMouseDown() {
-        return onFocusClick(row.latest_disclosure_url);
-      },
-      key: row.id,
-      className: "tr-results cursor"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: "col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
-      className: 'text-left judge-name'
-    }, row.name_full), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
-      className: 'text-left judge-court'
-    }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
-    }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
-      src: row.thumbnail_path,
-      alt: "Thumbnail of first page of disclosure",
-      width: '100%',
-      className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
-    }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-      className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
-      className: 'fa fa-user fa-10x missing-judge'
-    }))));
-  })) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null)))));
-};
-
 var DisclosureFooter = function DisclosureFooter() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "row v-offset-above-4"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "col-md-4"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "About this Database"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "Every year, federal judges must complete lengthy documents listing any investments or other potential sources of conflict that they may have. By statute, these documents are available to the public for six years before they must be destroyed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "In 2017, we began collecting these documents so they would not be thrown away. After extracting the data from the files we've collected, we have build a first-of-its-kind database of over a million investment transactions, and more than 250,000 pages of judicial records."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "All of the information you find here is available via our APIs or by browsing our database of judges."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "Creating this database was an expensive project for our organization. If you find this work valuable, please consider making a donation"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "About this Database"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "Every year, federal judges must complete lengthy documents listing any investments or other potential sources of conflict that they may have. By statute, these documents are available to the public for six years before they must be destroyed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "In 2017, we began collecting these documents so they would not be thrown away. After extracting the data from the files we've collected, we have build a first-of-its-kind database of over a million investment transactions, and more than 250,000 pages of judicial records."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "All of the information you find here is available via our APIs or by browsing our database of judges."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "Creating this database was an expensive project for our organization. If you find this work valuable, please consider making a donation"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "/donate/?referrer=fds-homepage",
     className: "btn btn-danger btn-lg"
-  }, "Donate Now"))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, "Donate Now"))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "col-md-4"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Coverage"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "This database is a collection of every disclosure we could find online or request under the law."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "To learn more about what we have found, please see our coverage page dedicated to the topic."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "If you know of sources of disclosures that we do not already have, please get in touch and we will be pleased to add it to our collection."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Coverage"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "This database is a collection of every disclosure we could find online or request under the law."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "To learn more about what we have found, please see our coverage page dedicated to the topic."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "If you know of sources of disclosures that we do not already have, please get in touch and we will be pleased to add it to our collection."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "/coverage/financial-disclosures/",
     className: "btn btn-primary btn-lg"
-  }, "See Coverage"))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, "See Coverage"))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "col-md-4"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Learn More"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("ul", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Learn More"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("ul", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://free.law/2021/09/28/announcing-federal-financial-disclosures"
-  }, "Our blog post announcing the database")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "Our blog post announcing the database")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://www.wsj.com/articles/131-federal-judges-broke-the-law-by-hearing-cases-where-they-had-a-financial-interest-11632834421?st=wm0bzo39zzjts1v"
-  }, "The Wall Street Journal's investigation using this data")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "The Wall Street Journal's investigation using this data")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf"
-  }, "The official policies guiding financial disclosures")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "The official policies guiding financial disclosures")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://www.gao.gov/assets/gao-18-406.pdf"
-  }, "A GAO report on disclosures")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "A GAO report on disclosures")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://www.govtrack.us/congress/bills/95/s555"
-  }, "The Ethics in Government Act establishing disclosure rules")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "The Ethics in Government Act establishing disclosure rules")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://web.archive.org/web/20190614103410/https://famguardian.org/PublishedAuthors/Media/KCStar/30da0058.404,.htm"
   }, "Early investigative work on disclosures from 1998")))));
 };
@@ -1191,25 +1086,22 @@ var DisclosureFooter = function DisclosureFooter() {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/helpers/extends */ "./node_modules/@babel/runtime/helpers/extends.js");
-/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @babel/runtime/helpers/asyncToGenerator */ "./node_modules/@babel/runtime/helpers/asyncToGenerator.js");
-/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @babel/runtime/helpers/slicedToArray */ "./node_modules/@babel/runtime/helpers/slicedToArray.js");
-/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
-/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3__);
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
-/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var _fetch__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./_fetch */ "./assets/react/_fetch.ts");
-/* harmony import */ var react_bootstrap__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! react-bootstrap */ "./node_modules/react-bootstrap/es/index.js");
-/* harmony import */ var _disclosure_page_css__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./disclosure-page.css */ "./assets/react/disclosure-page.css");
-/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router-dom/esm/react-router-dom.js");
-/* harmony import */ var _disclosure_models__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./_disclosure_models */ "./assets/react/_disclosure_models.ts");
-/* harmony import */ var _disclosure_helpers__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./_disclosure_helpers */ "./assets/react/_disclosure_helpers.ts");
-/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! lodash.debounce */ "./node_modules/lodash.debounce/index.js");
-/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_11___default = /*#__PURE__*/__webpack_require__.n(lodash_debounce__WEBPACK_IMPORTED_MODULE_11__);
-
+/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/helpers/asyncToGenerator */ "./node_modules/@babel/runtime/helpers/asyncToGenerator.js");
+/* harmony import */ var _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @babel/runtime/helpers/slicedToArray */ "./node_modules/@babel/runtime/helpers/slicedToArray.js");
+/* harmony import */ var _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @babel/runtime/regenerator */ "./node_modules/@babel/runtime/regenerator/index.js");
+/* harmony import */ var _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _fetch__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./_fetch */ "./assets/react/_fetch.ts");
+/* harmony import */ var react_bootstrap__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react-bootstrap */ "./node_modules/react-bootstrap/es/index.js");
+/* harmony import */ var _disclosure_page_css__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./disclosure-page.css */ "./assets/react/disclosure-page.css");
+/* harmony import */ var react_router_dom__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router-dom/esm/react-router-dom.js");
+/* harmony import */ var _disclosure_models__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./_disclosure_models */ "./assets/react/_disclosure_models.ts");
+/* harmony import */ var _disclosure_helpers__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./_disclosure_helpers */ "./assets/react/_disclosure_helpers.tsx");
+/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! lodash.debounce */ "./node_modules/lodash.debounce/index.js");
+/* harmony import */ var lodash_debounce__WEBPACK_IMPORTED_MODULE_10___default = /*#__PURE__*/__webpack_require__.n(lodash_debounce__WEBPACK_IMPORTED_MODULE_10__);
 
 
 
@@ -1223,57 +1115,47 @@ __webpack_require__.r(__webpack_exports__);
 
 
 var TableNavigation = function TableNavigation(disclosures) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, MainSection(disclosures));
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_3___default.a.Fragment, null, MainSection(disclosures));
 };
 
-function isDescendant(parent, child) {
-  var node = child.parentNode;
-
-  while (node != null) {
-    if (node == parent) {
-      return true;
-    }
-
-    node = node.parentNode;
-  }
-
-  return false;
-}
-
 var MainSection = function MainSection(disclosures) {
+  var empty_dict = {
+    addendum_content_raw: '',
+    filepath: '',
+    has_been_extracted: false,
+    thumbnail: '',
+    id: 0
+  };
   var years = disclosures['years'].split(',');
-  console.log(years);
   var doc_ids = disclosures['ids'].split(',');
+  var parameters = Object(react_router_dom__WEBPACK_IMPORTED_MODULE_7__["useParams"])();
+  var judge_id = parameters['judge_id'];
+  var disclosure_id = parameters['disclosure_id'];
 
-  var _useParams = Object(react_router_dom__WEBPACK_IMPORTED_MODULE_8__["useParams"])(),
-      disclosure_id = _useParams.disclosure_id;
-
-  var _useParams2 = Object(react_router_dom__WEBPACK_IMPORTED_MODULE_8__["useParams"])(),
-      judge_id = _useParams2.judge_id;
-
-  var _React$useState = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(''),
-      _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState, 2),
+  var _React$useState = react__WEBPACK_IMPORTED_MODULE_3___default.a.useState(empty_dict),
+      _React$useState2 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState, 2),
       data = _React$useState2[0],
       setData = _React$useState2[1];
 
-  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState([]),
-      _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState3, 2),
+  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_3___default.a.useState([]),
+      _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState3, 2),
       judge = _React$useState4[0],
       setJudge = _React$useState4[1];
 
   var judge_name = disclosures['judge'];
   var is_admin = disclosures['admin'] == 'True';
-  var indx = doc_ids.indexOf(disclosure_id);
+  var index = doc_ids.indexOf(disclosure_id);
 
-  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_4___default.a.useState(false),
-      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_React$useState5, 2),
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_3___default.a.useState(false),
+      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState5, 2),
       visible = _React$useState6[0],
       setVisible = _React$useState6[1];
 
   var handleClickOutside = function handleClickOutside(event) {
     var query_container = document.getElementById('sidebar-query-box');
+    var child = event.target;
 
-    if (!isDescendant(query_container, event.target)) {
+    if (!Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_9__["isDescendant"])(query_container, child)) {
       setVisible(false);
     }
 
@@ -1288,40 +1170,44 @@ var MainSection = function MainSection(disclosures) {
     }
   };
 
-  react__WEBPACK_IMPORTED_MODULE_4___default.a.useEffect(function () {
+  react__WEBPACK_IMPORTED_MODULE_3___default.a.useEffect(function () {
     document.addEventListener('click', handleClickOutside, true);
     window.addEventListener('keydown', handleEsc);
   }, []);
 
   var fetchDisclosure = /*#__PURE__*/function () {
-    var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee(doc_id) {
-      var response;
-      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.wrap(function _callee$(_context) {
+    var _ref = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.mark(function _callee(doc_id) {
+      var response, result;
+      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.wrap(function _callee$(_context) {
         while (1) {
           switch (_context.prev = _context.next) {
             case 0:
               _context.prev = 0;
               _context.next = 3;
-              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/financial-disclosures/?person=".concat(judge_id, "&id=").concat(doc_id));
+              return Object(_fetch__WEBPACK_IMPORTED_MODULE_4__["appFetch"])("/api/rest/v3/financial-disclosures/?person=".concat(judge_id, "&id=").concat(doc_id));
 
             case 3:
               response = _context.sent;
-              console.log(response);
-              setData(response['results'][0]);
-              _context.next = 11;
+
+              if (typeof response != 'boolean') {
+                result = response['results'][0];
+                setData(result);
+              }
+
+              _context.next = 10;
               break;
 
-            case 8:
-              _context.prev = 8;
+            case 7:
+              _context.prev = 7;
               _context.t0 = _context["catch"](0);
               console.log(_context.t0);
 
-            case 11:
+            case 10:
             case "end":
               return _context.stop();
           }
         }
-      }, _callee, null, [[0, 8]]);
+      }, _callee, null, [[0, 7]]);
     }));
 
     return function fetchDisclosure(_x) {
@@ -1329,20 +1215,20 @@ var MainSection = function MainSection(disclosures) {
     };
   }();
 
-  if (data == '') {
+  if (data.id == 0) {
     fetchDisclosure(disclosure_id);
   }
 
   var fetchJudge = /*#__PURE__*/function () {
-    var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_1___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee2(query) {
+    var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_0___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.mark(function _callee2(query) {
       var response;
-      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.wrap(function _callee2$(_context2) {
+      return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_2___default.a.wrap(function _callee2$(_context2) {
         while (1) {
           switch (_context2.prev = _context2.next) {
             case 0:
               _context2.prev = 0;
               _context2.next = 3;
-              return Object(_fetch__WEBPACK_IMPORTED_MODULE_5__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
+              return Object(_fetch__WEBPACK_IMPORTED_MODULE_4__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
 
             case 3:
               response = _context2.sent;
@@ -1377,34 +1263,34 @@ var MainSection = function MainSection(disclosures) {
     }
   };
 
-  var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_4___default.a.useMemo(function () {
-    return lodash_debounce__WEBPACK_IMPORTED_MODULE_11___default()(changeHandler, 300);
+  var debounceFetchJudge = react__WEBPACK_IMPORTED_MODULE_3___default.a.useMemo(function () {
+    return lodash_debounce__WEBPACK_IMPORTED_MODULE_10___default()(changeHandler, 300);
   }, []);
   var urlList = window.location.pathname.split('/');
   var judgeUrl = [urlList[0], urlList[1], urlList[2], urlList[5], urlList[6]].join('/');
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, data != '' && data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-md-9'
-  }, Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "tabcontent"
-  }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_4___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_3___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-md-3'
-  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible)))) : data != '' && data.has_been_extracted == false ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : data.id != 0 && !data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-sm-9'
-  }, Tabs(data, years, years[indx], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, judgeUrl), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "tabcontent"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'text-center v-offset-above-4'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
+    className: 'text-center v-offset-above-4 disclosure-page'
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-exclamation-triangle gray"
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h1", null, "Table extraction failed."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: data.filepath
-  }, "Click here to view the disclsoure as a PDF document"))))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  }, "Click here to view the disclosure as a PDF document"))))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-sm-3'
-  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
+  }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h1", {
     className: 'text-center'
   }, "Loading..."));
 };
@@ -1413,61 +1299,61 @@ var TableMaker = function TableMaker(data, key, is_admin) {
   var url = data.filepath;
   var disclosure_id = data.id;
   var rows = data[key];
-  var fields = _disclosure_models__WEBPACK_IMPORTED_MODULE_9__["disclosureModel"][key]['fields'];
-  var title = _disclosure_models__WEBPACK_IMPORTED_MODULE_9__["disclosureModel"][key]['title'];
+  var fields = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['fields'];
+  var title = _disclosure_models__WEBPACK_IMPORTED_MODULE_8__["disclosureModel"][key]['title'];
   var api_key = key.replaceAll('_', '-');
 
   if (api_key == 'positions') {
     api_key = "disclosure-".concat(api_key);
   }
 
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, rows.length > 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, rows.length > 0 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "table-responsive"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, title, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, title, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "/api/rest/v3/".concat(api_key, "/?financial_disclosure__id=").concat(disclosure_id)
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-code gray pull-right"
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement(react_bootstrap__WEBPACK_IMPORTED_MODULE_6__["Table"], {
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react_bootstrap__WEBPACK_IMPORTED_MODULE_5__["Table"], {
     striped: true,
     bordered: true,
     hover: true,
     responsive: true
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("thead", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("thead", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("tr", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("th", {
     key: ''
-  }, " "), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", null, "Admin") : '', Object.entries(fields).map(function (_ref3) {
-    var _ref4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_ref3, 2),
+  }, " "), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("th", null, "Admin") : '', Object.entries(fields).map(function (_ref3) {
+    var _ref4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_ref3, 2),
         key = _ref4[0],
         value = _ref4[1];
 
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("th", {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("th", {
       key: value
     }, key);
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", null, rows.sort(function (x, y) {
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("tbody", null, rows.sort(function (x, y) {
     return x.id > y.id ? 1 : -1;
   }).map(function (entry) {
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("tr", {
       key: entry.id,
       className: ''
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
       title: 'Go to PDF',
       href: url + '#page=' + entry.page_number
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       className: "fa fa-file-text-o gray"
-    })), "\xA0", entry.redacted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+    })), "\xA0", entry.redacted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       title: 'Redaction present in row',
       className: "fa fa-file-excel-o black"
-    }) : ''), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+    }) : ''), is_admin ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("td", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
       href: "/admin/disclosures/".concat(key.replaceAll('_', '').slice(0, -1), "/").concat(entry.id, "/")
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       className: "fa fa-pencil gray"
     }))) : '', Object.entries(fields).map(function (_ref5) {
-      var _ref6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2___default()(_ref5, 2),
+      var _ref6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_ref5, 2),
           key = _ref6[0],
           value = _ref6[1];
 
-      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
+      return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("td", {
         key: key
-      }, Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_10__["convertTD"])(entry[value], title, value), entry[value] == -1 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+      }, Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_9__["convertTD"])(entry[value], title, value), entry[value] == -1 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
         className: "fa fa-eye-slash black"
       }) : '');
     }));
@@ -1475,32 +1361,32 @@ var TableMaker = function TableMaker(data, key, is_admin) {
 };
 
 var Support = function Support() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     id: 'support'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Support FLP ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "Support FLP ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-heart-o red pull-right"
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", {
     className: "v-offset-above-1"
-  }, "CourtListener is a project of", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "CourtListener is a project of", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "https://free.law",
     target: "_blank",
     rel: "noreferrer"
-  }, "Free Law Project"), ", a federally-recognized 501(c)(3) non-profit. We rely on donations for our financial security."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, "Please support our work with a donation."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "Free Law Project"), ", a federally-recognized 501(c)(3) non-profit. We rely on donations for our financial security."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "Please support our work with a donation."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "",
     className: "btn btn-danger btn-lg btn-block"
   }, "Donate Now")));
 };
 
 var Thumb = function Thumb(data) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "v-offset-below-4"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Download", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "Download", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "/api/rest/v3/financial-disclosures/?id=".concat(data.id)
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-code gray pull-right"
-  })))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  })))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: data.filepath
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("img", {
     src: data.thumbnail,
     alt: "Thumbnail of first page of disclosure",
     className: "img-responsive thumbnail shadow img-thumbnail judge-pic",
@@ -1508,114 +1394,34 @@ var Thumb = function Thumb(data) {
   })));
 };
 
-var Sidebar = function Sidebar(data, is_admin, judge, fetchJudge, visible) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', data.thumbnail ? Thumb(data) : '', Notes(), SearchPanel(judge, fetchJudge, visible), Support());
+var Sidebar = function Sidebar(data, is_admin, judge_data, fetchJudge, visible, setVisible) {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, is_admin ? AdminPanel(data) : '', data.thumbnail ? Thumb(data) : '', Notes(), Object(_disclosure_helpers__WEBPACK_IMPORTED_MODULE_9__["DisclosureSearch"])(judge_data, fetchJudge, visible, setVisible, true), Support());
 };
 
 var Notes = function Notes() {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-4'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Notes ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "Notes ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-sticky-note-o pull-right"
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "The data in this file was extracted with OCR technology and may contain typos."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("ul", {
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "The data in this file was extracted with OCR technology and may contain typos."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("ul", {
     className: 'v-offset-above-2 v-offset-below-2'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-file-text-o gray"
-  }), " Links to the PDF row (if possible)."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }), " Links to the PDF row (if possible)."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-file-excel-o black"
-  }), " The row may contain a redaction."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }), " The row may contain a redaction."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-eye-slash black"
-  }), " Indicates failed extraction in the cell.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }), " Indicates failed extraction in the cell.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: 'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'
   }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."));
 };
 
-var SearchPanel = function SearchPanel(judge, fetchJudge, visible) {
-  function update(_ref7) {
-    var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref7);
-
-    var query = data.target.value;
-    fetchJudge(query);
-  }
-
-  var onFocusClick = function onFocusClick(url) {
-    if (event.button == 2) {
-      event.preventDefault();
-    }
-
-    if (event.button == 0 || event.keyCode == 13) {
-      event.preventDefault();
-      window.location = url;
-    }
-  };
-
-  var onReturn = function onReturn() {
-    console.log(judge.length);
-    console.log(event.keyCode);
-
-    if (judge.length == 1 && event.keyCode == 13) {
-      onFocusClick(judge[0].latest_disclosure_url);
-    }
-  };
-
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-    className: 'v-offset-below-4 table-parent'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Search ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
-    className: "fa fa-search gray pull-right"
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("input", {
-    id: 'sidebar-query-box',
-    onChange: update,
-    autoComplete: 'off',
-    autoCorrect: 'off',
-    autoCapitalize: 'off',
-    spellCheck: 'false',
-    className: 'form-control input-sm',
-    onKeyDown: onReturn,
-    placeholder: 'Search for judges by name…',
-    tabIndex: 300
-  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("table", {
-    className: visible ? 'search-panel-table' : 'hide-table'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tbody", {
-    className: 'cursor'
-  }, judge.map(function (row) {
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("tr", {
-      className: 'tr-results cursor',
-      key: row.id,
-      onKeyDown: function onKeyDown() {
-        return onFocusClick(row.latest_disclosure_url);
-      },
-      onMouseDown: function onMouseDown() {
-        return onFocusClick(row.latest_disclosure_url);
-      },
-      tabIndex: 301
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: 'col-lg-9 col-md-9 col-sm-11 col-xs-10'
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h4", {
-      className: 'text-left'
-    }, row.name_full), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("p", {
-      className: 'text-left'
-    }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("td", {
-      className: 'col-lg-3 col-md-3 col-sm-1 col-xs-2 '
-    }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("img", {
-      src: row.thumbnail_path != null ? row.thumbnail_path : '/static/png/logo-initials-only.png',
-      alt: "Thumbnail of first page of disclosure",
-      height: '50',
-      className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
-    }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
-      className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
-      height: '150',
-      className: 'fa fa-user fa-10x missing-judge'
-    }))));
-  }))));
-};
-
 var AdminPanel = function AdminPanel(data) {
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-4'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("span", null, "Admin ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "Admin ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-key red pull-right"
-  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("hr", null), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: "/admin/disclosures/financialdisclosure/".concat(data.id, "/")
   }, "Disclosure Admin Page"));
 };
@@ -1623,25 +1429,24 @@ var AdminPanel = function AdminPanel(data) {
 var Tabs = function Tabs(data, years, year, fetchDisclosure, doc_ids, judge_name, judgeUrl) {
   var pathname = window.location.pathname;
   var slug = pathname.split('/')[5];
-  console.log(years, "YEARS");
-  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("h1", {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h1", {
     className: "text-center"
-  }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+  }, "Financial Disclosures for J.\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: judgeUrl
-  }, judge_name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("ul", {
+  }, judge_name)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("ul", {
     className: "nav nav-tabs v-offset-below-2 v-offset-above-3",
     role: ""
   }, years.map(function (yr, index) {
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("li", {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", {
       key: "".concat(yr, "_").concat(index),
       className: year == yr ? 'active' : '',
       role: "presentation"
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("a", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
       href: "../../".concat(doc_ids[index], "/").concat(slug, "/"),
       onClick: function onClick() {
         fetchDisclosure(yr, index);
       }
-    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_4___default.a.createElement("i", {
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
       className: "fa fa-file-text-o gray"
     }), "\xA0 ", yr));
   })));
@@ -2614,18 +2419,43 @@ var TagSelect = function TagSelect(_ref) {
 
 /***/ }),
 
-/***/ "./assets/react/_disclosure_helpers.ts":
-/*!*********************************************!*\
-  !*** ./assets/react/_disclosure_helpers.ts ***!
-  \*********************************************/
-/*! exports provided: convertTD */
+/***/ "./assets/react/_disclosure_helpers.tsx":
+/*!**********************************************!*\
+  !*** ./assets/react/_disclosure_helpers.tsx ***!
+  \**********************************************/
+/*! exports provided: isDescendant, convertTD, DisclosureSearch */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "isDescendant", function() { return isDescendant; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "convertTD", function() { return convertTD; });
-/* harmony import */ var _disclosure_models__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./_disclosure_models */ "./assets/react/_disclosure_models.ts");
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "DisclosureSearch", function() { return DisclosureSearch; });
+/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @babel/runtime/helpers/extends */ "./node_modules/@babel/runtime/helpers/extends.js");
+/* harmony import */ var _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _disclosure_models__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./_disclosure_models */ "./assets/react/_disclosure_models.ts");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_2__);
 
+
+
+function isDescendant(parent, child) {
+  if (child == null) {
+    return false;
+  }
+
+  var node = child.parentNode;
+
+  while (node != null) {
+    if (node == parent) {
+      return true;
+    }
+
+    node = node.parentNode;
+  }
+
+  return false;
+}
 var convertTD = function convertTD(value, table, key) {
   if (value == -1 || !value) {
     return '';
@@ -2636,18 +2466,124 @@ var convertTD = function convertTD(value, table, key) {
   }
 
   if (['transaction_value_code', 'value_code', 'gross_value_code'].indexOf(key) > -1) {
-    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_0__["GROSS_VALUE"][value], " (").concat(value, ")");
+    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_1__["GROSS_VALUE"][value], " (").concat(value, ")");
   }
 
   if (['income_during_reporting_period_code', 'transaction_gain_code'].indexOf(key) > -1) {
-    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_0__["INCOME_GAIN"][value], " (").concat(value, ")");
+    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_1__["INCOME_GAIN"][value], " (").concat(value, ")");
   }
 
   if (key == 'gross_value_method' && value) {
-    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_0__["VALUATION_METHODS"][value], " (").concat(value, ")");
+    return "".concat(_disclosure_models__WEBPACK_IMPORTED_MODULE_1__["VALUATION_METHODS"][value], " (").concat(value, ")");
   }
 
   return value;
+};
+
+var InstantSearchResults = function InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress) {
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_2___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("input", {
+    className: "form-control input-lg",
+    name: "disclosures-filter",
+    id: "id_disclosures_search",
+    autoComplete: 'off',
+    autoCorrect: 'off',
+    autoCapitalize: 'off',
+    spellCheck: 'false',
+    onChange: update,
+    onKeyDown: function onKeyDown(e) {
+      return onReturn(e);
+    },
+    type: "search",
+    tabIndex: 300,
+    placeholder: "Search for judges by name\u2026"
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("table", {
+    className: visible ? 'table-instant-results' : 'hide-table'
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("tbody", null, data.map(function (row) {
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("tr", {
+      tabIndex: 301,
+      onKeyDown: function onKeyDown(e) {
+        return onFocusKeyPress(e, row.latest_disclosure_url);
+      },
+      onMouseDown: function onMouseDown(e) {
+        return onFocusClick(e, row.latest_disclosure_url);
+      },
+      key: row.id,
+      className: "tr-results cursor"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("td", {
+      className: "col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("h4", {
+      className: 'text-left judge-name'
+    }, row.name_full), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("p", {
+      className: 'text-left gray'
+    }, row.position_str)), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("td", {
+      className: "col-xs-4 col-sm-4 col-md-2 col-lg-2"
+    }, row.thumbnail_path != null ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("img", {
+      src: row.thumbnail_path,
+      alt: "Thumbnail of first page of disclosure",
+      width: '100%',
+      className: "img-responsive thumbnail shadow img-thumbnail judge-pic"
+    }) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+      className: 'img-responsive thumbnail shadow img-thumbnail judge-pic'
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("i", {
+      className: 'fa fa-user fa-10x missing-judge'
+    }))));
+  }))));
+};
+
+var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVisible, small) {
+  function update(_ref) {
+    var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref);
+
+    var query = data.target.value;
+
+    if (query.length > 1) {
+      fetchData(query);
+      setVisible(true);
+    } else {
+      setVisible(false);
+    }
+  }
+
+  var onFocusClick = function onFocusClick(event, url) {
+    if (event.button == 2) {
+      event.preventDefault();
+    }
+
+    if (event.button == 0) {
+      event.preventDefault();
+      window.location = url;
+    }
+  };
+
+  var onFocusKeyPress = function onFocusKeyPress(event, url) {
+    if (event.keyCode == 13) {
+      event.preventDefault();
+      window.location.pathname = url;
+    }
+  };
+
+  var onReturn = function onReturn(e) {
+    if (data.length == 1 && e.keyCode == 13) {
+      var location = data[0].latest_disclosure_url;
+      onFocusKeyPress(e, location);
+    }
+  };
+
+  return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", null, small ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+    className: 'v-offset-below-4 table-parent'
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("h3", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("span", null, "Search ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("i", {
+    className: "fa fa-search gray pull-right"
+  }))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("hr", null), InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress)) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+    className: "v-offset-above-2 row"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+    className: "hidden-xs col-sm-1 col-md-2 col-lg-3"
+  }), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("div", {
+    className: "col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group",
+    id: "main-query-box"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("label", {
+    className: "sr-only",
+    htmlFor: "id_disclosures_search"
+  }, "Filter disclosures\u2026"), InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress))));
 };
 
 /***/ }),
@@ -2678,16 +2614,16 @@ var INCOME_GAIN = {
   '-1': 'Failed Extraction'
 };
 var GROSS_VALUE = {
-  J: '1‑15,000',
-  K: '15,001‑50,000',
-  L: '50,001‑100,000',
-  M: '100,001‑250,000',
-  N: '250,001‑500,000',
-  O: '500,001‑1,000,000',
-  P1: '1,000,001‑5,000,000',
-  P2: '5,000,001‑25,000,000',
-  P3: '25,000,001‑50,000,000',
-  P4: '50,000,00+',
+  'J': '1‑15,000',
+  'K': '15,001‑50,000',
+  'L': '50,001‑100,000',
+  'M': '100,001‑250,000',
+  'N': '250,001‑500,000',
+  'O': '500,001‑1,000,000',
+  'P1': '1,000,001‑5,000,000',
+  'P2': '5,000,001‑25,000,000',
+  'P3': '25,000,001‑50,000,000',
+  'P4': '50,000,00+',
   '-1': 'Failed Extraction'
 };
 var VALUATION_METHODS = {
@@ -3281,7 +3217,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3419,7 +3355,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
@@ -3508,7 +3444,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,UAAU;EACV,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  width: 95%;\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.judge-court {\n  color: gray;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.hide-table {\n  display: None;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,iBAAiB;EACjB,aAAa;EACb,uBAAuB;EACvB,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,iBAAiB;EACjB,kCAAkC;AACpC;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,+BAA+B;AACjC;;AAEA;EACE;AACF;;AAEA;EACE,4BAA4B;EAC5B,qBAAqB;AACvB;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE;AACF;;AAEA;EACE,eAAe;EACf,aAAa;EACb,iBAAiB;EACjB,WAAW;EACX,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  border: 1px solid;\n  padding: 10px;\n  border-color: lightgrey;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: white;\n  border-bottom: 2px solid lightgrey;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 2px 2px 5px #acacac;\n}\n\n#main-query-box .table-instant-results {\n  width: 95%\n}\n\ntr:hover {\n  background-color: whitesmoke;\n  text-decoration: none;\n}\n\ntr > a:hover {\n  text-decoration: none;\n  color: black;\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-data-name {\n  width: 100%\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: solid;\n  border-width: 1px;\n  margin: 0px;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.hide-table {\n  display: None;\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { appFetch } from './_fetch';
 import { UserState } from './_types';
 import debounce from 'lodash.debounce';
+import {DisclosureSearch, isDescendant} from './_disclosure_helpers';
 
 interface Row {
   id: number;
@@ -12,25 +13,20 @@ interface Row {
   thumbnail_path: string;
 }
 
-function isDescendant(parent: HTMLElement, child: HTMLElement) {
-  let node = child.parentNode;
-  while (node != null) {
-    if (node == parent) {
-      return true;
-    }
-    node = node.parentNode;
-  }
-  return false;
+interface Query {
+  results: Row[];
+  previous: boolean;
+  next: boolean;
 }
 
 const DisclosureList: React.FC<UserState> = () => {
   const [data, setData] = React.useState<Row[]>([]);
-  const [query, setQuery] = React.useState('');
   const [visible, setVisible] = React.useState(false);
 
   const handleClickOutside = (event: Event) => {
     const query_container = document.getElementById('main-query-box');
-    if (isDescendant(query_container, event.target)) {
+    const child: HTMLElement = event.target as HTMLInputElement
+    if (isDescendant(query_container, child)) {
       setVisible(true);
     } else {
       setVisible(false);
@@ -50,12 +46,13 @@ const DisclosureList: React.FC<UserState> = () => {
 
   const fetchData = async (query: string) => {
     try {
-      const response: { results: Row[] } = await appFetch(
+      const response: boolean | Query = await appFetch(
         `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`
       );
-      const results: Row[] = response['results'];
-      setQuery(query);
-      setData(results);
+      if (typeof response != 'boolean') {
+        const results: Row[] = response['results'];
+        setData(results);
+      }
     } catch (error) {
       console.log(error);
     }
@@ -66,7 +63,7 @@ const DisclosureList: React.FC<UserState> = () => {
   return (
     <div>
       {DisclosureHeader()}
-      {DisclosureSearch(data, query, debounceFetchJudge, visible, setVisible)}
+      {DisclosureSearch(data, debounceFetchJudge, visible, setVisible, false)}
       {DisclosureFooter()}
     </div>
   );
@@ -79,103 +76,6 @@ const DisclosureHeader = () => {
       <p className="text-center gray large">
         Search and review the biggest database of judicial disclosures ever made.
       </p>
-    </div>
-  );
-};
-
-const DisclosureSearch = (
-  data: Row[],
-  query: string,
-  fetchData: React.ChangeEventHandler<HTMLInputElement>,
-  visible,
-  setVisible
-) => {
-  function update({ ...data }) {
-    const query: string = data.target.value;
-    if (query.length > 1) {
-      fetchData(query);
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }
-  const onFocusClick = (url: string) => {
-    if (event.button == 2) {
-      event.preventDefault();
-    }
-    if (event.button == 0 || event.keyCode == 13) {
-      event.preventDefault();
-      window.location = url;
-    }
-  };
-  const onReturn = () => {
-    if (data.length == 1 && event.keyCode == 13) {
-      onFocusClick(data[0].latest_disclosure_url);
-    }
-  };
-
-  return (
-    <div>
-      <div className="row v-offset-above-2">
-        <div className="hidden-xs col-sm-1 col-md-2 col-lg-3" />
-        <div className="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group" id="main-query-box">
-          <label className="sr-only" htmlFor="id_disclosures_search">
-            Filter disclosures…
-          </label>
-          <input
-            className="form-control input-lg"
-            name="disclosures-filter"
-            id="id_disclosures_search"
-            autoComplete={'off'}
-            autoCorrect={'off'}
-            autoCapitalize={'off'}
-            spellCheck={'false'}
-            onChange={update}
-            onKeyDown={onReturn}
-            type="search"
-            tabIndex={300}
-            placeholder="Search for judges by name…"
-          />
-          <table className={visible ? 'table-instant-results' : 'hide-table'}>
-            {query != '' ? (
-              <tbody>
-                {data.map((row: Row) => {
-                  return (
-                    <tr
-                      tabIndex={301}
-                      onKeyDown={() => onFocusClick(row.latest_disclosure_url)}
-                      onMouseDown={() => onFocusClick(row.latest_disclosure_url)}
-                      key={row.id}
-                      className="tr-results cursor"
-                    >
-                      <td className="col-xs-8 col-sm-8 col-md-10 col-lg-10 table-data-name">
-                        <h4 className={'text-left judge-name'}>{row.name_full}</h4>
-                        <p className={'text-left judge-court'}>{row.position_str}</p>
-                      </td>
-                      <td className="col-xs-4 col-sm-4 col-md-2 col-lg-2">
-                        {row.thumbnail_path != null ? (
-                          <img
-                            src={row.thumbnail_path}
-                            alt="Thumbnail of first page of disclosure"
-                            width={'100%'}
-                            className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-                          />
-                        ) : (
-                          <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
-                            <i className={'fa fa-user fa-10x missing-judge'}></i>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            ) : (
-              <tbody />
-            )}
-          </table>
-        </div>
-      </div>
     </div>
   );
 };
