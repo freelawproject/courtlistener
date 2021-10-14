@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "84d0d08b9eed49da000e";
+/******/ 	var hotCurrentHash = "87daf982e9a769b48d85";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1405,9 +1405,11 @@ var Notes = function Notes() {
     className: "fa fa-file-excel-o black"
   }), " The row may contain a redaction."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("li", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("i", {
     className: "fa fa-eye-slash black"
-  }), " Indicates failed extraction in the cell.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
+  }), " Indicates failed extraction in the cell.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "You can read more about financial disclosures at the", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
     href: 'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'
-  }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."));
+  }, "Guide to Judiciary Policy on Ethics and Judicial Conduct"), "."), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("p", null, "Please report any security or privacy concerns to", ' ', /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("span", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("a", {
+    href: "mailto:security@free.law"
+  }, "security@free.law"), ".")));
 };
 
 var AdminPanel = function AdminPanel(data) {
@@ -3239,7 +3241,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3377,7 +3379,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 

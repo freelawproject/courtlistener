@@ -197,7 +197,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
   const fields: string[] = disclosureModel[key]['fields'];
   const title: string = disclosureModel[key]['title'];
   const api_key: string = disclosureModel[key]['api'];
-  const admin_key: string = disclosureModel[key]['admin_key']
+  const admin_key: string = disclosureModel[key]['admin_key'];
   return (
     <div>
       {rows.length > 0 ? (
@@ -362,13 +362,23 @@ const Notes = () => {
           <i className="fa fa-eye-slash black" /> Indicates failed extraction in the cell.
         </li>
       </ul>
-      <span>
+      <p>
         You can read more about financial disclosures at the{' '}
         <a href={'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'}>
           Guide to Judiciary Policy on Ethics and Judicial Conduct
         </a>
         .
-      </span>
+      </p>
+
+      <p>
+        Please report any security or privacy concerns to{' '}
+        <span>
+          <a href="mailto:&#115;&#101;&#099;&#117;&#114;&#105;&#116;&#121;&#064;&#102;&#114;&#101;&#101;&#046;&#108;&#097;&#119;">
+            &#115;&#101;&#099;&#117;&#114;&#105;&#116;&#121;&#064;&#102;&#114;&#101;&#101;&#046;&#108;&#097;&#119;
+          </a>
+          .
+        </span>
+      </p>
     </div>
   );
 };
