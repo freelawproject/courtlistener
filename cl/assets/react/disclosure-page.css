@@ -40,12 +40,18 @@
   position: absolute;
   z-index: 9;
   box-shadow: 3px 3px 6px #8b8b8b;
+  margin-top:42px;
 }
 
 #main-query-box .table-instant-results {
-  width: 95%;
+  /*width: 95%;*/
   border-radius: 10px;
   background: white;
+}
+
+#main-query-box {
+  /*width: 600px;*/
+  text-align: center;
 }
 
 .table-parent .table-instant-results {
@@ -101,4 +107,20 @@ td.table-data-portrait {
 
 .judge-name {
   font-size: 20px;
+}
+
+.search-input-judges {
+  width:75%;
+}
+
+.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {
+  width: 100%;
+}
+
+.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{
+  margin-top: 32px;
+}
+
+.sidebar-search > #main-query-box {
+  margin-top: 0;
 }

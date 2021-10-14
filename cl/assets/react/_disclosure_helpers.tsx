@@ -52,58 +52,76 @@ const InstantSearchResults = (
   data: Row[],
   onFocusClick: (event: React.MouseEvent<HTMLTableRowElement>, url: string) => void,
   onFocusKeyPress: (event: React.KeyboardEvent<HTMLTableRowElement>, url: string) => void,
-  input_size: string
+  small: boolean
 ) => {
+  let size: string;
+  if (small) {
+    size = 'input-md form-control';
+  } else {
+    size = 'input-lg form-control';
+  }
+
   return (
     <React.Fragment>
-      <input
-        className={input_size}
-        name="disclosures-filter"
-        id="id_disclosures_search"
-        autoComplete={'off'}
-        autoCorrect={'off'}
-        autoCapitalize={'off'}
-        spellCheck={'false'}
-        onChange={update}
-        onKeyDown={(e) => onReturn(e)}
-        type="search"
-        tabIndex={300}
-        placeholder="Search for judges by name…"
-      />
-      <table className={visible ? 'table-instant-results' : 'hide'}>
-        <tbody>
-          {data.map((row: Row) => {
-            return (
-              <tr
-                tabIndex={301}
-                onKeyDown={(e) => onFocusKeyPress(e, row.oldest_disclosure_url)}
-                onMouseDown={(e) => onFocusClick(e, row.oldest_disclosure_url)}
-                key={row.id}
-                className="tr-results cursor"
-              >
-                <td className="col-xs-10 col-sm-10 col-lg-10 table-data-name">
-                  <h4 className={'text-left judge-name'}>{row.name_full}</h4>
-                  <p className={'text-left gray'}>{row.position_str}</p>
-                </td>
-                <td className="col-xs-2 col-sm-2 col-lg-2 table-data-portrait">
-                  {row.thumbnail_path != null ? (
-                    <img
-                      src={row.thumbnail_path}
-                      alt="Thumbnail of first page of disclosure"
-                      width={'100%'}
-                      className="img-responsive thumbnail shadow img-thumbnail judge-pic"
-                    />
-                  ) : (
-                    <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
-                      <i className={'fa fa-user fa-10x missing-judge'} />
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div id="main-query-box">
+        <form action="/" method="get" id="search-form" className="form-inline" role="form">
+          <div id="search-container" className="text-center">
+            <label className="sr-only" htmlFor="id_q">
+              Search
+            </label>
+            <div className="input-group search-input-judges">
+              <input
+                className={size}
+                name="disclosures-filter"
+                id="id_disclosures_search"
+                autoComplete={'off'}
+                autoCorrect={'off'}
+                autoCapitalize={'off'}
+                spellCheck={'false'}
+                onChange={update}
+                onKeyDown={(e) => onReturn(e)}
+                type="search"
+                tabIndex={300}
+                placeholder="Search for judges by name…"
+              />
+              <table className={visible ? 'table-instant-results' : 'hide'}>
+                <tbody>
+                  {data.map((row: Row) => {
+                    return (
+                      <tr
+                        tabIndex={301}
+                        onKeyDown={(e) => onFocusKeyPress(e, row.oldest_disclosure_url)}
+                        onMouseDown={(e) => onFocusClick(e, row.oldest_disclosure_url)}
+                        key={row.id}
+                        className="tr-results cursor"
+                      >
+                        <td className="col-xs-10 col-sm-10 col-lg-10 table-data-name">
+                          <h4 className={'text-left judge-name'}>{row.name_full}</h4>
+                          <p className={'text-left gray'}>{row.position_str}</p>
+                        </td>
+                        <td className="col-xs-2 col-sm-2 col-lg-2 table-data-portrait">
+                          {row.thumbnail_path != null ? (
+                            <img
+                              src={row.thumbnail_path}
+                              alt="Thumbnail of first page of disclosure"
+                              width={'100%'}
+                              className="img-responsive thumbnail shadow img-thumbnail judge-pic"
+                            />
+                          ) : (
+                            <div className={'img-responsive thumbnail shadow img-thumbnail judge-pic'}>
+                              <i className={'fa fa-user fa-10x missing-judge'} />
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </form>
+      </div>
     </React.Fragment>
   );
 };
@@ -151,25 +169,17 @@ export const DisclosureSearch = (
   return (
     <div>
       {small ? (
-        <div className={'v-offset-below-4 table-parent'}>
+        <div className={'sidebar-search'}>
           <h3>
             <span>
               Search <i className="fa fa-search gray pull-right" />
             </span>
           </h3>
           <hr />
-          {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, 'form-control input-md')}
+          {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, small)}
         </div>
       ) : (
-        <div className="v-offset-above-2 row">
-          <div className="hidden-xs col-sm-1 col-md-2 col-lg-3" />
-          <div className="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group" id="main-query-box">
-            <label className="sr-only" htmlFor="id_disclosures_search">
-              Filter disclosures…
-            </label>
-            {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, 'form-control input-lg')}
-          </div>
-        </div>
+        <>{InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, small)} </>
       )}
     </div>
   );
