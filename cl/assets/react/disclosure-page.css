@@ -28,8 +28,9 @@
 .tr-results {
   padding: 10px;
   width: 100%;
-  background: white;
+  background: rgba(255, 255, 255, 0);
   border-bottom: 1px solid lightgrey;
+  border-radius: 10px;
 }
 
 .tr-results:last-child {
@@ -44,14 +45,16 @@
 }
 
 #main-query-box .table-instant-results {
-  /*width: 95%;*/
   border-radius: 10px;
   background: white;
 }
 
 #main-query-box {
-  /*width: 600px;*/
   text-align: center;
+}
+
+#id_disclosures_search {
+  border-radius: 4px;
 }
 
 .table-parent .table-instant-results {
@@ -61,16 +64,17 @@
 
 .table-instant-results > tbody {
   background: white;
+  border-radius: 10px;
 }
 
 tr.tr-results:hover {
   background-color: whitesmoke;
-  text-decoration: none;
+  border-radius: 10px !important;
 }
 
-tr.tr-results > a:hover {
-  text-decoration: none;
-  color: black;
+tr.tr-results > td {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0);
 }
 
 .table-row-link {
@@ -78,20 +82,13 @@ tr.tr-results > a:hover {
   color: black;
 }
 
-.table-instant-results > tbody > tr:first-child > td.table-data-name {
-  border-radius: 10px 0 0 0;
+.table-instant-results {
+  border-radius: 10px;
+  background: white;
 }
 
-.table-instant-results > tbody > tr:last-child > td.table-data-name {
-  border-radius: 0 0 0 10px;
-}
-
-.table-instant-results > tbody > tr:first-child > td.table-data-portrait {
-  border-radius: 0 10px 0 0;
-}
-
-.table-instant-results > tbody > tr:last-child > td.table-data-portrait {
-  border-radius: 0 0 10px 0;
+.table-instant-results > tbody {
+  background: rgba(255, 255, 255, 0);
 }
 
 td.table-data-portrait {

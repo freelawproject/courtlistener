@@ -103,7 +103,7 @@ const InstantSearchResults = (
                           {row.thumbnail_path != null ? (
                             <img
                               src={row.thumbnail_path}
-                              alt="Thumbnail of first page of disclosure"
+                              alt="Future Judicial Portrait"
                               width={'100%'}
                               className="img-responsive thumbnail shadow img-thumbnail judge-pic"
                             />

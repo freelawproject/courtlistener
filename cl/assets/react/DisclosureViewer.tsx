@@ -299,7 +299,7 @@ const Thumb = (data: Data) => {
       <h3>
         <span>
           Download
-          <a href={`/api/rest/v3/financial-disclosures/?id=${data.id}`}>
+          <a href={`/api/rest/v3/financial-disclosures/${data.id}/`}>
             <i className="fa fa-code gray pull-right" />
           </a>
         </span>
@@ -308,7 +308,7 @@ const Thumb = (data: Data) => {
       <a href={data.filepath}>
         <img
           src={data.thumbnail}
-          alt="Thumbnail of first page of disclosure"
+          alt="Future Judicial Portrait"
           className="img-responsive thumbnail shadow img-thumbnail judge-pic"
           width={'100%'}
         />
