@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block og_title %}
+    Judicial Financial Disclosure Forms for {{ title }} – CourtListener.com
+{% endblock %}
+{% block description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database.
+{% endblock %}
+{% block og_description %}
+    Judicial Financial Disclosure Forms for {{ title }} at the Judicial Financial Disclosures Database.
+{% endblock %}
+
+{% block navbar-fd %}active{% endblock %}
+
+{% block footer-scripts %}
+  <script type="text/javascript" src="{% static "js/react/main.js" %}"></script>
+  <script type="text/javascript" src="{% static "js/react/vendor.js" %}"></script>
+{% endblock %}
+
+{% block content %}
+    <div id="react-root"
+         data-years="{{ disclosure_years }}"
+         data-admin="{{ user.is_staff }}"
+         data-ids="{{ disclosure_ids }}"
+         data-judge="{{ person.name_first }} {{ person.name_middle }} {{ person.name_last }} {{ person.name_suffix }}"
+    > </div>
+{% endblock %}

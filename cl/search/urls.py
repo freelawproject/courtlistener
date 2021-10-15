@@ -10,6 +10,7 @@ urlpatterns = [
     path("audio/", advanced, name="advanced_oa"),
     path("person/", advanced, name="advanced_p"),
     path("recap/", advanced, name="advanced_r"),
+    path("financial-disclosures/", advanced, name="advanced_fd"),
     # Feeds & Podcasts
     re_path(r"^feed/(search)/$", SearchFeed(), name="search_feed"),
     # lacks URL capturing b/c it will use GET queries.

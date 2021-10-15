@@ -39,7 +39,7 @@
   <div class="hidden-xs col-sm-1 col-md-2"></div>
   <div class="col-xs-12 col-sm-10 col-md-8">
     <h1>Data Coverage &mdash; What's in CourtListener?</h1>
-    <p>CourtListener is a vast searchable collection of legal information. We have millions of judicial opinions including <a href="https://free.law/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
+    <p>CourtListener is a vast searchable collection of legal information. We have millions of judicial opinions including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
     </p>
     <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), opinions, or oral argument recordings. Read on to learn more or skip ahead to the section that interests you:
     </p>
@@ -71,7 +71,7 @@
       </li>
       <li><p><strong>Special Case Scrapers:</strong> Special cases get additional monitoring via a system of scrapers that regularly gathers data from PACER. Examples of "special" cases are those that have active <a href="{% url "alert_help" %}#recap-alerts">RECAP Alerts for PACER</a>, are marked as favorites, or are otherwise popular or important.
       </p></li>
-      <li><p><strong>Our PACER Scraping Tools:</strong> We host <a href="https://free.law/2019/11/05/announcing-our-new-pacer-fetch-apis/">free APIs that many organizations use to gather cases and documents from PACER</a>. Every day, many organizations rely on these automated tools to add innumerable cases and documents to our system.</p></li>
+      <li><p><strong>Our PACER Scraping Tools:</strong> We host <a href="https://free.law/2019/11/05/pacer-fetch-api/">free APIs that many organizations use to gather cases and documents from PACER</a>. Every day, many organizations rely on these automated tools to add innumerable cases and documents to our system.</p></li>
       <li>
         <p><strong>Client Work:</strong> One way <a href="https://free.law">Free Law Project</a>, the non-profit sponsoring CourtListener and RECAP, remains sustainable is by working with organizations of all kinds to do bulk PACER downloads. In these arrangements, <a href="https://free.law/data-consulting/">we work with clients</a> to purchase thousands of dollars worth of PACER content, all of which we add to the RECAP Archive.
         </p>
@@ -92,7 +92,7 @@
         </p>
       </li>
       <li><p><strong>PACER Judicial Opinion Scraper:</strong> When clerks upload documents to PACER, they must consider <a href="https://free.law/pacer-facts/#written-opinions-are-free-on-pacer-but-h">whether
-        those documents are official opinions or orders of the court</a>. If they are, the clerks are supposed to mark them as such, and those documents become free to download from PACER. Each night <a href="https://free.law/2017/08/15/we-have-every-free-pacer-opinion-on-courtlistenercom/">we download all documents that clerks mark in this way</a> from district and bankruptcy courts across the country.
+        those documents are official opinions or orders of the court</a>. If they are, the clerks are supposed to mark them as such, and those documents become free to download from PACER. Each night <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">we download all documents that clerks mark in this way</a> from district and bankruptcy courts across the country.
       </p></li>
       <li><p><strong>PACER RSS Feeds:</strong> Most of federal district courts  provide RSS feeds listing their latest docket entries. We crawl these feeds on an ongoing basis to get the latest docket entries. This amounts to around 100,000 docket entries per day that we add to the RECAP Archive. Unfortunately, this only adds docket entries, not documents, party, or attorney information. For details on which courts are supported by RSS <a href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.
       </p></li>
@@ -118,14 +118,14 @@
       <li>
         <p><strong>Bulk contributions:</strong> Long before we began our work, Carl Malamud at <a href="https://public.resource.org/">Public.Resource.Org</a> was way ahead of us. When we started, one of our first steps was to add the data that he had collected, including the the complete <a href="https://en.wikipedia.org/wiki/United_States_Reports">United States Reports</a> going back to 1759, <a href="https://free.law/2011/08/25/second-series-of-federal-reporter-from-1950-to-1993-now-on-courtlistener/">the second series of the Federal Reporter</a>, and <a href="https://free.law/2012/05/13/announcing-the-third-series-of-the-federal-reporter/">volumes 1-491 of the third series of the Federal Reporter</a>. These sources added {{ count_pro|intcomma }} opinions to our collection.
         </p>
-        <p>In 2013 we <a href="https://free.law/2013/10/30/free-law-project-adds-more-than-15m-opinions-to-its-collection-thanks-to-data-donation/">received a generous data donation from Lawbox, LLC</a> that contributed to {{ count_lawbox|intcomma }} opinions.
+        <p>In 2013 we <a href="https://free.law/2013/10/30/lawbox/">received a generous data donation from Lawbox, LLC</a> that contributed to {{ count_lawbox|intcomma }} opinions.
         </p>
       </li>
       <li><p><strong>Scrapers:</strong> Since 2010, we have gathered opinions directly from court websites via <a href="https://free.law/juriscraper/">our Juriscraper toolkit</a>. When we began, we only collected content from the federal Circuit courts and the Supreme Court, but as of now we run over 200 scrapers throughout every day. So far, they have contributed to {{ count_scraper|intcomma }} opinions. The supported courts <a href="#scraped-jurisdictions">are listed below</a>.
       </p></li>
-      <li><p><strong>Supreme Court Database (SCDB):</strong> The <a href="http://scdb.wustl.edu/">NSF-funded SCDB</a> is the gold standard for high-quality legal information, and we have <a href="https://free.law/2014/12/21/courtlistener-is-now-integrated-with-the-supreme-court-database/">linked it up with the data available in the United States Reports</a>. Doing this added parallel citations and other metadata to tens of thousands of SCOTUS opinions.
+      <li><p><strong>Supreme Court Database (SCDB):</strong> The <a href="http://scdb.wustl.edu/">NSF-funded SCDB</a> is the gold standard for high-quality legal information, and we have <a href="https://free.law/2014/12/21/scdb/">linked it up with the data available in the United States Reports</a>. Doing this added parallel citations and other metadata to tens of thousands of SCOTUS opinions.
       </p></li>
-      <li><p><strong>Library of Congress:</strong> The Library of Congress released a PDF listing the filing dates for thousands of early historical Supreme Court cases. We have <a href="https://free.law/2011/05/25/updated-supreme-court-case-dates-and-the-first-release-of-early-scotus-data-in-machine-readable-form/">integrated these dates</a> so our users have the best information possible.
+      <li><p><strong>Library of Congress:</strong> The Library of Congress released a PDF listing the filing dates for thousands of early historical Supreme Court cases. We have <a href="https://free.law/2011/05/25/updated-scotus-dates/">integrated these dates</a> so our users have the best information possible.
       </p></li>
     </ul>
     <p>We currently have one more source of judicial opinions that we plan to add to the above sources. When that is complete, we will perform an audit to ensure that every opinion from both WestLaw and LexisNexis are readily available to the public in high-quality, machine readable, and easily accessible formats. <a href="{% url "contact" %}">Get in touch</a> if you want to help support this historical project.

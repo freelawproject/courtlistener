@@ -1,3 +1,4 @@
+from django.conf import settings
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
@@ -53,6 +54,25 @@ class NonInvestmentIncomeSerializer(
 
 
 class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+    resource_uri = serializers.SerializerMethodField()
+
+    def get_resource_uri(self, position: Position) -> str:
+        """Override incorrect resource uri in disclousre-position api
+
+        This 'hack' is used to correctly generate the resource_uri field
+        in the api. Currently django-rest-framework auto-generates the
+        wrong api location, because of the positions table in the people model.
+
+        Here we are simply overriding the incorrect field with the correct one
+        by passing in the correct path and id.
+
+        :param position: The position object
+        :return: Corrected resouce_uri
+        """
+
+        path = f"/api/rest/v3/disclosure-positions/{position.id}/"
+        return self.context["request"].build_absolute_uri(path)
+
     class Meta:
         model = Position
         fields = "__all__"
@@ -94,7 +114,17 @@ class FinancialDisclosureSerializer(
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    filepath = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = FinancialDisclosure
         exclude = ("download_filepath",)
+
+    def get_filepath(self, disclosure):
+        return f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.filepath}"
+
+    def get_thumbnail(self, disclosure):
+        return (
+            f"https://{settings.AWS_S3_CUSTOM_DOMAIN}/{disclosure.thumbnail}"
+        )

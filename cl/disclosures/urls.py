@@ -1,15 +1,15 @@
 from django.urls import path
 
 from cl.disclosures.views import (
-    financial_disclosures_for_somebody,
     financial_disclosures_home,
+    financial_disclosures_viewer,
 )
 
 urlpatterns = [
     path(
-        "person/<int:pk>/<blank-slug:slug>/financial-disclosures/",
-        financial_disclosures_for_somebody,
-        name="financial_disclosures_for_somebody",
+        "person/<int:person_pk>/disclosure/<int:pk>/<blank-slug:slug>/",
+        financial_disclosures_viewer,
+        name="financial_disclosures_viewer",
     ),
     path(
         "financial-disclosures/",

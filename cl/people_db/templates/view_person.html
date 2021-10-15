@@ -3,6 +3,7 @@
 {% load admin_urls %}
 {% load humanize %}
 {% load text_filters %}
+{% load waffle_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -568,7 +569,7 @@
                         </a>
                     {% endif %}
                 </h3>
-                <p class="gray">Includes opinions for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/courtlistener-improves-search-results-thanks-to-volunteer-contributor/">CiteGeist</a> relevance.</p>
+                <p class="gray">Includes opinions for which {{ person.name_full }} was on the panel, ordered by <a href="https://free.law/2013/11/12/citegeist/">CiteGeist</a> relevance.</p>
                 <hr class="top">
 
                 {% for o in authored_opinions %}
@@ -621,7 +622,6 @@
                 </div>
                 </div>
                 {% endfor %}
-
                 <p>
                     <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }}</a>
                 </p>
@@ -629,6 +629,24 @@
         </div>
         {% endif %}
 
+        {% flag "financial-disclosures" %}
+          {% if disclosures %}
+            <h3 class="bottom">
+              <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
+            </h3>
+              <p class="gray">An annual financial disclosure by Federal judges, magistrates and clerks of the court.</p>
+            <hr class="top">
+            <div class="row">
+              {% for disclosure in disclosures %}
+                <div class="col-xs-3">
+                  <h4 class="text">
+                    <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
+                  </h4>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endflag %}
 
         {% if oral_arguments_heard.result.numFound > 0 %}
         <div class="row v-offset-below-3">
@@ -689,7 +707,7 @@
             <div class="col-xs-12">
                 <p class="text-right">Something isn't right? <a href="{% url "contact" %}">Get in touch with a correction</a>.
                 </p>
-                <p class="text-right">Curious about our sources? <a href="https://free.law/2016/04/19/judicial-database-announcement/">Learn more</a>.
+                <p class="text-right">Curious about our sources? <a href="https://free.law/projects/judge-db/">Learn more</a>.
                 </p>
             </div>
         </div>
