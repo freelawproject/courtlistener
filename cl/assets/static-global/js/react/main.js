@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "ec1e318c4b0d652b070b";
+/******/ 	var hotCurrentHash = "4b8508cfc21b5a04144a";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -1272,7 +1272,7 @@ var MainSection = function MainSection(disclosures) {
     className: 'col-md-9'
   }, Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: "tabcontent"
-  }, TableMaker(data, 'investments', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_3___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
+  }, TableMaker(data, 'agreements', is_admin), TableMaker(data, 'positions', is_admin), TableMaker(data, 'reimbursements', is_admin), TableMaker(data, 'non_investment_incomes', is_admin), TableMaker(data, 'spouse_incomes', is_admin), TableMaker(data, 'gifts', is_admin), TableMaker(data, 'debts', is_admin), TableMaker(data, 'investments', is_admin), data.addendum_content_raw != '' ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_3___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("h3", null, "Addendum"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("article", null, data.addendum_content_raw), ' ') : '')), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'col-md-3'
   }, Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)))) : data.id != 0 && !data.has_been_extracted ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default.a.createElement("div", {
     className: 'v-offset-below-3 v-offset-above-3'
@@ -2520,10 +2520,10 @@ var InstantSearchResults = function InstantSearchResults(update, onReturn, visib
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_2___default.a.createElement("tr", {
       tabIndex: 301,
       onKeyDown: function onKeyDown(e) {
-        return onFocusKeyPress(e, row.oldest_disclosure_url);
+        return onFocusKeyPress(e, row.newest_disclosure_url);
       },
       onMouseDown: function onMouseDown(e) {
-        return onFocusClick(e, row.oldest_disclosure_url);
+        return onFocusClick(e, row.newest_disclosure_url);
       },
       key: row.id,
       className: "tr-results cursor"
@@ -2582,7 +2582,7 @@ var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVi
 
   var onReturn = function onReturn(e) {
     if (data.length == 1 && e.keyCode == 13) {
-      var location = data[0].oldest_disclosure_url;
+      var location = data[0].newest_disclosure_url;
       onFocusKeyPress(e, location);
     }
   };
@@ -2650,6 +2650,7 @@ var investmentFields = {
   'Gross Val. Method': 'gross_value_method',
   'Income Code': 'income_during_reporting_period_code',
   'Income Type': 'income_during_reporting_period_type',
+  'Trans. Type': 'transaction_during_reporting_period',
   'Trans. Date': 'transaction_date_raw',
   'Trans. Value': 'transaction_value_code',
   'Trans. Gain': 'transaction_gain_code',
@@ -2675,7 +2676,7 @@ var noninvestmentFields = {
 var agreementFields = {
   Dates: 'date_raw',
   Source: 'parties_and_terms',
-  'Income Amount': 'parties_and_terms'
+  'Parties and Terms': 'parties_and_terms'
 };
 var positionFields = {
   Position: 'position',
@@ -2688,7 +2689,7 @@ var debtFields = {
 };
 var spouseFields = {
   Date: 'date_raw',
-  Location: 'source_type'
+  "Source": 'source_type'
 };
 var disclosureModel = {
   investments: {

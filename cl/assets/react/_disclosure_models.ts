@@ -42,6 +42,7 @@ const investmentFields = {
   'Gross Val. Method': 'gross_value_method',
   'Income Code': 'income_during_reporting_period_code',
   'Income Type': 'income_during_reporting_period_type',
+  'Trans. Type': 'transaction_during_reporting_period',
   'Trans. Date': 'transaction_date_raw',
   'Trans. Value': 'transaction_value_code',
   'Trans. Gain': 'transaction_gain_code',
@@ -67,7 +68,7 @@ const noninvestmentFields = {
 const agreementFields = {
   Dates: 'date_raw',
   Source: 'parties_and_terms',
-  'Income Amount': 'parties_and_terms',
+  'Parties and Terms': 'parties_and_terms',
 };
 const positionFields = {
   Position: 'position',
@@ -80,7 +81,7 @@ const debtFields = {
 };
 const spouseFields = {
   Date: 'date_raw',
-  Location: 'source_type',
+  "Source": 'source_type',
 };
 
 export const disclosureModel = {
