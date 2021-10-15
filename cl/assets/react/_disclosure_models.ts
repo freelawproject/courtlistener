@@ -42,6 +42,7 @@ const investmentFields = {
   'Gross Val. Method': 'gross_value_method',
   'Income Code': 'income_during_reporting_period_code',
   'Income Type': 'income_during_reporting_period_type',
+  'Trans. Type': 'transaction_during_reporting_period',
   'Trans. Date': 'transaction_date_raw',
   'Trans. Value': 'transaction_value_code',
   'Trans. Gain': 'transaction_gain_code',
