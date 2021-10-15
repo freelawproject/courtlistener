@@ -1,13 +1,11 @@
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
-from django.templatetags.static import static
 from django.urls import reverse
-from django.utils.text import slugify
 
-from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
+from cl.people_db.utils import make_person_picture_path
 
 
 def make_title_str(person):
@@ -21,26 +19,8 @@ def make_title_str(person):
     return title
 
 
-def make_img_path(person):
-    """Make the path for a person's img tag."""
-
-    img_path = None
-    if person.has_photo:
-        p = slugify(f"{person.name_last}-{person.name_first}".lower())
-        if person.date_dob:
-            img_path = static(
-                "judge_pics/%s-%s.jpeg"
-                % (p, granular_date(person, "date_dob", iso=True, default=""))
-            )
-        else:
-            img_path = static(f"judge_pics/{p}.jpeg")
-
-    return img_path
-
-
 def view_person(request, pk, slug):
     person = get_object_or_404(Person, pk=pk)
-
     # Redirect the user if they're trying to check out an alias.
     if person.is_alias:
         return HttpResponseRedirect(
@@ -52,7 +32,7 @@ def view_person(request, pk, slug):
 
     title = make_title_str(person)
 
-    img_path = make_img_path(person)
+    img_path = make_person_picture_path(person)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the
@@ -121,9 +101,7 @@ def view_person(request, pk, slug):
             "political_affiliations": (
                 person.political_affiliations.all().order_by("-date_start")
             ),
-            "disclosures": person.financial_disclosures.all().order_by(
-                "-year"
-            ),
+            "disclosures": person.financial_disclosures.all().order_by("year"),
             "positions": positions,
             "educations": person.educations.all().order_by("-degree_year"),
             "authored_opinions": authored_opinions,

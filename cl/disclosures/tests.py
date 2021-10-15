@@ -108,7 +108,7 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
         """Can we query the financial disclosures?"""
         url = reverse("financialdisclosure-list", kwargs={"version": "v3"})
         # 4 of the queries are from the setup
-        with self.assertNumQueries(13):
+        with self.assertNumQueries(12):
             r = self.client.get(url)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count.")
@@ -127,13 +127,13 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 9, msg="Wrong API count")
 
-    def test_unauthorized_user(self) -> None:
-        """Can a regular user access forbidden content?"""
+    def test_anonymous_user(self) -> None:
+        """Can an anonymous user access disclosure content?"""
         self.client.logout()
         url = reverse("gift-list", kwargs={"version": "v3"})
         r = self.client.get(url)
         self.assertEqual(
-            r.status_code, 401, msg="Unauthorized content exposed."
+            r.status_code, 200, msg="Unauthorized content exposed."
         )
 
     def test_access_to_content_outside_authorization(self) -> None:
@@ -145,23 +145,19 @@ class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
 
 
 class DisclosureAPITest(LoggedInDisclosureTestCase):
-    def test_basic_disclosure_api_query(self) -> None:
-        """Can we query the financial disclosure API?"""
-        self.path = reverse(
-            "financialdisclosure-list", kwargs={"version": "v3"}
-        )
-        r = self.client.get(self.path)
-        self.assertEqual(r.status_code, 200, msg="API failed.")
-        self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
-
     def test_disclosure_position_api(self) -> None:
-        """Can we query the financial disclosure API?"""
+        """Can we query the financial disclosure position API?"""
         self.path = reverse(
             "disclosureposition-list", kwargs={"version": "v3"}
         )
         r = self.client.get(self.path)
         self.assertEqual(r.status_code, 200, msg="API failed.")
         self.assertEqual(r.json()["count"], 2, msg="Wrong API count")
+        self.assertIn(
+            "disclosure-positions",
+            r.json()["results"][0]["resource_uri"],
+            msg="Incorrect resource URI",
+        )
 
     def test_investment_filtering(self) -> None:
         """Can we filter investments by transaction value codes?"""

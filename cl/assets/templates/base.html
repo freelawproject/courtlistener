@@ -1,4 +1,5 @@
-{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}<!DOCTYPE html>
+{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
@@ -223,6 +224,9 @@
                   <a href="{% url "citation_redirector" %}"
                      tabindex="102">Citation Look Up</a>
                 </li>
+                <li>
+                  <a href="{% url "mapper_homepage" %}" tabindex="102">Citation Visualizations</a>
+                </li>
               </ul>
             </li>
             <li class="{% block navbar-r %}inactive{% endblock %}" id="navbar-r">
@@ -234,26 +238,11 @@
             <li class="{% block navbar-p %}inactive{% endblock %}" id="navbar-p">
               <a href="{% url "advanced_p" %}" tabindex="105">Judges</a>
             </li>
-            <li class="dropdown {% block navbar-vis %}inactive{% endblock %}"
-                id="navbar-vis">
-              <a href="#"
-                 class="dropdown-toggle"
-                 tabindex="104"
-                 data-toggle="dropdown">Visualizations&nbsp;<span
-                      class="caret"></span>
-              </a>
-              <ul class="dropdown-menu" role="menu">
-                <li>
-                  <a href="{% url "viz_gallery" %}" tabindex="106">Gallery</a>
-                </li>
-                <li>
-                  <a href="{% url "mapper_homepage" %}" tabindex="107">SCOTUS Networks</a>
-                </li>
-                <li>
-                  <a href="{% url "new_visualization" %}" tabindex="108">New Network</a>
-                </li>
-              </ul>
-            </li>
+            {% flag "financial-disclosures" %}
+              <li class="{% block navbar-fd %}inactive{% endblock %}" id="navbar-fd">
+                <a href="{% url "advanced_fd" %}" tabindex="106">Financial Disclosures</a>
+              </li>
+            {% endflag %}
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li

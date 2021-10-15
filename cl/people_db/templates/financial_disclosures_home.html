@@ -2,6 +2,8 @@
 {% load humanize %}
 {% load partition_util %}
 {% load cache %}
+{% load static %}
+{% load waffle_tags %}
 
 {% block title %}
     Judicial Financial Disclosures Database – CourtListener.com
@@ -10,100 +12,31 @@
     Judicial Financial Disclosures Database – CourtListener.com
 {% endblock %}
 {% block description %}
-    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free Law Project, and MuckRock.
+    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms and is the largest collection online.
 {% endblock %}
 {% block og_description %}
-    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms, and is the largest collection online. A collaboration of Demand Progress, Fix the Court, Free    Law Project, and MuckRock.
+    The Judicial Financial Disclosures Database at CourtListener.com contains {{ disclosure_count|intcomma }} financial disclosure forms and is the largest collection online.
 {% endblock %}
 
-{% block navbar-p %}active{% endblock %}
+{% block navbar-fd %}active{% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
-        var judge_filter = function(){
-          var judges = $('.judge-name:contains(' + this.value + ')');
-          matches.hide();
-        };
-        $('#id_disclosures_filter')
-                .on("keyup", judge_filter)
-                .on("change", judge_filter);
-    </script>
+
+  <script type="text/javascript"
+          src="{% static "js/react/main.js" %}"></script>
+  <script type="text/javascript"
+          src="{% static "js/react/vendor.js" %}"></script>
+
 {% endblock %}
 
 {% block content %}
-    <div id="financial_disclosures_homepage" class="col-xs-12">
-        <h1 class="text-center">Judicial Financial Disclosures Database (Draft)</h1>
-        <p class="text-center gray large">A collaboration of
-            <a href="https://demandprogress.org">Demand Progress</a>,
-            <a href="https://fixthecourt.org">Fix the Court</a>,
-            <a href="https://free.law">Free Law Project</a>, and
-            <a href="https://muckrock.org">MuckRock</a>.
-        </p>
-
-        <div class="row v-offset-above-4">
-            <div class="col-xs-12 col-sm-6">
-                <p class="lead">A column of explanatory text.</p>
-                <p>In pulvinar, ligula sed pellentesque hendrerit, sapien nunc
-                    mattis odio, at pharetra ipsum eros vel mi. Donec a consequat
-                    enim. Maecenas at nisl sit amet lacus aliquam tincidunt sit amet
-                    ac quam. Maecenas vulputate tincidunt magna, vestibulum
-                    tristique enim condimentum vel. </p>
-                <p>Sed id sagittis ex. Maecenas
-                    hendrerit tempor enim. Donec rutrum libero non quam molestie, in
-                    pellentesque justo euismod. In tincidunt tincidunt dolor vel
-                    dictum. Cras placerat maximus ex vitae interdum. Curabitur
-                    blandit mattis lorem et ultrices. Nunc a ligula commodo, luctus
-                    mi vitae, maximus felis. Cras mi risus, pretium vitae aliquam
-                    non, dignissim a sapien. Pellentesque ac libero quis felis
-                    dignissim pretium. Phasellus lobortis justo sit amet tortor
-                    elementum pulvinar. Donec lacinia turpis sapien, quis maximus
-                    velit efficitur sed. </p>
-            </div>
-            <div class="col-xs-12 col-sm-6">
-                <p class="lead">Another column of similarly-long explanatory text.</p>
-                <p>Suspendisse potenti. Sed auctor convallis neque vel egestas.
-                    Integer dictum nec lacus ut facilisis. Integer feugiat id nibh
-                    at interdum. Sed tincidunt orci vitae lacus vestibulum, at
-                    tempus eros dictum. Nam gravida magna nec neque imperdiet, a
-                    consequat diam lobortis.</p>
-                <p>Suspendisse imperdiet a felis ut
-                    tincidunt. Maecenas ultrices, ligula vel porttitor dictum,
-                    sapien purus interdum leo, ut iaculis ex lacus at dolor. Cras
-                    suscipit erat fermentum nisi faucibus, ac mollis quam commodo.
-                    Sed elementum dui lorem, vitae pharetra velit commodo ac. Duis
-                    nec aliquet dui, et egestas nisi. Vestibulum ante ipsum primis
-                    in faucibus orci luctus et ultrices posuere cubilia Curae; Cras
-                    pharetra erat imperdiet mauris tempor, id blandit augue
-                    aliquet. </p>
-            </div>
-        </div>
-
-        <div class="row v-offset-above-2">
-            <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
-            <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6 text-center form-group" id="main-query-box">
-                <label class="sr-only" for="id_disclosures_filter">Filter disclosures…</label>
-                <input class="form-control input-lg"
-                       name="disclosures-filter"
-                       id="id_disclosures_filter"
-                       autocomplete="off"
-                       type="text"
-                       placeholder="Filter disclosures by typing a judge's name here…">
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-xs-12">
-                <h3 class="gray">We currently have {{ disclosure_count|intcomma }} financial disclosure forms for {{ people_count|intcomma }} judge{{ people_count|pluralize }}.</h3>
-            </div>
-            {% cache 6000 financial_disclosures_home_listing %}
-            {% for row in people|rows:4 %}
-                <div class="col-sm-3">
-                    {% for person in row %}
-                        <h4 class="judge-name"><a href="{% url "financial_disclosures_for_somebody" pk=person.pk slug=person.slug %}">{{ person.name_full }}</a> ({{ person.financial_disclosures.count }} form{{ person.financial_disclosures.count|pluralize }})
-                        </h4>
-                    {% endfor %}
-                </div>
-            {% endfor %}
-            {% endcache %}
-        </div>
+    <div id="financial_disclosures_homepage" class="col-xs-12 v-offset-above-4">
+    {% flag "financial-disclosures" %}
+      <div id="react-root"></div>
+    {% else %}
+      <h1 class="text-center">Judicial Financial Disclosures Database</h1>
+      <h3 class="text-center v-offset-below-2">Coming soon. <i class="fa fa-gift"></i></h3>
+      <p class="text-center v-offset-below-7"> <a href="https://free.law/2021/09/28/announcing-federal-financial-disclosures/" class="btn btn-default ">Learn More</a> </p>
+    {% endflag %}
     </div>
 {% endblock %}
