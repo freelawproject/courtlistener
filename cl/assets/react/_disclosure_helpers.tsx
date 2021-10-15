@@ -4,7 +4,7 @@ import { DebouncedFunc } from 'lodash';
 
 interface Row {
   id: number;
-  oldest_disclosure_url: string;
+  newest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;
@@ -90,8 +90,8 @@ const InstantSearchResults = (
                     return (
                       <tr
                         tabIndex={301}
-                        onKeyDown={(e) => onFocusKeyPress(e, row.oldest_disclosure_url)}
-                        onMouseDown={(e) => onFocusClick(e, row.oldest_disclosure_url)}
+                        onKeyDown={(e) => onFocusKeyPress(e, row.newest_disclosure_url)}
+                        onMouseDown={(e) => onFocusClick(e, row.newest_disclosure_url)}
                         key={row.id}
                         className="tr-results cursor"
                       >
@@ -161,7 +161,7 @@ export const DisclosureSearch = (
 
   const onReturn = (e: KeyboardEvent) => {
     if (data.length == 1 && e.keyCode == 13) {
-      const location: string = data[0].oldest_disclosure_url;
+      const location: string = data[0].newest_disclosure_url;
       onFocusKeyPress(e, location);
     }
   };

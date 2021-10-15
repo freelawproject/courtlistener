@@ -31,7 +31,7 @@ interface Row {
   thumbnail: string;
   page_number: number;
   redacted: boolean;
-  oldest_disclosure_url: string;
+  newest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;
@@ -144,14 +144,14 @@ const MainSection = (disclosures: DisclosureParams) => {
             <div className={'col-md-9'}>
               {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
               <div className="tabcontent">
-                {TableMaker(data, 'investments', is_admin)}
-                {TableMaker(data, 'gifts', is_admin)}
-                {TableMaker(data, 'reimbursements', is_admin)}
-                {TableMaker(data, 'spouse_incomes', is_admin)}
-                {TableMaker(data, 'debts', is_admin)}
-                {TableMaker(data, 'non_investment_incomes', is_admin)}
                 {TableMaker(data, 'agreements', is_admin)}
                 {TableMaker(data, 'positions', is_admin)}
+                {TableMaker(data, 'reimbursements', is_admin)}
+                {TableMaker(data, 'non_investment_incomes', is_admin)}
+                {TableMaker(data, 'spouse_incomes', is_admin)}
+                {TableMaker(data, 'gifts', is_admin)}
+                {TableMaker(data, 'debts', is_admin)}
+                {TableMaker(data, 'investments', is_admin)}
                 {data.addendum_content_raw != '' ? (
                   <>
                     <h3>Addendum</h3>

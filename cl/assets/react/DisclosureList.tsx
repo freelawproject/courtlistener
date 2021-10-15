@@ -6,7 +6,7 @@ import { DisclosureSearch, isDescendant } from './_disclosure_helpers';
 
 interface Row {
   id: number;
-  oldest_disclosure_url: string;
+  newest_disclosure_url: string;
   name_full: string;
   position_str: string;
   disclosure_years: string;
