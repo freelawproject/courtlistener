@@ -103,7 +103,7 @@ class PersonDisclosureSerializer(
     name_full = serializers.CharField()
     disclosure_years = serializers.SerializerMethodField()
     thumbnail_path = serializers.SerializerMethodField()
-    oldest_disclosure_url = serializers.SerializerMethodField()
+    newest_disclosure_url = serializers.SerializerMethodField()
 
     def get_position_str(self, obj: Person) -> str:
         """Make a simple string of a judge's most recent position
@@ -121,9 +121,9 @@ class PersonDisclosureSerializer(
     def get_thumbnail_path(self, obj: Person) -> str:
         return make_person_picture_path(obj)
 
-    def get_oldest_disclosure_url(self, obj: Person) -> str:
+    def get_newest_disclosure_url(self, obj: Person) -> str:
         """Get the URL of the"""
-        return obj.disclosures[-1].get_absolute_url()
+        return obj.disclosures[0].get_absolute_url()
 
     class Meta:
         model = Person
@@ -132,7 +132,7 @@ class PersonDisclosureSerializer(
             "name_full",
             "disclosure_years",
             "thumbnail_path",
-            "oldest_disclosure_url",
+            "newest_disclosure_url",
         )
 
 
