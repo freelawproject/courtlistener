@@ -7,6 +7,7 @@ from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
 
 from cl.audio.sitemap import AudioSitemap
+from cl.disclosures.sitemap import DisclosureSitemap
 from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
 from cl.people_db.sitemap import PersonSitemap
@@ -22,6 +23,7 @@ sitemaps = {
     SEARCH_TYPES.OPINION: OpinionSitemap,
     SEARCH_TYPES.RECAP: DocketSitemap,
     SEARCH_TYPES.PEOPLE: PersonSitemap,
+    "disclosures": DisclosureSitemap,
     "visualizations": VizSitemap,
     "simple": SimpleSitemap,
 }
@@ -32,6 +34,7 @@ urlpatterns = [
     path("", include("cl.audio.urls")),
     path("", include("cl.opinion_page.urls")),
     path("", include("cl.simple_pages.urls")),
+    path("", include("cl.disclosures.urls")),
     path("", include("cl.users.urls")),
     path("", include("cl.favorites.urls")),
     path("", include("cl.people_db.urls")),

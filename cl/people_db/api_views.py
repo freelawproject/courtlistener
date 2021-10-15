@@ -1,11 +1,18 @@
+from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
 
-from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
+from cl.api.utils import (
+    LoggingMixin,
+    RECAPUsersReadOnly,
+    TinyAdjustablePagination,
+)
+from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
     AttorneySerializer,
     EducationSerializer,
     PartySerializer,
+    PersonDisclosureSerializer,
     PersonSerializer,
     PoliticalAffiliationSerializer,
     PositionSerializer,
@@ -18,6 +25,7 @@ from cl.people_db.filters import (
     AttorneyFilter,
     EducationFilter,
     PartyFilter,
+    PersonDisclosureFilter,
     PersonFilter,
     PoliticalAffiliationFilter,
     PositionFilter,
@@ -39,8 +47,72 @@ from cl.people_db.models import (
 )
 
 
+class PersonDisclosureViewSet(viewsets.ModelViewSet):
+    queryset = (
+        Person.objects.filter(
+            # Only return people that have disclosure sub-objects
+            Exists(
+                FinancialDisclosure.objects.filter(
+                    person=OuterRef("pk"),
+                ).only("pk")
+            ),
+            # Don't include aliases
+            is_alias_of=None,
+        )
+        .prefetch_related(
+            # Prefetch disclosures and positions to avoid query floods
+            Prefetch(
+                "financial_disclosures",
+                queryset=FinancialDisclosure.objects.all()
+                .only("year", "id", "person_id")
+                .order_by("-year"),
+                to_attr="disclosures",
+            ),
+            Prefetch(
+                "positions",
+                queryset=Position.objects.filter(court__isnull=False)
+                .select_related("court")
+                .only("pk", "court_id", "person_id")
+                .order_by("-date_start"),
+                to_attr="court_positions",
+            ),
+        )
+        .only(
+            "name_first",
+            "name_middle",
+            "name_last",
+            "name_suffix",
+            "has_photo",
+            "date_dob",
+            "date_granularity_dob",
+            "slug",
+        )
+        .order_by("-id")
+    )
+    serializer_class = PersonDisclosureSerializer
+    filterset_class = PersonDisclosureFilter
+    pagination_class = TinyAdjustablePagination
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+        "name_last",
+    )
+
+
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
-    queryset = Person.objects.all().order_by("-id")
+    queryset = (
+        Person.objects.all()
+        .prefetch_related(
+            "positions",
+            "educations",
+            "political_affiliations",
+            "sources",
+            "aba_ratings",
+            "race",
+        )
+        .order_by("-id")
+    )
     serializer_class = PersonSerializer
     filterset_class = PersonFilter
     ordering_fields = (
@@ -49,6 +121,7 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
         "date_dob",
         "date_dod",
+        "name_last",
     )
 
 

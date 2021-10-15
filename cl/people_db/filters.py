@@ -1,4 +1,5 @@
 import rest_framework_filters as filters
+from django.db.models import QuerySet
 from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
@@ -8,6 +9,7 @@ from cl.api.utils import (
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
 )
+from cl.people_db.lookup_utils import lookup_judge_by_first_or_last_name
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -155,6 +157,24 @@ class PositionFilter(FilterSet):
         }
 
 
+class PersonDisclosureFilter(FilterSet):
+    """Filters for looking up judges in the disclosure pages"""
+
+    fullname = filters.Filter(method="filter_fullname")
+
+    def filter_fullname(
+        self,
+        queryset: QuerySet,
+        name: str,
+        value: str,
+    ) -> QuerySet:
+        return lookup_judge_by_first_or_last_name(queryset, value)
+
+    class Meta:
+        model = Person
+        fields = {}
+
+
 class PersonFilter(FilterSet):
     educations = filters.RelatedFilter(
         EducationFilter,
@@ -194,12 +214,16 @@ class PersonFilter(FilterSet):
         "cl.search.filters.OpinionFilter",
         queryset=Opinion.objects.all(),
     )
-
     race = filters.MultipleChoiceFilter(
         choices=Race.RACES, method="filter_race"
     )
 
-    def filter_race(self, queryset, name, value):
+    def filter_race(
+        self,
+        queryset: QuerySet,
+        name: str,
+        value: str,
+    ) -> QuerySet:
         return queryset.filter(race__race__in=value)
 
     class Meta:

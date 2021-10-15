@@ -12,8 +12,7 @@ repos:
      - id: check-toml
      - id: check-xml
      - id: check-yaml
-     - id: end-of-file-fixer
-     - id: check-byte-order-marker
+     - id: fix-byte-order-marker
      - id: fix-encoding-pragma
        args: [--remove]
      - id: trailing-whitespace
