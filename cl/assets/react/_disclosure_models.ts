@@ -68,7 +68,7 @@ const noninvestmentFields = {
 const agreementFields = {
   Dates: 'date_raw',
   Source: 'parties_and_terms',
-  'Income Amount': 'parties_and_terms',
+  'Parties and Terms': 'parties_and_terms',
 };
 const positionFields = {
   Position: 'position',
@@ -81,7 +81,7 @@ const debtFields = {
 };
 const spouseFields = {
   Date: 'date_raw',
-  Location: 'source_type',
+  "Source": 'source_type',
 };
 
 export const disclosureModel = {

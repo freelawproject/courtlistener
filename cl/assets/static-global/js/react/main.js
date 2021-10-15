@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "445823d80052381c6c58";
+/******/ 	var hotCurrentHash = "4b8508cfc21b5a04144a";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -2676,7 +2676,7 @@ var noninvestmentFields = {
 var agreementFields = {
   Dates: 'date_raw',
   Source: 'parties_and_terms',
-  'Income Amount': 'parties_and_terms'
+  'Parties and Terms': 'parties_and_terms'
 };
 var positionFields = {
   Position: 'position',
@@ -2689,7 +2689,7 @@ var debtFields = {
 };
 var spouseFields = {
   Date: 'date_raw',
-  Location: 'source_type'
+  "Source": 'source_type'
 };
 var disclosureModel = {
   investments: {
