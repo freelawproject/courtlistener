@@ -42,6 +42,7 @@
   z-index: 9;
   box-shadow: 3px 3px 6px #8b8b8b;
   margin-top:42px;
+  width: 100%;
 }
 
 #main-query-box .table-instant-results {
