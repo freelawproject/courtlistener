@@ -15,7 +15,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
-from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
+from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 
 
