@@ -224,6 +224,13 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
+
+    fixtures = [
+        "authtest_data.json",
+        "disclosure.json",
+        "judge_judy.json",
+    ]
+
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("financial-disclosures", active=True)
     def test_disclosure_homepage(self) -> None:
@@ -237,4 +244,24 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         search_bar = self.browser.find_element(By.ID, "main-query-box")
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
+        )
+
+    @override_flag("financial-disclosures", active=True)
+    def test_disclosure_search(self) -> None:
+        self.browser.get(self.live_server_url)
+        link = self.browser.find_element(By.ID, "navbar-fd")
+        link.click()
+        self.assertIn(
+            "Judicial Financial Disclosures Database", self.browser.title
+        )
+        search_bar = self.browser.find_element(By.ID, "main-query-box")
+        no_results = self.browser.find_element(
+            By.CLASS_NAME, "table-instant-results"
+        )
+        search_bar.send_keys("Judith")
+        yes_results = self.browser.find_element(
+            By.CLASS_NAME, "table-instant-results"
+        )
+        self.assertNotEqual(
+            no_results, yes_results, msg="Something went wrong"
         )
