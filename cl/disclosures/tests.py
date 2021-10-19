@@ -227,10 +227,8 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     def test_disclosure_search_loads(self) -> None:
         """Can we query the financial disclosure position API?"""
         self.browser.get(self.live_server_url)
-        menu = self.browser.find_element(
-            By.LINK_TEXT, "Financial Disclosures"
-        )
-        menu.click()
+        link = self.browser.find_element(By.ID, "navbar-fd")
+        link.click()
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
