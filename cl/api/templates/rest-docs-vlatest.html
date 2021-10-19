@@ -769,10 +769,6 @@
     <p>Additionally, one could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
     <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version="v3" %}?person=1213&fields=gifts"</pre>
 
-    <h4>Permissions</h4>
-    <p>Financial disclosures currently requires authentication with a CourtListener account that has special permissions, though we plan to open this up soon. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
-
-
     <h3 id="recap-endpoint">RECAP Endpoints</h3>
     <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
     </p>
