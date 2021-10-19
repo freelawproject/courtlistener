@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "3245e36f98e845f60cb6";
+/******/ 	var hotCurrentHash = "b4f712b61c7201dfa45b";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -2552,7 +2552,7 @@ var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVi
   function update(_ref) {
     var data = _babel_runtime_helpers_extends__WEBPACK_IMPORTED_MODULE_0___default()({}, _ref);
 
-    var query = data.target.value;
+    var query = data.target.value.replace(/(^\s+|\s+$)/g, '');
 
     if (query.length > 1) {
       fetchData(query);
@@ -2574,6 +2574,26 @@ var DisclosureSearch = function DisclosureSearch(data, fetchData, visible, setVi
   };
 
   var onFocusKeyPress = function onFocusKeyPress(event, url) {
+    if (event.currentTarget == null) {
+      return;
+    }
+
+    if (event.keyCode == 40) {
+      event.preventDefault();
+
+      if (event.currentTarget.nextSibling) {
+        event.currentTarget.nextSibling.focus();
+      }
+    }
+
+    if (event.keyCode == 38) {
+      event.preventDefault();
+
+      if (event.currentTarget.previousSibling) {
+        event.currentTarget.previousSibling.focus();
+      }
+    }
+
     if (event.keyCode == 13) {
       event.preventDefault();
       window.location.pathname = url;
