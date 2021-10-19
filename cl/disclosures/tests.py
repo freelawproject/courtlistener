@@ -226,8 +226,8 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 class DisclosureReactLoadTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("financial-disclosures", active=True)
-    def test_disclosure_search_loads(self) -> None:
-        """Can we query the financial disclosure position API?"""
+    def test_disclosure_homepage(self) -> None:
+        """Can we load disclosure homepage?"""
         self.browser.get(self.live_server_url)
         link = self.browser.find_element(By.ID, "navbar-fd")
         link.click()
