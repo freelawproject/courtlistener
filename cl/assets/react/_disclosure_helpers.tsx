@@ -134,7 +134,7 @@ export const DisclosureSearch = (
   small: boolean
 ) => {
   function update({ ...data }) {
-    const query: string = data.target.value;
+    const query: string = data.target.value.replace(/(^\s+|\s+$)/g,'');
     if (query.length > 1) {
       fetchData(query);
       setVisible(true);
@@ -153,6 +153,21 @@ export const DisclosureSearch = (
   };
 
   const onFocusKeyPress = (event: KeyboardEvent, url: string) => {
+    if (event.currentTarget == null) {
+      return
+    }
+    if (event.keyCode == 40) {
+      event.preventDefault()
+      if (event.currentTarget.nextSibling) {
+        event.currentTarget.nextSibling.focus()
+      }
+    }
+    if (event.keyCode == 38) {
+      event.preventDefault()
+      if (event.currentTarget.previousSibling) {
+        event.currentTarget.previousSibling.focus()
+      }
+    }
     if (event.keyCode == 13) {
       event.preventDefault();
       window.location.pathname = url;

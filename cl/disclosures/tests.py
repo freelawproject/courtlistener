@@ -226,7 +226,6 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 class DisclosureReactLoadTest(TestCase, BaseSeleniumTest):
 
     fixtures = [
-        "authtest_data.json",
         "disclosure.json",
         "judge_judy.json",
     ]
