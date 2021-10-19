@@ -1,12 +1,7 @@
 import argparse
 import json
 import logging
-import os
-from glob import glob
-from typing import IO, Union
-
-from dateutil import parser
-from django.utils.encoding import force_bytes
+from typing import IO
 
 from cl.lib.command_utils import VerboseCommand
 from cl.people_db.import_judges.ca_judges_import_helpers import (
@@ -17,8 +12,7 @@ from cl.people_db.import_judges.ca_judges_position_helpers import (
     convert_date_to_gran_format,
     process_positions,
 )
-from cl.people_db.models import GRANULARITY_DAY, Person, Position
-from cl.search.models import Court
+from cl.people_db.models import GRANULARITY_DAY, Position
 
 
 def import_ca_judges(
@@ -42,7 +36,7 @@ def import_ca_judges(
 
     # shape of returned json
     # { count: string, judges: JudgeJson[] }
-    all_judges_json = load_json_file("ca_judges.json")
+    all_judges_json = json.load(file)
 
     count = all_judges_json["count"]
     logging.info(f"Processing {count} unique judges")

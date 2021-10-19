@@ -1,10 +1,10 @@
 import copy
-import json
 import logging
+import re
 import time
-from datetime import date
 
-from cl.people_db.models import Position
+from cl.people_db.models import Person, Position
+from cl.search.models import Court
 
 
 def convert_date_to_gran_format(date_text):
@@ -57,7 +57,7 @@ def process_positions(positions, counties):
                 "termination_reason": get_termination_reason(
                     pos["judicialExperienceInactiveStatus"]
                 ),
-                ## extra fields,
+                # extra fields,
                 "pending_status": pos["judicialExperiencePendingStatus"],
                 "inactive_status": pos["judicialExperienceInactiveStatus"],
             }
@@ -224,7 +224,7 @@ def get_appointer(jud_exp_pending_sub_type):
 
     :return string | None
     """
-    appointer_pos_fk = None
+    appointer_pos = None
 
     name_to_cl_id = {
         "Rolph": "cal-gov-27",
@@ -244,13 +244,13 @@ def get_appointer(jud_exp_pending_sub_type):
     cl_id = name_to_cl_id.get(jud_exp_pending_sub_type)
 
     if cl_id:
-        person = Person(cl_id=cl_id)
+        person = Person.objects.get(cl_id=cl_id)
         all_positions = person.positions.all()
         for position in all_positions:
             if position.position_type == Position.GOVERNOR:
-                appointer_pos_fk = position.pk
+                appointer_pos = position
 
-    return appointer_pos_fk
+    return appointer_pos
 
 
 def get_termination_reason(status):
@@ -419,24 +419,24 @@ def find_court(position, counties):
         name_parts = org_name.split(" ")
         abbrev = appellate_court_districts.get(name_parts[3])
         if abbrev:
-            return Court(id=f"calctapp{abbrev}d")
+            return Court.objects.get(id=f"calctapp{abbrev}d")
         else:
             raise Exception("Invalid appellate court name: {org_name}}")
 
     elif re.search(r"Justice\sCourt", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return Court(id=f"caljustct{county}")
+        return Court.objects.get(id=f"caljustct{county}")
 
     elif re.search(r"Municipal", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return Court(id=f"calmunct{county}")
+        return Court.objects.get(id=f"calmunct{county}")
 
     elif re.search(r"Superior\sCourt", org_type):
         county = lookup_court_abbr(org_name, counties)
-        return Court(id=f"calsuppct{county}")
+        return Court.objects.get(id=f"calsuppct{county}")
 
     elif re.search(r"Supreme\sCourt", org_type):
-        return Court(id="cal")
+        return Court.objects.get(id="cal")
 
     elif re.search(r"Association", org_type):
         # TODO

@@ -6,11 +6,10 @@ from datetime import date
 from typing import Optional
 
 from dateutil.parser import parse
-from django.db.models import Count, Q
+from django.db.models import Q
 from nameparser import HumanName
 
-from cl.people_db.models import SUFFIX_LOOKUP, Person, Position, Role
-from cl.search.models import Court
+from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 
 def load_json_file(file_name):
@@ -158,13 +157,7 @@ def lookup_judge_by_full_name(
 ) -> Optional[Person]:
     """Uniquely identifies a judge by name and event_date.
 
-    :param name: The judge's name, either as a str of the full name or as
-    a HumanName object. Do NOT provide just the last name of the judge. If you
-    do, it will be considered the judge's first name. You MUST provide their
-    full name or a HumanName object. To look up a judge by last name, see the
-    look_up_judge_by_last_name function. The str parsing used here is the
-    heuristic approach used by nameparser.HumanName.
-
+    :param lfm: The judge's name, as a str of the full name.
     :param event_date: The date when the judge did something
     :return Either the judge that matched the name in the court at the right
     time, or None.
@@ -173,16 +166,16 @@ def lookup_judge_by_full_name(
 
     # First we search by name_last, name_first, and suffix
     filter_sets = [
-        [Q(name_last__iexact=name.last)],
-        [Q(name_first__iexact=name.first)],
+        Q(name_last__iexact=name.last),
+        Q(name_first__iexact=name.first),
     ]
 
     if name.suffix:
         suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
         if suffix:
-            filter_sets.append([Q(name_suffix__iexact=suffix)])
+            filter_sets.append(Q(name_suffix__iexact=suffix))
 
-    candidates = Person.objects.filter(**filter_sets)
+    candidates = Person.objects.filter(*filter_sets)
 
     if len(candidates) == 0:
         # No luck finding somebody. Abort.
@@ -194,18 +187,18 @@ def lookup_judge_by_full_name(
         logging.info(
             f"Found more than one candidate. Adding middle name to filter"
         )
-        # if we have more than one candidate, we add in the middle_name queryset
-        # and rerun the search
+        # if we have more than one candidate, we add in the middle_name q
+        # queryset un the search
         if name.middle:
             initial = len(name.middle.strip(".,")) == 1
             if initial:
                 filter_sets.append(
-                    [Q(name_middle__istartswith=name.middle.strip(".,"))]
+                    Q(name_middle__istartswith=name.middle.strip(".,"))
                 )
             else:
-                filter_sets.append([Q(name_middle__iexact=name.middle)])
+                filter_sets.append(Q(name_middle__iexact=name.middle))
 
-        second_pass = Person.objects.filter(**filter_sets)
+        second_pass = Person.objects.filter(*filter_sets)
 
         if len(second_pass) == 0:
             return None
