@@ -1,12 +1,10 @@
 import json
 import os
-import time
 
 import requests
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.urls import reverse
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -17,7 +15,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
-from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 from cl.tests.cases import TestCase
 
 
@@ -225,45 +223,16 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
-    fixtures = [
-        "test_court.json",
-        "authtest_data.json",
-        "disclosure.json",
-        "judge_judy.json",
-    ]
-
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_disclosure_homepage(self) -> None:
-        """Can we load disclosure homepage?"""
+    def test_disclosure_search_loads(self) -> None:
+        """Can we query the financial disclosure position API?"""
         self.browser.get(self.live_server_url)
-        link = self.browser.find_element(By.ID, "navbar-fd")
-        link.click()
+        menu = self.browser.find_element(
+            By.PARTIAL_LINK_TEXT, "Financial Disclosures"
+        )
+        menu.click()
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
-        search_bar = self.browser.find_element(By.ID, "main-query-box")
-        self.assertTrue(
-            search_bar.is_displayed(), msg="React-root failed to load"
-        )
-
-    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    def test_disclosure_search(self) -> None:
-        """Can we search for judges?"""
-        self.browser.get(self.live_server_url)
-        link = self.browser.find_element(By.ID, "navbar-fd")
-        link.click()
-        self.assertIn(
-            "Judicial Financial Disclosures Database", self.browser.title
-        )
-        search_bar = self.browser.find_element(By.ID, "id_disclosures_search")
-        self.assertTrue(
-            search_bar.is_displayed(), msg="React-root failed to load"
-        )
-
-        with self.assertRaises(NoSuchElementException):
-            self.browser.find_element(By.CLASS_NAME, "tr-results")
-
-        search_bar.send_keys("Judith")
-        time.sleep(2)  # wait for results to appear
-        results = self.browser.find_elements(By.CLASS_NAME, "tr-results")
-        self.assertEqual(len(results), 1, msg="Incorrect results displayed")
+        search_bar = self.browser.find_element(By.ID("main-query-box"))
+        self.assertTrue(search_bar.is_displayed(), msg="React failed to load")
