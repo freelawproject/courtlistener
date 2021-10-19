@@ -437,9 +437,12 @@ class Position(AbstractDateTimeModel):
     # Acting
     ACTING_JUDGE = "act-jud"
     ACTING_PRESIDING_JUDGE = "act-pres-jud"
+    ADMINISTRATIVE_PRESIDING_JUSTICE = "ad-pres-jus"
     # Associate
     ASSOCIATE_JUDGE = "ass-jud"
+    ASSOCIATE_JUSTICE = "ass-jus"
     ASSOCIATE_CHIEF_JUDGE = "ass-c-jud"
+    ASSISTANT_PRESIDING_JUDGE = "asst-pres-jud"
     ASSOCIATE_PRESIDING_JUDGE = "ass-pres-jud"
     JUSTICE = "jus"
     # Chief
@@ -448,6 +451,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_SPECIAL_MASTER = "c-spec-m"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
+    SUPERVISING_JUDGE = "sup-jud"
     # Commissioner
     COMMISSIONER = "com"
     DEPUTY_COMMISSIONER = "com-dep"
@@ -514,8 +518,10 @@ class Position(AbstractDateTimeModel):
                 ),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
+                (ASSOCIATE_JUSTICE, "Associate Justice"),
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
                 (ASSOCIATE_PRESIDING_JUDGE, "Associate Presiding Judge"),
+                (ASSISTANT_PRESIDING_JUDGE, "Assistant Presiding Judge"),
                 (JUDGE, "Judge"),
                 (JUSTICE, "Justice"),
                 # Chief
@@ -524,6 +530,11 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
+                (SUPERVISING_JUDGE, "Supervising Judge"),
+                (
+                    ADMINISTRATIVE_PRESIDING_JUSTICE,
+                    "Administrative Presiding Justice",
+                ),
                 # Commissioner
                 (COMMISSIONER, "Commissioner"),
                 (DEPUTY_COMMISSIONER, "Deputy Commissioner"),
@@ -626,23 +637,34 @@ class Position(AbstractDateTimeModel):
         ("rec_postpone", "Recommendation Postponed"),
         ("rec_bad", "Recommended Unfavorably"),
     )
+    ELECTION_PARTISAN = "e_part"
+    ELECTION_NON_PARTISAN = "e_non_part"
+    COURT_TRANSFER = "ct_trans"
+    APPOINTMENT_PRESIDENT = "a_pres"
+    APPOINTMENT_GOVERNOR = "a_gov"
+    APPOINTMENT_LEGISLATURE = "a_legis"
+    APPOINTMENT_JUDGE = "a_judge"
     SELECTION_METHODS = (
         (
             "Election",
             (
-                ("e_part", "Partisan Election"),
-                ("e_non_part", "Non-Partisan Election"),
+                (ELECTION_PARTISAN, "Partisan Election"),
+                (ELECTION_NON_PARTISAN, "Non-Partisan Election"),
             ),
         ),
         (
             "Appointment",
             (
-                ("a_pres", "Appointment (President)"),
-                ("a_gov", "Appointment (Governor)"),
-                ("a_legis", "Appointment (Legislature)"),
+                (APPOINTMENT_PRESIDENT, "Appointment (President)"),
+                (APPOINTMENT_GOVERNOR, "Appointment (Governor)"),
+                (APPOINTMENT_LEGISLATURE, "Appointment (Legislature)"),
                 # FISC appointments are made by the chief justice of SCOTUS
-                ("a_judge", "Appointment (Judge)"),
+                (APPOINTMENT_JUDGE, "Appointment (Judge)"),
             ),
+        ),
+        (
+            "Other",
+            ((COURT_TRANSFER, "Transferred (Court Restructuring)"),),
         ),
     )
     SELECTION_METHOD_GROUPS = make_choices_group_lookup(SELECTION_METHODS)
