@@ -228,7 +228,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         """Can we query the financial disclosure position API?"""
         self.browser.get(self.live_server_url)
         menu = self.browser.find_element(
-            By.PARTIAL_LINK_TEXT, "Financial Disclosures"
+            By.LINK_TEXT, "Financial Disclosures"
         )
         menu.click()
         self.assertIn(
