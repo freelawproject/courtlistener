@@ -7,6 +7,7 @@ from django.contrib.auth.models import Permission, User
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.disclosures.models import (
     FinancialDisclosure,
@@ -224,6 +225,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag('financial-disclosures', active=True)
     def test_disclosure_search_loads(self) -> None:
         """Can we query the financial disclosure position API?"""
         self.browser.get(self.live_server_url)
