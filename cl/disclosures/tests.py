@@ -223,7 +223,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
 
 
-class DisclosureReactLoadTest(BaseSeleniumTest):
+class DisclosureReactLoadTest(TestCase, BaseSeleniumTest):
 
     fixtures = [
         "authtest_data.json",
