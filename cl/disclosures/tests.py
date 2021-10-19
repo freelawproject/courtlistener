@@ -225,7 +225,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    @override_flag('financial-disclosures', active=True)
+    @override_flag("financial-disclosures", active=True)
     def test_disclosure_search_loads(self) -> None:
         """Can we query the financial disclosure position API?"""
         self.browser.get(self.live_server_url)
@@ -234,5 +234,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
-        search_bar = self.browser.find_element(By.ID("main-query-box"))
-        self.assertTrue(search_bar.is_displayed(), msg="React failed to load")
+        search_bar = self.browser.find_element(By.ID, "main-query-box")
+        self.assertTrue(
+            search_bar.is_displayed(), msg="React-root failed to load"
+        )
