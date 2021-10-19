@@ -140,6 +140,7 @@ force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
 line_length = 79
+skip_glob = "migrations"
 
 [tool.pylint.messages_control]
 disable = "C0330, C0326"
