@@ -5,6 +5,8 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.urls import reverse
+from selenium.webdriver.common.by import By
+from timeout_decorator import timeout_decorator
 
 from cl.disclosures.models import (
     FinancialDisclosure,
@@ -13,6 +15,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
+from cl.tests.base import BaseSeleniumTest, SELENIUM_TIMEOUT
 from cl.tests.cases import TestCase
 
 
@@ -217,3 +220,19 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
         r = self.client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
+
+
+class DisclosureReactLoadTest(BaseSeleniumTest):
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    def test_disclosure_search_loads(self) -> None:
+        """Can we query the financial disclosure position API?"""
+        self.browser.get(self.live_server_url)
+        menu = self.browser.find_element(
+            By.PARTIAL_LINK_TEXT, "Financial Disclosures"
+        )
+        menu.click()
+        self.assertIn(
+            "Judicial Financial Disclosures Database", self.browser.title
+        )
+        search_bar = self.browser.find_element(By.ID("main-query-box"))
+        self.assertTrue(search_bar.is_displayed(), msg="React failed to load")
