@@ -7,7 +7,6 @@ from django.contrib.auth.models import Permission, User
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.disclosures.models import (
     FinancialDisclosure,
@@ -224,8 +223,15 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
+
+    fixtures = [
+        "test_court.json",
+        "authtest_data.json",
+        "disclosure.json",
+        "judge_judy.json",
+    ]
+
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    @override_flag("financial-disclosures", active=True)
     def test_disclosure_homepage(self) -> None:
         """Can we load disclosure homepage?"""
         self.browser.get(self.live_server_url)
