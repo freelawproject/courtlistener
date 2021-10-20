@@ -163,7 +163,6 @@ def alias_or_person(person: Person) -> Optional[Person]:
         return person
 
 
-
 def lookup_judge_by_full_name(
     lfm: str,
     event_date: Optional[date] = None,
