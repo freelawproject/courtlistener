@@ -223,7 +223,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
 
 
-class DisclosureReactLoadTest(TestCase, BaseSeleniumTest):
+class DisclosureReactLoadTest(BaseSeleniumTest):
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("financial-disclosures", active=True)
     def test_disclosure_homepage(self) -> None:
