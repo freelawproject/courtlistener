@@ -629,7 +629,6 @@
         </div>
         {% endif %}
 
-        {% flag "financial-disclosures" %}
           {% if disclosures %}
             <h3 class="bottom">
               <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
@@ -646,7 +645,6 @@
               {% endfor %}
             </div>
           {% endif %}
-        {% endflag %}
 
         {% if oral_arguments_heard.result.numFound > 0 %}
         <div class="row v-offset-below-3">

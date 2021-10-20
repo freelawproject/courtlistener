@@ -238,11 +238,9 @@
             <li class="{% block navbar-p %}inactive{% endblock %}" id="navbar-p">
               <a href="{% url "advanced_p" %}" tabindex="105">Judges</a>
             </li>
-            {% flag "financial-disclosures" %}
               <li class="{% block navbar-fd %}inactive{% endblock %}" id="navbar-fd">
                 <a href="{% url "advanced_fd" %}" tabindex="106">Financial Disclosures</a>
               </li>
-            {% endflag %}
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li
