@@ -1,6 +1,8 @@
 import html
+import operator
 import re
 from datetime import date
+from functools import reduce
 from typing import List, Optional, Union
 
 from dateutil.relativedelta import relativedelta
@@ -435,13 +437,15 @@ def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
     :param s: Query string to parse
     :return: Filter Queryset
     """
-    query_parts = [str for str in s.split()]
-    if len(query_parts) > 7:
-        # Possible DOS attack. Don't hit the DB.
-        return queryset
-    for part in query_parts:
-        q = queryset.filter(
-            Q(name_first__istartswith=part) | Q(name_last__istartswith=part)
-        )
-        q = q | q
-    return q
+    # Possible DOS attack. Don't hit the DB.
+    query_parts = [str.lower() for str in s.split()][:7]
+    search_args = []
+    for term in query_parts:
+        for query in (
+            "name_first__istartswith",
+            "name_last__istartswith",
+            "name_middle__istartswith",
+            "name_suffix__istartswith",
+        ):
+            search_args.append(Q(**{query: term}))
+    return queryset.filter(reduce(operator.or_, search_args))
