@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "10f4da4287f07a714006";
+/******/ 	var hotCurrentHash = "8f0305ef20e003b88a65";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -2303,7 +2303,7 @@ var convertTD = function convertTD(value, table, key) {
 };
 
 var fetchData = /*#__PURE__*/function () {
-  var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_2___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee2(query, setData) {
+  var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_2___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee2(query, pageSize, setData) {
     var response, results;
     return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.wrap(function _callee2$(_context2) {
       while (1) {
@@ -2311,7 +2311,7 @@ var fetchData = /*#__PURE__*/function () {
           case 0:
             _context2.prev = 0;
             _context2.next = 3;
-            return Object(_fetch__WEBPACK_IMPORTED_MODULE_6__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last"));
+            return Object(_fetch__WEBPACK_IMPORTED_MODULE_6__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last&page_size=").concat(pageSize));
 
           case 3:
             response = _context2.sent;
@@ -2337,7 +2337,7 @@ var fetchData = /*#__PURE__*/function () {
     }, _callee2, null, [[0, 7]]);
   }));
 
-  return function fetchData(_x3, _x4) {
+  return function fetchData(_x3, _x4, _x5) {
     return _ref2.apply(this, arguments);
   };
 }();
@@ -2356,10 +2356,20 @@ var InstantSearchResults = function InstantSearchResults(small) {
       data = _React$useState2[0],
       setData = _React$useState2[1];
 
-  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(false),
+  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(5),
       _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState3, 2),
-      visible = _React$useState4[0],
-      setVisible = _React$useState4[1];
+      pageSize = _React$useState4[0],
+      setPageSize = _React$useState4[1];
+
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(false),
+      _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState5, 2),
+      visible = _React$useState6[0],
+      setVisible = _React$useState6[1];
+
+  var _React$useState7 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(''),
+      _React$useState8 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState7, 2),
+      query = _React$useState8[0],
+      setQuery = _React$useState8[1];
 
   var handleClickOutside = function handleClickOutside(event) {
     var query_container = document.getElementById('main-query-box');
@@ -2393,12 +2403,19 @@ var InstantSearchResults = function InstantSearchResults(small) {
     var query = data.target.value.replace(/(^\s+|\s+$)/g, '');
 
     if (query.length > 1) {
-      debounceFetchJudge(query, setData);
+      debounceFetchJudge(query, pageSize, setData);
       setVisible(true);
+      setQuery(query);
     } else {
       setVisible(false);
+      setQuery(query);
     }
   }
+
+  var updatePageSize = function updatePageSize() {
+    setPageSize(20);
+    fetchData(query, 20, setData);
+  };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_5___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("div", {
     id: "main-query-box"
@@ -2462,7 +2479,18 @@ var InstantSearchResults = function InstantSearchResults(small) {
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("i", {
       className: 'fa fa-user fa-10x missing-judge'
     }))));
-  }))))))));
+  }), visible && data.length == 5 && pageSize == 5 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("tr", {
+    onClick: updatePageSize,
+    className: 'tr-results cursor '
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("td", {
+    className: "col-xs-8 col-sm-8 col-lg-8 "
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("h3", {
+    id: 'update_page_size'
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("i", {
+    className: "fa fa-chevron-down black"
+  }), " ", "Expand")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("td", {
+    className: "col-xs-2 col-sm-2 col-lg-2"
+  })) : '')))))));
 };
 
 var onFocusClick = function onFocusClick(event, url) {
@@ -3166,7 +3194,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3304,7 +3332,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
@@ -3393,7 +3421,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_1___default()(_node_modules_css_loader_dist_runtime_cssWithMappingToString_js__WEBPACK_IMPORTED_MODULE_0___default.a);
 // Module
-___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 3px 3px 6px #8b8b8b;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n  max-width: 250px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: rgba(255, 255, 255, 0);\n  border-bottom: 1px solid lightgrey;\n  border-radius: 10px;\n}\n\n.tr-results:last-child {\n  border-bottom: 0;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 3px 3px 6px #8b8b8b;\n  margin-top: 42px;\n  width: 100%;\n}\n\n#main-query-box .table-instant-results {\n  border-radius: 10px;\n  background: white;\n  width: 100%;\n}\n\n#main-query-box {\n  text-align: center;\n}\n\n#id_disclosures_search {\n  border-radius: 4px;\n}\n\n.table-parent .table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: white;\n  border-radius: 10px;\n}\n\ntr.tr-results:hover {\n  background-color: whitesmoke;\n  border-radius: 10px !important;\n}\n\ntr.tr-results > td {\n  border-radius: 10px;\n  background: rgba(255, 255, 255, 0);\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: rgba(255, 255, 255, 0);\n}\n\ntd.table-data-portrait {\n  max-height: 50px;\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.search-input-judges {\n  width:75%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {\n  width: 100%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{\n  margin-top: 32px;\n}\n\n.sidebar-search > #main-query-box {\n  margin-top: 0;\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,aAAa;EACb,2BAA2B;EAC3B,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;EAChB,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,kCAAkC;EAClC,kCAAkC;EAClC,mBAAmB;AACrB;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,+BAA+B;EAC/B,gBAAgB;EAChB,WAAW;AACb;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;EACjB,WAAW;AACb;;AAEA;EACE,kBAAkB;AACpB;;AAEA;EACE,kBAAkB;AACpB;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;AACnB;;AAEA;EACE,iBAAiB;EACjB,mBAAmB;AACrB;;AAEA;EACE,4BAA4B;EAC5B,8BAA8B;AAChC;;AAEA;EACE,mBAAmB;EACnB,kCAAkC;AACpC;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;AACnB;;AAEA;EACE,kCAAkC;AACpC;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,eAAe;EACf,iBAAiB;EACjB,SAAS;EACT,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,SAAS;AACX;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,aAAa;AACf","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 3px 3px 6px #8b8b8b;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n  max-width: 250px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: rgba(255, 255, 255, 0);\n  border-bottom: 1px solid lightgrey;\n  border-radius: 10px;\n}\n\n.tr-results:last-child {\n  border-bottom: 0;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 3px 3px 6px #8b8b8b;\n  margin-top: 42px;\n  width: 100%;\n}\n\n#main-query-box .table-instant-results {\n  border-radius: 10px;\n  background: white;\n  width: 100%;\n}\n\n#main-query-box {\n  text-align: center;\n}\n\n#id_disclosures_search {\n  border-radius: 4px;\n}\n\n.table-parent .table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: white;\n  border-radius: 10px;\n}\n\ntr.tr-results:hover {\n  background-color: whitesmoke;\n  border-radius: 10px !important;\n}\n\ntr.tr-results > td {\n  border-radius: 10px;\n  background: rgba(255, 255, 255, 0);\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: rgba(255, 255, 255, 0);\n}\n\ntd.table-data-portrait {\n  max-height: 50px;\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.search-input-judges {\n  width:75%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {\n  width: 100%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{\n  margin-top: 32px;\n}\n\n.sidebar-search > #main-query-box {\n  margin-top: 0;\n}\n"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.i, "/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 3px 3px 6px #8b8b8b;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n  max-width: 250px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: rgba(255, 255, 255, 0);\n  border-bottom: 1px solid lightgrey;\n  border-radius: 10px;\n}\n\n.tr-results:last-child {\n  border-bottom: 0;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 3px 3px 6px #8b8b8b;\n  margin-top: 42px;\n  width: 100%;\n}\n\n#main-query-box .table-instant-results {\n  border-radius: 10px;\n  background: white;\n  width: 100%;\n}\n\n#main-query-box {\n  text-align: center;\n}\n\n#id_disclosures_search {\n  border-radius: 4px;\n}\n\n.table-parent .table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: white;\n  border-radius: 10px;\n}\n\ntr.tr-results:hover {\n  background-color: whitesmoke;\n  border-radius: 10px !important;\n}\n\ntr.tr-results > td {\n  border-radius: 10px;\n  background: rgba(255, 255, 255, 0);\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: rgba(255, 255, 255, 0);\n}\n\ntd.table-data-portrait {\n  max-height: 50px;\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.search-input-judges {\n  width:75%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {\n  width: 100%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{\n  margin-top: 32px;\n}\n\n.sidebar-search > #main-query-box {\n  margin-top: 0;\n}\n\n#update_page_size {\n  padding-left: 16.6%\n}\n", "",{"version":3,"sources":["webpack://./assets/react/disclosure-page.css"],"names":[],"mappings":"AAAA,8BAA8B;;AAE9B;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,iBAAiB;EACjB,aAAa;EACb,2BAA2B;EAC3B,+BAA+B;AACjC;;AAEA;EACE,kBAAkB;AACpB;;AAEA,+BAA+B;AAC/B;EACE,gBAAgB;EAChB,eAAe;EACf,gBAAgB;EAChB,gBAAgB;AAClB;;AAEA;EACE,aAAa;EACb,WAAW;EACX,kCAAkC;EAClC,kCAAkC;EAClC,mBAAmB;AACrB;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,kBAAkB;EAClB,UAAU;EACV,+BAA+B;EAC/B,gBAAgB;EAChB,WAAW;AACb;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;EACjB,WAAW;AACb;;AAEA;EACE,kBAAkB;AACpB;;AAEA;EACE,kBAAkB;AACpB;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;AACnB;;AAEA;EACE,iBAAiB;EACjB,mBAAmB;AACrB;;AAEA;EACE,4BAA4B;EAC5B,8BAA8B;AAChC;;AAEA;EACE,mBAAmB;EACnB,kCAAkC;AACpC;;AAEA;EACE,qBAAqB;EACrB,YAAY;AACd;;AAEA;EACE,mBAAmB;EACnB,iBAAiB;AACnB;;AAEA;EACE,kCAAkC;AACpC;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,eAAe;EACf,iBAAiB;EACjB,SAAS;EACT,aAAa;AACf;;AAEA;EACE,eAAe;AACjB;;AAEA;EACE,SAAS;AACX;;AAEA;EACE,WAAW;AACb;;AAEA;EACE,gBAAgB;AAClB;;AAEA;EACE,aAAa;AACf;;AAEA;EACE;AACF","sourcesContent":["/*Disclosure Table Viewer CSS*/\n\n.disclosure-page .fa-exclamation-triangle {\n  font-size: 100px;\n}\n\n.search-panel-table {\n  position: absolute;\n  z-index: 9;\n  background: white;\n  padding: 10px;\n  border: 1px solid lightgrey;\n  box-shadow: 3px 3px 6px #8b8b8b;\n}\n\n.table-parent {\n  position: relative;\n}\n\n/*Disclosure List Homepage CSS*/\n.judge-pic {\n  margin-top: 10px;\n  min-width: 64px;\n  min-height: 64px;\n  max-width: 250px;\n}\n\n.tr-results {\n  padding: 10px;\n  width: 100%;\n  background: rgba(255, 255, 255, 0);\n  border-bottom: 1px solid lightgrey;\n  border-radius: 10px;\n}\n\n.tr-results:last-child {\n  border-bottom: 0;\n}\n\n.table-instant-results {\n  position: absolute;\n  z-index: 9;\n  box-shadow: 3px 3px 6px #8b8b8b;\n  margin-top: 42px;\n  width: 100%;\n}\n\n#main-query-box .table-instant-results {\n  border-radius: 10px;\n  background: white;\n  width: 100%;\n}\n\n#main-query-box {\n  text-align: center;\n}\n\n#id_disclosures_search {\n  border-radius: 4px;\n}\n\n.table-parent .table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: white;\n  border-radius: 10px;\n}\n\ntr.tr-results:hover {\n  background-color: whitesmoke;\n  border-radius: 10px !important;\n}\n\ntr.tr-results > td {\n  border-radius: 10px;\n  background: rgba(255, 255, 255, 0);\n}\n\n.table-row-link {\n  text-decoration: none;\n  color: black;\n}\n\n.table-instant-results {\n  border-radius: 10px;\n  background: white;\n}\n\n.table-instant-results > tbody {\n  background: rgba(255, 255, 255, 0);\n}\n\ntd.table-data-portrait {\n  max-height: 50px;\n}\n\n.missing-judge {\n  font-size: 40px;\n  border: 1px solid;\n  margin: 0;\n  padding: 12px;\n}\n\n.judge-name {\n  font-size: 20px;\n}\n\n.search-input-judges {\n  width:75%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {\n  width: 100%;\n}\n\n.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{\n  margin-top: 32px;\n}\n\n.sidebar-search > #main-query-box {\n  margin-top: 0;\n}\n\n#update_page_size {\n  padding-left: 16.6%\n}\n"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ __webpack_exports__["default"] = (___CSS_LOADER_EXPORT___);
 

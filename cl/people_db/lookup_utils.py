@@ -441,7 +441,7 @@ def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
         return queryset
     for part in query_parts:
         q = queryset.filter(
-            Q(name_first__icontains=part) | Q(name_last__icontains=part)
+            Q(name_first__istartswith=part) | Q(name_last__istartswith=part)
         )
         q = q | q
     return q
