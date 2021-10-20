@@ -10,8 +10,8 @@ from cl.lib.migration_utils import load_migration_fixture
 
 """
 
-POST-FIXTURE TODO: After loading of the governors, you will need to manually create 
-aliases for five of the "people" below using the admin panel. 
+POST-FIXTURE TODO: After loading of the governors, you will need to manually create
+aliases for five of the "people" below using the admin panel.
 Substitute the relevant alias pk in the "is_alias_of" field
 
 """
@@ -27,12 +27,9 @@ def load_fixture(apps, schema_editor):
     # not present in the fixtures, we can't import their positions here.
     # You will need to manually add the two positions at the bottom to the db
     # using the admin panel
-    if "test" in sys.argv:
-        return
-    else:
-        load_migration_fixture(
-            apps, schema_editor, "ca_govs_positions", "people_db"
-        )
+    load_migration_fixture(
+        apps, schema_editor, "ca_govs_positions", "people_db"
+    )
 
 
 def unload_fixture(apps, schema_editor):

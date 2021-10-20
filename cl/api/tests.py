@@ -353,11 +353,11 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         # People born after the day before her birthday
         before = correct_date - timedelta(days=1)
         self.q = {"date_dob__gt": before.isoformat()}
-        self.assertCountInResults(1)
+        self.assertCountInResults(5)
 
         # Flip the logic. This should return no results.
         self.q = {"date_dob__lt": before.isoformat()}
-        self.assertCountInResults(0)
+        self.assertCountInResults(11)
 
     def test_nested_judge_filtering(self) -> None:
         """Can we filter across various relations?
