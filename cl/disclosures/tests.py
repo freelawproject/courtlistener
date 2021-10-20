@@ -248,7 +248,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_search(self) -> None:
-        """Can we load disclosure homepage?"""
+        """Can we search for judges?"""
         self.browser.get(self.live_server_url)
         link = self.browser.find_element(By.ID, "navbar-fd")
         link.click()
@@ -265,5 +265,5 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
 
         search_bar.send_keys("Judith")
         time.sleep(2)  # wait for results to appear
-        results = self.browser.find_element(By.CLASS_NAME, "tr-results")
+        results = self.browser.find_elements(By.CLASS_NAME, "tr-results")
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")
