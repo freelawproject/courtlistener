@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import requests
 from django.conf import settings
@@ -223,7 +224,6 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
-
     fixtures = [
         "test_court.json",
         "authtest_data.json",
@@ -244,3 +244,25 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
         )
+
+    @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    def test_disclosure_search(self) -> None:
+        """Can we load disclosure homepage?"""
+        self.browser.get(self.live_server_url)
+        link = self.browser.find_element(By.ID, "navbar-fd")
+        link.click()
+        self.assertIn(
+            "Judicial Financial Disclosures Database", self.browser.title
+        )
+        search_bar = self.browser.find_element(By.ID, "main-query-box")
+        self.assertTrue(
+            search_bar.is_displayed(), msg="React-root failed to load"
+        )
+        results = self.browser.find_element(By.CLASS_NAME, "tr-results")
+        self.assertEqual(
+            len(results), 0, msg="Disclosure judges found incorrectly"
+        )
+        search_bar.send_keys("Judith")
+        time.sleep(2)  # wait for results to appear
+        results = self.browser.find_element(By.CLASS_NAME, "tr-results")
+        self.assertEqual(len(results), 1, msg="Incorrect results displayed")
