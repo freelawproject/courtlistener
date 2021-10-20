@@ -151,6 +151,19 @@ def find_or_create_judge(judgeJson, counties, index):
     return judge
 
 
+def alias_or_person(person: Person) -> Optional[Person]:
+    """Given a found person, check if that person is an alias
+
+    if so, get the actual Person and return it
+    else, return the Person passed into the function
+    """
+    if person.is_alias: 
+        return Person.objects.get(pk=person.is_alias_of)
+    else
+        return person
+
+
+
 def lookup_judge_by_full_name(
     lfm: str,
     event_date: Optional[date] = None,
@@ -182,7 +195,7 @@ def lookup_judge_by_full_name(
         return None
     elif len(candidates) == 1:
         # Got somebody unique!
-        return candidates.first()
+        return alias_or_person(candidates.first())
     elif len(candidates) > 1:
         logging.info(
             f"Found more than one candidate. Adding middle name to filter"
@@ -203,7 +216,7 @@ def lookup_judge_by_full_name(
         if len(second_pass) == 0:
             return None
         elif len(second_pass) == 1:
-            return second_pass.first()
+            return alias_or_person(second_pass.first())
         elif len(second_pass) > 1:
             logging.info(
                 f"Found %s candidates, returning None", len(second_pass)
