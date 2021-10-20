@@ -134,6 +134,7 @@ export const DisclosureSearch = (
   small: boolean
 ) => {
   function update({ ...data }) {
+    //Trim whitespace to require two non whitespace characters.
     const query: string = data.target.value.replace(/(^\s+|\s+$)/g,'');
     if (query.length > 1) {
       fetchData(query);
