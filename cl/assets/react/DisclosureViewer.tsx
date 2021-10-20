@@ -1,12 +1,9 @@
 import React from 'react';
-import { appFetch } from './_fetch';
 import { Table } from 'react-bootstrap';
 import './disclosure-page.css';
 import { useParams } from 'react-router-dom';
 import { disclosureModel } from './_disclosure_models';
-import { convertTD, DisclosureSearch, isDescendant } from './_disclosure_helpers';
-import debounce from 'lodash.debounce';
-import { DebouncedFunc } from 'lodash';
+import { convertTD, DisclosureSearch, fetchDisclosure } from './_disclosure_helpers';
 
 interface DisclosureParams {
   disclosures: string;
@@ -16,21 +13,8 @@ interface DisclosureParams {
   judge: string;
 }
 
-interface Person {
-  id: number;
-  name_first: string;
-  name_last: string;
-  slug: string;
-}
-
 interface Row {
   id: number;
-  filepath: string;
-  person: Person;
-  year: string;
-  thumbnail: string;
-  page_number: number;
-  redacted: boolean;
   newest_disclosure_url: string;
   name_full: string;
   position_str: string;
@@ -46,12 +30,6 @@ interface Data {
   id: number;
 }
 
-interface Query {
-  results: Data[];
-  previous: boolean;
-  next: boolean;
-}
-
 interface IDs {
   judge_id: string;
   disclosure_id: string;
@@ -59,128 +37,78 @@ interface IDs {
 }
 
 const TableNavigation: React.FC<DisclosureParams> = (disclosures) => {
-  return <React.Fragment>{MainSection(disclosures)}</React.Fragment>;
+  const empty_dict: Data = { addendum_content_raw: '', filepath: '', has_been_extracted: false, thumbnail: '', id: 0 };
+  const [data, setData] = React.useState(empty_dict);
+  const is_admin = disclosures['admin'] == 'True';
+
+  return (
+    <React.Fragment>
+      <div>
+        <div className={'v-offset-below-3 v-offset-above-3'}>
+          {MainSection(disclosures, is_admin, data, setData)}
+          {<div className={'col-md-3'}>{Sidebar(is_admin, data.id, data.thumbnail, data.filepath)}</div>}
+        </div>
+      </div>
+    </React.Fragment>
+  );
 };
 
-const MainSection = (disclosures: DisclosureParams) => {
-  const empty_dict: Data = { addendum_content_raw: '', filepath: '', has_been_extracted: false, thumbnail: '', id: 0 };
+const MainSection = (
+  disclosures: DisclosureParams,
+  is_admin: boolean,
+  data: Data,
+  setData: React.Dispatch<React.SetStateAction<Data>>
+) => {
   const years = disclosures['years'].split(',');
   const doc_ids = disclosures['ids'].split(',');
-  const parameters: IDs = useParams();
-  const judge_id: string = parameters['judge_id'];
-  const disclosure_id: string = parameters['disclosure_id'];
-  const [data, setData] = React.useState(empty_dict);
-  const [judge, setJudge] = React.useState([]);
   const judge_name = disclosures['judge'];
-  const is_admin = disclosures['admin'] == 'True';
+  const parameters: IDs = useParams();
+  const disclosure_id: string = parameters['disclosure_id'];
   const index = doc_ids.indexOf(disclosure_id);
-  const [visible, setVisible] = React.useState(false);
-
-  const handleClickOutside = (event: Event) => {
-    const query_container = document.getElementById('sidebar-query-box');
-    const child: HTMLElement = event.target as HTMLInputElement;
-    if (!isDescendant(query_container, child)) {
-      setVisible(false);
-    }
-    if (query_container == event.target) {
-      setVisible(true);
-    }
-  };
-
-  const handleEsc = (event: { keyCode: number }) => {
-    if (event.keyCode === 27) {
-      setVisible(false);
-    }
-  };
-
-  React.useEffect(() => {
-    document.addEventListener('click', handleClickOutside, true);
-    window.addEventListener('keydown', handleEsc);
-  }, []);
-
-  const fetchDisclosure = async (doc_id: string) => {
-    try {
-      const response: boolean | Query = await appFetch(
-        `/api/rest/v3/financial-disclosures/?person=${judge_id}&id=${doc_id}`
-      );
-      if (typeof response != 'boolean') {
-        const result = response['results'][0];
-        setData(result);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
   if (data.id == 0) {
-    fetchDisclosure(disclosure_id);
+    fetchDisclosure(setData, parameters);
   }
-
-  const fetchJudge = async (query: string) => {
-    try {
-      const response: any = await appFetch(`/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`);
-      setJudge(response['results']);
-    } catch (error) {
-      setJudge([]);
-    }
-  };
-
-  const changeHandler = (event: string) => {
-    if (event.length < 2) {
-      setVisible(false);
-    } else {
-      fetchJudge(event);
-      setVisible(true);
-    }
-  };
-
-  const debounceFetchJudge = React.useMemo(() => debounce(changeHandler, 300), []);
 
   return (
     <div>
       {data.has_been_extracted ? (
         <div>
-          <div className={'v-offset-below-3 v-offset-above-3'}>
-            <div className={'col-md-9'}>
-              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
-              <div className="tabcontent">
-                {TableMaker(data, 'agreements', is_admin)}
-                {TableMaker(data, 'positions', is_admin)}
-                {TableMaker(data, 'reimbursements', is_admin)}
-                {TableMaker(data, 'non_investment_incomes', is_admin)}
-                {TableMaker(data, 'spouse_incomes', is_admin)}
-                {TableMaker(data, 'gifts', is_admin)}
-                {TableMaker(data, 'debts', is_admin)}
-                {TableMaker(data, 'investments', is_admin)}
-                {data.addendum_content_raw != '' ? (
-                  <>
-                    <h3>Addendum</h3>
-                    <article>{data.addendum_content_raw}</article>{' '}
-                  </>
-                ) : (
-                  ''
-                )}
-              </div>
+          <div className={'col-md-9'}>
+            {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
+            <div className="tabcontent">
+              {TableMaker(data, 'agreements', is_admin)}
+              {TableMaker(data, 'positions', is_admin)}
+              {TableMaker(data, 'reimbursements', is_admin)}
+              {TableMaker(data, 'non_investment_incomes', is_admin)}
+              {TableMaker(data, 'spouse_incomes', is_admin)}
+              {TableMaker(data, 'gifts', is_admin)}
+              {TableMaker(data, 'debts', is_admin)}
+              {TableMaker(data, 'investments', is_admin)}
+              {data.addendum_content_raw != '' ? (
+                <>
+                  <h3>Addendum</h3>
+                  <article>{data.addendum_content_raw}</article>{' '}
+                </>
+              ) : (
+                ''
+              )}
             </div>
-            <div className={'col-md-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
       ) : data.id != 0 && !data.has_been_extracted ? (
         <div>
-          <div className={'v-offset-below-3 v-offset-above-3'}>
-            <div className={'col-sm-9'}>
-              {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
-              <div className="tabcontent">
-                <div className={'text-center v-offset-above-4 disclosure-page'}>
-                  <i className="fa fa-exclamation-triangle gray" />
-                  <h1>Table extraction failed.</h1>
-                  <p>
-                    <a href={data.filepath}>Click here to view the disclosure as a PDF document</a>
-                  </p>
-                </div>
+          <div className={'col-sm-9'}>
+            {Tabs(data, years, years[index], fetchDisclosure, doc_ids, judge_name, parameters)}
+            <div className="tabcontent">
+              <div className={'text-center v-offset-above-4 disclosure-page'}>
+                <i className="fa fa-exclamation-triangle gray" />
+                <h1>Table extraction failed.</h1>
+                <p>
+                  <a href={data.filepath}>Click here to view the disclosure as a PDF document</a>
+                </p>
               </div>
             </div>
-            <div className={'col-sm-3'}>{Sidebar(data, is_admin, judge, debounceFetchJudge, visible, setVisible)}</div>
           </div>
         </div>
       ) : (
@@ -293,21 +221,21 @@ const Support = () => {
   );
 };
 
-const Thumb = (data: Data) => {
+const Thumb = (id: number, thumbnail: string, filepath: string) => {
   return (
     <div className="v-offset-below-4">
       <h3>
         <span>
           Download
-          <a href={`/api/rest/v3/financial-disclosures/${data.id}/`}>
+          <a href={`/api/rest/v3/financial-disclosures/${id}/`}>
             <i className="fa fa-code gray pull-right" />
           </a>
         </span>
       </h3>
       <hr />
-      <a href={data.filepath}>
+      <a href={filepath}>
         <img
-          src={data.thumbnail}
+          src={thumbnail}
           alt="Future Judicial Portrait"
           className="img-responsive thumbnail shadow img-thumbnail judge-pic"
           width={'100%'}
@@ -317,25 +245,13 @@ const Thumb = (data: Data) => {
   );
 };
 
-const Sidebar = (
-  data: Data,
-  is_admin: boolean,
-  judge_data: Row[],
-  fetchJudge: DebouncedFunc<(query: string) => Promise<void>> | React.ChangeEventHandler<HTMLInputElement>,
-  visible: boolean,
-  setVisible: {
-    (value: React.SetStateAction<boolean>): void;
-    (value: React.SetStateAction<boolean>): void;
-    (value: React.SetStateAction<boolean>): void;
-    (arg0: boolean): void;
-  }
-) => {
+const Sidebar = (is_admin: boolean, id: number, thumbnail: string, filepath: string) => {
   return (
     <div>
-      {is_admin ? AdminPanel(data) : ''}
-      {data.thumbnail ? Thumb(data) : ''}
+      {is_admin ? AdminPanel(id) : ''}
+      {thumbnail ? Thumb(id, thumbnail, filepath) : ''}
       {Notes()}
-      {DisclosureSearch(judge_data, fetchJudge, visible, setVisible, true)}
+      {DisclosureSearch(true)}
       {Support()}
     </div>
   );
@@ -383,7 +299,7 @@ const Notes = () => {
   );
 };
 
-const AdminPanel = (data: Data) => {
+const AdminPanel = (id: number) => {
   return (
     <div className={'v-offset-below-4'}>
       <h3>
@@ -392,7 +308,7 @@ const AdminPanel = (data: Data) => {
         </span>
       </h3>
       <hr />
-      <a href={`/admin/disclosures/financialdisclosure/${data.id}/`}>Disclosure Admin Page</a>
+      <a href={`/admin/disclosures/financialdisclosure/${id}/`}>Disclosure Admin Page</a>
     </div>
   );
 };
@@ -401,11 +317,7 @@ const Tabs = (
   data: Data,
   years: string[],
   active_year: string,
-  fetchDisclosure: {
-    (doc_id: string): Promise<void>;
-    (doc_id: string): Promise<void>;
-    (arg0: string, arg1: number): void;
-  },
+  fetchDisclosure: (setData: any, parameters: any) => Promise<void>,
   doc_ids: string[],
   judge_name: string,
   parameters: IDs
