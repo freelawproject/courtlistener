@@ -1,9 +1,7 @@
 import html
-import operator
 import re
 from datetime import date
-from functools import reduce
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Union
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
@@ -430,81 +428,20 @@ def lookup_judges_by_messy_str(
     return lookup_judges_by_last_name_list(last_names, court_id, event_date)
 
 
-def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
-    """Sort judge list by name hit total
-
-    This method counts exact hits on the four name components and sorts
-    the returning results by hit count. If any result has more than one hit
-    only hits with more than 1 hit will be returned.
-
-    There was a brief discussion about SQL injection here, but we feel like
-    we are far enough removed as to avoid any problems.
-
-    :param judges: Filtered queryset
-    :param search_terms: Set of search terms
-    :return: Filtered queryset
-    """
-    judge_dict = {}
-    multi_match = False
-    for judge in judges:
-        judge_names = {
-            judge.name_first,
-            judge.name_last,
-            judge.name_middle,
-            judge.name_suffix,
-        }
-        # Find how much overlap exists between search terms and our
-        # filtered judges and generate a dictionary
-
-        count = 0
-        for term in search_terms:
-            for name in judge_names:
-                if term == name.lower()[: len(term)]:
-                    count += 1
-        if not multi_match and count > 1:
-            multi_match = True
-        judge_dict[judge.id] = count
-
-    # Sort judges by name match count
-    sorted_judges = dict(sorted(judge_dict.items(), key=lambda x: x[1]))
-
-    # Reduce list if any judge has more than one hit
-    if multi_match:
-        sorted_judges = dict(
-            (key, value) for key, value in sorted_judges.items() if value > 1
-        )
-    judge_pks = sorted_judges.keys()
-
-    # Create sql to order our filtered list by provided pk_list
-    clauses = " ".join(
-        [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(judge_pks)]
-    )
-    order_cmd = f"CASE {clauses} END"
-    # And pass the command to query set to order it.
-    return judges.filter(pk__in=judge_pks).extra(
-        select={"ordering": order_cmd}, order_by=("-ordering",)
-    )
-
-
-def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
-    """Find judge by first, middle, last name or suffix.
-
-    Method sorts the names by total hits against the four name fields.
+def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
+    """Find judge by first or last name
 
     :param queryset: Queryset to filter
     :param s: Query string to parse
     :return: Filter Queryset
     """
-    # Possible DOS attack. Don't hit the DB.
-    search_terms = [str.lower() for str in s.split()][:7]
-    search_args = []
-    for term in search_terms:
-        for query in (
-            "name_first__istartswith",
-            "name_last__istartswith",
-            "name_middle__istartswith",
-            "name_suffix__istartswith",
-        ):
-            search_args.append(Q(**{query: term}))
-    judges = queryset.filter(reduce(operator.or_, search_args))
-    return sort_judge_list(judges, set(search_terms))
+    query_parts = [str for str in s.split()]
+    if len(query_parts) > 7:
+        # Possible DOS attack. Don't hit the DB.
+        return queryset
+    for part in query_parts:
+        q = queryset.filter(
+            Q(name_first__istartswith=part) | Q(name_last__istartswith=part)
+        )
+        q = q | q
+    return q
