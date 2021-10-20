@@ -255,7 +255,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
-        search_bar = self.browser.find_element(By.ID, "main-query-box")
+        search_bar = self.browser.find_element(By.ID, "id_disclosures_search")
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
         )
