@@ -6,6 +6,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.urls import reverse
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -258,10 +259,10 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.assertTrue(
             search_bar.is_displayed(), msg="React-root failed to load"
         )
-        results = self.browser.find_element(By.CLASS_NAME, "tr-results")
-        self.assertEqual(
-            len(results), 0, msg="Disclosure judges found incorrectly"
-        )
+
+        with self.assertRaises(NoSuchElementException):
+            self.browser.find_element(By.CLASS_NAME, "tr-results")
+
         search_bar.send_keys("Judith")
         time.sleep(2)  # wait for results to appear
         results = self.browser.find_element(By.CLASS_NAME, "tr-results")
