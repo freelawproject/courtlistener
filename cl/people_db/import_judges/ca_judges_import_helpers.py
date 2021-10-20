@@ -159,7 +159,7 @@ def alias_or_person(person: Person) -> Optional[Person]:
     """
     if person.is_alias:
         return Person.objects.get(pk=person.is_alias_of)
-    else
+    else:
         return person
 
 
