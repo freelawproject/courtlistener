@@ -224,7 +224,6 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
 
 
 class DisclosureReactLoadTest(TestCase, BaseSeleniumTest):
-
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("financial-disclosures", active=True)
     def test_disclosure_homepage(self) -> None:
