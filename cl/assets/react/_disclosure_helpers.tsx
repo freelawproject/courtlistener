@@ -1,6 +1,7 @@
 import { GROSS_VALUE, INCOME_GAIN, VALUATION_METHODS } from './_disclosure_models';
 import React from 'react';
-import { DebouncedFunc } from 'lodash';
+import { appFetch } from './_fetch';
+import debounce from 'lodash.debounce';
 
 interface Row {
   id: number;
@@ -26,6 +27,20 @@ export function isDescendant(parent: HTMLElement | null, child: HTMLElement | nu
   return false;
 }
 
+export const fetchDisclosure = async (setData: any, parameters: any) => {
+  try {
+    const response: boolean | Query = await appFetch(
+      `/api/rest/v3/financial-disclosures/?person=${parameters['judge_id']}&id=${parameters['disclosure_id']}`
+    );
+    if (typeof response != 'boolean') {
+      const result = response['results'][0];
+      setData(result);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 export const convertTD = (value: string | number, table: string, key: string) => {
   if (value == -1 || !value) {
     return '';
@@ -45,15 +60,21 @@ export const convertTD = (value: string | number, table: string, key: string) =>
   return value;
 };
 
-const InstantSearchResults = (
-  update: React.ChangeEventHandler<HTMLInputElement> | undefined,
-  onReturn: (e: KeyboardEvent) => void,
-  visible: boolean,
-  data: Row[],
-  onFocusClick: (event: React.MouseEvent<HTMLTableRowElement>, url: string) => void,
-  onFocusKeyPress: (event: React.KeyboardEvent<HTMLTableRowElement>, url: string) => void,
-  small: boolean
-) => {
+const fetchData = async (query: string, setData: (arg0: Row[]) => void) => {
+  try {
+    const response: boolean | Query = await appFetch(
+      `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`
+    );
+    if (typeof response != 'boolean') {
+      const results: Row[] = response['results'];
+      setData(results);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const InstantSearchResults = (small: boolean) => {
   let size: string;
   if (small) {
     size = 'input-md form-control';
@@ -61,6 +82,42 @@ const InstantSearchResults = (
     size = 'input-lg form-control';
   }
 
+  const [data, setData] = React.useState<Row[]>([]);
+  const [visible, setVisible] = React.useState(false);
+
+  const handleClickOutside = (event: Event) => {
+    const query_container = document.getElementById('main-query-box');
+    const child: HTMLElement = event.target as HTMLInputElement;
+    if (isDescendant(query_container, child)) {
+      setVisible(true);
+    } else {
+      setVisible(false);
+    }
+  };
+
+  const handleEsc = (event: { keyCode: number }) => {
+    if (event.keyCode === 27) {
+      setVisible(false);
+    }
+  };
+
+  React.useEffect(() => {
+    document.addEventListener('click', handleClickOutside, true);
+    window.addEventListener('keydown', handleEsc);
+  }, []);
+
+  const debounceFetchJudge = React.useMemo(() => debounce(fetchData, 300), []);
+
+  function update({ ...data }) {
+    //Trim whitespace to require two non whitespace characters.
+    const query: string = data.target.value.replace(/(^\s+|\s+$)/g, '');
+    if (query.length > 1) {
+      debounceFetchJudge(query, setData);
+      setVisible(true);
+    } else {
+      setVisible(false);
+    }
+  }
   return (
     <React.Fragment>
       <div id="main-query-box">
@@ -79,7 +136,7 @@ const InstantSearchResults = (
                 autoCapitalize={'off'}
                 spellCheck={'false'}
                 onChange={update}
-                onKeyDown={(e) => onReturn(e)}
+                onKeyDown={(e) => onReturn(e, data)}
                 type="search"
                 tabIndex={300}
                 placeholder="Search for judges by name…"
@@ -126,62 +183,52 @@ const InstantSearchResults = (
   );
 };
 
-export const DisclosureSearch = (
-  data: Row[],
-  fetchData: DebouncedFunc<(query: string) => Promise<void>> | React.ChangeEventHandler<HTMLInputElement>,
-  visible: boolean,
-  setVisible: { (value: React.SetStateAction<boolean>): void; (arg0: boolean): void },
-  small: boolean
-) => {
-  function update({ ...data }) {
-    //Trim whitespace to require two non whitespace characters.
-    const query: string = data.target.value.replace(/(^\s+|\s+$)/g,'');
-    if (query.length > 1) {
-      fetchData(query);
-      setVisible(true);
-    } else {
-      setVisible(false);
+interface Query {
+  results: Row[];
+  previous: boolean;
+  next: boolean;
+}
+
+const onFocusClick = (event: MouseEvent, url: string) => {
+  if (event.button == 2) {
+    event.preventDefault();
+  }
+  if (event.button == 0) {
+    event.preventDefault();
+    window.location.pathname = url;
+  }
+};
+
+const onFocusKeyPress = (event: KeyboardEvent, url: string) => {
+  if (event.currentTarget == null) {
+    return;
+  }
+  if (event.keyCode == 40) {
+    event.preventDefault();
+    if (event.currentTarget.nextSibling) {
+      event.currentTarget.nextSibling.focus();
     }
   }
-  const onFocusClick = (event: MouseEvent, url: string) => {
-    if (event.button == 2) {
-      event.preventDefault();
+  if (event.keyCode == 38) {
+    event.preventDefault();
+    if (event.currentTarget.previousSibling) {
+      event.currentTarget.previousSibling.focus();
     }
-    if (event.button == 0) {
-      event.preventDefault();
-      window.location.pathname = url;
-    }
-  };
+  }
+  if (event.keyCode == 13) {
+    event.preventDefault();
+    window.location.pathname = url;
+  }
+};
 
-  const onFocusKeyPress = (event: KeyboardEvent, url: string) => {
-    if (event.currentTarget == null) {
-      return
-    }
-    if (event.keyCode == 40) {
-      event.preventDefault()
-      if (event.currentTarget.nextSibling) {
-        event.currentTarget.nextSibling.focus()
-      }
-    }
-    if (event.keyCode == 38) {
-      event.preventDefault()
-      if (event.currentTarget.previousSibling) {
-        event.currentTarget.previousSibling.focus()
-      }
-    }
-    if (event.keyCode == 13) {
-      event.preventDefault();
-      window.location.pathname = url;
-    }
-  };
+const onReturn = (e: KeyboardEvent, data: string | any[]) => {
+  if (data.length == 1 && e.keyCode == 13) {
+    const location: string = data[0].newest_disclosure_url;
+    onFocusKeyPress(e, location);
+  }
+};
 
-  const onReturn = (e: KeyboardEvent) => {
-    if (data.length == 1 && e.keyCode == 13) {
-      const location: string = data[0].newest_disclosure_url;
-      onFocusKeyPress(e, location);
-    }
-  };
-
+export const DisclosureSearch = (small: boolean) => {
   return (
     <div>
       {small ? (
@@ -192,10 +239,10 @@ export const DisclosureSearch = (
             </span>
           </h3>
           <hr />
-          {InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, small)}
+          {InstantSearchResults(small)}
         </div>
       ) : (
-        <>{InstantSearchResults(update, onReturn, visible, data, onFocusClick, onFocusKeyPress, small)} </>
+        <>{InstantSearchResults(small)} </>
       )}
     </div>
   );
