@@ -123,3 +123,7 @@ td.table-data-portrait {
 .sidebar-search > #main-query-box {
   margin-top: 0;
 }
+
+#update_page_size {
+  padding-left: 16.6%
+}

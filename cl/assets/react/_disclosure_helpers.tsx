@@ -60,10 +60,10 @@ export const convertTD = (value: string | number, table: string, key: string) =>
   return value;
 };
 
-const fetchData = async (query: string, setData: (arg0: Row[]) => void) => {
+const fetchData = async (query: string, pageSize: number, setData: (arg0: Row[]) => void) => {
   try {
     const response: boolean | Query = await appFetch(
-      `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`
+      `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last&page_size=${pageSize}`
     );
     if (typeof response != 'boolean') {
       const results: Row[] = response['results'];
@@ -83,7 +83,9 @@ const InstantSearchResults = (small: boolean) => {
   }
 
   const [data, setData] = React.useState<Row[]>([]);
-  const [visible, setVisible] = React.useState(false);
+  const [pageSize, setPageSize] = React.useState<number>(5);
+  const [visible, setVisible] = React.useState<boolean>(false);
+  const [query, setQuery] = React.useState<string>('');
 
   const handleClickOutside = (event: Event) => {
     const query_container = document.getElementById('main-query-box');
@@ -112,12 +114,20 @@ const InstantSearchResults = (small: boolean) => {
     //Trim whitespace to require two non whitespace characters.
     const query: string = data.target.value.replace(/(^\s+|\s+$)/g, '');
     if (query.length > 1) {
-      debounceFetchJudge(query, setData);
+      debounceFetchJudge(query, pageSize, setData);
       setVisible(true);
+      setQuery(query);
     } else {
       setVisible(false);
+      setQuery(query);
     }
   }
+
+  const updatePageSize = () => {
+    setPageSize(20);
+    fetchData(query, 20, setData);
+  };
+
   return (
     <React.Fragment>
       <div id="main-query-box">
@@ -173,6 +183,18 @@ const InstantSearchResults = (small: boolean) => {
                       </tr>
                     );
                   })}
+                  {visible && data.length == 5 && pageSize == 5 ? (
+                    <tr onClick={updatePageSize} className={'tr-results cursor '}>
+                      <td className="col-xs-8 col-sm-8 col-lg-8 ">
+                        <h3 id={'update_page_size'}>
+                          <i className="fa fa-chevron-down black" /> {}Expand
+                        </h3>
+                      </td>
+                      <td className="col-xs-2 col-sm-2 col-lg-2" />
+                    </tr>
+                  ) : (
+                    ''
+                  )}
                 </tbody>
               </table>
             </div>
