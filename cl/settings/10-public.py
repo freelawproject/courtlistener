@@ -352,6 +352,7 @@ REST_FRAMEWORK = {
         "hdave4": "15000/hour",  # GSU
         "ellliottt": "15000/hour",
         "flooie": "20000/hour",  # Needed for testing
+        "WarrenLex": "20000/day",  # For big litigation days (wow)
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
