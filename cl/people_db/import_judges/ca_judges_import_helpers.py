@@ -158,7 +158,7 @@ def alias_or_person(person: Person) -> Optional[Person]:
     else, return the Person passed into the function
     """
     if person.is_alias:
-        return Person.objects.get(pk=person.is_alias_of)
+        return person.is_alias_of
     else:
         return person
 
