@@ -430,44 +430,59 @@ def lookup_judges_by_messy_str(
     return lookup_judges_by_last_name_list(last_names, court_id, event_date)
 
 
-def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
+def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
     """Sort judge list by name hit total
 
     This method counts exact hits on the four name components and sorts
     the returning results by hit count. If any result has more than one hit
     only hits with more than 1 hit will be returned.
 
+    There was a brief discussion about SQL injection here, but we feel like
+    we are far enough removed as to avoid any problems.
+
     :param judges: Filtered queryset
-    :param search_set: Set of search terms
+    :param search_terms: Set of search terms
     :return: Filtered queryset
     """
-    cd = {}
+    judge_dict = {}
+    multi_match = False
     for judge in judges:
-        names = {
-            judge.name_first.lower(),
-            judge.name_last.lower(),
-            judge.name_middle.lower(),
-            judge.name_suffix.lower(),
+        judge_names = {
+            judge.name_first,
+            judge.name_last,
+            judge.name_middle,
+            judge.name_suffix,
         }
-        cd[judge.id] = sum(
-            [
-                any(query in name[: len(query)] for name in names)
-                for query in search_set
-            ]
-        )
+        # Find how much overlap exists between search terms and our
+        # filtered judges and generate a dictionary
 
-    pk_tuples = sorted(cd.items(), key=lambda x: x[1])
-    # Filter single hit matches if more than 1 hit matches exist in results
-    pk_list = (
-        [u[0] for u in pk_tuples if u[1] > 1]
-        if pk_tuples[-1][1] > 1
-        else [u[0] for u in pk_tuples]
-    )
+        count = 0
+        for term in search_terms:
+            for name in judge_names:
+                if term == name.lower()[: len(term)]:
+                    count += 1
+        if not multi_match and count > 1:
+            multi_match = True
+        judge_dict[judge.id] = count
+
+    # Sort judges by name match count
+    sorted_judges = dict(sorted(judge_dict.items(), key=lambda x: x[1]))
+
+    # Reduce list if any judge has more than one hit
+    if multi_match:
+        sorted_judges = dict(
+            (key, value) for key, value in sorted_judges.items() if value > 1
+        )
+    judge_pks = sorted_judges.keys()
+
+    # Create sql to order our filtered list by provided pk_list
     clauses = " ".join(
-        [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(pk_list)]
+        [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(judge_pks)]
     )
-    return judges.filter(pk__in=pk_list).extra(
-        select={"ordering": f"CASE {clauses} END"}, order_by=("-ordering",)
+    order_cmd = f"CASE {clauses} END"
+    # And pass the command to query set to order it.
+    return judges.filter(pk__in=judge_pks).extra(
+        select={"ordering": order_cmd}, order_by=("-ordering",)
     )
 
 
