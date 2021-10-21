@@ -452,6 +452,7 @@ def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
         cd[judge.id] = len(names & search_set)
 
     pk_tuples = sorted(cd.items(), key=lambda x: x[1])
+    # Filter single hit matches if more than 1 hit matches exist in results
     pk_list = (
         [u[0] for u in pk_tuples if u[1] > 1]
         if pk_tuples[-1][1] > 1
@@ -460,9 +461,8 @@ def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
     clauses = " ".join(
         [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(pk_list)]
     )
-    ordering = f"CASE {clauses} END"
     return judges.filter(pk__in=pk_list).extra(
-        select={"ordering": ordering}, order_by=("-ordering",)
+        select={"ordering": f"CASE {clauses} END"}, order_by=("-ordering",)
     )
 
 
