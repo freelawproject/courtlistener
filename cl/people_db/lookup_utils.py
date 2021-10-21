@@ -3,7 +3,7 @@ import operator
 import re
 from datetime import date
 from functools import reduce
-from typing import List, Optional, Union, Set
+from typing import List, Optional, Set, Union
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
@@ -458,9 +458,9 @@ def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
         else [u[0] for u in pk_tuples]
     )
     clauses = " ".join(
-        ["WHEN id=%s THEN %s" % (pk, i) for i, pk in enumerate(pk_list)]
+        [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(pk_list)]
     )
-    ordering = "CASE %s END" % clauses
+    ordering = f"CASE {clauses} END"
     return judges.filter(pk__in=pk_list).extra(
         select={"ordering": ordering}, order_by=("-ordering",)
     )
