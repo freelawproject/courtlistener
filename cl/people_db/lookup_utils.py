@@ -449,7 +449,12 @@ def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
             judge.name_middle.lower(),
             judge.name_suffix.lower(),
         }
-        cd[judge.id] = len(names & search_set)
+        cd[judge.id] = sum(
+            [
+                any(query in name[: len(query)] for name in names)
+                for query in search_set
+            ]
+        )
 
     pk_tuples = sorted(cd.items(), key=lambda x: x[1])
     # Filter single hit matches if more than 1 hit matches exist in results
