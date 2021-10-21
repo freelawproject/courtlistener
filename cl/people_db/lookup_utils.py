@@ -3,7 +3,7 @@ import operator
 import re
 from datetime import date
 from functools import reduce
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Set
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, QuerySet
@@ -430,17 +430,55 @@ def lookup_judges_by_messy_str(
     return lookup_judges_by_last_name_list(last_names, court_id, event_date)
 
 
-def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
-    """Find judge by first or last name
+def sort_judge_list(judges: QuerySet, search_set: Set[str]) -> QuerySet:
+    """Sort judge list by name hit total
+
+    This method counts exact hits on the four name components and sorts
+    the returning results by hit count. If any result has more than one hit
+    only hits with more than 1 hit will be returned.
+
+    :param judges: Filtered queryset
+    :param search_set: Set of search terms
+    :return: Filtered queryset
+    """
+    cd = {}
+    for judge in judges:
+        names = {
+            judge.name_first.lower(),
+            judge.name_last.lower(),
+            judge.name_middle.lower(),
+            judge.name_suffix.lower(),
+        }
+        cd[judge.id] = len(names & search_set)
+
+    pk_tuples = sorted(cd.items(), key=lambda x: x[1])
+    pk_list = (
+        [u[0] for u in pk_tuples if u[1] > 1]
+        if pk_tuples[-1][1] > 1
+        else [u[0] for u in pk_tuples]
+    )
+    clauses = " ".join(
+        ["WHEN id=%s THEN %s" % (pk, i) for i, pk in enumerate(pk_list)]
+    )
+    ordering = "CASE %s END" % clauses
+    return judges.filter(pk__in=pk_list).extra(
+        select={"ordering": ordering}, order_by=("-ordering",)
+    )
+
+
+def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
+    """Find judge by first, middle, last name or suffix.
+
+    Method sorts the names by total hits against the four name fields.
 
     :param queryset: Queryset to filter
     :param s: Query string to parse
     :return: Filter Queryset
     """
     # Possible DOS attack. Don't hit the DB.
-    query_parts = [str.lower() for str in s.split()][:7]
+    search_terms = [str.lower() for str in s.split()][:7]
     search_args = []
-    for term in query_parts:
+    for term in search_terms:
         for query in (
             "name_first__istartswith",
             "name_last__istartswith",
@@ -448,4 +486,5 @@ def lookup_judge_by_first_or_last_name(queryset: QuerySet, s: str) -> QuerySet:
             "name_suffix__istartswith",
         ):
             search_args.append(Q(**{query: term}))
-    return queryset.filter(reduce(operator.or_, search_args))
+    judges = queryset.filter(reduce(operator.or_, search_args))
+    return sort_judge_list(judges, set(search_terms))

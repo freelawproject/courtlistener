@@ -113,7 +113,7 @@
 /******/
 /******/ 	var hotApplyOnUpdate = true;
 /******/ 	// eslint-disable-next-line no-unused-vars
-/******/ 	var hotCurrentHash = "8f0305ef20e003b88a65";
+/******/ 	var hotCurrentHash = "f58734cbaa7059c1ca8e";
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule;
@@ -2303,7 +2303,7 @@ var convertTD = function convertTD(value, table, key) {
 };
 
 var fetchData = /*#__PURE__*/function () {
-  var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_2___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee2(query, pageSize, setData) {
+  var _ref2 = _babel_runtime_helpers_asyncToGenerator__WEBPACK_IMPORTED_MODULE_2___default()( /*#__PURE__*/_babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.mark(function _callee2(query, setData) {
     var response, results;
     return _babel_runtime_regenerator__WEBPACK_IMPORTED_MODULE_3___default.a.wrap(function _callee2$(_context2) {
       while (1) {
@@ -2311,7 +2311,7 @@ var fetchData = /*#__PURE__*/function () {
           case 0:
             _context2.prev = 0;
             _context2.next = 3;
-            return Object(_fetch__WEBPACK_IMPORTED_MODULE_6__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&order_by=name_last&page_size=").concat(pageSize));
+            return Object(_fetch__WEBPACK_IMPORTED_MODULE_6__["appFetch"])("/api/rest/v3/disclosure-typeahead/?fullname=".concat(query, "&page_size=5"));
 
           case 3:
             response = _context2.sent;
@@ -2337,7 +2337,7 @@ var fetchData = /*#__PURE__*/function () {
     }, _callee2, null, [[0, 7]]);
   }));
 
-  return function fetchData(_x3, _x4, _x5) {
+  return function fetchData(_x3, _x4) {
     return _ref2.apply(this, arguments);
   };
 }();
@@ -2356,20 +2356,15 @@ var InstantSearchResults = function InstantSearchResults(small) {
       data = _React$useState2[0],
       setData = _React$useState2[1];
 
-  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(5),
+  var _React$useState3 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(false),
       _React$useState4 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState3, 2),
-      pageSize = _React$useState4[0],
-      setPageSize = _React$useState4[1];
+      visible = _React$useState4[0],
+      setVisible = _React$useState4[1];
 
-  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(false),
+  var _React$useState5 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(''),
       _React$useState6 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState5, 2),
-      visible = _React$useState6[0],
-      setVisible = _React$useState6[1];
-
-  var _React$useState7 = react__WEBPACK_IMPORTED_MODULE_5___default.a.useState(''),
-      _React$useState8 = _babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_1___default()(_React$useState7, 2),
-      query = _React$useState8[0],
-      setQuery = _React$useState8[1];
+      query = _React$useState6[0],
+      setQuery = _React$useState6[1];
 
   var handleClickOutside = function handleClickOutside(event) {
     var query_container = document.getElementById('main-query-box');
@@ -2403,7 +2398,7 @@ var InstantSearchResults = function InstantSearchResults(small) {
     var query = data.target.value.replace(/(^\s+|\s+$)/g, '');
 
     if (query.length > 1) {
-      debounceFetchJudge(query, pageSize, setData);
+      debounceFetchJudge(query, setData);
       setVisible(true);
       setQuery(query);
     } else {
@@ -2411,11 +2406,6 @@ var InstantSearchResults = function InstantSearchResults(small) {
       setQuery(query);
     }
   }
-
-  var updatePageSize = function updatePageSize() {
-    setPageSize(20);
-    fetchData(query, 20, setData);
-  };
 
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement(react__WEBPACK_IMPORTED_MODULE_5___default.a.Fragment, null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("div", {
     id: "main-query-box"
@@ -2479,18 +2469,7 @@ var InstantSearchResults = function InstantSearchResults(small) {
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("i", {
       className: 'fa fa-user fa-10x missing-judge'
     }))));
-  }), visible && data.length == 5 && pageSize == 5 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("tr", {
-    onClick: updatePageSize,
-    className: 'tr-results cursor '
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("td", {
-    className: "col-xs-8 col-sm-8 col-lg-8 "
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("h3", {
-    id: 'update_page_size'
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("i", {
-    className: "fa fa-chevron-down black"
-  }), " ", "Expand")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_5___default.a.createElement("td", {
-    className: "col-xs-2 col-sm-2 col-lg-2"
-  })) : '')))))));
+  }))))))));
 };
 
 var onFocusClick = function onFocusClick(event, url) {
@@ -3194,7 +3173,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_disclosure_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./disclosure-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/disclosure-page.css");
 
-
+            
 
 var options = {};
 
@@ -3332,7 +3311,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_dist_runtime_injectStylesIntoStyleTag_js__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _node_modules_css_loader_dist_cjs_js_tag_page_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! !../../node_modules/css-loader/dist/cjs.js!./tag-page.css */ "./node_modules/css-loader/dist/cjs.js!./assets/react/tag-page.css");
 
-
+            
 
 var options = {};
 
