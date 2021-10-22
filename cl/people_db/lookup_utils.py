@@ -459,7 +459,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
         count = 0
         for term in search_terms:
             for name in judge_names:
-                if name.lower().startswith(term):
+                if re.match(term, name, re.I):
                     count += 1
         if count > 1:
             multi_match = True
@@ -496,7 +496,7 @@ def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
     :return: Filter Queryset
     """
     # Possible DOS attack. Don't hit the DB.
-    search_terms = [str.lower() for str in s.split()][:7]
+    search_terms = s.split()[:7]
     search_args = []
     for term in search_terms:
         for query in (
