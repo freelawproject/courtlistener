@@ -250,6 +250,7 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     def test_disclosure_search(self) -> None:
         """Can we search for judges?"""
         self.browser.get(self.live_server_url)
+        self.browser.implicitly_wait(2)
         link = self.browser.find_element(By.ID, "navbar-fd")
         link.click()
         self.assertIn(
@@ -264,6 +265,5 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
             self.browser.find_element(By.CLASS_NAME, "tr-results")
 
         search_bar.send_keys("Judith")
-        time.sleep(2)  # wait for results to appear
         results = self.browser.find_elements(By.CLASS_NAME, "tr-results")
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")
