@@ -222,15 +222,18 @@ class DocketAdmin(admin.ModelAdmin):
         add_items_to_solr.delay(ids, "search.RECAPDocument")
 
     def delete_model(self, request: HttpRequest, obj: Docket) -> None:
-        obj.delete()
-        from cl.search.tasks import delete_items
-
+        # Do the query before deleting the item. Otherwise, the query returns
+        # nothing.
         ids = list(
             RECAPDocument.objects.filter(
                 docket_entry__docket_id=obj.pk
             ).values_list("id", flat=True)
         )
+
+        from cl.search.tasks import delete_items
+
         delete_items.delay(ids, "search.RECAPDocument")
+        obj.delete()
 
 
 @admin.register(OpinionsCited)

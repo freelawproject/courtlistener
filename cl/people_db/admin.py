@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.forms import ModelForm
+from django.http import HttpRequest
 
 from cl.lib.admin import AdminTweaksMixin, NotesInline
 
@@ -42,13 +44,20 @@ class PositionAdmin(admin.ModelAdmin):
         "predecessor",
     )
 
-    def save_model(self, request, obj, form, change):
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Position,
+        form: ModelForm,
+        change: bool,
+    ) -> None:
         obj.save()
         from cl.search.tasks import add_items_to_solr
 
         add_items_to_solr.delay([obj.person_id], "people_db.Person")
 
-    def delete_model(self, request, obj):
+    def delete_model(self, request: HttpRequest, obj: Position) -> None:
+        # Update the person to remove the position from them.
         obj.delete()
         from cl.search.tasks import add_items_to_solr
 
