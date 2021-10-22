@@ -459,7 +459,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
         count = 0
         for term in search_terms:
             for name in judge_names:
-                if term == name.lower()[: len(term)]:
+                if name.lower().startswith(term):
                     count += 1
         if not multi_match and count > 1:
             multi_match = True
