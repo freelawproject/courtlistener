@@ -433,12 +433,8 @@ def lookup_judges_by_messy_str(
 def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
     """Sort judge list by name hit total
 
-    This method counts exact hits on the four name components and sorts
-    the returning results by hit count. If any result has more than one hit
-    only hits with more than 1 hit will be returned.
-
-    There was a brief discussion about SQL injection here, but we feel like
-    we are far enough removed as to avoid any problems.
+    This method counts exact hits on the four name and returns only the judges
+    with the highest count (sorted by last name).
 
     :param judges: Filtered queryset
     :param search_terms: Set of search terms
