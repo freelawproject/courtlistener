@@ -445,7 +445,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
     :return: Filtered queryset
     """
     judge_dict = {}
-    multi_match = False
+    highest_match = 0
     for judge in judges:
         judge_names = {
             judge.name_first,
@@ -453,37 +453,29 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
             judge.name_middle,
             judge.name_suffix,
         }
-        # Find how much overlap exists between search terms and our
-        # filtered judges and generate a dictionary
 
         count = 0
         for term in search_terms:
             for name in judge_names:
                 if re.match(term, name, re.I):
                     count += 1
-        if count > 1:
-            multi_match = True
-        judge_dict[judge.id] = count
 
-    # Sort judges by name match count
-    sorted_judges = dict(sorted(judge_dict.items(), key=lambda x: x[1]))
+        if count > highest_match:
+            highest_match = count
+        if count == highest_match:
+            judge_dict[judge.id] = count
 
-    # Reduce list if any judge has more than one hit
-    if multi_match:
-        sorted_judges = dict(
-            (key, value) for key, value in sorted_judges.items() if value > 1
-        )
-    judge_pks = sorted_judges.keys()
+    # Create list of Judge IDs that have the highest match count
+    judge_pks = []
+    for (
+        k,
+        v,
+    ) in judge_dict.items():
+        if v == highest_match:
+            judge_pks.append(k)
 
-    # Create sql to order our filtered list by provided pk_list
-    clauses = " ".join(
-        [f"WHEN id={pk} THEN {i}" for i, pk in enumerate(judge_pks)]
-    )
-    order_cmd = f"CASE {clauses} END"
-    # And pass the command to query set to order it.
-    return judges.filter(pk__in=judge_pks).extra(
-        select={"ordering": order_cmd}, order_by=("-ordering",)
-    )
+    # Return the filtered queryset and sort by name_last
+    return judges.filter(pk__in=judge_pks).order_by("name_last")
 
 
 def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
