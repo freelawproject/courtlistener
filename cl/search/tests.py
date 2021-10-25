@@ -1352,6 +1352,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
+        self.browser.implicitly_wait(1)
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
@@ -1419,7 +1420,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             By.CSS_SELECTOR, ".input-group-addon-blended i"
         )
         alert_bell.click()
-        time.sleep(1)  # Wait for the modal to open
         page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
