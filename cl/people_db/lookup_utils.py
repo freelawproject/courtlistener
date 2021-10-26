@@ -431,14 +431,14 @@ def lookup_judges_by_messy_str(
 
 
 def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
-    """Sort judge list by name hit total
+    """Filter a list of judges by a set of search terms.
 
-    This method counts exact hits on the four name and returns only the judges
-    with the highest count (sorted by last name).
+    This method counts exact hits on first middle last suffix and returns
+    an ordered queryset of judges with the most paritial/full matches.
 
-    :param judges: Filtered queryset
-    :param search_terms: Set of search terms
-    :return: Filtered queryset
+    :param judges: Queryset of judges found with matching names
+    :param search_terms: Set of search terms for looking up judges by name
+    :return: Best queryset of judges ordered by last name
     """
     judge_dict = {}
     highest_match = 0
@@ -475,12 +475,10 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
 
 
 def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
-    """Find judge by first, middle, last name or suffix.
-
-    Method sorts the names by total hits against the four name fields.
+    """Find judges by first, middle, last name or suffix.
 
     :param queryset: Queryset to filter
-    :param s: Query string to parse
+    :param s: User search terms in financial disclosures lookup by judge
     :return: Filter Queryset
     """
     # Possible DOS attack. Don't hit the DB.
