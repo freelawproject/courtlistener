@@ -41,12 +41,14 @@
   position: absolute;
   z-index: 9;
   box-shadow: 3px 3px 6px #8b8b8b;
-  margin-top:42px;
+  margin-top: 42px;
+  width: 100%;
 }
 
 #main-query-box .table-instant-results {
   border-radius: 10px;
   background: white;
+  width: 100%;
 }
 
 #main-query-box {
@@ -120,4 +122,8 @@ td.table-data-portrait {
 
 .sidebar-search > #main-query-box {
   margin-top: 0;
+}
+
+#update_page_size {
+  padding-left: 16.6%
 }

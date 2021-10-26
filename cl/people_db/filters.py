@@ -9,7 +9,7 @@ from cl.api.utils import (
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
 )
-from cl.people_db.lookup_utils import lookup_judge_by_first_or_last_name
+from cl.people_db.lookup_utils import lookup_judge_by_name_components
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -168,7 +168,7 @@ class PersonDisclosureFilter(FilterSet):
         name: str,
         value: str,
     ) -> QuerySet:
-        return lookup_judge_by_first_or_last_name(queryset, value)
+        return lookup_judge_by_name_components(queryset, value)
 
     class Meta:
         model = Person

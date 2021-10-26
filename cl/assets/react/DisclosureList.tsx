@@ -1,69 +1,12 @@
 import React from 'react';
-import { appFetch } from './_fetch';
 import { UserState } from './_types';
-import debounce from 'lodash.debounce';
-import { DisclosureSearch, isDescendant } from './_disclosure_helpers';
-
-interface Row {
-  id: number;
-  newest_disclosure_url: string;
-  name_full: string;
-  position_str: string;
-  disclosure_years: string;
-  thumbnail_path: string;
-}
-
-interface Query {
-  results: Row[];
-  previous: boolean;
-  next: boolean;
-}
+import { DisclosureSearch } from './_disclosure_helpers';
 
 const DisclosureList: React.FC<UserState> = () => {
-  const [data, setData] = React.useState<Row[]>([]);
-  const [visible, setVisible] = React.useState(false);
-
-  const handleClickOutside = (event: Event) => {
-    const query_container = document.getElementById('main-query-box');
-    const child: HTMLElement = event.target as HTMLInputElement;
-    if (isDescendant(query_container, child)) {
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  };
-
-  const handleEsc = (event: { keyCode: number }) => {
-    if (event.keyCode === 27) {
-      setVisible(false);
-    }
-  };
-
-  React.useEffect(() => {
-    document.addEventListener('click', handleClickOutside, true);
-    window.addEventListener('keydown', handleEsc);
-  }, []);
-
-  const fetchData = async (query: string) => {
-    try {
-      const response: boolean | Query = await appFetch(
-        `/api/rest/v3/disclosure-typeahead/?fullname=${query}&order_by=name_last`
-      );
-      if (typeof response != 'boolean') {
-        const results: Row[] = response['results'];
-        setData(results);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const debounceFetchJudge = React.useMemo(() => debounce(fetchData, 300), []);
-
   return (
     <div>
       {DisclosureHeader()}
-      {DisclosureSearch(data, debounceFetchJudge, visible, setVisible, false)}
+      {DisclosureSearch(false)}
       {DisclosureFooter()}
     </div>
   );
