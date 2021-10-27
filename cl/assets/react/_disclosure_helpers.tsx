@@ -49,13 +49,13 @@ export const convertTD = (value: string | number, table: string, key: string) =>
     return value;
   }
   if (['transaction_value_code', 'value_code', 'gross_value_code'].indexOf(key) > -1) {
-    return `${GROSS_VALUE[value]} (${value})`;
+    return `$${GROSS_VALUE[value]}\u00a0(${value})`;
   }
   if (['income_during_reporting_period_code', 'transaction_gain_code'].indexOf(key) > -1) {
-    return `${INCOME_GAIN[value]} (${value})`;
+    return `$${INCOME_GAIN[value]}\u00a0(${value})`;
   }
   if (key == 'gross_value_method' && value) {
-    return `${VALUATION_METHODS[value]} (${value})`;
+    return `${VALUATION_METHODS[value]}\u00a0(${value})`;
   }
   return value;
 };
