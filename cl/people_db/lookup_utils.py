@@ -312,7 +312,11 @@ def lookup_judge_by_full_name(
 
     # check based on last name and court first
     filter_sets = [
-        [Q(name_last__iexact=name.last), Q(positions__court_id=court_id)],
+        [
+            Q(name_last__iexact=name.last)
+            | Q(aliases__name_last__iexact=name.last),
+            Q(positions__court_id=court_id),
+        ],
     ]
     # Then narrow by date
     if event_date is not None:
@@ -333,23 +337,43 @@ def lookup_judge_by_full_name(
 
     # Then by first name
     if name.first:
-        filter_sets.append([Q(name_first__iexact=name.first)])
+        filter_sets.append(
+            [
+                Q(name_first__iexact=name.first)
+                | Q(aliases__name_first__iexact=name.first)
+            ]
+        )
 
     # Do middle name or initial next.
     if name.middle:
-        initial = len(name.middle.strip(".,")) == 1
+        stripped_middle = name.middle.strip(".,")
+        initial = len(stripped_middle) == 1
         if initial:
+
             filter_sets.append(
-                [Q(name_middle__istartswith=name.middle.strip(".,"))]
+                [
+                    Q(name_middle__istartswith=stripped_middle)
+                    | Q(aliases__name_middle__istartswith=stripped_middle)
+                ]
             )
         else:
-            filter_sets.append([Q(name_middle__iexact=name.middle)])
+            filter_sets.append(
+                [
+                    Q(name_middle__iexact=name.middle)
+                    | Q(aliases__name_middle__iexact=name.middle)
+                ]
+            )
 
     # And finally, by suffix
     if name.suffix:
         suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
         if suffix:
-            filter_sets.append([Q(name_suffix__iexact=suffix)])
+            filter_sets.append(
+                [
+                    Q(name_suffix__iexact=suffix)
+                    | Q(aliases__name_suffix__iexact=suffix)
+                ]
+            )
 
     # Query people DB, slowly adding more filters to the query. If we get zero
     # results, no luck. If we get one, great. If we get more than one, continue
@@ -371,7 +395,7 @@ def lookup_judge_by_full_name(
 def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
-    full_name: str,
+    full_name: Union[HumanName, str],
     court_id: str,
     event_date: date,
 ) -> None:
