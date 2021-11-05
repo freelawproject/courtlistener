@@ -283,6 +283,10 @@ const Notes = () => {
         <a href={'https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf'}>
           Guide to Judiciary Policy on Ethics and Judicial Conduct
         </a>
+        , or the official{' '}
+        <a href="https://free.law/pdf/disclosure-filing-instructions-2021.pdf">
+          Filing Instructions for Judicial Officers and Employees
+        </a>
         .
       </p>
 
