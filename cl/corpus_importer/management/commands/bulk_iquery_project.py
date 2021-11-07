@@ -4,6 +4,7 @@ from typing import List, TypedDict
 
 from django.conf import settings
 from django.core.management import CommandParser  # type: ignore
+from redis.exceptions import ConnectionError
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
@@ -51,6 +52,7 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
     ):
         if len(court_ids) == 0:
             # No more courts. Done!
+            print("Finished all courts. Exiting!")
             break
 
         for court_id in court_ids:
@@ -65,6 +67,16 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
                     args=(court_id, pacer_case_id, next(db_key_cycle)),
                     queue=q,
                 )
+            except ConnectionError:
+                print(
+                    "Failed to connect to redis. Waiting a bit and making "
+                    "a new connection."
+                )
+                time.sleep(10)
+                r = make_redis_interface("CACHE")
+                # Continuing here will skip this court for this iteration; not
+                # a huge deal.
+                continue
             except Exception as e:
                 # Cleanup
                 r.hincrby("iquery_status", court_id, -1)
