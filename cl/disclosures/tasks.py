@@ -387,8 +387,6 @@ def generate_or_download_disclosure_as_pdf(
     :param pdf_url: The URL of PDF in S3
     :return: Response containing PDF
     """
-    logger.info(pdf_url)
-    logger.info(data)
     if pdf_url:
         logger.info(f"Downloading PDF: {pdf_url}")
         return requests.get(pdf_url, timeout=60 * 20)
