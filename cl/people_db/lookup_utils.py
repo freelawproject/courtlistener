@@ -1,7 +1,7 @@
 import html
 import operator
 import re
-from datetime import date
+from datetime import date, timedelta
 from functools import reduce
 from typing import List, Optional, Set, Union
 
@@ -293,6 +293,7 @@ def lookup_judge_by_full_name(
     name: Union[HumanName, str],
     court_id: str,
     event_date: Optional[date] = None,
+    require_living_judge: bool = True,
 ) -> Optional[Person]:
     """Uniquely identifies a judge by both name and metadata.
 
@@ -304,16 +305,44 @@ def lookup_judge_by_full_name(
     heuristic approach used by nameparser.HumanName.
     :param court_id: The court where the judge did something
     :param event_date: The date when the judge did something
+    :param require_living_judge: Whether to ensure that the judge found was
+    born before the event date and died after it. In order to keep code simple,
+    there's some slop in here to allow for date fields with low granularity
+    (like those with DATE_GRANULARITY = "%Y").
     :return Either the judge that matched the name in the court at the right
     time, or None.
     """
     if isinstance(name, str):
         name = HumanName(name)
 
-    # check based on last name and court first
-    filter_sets = [
-        [Q(name_last__iexact=name.last), Q(positions__court_id=court_id)],
+    filter_sets = []
+
+    # check based on last name, court, and functioning flesh and blood first
+    first_filter = [
+        Q(name_last__iexact=name.last)
+        | Q(aliases__name_last__iexact=name.last),
+        Q(positions__court_id=court_id),
     ]
+    if require_living_judge and event_date:
+        first_filter.extend(
+            [
+                # Include timedelta here to account for low-granularity fields.
+                # For example, if they died on 2021/10/15, but we only have the
+                # granularity of a month, and the event is on 2021/10/14, then
+                # date_dob would be 2021/10/01, and we'd miss this. Since
+                # granularity can be off by as much as 365 days, just add some
+                # slop into our query to make sure that when we have low
+                # granularity, we err on the side of over-inclusion. Another
+                # approach would be to factor in the granularity field and
+                # adjust this accordingly, but that's harder.
+                Q(date_dod__gte=event_date - timedelta(days=365))
+                | Q(date_dod__isnull=True),
+                Q(date_dob__lte=event_date + timedelta(days=365))
+                | Q(date_dob__isnull=True),
+            ]
+        )
+    filter_sets.append(first_filter)
+
     # Then narrow by date
     if event_date is not None:
         filter_sets.append(
@@ -333,23 +362,43 @@ def lookup_judge_by_full_name(
 
     # Then by first name
     if name.first:
-        filter_sets.append([Q(name_first__iexact=name.first)])
+        filter_sets.append(
+            [
+                Q(name_first__iexact=name.first)
+                | Q(aliases__name_first__iexact=name.first)
+            ]
+        )
 
     # Do middle name or initial next.
     if name.middle:
-        initial = len(name.middle.strip(".,")) == 1
+        stripped_middle = name.middle.strip(".,")
+        initial = len(stripped_middle) == 1
         if initial:
+
             filter_sets.append(
-                [Q(name_middle__istartswith=name.middle.strip(".,"))]
+                [
+                    Q(name_middle__istartswith=stripped_middle)
+                    | Q(aliases__name_middle__istartswith=stripped_middle)
+                ]
             )
         else:
-            filter_sets.append([Q(name_middle__iexact=name.middle)])
+            filter_sets.append(
+                [
+                    Q(name_middle__iexact=name.middle)
+                    | Q(aliases__name_middle__iexact=name.middle)
+                ]
+            )
 
     # And finally, by suffix
     if name.suffix:
         suffix = SUFFIX_LOOKUP.get(name.suffix.lower())
         if suffix:
-            filter_sets.append([Q(name_suffix__iexact=suffix)])
+            filter_sets.append(
+                [
+                    Q(name_suffix__iexact=suffix)
+                    | Q(aliases__name_suffix__iexact=suffix)
+                ]
+            )
 
     # Query people DB, slowly adding more filters to the query. If we get zero
     # results, no luck. If we get one, great. If we get more than one, continue
@@ -371,7 +420,7 @@ def lookup_judge_by_full_name(
 def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
-    full_name: str,
+    full_name: Union[HumanName, str],
     court_id: str,
     event_date: date,
 ) -> None:

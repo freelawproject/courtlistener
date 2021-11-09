@@ -223,8 +223,17 @@
                 <span class="meta-data-header">Precedential Status:</span>
                 <span class="meta-data-value">
                     {{cluster.get_precedential_status_display|default:'Unknown'}}
+                    {% if cluster.docket.court_id == 'ill' or cluster.docket.court_id == 'illappct' %}
+                    <i class="fa fa-warning gray"
+                        data-toggle="modal"
+                        data-target="#modal-note-illinois-court"
+                        title="A Note on Illinois Opinions"></i>
+                    {% endif %}
                 </span>
             </p>
+            {% if cluster.docket.court_id == 'ill' or cluster.docket.court_id == 'illappct' %}
+              {% include "includes/note_illinois_court_modal.html" %}
+            {% endif %}
             <p class="bottom">
                 <span class="meta-data-header">Citations:</span>
                 <span class="meta-data-value">
@@ -298,7 +307,6 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-
 
             {% if cluster.nature_of_suit %}
             <p class="bottom">
