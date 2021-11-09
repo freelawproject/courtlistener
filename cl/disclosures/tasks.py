@@ -107,7 +107,22 @@ def extract_content(
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
     try:
-        if disclosure_type == "jw":
+        if disclosure_type == "pdf":
+            extractor_response = requests.post(
+                settings.BTE_URLS["extract-disclosure-pdf"]["url"],
+                files={"file": ("file", pdf_bytes)},
+                timeout=settings.BTE_URLS["extract-disclosure-pdf"]["timeout"],
+            )
+            if extractor_response.json()["success"] is False:
+                # Sometimes these vector PDFs are mixed with images
+                # In that case - try again with the image extractor
+                extractor_response = requests.post(
+                    settings.BTE_URLS["extract-disclosure"]["url"],
+                    files={"pdf_document": ("file", pdf_bytes)},
+                    timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
+                )
+
+        elif disclosure_type == "jw":
             extractor_response = requests.post(
                 settings.BTE_URLS["extract-disclosure-jw"]["url"],
                 files={"file": ("file", pdf_bytes)},
@@ -345,7 +360,7 @@ def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
     :param data: File data
     :return: URL or first URL on AWS
     """
-    if data["disclosure_type"] in ["jw", "single", "jef"]:
+    if data["disclosure_type"] in ["jw", "single", "jef", "pdf"]:
         url = data["url"]
     else:
         url = data["urls"][0]
@@ -383,6 +398,8 @@ def generate_or_download_disclosure_as_pdf(
         return requests.get(data["url"], timeout=60 * 20)
     elif data["disclosure_type"] == "single":
         urls = [data["url"]]
+    elif data["disclosure_type"] == "pdf":
+        return requests.get(data["url"], timeout=60 * 20)
     else:
         urls = data["urls"]
     logger.info(f"Processing url:{quote(urls[0], safe=':/')}")
