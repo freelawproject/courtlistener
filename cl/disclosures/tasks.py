@@ -113,6 +113,15 @@ def extract_content(
                 files={"file": ("file", pdf_bytes)},
                 timeout=settings.BTE_URLS["extract-disclosure-pdf"]["timeout"],
             )
+            if extractor_response.json()["success"] is False:
+                # Sometimes these vector PDFs are mixed with images
+                # In that case - try again with the image extractor
+                extractor_response = requests.post(
+                    settings.BTE_URLS["extract-disclosure"]["url"],
+                    files={"pdf_document": ("file", pdf_bytes)},
+                    timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
+                )
+
         elif disclosure_type == "jw":
             extractor_response = requests.post(
                 settings.BTE_URLS["extract-disclosure-jw"]["url"],
