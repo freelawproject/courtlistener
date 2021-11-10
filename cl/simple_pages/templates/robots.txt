@@ -90,6 +90,17 @@ Disallow: /txt/
 Disallow: /doc/
 Disallow: /static/judge_pics/
 
+User-agent: MojeekBot
+Disallow: /robots.txt
+Disallow: /assets/
+Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
+Disallow: /api/bulk-data/
+Disallow: /pdf/
+Disallow: /wpd/
+Disallow: /txt/
+Disallow: /doc/
+Disallow: /static/judge_pics/
 
 # Baidu, Blekko, Others
 # No support for robots meta tag nor x-robots-tag.
