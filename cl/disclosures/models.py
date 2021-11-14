@@ -512,7 +512,7 @@ class Reimbursement(AbstractDateTimeModel):
         blank=True,
     )
     date_raw = models.TextField(
-        help_text="Dates as a text string for the date of reimbursements."
+        help_text="Dates as a text string for the date of reimbursements. "
         "This is often conference dates (ex. June 2-6, 2011).",
         blank=True,
     )
