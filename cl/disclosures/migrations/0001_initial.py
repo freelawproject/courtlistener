@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
                 ('date_created', models.DateTimeField(auto_now_add=True, db_index=True, help_text='The moment when the item was created.')),
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
                 ('source', models.TextField(blank=True, help_text='Source of the reimbursement (ex. FSU Law School).')),
-                ('date_raw', models.TextField(blank=True, help_text='Dates as a text string for the date of reimbursements.This is often conference dates (ex. June 2-6, 2011).')),
+                ('date_raw', models.TextField(blank=True, help_text='Dates as a text string for the date of reimbursements. This is often conference dates (ex. June 2-6, 2011).')),
                 ('location', models.TextField(blank=True, help_text='Location of the reimbursement (ex. Harvard Law School, Cambridge, MA).')),
                 ('purpose', models.TextField(blank=True, help_text='Purpose of the reimbursement (ex. Baseball announcer).')),
                 ('items_paid_or_provided', models.TextField(blank=True, help_text='Items reimbursed (ex. Room, Airfare).')),
