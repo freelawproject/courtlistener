@@ -337,9 +337,9 @@ def get_and_save_free_document_report(
                 "PacerLoginException while getting free docs"
             )
         elif isinstance(exc, ParsingException):
-            if "nonce" in exc.message:
+            if "nonce" in f"{exc}":
                 msg = "Didn't get Nonce"
-            elif "XML" in exc.message:
+            elif "XML" in f"{exc}":
                 msg = "Written opinion reports are blocked. Please " \
                       "contact the court director"
             else:
