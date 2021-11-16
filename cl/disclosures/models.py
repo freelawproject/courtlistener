@@ -371,8 +371,8 @@ class Investment(AbstractDateTimeModel):
         help_text="Identity of the transaction partner", blank=True
     )
     has_inferred_values = models.BooleanField(
-        help_text="Is the investment name was inferred during extraction."
-        "This is common because transactions usually list the first"
+        help_text="If the investment name was inferred during extraction. "
+        "This is common because transactions usually list the first "
         "purchase of a stock and leave the name value blank for "
         "subsequent purchases or sales.",
         default=False,
@@ -512,7 +512,7 @@ class Reimbursement(AbstractDateTimeModel):
         blank=True,
     )
     date_raw = models.TextField(
-        help_text="Dates as a text string for the date of reimbursements."
+        help_text="Dates as a text string for the date of reimbursements. "
         "This is often conference dates (ex. June 2-6, 2011).",
         blank=True,
     )

@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
                 ('date_created', models.DateTimeField(auto_now_add=True, db_index=True, help_text='The moment when the item was created.')),
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
                 ('source', models.TextField(blank=True, help_text='Source of the reimbursement (ex. FSU Law School).')),
-                ('date_raw', models.TextField(blank=True, help_text='Dates as a text string for the date of reimbursements.This is often conference dates (ex. June 2-6, 2011).')),
+                ('date_raw', models.TextField(blank=True, help_text='Dates as a text string for the date of reimbursements. This is often conference dates (ex. June 2-6, 2011).')),
                 ('location', models.TextField(blank=True, help_text='Location of the reimbursement (ex. Harvard Law School, Cambridge, MA).')),
                 ('purpose', models.TextField(blank=True, help_text='Purpose of the reimbursement (ex. Baseball announcer).')),
                 ('items_paid_or_provided', models.TextField(blank=True, help_text='Items reimbursed (ex. Room, Airfare).')),
@@ -123,7 +123,7 @@ class Migration(migrations.Migration):
                 ('transaction_value_code', models.CharField(blank=True, choices=[('J', '1 - 15,000'), ('K', '15,001 - 50,000'), ('L', '50,001 - 100,000'), ('M', '100,001 - 250,000'), ('N', '250,001 - 500,000'), ('O', '500,001 - 1,000,000'), ('P1', '1,000,001 - 5,000,000'), ('P2', '5,000,001 - 25,000,000'), ('P3', '25,000,001 - 50,000,000'), ('P4', '50,000,001 - '), ('-1', 'Failed Extraction')], help_text='Transaction value amount, as form code (ex. J (1-15,000)).', max_length=5)),
                 ('transaction_gain_code', models.CharField(blank=True, choices=[('A', '1 - 1,000'), ('B', '1,001 - 2,500'), ('C', '2,501 - 5,000'), ('D', '5,001 - 15,000'), ('E', '15,001 - 50,000'), ('F', '50,001 - 100,000'), ('G', '100,001 - 1,000,000'), ('H1', '1,000,001 - 5,000,000'), ('H2', '5,000,001 +'), ('-1', 'Failed Extraction')], help_text='Gain from investment transaction if any (ex. A (1-1000)).', max_length=5)),
                 ('transaction_partner', models.TextField(blank=True, help_text='Identity of the transaction partner')),
-                ('has_inferred_values', models.BooleanField(default=False, help_text='Is the investment name was inferred during extraction.This is common because transactions usually list the firstpurchase of a stock and leave the name value blank for subsequent purchases or sales.')),
+                ('has_inferred_values', models.BooleanField(default=False, help_text='If the investment name was inferred during extraction. This is common because transactions usually list the first purchase of a stock and leave the name value blank for subsequent purchases or sales.')),
                 ('financial_disclosure', models.ForeignKey(help_text='The financial disclosure associated with this investment.', on_delete=django.db.models.deletion.CASCADE, related_name='investments', to='disclosures.financialdisclosure')),
             ],
             options={
