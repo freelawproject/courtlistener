@@ -29,9 +29,9 @@ class OurCasesTestLoader(TestLoader):
     def loadTestsFromTestCase(self, testCaseClass):
         if not issubclass(testCaseClass, self.allowed_test_case_classes):
             print(
-                f"{testCaseClass.__module__}.{testCaseClass.__name__} does not"
-                + " inherit from an cl.tests.cases TestCase class. Be sure to "
-                "use those test case classes for your tests.",
+                f"{testCaseClass.__module__}.{testCaseClass.__name__} does"
+                " not inherit from an cl.tests.cases TestCase class. Be"
+                " sure to use those test case classes for your tests.",
                 file=sys.stderr,
             )
             sys.exit(1)
