@@ -329,13 +329,9 @@ def get_and_save_free_document_report(
                 "to failure to get Nonce."
             )
         elif isinstance(exc, (RequestException, ReadTimeoutError)):
-            msg = (
-                "Unable to get free document report results"
-            )
+            msg = "Unable to get free document report results"
         elif isinstance(exc, PacerLoginException):
-            msg = (
-                "PacerLoginException while getting free docs"
-            )
+            msg = "PacerLoginException while getting free docs"
         elif isinstance(exc, ParsingException):
             if "nonce" in f"{exc}":
                 msg = "Didn't get Nonce"
@@ -348,7 +344,7 @@ def get_and_save_free_document_report(
             msg = "Soft time limit exceeded"
 
         if self.request.retries == self.max_retries:
-            logger.error(msg + " at %s (%s to %s).", court_id, start, end)
+            logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)
             return PACERFreeDocumentLog.SCRAPE_FAILED
         logger.info(f"{msg} Retrying.", court_id, start, end)
         raise self.retry(exc=exc, countdown=5)
