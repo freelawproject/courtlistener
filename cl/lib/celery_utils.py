@@ -32,8 +32,8 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
     """Make a queue name for redis
 
     Celery uses PRIORITY_SEP to separate different priorities of tasks into
-    different queues in Redis. Each queue-priority combination becomes a key in
-    redis with names like:
+    different queues in Redis. Each queue-priority combination becomes a key
+    in redis with names like:
 
      - batch1\x06\x163 <-- P3 queue named batch1
 
@@ -95,8 +95,8 @@ class CeleryThrottle(object):
         self.queue_name: Final = queue_name
 
         # `shortage` stores the number of items that the queue is short by, as
-        # compared to `self.max`. At init, the queue is empty, so it's short by
-        # the full amount. Fill it up.
+        # compared to `self.max`. At init, the queue is empty, so it's short
+        # by the full amount. Fill it up.
         self.shortage = self.max
 
     def maybe_wait(self) -> None:
@@ -178,8 +178,8 @@ def set_for_next_window(
     schedule_key: str,
     n: datetime,
 ) -> float:
-    """Set the schedule for the next window to start as soon as the current one
-    runs out.
+    """Set the schedule for the next window to start as soon as the current
+    one runs out.
     """
     ttl = r.ttl(throttle_key)
     if ttl < 0:
@@ -235,8 +235,8 @@ def get_task_wait(
 
     ---
 
-    There is also a scheduler that figures out when to re-queue tasks. The idea
-    of the scheduler is simple: If you know the rate the tasks can be
+    There is also a scheduler that figures out when to re-queue tasks. The
+    idea of the scheduler is simple: If you know the rate the tasks can be
     processed, and if you're getting tasks faster than that rate, you can
     schedule each one to take its turn at a reasonable specified time. This is
     implemented by keeping a timestamp in redis indicating when the throttle
@@ -251,10 +251,10 @@ def get_task_wait(
               3s      |     3
 
     Task number 1 runs immediately, but sets a throttle for five seconds until
-    more work can be done. The second comes in and sees that the throttle has a
-    ttl of three remaining seconds, so it waits that long. Next, task number 3
-    comes in. It sees that the current window is full, and that the next one is
-    too — only one task every five seconds, right? It has to wait seven
+    more work can be done. The second comes in and sees that the throttle has
+    a ttl of three remaining seconds, so it waits that long. Next, task number
+    3 comes in. It sees that the current window is full, and that the next one
+    is too — only one task every five seconds, right? It has to wait seven
     seconds: two seconds (for the current window) *plus* 5 seconds (for the
     next one, which is occupied by task two).
 
@@ -290,8 +290,8 @@ def get_task_wait(
         # OK by returning 0.
         new_count = r.incr(throttle_key, 1)
         if new_count == 1:
-            # Safety check. If the count is 1 after incrementing, that means we
-            # created the key via the incr command. This can happen when it
+            # Safety check. If the count is 1 after incrementing, that means
+            # we created the key via the incr command. This can happen when it
             # expires between when we `get` its value up above and when we
             # increment it here. If that happens, it lacks a ttl! Set one.
             #
@@ -312,7 +312,7 @@ def get_task_wait(
     # We have a delay, so use it if it's in the future
     delay = parser.parse(delay)
     if delay < n:
-        # Delay is in the past. Run the task when the current throttle expires.
+        # Delay is in the past. Run the task when the current throttle expires
         return set_for_next_window(r, throttle_key, schedule_key, n)
 
     # Delay is in the future; use it and supplement it
