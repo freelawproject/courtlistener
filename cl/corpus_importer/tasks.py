@@ -336,8 +336,10 @@ def get_and_save_free_document_report(
             if "nonce" in f"{exc}":
                 msg = "Didn't get Nonce"
             elif "XML" in f"{exc}":
-                msg = "Written opinion reports are blocked. Please " \
-                      "contact the court director"
+                msg = (
+                    "Written opinion reports are blocked. Please "
+                    "contact the court director"
+                )
             else:
                 msg = "Unknown parsing error in written opinion report"
         elif isinstance(exc, SoftTimeLimitExceeded):
