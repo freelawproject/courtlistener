@@ -6,10 +6,6 @@ from django.core.exceptions import ValidationError
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.import_judges.assign_authors import (
-    assign_authors_to_opinions,
-    assign_authors_to_oral_arguments,
-)
 from cl.people_db.import_judges.judge_utils import process_date_string
 from cl.people_db.import_judges.populate_fjc_judges import (
     add_positions_from_row,
@@ -172,16 +168,6 @@ class Command(VerboseCommand):
         self.import_state_judges(
             infile=f"{datadir}/state-iac-bios-2016-04-06.xlsx"
         )
-
-    def assign_judges_to_opinions(self):
-        logger.info("Assigning authors...")
-        assign_authors_to_opinions(
-            jurisdictions=self.options["jurisdictions"], testing=self.debug
-        )
-
-    def assign_judges_to_oral_arguments(self):
-        logger.info("Assigning panel members to oral arguments...")
-        assign_authors_to_oral_arguments(testing=self.debug)
 
     def assign_bankruptcy_fjc(self):
         """update FJC judges with bankruptcy positions"""
@@ -353,8 +339,6 @@ class Command(VerboseCommand):
         "import-state-judges": import_state_judges,
         "import-presidents": import_presidents,
         "import-recap-judges": import_recap_judges,
-        "assign-judges-to-opinions": assign_judges_to_opinions,
-        "assign-judges-to-oral-arguments": assign_judges_to_oral_arguments,
         "assign-bankruptcy-fjc": assign_bankruptcy_fjc,
         "fix-fjc-positions": fix_fjc_positions,
         "import-mag-bk-judges": import_mag_bk_judges,
