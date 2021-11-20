@@ -48,7 +48,6 @@ djangorestframework = "3.12.*"
 djangorestframework-xml = "^2.0.0"
 drf-dynamic-fields = "*"
 feedparser = "^5.2.1"
-geonamescache = "^0.20"
 httplib2 = "*"
 internetarchive = "*"
 ipaddress = "^1.0.16"
@@ -83,10 +82,7 @@ timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
 usaddress = "*"
-
-
-# Currently this doesn't support py3, which blocks installation due to outdated dependencies.
-juriscraper = "^2.3.0"
+juriscraper = "^2.3.20"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.21.0"

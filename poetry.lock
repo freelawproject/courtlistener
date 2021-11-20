@@ -700,7 +700,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "geonamescache"
-version = "0.20"
+version = "1.3.0"
 description = "Geonames data for continents, cities and US states."
 category = "main"
 optional = false
@@ -911,7 +911,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "juriscraper"
-version = "2.3.17"
+version = "2.3.20"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -924,13 +924,12 @@ certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<3.1.0"
 cssselect = "*"
 feedparser = "5.2.1"
-geonamescache = "0.20"
+geonamescache = "1.3.0"
 html5lib = "*"
 lxml = ">=4.0,<5.0"
-python-dateutil = "2.8.1"
+python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0-alpha-6"
-six = "*"
 tldextract = "*"
 
 [[package]]
@@ -1404,7 +1403,7 @@ python-versions = "*"
 
 [[package]]
 name = "python-dateutil"
-version = "2.8.1"
+version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
 category = "main"
 optional = false
@@ -1843,7 +1842,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "ccbc84173c1d99ec5dce470d0343afdca6db0e70ba9e3c682c75367dd9688390"
+content-hash = "4443acc4e779b2e5d7d4b4e394ef9b85aa446e20ee3425c4e8795d5fb3d2cac3"
 
 [metadata.files]
 amqp = [
@@ -2043,10 +2042,8 @@ cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-win_amd64.whl", hash = "sha256:de4e5f7f68220d92b7637fc99847475b59154b7a1b3868fb7385337af54ac9ca"},
     {file = "cryptography-3.4.7-pp36-pypy36_pp73-manylinux2010_x86_64.whl", hash = "sha256:26965837447f9c82f1855e0bc8bc4fb910240b6e0d16a664bb722df3b5b06873"},
     {file = "cryptography-3.4.7-pp36-pypy36_pp73-manylinux2014_x86_64.whl", hash = "sha256:eb8cc2afe8b05acbd84a43905832ec78e7b3873fb124ca190f574dca7389a87d"},
-    {file = "cryptography-3.4.7-pp37-pypy37_pp73-macosx_10_10_x86_64.whl", hash = "sha256:b01fd6f2737816cb1e08ed4807ae194404790eac7ad030b34f2ce72b332f5586"},
     {file = "cryptography-3.4.7-pp37-pypy37_pp73-manylinux2010_x86_64.whl", hash = "sha256:7ec5d3b029f5fa2b179325908b9cd93db28ab7b85bb6c1db56b10e0b54235177"},
     {file = "cryptography-3.4.7-pp37-pypy37_pp73-manylinux2014_x86_64.whl", hash = "sha256:ee77aa129f481be46f8d92a1a7db57269a2f23052d5f2433b4621bb457081cc9"},
-    {file = "cryptography-3.4.7-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:bf40af59ca2465b24e54f671b2de2c59257ddc4f7e5706dbd6930e26823668d3"},
     {file = "cryptography-3.4.7.tar.gz", hash = "sha256:3d10de8116d25649631977cb37da6cbdd2d6fa0e0281d014a5b7d337255ca713"},
 ]
 cssselect = [
@@ -2176,8 +2173,8 @@ future = [
     {file = "future-0.18.2.tar.gz", hash = "sha256:b1bead90b70cf6ec3f0710ae53a525360fa360d306a86583adc6bf83a4db537d"},
 ]
 geonamescache = [
-    {file = "geonamescache-0.20-py2-none-any.whl", hash = "sha256:3f5779d671de6e76dfbe7518f84edad665e3a92309db2e2f9865c6d4482942e4"},
-    {file = "geonamescache-0.20.tar.gz", hash = "sha256:7e5e6b98e7fb179a207985650227d423a121fad0e526f6ef728ba68e8352aab8"},
+    {file = "geonamescache-1.3.0-py3-none-any.whl", hash = "sha256:efa1dd28a87632303c5d882cc52718f04cf28e85f1cc7d6afdf8a6ba7c5ab1dc"},
+    {file = "geonamescache-1.3.0.tar.gz", hash = "sha256:5a1fc774a3282d324952b87eb5c2c13684055e68e829526909c76c2fffb84f8f"},
 ]
 gunicorn = [
     {file = "gunicorn-20.1.0-py3-none-any.whl", hash = "sha256:9dcc4547dbb1cb284accfb15ab5667a0e5d1881cc443e0677b4882a4067a807e"},
@@ -2244,8 +2241,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.3.17-py27-none-any.whl", hash = "sha256:bfcd1955557b6da429b6d8610224f3f56b94e6acba4cb790374de9a8abd44bc9"},
-    {file = "juriscraper-2.3.17.tar.gz", hash = "sha256:8c6ec1f0fb7a6399c83d0e73eef15da5a9253108964f4491ff4dd58b803d9c7c"},
+    {file = "juriscraper-2.3.20-py27-none-any.whl", hash = "sha256:9560fe3a83aac1b01c0ea69374322e36c977085393795e3b630066134e645a65"},
+    {file = "juriscraper-2.3.20.tar.gz", hash = "sha256:95a5d31270b687053326635e5ba3c3ae5175385d5299ebd00a3e3f97b1a9dbcc"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
@@ -2283,8 +2280,6 @@ lxml = [
     {file = "lxml-4.6.3-cp27-cp27m-win_amd64.whl", hash = "sha256:8157dadbb09a34a6bd95a50690595e1fa0af1a99445e2744110e3dca7831c4ee"},
     {file = "lxml-4.6.3-cp27-cp27mu-manylinux1_i686.whl", hash = "sha256:7728e05c35412ba36d3e9795ae8995e3c86958179c9770e65558ec3fdfd3724f"},
     {file = "lxml-4.6.3-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:4bff24dfeea62f2e56f5bab929b4428ae6caba2d1eea0c2d6eb618e30a71e6d4"},
-    {file = "lxml-4.6.3-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_24_i686.whl", hash = "sha256:64812391546a18896adaa86c77c59a4998f33c24788cadc35789e55b727a37f4"},
-    {file = "lxml-4.6.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:c1a40c06fd5ba37ad39caa0b3144eb3772e813b5fb5b084198a985431c2f1e8d"},
     {file = "lxml-4.6.3-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:74f7d8d439b18fa4c385f3f5dfd11144bb87c1da034a466c5b5577d23a1d9b51"},
     {file = "lxml-4.6.3-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:f90ba11136bfdd25cae3951af8da2e95121c9b9b93727b1b896e3fa105b2f586"},
     {file = "lxml-4.6.3-cp35-cp35m-manylinux2010_i686.whl", hash = "sha256:4c61b3a0db43a1607d6264166b230438f85bfed02e8cff20c22e564d0faff354"},
@@ -2675,8 +2670,8 @@ python-crfsuite = [
     {file = "python_crfsuite-0.9.7-py3.8-win32.egg", hash = "sha256:263f29c656fbb63d8d198d30ec9bca5b6fc7fab61fd20dd2f7cab795a613a85a"},
 ]
 python-dateutil = [
-    {file = "python-dateutil-2.8.1.tar.gz", hash = "sha256:73ebfe9dbf22e832286dafa60473e4cd239f8592f699aa5adaf10050e6e1823c"},
-    {file = "python_dateutil-2.8.1-py2.py3-none-any.whl", hash = "sha256:75bb3f31ea686f1197762692a9ee6a7550b59fc6ca3a1f4b5d7e32fb98e2da2a"},
+    {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
+    {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
 ]
 python-igraph = [
     {file = "python-igraph-0.9.1.tar.gz", hash = "sha256:f1895a83c57180f03c50fb77334a4d5029327aefee14f03381e10d34a1794410"},
