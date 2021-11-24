@@ -186,8 +186,5 @@ use this user to access and create the files on the server.
 
 ## Pushing a new version
 
-1. Update version.txt
-
-1. Change into the root directory, and then do:
-
-        make push --file docker/task-server/Makefile
+See README.md in cl/docker/django for details (but sub "task-server" in any
+paths that say "django".
