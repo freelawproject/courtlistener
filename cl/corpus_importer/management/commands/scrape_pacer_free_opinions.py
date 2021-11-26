@@ -141,12 +141,13 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                 IndexError,
                 TypeError,
                 PacerLoginException,
+                ValueError,
             ) as exc:
                 if isinstance(exc, (RequestException, ReadTimeoutError)):
                     reason = "network error."
                 elif isinstance(exc, IndexError):
                     reason = "PACER 6.3 bug."
-                elif isinstance(exc, TypeError):
+                elif isinstance(exc, (TypeError, ValueError)):
                     reason = "failing PACER website."
                 elif isinstance(exc, PacerLoginException):
                     reason = "PACER login issue."
