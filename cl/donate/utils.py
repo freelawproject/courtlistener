@@ -116,7 +116,7 @@ emails: Dict[str, EmailType] = {
         "processing your card. As a result, unfortunately, we have disabled "
         "this monthly contribution.\n\n"
         "You were donating $%0.2f each month. The easiest way to fix this is "
-        "to set up a new monthly contribution, here\n\n:"
+        "to set up a new monthly contribution, here:\n\n"
         "    https://www.courtlistener.com%s?amount_other=%0.2f\n\n"
         "Would you mind setting that up again so that your donations and "
         "other services keep working properly?\n\n"
