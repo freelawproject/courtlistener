@@ -322,8 +322,9 @@ def get_and_save_free_document_report(
         PacerLoginException,
         ParsingException,
         SoftTimeLimitExceeded,
+        ValueError,
     ) as exc:
-        if isinstance(exc, TypeError):
+        if isinstance(exc, (TypeError, ValueError)):
             msg = (
                 "TypeError getting free document report results, likely due "
                 "to failure to get Nonce."
@@ -344,6 +345,8 @@ def get_and_save_free_document_report(
                 msg = "Unknown parsing error in written opinion report"
         elif isinstance(exc, SoftTimeLimitExceeded):
             msg = "Soft time limit exceeded"
+        else:
+            msg = "An unknown error ocurred while getting an opinion report"
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)
