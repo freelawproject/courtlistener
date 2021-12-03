@@ -307,7 +307,7 @@ class Investment(AbstractDateTimeModel):
     )
     page_number = models.IntegerField(
         help_text="The page number the investment is listed on.  This is used"
-        "to generate links directly to the PDF page.",
+        " to generate links directly to the PDF page.",
     )
     description = models.TextField(
         help_text="Name of investment (ex. APPL common stock).", blank=True

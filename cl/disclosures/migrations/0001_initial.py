@@ -110,7 +110,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('date_created', models.DateTimeField(auto_now_add=True, db_index=True, help_text='The moment when the item was created.')),
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
-                ('page_number', models.IntegerField(help_text='The page number the investment is listed on.  This is usedto generate links directly to the PDF page.')),
+                ('page_number', models.IntegerField(help_text='The page number the investment is listed on.  This is used to generate links directly to the PDF page.')),
                 ('description', models.TextField(blank=True, help_text='Name of investment (ex. APPL common stock).')),
                 ('redacted', models.BooleanField(default=False, help_text='Does the investment row contains redaction(s)?')),
                 ('income_during_reporting_period_code', models.CharField(blank=True, choices=[('A', '1 - 1,000'), ('B', '1,001 - 2,500'), ('C', '2,501 - 5,000'), ('D', '5,001 - 15,000'), ('E', '15,001 - 50,000'), ('F', '50,001 - 100,000'), ('G', '100,001 - 1,000,000'), ('H1', '1,000,001 - 5,000,000'), ('H2', '5,000,001 +'), ('-1', 'Failed Extraction')], help_text='Increase in investment value - as a form code', max_length=5)),
