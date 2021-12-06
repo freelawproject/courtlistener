@@ -1420,6 +1420,10 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             By.CSS_SELECTOR, ".input-group-addon-blended i"
         )
         alert_bell.click()
+        self.browser.implicitly_wait(1)
+        modal = self.browser.find_element(By.CLASS_NAME, "modal-body")
+        self.assertEqual("modal-body logged-in", modal.get_attribute("class"))
+
         page_text = self.browser.find_element(By.TAG_NAME, "body").text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
