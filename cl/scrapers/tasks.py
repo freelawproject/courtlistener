@@ -564,7 +564,7 @@ def process_audio_file(self, pk) -> None:
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
-@throttle_task("2/s", key="court_id")
+@throttle_task("1/s", key="court_id")
 def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     """Update the docket info from iquery
 

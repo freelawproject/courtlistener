@@ -528,7 +528,7 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("2/s", key="court_id")
+@throttle_task("1/s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
@@ -1066,7 +1066,7 @@ def filter_docket_by_tags(
     interval_step=5 * 60,
     ignore_result=True,
 )
-@throttle_task("2/s", key="court_id")
+@throttle_task("1/s", key="court_id")
 def make_docket_by_iquery(
     self,
     court_id: str,
