@@ -136,6 +136,12 @@ emails: Dict[str, EmailType] = {
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
+    "admin_big_donation_fyi": {
+        "subject": "Got big donation of $%0.2f",
+        "body": "Just got a donation of $%0.2f from %s %s, with email %s.",
+        "from_email": settings.DEFAULT_FROM_EMAIL,
+        "to": [a[1] for a in settings.MANAGERS],
+    },
 }
 
 
@@ -180,6 +186,22 @@ def send_thank_you_email(
             send_mail(
                 email["subject"], body, email["from_email"], [user.email]
             )
+
+            if donation.amount > 500:
+                # Big donation; send an email
+                email = emails["admin_big_donation_fyi"]
+                send_mail(
+                    email["subject"] % donation.amount,
+                    email["body"]
+                    % (
+                        donation.amount,
+                        user.first_name,
+                        user.last_name,
+                        user.email,
+                    ),
+                    email["from_email"],
+                    email["to"],
+                )
         elif payment_type == PAYMENT_TYPES.PAYMENT:
             email = emails["payment_thanks"]
             body = email["body"] % (
