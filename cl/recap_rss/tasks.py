@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
+from celery import Task
 from dateutil import parser
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
@@ -147,16 +148,16 @@ def mark_status(status_obj, status_value):
     status_obj.save()
 
 
-def abort_or_retry(task, feed_status, exc):
-    """Abort a task chain if there are no more retries. Else, retry it."""
-    if task.request.retries == task.max_retries:
-        # Abort and cut off the chain. No more retries.
-        mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
-        task.request.chain = None
-        return
+def abort_task(task: Task, feed_status: RssFeedStatus):
+    """Abort RSS tasks without retry.
 
-    mark_status(feed_status, RssFeedStatus.QUEUED_FOR_RETRY)
-    raise task.retry(exc=exc, countdown=5)
+    We don't want to retry RSS tasks because they'll get retried by the
+    daemon anyway, and because they have log timeouts. Better just to let
+    them die.
+    """
+    mark_status(feed_status, RssFeedStatus.PROCESSING_FAILED)
+    task.request.chain = None
+    return
 
 
 @app.task(bind=True, max_retries=0)
@@ -195,11 +196,11 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     rss_feed = PacerRssFeed(map_cl_to_pacer_id(court_pk))
     try:
         rss_feed.query()
-    except requests.RequestException as exc:
+    except requests.RequestException:
         logger.warning(
             f"Network error trying to get RSS feed at {rss_feed.url}"
         )
-        abort_or_retry(self, feed_status, exc)
+        abort_task(self, feed_status)
         return
 
     content = rss_feed.response.content
@@ -210,7 +211,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             )
         except Exception as exc:
             logger.warning(str(exc))
-            abort_or_retry(self, feed_status, exc)
+            abort_task(self, feed_status)
             return
 
     try:
@@ -220,7 +221,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             f"RSS feed down at '{court_pk}' "
             f"({rss_feed.response.status_code}). {exc}"
         )
-        abort_or_retry(self, feed_status, exc)
+        abort_task(self, feed_status)
         return
 
     current_build_date = get_last_build_date(content)
@@ -238,7 +239,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
             )
         except Exception as exc:
             logger.warning(str(exc))
-            abort_or_retry(self, feed_status, exc)
+            abort_task(self, feed_status)
             return
 
     # Only check for early abortion during partial crawls.
@@ -273,7 +274,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         )
     except OSError as exc:
         if exc.errno == errno.EIO:
-            abort_or_retry(self, feed_status, exc)
+            abort_task(self, feed_status)
         else:
             raise exc
 
