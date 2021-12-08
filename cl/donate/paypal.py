@@ -11,11 +11,6 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_503_SERVICE_UNAVAILABLE,
-)
 
 from cl.donate.forms import CleanedDonationFormType
 from cl.donate.models import PAYMENT_TYPES, Donation
@@ -37,7 +32,7 @@ def get_paypal_access_token() -> str:
         data={"grant_type": "client_credentials"},
         timeout=30,
     )
-    if r.status_code == HTTP_200_OK:
+    if r.status_code == HTTPStatus.OK:
         logger.info("Got paypal token successfully.")
     else:
         logger.warning(
@@ -67,7 +62,7 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
         access_token = get_paypal_access_token()
     except PaymentFailureException as e:
         logger.info(f"Unable to get PayPal access token. Message was: {e}")
-        return HttpResponse(status=HTTP_503_SERVICE_UNAVAILABLE)
+        return HttpResponse(status=HTTPStatus.SERVICE_UNAVAILABLE)
 
     d = Donation.objects.get(transaction_id=request.GET["token"])
     r = requests.post(
@@ -79,7 +74,7 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
         data=json.dumps({"payer_id": request.GET["PayerID"]}),
         timeout=30,
     )
-    if r.status_code == HTTP_200_OK:
+    if r.status_code == HTTPStatus.OK:
         d.clearing_date = now()
         # Technically, this should be d.status = 2 (Completed, awaiting
         # processing) and we should await a webhook to tell us that the
@@ -146,7 +141,7 @@ def process_paypal_payment(
         timeout=30,
     )
 
-    if r.status_code == HTTP_201_CREATED:
+    if r.status_code == HTTPStatus.CREATED:
         r_content_as_dict = json.loads(r.content)
         # Get the redirect value from the 'links' attribute. Links look like:
         #   [{u'href': u'https://api.sandbox.paypal.com/v1/payments/payment/PAY-8BC403022U6413151KIQPC2I',
