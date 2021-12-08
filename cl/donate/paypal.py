@@ -1,4 +1,5 @@
 import logging
+from http import HTTPStatus
 from typing import Dict
 from urllib.parse import parse_qs, urlparse
 
@@ -89,12 +90,24 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
         d.save()
         send_thank_you_email(d, payment_type=PAYMENT_TYPES.DONATION)
     else:
-        logger.critical(
-            "Unable to execute PayPal transaction. Status code %s "
-            "with data: %s" % (r.status_code, r.text)
-        )
-        d.status = Donation.UNKNOWN_ERROR
-        d.save()
+        if (
+            r.status_code == HTTPStatus.BAD_REQUEST
+            and r.json().get("name") == "INSTRUMENT_DECLINED"
+        ):
+            d.status = Donation.FAILED
+            d.save()
+            return render(
+                request,
+                "donate_complete.html",
+                {"error": "declined", "private": True},
+            )
+        else:
+            logger.critical(
+                "Unable to execute PayPal transaction. Status code %s "
+                "with data: %s" % (r.status_code, r.text)
+            )
+            d.status = Donation.UNKNOWN_ERROR
+            d.save()
     # Finally, show them the thank you page
     return HttpResponseRedirect(reverse("donate_complete"))
 
