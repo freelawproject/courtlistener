@@ -186,5 +186,5 @@ def donate_paypal_cancel(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "donate_complete.html",
-        {"error": "User Cancelled", "private": False},
+        {"error": "user_cancelled", "private": True},
     )

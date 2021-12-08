@@ -342,13 +342,11 @@ def payment_complete(
     if len(request.GET) > 0:
         # We've gotten some information from the payment provider
         if request.GET.get("error") == "failure":
-            if request.GET.get("error_description") == "User Cancelled":
-                error = "User Cancelled"
-            elif (
-                "insufficient funds"
-                in request.GET.get("error_description").lower()
-            ):
-                error = "Insufficient Funds"
+            error_msg = request.GET.get("error_description", "").lower()
+            if error_msg == "user cancelled":
+                error = "user_cancelled"
+            elif "insufficient funds" in error_msg:
+                error = "insufficient_funds"
             return render(
                 request,
                 "donate_complete.html",
