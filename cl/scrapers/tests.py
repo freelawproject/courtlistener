@@ -139,40 +139,6 @@ class IngestionTest(IndexedSolrTestCase):
         )
 
 
-class ExtractionTest(TestCase):
-    fixtures = ["tax_court_test.json"]
-
-    def test_juriscraper_object_creation(self) -> None:
-        """Can we extract text from tax court pdf and add to db?"""
-
-        o = Opinion.objects.get(pk=76)
-        self.assertFalse(
-            o.cluster.citations.exists(),
-            msg="Citation should not exist at beginning of test",
-        )
-
-        extract_doc_content(pk=o.pk, ocr_available=False)
-        self.assertTrue(
-            o.cluster.citations.exists(),
-            msg="Expected citation was not created in db",
-        )
-
-    def test_juriscraper_docket_number_extraction(self) -> None:
-        """Can we extract docket number from tax court pdf and add to db?"""
-
-        o = Opinion.objects.get(pk=76)
-        self.assertEqual(
-            None,
-            o.cluster.docket.docket_number,
-            msg="Docket number should be none.",
-        )
-        extract_doc_content(pk=76, ocr_available=False)
-        o.cluster.docket.refresh_from_db()
-        self.assertEqual(
-            "19031-13, 27735-13, 11905-14", o.cluster.docket.docket_number
-        )
-
-
 class ExtensionIdentificationTest(SimpleTestCase):
     def setUp(self) -> None:
         self.path = os.path.join(settings.MEDIA_ROOT, "test", "search")
