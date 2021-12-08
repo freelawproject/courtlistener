@@ -9,10 +9,25 @@
 {% block content %}
   <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
   <div class="col-xs-12 col-sm-8 col-md-6">
-    {% if error == 'User Cancelled' %}
-      <h1 class="text-center">Donation Cancelled</h1>
-      <p>You have cancelled your donation, but your support means the world to us.
-      </p>
+    {% if error %}
+      {% if error == 'user_cancelled' %}
+        <h1 class="text-center">Donation Cancelled</h1>
+        <p>You have cancelled your donation, but your support means the world to us.
+        </p>
+      {% elif error == "insufficient_funds" %}
+        <h1 class="text-center">Payment Method Declined</h1>
+        <p>Your donation method didn't have sufficient funds, but your support means the world to us.
+        </p>
+      {% elif error == "declined" %}
+        <h1 class="text-center">Payment Method Declined</h1>
+        <p>For some reason, your donation method was declined, but your support means the world to us.
+        </p>
+      {% else %}
+        <h1 class="text-center">Oops. Unexpected Error!</h1>
+        <p>For some reason we haven't seen before, your donation didn't work, but your support means the world to us.
+        </p>
+      {% endif %}
+
       <p>Would you like to try again, or just go back to the homepage?</p>
 
       <p class="v-offset-above-2">
