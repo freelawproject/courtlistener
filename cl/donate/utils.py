@@ -137,12 +137,52 @@ emails: Dict[str, EmailType] = {
         "to": [a[1] for a in settings.MANAGERS],
     },
     "admin_big_donation_fyi": {
-        "subject": "Got big donation of $%0.2f",
         "body": "Just got a donation of $%0.2f from %s %s, with email %s.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
 }
+
+
+def send_big_donation_email(
+    donation: Donation,
+    payment_type: str,
+    recurring: bool = False,
+) -> None:
+    """Send an email if it's a big donation
+
+    :param donation: The donation object to process
+    :param payment_type: A payment type in the PAYMENT_TYPES object
+    :param recurring: Whether it's a recurring payment
+    :return: None
+    """
+    user = donation.donor
+    amount = donation.amount
+
+    if payment_type != PAYMENT_TYPES.DONATION:
+        return
+
+    big_recurring = recurring and amount > 100
+    big_one_time = not recurring and amount > 500
+    if big_recurring or big_one_time:
+        if recurring:
+            subject = f"Got big recurring donation of ${amount:0.2f}"
+        else:
+            subject = f"Got big non-recurring donation of ${amount:0.2f}"
+
+        email = emails["admin_big_donation_fyi"]
+        send_mail(
+            subject,
+            email["body"]
+            % (
+                amount,
+                user.first_name,
+                user.last_name,
+                user.email,
+            ),
+            email["from_email"],
+            email["to"],
+        )
 
 
 def send_thank_you_email(
@@ -186,22 +226,6 @@ def send_thank_you_email(
             send_mail(
                 email["subject"], body, email["from_email"], [user.email]
             )
-
-            if donation.amount > 500:
-                # Big donation; send an email
-                email = emails["admin_big_donation_fyi"]
-                send_mail(
-                    email["subject"] % donation.amount,
-                    email["body"]
-                    % (
-                        donation.amount,
-                        user.first_name,
-                        user.last_name,
-                        user.email,
-                    ),
-                    email["from_email"],
-                    email["to"],
-                )
         elif payment_type == PAYMENT_TYPES.PAYMENT:
             email = emails["payment_thanks"]
             body = email["body"] % (

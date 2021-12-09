@@ -14,7 +14,11 @@ from django.views.decorators.csrf import csrf_exempt
 
 from cl.donate.forms import CleanedDonationFormType
 from cl.donate.models import PAYMENT_TYPES, Donation
-from cl.donate.utils import PaymentFailureException, send_thank_you_email
+from cl.donate.utils import (
+    PaymentFailureException,
+    send_big_donation_email,
+    send_thank_you_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +88,7 @@ def process_paypal_callback(request: HttpRequest) -> HttpResponse:
         d.status = Donation.PROCESSED
         d.save()
         send_thank_you_email(d, payment_type=PAYMENT_TYPES.DONATION)
+        send_big_donation_email(d, payment_type=PAYMENT_TYPES.DONATION)
     else:
         if (
             r.status_code == HTTPStatus.BAD_REQUEST
