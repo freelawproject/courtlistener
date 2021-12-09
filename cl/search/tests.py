@@ -1,6 +1,5 @@
 import io
 import os
-import time
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -17,6 +16,8 @@ from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query
@@ -44,6 +45,7 @@ from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
+from cl.tests.utils import get_with_wait
 
 
 class UpdateIndexCommandTest(SolrTestCase):
@@ -1349,6 +1351,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
+        wait = WebDriverWait(self.browser, 1)
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
