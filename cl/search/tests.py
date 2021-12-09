@@ -1424,7 +1424,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
         alert_bell.click()
 
-        modal = get_with_wait(wait, (By.CLASS_NAME, "modal-body"))
+        modal = wait.until(
+            EC.visibility_of_element_located((By.CLASS_NAME, "modal-body"))
+        )
         self.assertEqual("modal-body logged-in", modal.get_attribute("class"))
 
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
