@@ -1355,16 +1355,15 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Dora navigates to the CL website.
         self.browser.get(self.live_server_url)
-        self.browser.implicitly_wait(1)
 
         # At a glance, Dora can see the Latest Opinions, Latest Oral Arguments,
         # the searchbox (obviously important), and a place to sign in
-        page_text = self.browser.find_element(By.TAG_NAME, "body").text
+        page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertIn("Latest Opinions", page_text)
         self.assertIn("Latest Oral Arguments", page_text)
 
-        search_box = self.browser.find_element(By.ID, "id_q")
-        search_button = self.browser.find_element(By.ID, "search-button")
+        search_box = get_with_wait(wait, (By.ID, "id_q"))
+        search_button = get_with_wait(wait, (By.ID, "search-button"))
         self.assertIn("Search", search_button.text)
 
         self.assertIn("Sign in / Register", page_text)
@@ -1378,12 +1377,13 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # The browser brings her to a search engine result page with some
         # results. She notices her query is still in the searchbox and
         # has the ability to refine via facets
-        result_count = self.browser.find_element(By.ID, "result-count")
+        result_count = get_with_wait(wait, (By.ID, "result-count"))
+
         self.assertIn("1 Opinion", result_count.text)
-        search_box = self.browser.find_element(By.ID, "id_q")
+        search_box = get_with_wait(wait, (By.ID, "id_q"))
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
-        facet_sidebar = self.browser.find_element(By.ID, "extra-search-fields")
+        facet_sidebar = get_with_wait(wait, (By.ID, "extra-search-fields"))
         self.assertIn("Precedential Status", facet_sidebar.text)
 
         # She notes her URL For after signing in
@@ -1391,51 +1391,55 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
         # Wanting to keep an eye on this Lissner guy, she decides to sign-in
         # and so she can create an alert
-        sign_in = self.browser.find_element(By.LINK_TEXT, "Sign in / Register")
+        sign_in = get_with_wait(wait, (By.LINK_TEXT, "Sign in / Register"))
         sign_in.click()
 
         # she providers her usename and password to sign in
-        page_text = self.browser.find_element(By.TAG_NAME, "body").text
+        body_element = get_with_wait(wait, (By.TAG_NAME, "body"))
+        page_text = body_element.text
         self.assertIn("Sign In", page_text)
         self.assertIn("Username", page_text)
         self.assertIn("Password", page_text)
-        btn = self.browser.find_element(
-            By.CSS_SELECTOR, 'button[type="submit"]'
-        )
+
+        btn = get_with_wait(wait, (By.CSS_SELECTOR, 'button[type="submit"]'))
         self.assertEqual("Sign In", btn.text)
 
-        self.browser.find_element(By.ID, "username").send_keys("pandora")
-        self.browser.find_element(By.ID, "password").send_keys("password")
+        get_with_wait(wait, (By.ID, "username")).send_keys("pandora")
+        get_with_wait(wait, (By.ID, "password")).send_keys("password")
         btn.click()
 
         # After logging in, she goes to the homepage. From there, she goes back
         # to where she was, which still has "lissner" in the search box.
         self.browser.get(results_url)
-        page_text = self.browser.find_element(By.TAG_NAME, "body").text
+        page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertNotIn(
             "Please enter a correct username and password.", page_text
         )
-        search_box = self.browser.find_element(By.ID, "id_q")
+        search_box = get_with_wait(wait, (By.ID, "id_q"))
         self.assertEqual("lissner", search_box.get_attribute("value"))
 
         # She now opens the modal for the form for creating an alert
-        alert_bell = self.browser.find_element(
-            By.CSS_SELECTOR, ".input-group-addon-blended i"
+        alert_bell = get_with_wait(
+            wait, (By.CSS_SELECTOR, ".input-group-addon-blended i")
         )
         alert_bell.click()
-        self.browser.implicitly_wait(1)
-        modal = self.browser.find_element(By.CLASS_NAME, "modal-body")
+
+        modal = get_with_wait(wait, (By.CLASS_NAME, "modal-body"))
         self.assertEqual("modal-body logged-in", modal.get_attribute("class"))
 
-        page_text = self.browser.find_element(By.TAG_NAME, "body").text
+        page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertIn("Create an Alert", page_text)
         self.assertIn("Give the alert a name", page_text)
         self.assertIn("How often should we notify you?", page_text)
-        self.browser.find_element(By.ID, "id_name")
-        self.browser.find_element(By.ID, "id_rate")
-        btn = self.browser.find_element(By.ID, "alertSave")
+        get_with_wait(wait, (By.ID, "id_name"))
+        get_with_wait(wait, (By.ID, "id_rate"))
+        btn = get_with_wait(wait, (By.ID, "alertSave"))
         self.assertEqual("Create Alert", btn.text)
-        x_button = self.browser.find_elements(By.CSS_SELECTOR, ".close")[0]
+        x_button = wait.until(
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, ".modal-header .close")
+            )
+        )
         x_button.click()
 
         # But she decides to wait until another time. Instead she decides she
@@ -1446,19 +1450,18 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )[0]
         self.assertEqual(profile_dropdown.text.strip(), "Profile")
 
-        dropdown_menu = self.browser.find_element(
-            By.CSS_SELECTOR, "ul.dropdown-menu"
+        dropdown_menu = get_with_wait(
+            wait, (By.CSS_SELECTOR, "ul.dropdown-menu")
         )
         self.assertIsNone(dropdown_menu.get_attribute("display"))
-
         profile_dropdown.click()
 
-        sign_out = self.browser.find_element(By.LINK_TEXT, "Sign out")
+        sign_out = get_with_wait(wait, (By.LINK_TEXT, "Sign out"))
         sign_out.click()
 
         # She receives a sign out confirmation with links back to the homepage,
         # the block, and an option to sign back in.
-        page_text = self.browser.find_element(By.TAG_NAME, "body").text
+        page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
         self.assertIn("You Have Successfully Signed Out", page_text)
         links = self.browser.find_elements(By.TAG_NAME, "a")
         self.assertIn("Go to the homepage", [link.text for link in links])
