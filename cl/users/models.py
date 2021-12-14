@@ -1,10 +1,14 @@
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
 from django.contrib.auth.models import User
+from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Sum
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
@@ -115,6 +119,10 @@ class UserProfile(models.Model):
         help_text="The user tests new features before they are finished",
         default=False,
     )
+    recap_email = models.EmailField(
+        help_text="Generated recap email address for the user.",
+        blank=True,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:
@@ -164,3 +172,26 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "user profile"
         verbose_name_plural = "user profiles"
+
+
+def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
+    username = user_profile.user.username
+    recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
+        append if append is not None else ""
+    )
+    recap_email = f"{recap_email_header}@recap.email"
+    user_profiles_with_match = UserProfile.objects.filter(
+        recap_email=recap_email
+    )
+    if append is not None and append >= 100:
+        raise FieldError("Too many requests made to generate recap email.")
+    elif len(user_profiles_with_match) > 0:
+        return generate_recap_email(user_profile, (append or 0) + 1)
+    return recap_email
+
+
+@receiver(post_save, sender=UserProfile)
+def assign_recap_email(sender, instance=None, created=False, **kwargs):
+    if created:
+        instance.recap_email = generate_recap_email(instance)
+        instance.save()

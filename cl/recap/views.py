@@ -27,6 +27,7 @@ from cl.recap.filters import (
     ProcessingQueueFilter,
 )
 from cl.recap.models import (
+    REQUEST_TYPE,
     EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
@@ -65,13 +66,17 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     def get_message_id_from_request_data(self):
         return self.request.data.get("mail", {}).get("message_id")
 
+    def get_destination_emails_from_request_data(self):
+        return self.request.data.get("mail", {}).get("destination")
+
     def perform_create(self, serializer):
         recap_email_user = User.objects.get(username="recap-email")
         epq = serializer.save(
             message_id=self.get_message_id_from_request_data(),
+            destination_emails=self.get_destination_emails_from_request_data(),
             uploader=recap_email_user,
         )
-        do_recap_document_fetch(epq)
+        do_recap_document_fetch(epq, recap_email_user)
         return epq
 
 
