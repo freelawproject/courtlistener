@@ -1,5 +1,6 @@
-1.0.56
+1.0.57
 
+1.0.57 - Update Django and LXML for vulns
 1.0.56 - Update juriscraper
 1.0.55 - Update juriscraper ** (Failure)
 1.0.54 - Update juriscraper
