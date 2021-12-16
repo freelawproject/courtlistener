@@ -502,7 +502,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
         count = 0
         for term in search_terms:
             for name in judge_names:
-                if re.match(term, name, re.I):
+                if term.lower() in name.lower():
                     count += 1
 
         if count > highest_match:
@@ -512,10 +512,7 @@ def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:
 
     # Create list of Judge IDs that have the highest match count
     judge_pks = []
-    for (
-        k,
-        v,
-    ) in judge_dict.items():
+    for (k, v) in judge_dict.items():
         if v == highest_match:
             judge_pks.append(k)
 
