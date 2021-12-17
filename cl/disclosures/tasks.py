@@ -437,6 +437,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     # Generate PDF content from our three paths
     year = int(data["year"])
     person_id = data["person_id"]
+    report_type = data.get("report_type", -1)
 
     logger.info(
         f"Processing row {data['id']} for person {person_id} "
@@ -483,6 +484,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
             person=Person.objects.get(id=person_id),
             sha1=sha1_hash,
             has_been_extracted=False,
+            report_type=report_type,
             download_filepath=data.get("url")
             if data.get("url")
             else data.get("urls")[0],
@@ -496,6 +498,12 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
             f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
             f"{disclosure.filepath}"
         )
+
+    if report_type == REPORT_TYPES.NOMINATION:
+        logger.info("Skipping extraction for nomination forms.")
+        interface.delete(disclosure_key)
+        return
+
     # Extract content from PDF
     content = extract_content(
         pdf_bytes=pdf_bytes, disclosure_type=data["disclosure_type"]
