@@ -2253,8 +2253,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.3.25-py27-none-any.whl", hash = "sha256:5eed5be1f91c490d7210aa05d3a9884bfd4c8c814bb996ba296bd8f1fa1dc990"},
-    {file = "juriscraper-2.3.25.tar.gz", hash = "sha256:49d5ca6c2b42a532b92bfe9f6f719c9217614bb64447d6a65606192c4df251fa"},
+    {file = "juriscraper-2.3.26-py27-none-any.whl", hash = "sha256:128415e3252f0cca80af69679f9d3a942df8dec6255ca6793521a1e7d1c9d5ce"},
+    {file = "juriscraper-2.3.26.tar.gz", hash = "sha256:c11aedf6d8471c498bfd0872ad41fa4d3cf3ac5ff023cadb1a8291486cb12e0a"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
