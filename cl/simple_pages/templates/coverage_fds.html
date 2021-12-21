@@ -28,6 +28,7 @@
            alt="Picture of thumb drives"
       >
     </p>
+    <p>Additionally, judicial nominees file financial disclosures with the Senate Judiciary Committee during the nomination process. Free Law Project <a href="https://www.github.com/freelawproject/nomination-extractor/">built a machine learning model and tool</a> that could identify financial disclosures and used it to scan hundreds of thousands of pages of Senate records.</p>
 
     <p><a href="https://www.judicialwatch.org/" rel="nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a href="https://twitter.com/FreeLawProject/status/1093612415185350656">their records were lost to water damage</a>. If you know of other sources, <a href="{% url "contact" %}">please get in touch</a>.
     </p>
@@ -45,6 +46,13 @@
         </tr>
       </thead>
       <tbody>
+      <tr>
+          <td>Senate Records</td>
+          <td>1987-2013</td>
+          <td>874</td>
+          <td>394.7 MB</td>
+          <td>Extracted from Senate Records</td>
+      </tr>
       <tr>
         <td>Judicial Watch</td>
         <td>2003-2010</td>
@@ -126,8 +134,8 @@
       <tfoot>
       <tr>
         <td><strong>TOTAL</strong></td>
-        <td><strong>17 YEARS</strong></td>
-        <td><strong>33k</strong></td>
+        <td><strong>34 YEARS</strong></td>
+        <td><strong>34.6k</strong></td>
         <td><strong>407GB</strong></td>
         <td><strong></strong></td>
       </tr>
@@ -143,6 +151,7 @@
     <h2 id="enhancements">Our Enhancements</h2>
     <p>We have dedicated considerable energy to develop <a href="https://github.com/freelawproject/disclosure-extractor">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
     </p>
+    <p>Additionally, we developed a <a href="https://github.com/freelawproject/nomination-extractor/">machine learning model</a> that extracted 843 Financial Disclosure from over 250k pages of Senate hearing documents.</p>
     <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
     </p>
 
