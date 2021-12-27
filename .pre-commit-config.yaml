@@ -12,6 +12,8 @@ repos:
      - id: check-toml
      - id: check-xml
      - id: check-yaml
+     - id: debug-statements
+     - id: detect-private-key
      - id: fix-byte-order-marker
      - id: fix-encoding-pragma
        args: [--remove]
