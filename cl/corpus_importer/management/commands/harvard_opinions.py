@@ -59,7 +59,9 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
 
 
 def _make_glob_from_args(
-    reporter: Optional[str], volumes: Optional[range]
+    reporter: Optional[str],
+    volumes: Optional[range],
+    page: Optional[str],
 ) -> List[str]:
     """Make list of glob paths
 
@@ -67,31 +69,39 @@ def _make_glob_from_args(
     :param volumes: The volumes of the reporter to filter to, if any
     :return: A list of glob paths
     """
-    glob_paths = []
-    if reporter and volumes:
+
+    if reporter and volumes and page:
+        reporter_key = f"law.free.cap.{reporter}.{volumes[0]}"
+        glob_path = f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/{page}.*.json"
+        return [glob_path]
+    elif reporter and volumes:
+        glob_paths = []
         for volume in volumes:
             reporter_key = f"law.free.cap.{reporter}.{volume}"
             glob_path = (
                 f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
             )
             glob_paths.append(glob_path)
+        return glob_paths
+    elif reporter:
+        reporter_key = ".".join(["law.free.cap", reporter])
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT,
+            "harvard_corpus",
+            f"{reporter_key}.*/*.json",
+        )
     else:
-        if reporter:
-            reporter_key = ".".join(["law.free.cap", reporter])
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT,
-                "harvard_corpus",
-                f"{reporter_key}.*/*.json",
-            )
-        else:
-            glob_path = os.path.join(
-                settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
-            )
-        glob_paths.append(glob_path)
-    return glob_paths
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT, "harvard_corpus", "law.free.cap.*/*.json"
+        )
+    return [glob_path]
 
 
-def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
+def filepath_list(
+    reporter: str,
+    volumes: Optional[range],
+    page: Optional[str],
+) -> List[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
     Make a list of file paths accordingly:
@@ -108,7 +118,7 @@ def filepath_list(reporter: str, volumes: Optional[range]) -> List[str]:
     """
 
     files = []
-    glob_paths = _make_glob_from_args(reporter, volumes)
+    glob_paths = _make_glob_from_args(reporter, volumes, page)
     for glob_path in glob_paths:
         files.extend(glob(glob_path))
     files = human_sort(files, key=None)  # type: ignore
@@ -191,6 +201,7 @@ def parse_extra_fields(soup, fields, long_field=False):
 class OptionsType(TypedDict):
     reporter: str
     volumes: Optional[range]
+    page: str
     court_id: Optional[str]
     location: Optional[str]
     make_searchable: bool
@@ -216,6 +227,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
     reporter = options["reporter"]
     volumes = options["volumes"]
+    page = options["page"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
 
@@ -223,7 +235,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         logger.error("You provided volume(s) but no reporter. Exiting.")
         return
 
-    for file_path in filepath_list(reporter, volumes):
+    filepaths = filepath_list(reporter, volumes, page)
+    for file_path in filepaths:
         logger.info(f"Processing opinion at {file_path}")
 
         ia_download_url = "/".join(
@@ -250,7 +263,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
             logger.warning(
-                f"No citation found for {data['citations'][0]['cite']}."
+                f"No citation found for {data['citations'][0]['cite']}"
             )
             continue
 
@@ -607,7 +620,7 @@ def length_too_different(
     :return: Whether the content is too different in length
     """
     if len(cl_characters) == 0:
-        logger.warning(f"Empty Courtlistener opinion cluster: {case.id}")
+        logger.info(f"Empty Courtlistener opinion cluster: {case.id}")
         return True
 
     diff = len(harvard_characters) / len(cl_characters)
@@ -1017,6 +1030,13 @@ class Command(VerboseCommand):
             type=str,
             help="Reporter abbreviation as saved on IA.",
             required=False,
+        )
+        parser.add_argument(
+            "--page",
+            type=str,
+            help="Opinion page as saved on IA.",
+            required=False,
+            default=None,
         )
         parser.add_argument(
             "--court-id",

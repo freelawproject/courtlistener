@@ -533,6 +533,7 @@ class HarvardTests(TestCase):
             {
                 "reporter": None,
                 "volumes": None,
+                "page": None,
                 "make_searchable": False,
                 "court_id": None,
                 "location": None,

@@ -2,7 +2,7 @@ import signal
 import sys
 import time
 from datetime import date
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
@@ -40,14 +40,17 @@ def make_citation(
     cite_str: str,
     cluster: OpinionCluster,
     cite_type: int,
-) -> Citation:
+) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
-    citation_obj = get_citations(cite_str)[0]
+    citation_objs = get_citations(cite_str)
+    if not citation_objs:
+        logger.warn(f"Could not parse citation: {cite_str}")
+        return None
     return Citation(
         cluster=cluster,
-        volume=citation_obj.volume,
-        reporter=citation_obj.reporter,
-        page=citation_obj.page,
+        volume=citation_objs[0].volume,
+        reporter=citation_objs[0].reporter,
+        page=citation_objs[0].page,
         type=cite_type,
     )
 
@@ -107,7 +110,9 @@ def make_objects(
     ]
     for cite_str, cite_type in cite_types:
         if cite_str:
-            citations.append(make_citation(cite_str, cluster, cite_type))
+            citation = make_citation(cite_str, cluster, cite_type)
+            if citation:
+                citations.append(citation)
     opinion = Opinion(
         type=Opinion.COMBINED,
         sha1=sha1_hash,

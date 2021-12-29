@@ -295,7 +295,7 @@ def get_page_count(path: str, extension: str) -> Optional[int]:
 def update_document_from_text(opinion: Opinion) -> None:
     """Extract additional metadata from document text
 
-    We no longer use this code but it's still here for reference.
+    We use this code with BIA decisions. Previously Tax.
     I think it is not unlikely that we will use or need this in the future.
 
     Use functions from Juriscraper to pull metadata out of opinion
@@ -385,6 +385,7 @@ def extract_doc_content(
     ), f"content must be of type str, not {type(content)}"
 
     set_blocked_status(opinion, content, extension)
+    update_document_from_text(opinion)
 
     if err:
         print(err)
