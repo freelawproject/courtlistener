@@ -2,7 +2,7 @@ import signal
 import sys
 import time
 from datetime import date
-from typing import Any, Dict, List, Tuple, Union, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
