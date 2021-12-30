@@ -1,5 +1,6 @@
-1.0.58
+1.0.59
 
+1.0.59 - Update juriscraper, harvard importer, cl-scrape-opinions
 1.0.58 - Update juriscraper, add safari, Update financial disclosure import
 1.0.57 - Update Django and LXML for vulns
 1.0.56 - Update juriscraper
