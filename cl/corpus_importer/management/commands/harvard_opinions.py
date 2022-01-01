@@ -35,7 +35,7 @@ from cl.search.tasks import add_items_to_solr
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> Tuple[date, bool]:
+def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
