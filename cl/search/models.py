@@ -2413,7 +2413,9 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
-class CITE:
+class Citation(models.Model):
+    """A simple class to hold citations."""
+
     FEDERAL = 1
     STATE = 2
     STATE_REGIONAL = 3
@@ -2422,7 +2424,6 @@ class CITE:
     LEXIS = 6
     WEST = 7
     NEUTRAL = 8
-
     CITATION_TYPES = (
         (FEDERAL, "A federal reporter citation (e.g. 5 F. 55)"),
         (
@@ -2445,22 +2446,6 @@ class CITE:
         (WEST, "A citation in the WestLaw system (e.g. 5 WL 55)"),
         (NEUTRAL, "A vendor neutral citation (e.g. 2013 FL 1)"),
     )
-
-    TYPES = {
-        "federal": FEDERAL,
-        "state": STATE,
-        "state_regional": STATE_REGIONAL,
-        "specialty": SPECIALTY,
-        "scotus_early": SCOTUS_EARLY,
-        "specialty_lexis": LEXIS,
-        "specialty_west": WEST,
-        "neutral": NEUTRAL,
-    }
-
-
-class Citation(models.Model):
-    """A simple class to hold citations."""
-
     cluster = models.ForeignKey(
         OpinionCluster,
         help_text="The cluster that the citation applies to",
@@ -2484,8 +2469,7 @@ class Citation(models.Model):
         ),
     )
     type = models.SmallIntegerField(
-        help_text="The type of citation that this is.",
-        choices=CITE.CITATION_TYPES,
+        help_text="The type of citation that this is.", choices=CITATION_TYPES
     )
 
     def __str__(self) -> str:

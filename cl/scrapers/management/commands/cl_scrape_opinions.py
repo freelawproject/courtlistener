@@ -14,6 +14,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -23,7 +24,6 @@ from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import get_binary_content, get_extension, signal_handler
 from cl.search.models import (
-    CITE,
     SEARCH_TYPES,
     Citation,
     Court,
@@ -53,7 +53,7 @@ def make_citation(
         volume=citation_objs[0].volume,
         reporter=citation_objs[0].reporter,
         page=citation_objs[0].page,
-        type=CITE.TYPES[cite_type_str],
+        type=map_reporter_db_cite_type(cite_type_str),
     )
 
 
