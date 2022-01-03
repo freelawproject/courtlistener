@@ -35,23 +35,34 @@ from cl.search.models import (
 die_now = False
 cnt = CaseNameTweaker()
 
+VALID_CITE_TYPES = {
+    "federal": 1,
+    "neutral": 8,
+    "scotus_early": 5,
+    "specialty": 4,
+    "specialty_west": 7,
+    "specialty_lexis": 6,
+    "state": 2,
+    "state_regional": 3
+}
 
 def make_citation(
     cite_str: str,
     cluster: OpinionCluster,
-    cite_type: int,
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.warn(f"Could not parse citation: {cite_str}")
         return None
+    # Convert the found cite type to a valid cite type for our DB.
+    cite_type_str = citation_objs[0].exact_editions[0].reporter.cite_type
     return Citation(
         cluster=cluster,
         volume=citation_objs[0].volume,
         reporter=citation_objs[0].reporter,
         page=citation_objs[0].page,
-        type=cite_type,
+        type=VALID_CITE_TYPES[cite_type_str],
     )
 
 
@@ -110,7 +121,7 @@ def make_objects(
     ]
     for cite_str, cite_type in cite_types:
         if cite_str:
-            citation = make_citation(cite_str, cluster, cite_type)
+            citation = make_citation(cite_str, cluster)
             if citation:
                 citations.append(citation)
     opinion = Opinion(
