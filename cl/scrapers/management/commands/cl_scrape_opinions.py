@@ -43,8 +43,9 @@ VALID_CITE_TYPES = {
     "specialty_west": 7,
     "specialty_lexis": 6,
     "state": 2,
-    "state_regional": 3
+    "state_regional": 3,
 }
+
 
 def make_citation(
     cite_str: str,
