@@ -14,6 +14,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -39,19 +40,20 @@ cnt = CaseNameTweaker()
 def make_citation(
     cite_str: str,
     cluster: OpinionCluster,
-    cite_type: int,
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
         logger.warn(f"Could not parse citation: {cite_str}")
         return None
+    # Convert the found cite type to a valid cite type for our DB.
+    cite_type_str = citation_objs[0].exact_editions[0].reporter.cite_type
     return Citation(
         cluster=cluster,
         volume=citation_objs[0].volume,
         reporter=citation_objs[0].reporter,
         page=citation_objs[0].page,
-        type=cite_type,
+        type=map_reporter_db_cite_type(cite_type_str),
     )
 
 
@@ -86,9 +88,6 @@ def make_objects(
         source=item.get("source") or Docket.SCRAPER,
     )
 
-    west_cite_str = item.get("west_citations", "")
-    state_cite_str = item.get("west_state_citations", "")
-    neutral_cite_str = item.get("neutral_citations", "")
     cluster = OpinionCluster(
         judges=item.get("judges", ""),
         date_filed=item["case_dates"],
@@ -102,17 +101,10 @@ def make_objects(
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
     )
-    citations = []
-    cite_types = [
-        (west_cite_str, Citation.WEST),
-        (state_cite_str, Citation.STATE),
-        (neutral_cite_str, Citation.NEUTRAL),
-    ]
-    for cite_str, cite_type in cite_types:
-        if cite_str:
-            citation = make_citation(cite_str, cluster, cite_type)
-            if citation:
-                citations.append(citation)
+
+    cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
+    citations = [make_citation(cite, cluster) for cite in cites if cite]
+
     opinion = Opinion(
         type=Opinion.COMBINED,
         sha1=sha1_hash,

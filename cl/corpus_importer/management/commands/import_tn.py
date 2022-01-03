@@ -59,7 +59,7 @@ def make_item(case):
         "author": lead_author,
         "date_filed_is_approximate": False,
         "blocked_statuses": False,
-        "neutral_citations": case["neutral_citation"],
+        "citations": case["citation"],
         "download_urls": case["pdf_url"],
     }
 
