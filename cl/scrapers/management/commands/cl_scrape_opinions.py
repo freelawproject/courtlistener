@@ -23,6 +23,7 @@ from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import get_binary_content, get_extension, signal_handler
 from cl.search.models import (
+    CITE,
     SEARCH_TYPES,
     Citation,
     Court,
@@ -34,17 +35,6 @@ from cl.search.models import (
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
-
-VALID_CITE_TYPES = {
-    "federal": 1,
-    "neutral": 8,
-    "scotus_early": 5,
-    "specialty": 4,
-    "specialty_west": 7,
-    "specialty_lexis": 6,
-    "state": 2,
-    "state_regional": 3,
-}
 
 
 def make_citation(
@@ -63,7 +53,7 @@ def make_citation(
         volume=citation_objs[0].volume,
         reporter=citation_objs[0].reporter,
         page=citation_objs[0].page,
-        type=VALID_CITE_TYPES[cite_type_str],
+        type=CITE.TYPES[cite_type_str],
     )
 
 
@@ -98,9 +88,6 @@ def make_objects(
         source=item.get("source") or Docket.SCRAPER,
     )
 
-    west_cite_str = item.get("west_citations", "")
-    state_cite_str = item.get("west_state_citations", "")
-    neutral_cite_str = item.get("neutral_citations", "")
     cluster = OpinionCluster(
         judges=item.get("judges", ""),
         date_filed=item["case_dates"],
@@ -114,17 +101,10 @@ def make_objects(
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
     )
-    citations = []
-    cite_types = [
-        (west_cite_str, Citation.WEST),
-        (state_cite_str, Citation.STATE),
-        (neutral_cite_str, Citation.NEUTRAL),
-    ]
-    for cite_str, cite_type in cite_types:
-        if cite_str:
-            citation = make_citation(cite_str, cluster)
-            if citation:
-                citations.append(citation)
+
+    cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
+    citations = [make_citation(cite, cluster) for cite in cites if cite]
+
     opinion = Opinion(
         type=Opinion.COMBINED,
         sha1=sha1_hash,
