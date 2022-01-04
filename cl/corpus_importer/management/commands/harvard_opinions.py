@@ -51,16 +51,19 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     add_ons = ["", "-15", "-07-01"]
     for add_on in add_ons:
         try:
-            date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
             if date_obj:
-                break
+                continue
+            date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
         except ValueError as msg:
-            # We discovered that dates like 1913-02-29 killed this method.
-            # If a date is outside the scope of the month we switch to 15th
-            # If its not correct at all we skip it and log a warning.
-            if str(msg) == "day is out of range for month":
-                date_str = date_str.rsplit("-", 1)[0]
             date_approx = True
+            # We discovered that dates like 1913-02-29 killed this method.
+            # In this instance, revert back one day and continue
+            if (
+                str(msg) == "day is out of range for month"
+                and "02-29" in date_str
+            ):
+                date_str = date_str.replace("29", "28")
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
     return date_obj, date_approx
 
 
