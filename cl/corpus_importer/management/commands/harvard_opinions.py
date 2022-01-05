@@ -51,9 +51,8 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     add_ons = ["", "-15", "-07-01"]
     for add_on in add_ons:
         try:
-            if date_obj:
-                continue
             date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
+            break
         except ValueError as msg:
             date_approx = True
             # We discovered that dates like 1913-02-29 killed this method.
@@ -64,6 +63,7 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
             ):
                 date_str = date_str.replace("29", "28")
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                break
     return date_obj, date_approx
 
 
