@@ -35,7 +35,7 @@ from cl.search.tasks import add_items_to_solr
 cnt = CaseNameTweaker()
 
 
-def validate_dt(date_str: str) -> Tuple[date, bool]:
+def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
     """
     Check if the date string is only year-month or year.
     If partial date string, make date string the first of the month
@@ -47,14 +47,23 @@ def validate_dt(date_str: str) -> Tuple[date, bool]:
     :returns: Tuple of date obj or date obj estimate
     and boolean indicating estimated date or actual date.
     """
-    date_approx = False
+    date_obj, date_approx = None, False
     add_ons = ["", "-15", "-07-01"]
     for add_on in add_ons:
         try:
             date_obj = datetime.strptime(date_str + add_on, "%Y-%m-%d").date()
-        except ValueError:
-            # Failed parsing at least once, ∴ an approximate date
+            break
+        except ValueError as msg:
             date_approx = True
+            # We discovered that dates like 1913-02-29 killed this method.
+            # In this instance, revert back one day and continue
+            if (
+                str(msg) == "day is out of range for month"
+                and "02-29" in date_str
+            ):
+                date_str = date_str.replace("29", "28")
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                break
     return date_obj, date_approx
 
 
@@ -291,6 +300,11 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             court_id = found_court[0]
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
+        if not date_filed:
+            logger.warning(
+                f"No date found for {data['decision_date']} at {file_path}"
+            )
+            continue
         case_body = data["casebody"]["data"]
         harvard_characters = clean_body_content(case_body, harvard=True)
 
