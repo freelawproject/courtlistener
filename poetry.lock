@@ -1487,7 +1487,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.8"
+version = "3.2.9"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -1853,7 +1853,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "8fd0b3cdefcf689287f2555be50f2050b8ef002c59786e810193d447172065ac"
+content-hash = "d321ba2e7d11450479e8b54fe668d326b910c003f06bf7feb91297a46bb2d1b2"
 
 [metadata.files]
 amqp = [
@@ -2827,8 +2827,8 @@ regex = [
     {file = "regex-2021.3.17.tar.gz", hash = "sha256:4b8a1fb724904139149a43e172850f35aa6ea97fb0545244dc0b805e0154ed68"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.2.8.tar.gz", hash = "sha256:a3985a4642f6f1d278854b4d8853ff0f8a5177601717a66adfab0a9950a823d9"},
-    {file = "reporters_db-3.2.8-py2.py3-none-any.whl", hash = "sha256:b0fedad3869004bd75f04bd2634ec2ed2fc180166941128d784396499eac3988"},
+    {file = "reporters-db-3.2.9.tar.gz", hash = "sha256:f7a58194b4095de5b8bed5472acd21c30edfc58caeb16a929275d341b02232b0"},
+    {file = "reporters_db-3.2.9-py2.py3-none-any.whl", hash = "sha256:e4a079125d5296d3ad8b035da163225c2d31f0e5b85c636ab36fdc80b2e2d21c"},
 ]
 requests = [
     {file = "requests-2.25.1-py2.py3-none-any.whl", hash = "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"},
