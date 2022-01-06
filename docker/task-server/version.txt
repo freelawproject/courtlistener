@@ -1,5 +1,6 @@
-1.0.56
+1.0.57
 
+1.0.57 - Bump reporters-db
 1.0.56 - Bump reporters-db
 1.0.55 - Update juriscraper, courts-db reporters-db - Includes an update to scraping that generalizes scraped citations
 1.0.54 - Update juriscraper, harvard importer, cl-scrape-opinions
