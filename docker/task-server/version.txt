@@ -1,5 +1,6 @@
-1.0.57
+1.0.58
 
+1.0.58 - Update harvard opinion importer.
 1.0.57 - Bump reporters-db
 1.0.56 - Bump reporters-db
 1.0.55 - Update juriscraper, courts-db reporters-db - Includes an update to scraping that generalizes scraped citations
