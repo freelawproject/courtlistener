@@ -496,17 +496,21 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Because of non-canonical reporters this code breaks for states like
         # Washington, where there are reporter abbreviations like "wash", that
         # refer to more than one reporter series. The fix here is to eventually
-        # look up the abbreviation in e reporters DB and see if the cite_type
+        # look up the abbreviation in reporters DB and see if the cite_type
         # varies across the reporter series it refers to. If so, we have a hard
         # problem -- maybe unsolveable -- if not, we can just use the value we
         # get. In the case of Wash., it refers to two reporter series, both of
         # which are of type "state", so it's easy.
+
+        # We now have an example of non-canonical reporters that do not have
+        # the same type, in Arkansas and Ark App. - We can resolve these by
+        # defining the regex pattern much more narrowly.  The neutral cite
+        # follows a four digit year volume while the state reporter does not.
         if not citation[0].canonical_reporter:
             reporter_type = Citation.STATE
         else:
-            reporter_type = map_reporter_db_cite_type(
-                REPORTERS[citation[0].canonical_reporter][0]["cite_type"]
-            )
+            cite_type_str = citation[0].exact_editions[0].reporter.cite_type
+            reporter_type = map_reporter_db_cite_type(cite_type_str)
 
         Citation.objects.get_or_create(
             volume=citation[0].volume,
