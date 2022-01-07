@@ -295,6 +295,9 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                     f"Court not found for {data['court']['name']} at {file_path}"
                 )
                 continue
+            if not Court.objects.filter(id=court_id).exists():
+                logger.warning(f"Court not found in Courtlistener: {court_id}")
+                continue
 
             court_id = found_court[0]
         # Handle partial dates by adding -01 to YYYY-MM dates
@@ -413,9 +416,6 @@ def add_new_case(
         logger.info(
             f"Adding docket for {case_name}: {citation.base_citation()}"
         )
-        if not Court.objects.filter(id=court_id).exists():
-            logger.warning(f"No court found for ID: {court_id}")
-
         docket = Docket(
             case_name=case_name,
             case_name_short=case_name_short,
