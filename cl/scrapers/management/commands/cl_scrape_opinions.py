@@ -47,7 +47,7 @@ def make_citation(
         logger.warn(f"Could not parse citation: {cite_str}")
         return None
     # Convert the found cite type to a valid cite type for our DB.
-    cite_type_str = citation_objs[0].exact_editions[0].reporter.cite_type
+    cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
     return Citation(
         cluster=cluster,
         volume=citation_objs[0].volume,

@@ -16,11 +16,10 @@ from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
-from django.db.utils import OperationalError
+from django.db.utils import IntegrityError, OperationalError
 from eyecite.find_citations import get_citations
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
-from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.argparse_types import _argparse_volumes
@@ -29,7 +28,7 @@ from cl.lib.string_diff import get_cosine_similarity
 from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
-from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
 
 cnt = CaseNameTweaker()
@@ -296,8 +295,12 @@ def parse_harvard_opinions(options: OptionsType) -> None:
                     f"Court not found for {data['court']['name']} at {file_path}"
                 )
                 continue
-
             court_id = found_court[0]
+
+        if not Court.objects.filter(id=court_id).exists():
+            logger.warning(f"Court not found in Courtlistener: {court_id}")
+            continue
+
         # Handle partial dates by adding -01 to YYYY-MM dates
         date_filed, is_approximate = validate_dt(data["decision_date"])
         if not date_filed:
@@ -509,16 +512,21 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         if not citation[0].canonical_reporter:
             reporter_type = Citation.STATE
         else:
-            cite_type_str = citation[0].exact_editions[0].reporter.cite_type
+            cite_type_str = citation[0].all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
-        Citation.objects.get_or_create(
-            volume=citation[0].volume,
-            reporter=citation[0].reporter,
-            page=citation[0].page,
-            type=reporter_type,
-            cluster_id=cluster_id,
-        )
+        try:
+            Citation.objects.get_or_create(
+                volume=citation[0].volume,
+                reporter=citation[0].reporter,
+                page=citation[0].page,
+                type=reporter_type,
+                cluster_id=cluster_id,
+            )
+        except IntegrityError:
+            logger.warning(
+                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite['cite']}"
+            )
 
 
 def add_opinions(
