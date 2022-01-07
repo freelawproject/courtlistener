@@ -44,6 +44,72 @@
     }
   },
   {
+    "model": "search.court",
+    "pk": "kan",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2013-08-14T16:46:30Z",
+      "in_use": true,
+      "has_opinion_scraper": true,
+      "has_oral_argument_scraper": false,
+      "position": 114.35,
+      "citation_string": "Kan.",
+      "short_name": "Kansas test court",
+      "full_name": "Kansas Supreme Court",
+      "url": "",
+      "start_date": null,
+      "end_date": null,
+      "jurisdiction": "S",
+      "notes": ""
+    }
+  },
+  {
+    "model": "search.court",
+    "pk": "cadc",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2013-08-14T16:46:30Z",
+      "in_use": true,
+      "has_opinion_scraper": true,
+      "has_oral_argument_scraper": false,
+      "position": 114.36,
+      "citation_string": "D.C.",
+      "short_name": "DC Court",
+      "full_name": "DC Court",
+      "url": "",
+      "start_date": null,
+      "end_date": null,
+      "jurisdiction": "FD",
+      "notes": ""
+    }
+  },
+  {
+    "model": "search.court",
+    "pk": "bta",
+    "fields": {
+      "pacer_court_id": null,
+      "pacer_has_rss_feed": null,
+      "fjc_court_id": "",
+      "date_modified": "2013-08-14T16:46:30Z",
+      "in_use": true,
+      "has_opinion_scraper": true,
+      "has_oral_argument_scraper": false,
+      "position": 114.37,
+      "citation_string": "B.T.A.",
+      "short_name": "Board of Tax Appeals",
+      "full_name": "Board of Tax Appeals",
+      "url": "",
+      "start_date": null,
+      "end_date": null,
+      "jurisdiction": "FD",
+      "notes": ""
+    }
+  },
+  {
     "fields": {
       "jurisdiction": "FD",
       "end_date": null,
