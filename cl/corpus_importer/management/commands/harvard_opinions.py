@@ -93,7 +93,7 @@ def _make_glob_from_args(
                 settings.MEDIA_ROOT,
                 "harvard_corpus",
                 f"law.free.cap.{reporter}.{volume}",
-                ".*.json",
+                "*.json",
             )
             glob_paths.append(glob_path)
         return glob_paths
