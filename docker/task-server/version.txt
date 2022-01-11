@@ -1,5 +1,6 @@
-1.0.59
+1.0.60
 
+1.0.60 - Update harvard opinion importer, Bump reporters-db and courts-db.
 1.0.59 - Update harvard opinion importer with better logging, improve error handling and reporter-typing. Bump reporters-db.
 1.0.58 - Update harvard opinion importer.
 1.0.57 - Bump reporters-db
