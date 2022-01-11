@@ -69,7 +69,7 @@ def reverse_match(
         query = " ".join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
         # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
-        params["q"] = '"%s"~%d' % (query, len(query_tokens))
+        params["q"] = f'"{query}"~{len(query_tokens)}'
         params["caller"] = "reverse_match"
         new_results = conn.query().add_extra(**params).execute()
         if len(new_results) == 1:
