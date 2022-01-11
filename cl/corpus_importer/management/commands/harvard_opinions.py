@@ -79,15 +79,21 @@ def _make_glob_from_args(
     """
 
     if reporter and volumes and page:
-        reporter_key = f"law.free.cap.{reporter}.{volumes[0]}"
-        glob_path = f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/{page}.*.json"
+        glob_path = os.path.join(
+            settings.MEDIA_ROOT,
+            "harvard_corpus",
+            f"law.free.cap.{reporter}.{volumes[0]}",
+            f"{page}.*.json",
+        )
         return [glob_path]
     elif reporter and volumes:
         glob_paths = []
         for volume in volumes:
-            reporter_key = f"law.free.cap.{reporter}.{volume}"
-            glob_path = (
-                f"{settings.MEDIA_ROOT}/harvard_corpus/{reporter_key}/*.json"
+            glob_path = os.path.join(
+                settings.MEDIA_ROOT,
+                "harvard_corpus",
+                f"law.free.cap.{reporter}.{volume}",
+                "*.json",
             )
             glob_paths.append(glob_path)
         return glob_paths
@@ -491,7 +497,9 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
     :return: None
     """
     for cite in cites:
-        citation = get_citations(cite["cite"])
+        # Cleanup citations with extra spaces
+        clean_cite = re.sub(r"\s{2,}", " ", cite["cite"])
+        citation = get_citations(clean_cite)
         if not citation:
             logger.warning(f"Citation parsing failed for {cite['cite']}")
             continue
