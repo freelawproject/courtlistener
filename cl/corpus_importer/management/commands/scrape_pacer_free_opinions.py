@@ -117,7 +117,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
         while True:
             next_start_d, next_end_d = get_next_date_range(pacer_court_id)
             if next_end_d is None:
-                logger.warn(
+                logger.warning(
                     f"Free opinion scraper for {pacer_court_id} still "
                     f"in progress."
                 )
