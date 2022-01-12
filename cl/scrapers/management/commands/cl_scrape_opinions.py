@@ -44,7 +44,10 @@ def make_citation(
     """Create and return a citation object for the input values."""
     citation_objs = get_citations(cite_str)
     if not citation_objs:
-        logger.warn(f"Could not parse citation: {cite_str}")
+        logger.error(
+            f"Could not parse citation",
+            extra=dict(cite=cite_str, cluster=cluster),
+        )
         return None
     # Convert the found cite type to a valid cite type for our DB.
     cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
