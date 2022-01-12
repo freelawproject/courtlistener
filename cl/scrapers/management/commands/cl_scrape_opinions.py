@@ -104,6 +104,8 @@ def make_objects(
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
     citations = [make_citation(cite, cluster) for cite in cites if cite]
+    # Remove citations that did not parse correctly.
+    citations = [cite for cite in citations if cite]
 
     opinion = Opinion(
         type=Opinion.COMBINED,
