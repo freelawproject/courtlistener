@@ -240,12 +240,14 @@
                     {{ cluster.citation_string|default:"None known" }}
                 </span>
             </p>
-            <p class="bottom">
-                <span class="meta-data-header">Docket Number:</span>
-                <span class="meta-data-value">
-                    {{ cluster.docket.docket_number|default:"Unknown" }}
-                </span>
-            </p>
+            {% if cluster.docket.court_id != "olc" %}
+                <p class="bottom">
+                    <span class="meta-data-header">Docket Number:</span>
+                    <span class="meta-data-value">
+                        {{ cluster.docket.docket_number|default:"Unknown" }}
+                    </span>
+                </p>
+            {% endif %}
             {% if cluster.docket.court_id == 'scotus' %}
             <p class="bottom">
                 <span class="meta-data-header">Supreme Court Database ID:</span>

@@ -1,5 +1,6 @@
-1.0.61
+1.0.62
 
+1.0.62 - Bump reporters-db and juriscraper.  Update logging in scraping and improve appelate pacer download links.
 1.0.61 - Bump reporters-db.
 1.0.60 - Update harvard opinion importer, Bump reporters-db and courts-db.
 1.0.59 - Update harvard opinion importer with better logging, improve error handling and reporter-typing. Bump reporters-db.

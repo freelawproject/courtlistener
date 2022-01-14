@@ -689,13 +689,13 @@ class Docket(AbstractDateTimeModel):
                 path = "/n/beam/servlet/TransportRoom?"
 
             return (
-                "https://ecf.%s.uscourts.gov"
-                + path
-                + "servlet=CaseSummary.jsp&"
-                "caseNum=%s&"
-                "incOrigDkt=Y&"
-                "incDktEntries=Y"
-            ) % (self.pacer_court_id, self.pacer_case_id)
+                f"https://ecf.{self.pacer_court_id}.uscourts.gov"
+                f"{path}"
+                f"servlet=CaseSummary.jsp&"
+                f"caseId={self.pacer_case_id}&"
+                f"incOrigDkt=Y&"
+                f"incDktEntries=Y"
+            )
         else:
             return self.pacer_district_url("DktRpt.pl")
 
