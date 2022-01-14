@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import date
 from unittest import mock
@@ -42,10 +43,12 @@ from cl.recap.models import (
     REQUEST_TYPE,
     UPLOAD_TYPE,
     EmailProcessingQueue,
+    FjcIntegratedDatabase,
     PacerFetchQueue,
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     process_recap_appellate_docket,
@@ -1701,3 +1704,29 @@ class IdbImportTest(SimpleTestCase):
             self.assertEqual(
                 self.cmd.make_csv_row_dict(qa[0], ["1", "2", "3"]), qa[1]
             )
+
+
+class IdbMergeTest(TestCase):
+    """Can we successfully do heuristic matching"""
+
+    fixtures = ["fjc_data.json", "canb_court.json"]
+
+    def tearDown(self) -> None:
+        FjcIntegratedDatabase.objects.all().delete()
+
+    def test_merge_from_idb_chunk(self) -> None:
+        """Can we successfully merge a chunk of IDB data?"""
+
+        self.assertEqual(Docket.objects.count(), 2)
+        self.assertEqual(Docket.objects.get(id=400).nature_of_suit, "")
+        create_or_merge_from_idb_chunk([1])
+        self.assertEqual(Docket.objects.count(), 2)
+        self.assertEqual(
+            Docket.objects.get(id=400).nature_of_suit, "440 Civil rights other"
+        )
+
+    def test_create_from_idb_chunk(self) -> None:
+        # Can we ignore dockets with CR in them that otherwise match?
+        self.assertEqual(Docket.objects.count(), 2)
+        create_or_merge_from_idb_chunk([2])
+        self.assertEqual(Docket.objects.count(), 3)
