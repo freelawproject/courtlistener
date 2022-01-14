@@ -39,12 +39,8 @@ multiarch_image:
 multiarch_push: multiarch_image
 	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --file docker/task-server/Dockerfile .
 
-x86_image:
+x86_push:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
 	$(DOCKER) buildx rm
 	$(DOCKER) buildx create --use --name flp-builder
-	$(DOCKER) buildx build --platform linux/amd64 -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --file docker/task-server/Dockerfile .
-	$(DOCKER) buildx build --cache-from=type=local,src=cache -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --push --file docker/task-server/Dockerfile .
-
-x86_push: x86_image
 	$(DOCKER) buildx build --push --platform linux/amd64 -t $(DOCKER_REPOSITORY):latest -t $(DOCKER_REPOSITORY):$(DOCKER_TAG) --file docker/task-server/Dockerfile .
