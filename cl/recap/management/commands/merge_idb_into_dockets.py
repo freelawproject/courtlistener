@@ -12,7 +12,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
 from cl.lib.utils import chunks
-from cl.recap.constants import CV_2017, CV_2020
+from cl.recap.constants import CV_2017, CV_2020, CV_2021
 from cl.recap.models import FjcIntegratedDatabase
 from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
@@ -79,7 +79,7 @@ class Command(VerboseCommand, CommandUtils):
     def join_fjc_with_dockets(options):
         idb_rows = (
             FjcIntegratedDatabase.objects.filter(
-                dataset_source__in=[CV_2017, CV_2020],
+                dataset_source__in=[CV_2017, CV_2020, CV_2021],
             )
             .values_list("pk", flat=True)
             .order_by("pk")

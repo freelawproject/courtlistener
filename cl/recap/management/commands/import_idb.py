@@ -1,4 +1,3 @@
-import io
 import re
 import sys
 from datetime import date
@@ -14,6 +13,7 @@ from cl.recap.constants import (
     CR_2017,
     CV_2017,
     CV_2020,
+    CV_2021,
     DATASET_SOURCES,
     IDB_FIELD_DATA,
 )
@@ -184,34 +184,39 @@ class Command(VerboseCommand, CommandUtils):
         self.build_field_data()
 
         logger.info(f"Importing IDB file at: {options['input_file']}")
-        f = io.open(
+        with open(
             options["input_file"], mode="r", encoding="cp1252", newline="\r\n"
-        )
-        col_headers = f.next().strip().split("\t")
-        for i, line in enumerate(f):
-            sys.stdout.write(f"\rDoing line: {i}")
-            sys.stdout.flush()
-            if i < options["start_line"]:
-                continue
+        ) as f:
+            col_headers = f.readline().strip().split("\t")
+            for i, line in enumerate(f):
+                sys.stdout.write(f"\rDoing line: {i}")
+                sys.stdout.flush()
+                if i < options["start_line"]:
+                    continue
 
-            row = self.make_csv_row_dict(line, col_headers)
-            if options["filetype"] == CR_2017 and row["SOURCE"] != "CMECF":
-                continue
+                row = self.make_csv_row_dict(line, col_headers)
+                if options["filetype"] == CR_2017 and row["SOURCE"] != "CMECF":
+                    continue
 
-            self.normalize_nulls(row)
-            self.normalize_court_fields(row)
-            self.normalize_booleans(row)
-            self.normalize_dates(row)
-            self.normalize_ints(row)
-            if options["filetype"] not in [CV_2017, CV_2020, CR_2017]:
-                raise NotImplementedError("This file type not implemented.")
-            else:
-                values = self.convert_to_cl_data_model(
-                    row, options["filetype"]
-                )
-            create_or_update_row(values)
-
-        f.close()
+                self.normalize_nulls(row)
+                self.normalize_court_fields(row)
+                self.normalize_booleans(row)
+                self.normalize_dates(row)
+                self.normalize_ints(row)
+                if options["filetype"] not in [
+                    CV_2017,
+                    CV_2020,
+                    CV_2021,
+                    CR_2017,
+                ]:
+                    raise NotImplementedError(
+                        "This file type not implemented."
+                    )
+                else:
+                    values = self.convert_to_cl_data_model(
+                        row, options["filetype"]
+                    )
+                create_or_update_row(values)
 
     def normalize_nulls(self, row):
         """The IDB uses the value -8 to indicate a null value. Fix this
