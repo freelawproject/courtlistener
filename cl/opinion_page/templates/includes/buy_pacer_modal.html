@@ -1,0 +1,39 @@
+{% load humanize %}
+<div id="modal-buy-pacer"
+     class="modal hidden-print text-left"
+     role="dialog"
+     aria-hidden="true"
+     tabindex="-1">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"
+                aria-label="Close"><span aria-hidden="true">&times;</span>
+        </button>
+        <h2 class="modal-title"> If you use PACER, please install    <span class="recap_install_plea">RECAP?</span></h2>
+      </div>
+
+      <div class="modal-body">
+        
+        <p>
+            Launched in 2010, the RECAP extension is a Free tool for your browser that helps build the world's biggest open collection of PACER content while saving you money on court documents.    
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <p>
+          <a href="https://free.law/recap/" target="_blank"
+             class="btn btn-default">Install RECAP</a>
+             <!--- Set Cookie disable for 30 days--->
+
+          <a href="{{ rd.pacer_url }}" id="pacer_url" 
+          data-duration="30"
+          data-cookie-name="buy_on_pacer_modal"
+          target="_blank" class="btn btn-danger float-right">
+          <i class="fa fa-heart-o"></i> Continue to PACER</a>
+
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
