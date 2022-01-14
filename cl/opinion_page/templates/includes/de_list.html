@@ -94,8 +94,8 @@
                         <li>
                           {% if not request.COOKIES.buy_on_pacer_modal %}
 
-                          <a href="{{ rd.pacer_url }}" id="open_buy_pacer_modal" data-toggle="modal" data-target="#modal-buy-pacer" 
-                          target="_blank" 
+                          <a href="{{ rd.pacer_url }}" id="open_buy_pacer_modal" data-toggle="modal" data-target="#modal-buy-pacer"
+                          target="_blank"
                           rel="nofollow">Buy on
                           PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
 
@@ -119,11 +119,11 @@
                       {% if rd.pacer_url %}
                         {% if not request.COOKIES.buy_on_pacer_modal %}
                         <a href="{{ rd.pacer_url }}"  id="open_buy_pacer_modal" class="btn btn-default btn-xs"
-                        data-toggle="modal" data-target="#modal-buy-pacer" 
-                        target="_blank" 
+                        data-toggle="modal" data-target="#modal-buy-pacer"
+                        target="_blank"
                         rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
                         {% else%}
-                        
+
                         <a href="{{ rd.pacer_url }}"
                         class="btn btn-default btn-xs"
                         target="_blank"

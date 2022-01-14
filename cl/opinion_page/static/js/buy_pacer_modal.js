@@ -17,7 +17,7 @@ $(document).ready(function () {
         return cookieValue;
       }
 
-    
+
     $("#open_buy_pacer_modal").on("click", function (e) {
 
         //Modal clicked
@@ -30,7 +30,7 @@ $(document).ready(function () {
             e.stopPropagation();
 
         }
-        
+
         else{
             //otherwise open modal and concatenate pacer URL to button
             var pacer_url = $(this).attr('href');
@@ -55,7 +55,7 @@ $(document).ready(function () {
 
     ///Close Modal
     $("#modal-buy-pacer ").modal('toggle');
-    
+
   });
 
 
