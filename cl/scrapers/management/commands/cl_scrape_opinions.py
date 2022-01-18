@@ -219,10 +219,13 @@ class Command(VerboseCommand):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         if dup_checker.abort_by_url_hash(site.url, site.hash):
+            logger.debug(f"Aborting by url hash.")
             return
 
         if site.cookies:
             logger.info(f"Using cookies: {site.cookies}")
+        logger.debug(f"#{len(site.cases)} opinions found.")
+        added = 0
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
@@ -265,8 +268,10 @@ class Command(VerboseCommand):
                 Opinion, current_date, next_date, **lookup_params
             )
             if dup_checker.emulate_break:
+                logger.debug("Emulate break triggered.")
                 break
             if not proceed:
+                logger.debug("Skipping opinion.")
                 continue
 
             # Not a duplicate, carry on
@@ -296,9 +301,12 @@ class Command(VerboseCommand):
                 f"Successfully added opinion {opinion.pk}: "
                 f"{item['case_names'].encode()}"
             )
+            added += 1
 
         # Update the hash if everything finishes properly.
-        logger.info(f"{site.court_id}: Successfully crawled opinions.")
+        logger.debug(
+            f"{site.court_id}: Successfully crawled {added}/{len(site)} opinions."
+        )
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
