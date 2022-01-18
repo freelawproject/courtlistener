@@ -224,7 +224,7 @@ class Command(VerboseCommand):
 
         if site.cookies:
             logger.info(f"Using cookies: {site.cookies}")
-        logger.debug(f"#{len(site.cases)} opinions found.")
+        logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
             msg, r = get_binary_content(
