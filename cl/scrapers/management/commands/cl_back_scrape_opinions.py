@@ -7,7 +7,9 @@ from cl.scrapers.management.commands import cl_scrape_opinions
 
 class Command(cl_scrape_opinions.Command):
     def parse_and_scrape_site(
-        self, mod: AbstractSite, full_crawl: bool
+        self,
+        mod: AbstractSite,
+        full_crawl: bool,
     ) -> None:
         """Parse the site and scrape it using the backscraper
 
@@ -17,10 +19,8 @@ class Command(cl_scrape_opinions.Command):
         """
         court_str = mod.__name__.split(".")[-1].split("_")[0]
         logger.info(f'Using court_str: "{court_str}"')
-        site = mod.Site()
         for site in site_yielder(mod.Site().back_scrape_iterable, mod):
             site.parse()
-        if site.cases:
             self.scrape_court(site, full_crawl=True)
 
     def save_everything(self, items, index=False, backscrape=True):
