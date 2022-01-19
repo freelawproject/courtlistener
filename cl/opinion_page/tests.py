@@ -369,9 +369,34 @@ class UploadPublication(TestCase):
         form.fields["lead_author"].queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
+
+        # Validate that no citations exist
+        count = OpinionCluster.objects.all().count()
+        cite_count = Citation.objects.all().count()
+        self.assertEqual(
+            0, count, msg=f"The opinion count should be zero not {count}"
+        )
+        self.assertEqual(
+            0,
+            cite_count,
+            msg=f"The citation count should be zero not {cite_count}",
+        )
+
         if form.is_valid():
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
+
+        # Validate that citations were created on upload.
+        count = OpinionCluster.objects.all().count()
+        cite_count = Citation.objects.all().count()
+        self.assertEqual(
+            1, count, msg=f"The opinion count should be zero not {count}"
+        )
+        self.assertEqual(
+            1,
+            cite_count,
+            msg=f"The citation count should be zero not {cite_count}",
+        )
 
     def test_pdf_validation_failure(self, mock) -> None:
         """Can we fail upload documents that are not PDFs?"""
@@ -404,9 +429,33 @@ class UploadPublication(TestCase):
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
 
+        # Check no citations exist before upload
+        count = OpinionCluster.objects.all().count()
+        cite_count = Citation.objects.all().count()
+        self.assertEqual(
+            0, count, msg=f"The opinion count should be zero not {count}"
+        )
+        self.assertEqual(
+            0,
+            cite_count,
+            msg=f"The citation count should be zero not {cite_count}",
+        )
+
         if form.is_valid():
             form.save()
         self.assertEqual(form.is_valid(), True, form.errors)
+
+        # Check that citations were created on upload.
+        count = OpinionCluster.objects.all().count()
+        cite_count = Citation.objects.all().count()
+        self.assertEqual(
+            1, count, msg=f"The opinion count should be zero not {count}"
+        )
+        self.assertEqual(
+            1,
+            cite_count,
+            msg=f"The citation count should be zero not {cite_count}",
+        )
 
     def test_required_case_title(self, mock) -> None:
         """Can we validate required testing field case title?"""
