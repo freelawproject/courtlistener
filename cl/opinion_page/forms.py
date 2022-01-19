@@ -7,6 +7,7 @@ from django.core.validators import FileExtensionValidator
 from django.utils.encoding import force_bytes
 from django.utils.html import format_html
 
+from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.people_db.models import Person
 from cl.scrapers.management.commands.cl_scrape_opinions import (
@@ -241,7 +242,7 @@ class TennWorkersForm(forms.Form):
                     )
                 ),
             )
-        self.cleaned_data["neutral_citation"] = f"{volume} {reporter} {page}"
+        self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
     def verify_unique_judges(self):
         if self.pk == "tennworkcompapp":
@@ -299,7 +300,7 @@ class TennWorkersForm(forms.Form):
             "author": self.cleaned_data["lead_author"],
             "date_filed_is_approximate": False,
             "blocked_statuses": False,
-            "neutral_citations": self.cleaned_data["neutral_citation"],
+            "citations": self.cleaned_data["citations"],
             "download_urls": "",
         }
 
@@ -326,6 +327,9 @@ class TennWorkersForm(forms.Form):
             sha1_hash,
             self.cleaned_data.get("pdf_upload"),
         )
+
+        if not citations:
+            logger.warning("Citation not found for Tenn Workers' Forms")
 
         save_everything(
             items={
