@@ -331,7 +331,8 @@ REST_FRAMEWORK = {
         # with them.
         "elios": "10/hour",
         # Sent multiple emails, but no response.
-        "bchecker": "10/hour",
+        "bchecker": "1/hour",
+        "JaneDoe": "1/hour",
         "shreyngd": "100/hour",
         "leo": "100/hour",
         "miffy": "100/hour",
