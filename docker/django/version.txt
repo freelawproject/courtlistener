@@ -1,5 +1,6 @@
-1.0.68
+1.0.69
 
+1.0.69 - Bump courts-db.
 1.0.68 - Bump courts-db and juriscraper.  Update logging in scraping. Update docker makefiles.  Fix bug in tenn-workers uploader.
 1.0.67 - Bump reporters-db and juriscraper.  Update logging in scraping and improve appellate pacer download links.
 1.0.66 - Bump reporters-db.
