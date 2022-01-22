@@ -1,5 +1,6 @@
-1.0.64
+1.0.65
 
+1.0.65 - Bump juriscraper. Add fix for tax court opinions in scraper.
 1.0.64 - Bump courts-db.
 1.0.63 - Bump courts-db and juriscraper.  Update logging in scraping. Update docker makefiles.  Fix bug in tenn-workers uploader.
 1.0.62 - Bump reporters-db and juriscraper.  Update logging in scraping and improve appelate pacer download links.
