@@ -110,10 +110,15 @@ def make_objects(
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
+    url = item["download_urls"]
+    if court.id == "tax":
+        url = url.split("&")[0]
+        pass
+
     opinion = Opinion(
         type=Opinion.COMBINED,
         sha1=sha1_hash,
-        download_url=item["download_urls"],
+        download_url=url,
     )
 
     cf = ContentFile(content)
