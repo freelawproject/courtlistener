@@ -85,7 +85,7 @@ usaddress = "*"
 juriscraper = "2.4.6"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
-ipython = "^7.21.0"
+ipython = "^7.31.1"
 gunicorn = "^20.0.4"
 django-hCaptcha = "^0.1.0"
 eyecite = "^2.1.0"
