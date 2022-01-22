@@ -20,6 +20,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
 from cl.lib.types import (
     MatchedResourceType,
+    ResolvedFullCites,
     SearchParam,
     SupportedCitationType,
 )
@@ -29,9 +30,7 @@ DEBUG = True
 
 QUERY_LENGTH = 10
 
-NO_MATCH_RESOURCE = Resource(
-    case_citation(0, source_text="UNMATCHED_CITATION")
-)
+NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
 
 
 def build_date_range(start_year: int, end_year: int) -> str:
@@ -83,7 +82,9 @@ def case_name_query(
     citation: SupportedCitationType,
     citing_opinion: Opinion,
 ) -> List[ExtraSolrSearch]:
-    query, length = make_name_param(citation.defendant, citation.plaintiff)
+    query, length = make_name_param(
+        citation.metadata.defendant, citation.metadata.plaintiff
+    )
     params["q"] = f"caseName:({query})"
     params["caller"] = "match_citations"
     results = []
@@ -103,7 +104,7 @@ def case_name_query(
 
 
 def get_years_from_reporter(
-    citation: SupportedCitationType,
+    citation: FullCaseCitation,
 ) -> Tuple[int, int]:
     """Given a citation object, try to look it its dates in the reporter DB"""
     start_year = 1750
@@ -157,11 +158,13 @@ def search_db_for_fullcitation(
         f"dateFiled:{build_date_range(start_year, end_year)}"
     )
 
-    if full_citation.court:
-        main_params["fq"].append(f"court_exact:{full_citation.court}")
+    if full_citation.metadata.court:
+        main_params["fq"].append(f"court_exact:{full_citation.metadata.court}")
 
     # Take 1: Use a phrase query to search the citation field.
-    main_params["fq"].append(f'citation:("{full_citation.base_citation()}")')
+    main_params["fq"].append(
+        f'citation:("{full_citation.corrected_citation()}")'
+    )
     results = si.query().add_extra(**main_params).execute()
     si.conn.http_connection.close()
     if len(results) == 1:
@@ -169,7 +172,7 @@ def search_db_for_fullcitation(
     if len(results) > 1:
         if (
             full_citation.citing_opinion is not None
-            and full_citation.defendant
+            and full_citation.metadata.defendant
         ):  # Refine using defendant, if there is one
             results = case_name_query(
                 si, main_params, full_citation, full_citation.citing_opinion
@@ -220,17 +223,17 @@ def resolve_fullcase_citation(
 
 def resolve_shortcase_citation(
     short_citation: ShortCaseCitation,
-    resolved_full_cites: Dict[FullCaseCitation, MatchedResourceType],
+    resolved_full_cites: ResolvedFullCites,
 ) -> Optional[Opinion]:
     candidates: List[Opinion] = []
     matched_opinions = [
-        o for c, o in resolved_full_cites.items() if type(o) is Opinion
+        o for c, o in resolved_full_cites if type(o) is Opinion
     ]
     for opinion in matched_opinions:
         for c in opinion.cluster.citations.all():
             if (
-                short_citation.reporter == c.reporter
-                and short_citation.volume == str(c.volume)
+                short_citation.corrected_reporter() == c.reporter
+                and short_citation.groups["volume"] == str(c.volume)
             ):
                 candidates.append(opinion)
 
@@ -244,19 +247,19 @@ def resolve_shortcase_citation(
     # Otherwise, try to refine further using the antecedent guess
     else:
         return filter_by_matching_antecedent(
-            candidates, short_citation.antecedent_guess
+            candidates, short_citation.metadata.antecedent_guess
         )
 
 
 def resolve_supra_citation(
     supra_citation: SupraCitation,
-    resolved_full_cites: Dict[FullCaseCitation, MatchedResourceType],
+    resolved_full_cites: ResolvedFullCites,
 ) -> Optional[Opinion]:
     matched_opinions = [
-        o for c, o in resolved_full_cites.items() if type(o) is Opinion
+        o for c, o in resolved_full_cites if type(o) is Opinion
     ]
     return filter_by_matching_antecedent(
-        matched_opinions, supra_citation.antecedent_guess
+        matched_opinions, supra_citation.metadata.antecedent_guess
     )
 
 
@@ -271,7 +274,7 @@ def do_resolve_citations(
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(
         citations=citations,
-        resolve_fullcase_citation=resolve_fullcase_citation,
+        resolve_full_citation=resolve_fullcase_citation,
         resolve_shortcase_citation=resolve_shortcase_citation,
         resolve_supra_citation=resolve_supra_citation,
     )

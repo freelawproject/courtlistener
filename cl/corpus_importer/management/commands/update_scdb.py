@@ -23,7 +23,7 @@ from datetime import datetime
 from django.core.management import CommandError
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
-from eyecite.find_citations import get_citations
+from eyecite.find import get_citations
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
@@ -167,8 +167,6 @@ class Command(VerboseCommand):
             try:
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
-                    do_post_citation=False,
-                    do_defendant=False,
                     remove_ambiguous=False,
                 )[0]
             except IndexError:
@@ -180,18 +178,18 @@ class Command(VerboseCommand):
                 if cites.count() == 1:
                     # Update the existing citation.
                     cite = cites[0]
-                    cite.volume = citation_obj.volume
-                    cite.reporter = citation_obj.reporter
-                    cite.page = citation_obj.page
+                    cite.volume = citation_obj.groups["volume"]
+                    cite.reporter = citation_obj.corrected_reporter()
+                    cite.page = citation_obj.groups["page"]
                     cite.save()
                 else:
                     try:
                         # Create a new citation
                         Citation.objects.create(
                             cluster=cluster,
-                            volume=citation_obj.volume,
-                            reporter=citation_obj.reporter,
-                            page=citation_obj.page,
+                            volume=citation_obj.groups["volume"],
+                            reporter=citation_obj.corrected_reporter(),
+                            page=citation_obj.groups["page"],
                             type=reporter_info[1],
                         )
                     except IntegrityError:

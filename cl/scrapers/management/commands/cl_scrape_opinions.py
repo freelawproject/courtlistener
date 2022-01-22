@@ -8,7 +8,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from eyecite.find_citations import get_citations
+from eyecite.find import get_citations
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -53,9 +53,9 @@ def make_citation(
     cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
     return Citation(
         cluster=cluster,
-        volume=citation_objs[0].volume,
-        reporter=citation_objs[0].reporter,
-        page=citation_objs[0].page,
+        volume=citation_objs[0].groups["volume"],
+        reporter=citation_objs[0].corrected_reporter(),
+        page=citation_objs[0].groups["page"],
         type=map_reporter_db_cite_type(cite_type_str),
     )
 

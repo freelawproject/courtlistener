@@ -304,53 +304,58 @@ class MatchingTest(IndexedSolrTestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            canonical_reporter="U.S.",
-            court="scotus",
             index=1,
             reporter_found="U.S.",
+            metadata={"court": "scotus"},
         )
         full8 = case_citation(
             volume="2",
             reporter="F.3d",
             page="2",
-            canonical_reporter="F.",
-            court="ca1",
             index=1,
             reporter_found="F.3d",
+            metadata={"court": "ca1"},
         )
         full9 = case_citation(
             volume="1",
             reporter="U.S.",
             page="50",
-            canonical_reporter="U.S.",
-            court="scotus",
             index=1,
             reporter_found="U.S.",
+            metadata={"court": "scotus"},
         )
         full11 = case_citation(
             volume="1",
             reporter="U.S.",
             page="999",
-            canonical_reporter="U.S.",
-            court="scotus",
             index=1,
             reporter_found="U.S.",
+            metadata={"court": "scotus"},
         )
         full_na = case_citation(
             volume="1",
             reporter="U.S.",
             page="99",
-            canonical_reporter="U.S.",
-            court="scotus",
             index=1,
             reporter_found="U.S.",
+            metadata={"court": "scotus"},
         )
 
         supra7 = supra_citation(
-            index=1, antecedent_guess="Bar", pin_cite="99", volume="1"
+            index=1,
+            metadata={
+                "antecedent_guess": "Bar",
+                "pin_cite": "99",
+                "volume": "1",
+            },
         )
         supra9_or_11 = supra_citation(
-            index=1, antecedent_guess="Ipsum", pin_cite="99", volume="1"
+            index=1,
+            metadata={
+                "antecedent_guess": "Ipsum",
+                "pin_cite": "99",
+                "volume": "1",
+            },
         )
 
         short7 = case_citation(
@@ -358,40 +363,40 @@ class MatchingTest(IndexedSolrTestCase):
             page="99",
             volume="1",
             index=1,
-            antecedent_guess="Bar,",
             short=True,
+            metadata={"antecedent_guess": "Bar,"},
         )
         short7_or_9_tiebreaker = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
             index=1,
-            antecedent_guess="Bar",
             short=True,
+            metadata={"antecedent_guess": "Bar"},
         )
         short7_or_9_bad_antecedent = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
             index=1,
-            antecedent_guess="somethingwrong",
             short=True,
+            metadata={"antecedent_guess": "somethingwrong"},
         )
         short9_or_11_common_antecedent = case_citation(
             reporter="U.S.",
             page="99",
             volume="1",
             index=1,
-            antecedent_guess="Ipsum",
             short=True,
+            metadata={"antecedent_guess": "Ipsum"},
         )
         short_na = case_citation(
             reporter="F.3d",
             page="99",
             volume="1",
             index=1,
-            antecedent_guess="somethingwrong",
             short=True,
+            metadata={"antecedent_guess": "somethingwrong"},
         )
 
         id = id_citation(index=1)

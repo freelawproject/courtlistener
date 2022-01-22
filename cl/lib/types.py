@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, TypedDict, Union
+from typing import Any, Dict, List, Tuple, TypedDict, Union
 
 from django.http import HttpRequest
 from eyecite.models import (
@@ -19,6 +19,8 @@ SupportedCitationType = Union[
     FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
 ]
 MatchedResourceType = Union[Opinion, Resource]
+ResolvedFullCite = Tuple[FullCaseCitation, MatchedResourceType]
+ResolvedFullCites = List[ResolvedFullCite]
 
 
 class AuthenticatedHttpRequest(HttpRequest):

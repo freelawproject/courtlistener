@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from eyecite import annotate, clean_text
+from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
 from cl.lib.types import MatchedResourceType, SupportedCitationType
@@ -70,14 +70,14 @@ def create_cited_html(
     :return The new HTML containing citations
     """
     if opinion.source_is_html:  # If opinion was originally HTML...
-        new_html = annotate(
+        new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
             annotations=generate_annotations(citation_resolutions),
             source_text=opinion.source_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
         )
     else:  # Else, make sure to wrap the new text in <pre> HTML tags...
-        new_html = annotate(
+        new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
