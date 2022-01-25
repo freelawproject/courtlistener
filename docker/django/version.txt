@@ -1,5 +1,6 @@
-1.0.70
+1.0.71
 
+1.0.71 - Update to harvard importer.
 1.0.70 - Bump juriscraper. Add fix for tax court opinions in scraper.
 1.0.69 - Bump courts-db.
 1.0.68 - Bump courts-db and juriscraper.  Update logging in scraping. Update docker makefiles.  Fix bug in tenn-workers uploader.
