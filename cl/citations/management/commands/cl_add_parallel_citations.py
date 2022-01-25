@@ -5,7 +5,7 @@ from celery.canvas import group
 from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError
-from eyecite.find_citations import get_citations
+from eyecite.find import get_citations
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import (
@@ -84,7 +84,7 @@ class Command(VerboseCommand):
         main_params = {
             "fq": [
                 "status:Precedential",
-                f'citation:("{citation.base_citation()}"~5)',
+                f'citation:("{citation.corrected_citation()}"~5)',
             ],
             "caller": "citation.add_parallel_citations",
         }
@@ -174,9 +174,9 @@ class Command(VerboseCommand):
             return
 
         # Are the number of unique reporters equal to the number of results?
-        if len(set([node.reporter for node, results in result_sets])) != len(
-            result_sets
-        ):
+        if len(
+            set([node.edition_guess.reporter for node, results in result_sets])
+        ) != len(result_sets):
             logger.info("  Got duplicated reporter in citations. Pass.\n")
             return
 
@@ -218,11 +218,12 @@ class Command(VerboseCommand):
         for group in citation_groups:
             edge_list = make_edge_list(group)
             for edge in edge_list:
-                if any(e for e in edge if e.reporter_found in ["Id.", "Cr."]):
+                for e in edge:
                     # Alas, Idaho can be abbreviated as Id. This creates lots of
                     # problems, so if made a match on "Id." we simple move on.
                     # Ditto for Cr. (short for Cranch)
-                    return
+                    if e.groups["reporter"] in ["Id.", "Cr."]:
+                        return
 
                 if self.g.has_edge(*edge):
                     # Increment the weight of the edge.

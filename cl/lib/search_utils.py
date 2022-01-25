@@ -117,9 +117,7 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(
-        cd["q"], do_post_citation=False, do_defendant=False
-    )
+    citations = get_citations(cd["q"])
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
 
