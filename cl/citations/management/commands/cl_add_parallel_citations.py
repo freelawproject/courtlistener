@@ -218,15 +218,12 @@ class Command(VerboseCommand):
         for group in citation_groups:
             edge_list = make_edge_list(group)
             for edge in edge_list:
-                if any(
-                    e
-                    for e in edge
-                    if e.groups.reporter_found in ["Id.", "Cr."]
-                ):
+                for e in edge:
                     # Alas, Idaho can be abbreviated as Id. This creates lots of
                     # problems, so if made a match on "Id." we simple move on.
                     # Ditto for Cr. (short for Cranch)
-                    return
+                    if e.groups["reporter"] in ["Id.", "Cr."]:
+                        return
 
                 if self.g.has_edge(*edge):
                     # Increment the weight of the edge.
