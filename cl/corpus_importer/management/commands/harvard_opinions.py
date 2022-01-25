@@ -305,7 +305,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             logger.warning(f"Unknown error {e} for: {ia_download_url}")
             continue
 
-        if file_path.split("/", 7)[-1] in fix_list:
+        if file_path.split("harvard_corpus/")[1] in fix_list:
             logger.info(f"Fetching fixes and merging data at {file_path}")
             data = merge_fixes(data, file_path)
 

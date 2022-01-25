@@ -1,5 +1,6 @@
-1.0.66
+1.0.67
 
+1.0.67 - Upgrade eyecite to latest version
 1.0.66 - Update harvard importer.
 1.0.65 - Bump juriscraper. Add fix for tax court opinions in scraper.
 1.0.64 - Bump courts-db.
