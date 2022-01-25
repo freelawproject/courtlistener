@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 from glob import glob
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
 
+import requests
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
@@ -221,6 +222,34 @@ class OptionsType(TypedDict):
     make_searchable: bool
 
 
+def get_fix_list() -> List[str]:
+    """Download the fix list for harvard data.
+
+    :return:List of files to fix
+    """
+    data = requests.get(
+        "https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/missing-files.json",
+        timeout=10,
+    ).json()
+    return data["files"]
+
+
+def merge_fixes(data: Dict[str, Any], filepath: str) -> Dict[str, Any]:
+    """Merge fixes into the data
+
+    :param data: The Harvard data
+    :param filepath: The filepath of the data to fix.
+    :return:
+    """
+    slug = filepath.split("/", 7)[-1]
+    fix = requests.get(
+        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{slug}",
+        timeout=10,
+    ).json()
+    data.update(fix)
+    return data
+
+
 def parse_harvard_opinions(options: OptionsType) -> None:
     """Parse Harvard Opinions
 
@@ -250,6 +279,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         return
 
     filepaths = filepath_list(reporter, volumes, page)
+    fix_list = get_fix_list()
+
     for file_path in filepaths:
         logger.info(f"Processing opinion at {file_path}")
 
@@ -273,6 +304,10 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         except Exception as e:
             logger.warning(f"Unknown error {e} for: {ia_download_url}")
             continue
+
+        if file_path.split("/", 7)[-1] in fix_list:
+            logger.info(f"Fetching fixes and merging data at {file_path}")
+            data = merge_fixes(data, file_path)
 
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
