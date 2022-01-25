@@ -228,7 +228,8 @@ def get_fix_list() -> List[str]:
     :return:List of files to fix
     """
     data = requests.get(
-        "https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/missing-files.json"
+        "https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/missing-files.json",
+        timeout=10,
     ).json()
     return data["files"]
 
@@ -242,7 +243,8 @@ def merge_fixes(data: Dict[str, Any], filepath: str) -> Dict[str, Any]:
     """
     slug = filepath.split("/", 7)[-1]
     fix = requests.get(
-        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{slug}"
+        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{slug}",
+        timeout=10,
     ).json()
     data.update(fix)
     return data
