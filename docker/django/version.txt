@@ -1,5 +1,6 @@
-1.0.72
+1.0.73
 
+1.0.73 - Fix for Harvard. Fix tests.
 1.0.72 - Upgrade eyecite to latest version
 1.0.71 - Update to harvard importer.
 1.0.70 - Bump juriscraper. Add fix for tax court opinions in scraper.
