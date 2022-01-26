@@ -234,16 +234,15 @@ def get_fix_list() -> List[str]:
     return data["files"]
 
 
-def merge_fixes(data: Dict[str, Any], filepath: str) -> Dict[str, Any]:
+def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
     """Merge fixes into the data
 
     :param data: The Harvard data
     :param filepath: The filepath of the data to fix.
     :return:
     """
-    slug = filepath.split("/", 7)[-1]
     fix = requests.get(
-        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{slug}",
+        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{identifier}",
         timeout=10,
     ).json()
     data.update(fix)
@@ -305,9 +304,10 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             logger.warning(f"Unknown error {e} for: {ia_download_url}")
             continue
 
-        if file_path.split("harvard_corpus/")[1] in fix_list:
+        identifier = "/".join(file_path.rsplit("/", 2)[1:])
+        if identifier in fix_list:
             logger.info(f"Fetching fixes and merging data at {file_path}")
-            data = merge_fixes(data, file_path)
+            data = merge_fixes(data, identifier)
 
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
