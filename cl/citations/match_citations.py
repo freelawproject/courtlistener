@@ -8,6 +8,9 @@ from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
     FullCaseCitation,
+    FullCitation,
+    FullJournalCitation,
+    FullLawCitation,
     Resource,
     ShortCaseCitation,
     SupraCitation,
@@ -203,19 +206,29 @@ def filter_by_matching_antecedent(
 
 
 def resolve_fullcase_citation(
-    full_citation: FullCaseCitation,
+    full_citation: FullCitation,
 ) -> MatchedResourceType:
-    db_search_results: List[ExtraSolrSearch] = search_db_for_fullcitation(
-        full_citation
-    )
+    # Case 1: FullCaseCitation
+    if type(full_citation) is FullCaseCitation:
+        db_search_results: List[ExtraSolrSearch] = search_db_for_fullcitation(
+            full_citation
+        )
 
-    # If there is one search result, try to return it
-    if len(db_search_results) == 1:
-        result_id = db_search_results[0]["id"]
-        try:
-            return Opinion.objects.get(pk=result_id)
-        except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
-            pass
+        # If there is one search result, try to return it
+        if len(db_search_results) == 1:
+            result_id = db_search_results[0]["id"]
+            try:
+                return Opinion.objects.get(pk=result_id)
+            except (Opinion.DoesNotExist, Opinion.MultipleObjectsReturned):
+                pass
+
+    # Case 2: FullLawCitation (TODO: implement support)
+    elif type(full_citation) is FullLawCitation:
+        pass
+
+    # Case 3: FullJournalCitation (TODO: implement support)
+    elif type(full_citation) is FullJournalCitation:
+        pass
 
     # If no Opinion can be matched, just return a placeholder object
     return NO_MATCH_RESOURCE
