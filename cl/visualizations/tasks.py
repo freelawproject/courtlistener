@@ -42,7 +42,7 @@ def get_title(self, referer_id):
     """
     # Set the exponential back off in case we need it, starting at 15 minutes,
     # then 30, 60, 120...
-    countdown = 15 * 60 * (2 ** self.request.retries)
+    countdown = 15 * 60 * (2**self.request.retries)
     retried_exceeded = self.request.retries >= self.max_retries
 
     referer = Referer.objects.get(pk=referer_id)
