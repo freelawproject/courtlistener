@@ -6,6 +6,8 @@ from eyecite import get_citations
 from eyecite.test_factories import (
     case_citation,
     id_citation,
+    journal_citation,
+    law_citation,
     nonopinion_citation,
     supra_citation,
 )
@@ -401,6 +403,12 @@ class MatchingTest(IndexedSolrTestCase):
 
         id = id_citation(index=1)
         non = nonopinion_citation(index=1, source_text="§99")
+        journal = journal_citation(reporter="Minn. L. Rev.")
+        law = law_citation(
+            source_text="1 Stat. 2",
+            reporter="Stat.",
+            groups={"volume": "1", "page": "2"},
+        )
 
         test_pairs = [
             # Simple test for matching a single, full citation
@@ -483,6 +491,12 @@ class MatchingTest(IndexedSolrTestCase):
             # found. Since there is nothing before it, we expect no matches to
             # be returned.
             ([id], {}),
+            # Test resolving a law citation. Since we don't support these yet,
+            # we expect no matches to be returned.
+            ([law], {NO_MATCH_RESOURCE: [law]}),
+            # Test resolving a journal citation. Since we don't support these
+            # yet, we expect no matches to be returned.
+            ([journal], {NO_MATCH_RESOURCE: [journal]}),
         ]
 
         # fmt: on
