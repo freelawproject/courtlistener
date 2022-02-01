@@ -17,9 +17,8 @@ from django.template.defaultfilters import slugify
 from django.urls import reverse
 from django.utils.safestring import SafeText
 from django.utils.timezone import now
-from django.views.decorators.cache import cache_page, never_cache
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.vary import vary_on_cookie
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -228,8 +227,6 @@ def core_docket_data(
     )
 
 
-@cache_page(60)
-@vary_on_cookie
 @ratelimit_if_not_whitelisted
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
