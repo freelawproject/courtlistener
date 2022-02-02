@@ -1,5 +1,6 @@
 import argparse
 import os
+from typing import List
 
 from dateutil import parser
 from django.utils.timezone import is_naive, make_aware, utc
@@ -37,15 +38,17 @@ def readable_dir(prospective_dir):
         )
 
 
-def _argparse_volumes(volumes_arg: str) -> range:
+def _argparse_volumes(volumes_arg: str) -> List:
     """Custom argparse handling for volumes
 
     :param volumes_arg: The volume argparse for harvard imports
     :return: Range of values
     """
+    if ":" not in volumes_arg:
+        return [volumes_arg]
     volumes = [int(e) if e.strip() else 2000 for e in volumes_arg.split(":")]
     if len(volumes) == 1:
         start = stop = volumes[0]
     else:
         start, stop = volumes[0], volumes[1] + 1
-    return range(start, stop)
+    return [*range(start, stop)]
