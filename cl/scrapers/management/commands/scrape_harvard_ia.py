@@ -109,8 +109,6 @@ def get_from_ia(options: OptionsType) -> None:
     """
     ia_session = create_ia_session()
     volumes_ids_for_reporter = fetch_ia_volumes(ia_session, options)
-    print(volumes_ids_for_reporter)
-    return
     if not volumes_ids_for_reporter:
         logger.info("No volumes found.")
         return
