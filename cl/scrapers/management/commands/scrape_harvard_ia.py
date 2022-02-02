@@ -36,7 +36,11 @@ def fetch_ia_volumes(
     reporter = options["reporter"]
     volumes = options["volumes"]
 
-    reporter_key = f"law.free.cap.{reporter}"
+    if len(volumes) == 1:
+        reporter_key = f"law.free.cap.{reporter}.{volumes[0]}"
+    else:
+        reporter_key = f"law.free.cap.{reporter}"
+
     query = ia_session.search_items(reporter_key)
 
     # Remove partial matches
@@ -49,7 +53,9 @@ def fetch_ia_volumes(
         return results
 
     # Return only the volumes requested, if specified
-    vol_pattern = "|".join(f"(.*{reporter}.{volume}$)" for volume in volumes)
+    vol_pattern = "|".join(
+        f"(.*{reporter}.{volume}(_\d+)?$)" for volume in volumes
+    )
     results = [
         res for res in results if re.match(vol_pattern, res["identifier"])  # type: ignore
     ]
@@ -64,6 +70,9 @@ def download_file(ia_key: str, file_name) -> None:
     :return: None
     """
     url = f"https://archive.org/download/{ia_key}/{file_name}"
+    if "_" in ia_key:
+        ia_key = ia_key.split("_")[0]
+
     directory = Path(settings.MEDIA_ROOT, "harvard_corpus", ia_key)
     file_path = Path(directory, file_name)
 
@@ -100,7 +109,6 @@ def get_from_ia(options: OptionsType) -> None:
     """
     ia_session = create_ia_session()
     volumes_ids_for_reporter = fetch_ia_volumes(ia_session, options)
-
     if not volumes_ids_for_reporter:
         logger.info("No volumes found.")
         return
