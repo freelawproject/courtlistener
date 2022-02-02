@@ -51,4 +51,4 @@ def _argparse_volumes(volumes_arg: str) -> List:
         start = stop = volumes[0]
     else:
         start, stop = volumes[0], volumes[1] + 1
-    return [*range(start, stop)]
+    return list(range(start, stop))
