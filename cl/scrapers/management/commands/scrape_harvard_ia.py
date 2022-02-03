@@ -36,7 +36,7 @@ def fetch_ia_volumes(
     reporter = options["reporter"]
     volumes = options["volumes"]
 
-    if len(volumes) == 1:
+    if volumes and len(volumes) == 1:
         reporter_key = f"law.free.cap.{reporter}.{volumes[0]}"
     else:
         reporter_key = f"law.free.cap.{reporter}"

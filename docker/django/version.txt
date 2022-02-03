@@ -1,5 +1,6 @@
-1.0.74
+1.0.75
 
+1.0.75 - Bump Courts-db.
 1.0.74 - Bump juriscraper, Reporters-db, Courts-db.  Update harvard import.
 1.0.73 - Fix for Harvard. Fix tests.
 1.0.72 - Upgrade eyecite to latest version
