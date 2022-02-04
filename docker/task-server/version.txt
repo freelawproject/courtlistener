@@ -1,5 +1,6 @@
-1.0.70
+1.0.71
 
+1.0.71 - Bump Courts-db.
 1.0.70 - Bump Courts-db.
 1.0.69 - Bump juriscraper, Reporters-db, Courts-db.  Update harvard import.
 1.0.68 - Fix for Harvard. Fix tests.
