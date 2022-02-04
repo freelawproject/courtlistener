@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404, render
 from cl.disclosures.models import FinancialDisclosure
 from cl.disclosures.utils import make_disclosure_data
 from cl.people_db.models import Person
-from cl.people_db.views import make_title_str
+from cl.people_db.utils import make_title_str
 
 
 def financial_disclosures_home(request: HttpRequest) -> HttpResponse:

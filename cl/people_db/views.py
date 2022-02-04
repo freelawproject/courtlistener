@@ -5,18 +5,7 @@ from django.urls import reverse
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
-from cl.people_db.utils import make_person_picture_path
-
-
-def make_title_str(person):
-    """Make a nice title for somebody."""
-    locations = ", ".join(
-        {p.court.short_name for p in person.positions.all() if p.court}
-    )
-    title = person.name_full
-    if locations:
-        title = f"{title} ({locations})"
-    return title
+from cl.people_db.utils import make_person_picture_path, make_title_str
 
 
 def view_person(request, pk, slug):
