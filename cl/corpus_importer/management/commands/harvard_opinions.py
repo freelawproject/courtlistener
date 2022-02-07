@@ -533,7 +533,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
     """
     for cite in cites:
         # Cleanup citations with extra spaces
-        clean_cite = re.sub(r"\s{2,}", " ", cite["cite"])
+        clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
         if not citation:
             logger.warning(f"Citation parsing failed for {cite['cite']}")
