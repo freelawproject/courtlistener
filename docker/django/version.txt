@@ -1,5 +1,6 @@
-1.0.76
+1.0.77
 
+1.0.77 - Bump juriscraper, reporters-db and courts-db.
 1.0.76 - Bump Courts-db.
 1.0.75 - Bump Courts-db.
 1.0.74 - Bump juriscraper, Reporters-db, Courts-db.  Update harvard import.
