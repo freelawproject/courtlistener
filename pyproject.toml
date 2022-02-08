@@ -82,7 +82,7 @@ timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
 usaddress = "*"
-juriscraper = "2.4.9"
+juriscraper = "2.4.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
 ipython = "^7.31.1"

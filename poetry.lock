@@ -915,7 +915,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "juriscraper"
-version = "2.4.9"
+version = "2.4.10"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1865,7 +1865,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "19c20dc7ed7ae97f843e45fc9f09d9bde3ac7aa4bc2a6833660d9de9cc1bff98"
+content-hash = "006c22230ac6c0724c2e5c9ef3c11097de2713f9ad18808e3b0845dcccf5c846"
 
 [metadata.files]
 amqp = [
@@ -2265,8 +2265,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.4.9-py27-none-any.whl", hash = "sha256:139662a212722fa47de17be824d150592f1b28535995ac2951bc0155b0a58c26"},
-    {file = "juriscraper-2.4.9.tar.gz", hash = "sha256:67c83eea4b19a599ddd7b00f9645e7ee2a255ef1cac5b3750ccf6e375cba9935"},
+    {file = "juriscraper-2.4.10-py27-none-any.whl", hash = "sha256:52320a5e468cd7e534a113c1a18420bf2219c14021623ab7991799af1ac32ec6"},
+    {file = "juriscraper-2.4.10.tar.gz", hash = "sha256:5573991ceed6eb541dcde4defad9bd3e28cca75a158989f40698d9ca97adaa8f"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
