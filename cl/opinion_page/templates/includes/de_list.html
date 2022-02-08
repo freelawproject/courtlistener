@@ -92,9 +92,11 @@
                       {% endif %}
                       {% if rd.pacer_url %}
                         <li>
-                          {% if not request.COOKIES.buy_on_pacer_modal %}
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
 
-                          <a href="{{ rd.pacer_url }}" id="open_buy_pacer_modal" data-toggle="modal" data-target="#modal-buy-pacer" 
+                          <a href="{{ rd.pacer_url }}" 
+                          class="open_buy_pacer_modal" 
+                          data-toggle="modal" data-target="#modal-buy-pacer" 
                           target="_blank" 
                           rel="nofollow">Buy on
                           PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
@@ -117,8 +119,9 @@
                       <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
                     {% else %}
                       {% if rd.pacer_url %}
-                        {% if not request.COOKIES.buy_on_pacer_modal %}
-                        <a href="{{ rd.pacer_url }}"  id="open_buy_pacer_modal" class="btn btn-default btn-xs"
+                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                        <a href="{{ rd.pacer_url }}" 
+                        class="open_buy_pacer_modal btn btn-default btn-xs"
                         data-toggle="modal" data-target="#modal-buy-pacer" 
                         target="_blank" 
                         rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
@@ -151,11 +154,24 @@
                             </span>
                     {% else %}
                       {% if rd.pacer_url %}
-                        <a href="{{ rd.pacer_url }}"
+
+                      {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                          <a href="{{ rd.pacer_url }}"
+                          data-toggle="modal" data-target="#modal-buy-pacer" 
+                          target="_blank" class="open_buy_pacer_modal btn btn-default btn-xs"
+                          rel="nofollow"
+                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
+
+                          {% else%}
+
+                          <a href="{{ rd.pacer_url }}"
                            class="btn btn-default btn-xs"
                            target="_blank"
                            rel="nofollow"
                            title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
+
+                          {% endif %}
+
                       {% endif %}
                     {% endif %}
                   {% endif %}
