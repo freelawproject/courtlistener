@@ -92,10 +92,11 @@ To set up a development server, do the following:
 
     `docker-compose up`
 
-    *Note for Docker Desktop for Mac users:* By default, Docker runs with a few memory (2GB) so in order to be able to run all the tests properly, we recommend changing those default values as follows:
-    -Go to docker Settings/Resources/Advanced
-    -Increase Memory to at least 4GB and Swap to 2GB
-    -Then Apply and Restart.
+    *Docker Desktop for Mac users:* By default, Docker runs with very little memory (2GB), so to run everything properly you will need to change the default values:
+
+      - Go to docker Settings/Resources/Advanced
+      - Increase Memory to at least 4GB and Swap to 2GB
+      - Then Apply and Restart.
 
 1. Finally, create a new super user login by running this command, and entering the required information:
 
