@@ -11,13 +11,14 @@ from datetime import date, datetime, timedelta
 from glob import glob
 from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, TypedDict
 
+import requests
 from bs4 import BeautifulSoup
 from courts_db import find_court
 from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError, OperationalError
-from eyecite.find_citations import get_citations
+from eyecite.find import get_citations
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
@@ -221,6 +222,33 @@ class OptionsType(TypedDict):
     make_searchable: bool
 
 
+def get_fix_list() -> List[str]:
+    """Download the fix list for harvard data.
+
+    :return:List of files to fix
+    """
+    data = requests.get(
+        "https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/missing-files.json",
+        timeout=10,
+    ).json()
+    return data["files"]
+
+
+def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
+    """Merge fixes into the data
+
+    :param data: The Harvard data
+    :param filepath: The filepath of the data to fix.
+    :return:
+    """
+    fix = requests.get(
+        f"https://raw.githubusercontent.com/freelawproject/opinionated/main/data/harvard/{identifier}",
+        timeout=10,
+    ).json()
+    data.update(fix)
+    return data
+
+
 def parse_harvard_opinions(options: OptionsType) -> None:
     """Parse Harvard Opinions
 
@@ -250,6 +278,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         return
 
     filepaths = filepath_list(reporter, volumes, page)
+    fix_list = get_fix_list()
+
     for file_path in filepaths:
         logger.info(f"Processing opinion at {file_path}")
 
@@ -273,6 +303,11 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         except Exception as e:
             logger.warning(f"Unknown error {e} for: {ia_download_url}")
             continue
+
+        identifier = "/".join(file_path.rsplit("/", 2)[1:])
+        if identifier in fix_list:
+            logger.info(f"Fetching fixes and merging data at {file_path}")
+            data = merge_fixes(data, identifier)
 
         cites = get_citations(data["citations"][0]["cite"])
         if not cites:
@@ -421,7 +456,7 @@ def add_new_case(
 
     with transaction.atomic():
         logger.info(
-            f"Adding docket for {case_name}: {citation.base_citation()}"
+            f"Adding docket for {case_name}: {citation.corrected_citation()}"
         )
         docket = Docket(
             case_name=case_name,
@@ -471,14 +506,14 @@ def add_new_case(
         cluster.save(index=False)
         logger.info("Saving cluster for: %s", cluster.id)
 
-        logger.info("Adding citation for: %s", citation.base_citation())
+        logger.info("Adding citation for: %s", citation.corrected_citation())
         add_citations(data["citations"], cluster.id)
         new_op_pks = add_opinions(soup, cluster.id, citation)
 
     if make_searchable:
         add_items_to_solr.delay(new_op_pks, "search.Opinion")
 
-    logger.info("Finished: %s", citation.base_citation())
+    logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
         f"Finished adding case at https://www.courtlistener.com/opinion/{cluster.id}/{cluster.slug}"
     )
@@ -498,7 +533,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
     """
     for cite in cites:
         # Cleanup citations with extra spaces
-        clean_cite = re.sub(r"\s{2,}", " ", cite["cite"])
+        clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
         if not citation:
             logger.warning(f"Citation parsing failed for {cite['cite']}")
@@ -517,7 +552,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # the same type, in Arkansas and Ark App. - We can resolve these by
         # defining the regex pattern much more narrowly.  The neutral cite
         # follows a four digit year volume while the state reporter does not.
-        if not citation[0].canonical_reporter:
+        if not citation[0].corrected_reporter():
             reporter_type = Citation.STATE
         else:
             cite_type_str = citation[0].all_editions[0].reporter.cite_type
@@ -525,9 +560,9 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
 
         try:
             Citation.objects.get_or_create(
-                volume=citation[0].volume,
-                reporter=citation[0].reporter,
-                page=citation[0].page,
+                volume=citation[0].groups["volume"],
+                reporter=citation[0].corrected_reporter(),
+                page=citation[0].groups["page"],
                 type=reporter_type,
                 cluster_id=cluster_id,
             )
@@ -572,7 +607,7 @@ def add_opinions(
 
         op_type = map_opinion_type(op.get("type"))
         opinion_xml = str(op)
-        logger.info("Adding opinion for: %s", citation.base_citation())
+        logger.info("Adding opinion for: %s", citation.corrected_citation())
         op = Opinion(
             cluster_id=cluster_id,
             type=op_type,
@@ -778,9 +813,11 @@ def has_too_similar_citation(case: OpinionCluster, citation: Citation) -> bool:
     return (
         Citation.objects.filter(
             cluster_id=case.id,
-            reporter=citation.reporter,
+            reporter=citation.corrected_reporter(),
         )
-        .exclude(page=citation.page, volume=citation.volume)
+        .exclude(
+            page=citation.groups["page"], volume=citation.groups["volume"]
+        )
         .exists()
     )
 
@@ -849,9 +886,9 @@ def find_previously_imported_cases(
         found_cite = get_citations(cite["cite"])
         if found_cite:
             possible_cases = OpinionCluster.objects.filter(
-                citations__reporter=found_cite[0].reporter,
-                citations__volume=found_cite[0].volume,
-                citations__page=found_cite[0].page,
+                citations__reporter=found_cite[0].corrected_reporter(),
+                citations__volume=found_cite[0].groups["volume"],
+                citations__page=found_cite[0].groups["page"],
             ).order_by("id")
             match = match_based_text(
                 harvard_characters,
@@ -870,7 +907,7 @@ def find_previously_imported_cases(
             date_filed=date_filed,
             docket__court_id=court_id,
         )
-        .exclude(citations__reporter=citation.reporter)
+        .exclude(citations__reporter=citation.corrected_reporter())
         .order_by("id")
     )
     docket_number = data["docket_number"]
@@ -889,7 +926,7 @@ def find_previously_imported_cases(
                 date_filed__range=[date_filed - month, date_filed + month],
                 docket__court_id=court_id,
             )
-            .exclude(citations__reporter=citation.reporter)
+            .exclude(citations__reporter=citation.corrected_reporter())
             .exclude(date_filed=date_filed)
             .order_by("id")
         )

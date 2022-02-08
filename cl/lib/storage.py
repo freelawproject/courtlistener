@@ -107,4 +107,4 @@ class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
 
 
 class RecapEmailSESStorage(S3Boto3Storage):
-    bucket_name = "recap-dot-email-global-inbox"
+    bucket_name = "recap.email"

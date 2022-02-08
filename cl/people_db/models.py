@@ -184,7 +184,10 @@ class Person(AbstractDateTimeModel):
         blank=True,
     )
     religion = models.CharField(
-        help_text="The religion of a person", max_length=30, blank=True
+        help_text="The religion of a person",
+        max_length=30,
+        blank=True,
+        choices=RELIGIONS,
     )
     ftm_total_received = models.FloatField(
         help_text="The amount of money received by this person and logged by "

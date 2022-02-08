@@ -8,7 +8,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
-from eyecite.find_citations import get_citations
+from eyecite.find import get_citations
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -53,9 +53,9 @@ def make_citation(
     cite_type_str = citation_objs[0].all_editions[0].reporter.cite_type
     return Citation(
         cluster=cluster,
-        volume=citation_objs[0].volume,
-        reporter=citation_objs[0].reporter,
-        page=citation_objs[0].page,
+        volume=citation_objs[0].groups["volume"],
+        reporter=citation_objs[0].corrected_reporter(),
+        page=citation_objs[0].groups["page"],
         type=map_reporter_db_cite_type(cite_type_str),
     )
 
@@ -110,10 +110,15 @@ def make_objects(
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
+    url = item["download_urls"]
+    if court.id == "tax":
+        url = url.split("&")[0]
+        pass
+
     opinion = Opinion(
         type=Opinion.COMBINED,
         sha1=sha1_hash,
-        download_url=item["download_urls"],
+        download_url=url,
     )
 
     cf = ContentFile(content)
@@ -219,10 +224,13 @@ class Command(VerboseCommand):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         if dup_checker.abort_by_url_hash(site.url, site.hash):
+            logger.debug(f"Aborting by url hash.")
             return
 
         if site.cookies:
             logger.info(f"Using cookies: {site.cookies}")
+        logger.debug(f"#{len(site)} opinions found.")
+        added = 0
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
@@ -265,8 +273,10 @@ class Command(VerboseCommand):
                 Opinion, current_date, next_date, **lookup_params
             )
             if dup_checker.emulate_break:
+                logger.debug("Emulate break triggered.")
                 break
             if not proceed:
+                logger.debug("Skipping opinion.")
                 continue
 
             # Not a duplicate, carry on
@@ -296,9 +306,12 @@ class Command(VerboseCommand):
                 f"Successfully added opinion {opinion.pk}: "
                 f"{item['case_names'].encode()}"
             )
+            added += 1
 
         # Update the hash if everything finishes properly.
-        logger.info(f"{site.court_id}: Successfully crawled opinions.")
+        logger.debug(
+            f"{site.court_id}: Successfully crawled {added}/{len(site)} opinions."
+        )
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)

@@ -6,8 +6,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup as bs4
 from django.db import transaction
-from eyecite.find_citations import clean_text, get_citations
+from eyecite.find import get_citations
 from eyecite.models import CitationBase as FoundCitation
+from eyecite.utils import clean_text
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from reporters_db import REPORTERS
 
@@ -124,11 +125,11 @@ def merge_or_add_opinions(
     # Add citations to cluster if applicable
     for citation in found_citations:
         Citation.objects.get_or_create(
-            volume=citation.volume,
-            reporter=citation.reporter,
-            page=citation.page,
+            volume=citation.groups["volume"],
+            reporter=citation.corrected_reporter(),
+            page=citation.groups["page"],
             type=map_reporter_db_cite_type(
-                REPORTERS[citation.canonical_reporter][0]["cite_type"]
+                REPORTERS[citation.corrected_reporter()][0]["cite_type"]
             ),
             cluster_id=cluster.id,
         )
@@ -184,7 +185,7 @@ def add_new_records(
         date_argued=date_argued,
     )
 
-    logger.info("Add cluster for: %s", found_citations[0].base_citation())
+    logger.info("Add cluster for: %s", found_citations[0].corrected_citation())
     judges = data["judges"] or ""
     cluster = OpinionCluster(
         **case_names,
@@ -203,13 +204,13 @@ def add_new_records(
     cluster.save(index=False)
 
     for citation in found_citations:
-        logger.info("Adding citation for: %s", citation.base_citation())
+        logger.info("Adding citation for: %s", citation.corrected_citation())
         Citation.objects.get_or_create(
-            volume=citation.volume,
-            reporter=citation.reporter,
-            page=citation.page,
+            volume=citation.groups["volume"],
+            reporter=citation.corrected_reporter(),
+            page=citation.groups["page"],
             type=map_reporter_db_cite_type(
-                REPORTERS[citation.canonical_reporter][0]["cite_type"]
+                REPORTERS[citation.corrected_reporter()][0]["cite_type"]
             ),
             cluster_id=cluster.id,
         )
@@ -222,7 +223,7 @@ def add_new_records(
     )
     op.save()
     logger.info(
-        f"Finished importing cluster {cluster.id}; {found_citations[0].base_citation()}"
+        f"Finished importing cluster {cluster.id}; {found_citations[0].corrected_citation()}"
     )
     return docket
 
@@ -265,9 +266,9 @@ def attempt_cluster_lookup(
     """
     for citation in citations:
         cites = Citation.objects.filter(
-            reporter=citation.reporter,
-            page=citation.page,
-            volume=citation.volume,
+            reporter=citation.corrected_reporter(),
+            page=citation.groups["page"],
+            volume=citation.groups["volume"],
         )
         cite_count = cites.count()
         if cite_count == 1:

@@ -5,7 +5,8 @@ from collections import OrderedDict
 from datetime import date
 
 from django.conf import settings
-from eyecite.find_citations import clean_text, get_citations
+from eyecite.find import get_citations
+from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.solr_core_admin import get_term_frequency

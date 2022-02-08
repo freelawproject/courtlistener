@@ -32,6 +32,7 @@ urlpatterns = [
     # Admin docs and site
     path("admin/", admin.site.urls),
     path("", include("cl.audio.urls")),
+    path("", include("cl.corpus_importer.urls")),
     path("", include("cl.opinion_page.urls")),
     path("", include("cl.simple_pages.urls")),
     path("", include("cl.disclosures.urls")),

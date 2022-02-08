@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}California Judge Data Entry — Staff Members Only – CourtListener.com{% endblock %}
+
+{% block head %}
+  {% if DEBUG %}
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.css" %}"/>
+  {% else %}
+    <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+  {% endif %}
+{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/date_picker.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+    <div class="col-xs-12">
+      {% include "includes/pagination.html" with results=judge_page %}
+      <div class="text-center">
+        <h1 class="v-offset-below-1 v-offset-above-3">{{ title }}</h1>
+        <p class="h4">
+          <span class="meta-data-value"><a href="https://en.wikipedia.org/w/index.php?search={{ judge.name_first }}+{{ judge.name_last }}&title=Special:Search&profile=advanced&fulltext=1&ns0=1" target="_blank">Wikipedia</a></span>
+          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}" target="_blank">Google</a></span>
+          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}+site%3Aballotpedia.org" target="_blank">Ballotpedia</a></span>
+        </p>
+        <p>
+          <span class="meta-data-value gray">Updated: {{ judge.date_modified }}</span>
+        </p>
+      </div>
+
+
+      {% if person_form.errors or education_formset.errors or politics_formset.errors or positions_formset.errors or sources_formset.errors %}
+        <div class="alert alert-danger">
+          There were errors below.
+        </div>
+      {% endif %}
+      <form role="form" action="" method="post" class="form-horizontal">{% csrf_token %}
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Name &amp; Demographics {% if person_form.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {% include "includes/field_section.html" with form=person_form %}
+
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Education {% if education_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {{ education_formset.management_form }}
+        {% for education_form in education_formset %}
+          {% include "includes/field_section.html" with form=education_form %}
+          {% if not forloop.last  %}<hr>{% endif %}
+        {% endfor %}
+
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Politics {% if politics_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {{ politics_formset.management_form }}
+        {% for politics_form in politics_formset %}
+          {% include "includes/field_section.html" with form=politics_form %}
+          {% if not forloop.last  %}<hr>{% endif %}
+        {% endfor %}
+
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Judicial Positions {% if positions_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {{ positions_formset.management_form }}
+        {% for positions_form in positions_formset %}
+          {% include "includes/field_section.html" with form=positions_form %}
+          {% if not forloop.last  %}<hr>{% endif %}
+        {% endfor %}
+
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Data Sources {% if sources_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {{ sources_formset.management_form }}
+        {% for sources_form in sources_formset %}
+          {% include "includes/field_section.html" with form=sources_form %}
+          {% if not forloop.last  %}<hr>{% endif %}
+        {% endfor %}
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <button type="submit"
+                    class="btn btn-primary btn-lg">Save &amp Go to Next
+            </button>
+          </div>
+        </div>
+      </form>
+      {% include "includes/pagination.html" with results=judge_page %}
+
+      <h3>Tips</h3>
+      <ol>
+        <li>Filter to a specific type of court with <code>&court_type=S</code>. Valid types are:
+          <ul>
+            <li>"S" — State supreme courts</li>
+            <li>"SA" — State appellate courts</li>
+            <li>"ST" — State trial courts</li>
+            <li>"SS" — State special courts</li>
+          </ul>
+        </li>
+        <li>Filter to a specific court with <code>&court=cal</code></li>
+        <li>Filter to a specific judge by name with <code>&name=xyz</code></li>
+      </ol>
+    </div>
+{% endblock %}
+
+
+<!--
+
+1. Add a note re filtering to different types of courts or different courts
+   altogether. court, court_type, or name
+-->
+

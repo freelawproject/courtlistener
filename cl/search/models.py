@@ -1896,8 +1896,6 @@ class ClusterCitationQuerySet(models.query.QuerySet):
             try:
                 c = get_citations(
                     citation_str,
-                    do_post_citation=False,
-                    do_defendant=False,
                     remove_ambiguous=False,
                 )[0]
             except IndexError:
@@ -1905,9 +1903,9 @@ class ClusterCitationQuerySet(models.query.QuerySet):
             else:
                 clone.query.add_q(
                     Q(
-                        citations__volume=c.volume,
-                        citations__reporter=c.reporter,
-                        citations__page=c.page,
+                        citations__volume=c.groups["volume"],
+                        citations__reporter=c.corrected_reporter(),
+                        citations__page=c.groups["page"],
                     )
                 )
 

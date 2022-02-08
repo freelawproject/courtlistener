@@ -1,5 +1,15 @@
-1.0.66
+1.0.76
 
+1.0.76 - Bump Courts-db.
+1.0.75 - Bump Courts-db.
+1.0.74 - Bump juriscraper, Reporters-db, Courts-db.  Update harvard import.
+1.0.73 - Fix for Harvard. Fix tests.
+1.0.72 - Upgrade eyecite to latest version
+1.0.71 - Update to harvard importer.
+1.0.70 - Bump juriscraper. Add fix for tax court opinions in scraper.
+1.0.69 - Bump courts-db.
+1.0.68 - Bump courts-db and juriscraper.  Update logging in scraping. Update docker makefiles.  Fix bug in tenn-workers uploader.
+1.0.67 - Bump reporters-db and juriscraper.  Update logging in scraping and improve appellate pacer download links.
 1.0.66 - Bump reporters-db.
 1.0.65 - Update harvard opinion importer, Bump reporters-db and courts-db.
 1.0.64 - Update harvard opinion importer with better logging, improve error handling and reporter-typing. Bump reporters-db.

@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.31"
+version = "0.9.39"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -375,7 +375,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
 name = "diff-match-patch-python"
-version = "1.0.2"
+version = "1.0.3"
 description = "A Python extension module that wraps Google's diff_match_patch C++ implementation for very fast string comparisons. Version 1.0.2 fixes a build issue on Macs."
 category = "main"
 optional = false
@@ -636,19 +636,19 @@ python-versions = "*"
 
 [[package]]
 name = "eyecite"
-version = "2.1.0"
+version = "2.3.0"
 description = "Tool for extracting legal citations from text strings."
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
-courts-db = ">=0.9.7,<0.10.0"
+courts-db = ">=0.9.13,<0.10.0"
 diff_match_patch_python = ">=1.0.2,<2.0.0"
 lxml = ">=4.6.3,<5.0.0"
 pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
-reporters-db = ">=3.0.1,<4.0.0"
+reporters-db = ">=3.2.1,<4.0.0"
 
 [[package]]
 name = "feedparser"
@@ -798,7 +798,7 @@ python-versions = "*"
 
 [[package]]
 name = "ipython"
-version = "7.22.0"
+version = "7.31.1"
 description = "IPython: Productive Interactive Computing"
 category = "main"
 optional = false
@@ -810,6 +810,7 @@ backcall = "*"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 decorator = "*"
 jedi = ">=0.16"
+matplotlib-inline = "*"
 pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
 pickleshare = "*"
 prompt-toolkit = ">=2.0.0,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.1.0"
@@ -817,7 +818,7 @@ pygments = "*"
 traitlets = ">=4.2"
 
 [package.extras]
-all = ["Sphinx (>=1.3)", "ipykernel", "ipyparallel", "ipywidgets", "nbconvert", "nbformat", "nose (>=0.10.1)", "notebook", "numpy (>=1.16)", "pygments", "qtconsole", "requests", "testpath"]
+all = ["Sphinx (>=1.3)", "ipykernel", "ipyparallel", "ipywidgets", "nbconvert", "nbformat", "nose (>=0.10.1)", "notebook", "numpy (>=1.17)", "pygments", "qtconsole", "requests", "testpath"]
 doc = ["Sphinx (>=1.3)"]
 kernel = ["ipykernel"]
 nbconvert = ["nbconvert"]
@@ -825,7 +826,7 @@ nbformat = ["nbformat"]
 notebook = ["notebook", "ipywidgets"]
 parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
-test = ["nose (>=0.10.1)", "requests", "testpath", "pygments", "nbformat", "ipykernel", "numpy (>=1.16)"]
+test = ["nose (>=0.10.1)", "requests", "testpath", "pygments", "nbformat", "ipykernel", "numpy (>=1.17)"]
 
 [[package]]
 name = "ipython-genutils"
@@ -914,7 +915,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "juriscraper"
-version = "2.4.3"
+version = "2.4.8"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1010,6 +1011,17 @@ description = "Safely add untrusted strings to HTML/XML markup."
 category = "main"
 optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+
+[[package]]
+name = "matplotlib-inline"
+version = "0.1.3"
+description = "Inline Matplotlib backend for Jupyter"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+traitlets = "*"
 
 [[package]]
 name = "mccabe"
@@ -1487,7 +1499,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.13"
+version = "3.2.15"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -1853,7 +1865,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "ebddd295ac42bcb46540e943cd1c1a864ae51bacd238b20068c0a0fe2ac7c9f3"
+content-hash = "3cf6babdbd206e5437991d5f8ec446ff6b237f1fc30970df9c8f37e91af1377c"
 
 [metadata.files]
 amqp = [
@@ -2040,8 +2052,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.31.tar.gz", hash = "sha256:467c7e05dc71798fbf021e5afac8fd562de663fecd2f896f411d8bec48516fc1"},
-    {file = "courts_db-0.9.31-py2.py3-none-any.whl", hash = "sha256:df5a1a999f2700430bb99e8583768fbfbfa1358ed9d8a7e8efb7d206af36ae15"},
+    {file = "courts-db-0.9.39.tar.gz", hash = "sha256:0bf931fc3be0a0e6d0ae7c298b05e682db5265b0fa6511e88b76c247f3ab39ee"},
+    {file = "courts_db-0.9.39-py2.py3-none-any.whl", hash = "sha256:9fb968b8199d62ce180d652bcd35eb2beadd139699e657f14be3cc14a5e52b06"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
@@ -2072,7 +2084,7 @@ defusedxml = [
     {file = "defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
 ]
 diff-match-patch-python = [
-    {file = "diff_match_patch_python-1.0.2.tar.gz", hash = "sha256:5a833417344def272ad7dee7c5d455cf3aaf4fb0ffb58029d73e29512dd3ed48"},
+    {file = "diff_match_patch_python-1.0.3.tar.gz", hash = "sha256:2dda369d32c1c4fbba103e7ac7797a53ad4a4a1092e50e590589ee5c61c3de97"},
 ]
 disposable-email-domains = [
     {file = "disposable-email-domains-0.0.64.tar.gz", hash = "sha256:da4b9099542af33c854a2f482d825b759a7db43819c535bb3a20e37eb01a2534"},
@@ -2162,8 +2174,8 @@ exrex = [
     {file = "exrex-0.10.5.tar.gz", hash = "sha256:3fb8b18fd9832eaff8b13dc042a4f63b13c5d684ee069f70a23ddfc6bcb708f3"},
 ]
 eyecite = [
-    {file = "eyecite-2.1.0-py3-none-any.whl", hash = "sha256:55aaf49bffb5e2cce644777e922edb40f9b29fd409d7f94b0a5feacb0e03b94c"},
-    {file = "eyecite-2.1.0.tar.gz", hash = "sha256:1d39263f0ee53ba30c02b952a3d2128bec922bc296eaae603f14ced2caf06ae9"},
+    {file = "eyecite-2.3.0-py3-none-any.whl", hash = "sha256:7820a25e84a09cc6e43fb8d05748a2c5e13b3f2d22f5a33bba1b86d788701357"},
+    {file = "eyecite-2.3.0.tar.gz", hash = "sha256:2ca1c4c6b632d4f7812e5264bb0fc772a055d07a9882912193e66763f8201069"},
 ]
 feedparser = [
     {file = "feedparser-6.0.8-py3-none-any.whl", hash = "sha256:1b7f57841d9cf85074deb316ed2c795091a238adb79846bc46dccdaf80f9c59a"},
@@ -2217,8 +2229,8 @@ ipaddress = [
     {file = "ipaddress-1.0.23.tar.gz", hash = "sha256:b7f8e0369580bb4a24d5ba1d7cc29660a4a6987763faf1d8a8046830e020e7e2"},
 ]
 ipython = [
-    {file = "ipython-7.22.0-py3-none-any.whl", hash = "sha256:c0ce02dfaa5f854809ab7413c601c4543846d9da81010258ecdab299b542d199"},
-    {file = "ipython-7.22.0.tar.gz", hash = "sha256:9c900332d4c5a6de534b4befeeb7de44ad0cc42e8327fa41b7685abde58cec74"},
+    {file = "ipython-7.31.1-py3-none-any.whl", hash = "sha256:55df3e0bd0f94e715abd968bedd89d4e8a7bce4bf498fb123fed4f5398fea874"},
+    {file = "ipython-7.31.1.tar.gz", hash = "sha256:b5548ec5329a4bcf054a5deed5099b0f9622eb9ea51aaa7104d215fece201d8c"},
 ]
 ipython-genutils = [
     {file = "ipython_genutils-0.2.0-py2.py3-none-any.whl", hash = "sha256:72dd37233799e619666c9f639a9da83c34013a73e8bbc79a7a6348d93c61fab8"},
@@ -2253,8 +2265,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.4.3-py27-none-any.whl", hash = "sha256:f032e4375a64fcf9da2f99e4d8869475bc2cc1e789fb1828cb1a219cea9be8a0"},
-    {file = "juriscraper-2.4.3.tar.gz", hash = "sha256:30b0862f85eeb2940f766caaccead53bcd8814d2b617291a0072ed1755a66b64"},
+    {file = "juriscraper-2.4.8-py27-none-any.whl", hash = "sha256:ea6471964cd95a12b5d0ec23567a9565986375716f30bb718b99e52b78b5ddf7"},
+    {file = "juriscraper-2.4.8.tar.gz", hash = "sha256:a52e6e4306604208867e7d28473ea87d87905c9f55c267e53ab144ccd7a50839"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
@@ -2407,6 +2419,10 @@ markupsafe = [
     {file = "MarkupSafe-1.1.1-cp39-cp39-win32.whl", hash = "sha256:22c178a091fc6630d0d045bdb5992d2dfe14e3259760e713c490da5323866c39"},
     {file = "MarkupSafe-1.1.1-cp39-cp39-win_amd64.whl", hash = "sha256:b7d644ddb4dbd407d31ffb699f1d140bc35478da613b441c582aeb7c43838dd8"},
     {file = "MarkupSafe-1.1.1.tar.gz", hash = "sha256:29872e92839765e546828bb7754a68c418d927cd064fd4708fab9fe9c8bb116b"},
+]
+matplotlib-inline = [
+    {file = "matplotlib-inline-0.1.3.tar.gz", hash = "sha256:a04bfba22e0d1395479f866853ec1ee28eea1485c1d69a6faf00dc3e24ff34ee"},
+    {file = "matplotlib_inline-0.1.3-py3-none-any.whl", hash = "sha256:aed605ba3b72462d64d475a21a9296f400a19c4f74a31b59103d2a99ffd5aa5c"},
 ]
 mccabe = [
     {file = "mccabe-0.6.1-py2.py3-none-any.whl", hash = "sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42"},
@@ -2822,8 +2838,8 @@ regex = [
     {file = "regex-2021.3.17.tar.gz", hash = "sha256:4b8a1fb724904139149a43e172850f35aa6ea97fb0545244dc0b805e0154ed68"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.2.13.tar.gz", hash = "sha256:fa8a3da31cff7b80a3ce76811a96b0b7ed2c110745feca2634de7dd5f1cb3b67"},
-    {file = "reporters_db-3.2.13-py2.py3-none-any.whl", hash = "sha256:8cc29a05928f416f343523497803a93a264e737ad994a3aac4733c1507603244"},
+    {file = "reporters-db-3.2.15.tar.gz", hash = "sha256:ba949496492de5a88fa8ef6930e227a5a38ceb562fcf2706d717e4fdf3524a24"},
+    {file = "reporters_db-3.2.15-py2.py3-none-any.whl", hash = "sha256:14efd51c4cd53854d22299485d0ab7942c3eafb11c025ebce198f072a7660b1c"},
 ]
 requests = [
     {file = "requests-2.25.1-py2.py3-none-any.whl", hash = "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"},
