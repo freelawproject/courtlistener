@@ -1,6 +1,6 @@
 1.0.78
 
-1.0.78 - Bump juriscraper.
+1.0.78 - Bump juriscraper, courts-db.
 1.0.77 - Bump juriscraper, reporters-db and courts-db.
 1.0.76 - Bump Courts-db.
 1.0.75 - Bump Courts-db.
