@@ -26,6 +26,8 @@
             src="{% static "js/jquery.NobleCount.min.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/save-favorites.js" %}"></script>
+    <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
 {% endblock %}
 
 {% block sidebar %}
@@ -74,7 +76,7 @@
               href="{{ rd.docket_entry.docket.get_absolute_url }}"
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
       {% include "includes/favorites_modal.html" %}
-
+      {% include "includes/buy_pacer_modal.html" %}
       {% include "includes/rd_metadata_headers.html" %}
       <br>
 

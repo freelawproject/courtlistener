@@ -92,6 +92,12 @@ To set up a development server, do the following:
 
     `docker-compose up`
 
+    *Docker Desktop for Mac users:* By default, Docker runs with very little memory (2GB), so to run everything properly you will need to change the default values:
+
+      - Go to docker Settings/Resources/Advanced
+      - Increase Memory to at least 4GB and Swap to 2GB
+      - Then Apply and Restart.
+
 1. Finally, create a new super user login by running this command, and entering the required information:
 
     `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`

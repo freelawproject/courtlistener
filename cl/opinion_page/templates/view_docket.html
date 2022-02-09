@@ -27,7 +27,6 @@
 {% endblock %}
 
 {% block nav-de %}active{% endblock %}
-
 {% block tab-content %}
 {% if docket_entries.paginator.count %}
   {% include "includes/de_filter.html" %}
@@ -41,10 +40,19 @@
     {% if docket.pacer_docket_url %}
       <div class="col-sm-4 right">
         <p>
-          <a href="{{ docket.pacer_docket_url }}"
-             class="btn btn-lg btn-primary"
-             target="_blank"
-             rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+            <a href="{{ docket.pacer_docket_url }}"
+            data-toggle="modal" data-target="#modal-buy-pacer"
+            class="open_buy_pacer_modal btn btn-lg btn-primary"
+            target="_blank"
+            rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+          {% else%}
+            <a href="{{ docket.pacer_docket_url }}"
+            class="btn btn-lg btn-primary"
+            target="_blank"
+            rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+          {% endif %}
+
         </p>
       </div>
     {% endif %}
