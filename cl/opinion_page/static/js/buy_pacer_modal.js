@@ -21,7 +21,7 @@ $(document).ready(function () {
     date.setTime(date.getTime() + 30 * 24 * 60 * 60 * 1000); //30 days
     let expires = '; expires=' + date.toGMTString();
     document.cookie = 'buy_on_pacer_modal=true' + expires + '; path=/';
-
+    
     ///Close Modal
     $('#modal-buy-pacer ').modal('toggle');
   });
