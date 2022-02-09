@@ -321,7 +321,7 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.39"
+version = "0.9.41"
 description = "Database of Courts"
 category = "main"
 optional = false
@@ -915,7 +915,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "juriscraper"
-version = "2.4.8"
+version = "2.4.10"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1499,7 +1499,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.15"
+version = "3.2.17"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -1865,7 +1865,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "3cf6babdbd206e5437991d5f8ec446ff6b237f1fc30970df9c8f37e91af1377c"
+content-hash = "33f91925653b27bc8c2061e9d907c3c92a7702f9373b610899b105a155273c9e"
 
 [metadata.files]
 amqp = [
@@ -2052,8 +2052,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.39.tar.gz", hash = "sha256:0bf931fc3be0a0e6d0ae7c298b05e682db5265b0fa6511e88b76c247f3ab39ee"},
-    {file = "courts_db-0.9.39-py2.py3-none-any.whl", hash = "sha256:9fb968b8199d62ce180d652bcd35eb2beadd139699e657f14be3cc14a5e52b06"},
+    {file = "courts-db-0.9.41.tar.gz", hash = "sha256:960b8ac8671d5006bb7da49039b19f7c1613c7926660f7eed8353234e6568251"},
+    {file = "courts_db-0.9.41-py2.py3-none-any.whl", hash = "sha256:40395b51193580ac1257854f6d94da02b40d25a4dbc470930a7991df5b8e4827"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
@@ -2265,8 +2265,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.4.8-py27-none-any.whl", hash = "sha256:ea6471964cd95a12b5d0ec23567a9565986375716f30bb718b99e52b78b5ddf7"},
-    {file = "juriscraper-2.4.8.tar.gz", hash = "sha256:a52e6e4306604208867e7d28473ea87d87905c9f55c267e53ab144ccd7a50839"},
+    {file = "juriscraper-2.4.10-py27-none-any.whl", hash = "sha256:52320a5e468cd7e534a113c1a18420bf2219c14021623ab7991799af1ac32ec6"},
+    {file = "juriscraper-2.4.10.tar.gz", hash = "sha256:5573991ceed6eb541dcde4defad9bd3e28cca75a158989f40698d9ca97adaa8f"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},
@@ -2838,8 +2838,8 @@ regex = [
     {file = "regex-2021.3.17.tar.gz", hash = "sha256:4b8a1fb724904139149a43e172850f35aa6ea97fb0545244dc0b805e0154ed68"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.2.15.tar.gz", hash = "sha256:ba949496492de5a88fa8ef6930e227a5a38ceb562fcf2706d717e4fdf3524a24"},
-    {file = "reporters_db-3.2.15-py2.py3-none-any.whl", hash = "sha256:14efd51c4cd53854d22299485d0ab7942c3eafb11c025ebce198f072a7660b1c"},
+    {file = "reporters-db-3.2.17.tar.gz", hash = "sha256:f773d18ce43bc0ecfc97c1ce56fc3c921c3bf15dc0148bfba912900dda1cd01b"},
+    {file = "reporters_db-3.2.17-py2.py3-none-any.whl", hash = "sha256:d2c1fe05a25ffc549d30d07e00f3073c5b48dde06961b875aafd8502c024ec2f"},
 ]
 requests = [
     {file = "requests-2.25.1-py2.py3-none-any.whl", hash = "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"},
