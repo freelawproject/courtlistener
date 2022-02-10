@@ -309,11 +309,11 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             logger.info(f"Fetching fixes and merging data at {file_path}")
             data = merge_fixes(data, identifier)
 
-        cites = get_citations(data["citations"][0]["cite"])
+        # Cleanup whitespace on citations
+        clean_cite = re.sub(r"\s+", " ", data["citations"][0]["cite"])
+        cites = get_citations(clean_cite)
         if not cites:
-            logger.warning(
-                f"No citation found for {data['citations'][0]['cite']}"
-            )
+            logger.warning(f"No citation found for {clean_cite}")
             continue
 
         case_name = harmonize(data["name_abbreviation"])
@@ -536,7 +536,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
         if not citation:
-            logger.warning(f"Citation parsing failed for {cite['cite']}")
+            logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
 
         # Because of non-canonical reporters this code breaks for states like
