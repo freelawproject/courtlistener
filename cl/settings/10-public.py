@@ -16,8 +16,6 @@ except ImportError:
 
 from cl.lib.redis_utils import make_redis_interface
 
-TEST_RUNNER = "cl.tests.runner.TestRunner"
-
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 TESTING = "test" in sys.argv
 TEST_RUNNER = "cl.tests.runner.TestRunner"
@@ -28,6 +26,12 @@ if TESTING:
         "django.contrib.auth.hashers.MD5PasswordHasher",
     ]
     CELERY_BROKER = "memory://"
+    ### Configuration for dj-inmemorystorage ###
+    # Reference: https://github.com/waveaccounting/dj-inmemorystorage
+    # Store files in memory with non-persistant backend
+    DEFAULT_FILE_STORAGE = "inmemorystorage.InMemoryStorage"
+    # If you need your storage to persist enable the following setting:
+    # INMEMORYSTORAGE_PERSIST = True
 
 
 MAINTENANCE_MODE_ENABLED = False

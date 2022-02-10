@@ -107,6 +107,7 @@ lxml-stubs = "^0.1.1"
 tblib = "^1.7.0"
 pre-commit = "^2.13.0"
 flynt = "^0.65"
+dj-inmemorystorage = "^2.1.0"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
