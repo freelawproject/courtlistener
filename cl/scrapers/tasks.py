@@ -24,7 +24,9 @@ from PyPDF2.utils import PdfReadError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
-from cl.citations.tasks import find_citations_for_opinion_by_pks
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
@@ -413,7 +415,7 @@ def extract_doc_content(
         return
 
     # Identify and link citations within the document content
-    find_citations_for_opinion_by_pks.apply_async(
+    find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
         ([opinion.pk],), countdown=random.randint(0, 3600)
     )
 

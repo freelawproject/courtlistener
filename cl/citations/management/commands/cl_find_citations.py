@@ -5,7 +5,9 @@ from typing import Iterable
 from django.conf import settings
 from django.core.management import CommandError, call_command
 
-from cl.citations.tasks import find_citations_for_opinion_by_pks
+from cl.citations.tasks import (
+    find_citations_and_parentheticals_for_opinion_by_pks,
+)
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
@@ -13,7 +15,7 @@ from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
-    help = "Parse citations out of documents."
+    help = "Parse citations and parentheticals out of documents."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -169,7 +171,7 @@ class Command(VerboseCommand):
             last_item = self.count == processed_count
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
-                find_citations_for_opinion_by_pks.apply_async(
+                find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
                     args=(chunk, index_during_subtask),
                     queue=queue_name,
                 )

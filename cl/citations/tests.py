@@ -31,7 +31,7 @@ from cl.citations.match_citations import (
     resolve_fullcase_citation,
 )
 from cl.citations.tasks import (
-    find_citations_and_descriptions_for_opinion_by_pks,
+    find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.search.models import (
@@ -48,6 +48,7 @@ def remove_citations_from_imported_fixtures():
     default, and reset counts to zero.
     """
     OpinionsCited.objects.all().delete()
+    Parenthetical.objects.all().delete()
     OpinionCluster.objects.all().update(citation_count=0)
 
 
@@ -557,7 +558,7 @@ class UpdateTest(IndexedSolrTestCase):
         remove_citations_from_imported_fixtures()
 
         # Updates d1's citation count in a Celery task
-        find_citations_and_descriptions_for_opinion_by_pks.delay([3])
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([3])
 
         cited = Opinion.objects.get(pk=2)
         expected_count = 1
@@ -579,20 +580,21 @@ class UpdateTest(IndexedSolrTestCase):
         # test all combinations, but this test case is made to be deliberately
         # complex, in an effort to "trick" the algorithm. Cited opinions:
         # pk=7: 1 FullCaseCitation, 1 ShortCaseCitation, 1 SupraCitation (depth=3)
+        # (case name Foo)
         # pk=8: 1 FullCaseCitation, 2 IdCitation (one Id. and one Ibid.),
-        #   1 ShortCaseCitation, 2 SupraCitation (depth=6)
-        # pk=9: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2)
+        #   1 ShortCaseCitation, 2 SupraCitation (depth=6) (case name Qwerty)
+        # pk=9: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2) (case name Lorem)
         remove_citations_from_imported_fixtures()
         citing = Opinion.objects.get(pk=10)
-        find_citations_and_descriptions_for_opinion_by_pks.delay([10])
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([10])
 
-        test_pairs = [
+        citation_test_pairs = [
             (Opinion.objects.get(pk=7), 3),
             (Opinion.objects.get(pk=8), 6),
             (Opinion.objects.get(pk=9), 2),
         ]
 
-        for cited, depth in test_pairs:
+        for cited, depth in citation_test_pairs:
             with self.subTest(
                 f"Testing OpinionsCited creation for {cited}...",
                 cited=cited,
@@ -603,6 +605,24 @@ class UpdateTest(IndexedSolrTestCase):
                         citing_opinion=citing, cited_opinion=cited
                     ).depth,
                     depth,
+                )
+
+        description_test_pairs = [
+            (Opinion.objects.get(pk=7), 1),
+            (Opinion.objects.get(pk=8), 1),
+            (Opinion.objects.get(pk=9), 0),
+        ]
+        for described, num_parentheticals in description_test_pairs:
+            with self.subTest(
+                f"Testing Parenthetical creation for {described}...",
+                described=described,
+                num_descriptions=num_parentheticals,
+            ):
+                self.assertEqual(
+                    Parenthetical.objects.filter(
+                        describing_opinion=citing, described_opinion=described
+                    ).count(),
+                    num_parentheticals,
                 )
 
 
