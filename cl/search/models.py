@@ -2236,6 +2236,14 @@ class OpinionCluster(AbstractDateTimeModel):
         ).order_by("-citation_count", "-date_filed")
 
     @property
+    def parentheticals(self):
+        return Parenthetical.objects.filter(
+            described_opinion_id__in=self.sub_opinions.values_list(
+                "pk", flat=True
+            )
+        ).order_by("-score")
+
+    @property
     def authority_count(self):
         return self.authorities.count()
 
@@ -2844,6 +2852,31 @@ class OpinionsCited(models.Model):
     class Meta:
         verbose_name_plural = "Opinions cited"
         unique_together = ("citing_opinion", "cited_opinion")
+
+
+class Parenthetical(models.Model):
+    describing_opinion = models.ForeignKey(
+        Opinion,
+        related_name="authored_parentheticals",
+        on_delete=models.CASCADE,
+    )
+    described_opinion = models.ForeignKey(
+        Opinion, related_name="parentheticals", on_delete=models.CASCADE
+    )
+    text = models.TextField(
+        help_text="The text of the description as written in the describing opinion",
+    )
+    score = models.FloatField(
+        db_index=True,
+        default=0.0,
+        help_text="A score between 0 and 1 representing how descriptive the parenthetical is",
+    )
+
+    def __str__(self) -> str:
+        return f"{self.describing_opinion.id} description of {self.described_opinion.id} (score {self.score}): {self.text}"
+
+    class Meta:
+        verbose_name_plural = "Opinion parentheticals"
 
 
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
