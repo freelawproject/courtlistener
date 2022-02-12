@@ -17,6 +17,10 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
+from cl.citations.filter_parentheticals import (
+    clean_parenthetical_text,
+    is_parenthetical_descriptive,
+)
 from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
     make_edge_list,
@@ -26,9 +30,16 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
-from cl.citations.tasks import find_citations_for_opinion_by_pks
+from cl.citations.tasks import (
+    find_citations_and_descriptions_for_opinion_by_pks,
+)
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.search.models import Opinion, OpinionCluster, OpinionsCited
+from cl.search.models import (
+    Opinion,
+    OpinionCluster,
+    OpinionsCited,
+    Parenthetical,
+)
 from cl.tests.cases import SimpleTestCase
 
 
@@ -546,7 +557,7 @@ class UpdateTest(IndexedSolrTestCase):
         remove_citations_from_imported_fixtures()
 
         # Updates d1's citation count in a Celery task
-        find_citations_for_opinion_by_pks.delay([3])
+        find_citations_and_descriptions_for_opinion_by_pks.delay([3])
 
         cited = Opinion.objects.get(pk=2)
         expected_count = 1
@@ -573,7 +584,7 @@ class UpdateTest(IndexedSolrTestCase):
         # pk=9: 1 FullCaseCitation, 1 ShortCaseCitation (depth=2)
         remove_citations_from_imported_fixtures()
         citing = Opinion.objects.get(pk=10)
-        find_citations_for_opinion_by_pks.delay([10])
+        find_citations_and_descriptions_for_opinion_by_pks.delay([10])
 
         test_pairs = [
             (Opinion.objects.get(pk=7), 3),
@@ -761,3 +772,116 @@ class ParallelCitationTest(SimpleTestCase):
                 a=a,
             ):
                 self.assertEqual(make_edge_list(q), a)
+
+
+class FilterParentheticalTest(SimpleTestCase):
+    def test_is_not_descriptive(self):
+        fixtures = [
+            "Gonzales II",
+            "Third Circuit 2013",
+            "3d. Cir. 1776",
+            "emphasis in original",
+            "quotation altered",
+            "internal citations and quotations omitted",
+            "citations and internal ellipses omitted",
+            "quotation marks omitted; ellipses ours",
+            "plurality opinion",
+            "opinion of Breyer, J.",
+            "opinion of Mister Justice Black",
+            "supplemental opinion",
+            "majority continuance in part",
+            "dicta",
+            "denying cert",
+            "denying certiorari",
+            "as amended",
+            "contra",
+            "authority below",
+            "statement below",
+            "citing Raich v. Conzales, 123 F.3d 123 (2019)",
+            "third circuit",
+            "hereinafter, this rules applies.",
+            "Scalia, J., concurring in the judgment",
+            "Sotomayor, J., statement respecting denial of certiorari",
+            "Roberts, C.J., concurring in part and dissenting in part",
+            "Friendly, J., concurring in the judgment, concurring in part, and dissenting in part",
+            "en banc",
+            "per curiam",
+            "same",
+            "no",
+            "n. 3",
+            "No. 12-345",
+            "TILA",
+            "citing Jones",
+            "cited in Heart of Atlanta Motel v. United States",
+            "quoting Hart Steel Co. v. Railroad Supply Co., 244 U.S. 294, 299, 37 S. Ct. 506, 508, 61 L. Ed. 1148 (1917)",
+            "collecting cases",
+        ]
+        for i, parenthetical_text in enumerate(fixtures):
+            with self.subTest(
+                f"Testing {parenthetical_text} is not descriptive...", i=i
+            ):
+                self.assertFalse(
+                    is_parenthetical_descriptive(parenthetical_text),
+                    f"Got incorrect result from is_parenthetical_descriptive for text (expected False): {parenthetical_text}",
+                )
+
+    def test_is_descriptive(self):
+        fixtures = [
+            "holding that 2 + 2 = 5",
+            "accountant who gave lay opinion testimony might have qualified as expert",
+            "where plaintif's complaint alleges facts which, if proven, would entitle plaintiff to relief under the Eighth Amendment, dismissal of complaint was inappropriate",
+            "ruling that there is nothing either legal or illegal, only thinking makes it so",
+            "First Amendment",
+            "mislabeled product",
+            '"Look on my Works, ye Mighty, and despair"',
+            '"Texas does not seek to have the Court interpret the Constitution, so much as disregard it."',
+            "questioning whether he who made the Lamb made thee",
+            "Section 403(d)(2)",
+        ]
+
+        for i, parenthetical_text in enumerate(fixtures):
+            with self.subTest(
+                f"Testing {parenthetical_text} is descriptive...", i=i
+            ):
+                self.assertTrue(
+                    is_parenthetical_descriptive(parenthetical_text),
+                    f"Got incorrect result from is_parenthetical_descriptive for text (expected True): {parenthetical_text}",
+                )
+
+    def test_clean_text(self):
+        test_pairs = [
+            (
+                "This parenthetical is as it should be",
+                "This parenthetical is as it should be",
+            ),
+            (
+                "Does not remove part of a reporter citation. See Hurley, 583 U.S. ---",
+                "Does not remove part of a reporter citation. See Hurley, 583 U.S. ---",
+            ),
+            (
+                "Gets rid of ------- divider characters properly",
+                "Gets rid of divider characters properly",
+            ),
+            (
+                "Replaces    \n extra whitespace\r\r\r\r with a single space",
+                "Replaces extra whitespace with a single space",
+            ),
+            (
+                "Removes *389 star pagination * 456 marks in the text",
+                "Removes star pagination marks in the text",
+            ),
+            (
+                "Deals properly *123 with a mix of ---- \r\n \n ------ different issues",
+                "Deals properly with a mix of different issues",
+            ),
+        ]
+
+        for i, (input_text, expected_clean_text) in enumerate(test_pairs):
+            with self.subTest(
+                f"Testing description text cleaning for {input_text}...", i=i
+            ):
+                self.assertEqual(
+                    clean_parenthetical_text(input_text),
+                    expected_clean_text,
+                    f"Got incorrect result from clean_parenthetical_text for text: {input_text}",
+                )
