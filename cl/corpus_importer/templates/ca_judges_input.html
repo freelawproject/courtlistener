@@ -6,13 +6,16 @@
 {% block head %}
   {% if DEBUG %}
     <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.css" %}"/>
+    <link rel="stylesheet" href="{% static "css/select2.css" %}" />
   {% else %}
     <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+    <link rel="stylesheet" href="{% static "css/select2.min.css" %}" />
   {% endif %}
 {% endblock %}
 
 {% block footer-scripts %}
   {% include "includes/date_picker.html" %}
+  {% include "includes/select2.html" %}
 {% endblock %}
 {% block sidebar %}{% endblock %}
 
