@@ -550,6 +550,14 @@ div.shown ul {
   padding: 3px 0 5px 0;
 }
 
+
+#summaries ul {
+  padding-inline-start: 15px;
+  border-bottom: 1pt solid #DDD;
+}
+#summaries li {
+  padding-bottom: 5px;
+}
 .bullet-tail:after{
   content: " \2022";
   padding: 0.5em;

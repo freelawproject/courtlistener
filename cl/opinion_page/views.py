@@ -514,6 +514,8 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "citing_cluster_count": citing_cluster_count,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
+            "top_summaries": cluster.parentheticals[:3],
+            "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
