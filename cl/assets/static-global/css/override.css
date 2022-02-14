@@ -517,6 +517,7 @@ div.shown ul {
 
 /* cited by and authorities styling */
 #authorities hr,
+#all-summaries hr,
 #cited-by hr,
 #visualizations hr,
 #recommendations hr{
@@ -524,6 +525,7 @@ div.shown ul {
 }
 
 #authorities ul,
+#all-summaries ul,
 #docket-list ul,
 #cited-by ul,
 #visualizations ul,
@@ -535,6 +537,7 @@ div.shown ul {
 }
 
 #authorities ul li,
+#all-summaries ul li,
 #cited-by ul li,
 #visualizations ul li,
 #recommendations ul li,

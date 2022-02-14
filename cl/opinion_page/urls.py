@@ -15,6 +15,7 @@ from cl.opinion_page.views import (
     view_opinion,
     view_parties,
     view_recap_document,
+    view_summaries,
 )
 
 urlpatterns = [
@@ -26,6 +27,11 @@ urlpatterns = [
         name="court_publish_page",
     ),
     # Opinion pages
+    path(
+        "opinion/<int:pk>/<blank-slug:slug>/summaries/",
+        view_summaries,
+        name="view_summaries",
+    ),
     path(
         "opinion/<int:pk>/<blank-slug:slug>/authorities/",
         view_authorities,
