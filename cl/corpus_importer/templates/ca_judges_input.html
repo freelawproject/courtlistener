@@ -25,6 +25,9 @@
           <span class="meta-data-value"><a href="https://en.wikipedia.org/w/index.php?search={{ judge.name_first }}+{{ judge.name_last }}&title=Special:Search&profile=advanced&fulltext=1&ns0=1" target="_blank">Wikipedia</a></span>
           <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}" target="_blank">Google</a></span>
           <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}+site%3Aballotpedia.org" target="_blank">Ballotpedia</a></span>
+          <span class="meta-data-value"><a href="https://www.martindale.com/search/attorneys/?term={{ judge.name_first }}%20{{ judge.name_last }}" target="_blank">Martindale</a></span>
+          <span class="meta-data-value"><a href="https://trellis.law/judges/ca/?s={{ judge.name_first }}%20{{ judge.name_last }}" target="_blank">Trellis</a></span>
+
         </p>
         <p>
           <span class="meta-data-value gray">Updated: {{ judge.date_modified }}</span>
@@ -113,11 +116,3 @@
       </ol>
     </div>
 {% endblock %}
-
-
-<!--
-
-1. Add a note re filtering to different types of courts or different courts
-   altogether. court, court_type, or name
--->
-
