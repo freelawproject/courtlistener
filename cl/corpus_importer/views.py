@@ -35,7 +35,9 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     judge_list = (
         Person.objects.filter(
-            positions__court__in=cts, positions__date_termination=None
+            is_alias_of__isnull=True,
+            positions__court__in=cts,
+            positions__date_termination=None,
         )
         .order_by("name_last", "name_first")
         .distinct()
@@ -125,6 +127,7 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
                 f"{request.path}?{get_string}&page={judge_page.next_page_number()}"
             )
     else:
+        # Just a regular GET. Load the forms with the current data
         person_form = PersonForm(instance=judge)
         education_formset = EducationFormSet(
             queryset=qs_education,
