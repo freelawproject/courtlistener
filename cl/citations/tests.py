@@ -1,3 +1,4 @@
+from typing import List, Tuple
 from unittest.mock import Mock
 
 from django.core.management import call_command
@@ -17,6 +18,7 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
+from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -905,3 +907,156 @@ class FilterParentheticalTest(SimpleTestCase):
                     expected_clean_text,
                     f"Got incorrect result from clean_parenthetical_text for text: {input_text}",
                 )
+
+
+DescriptionUtilityTestCase = Tuple[Tuple[str, int], Tuple[str, int], int]
+
+
+class DescriptionScoreTest(SimpleTestCase):
+    def test_description_score_h2h(self) -> None:
+        """
+        Tests the functionality of the description utility metric by comparing
+        its accuracy at picking the better of two descriptions (as determined
+        by a human)
+        """
+        minimum_accuracy = 0.9
+        test_cases: List[DescriptionUtilityTestCase] = [
+            (
+                (
+                    "holding that a State may not require a parade to include a group if the parade's organizer disagrees with the group's message",
+                    110,
+                ),
+                (
+                    "state law cannot require a parade to include a group whose message the parade's organizer does not wish to send",
+                    1043,
+                ),
+                0,
+            ),
+            (
+                (
+                    "ruling that failure to Mirandize a witness before his confession automatically results in exclusion of the statement's use in the prosecution's case in chief",
+                    15,
+                ),
+                (
+                    'holding that statements obtained in violation of Miranda are irrebuttably presumed involuntary "for purposes of the prosecution\'s case in chief"',
+                    603,
+                ),
+                1,
+            ),
+            (
+                (
+                    'holding that pursuant to the trial judge\'s "gatekeeping responsibility," she "must ensure that any and all scientific testimony or evidence admitted is not only relevant, but reliable"',
+                    28,
+                ),
+                (
+                    "overruling Frye",
+                    48,
+                ),
+                0,
+            ),
+            (
+                (
+                    'discussing the legislative history to the 1986 amendments as demonstrating a congressional intent to encourage qui tam suits brought "by insiders, such as employees who come across information of fraud in the course of their employment"',
+                    58,
+                ),
+                (
+                    "detailing the history of the FCA",
+                    93,
+                ),
+                0,
+            ),
+            (
+                (
+                    "focusing upon interstate effects",
+                    45,
+                ),
+                (
+                    "specific statutory provisions overcome inferences to contrary from general, ambiguous legislative declarations",
+                    49,
+                ),
+                1,
+            ),
+            (
+                (
+                    "Like other sanctions, attorney's fees should not be assessed lightly or without fair notice and an opportunity for a hearing on the record",
+                    18,
+                ),
+                (
+                    "inherent power of court",
+                    49,
+                ),
+                0,
+            ),
+            (
+                (
+                    'determining that error is not harmless if court "is left in grave doubt"',
+                    9,
+                ),
+                (
+                    'concluding that error had sufficient influence if court "is left in grave doubt"',
+                    1500,
+                ),
+                1,
+            ),
+            (
+                (
+                    "construing Title III's requirements that the government identify probable wiretap subjects and that it give subsequent notice to those whose conversations were intercepted",
+                    33,
+                ),
+                (
+                    '"It is not a constitutional requirement that all those likely to be overheard engaging in incriminating conversations be named."',
+                    472,
+                ),
+                0,
+            ),
+            (
+                (
+                    'holding that a defendant\'s "desire to exchange one mandatory counsel for another . . . does not signify that he was abandoning his Sixth Amendment right to have none"',
+                    94,
+                ),
+                (
+                    "right is unqualified if request made before start of trial",
+                    99,
+                ),
+                0,
+            ),
+            (
+                (
+                    '"New York has no power to project its legislation into Vermont by regulating the price to be paid in that state for milk acquired there."',
+                    956,
+                ),
+                (
+                    'declaring that "one state in its dealings with another may not place itself in a position of economic isolation"',
+                    13,
+                ),
+                1,
+            ),
+        ]
+        num_correct = 0
+        failed_cases = []
+        for (desc_a, desc_b, correct_idx) in test_cases:
+            score_a, score_b = (
+                description_score(
+                    desc[0], OpinionCluster(citation_count=desc[1])
+                )
+                for desc in (desc_a, desc_b)
+            )
+            higher_score_idx = 0 if score_a >= score_b else 1
+            if higher_score_idx == correct_idx:
+                num_correct += 1
+            else:
+                failed_cases.append((desc_a, desc_b, correct_idx))
+        actual_accuracy = num_correct / len(test_cases)
+        self.assertGreaterEqual(
+            actual_accuracy,
+            minimum_accuracy,
+            f"Description score head-to-head test failed because the accuracy was below the required threshold. Failed test cases: {self._print_failed_cases(failed_cases)}",
+        )
+
+    def _print_failed_cases(
+        self, failed_cases: List[DescriptionUtilityTestCase]
+    ) -> str:
+        output = ""
+        for case in failed_cases:
+            output += f"\nDescription 0: {case[0]}\nDescription 1: {case[1]}\nExpected Winner: {case[2]}\n"
+        return output
