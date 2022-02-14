@@ -77,7 +77,7 @@ class SchoolFilter(FilterSet):
             "id": ["exact"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": BASIC_TEXT_LOOKUPS,
+            "name": ALL_TEXT_LOOKUPS,
             "ein": ["exact"],
         }
 

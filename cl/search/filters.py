@@ -40,6 +40,8 @@ class CourtFilter(FilterSet):
             "position": INTEGER_LOOKUPS,
             "start_date": DATE_LOOKUPS,
             "end_date": DATE_LOOKUPS,
+            "short_name": ALL_TEXT_LOOKUPS,
+            "full_name": ALL_TEXT_LOOKUPS,
         }
 
 
