@@ -178,5 +178,5 @@ SourcesFormSet = inlineformset_factory(
     Person,
     Source,
     form=SourceForm,
-    extra=2,
+    extra=5,
 )
