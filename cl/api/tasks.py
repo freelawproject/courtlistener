@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import shutil
 import tarfile
@@ -201,8 +202,15 @@ def write_json_to_disk(
                 # A non-jurisdiction-centric object.
                 loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
 
-            with open(loc, "wb") as f:
-                f.write(json_str)
+            try:
+                with open(loc, "wb") as f:
+                    f.write(json_str)
+            except FileNotFoundError:
+                logging.warning("Court directory not found, adding it now.")
+                # If a court is created during the bulk generation, generate the directory for it.
+                os.mkdir(os.path.dirname(loc))
+                with open(loc, "wb") as f:
+                    f.write(json_str)
             i += 1
 
         print(f"   - {i} {obj_type_str} json files created.")
