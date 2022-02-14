@@ -41,28 +41,6 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
             return default
 
 
-def mkdir_p(path):
-    """Makes a directory path, but doesn't crash if the path already exists.
-
-    Doesn't clobber.
-
-    :param path: A path you wish to create on the file system.
-    """
-    try:
-        os.makedirs(path)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST:
-            if os.path.isdir(path):
-                pass
-            else:
-                raise OSError(
-                    "Cannot create directory. Location already "
-                    "exists, but is not a directory: %s" % path
-                )
-        else:
-            raise
-
-
 def chunks(iterable, chunk_size):
     """Like the chunks function, but the iterable can be a generator.
 

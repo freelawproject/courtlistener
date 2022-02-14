@@ -14,7 +14,7 @@ from internetarchive import ArchiveSession
 
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.utils import human_sort, mkdir_p
+from cl.lib.utils import human_sort
 
 
 class OptionsType(TypedDict):
@@ -81,7 +81,8 @@ def download_file(ia_key: str, file_name) -> None:
         return
 
     logger.info("Capturing: %s", url)
-    mkdir_p(directory)
+    Path(directory).mkdir(parents=True, exist_ok=True)
+
     data = requests.get(url, timeout=10).json()
     with open(file_path, "w") as outfile:
         json.dump(data, outfile, indent=2)

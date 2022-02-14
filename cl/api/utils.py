@@ -3,6 +3,7 @@ import logging
 import os
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime
+from pathlib import Path
 from typing import Dict, List, Set, Union
 
 from dateutil import parser
@@ -29,8 +30,6 @@ from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.types import EmailType
-from cl.lib.utils import mkdir_p
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
@@ -406,7 +405,10 @@ class BulkJsonHistory(object):
             return {}
 
     def save_to_disk(self):
-        mkdir_p(self.path.rsplit("/", 1)[0])
+        Path(self.path.rsplit("/", 1)[0].decode()).mkdir(
+            parents=True, exist_ok=True
+        )
+
         with open(self.path, "w") as f:
             json.dump(self.json, f, indent=2)
 
