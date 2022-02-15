@@ -15,7 +15,7 @@ from cl.corpus_importer.forms import (
 )
 from cl.lib.search_utils import make_get_string
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.people_db.models import Person, Source
+from cl.people_db.models import Person, School, Source
 from cl.people_db.utils import make_title_str
 from cl.search.models import Court
 
@@ -35,7 +35,9 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     judge_list = (
         Person.objects.filter(
-            positions__court__in=cts, positions__date_termination=None
+            is_alias_of__isnull=True,
+            positions__court__in=cts,
+            positions__date_termination=None,
         )
         .order_by("name_last", "name_first")
         .distinct()
@@ -125,6 +127,7 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
                 f"{request.path}?{get_string}&page={judge_page.next_page_number()}"
             )
     else:
+        # Just a regular GET. Load the forms with the current data
         person_form = PersonForm(instance=judge)
         education_formset = EducationFormSet(
             queryset=qs_education,
@@ -141,6 +144,23 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
         sources_formset = SourcesFormSet(
             queryset=qs_sources,
             instance=judge,
+        )
+
+    # Show pre-filled values if already exist for schools and courts
+    # Get list of judge schools
+    judge_schools = qs_education.values_list("school", flat=True)
+    # Populate queryset form just with judge schools
+    for form in education_formset.initial_forms:
+        form.fields["school"].queryset = School.objects.filter(
+            pk__in=judge_schools
+        )
+
+    # Get list of judge courts
+    judge_courts = qs_positions.values_list("court", flat=True)
+    # Populate queryset just with judge courts
+    for form in positions_formset.initial_forms:
+        form.fields["court"].queryset = Court.objects.filter(
+            pk__in=judge_courts
         )
 
     return render(

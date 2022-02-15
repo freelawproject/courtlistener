@@ -164,7 +164,7 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
-    ordering_fields = ("id", "date_created", "date_modified")
+    ordering_fields = ("id", "date_created", "date_modified", "name")
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
