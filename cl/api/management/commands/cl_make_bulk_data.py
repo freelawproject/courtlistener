@@ -1,6 +1,7 @@
 import os
 import shutil
 from os.path import join
+from pathlib import Path
 from typing import Any, Dict, List
 
 from django.conf import settings
@@ -9,7 +10,6 @@ from cl.api.tasks import make_bulk_data_and_swap_it_in
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.models import Audio
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.utils import mkdir_p
 from cl.people_db.api_serializers import (
     EducationSerializer,
     PersonSerializer,
@@ -127,7 +127,7 @@ class Command(VerboseCommand):
         self.make_citation_data(tmp_destination)
         logger.info("   - Swapping in the new citation archives...")
 
-        mkdir_p(final_destination)
+        Path(final_destination).mkdir(parents=True, exist_ok=True)
         shutil.move(
             join(tmp_destination, "all.csv.gz"),
             join(final_destination, "all.csv.gz"),
@@ -144,8 +144,7 @@ class Command(VerboseCommand):
         Instead of doing that, we dump our citation table with a shell command,
         which provides people with compact and reasonable data they can import.
         """
-        mkdir_p(tmp_destination)
-
+        Path(tmp_destination).mkdir(parents=True, exist_ok=True)
         logger.info("   - Copying the citations table to disk...")
 
         # This command calls the psql COPY command and requests that it dump

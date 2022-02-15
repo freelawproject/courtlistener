@@ -1,5 +1,6 @@
-1.0.73
+1.0.74
 
+1.0.74 - Bump courts-db, update throttle for researcher, remove mkdir_p function. Also add pacer modal.
 1.0.73 - Bump juriscraper, courts-db.
 1.0.72 - Bump juriscraper, reporters-db and courts-db.
 1.0.71 - Bump Courts-db.

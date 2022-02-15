@@ -346,7 +346,7 @@ REST_FRAMEWORK = {
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
         # Throttling up.
-        "JonasHappel": "10000",
+        "JonasHappel": "10000/hour",
         "YFIN": "430000/day",
         "mlissner": "1000000/hour",  # Needed for benchmarking (not greed)
         "gpilapil": "10000/hour",

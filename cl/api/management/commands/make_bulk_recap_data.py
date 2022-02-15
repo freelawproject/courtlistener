@@ -51,7 +51,6 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        courts = Court.objects.all()
 
         for data_type in options["data_types"]:
             kwargs = self.data_types[data_type]
@@ -60,8 +59,6 @@ class Command(VerboseCommand):
             )
             t1 = now()
 
-            write_json_to_disk(
-                courts, bulk_dir=options["output_directory"], **kwargs
-            )
+            write_json_to_disk(bulk_dir=options["output_directory"], **kwargs)
             t2 = now()
             self.stdout.write(f"Completed in {t2 - t1}")

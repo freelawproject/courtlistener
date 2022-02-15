@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from django.db.models import Q
 from django.template.loader import render_to_string
@@ -6,7 +7,6 @@ from django.template.loader import render_to_string
 from cl.lib.argparse_types import readable_dir
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.db_tools import queryset_generator
-from cl.lib.utils import mkdir_p
 from cl.search.models import Opinion
 
 
@@ -40,7 +40,7 @@ class Command(VerboseCommand):
                 str(op.cluster.date_filed.month),
                 str(op.cluster.date_filed.day),
             )
-            mkdir_p(output_dir)
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
             output_path = os.path.join(output_dir, f"{op.pk}.html")
             with open(output_path, "w") as f:
                 f.write(content.encode())

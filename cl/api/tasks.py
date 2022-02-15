@@ -1,8 +1,10 @@
 import glob
+import logging
 import os
 import shutil
 import tarfile
 from os.path import join
+from pathlib import Path
 from typing import Any, Dict
 
 from django.db.models import QuerySet
@@ -14,7 +16,7 @@ from cl.api.utils import BulkJsonHistory, HyperlinkedModelSerializerWithId
 from cl.celery_init import app
 from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
-from cl.lib.utils import deepgetattr, mkdir_p
+from cl.lib.utils import deepgetattr
 
 
 @app.task
@@ -29,7 +31,7 @@ def make_bulk_data_and_swap_it_in(
     tmp_bulk_dir = join(bulk_dir, "tmp")
 
     print(f" - Creating bulk {kwargs['obj_type_str']} files...")
-    num_written = write_json_to_disk(courts, bulk_dir=tmp_bulk_dir, **kwargs)
+    num_written = write_json_to_disk(bulk_dir=tmp_bulk_dir, **kwargs)
 
     if num_written > 0:
         print(
@@ -51,7 +53,7 @@ def swap_archives(
     """Swap out new archives, clobbering the old, if present"""
     tmp_gz_dir = join(tmp_bulk_dir, obj_type_str)
     final_gz_dir = join(bulk_dir, obj_type_str)
-    mkdir_p(final_gz_dir)
+    Path(final_gz_dir).mkdir(parents=True, exist_ok=True)
     for f in glob.glob(join(tmp_gz_dir, "*.tar*")):
         shutil.move(f, join(final_gz_dir, os.path.basename(f)))
 
@@ -103,7 +105,6 @@ def targz_json_files(
 
 
 def write_json_to_disk(
-    courts: QuerySet,
     obj_type_str: str,
     obj_class: Any,
     court_attr: str,
@@ -123,7 +124,6 @@ def write_json_to_disk(
     specific, like people or schools. For jurisdiction-specific data, we make
     jurisdiction directories to put the data into. Otherwise, we do not.
 
-    :param courts: Court objects that you expect to make data for.
     :param obj_type_str: A string to use for the directory name of a type of
     data. For example, for clusters, it's 'clusters'.
     :param obj_class: The actual class to make a bulk data for.
@@ -138,15 +138,6 @@ def write_json_to_disk(
     history = BulkJsonHistory(obj_type_str, bulk_dir)
     last_good_date = history.get_last_good_date()
     history.add_current_attempt_and_save()
-
-    if court_attr is not None:
-        # Create a directory for every jurisdiction, if they don't already
-        # exist. This does not clobber.
-        for court in courts:
-            mkdir_p(join(bulk_dir, obj_type_str, court.pk))
-    else:
-        # Make a directory for the object type.
-        mkdir_p(join(bulk_dir, obj_type_str))
 
     if last_good_date is not None:
         print(
@@ -201,8 +192,19 @@ def write_json_to_disk(
                 # A non-jurisdiction-centric object.
                 loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
 
-            with open(loc, "wb") as f:
-                f.write(json_str)
+            try:
+                with open(loc, "wb") as f:
+                    f.write(json_str)
+            except FileNotFoundError:
+                logging.warning(
+                    "Bulk data directory not found, adding it now."
+                )
+                # If we have new courts or object types since last generation,
+                # make the needed directories
+                directory_path = Path(loc).parents[0]
+                Path(directory_path).mkdir(parents=True, exist_ok=True)
+                with open(loc, "wb") as f:
+                    f.write(json_str)
             i += 1
 
         print(f"   - {i} {obj_type_str} json files created.")
