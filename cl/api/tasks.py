@@ -196,8 +196,9 @@ def write_json_to_disk(
                 with open(loc, "wb") as f:
                     f.write(json_str)
             except FileNotFoundError:
-                logging.warning("Court directory not found, adding it now.")
-                # If a court is created during the bulk generation, generate the directory for it.
+                logging.warning("Bulk data directory not found, adding it now.")
+                # If we have new courts or object types since last generation, 
+                # make the needed directories
                 directory_path = Path(loc).parents[0]
                 Path(directory_path).mkdir(parents=True, exist_ok=True)
                 with open(loc, "wb") as f:
