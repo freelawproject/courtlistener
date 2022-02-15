@@ -15,9 +15,10 @@ from cl.corpus_importer.forms import (
 )
 from cl.lib.search_utils import make_get_string
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.people_db.models import Person, Source, School
+from cl.people_db.models import Person, School, Source
 from cl.people_db.utils import make_title_str
 from cl.search.models import Court
+
 
 @staff_member_required
 def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
@@ -147,16 +148,20 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     # Show pre-filled values if already exist for schools and courts
     # Get list of judge schools
-    judge_schools = qs_education.values_list('school', flat=True)
+    judge_schools = qs_education.values_list("school", flat=True)
     # Populate queryset form just with judge schools
     for form in education_formset.initial_forms:
-        form.fields["school"].queryset = School.objects.filter(pk__in=judge_schools)
+        form.fields["school"].queryset = School.objects.filter(
+            pk__in=judge_schools
+        )
 
     # Get list of judge courts
-    judge_courts = qs_positions.values_list('court', flat=True)
+    judge_courts = qs_positions.values_list("court", flat=True)
     # Populate queryset just with judge courts
     for form in positions_formset.initial_forms:
-        form.fields["court"].queryset = Court.objects.filter(pk__in=judge_courts)
+        form.fields["court"].queryset = Court.objects.filter(
+            pk__in=judge_courts
+        )
 
     return render(
         request,
