@@ -437,6 +437,8 @@ class Position(AbstractDateTimeModel):
     """A role held by a person, and the details about it."""
 
     JUDGE = "jud"
+    JUSTICE = "jus"
+    ADMINISTRATIVE_LAW_JUDGE = "ad-law-jud"
     # Acting
     ACTING_JUDGE = "act-jud"
     ACTING_PRESIDING_JUDGE = "act-pres-jud"
@@ -447,7 +449,6 @@ class Position(AbstractDateTimeModel):
     ASSOCIATE_CHIEF_JUDGE = "ass-c-jud"
     ASSISTANT_PRESIDING_JUDGE = "asst-pres-jud"
     ASSOCIATE_PRESIDING_JUDGE = "ass-pres-jud"
-    JUSTICE = "jus"
     # Chief
     CHIEF_JUDGE = "c-jud"
     CHIEF_JUSTICE = "c-jus"
@@ -513,6 +514,10 @@ class Position(AbstractDateTimeModel):
         (
             "Judge",
             (
+                # Regular judges
+                (JUDGE, "Judge"),
+                (JUSTICE, "Justice"),
+                (ADMINISTRATIVE_LAW_JUDGE, "Administrative Law Judge"),
                 # Acting
                 (ACTING_JUDGE, "Acting Judge"),
                 (
@@ -525,8 +530,6 @@ class Position(AbstractDateTimeModel):
                 (ASSOCIATE_CHIEF_JUDGE, "Associate Chief Judge"),
                 (ASSOCIATE_PRESIDING_JUDGE, "Associate Presiding Judge"),
                 (ASSISTANT_PRESIDING_JUDGE, "Assistant Presiding Judge"),
-                (JUDGE, "Judge"),
-                (JUSTICE, "Justice"),
                 # Chief
                 (CHIEF_JUDGE, "Chief Judge"),
                 (CHIEF_JUSTICE, "Chief Justice"),
