@@ -22,7 +22,11 @@
             delay: 250,
             data: function(params) {
               let term_search = field + '__icontains';
-              let query = {[term_search]: params.term, order_by: field};
+              let query = {
+                [term_search]: params.term,
+                order_by: field,
+                page: params.page || 1
+              };
               return query;
             },
             processResults: function(data, params){
