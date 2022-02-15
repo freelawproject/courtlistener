@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, Optional
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -87,7 +87,7 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
     XYZ.objects.none() by overriding the to_python method in ModelChoiceField.
     """
 
-    def to_python(self, value: Union[str, int]) -> Any:
+    def to_python(self, value: Optional[Any]) -> Any:
         if value in self.empty_values:
             return None
         try:
