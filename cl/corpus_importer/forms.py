@@ -14,6 +14,7 @@ from cl.people_db.models import (
     School,
     Source,
 )
+from cl.search.models import Court
 
 
 class PersonFilterForm(forms.Form):
@@ -108,7 +109,7 @@ class EmptyModelChoiceField(forms.ModelChoiceField):
 class EducationForm(BootstrapModelForm):
     school = EmptyModelChoiceField(
         queryset=School.objects.none(),
-        widget=forms.Select(attrs={"class": "select2"}),
+        widget=forms.Select(attrs={"class": "select2 school-select"}),
     )
 
     class Meta:
@@ -151,6 +152,10 @@ PoliticalAffiliationFormSet = inlineformset_factory(
 
 
 class PositionForm(BootstrapModelForm):
+    court = EmptyModelChoiceField(
+        queryset=Court.objects.none(),
+        widget=forms.Select(attrs={"class": "select2 court-select"}),
+    )
     date_start = forms.DateField(
         label="Date started",
         required=False,

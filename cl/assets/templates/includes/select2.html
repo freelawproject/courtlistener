@@ -9,27 +9,36 @@
 {% endif %}
 <script type="text/javascript">
   $(document).ready(function() {
-    $('.select2').select2({
-      ajax: {
-        url: "/api/rest/v3/schools/",
-        dataType: "json",
-        delay: 250,
-        data: function(params) {
-          return {name__icontains: params.term, order_by: "name"};
-        },
-        processResults: function(data, params){
-          params.page = params.page || 1
-          return {
-            results: data.results.map(function(result){return {
-              id: result.id,
-              text: result.name,
-            }}),
-            pagination: {
-              more: !!data.next,
+
+    $.each(array_forms, function(i, item) {
+      call_ajax(item[0], item[1], item[2]);
+    });
+
+    function call_ajax(endpoint, classname, field) {
+      $('.select2'+classname).select2({
+          ajax: {
+            url: endpoint,
+            dataType: "json",
+            delay: 250,
+            data: function(params) {
+              let term_search = field + '__icontains';
+              let query = {[term_search]: params.term, order_by: field};
+              return query;
+            },
+            processResults: function(data, params){
+              params.page = params.page || 1
+              return {
+                results: data.results.map(function(result){return {
+                  id: result.id,
+                  text: result[field],
+                }}),
+                pagination: {
+                  more: !!data.next,
+                }
+              }
             }
           }
-        }
-      }
-    });
+        });
+    }
   });
 </script>
