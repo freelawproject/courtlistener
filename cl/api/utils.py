@@ -405,9 +405,8 @@ class BulkJsonHistory(object):
             return {}
 
     def save_to_disk(self):
-        Path(self.path.rsplit("/", 1)[0].decode()).mkdir(
-            parents=True, exist_ok=True
-        )
+        filepath = self.path.rsplit("/", 1)[0]
+        Path(filepath).mkdir(parents=True, exist_ok=True)
 
         with open(self.path, "w") as f:
             json.dump(self.json, f, indent=2)
