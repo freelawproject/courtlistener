@@ -11,12 +11,21 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
+from cl.citations.filter_parentheticals import (
+    clean_parenthetical_text,
+    is_parenthetical_descriptive,
+)
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
 from cl.lib.types import MatchedResourceType, SupportedCitationType
-from cl.search.models import Opinion, OpinionCluster, OpinionsCited
+from cl.search.models import (
+    Opinion,
+    OpinionCluster,
+    OpinionsCited,
+    Parenthetical,
+)
 from cl.search.tasks import add_items_to_solr
 
 # This is the distance two reporter abbreviations can be from each other if
@@ -64,12 +73,12 @@ def identify_parallel_citations(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def find_citations_for_opinion_by_pks(
+def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: List[int],
     index: bool = True,
 ) -> None:
-    """Find citations for search.Opinion objects.
+    """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
     :param index: Whether to add the item to Solr
@@ -133,8 +142,11 @@ def find_citations_for_opinion_by_pks(
                     "search.OpinionCluster",
                 )
 
-            # Nuke existing citations
+            # Nuke existing citations and parentheticals
             OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
+            Parenthetical.objects.filter(
+                describing_opinion_id=opinion.pk
+            ).delete()
 
             # Create the new ones.
             OpinionsCited.objects.bulk_create(
@@ -147,6 +159,23 @@ def find_citations_for_opinion_by_pks(
                     for _opinion, _citations in citation_resolutions.items()
                 ]
             )
+
+            parentheticals = []
+            for _opinion, _citations in citation_resolutions.items():
+                for _cit in _citations:
+                    # If the citation has a descriptive parenthetical, clean
+                    # it up and store it as a Parenthetical
+                    if (
+                        par_text := _cit.metadata.parenthetical
+                    ) and is_parenthetical_descriptive(par_text):
+                        parentheticals.append(
+                            Parenthetical(
+                                describing_opinion_id=opinion.pk,
+                                described_opinion_id=_opinion.pk,
+                                text=clean_parenthetical_text(par_text),
+                            )
+                        )
+            Parenthetical.objects.bulk_create(parentheticals)
 
             # Save all the changes to the citing opinion (send to solr later)
             opinion.save(index=False)
