@@ -1,8 +1,4 @@
-import json
-from io import StringIO
-
 from django.contrib.auth.models import User
-from django.core.files import File
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
