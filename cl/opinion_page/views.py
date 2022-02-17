@@ -168,6 +168,10 @@ def redirect_docket_recap(
     )
 
 
+def get_case_title(cluster: OpinionCluster) -> str:
+    return f"{trunc(best_case_name(cluster), 100)}, {cluster.citation_string}"
+
+
 def make_docket_title(docket: Docket) -> str:
     title = ", ".join(
         [
@@ -514,11 +518,30 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "citing_cluster_count": citing_cluster_count,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
+            "top_summaries": cluster.parentheticals[:3],
+            "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": f"&{urlencode(related_search_params)}",
+        },
+    )
+
+
+@ratelimit_if_not_whitelisted
+def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
+    cluster = get_object_or_404(OpinionCluster, pk=pk)
+
+    return render(
+        request,
+        "view_opinion_summaries.html",
+        {
+            "title": get_case_title(cluster),
+            "cluster": cluster,
+            "private": cluster.blocked,
+            "summaries": cluster.parentheticals,
+            "summaries_count": cluster.parentheticals.count(),
         },
     )
 
@@ -531,8 +554,7 @@ def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         request,
         "view_opinion_authorities.html",
         {
-            "title": "%s, %s"
-            % (trunc(best_case_name(cluster), 100), cluster.citation_string),
+            "title": get_case_title(cluster),
             "cluster": cluster,
             "private": cluster.blocked or cluster.has_private_authority,
             "authorities_with_data": cluster.authorities_with_data,
@@ -549,8 +571,7 @@ def cluster_visualizations(
         request,
         "view_opinion_visualizations.html",
         {
-            "title": "%s, %s"
-            % (trunc(best_case_name(cluster), 100), cluster.citation_string),
+            "title": get_case_title(cluster),
             "cluster": cluster,
             "private": cluster.blocked or cluster.has_private_authority,
         },

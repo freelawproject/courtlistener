@@ -2,6 +2,7 @@
 {% load text_filters %}
 {% load humanize %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -82,6 +83,30 @@
                 </p>
             </div>
         </div>
+
+        {% flag "parentheticals" %}
+          {% if summaries_count > 0  %}
+          <div id="summaries" class="sidebar-section">
+            <h3><span>Summaries ({{ summaries_count|intcomma }})</span></h3>
+            <p class="bottom">Judge-written summaries of this case:</p>
+            <ul>
+              {% for summary in top_summaries %}
+                <li>
+                  {{ summary.text|truncatewords:50|capfirst }}
+                  (from <a href="{{ summary.describing_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                    {{ summary.describing_opinion.cluster.caption|safe|truncatewords:10|v_wrapper }}</a>)
+                </li>
+              {% endfor %}
+            </ul>
+            <h4>
+              <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+                 class="btn btn-default">
+                View All Summaries
+              </a>
+            </h4>
+          </div>
+          {% endif %}
+        {% endflag %}
 
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">

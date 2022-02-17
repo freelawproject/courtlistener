@@ -11,6 +11,7 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
+from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -168,11 +169,15 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                     if (
                         par_text := _cit.metadata.parenthetical
                     ) and is_parenthetical_descriptive(par_text):
+                        clean = clean_parenthetical_text(par_text)
                         parentheticals.append(
                             Parenthetical(
                                 describing_opinion_id=opinion.pk,
                                 described_opinion_id=_opinion.pk,
-                                text=clean_parenthetical_text(par_text),
+                                text=clean,
+                                score=description_score(
+                                    clean, opinion.cluster
+                                ),
                             )
                         )
             Parenthetical.objects.bulk_create(parentheticals)

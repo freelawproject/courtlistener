@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load text_filters %}
+{% load humanize %}
+
+
+{% block title %}Summaries of {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Summaries of {{ title }} –
+    CourtListener.com{% endblock %}
+{% block description %}Summaries of {{ title }}{% endblock %}
+{% block og_description %}
+  {% if summaries_count > 0 %}
+    {{ summaries_count|intcomma }} summaries of {{ title }} were extracted from other cases. The top one: "{{ summaries.0.text }}".
+  {% else %}
+    No summaries found for {{ title }}.
+  {% endif %}
+{% endblock %}
+
+{% block navbar-o %}active{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Opinion</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-sm-9">
+        <h2>
+          <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}" class="black-link no-underline">{{ cluster.caption|safe|v_wrapper }}</a>
+        </h2>
+
+        <div id="all-summaries">
+            <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion from other cases.</h3>
+            <p>We looked through our complete collection of opinions and identified the following parenthetical summaries that describe this case:</p>
+            <hr>
+            <ul>
+                {% for summary in summaries %}
+                    {% with describing_cluster=summary.describing_opinion.cluster %}
+                    <li>
+                        {{ summary.text|capfirst }}
+                        <br/>
+                        <span class="bullet-tail">
+                          <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                              {{ describing_cluster.caption|safe|v_wrapper }}
+                          </a>
+                        </span>
+                        <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
+                        <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
+                    </li>
+                  {% endwith %}
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

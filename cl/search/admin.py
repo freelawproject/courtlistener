@@ -15,6 +15,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     OriginatingCourtInformation,
+    Parenthetical,
     RECAPDocument,
 )
 
@@ -249,3 +250,12 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
         from cl.search.tasks import add_items_to_solr
 
         add_items_to_solr.delay([obj.citing_opinion_id], "search.Opinion")
+
+
+@admin.register(Parenthetical)
+class ParentheticalAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "describing_opinion",
+        "described_opinion",
+    )
+    search_fields = ("=describing_opinion_id",)
