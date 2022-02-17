@@ -351,10 +351,10 @@ class RECAPUploaders(DjangoModelPermissions):
     }
 
 
-class EmailProcessingQueueAPIUsers(BasePermission):
-    def has_permission(self, request, view):
-        # TODO - This will check against an API token in the header. This will be stored in environment variables on either side. https://github.com/freelawproject/courtlistener/issues/1676
-        return True
+class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
+    perms_map = {
+        "POST": ["%(app_label)s.has_recap_upload_access"],
+    }
 
 
 class TinyAdjustablePagination(PageNumberPagination):
