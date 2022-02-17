@@ -63,7 +63,7 @@ _SURROUNDING_CHARS = r'[.!;,"“” ]'
 _PREFIX = rf"^{_SURROUNDING_CHARS}*("  # Begin string, optional whitespace/puncutation, begin capture group
 _SUFFIX = rf"){_SURROUNDING_CHARS}*$"  # Close capture group, optional whitespace/punctuation, end string
 
-PARENTHETICAL_BLACKLIST_REGEX = re.compile(
+PARENTHETICAL_BLOCKLIST_REGEX = re.compile(
     _PREFIX
     + r"|".join(  # Wrap each rule in its own group
         map(lambda reg: f"({reg})", PARENTHETICAL_REGEX_BLOCKLIST_RULES)
@@ -75,7 +75,7 @@ PARENTHETICAL_BLACKLIST_REGEX = re.compile(
 
 def is_parenthetical_descriptive(text: str) -> bool:
     text = clean_parenthetical_text(text)
-    return not re.match(PARENTHETICAL_BLACKLIST_REGEX, text)
+    return not re.match(PARENTHETICAL_BLOCKLIST_REGEX, text)
 
 
 def clean_parenthetical_text(text: str) -> str:
