@@ -51,7 +51,7 @@ def description_score(
 
     # Reward based on how popular the authoring case is
     # (max of ~125 for the most cited case)
-    score += 25 * log(citing_opinion_cluster.citation_count, 10)
+    score += 25 * log(citing_opinion_cluster.citation_count or 1, 10)
 
     # Penalize if parentheticals are too long or too short
     if num_words < OPTIMAL_NUM_WORDS - ALLOWED_NUM_WORDS_DEVIATION:

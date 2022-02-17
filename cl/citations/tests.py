@@ -1053,6 +1053,14 @@ class DescriptionScoreTest(SimpleTestCase):
             f"Description score head-to-head test failed because the accuracy was below the required threshold. Failed test cases: {self._print_failed_cases(failed_cases)}",
         )
 
+    def test_handles_zero_citation_count(self):
+        # Just a basic smoke test to ensure it doesn't blow up when the citation count is 0
+        cluster = OpinionCluster(citation_count=0)
+        result = description_score(
+            "some parenthetical, it's not important what", cluster
+        )
+        self.assertGreater(result, 0)
+
     def _print_failed_cases(
         self, failed_cases: List[DescriptionUtilityTestCase]
     ) -> str:
