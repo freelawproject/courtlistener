@@ -3,10 +3,12 @@ from math import log
 
 from cl.search.models import OpinionCluster
 
-_GERUND = re.compile(r"(?:\S+ing)")
-_GERUND_THAT = re.compile(rf"{_GERUND} that")
-_HOLDING = re.compile(r"(?:holding|deciding|ruling|recognizing|concluding)")
-_HOLDING_THAT = re.compile(rf"{_HOLDING} that")
+_GERUND = re.compile(r"(?:\S+ing)", re.IGNORECASE)
+_GERUND_THAT = re.compile(rf"{_GERUND} that", re.IGNORECASE)
+_HOLDING = re.compile(
+    r"(?:holding|deciding|ruling|recognizing|concluding)", re.IGNORECASE
+)
+_HOLDING_THAT = re.compile(rf"{_HOLDING} that", re.IGNORECASE)
 
 # Observation of thousands of parentheticals seems to indicate that the
 # most useful ones are in the neighborhood of 20 words long.
