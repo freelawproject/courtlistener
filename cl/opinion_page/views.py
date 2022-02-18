@@ -823,9 +823,6 @@ def citation_redirector(
         if form.is_valid():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
-            ### debug
-            print(f"[DEBUG - 2.1] reporter: {cd['reporter']}")
-            ### debug
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=cd)
             )
