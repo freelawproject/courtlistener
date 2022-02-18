@@ -262,6 +262,17 @@
         "model": "search.citation",
         "pk": 6
     },
+  {
+    "fields": {
+      "volume": 2,
+      "reporter": "S.Ct.",
+      "page": "2",
+      "type": 1,
+      "cluster": 4
+    },
+    "model": "search.citation",
+    "pk": 20
+  },
     {
         "fields": {
             "volume": 2,
@@ -401,7 +412,7 @@
             "date_modified": "2015-08-15T14:10:56.801Z",
             "extracted_by_ocr": false,
             "author": 2,
-            "plain_text": "my plain text secret word for queries",
+            "plain_text": "my plain text secret word for queries. Foo v. Bar, 1 U.S. 1, 4, 2 S.Ct. 2, 5 (2000) (holding something happened)",
             "html": "",
             "download_url": null,
             "cluster": 8,

@@ -163,12 +163,19 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
 
             parentheticals = []
             for _opinion, _citations in citation_resolutions.items():
+                # Currently, eyecite has a bug where parallel citations are
+                # detected individually. We avoid creating duplicate parentheticals
+                # because of that by keeping track of what we've seen so far.
+                parenthetical_texts = set()
                 for _cit in _citations:
                     # If the citation has a descriptive parenthetical, clean
                     # it up and store it as a Parenthetical
                     if (
-                        par_text := _cit.metadata.parenthetical
-                    ) and is_parenthetical_descriptive(par_text):
+                        (par_text := _cit.metadata.parenthetical)
+                        and par_text not in parenthetical_texts
+                        and is_parenthetical_descriptive(par_text)
+                    ):
+                        parenthetical_texts.add(par_text)
                         clean = clean_parenthetical_text(par_text)
                         parentheticals.append(
                             Parenthetical(

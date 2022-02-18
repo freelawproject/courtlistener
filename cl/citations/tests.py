@@ -627,6 +627,18 @@ class UpdateTest(IndexedSolrTestCase):
                     num_parentheticals,
                 )
 
+    def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
+        remove_citations_from_imported_fixtures()
+        citing = Opinion.objects.get(pk=11)
+        cited = Opinion.objects.get(pk=7)
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([11])
+        self.assertEqual(
+            Parenthetical.objects.filter(
+                describing_opinion=citing, described_opinion=cited
+            ).count(),
+            1,
+        )
+
 
 class CitationFeedTest(IndexedSolrTestCase):
     def _tree_has_content(self, content, expected_count):
@@ -807,6 +819,7 @@ class FilterParentheticalTest(SimpleTestCase):
             "internal citations and quotations omitted",
             "citations and internal ellipses omitted",
             "quotation marks omitted; ellipses ours",
+            "headings and internal quotations omitted, emphasis and citations altered",
             "plurality opinion",
             "opinion of Breyer, J.",
             "opinion of Mister Justice Black",
@@ -826,9 +839,12 @@ class FilterParentheticalTest(SimpleTestCase):
             "Sotomayor, J., statement respecting denial of certiorari",
             "Roberts, C.J., concurring in part and dissenting in part",
             "Friendly, J., concurring in the judgment, concurring in part, and dissenting in part",
+            "Scalia, J., specially concurring in the judgment on this issue",
             "en banc",
             "per curiam",
             "same",
+            "standard of review",
+            "opinion of O'Connor, J., respecting the granting of an injunction",
             "no",
             "n. 3",
             "No. 12-345",
@@ -853,6 +869,7 @@ class FilterParentheticalTest(SimpleTestCase):
             "accountant who gave lay opinion testimony might have qualified as expert",
             "where plaintif's complaint alleges facts which, if proven, would entitle plaintiff to relief under the Eighth Amendment, dismissal of complaint was inappropriate",
             "ruling that there is nothing either legal or illegal, only thinking makes it so",
+            "testing that the mere presence of the word quotation doesn't get a parenthetical filtered out if it's long enough",
             "First Amendment",
             "mislabeled product",
             '"Look on my Works, ye Mighty, and despair"',
