@@ -36,7 +36,9 @@
 
         <div id="all-summaries">
             <h3>{{ summaries_count|intcomma }} judge-written summar{{ summaries_count|pluralize:"y,ies" }} of this opinion from other cases.</h3>
-            <p>We looked through our complete collection of opinions and identified the following parenthetical summaries that describe this case:</p>
+            {% if summaries_count > 0 %}
+              <p>We looked through our complete collection of opinions and identified the following parenthetical summaries that describe this case:</p>
+            {% endif %}
             <hr>
             <ul>
                 {% for summary in summaries %}
