@@ -627,6 +627,18 @@ class UpdateTest(IndexedSolrTestCase):
                     num_parentheticals,
                 )
 
+    def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
+        remove_citations_from_imported_fixtures()
+        citing = Opinion.objects.get(pk=11)
+        cited = Opinion.objects.get(pk=7)
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([11])
+        self.assertEqual(
+            Parenthetical.objects.filter(
+                describing_opinion=citing, described_opinion=cited
+            ).count(),
+            1,
+        )
+
 
 class CitationFeedTest(IndexedSolrTestCase):
     def _tree_has_content(self, content, expected_count):
