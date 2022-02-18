@@ -818,7 +818,6 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
@@ -868,7 +867,10 @@ def citation_redirector(
     slug_edition = {slugify(item): item for item in EDITIONS.keys()}
     proper_reporter = slug_edition.get(SafeText(reporter), None)
     if not proper_reporter:
-        return HttpResponse(status=404)
+        return throw_404(
+            request,
+            {"no_reporters": True, "reporter": reporter, "private": False},
+        )
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:
