@@ -1533,13 +1533,14 @@ def process_recap_email(
         docket, data["docket_entries"]
     )
 
+    # Ensures we have PACER cookies ready to go.
+    get_or_cache_pacer_cookies(
+        user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+
     for rd in rds_created:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
-        )
-        # Ensures we have PACER cookies ready to go.
-        get_or_cache_pacer_cookies(
-            fq.user_id, settings.PACER_USERNAME, settings.PACER_PASSWORD
         )
         fetch_pacer_doc_by_rd(rd.pk, fq.pk)
 
