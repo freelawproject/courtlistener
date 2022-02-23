@@ -448,7 +448,6 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     # Generate PDF content from our three paths
     year = int(data["year"])
     person_id = data["person_id"]
-    person_id = 10305
     report_type = data.get("report_type", -1)
 
     logger.info(
@@ -540,8 +539,6 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
 
     # Save PDF content
     save_disclosure(extracted_data=content, disclosure=disclosure)
+
     # Remove disclosure ID in redis for completed disclosure
     interface.delete(disclosure_key)
-
-    logger.info(f"Deleting test disclosure {disclosure.id}")
-    disclosure.delete()
