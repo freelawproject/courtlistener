@@ -1121,6 +1121,9 @@ class Education(AbstractDateTimeModel):
         ("jd", "Juris Doctor (J.D.)"),
         ("llm", "Master of Laws (LL.M)"),
         ("llb", "Bachelor of Laws (e.g. LL.B)"),
+        # N.B. you may be tempted to add LL.D. here. Don't. It's not a real
+        # degree. It's an honorarium and belongs with your awards, not your
+        # degrees.
         ("jsd", "Doctor of Law (J.S.D)"),
         ("phd", "Doctor of Philosophy (PhD)"),
         ("aa", "Associate (e.g. A.A.)"),
