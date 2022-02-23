@@ -179,7 +179,7 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""
     )
-    recap_email = f"{recap_email_header}@recap.email"
+    recap_email = f"{recap_email_header.lower()}@recap.email"
     user_profiles_with_match = UserProfile.objects.filter(
         recap_email=recap_email
     )

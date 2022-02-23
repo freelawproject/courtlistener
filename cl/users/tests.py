@@ -217,6 +217,12 @@ class ProfileTest(TestCase):
         )
         self.assertEqual(user_profile.user.pk, 1006)
 
+    def test_generate_recap_email_username_lowercase(self) -> None:
+        user_profile = UserProfile.objects.get(
+            recap_email="test.user@recap.email"
+        )
+        self.assertEqual(user_profile.user.pk, 1007)
+
 
 class DisposableEmailTest(TestCase):
     fixtures = ["authtest_data.json"]
