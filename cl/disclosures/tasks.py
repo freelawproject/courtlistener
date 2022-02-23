@@ -8,7 +8,6 @@ from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
-from redis import Redis
 from requests import ReadTimeout
 
 from cl.celery_init import app
@@ -93,6 +92,7 @@ def check_if_in_system(sha1_hash: str) -> bool:
 def extract_content(
     pdf_bytes: bytes,
     disclosure_type: str,
+    disclosure_key: str,
 ) -> Dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
@@ -100,6 +100,7 @@ def extract_content(
 
     :param pdf_bytes: The byte array of the PDF
     :param disclosure_type: Type of disclosure
+    :param disclosure_key: The disclosure ID
     :return:The extracted content
     """
     logger.info("Attempting extraction.")
@@ -113,7 +114,10 @@ def extract_content(
                 files={"file": ("file", pdf_bytes)},
                 timeout=settings.BTE_URLS["extract-disclosure-pdf"]["timeout"],
             )
-            if extractor_response.json()["success"] is False:
+            if (
+                extractor_response.status_code == 200
+                and extractor_response.json()["success"] is False
+            ):
                 # Sometimes these vector PDFs are mixed with images
                 # In that case - try again with the image extractor
                 extractor_response = requests.post(
@@ -141,13 +145,17 @@ def extract_content(
                 timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
             )
     except ReadTimeout:
-        logger.info("Timeout occurred for PDF")
+        logger.warning(
+            msg="Timeout occurred for PDF",
+            extra=dict(disclosure_key=disclosure_key),
+        )
         return {}
 
     status = extractor_response.status_code
     if status != 200 or extractor_response.json()["success"] is False:
-        logger.info(
-            f"Could not extract data from this document, status: {status}"
+        logger.warning(
+            msg="Could not extract data from this document",
+            extra=dict(disclosure_key=disclosure_key, status=status),
         )
         return {}
 
@@ -431,7 +439,9 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     )
 
     if not newly_enqueued:
-        logger.info(f"Process is already running {data['id']}.")
+        logger.error(
+            f"Process is already running {data['id']}. {disclosure_key}",
+        )
         return
 
     # Generate PDF content from our three paths
@@ -453,7 +463,8 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     pdf_bytes = pdf_response.content
 
     if pdf_response.status_code != 200:
-        logger.info("PDF generation failed.")
+        logger.error(msg="PDF generation failed.")
+        interface.delete(disclosure_key)
         return
 
     if was_previously_pdfed:
@@ -465,7 +476,11 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         sha1_hash = sha1(pdf_bytes)
         in_system = check_if_in_system(sha1_hash)
         if in_system:
-            logger.info("PDF already in system.")
+            # If we are given duplicate images as different files.  Sadly something to test for.
+            logger.error(
+                "PDF already in system.",
+                extra={"disclosure_id": disclosure_key},
+            )
             interface.delete(disclosure_key)
             return
 
@@ -473,7 +488,10 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         # Not actually present on aws.
         pg_count = get_page_count(pdf_bytes)
         if not pg_count:
-            logger.info(f"PDF failed for disclosure {data['id']}.")
+            logger.error(
+                msg=f"Page count failed",
+                extra={"disclosure_id": disclosure_key, "url": disclosure_url},
+            )
             interface.delete(disclosure_key)
             return
 
@@ -506,14 +524,20 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
 
     # Extract content from PDF
     content = extract_content(
-        pdf_bytes=pdf_bytes, disclosure_type=data["disclosure_type"]
+        pdf_bytes=pdf_bytes,
+        disclosure_type=data["disclosure_type"],
+        disclosure_key=disclosure_key,
     )
     if not content:
-        logger.info("Failed extraction!")
+        logger.warning(
+            msg="Failed extraction of content from PDF",
+            extra={"disclosure_id": disclosure_key, "url": disclosure_url},
+        )
         interface.delete(disclosure_key)
         return
 
     # Save PDF content
     save_disclosure(extracted_data=content, disclosure=disclosure)
+
     # Remove disclosure ID in redis for completed disclosure
     interface.delete(disclosure_key)
