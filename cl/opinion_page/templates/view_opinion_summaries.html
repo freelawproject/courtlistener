@@ -9,7 +9,7 @@
 {% block description %}Summaries of {{ title }}{% endblock %}
 {% block og_description %}
   {% if summaries_count > 0 %}
-    {{ summaries_count|intcomma }} summaries were extracted from other cases. The top one: "{{ summaries.0.text }}".
+    {{ summaries_count|intcomma }} summaries were extracted from other cases. The top one: &quot;{{ summaries.0.text }}&quot;.
   {% else %}
     No summaries found for {{ title }}.
   {% endif %}
