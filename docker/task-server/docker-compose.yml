@@ -98,6 +98,8 @@ services:
       container_name: "cl-binary-transformers-and-extractors"
       depends_on:
         - cl-seal-rookery
+      logging:
+        driver: journald
       ports:
         - "5050:5050"
       networks:
