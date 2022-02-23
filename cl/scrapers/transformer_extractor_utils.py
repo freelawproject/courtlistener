@@ -5,6 +5,7 @@ import requests
 from django.conf import settings
 
 from cl.audio.models import Audio
+from cl.lib.command_utils import logger
 
 
 def convert_and_clean_audio(audio_obj: Audio) -> requests.Response:

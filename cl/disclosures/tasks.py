@@ -93,6 +93,7 @@ def check_if_in_system(sha1_hash: str) -> bool:
 def extract_content(
     pdf_bytes: bytes,
     disclosure_type: str,
+    disclosure_key: str,
 ) -> Dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
@@ -100,6 +101,7 @@ def extract_content(
 
     :param pdf_bytes: The byte array of the PDF
     :param disclosure_type: Type of disclosure
+    :param disclosure_key: The disclosure ID
     :return:The extracted content
     """
     logger.info("Attempting extraction.")
@@ -113,7 +115,10 @@ def extract_content(
                 files={"file": ("file", pdf_bytes)},
                 timeout=settings.BTE_URLS["extract-disclosure-pdf"]["timeout"],
             )
-            if extractor_response.json()["success"] is False:
+            if (
+                extractor_response.status_code == 200
+                and extractor_response.json()["success"] is False
+            ):
                 # Sometimes these vector PDFs are mixed with images
                 # In that case - try again with the image extractor
                 extractor_response = requests.post(
@@ -141,13 +146,17 @@ def extract_content(
                 timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
             )
     except ReadTimeout:
-        logger.info("Timeout occurred for PDF")
+        logger.warning(
+            msg="Timeout occured for PDF",
+            extra=dict(disclosure_key=disclosure_key),
+        )
         return {}
 
     status = extractor_response.status_code
     if status != 200 or extractor_response.json()["success"] is False:
-        logger.info(
-            f"Could not extract data from this document, status: {status}"
+        logger.warning(
+            msg="Could not extract data from this document",
+            extra=dict(disclosure_key=disclosure_key, status=status),
         )
         return {}
 
@@ -206,7 +215,6 @@ def get_date(text: str, year: int) -> Optional[datetime.date]:
         return None
 
 
-@transaction.atomic
 def save_disclosure(extracted_data: dict, disclosure) -> None:
     """Save financial data to system.
 
@@ -216,142 +224,180 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
     :param extracted_data: disclosure
     :return:None
     """
-    addendum = "Additional Information or Explanations"
+    try:
+        with transaction.atomic():
+            addendum = "Additional Information or Explanations"
 
-    # Process and save our data into the system.
-    disclosure.has_been_extracted = True
-    disclosure.addendum_content_raw = extracted_data[addendum]["text"]
-    disclosure.addendum_redacted = extracted_data[addendum]["is_redacted"]
-    disclosure.is_amended = extracted_data.get("amended") or False
-    disclosure.report_type = get_report_type(extracted_data)
-    disclosure.save()
-
-    Investment.objects.bulk_create(
-        [
-            Investment(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in investment.values()),
-                description=investment["A"]["text"],
-                page_number=investment["A"]["page_number"],
-                has_inferred_values=investment["A"]["inferred_value"],
-                income_during_reporting_period_code=investment["B1"]["text"],
-                income_during_reporting_period_type=investment["B2"]["text"],
-                gross_value_code=investment["C1"]["text"],
-                gross_value_method=investment["C2"]["text"],
-                transaction_during_reporting_period=investment["D1"]["text"],
-                transaction_date_raw=investment["D2"]["text"],
-                transaction_date=get_date(
-                    investment["D2"]["text"], disclosure.year
-                ),
-                transaction_value_code=investment["D3"]["text"],
-                transaction_gain_code=investment["D4"]["text"],
-                transaction_partner=investment["D5"]["text"],
-            )
-            for investment in extracted_data["sections"][
-                "Investments and Trusts"
-            ]["rows"]
-        ]
-    )
-
-    Agreement.objects.bulk_create(
-        [
-            Agreement(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in agreement.values()),
-                date_raw=agreement["Date"]["text"],
-                parties_and_terms=agreement["Parties and Terms"]["text"],
-            )
-            for agreement in extracted_data["sections"]["Agreements"]["rows"]
-        ]
-    )
-
-    Debt.objects.bulk_create(
-        [
-            Debt(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in debt.values()),
-                creditor_name=debt["Creditor"]["text"],
-                description=debt["Description"]["text"],
-                value_code=debt["Value Code"]["text"],
-            )
-            for debt in extracted_data["sections"]["Liabilities"]["rows"]
-        ]
-    )
-
-    Position.objects.bulk_create(
-        [
-            Position(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in position.values()),
-                position=position["Position"]["text"],
-                organization_name=position["Name of Organization"]["text"],
-            )
-            for position in extracted_data["sections"]["Positions"]["rows"]
-        ]
-    )
-
-    Gift.objects.bulk_create(
-        [
-            Gift(
-                financial_disclosure=disclosure,
-                source=gift["Source"]["text"],
-                description=gift["Description"]["text"],
-                value=gift["Value"]["text"],
-                redacted=any(v["is_redacted"] for v in gift.values()),
-            )
-            for gift in extracted_data["sections"]["Gifts"]["rows"]
-        ]
-    )
-
-    Reimbursement.objects.bulk_create(
-        [
-            Reimbursement(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in reimbursement.values()),
-                source=reimbursement["Source"]["text"],
-                date_raw=reimbursement["Dates"]["text"],
-                location=reimbursement["Locations"]["text"],
-                purpose=reimbursement["Purpose"]["text"],
-                items_paid_or_provided=reimbursement["Items Paid or Provided"][
-                    "text"
-                ],
-            )
-            for reimbursement in extracted_data["sections"]["Reimbursements"][
-                "rows"
+            # Process and save our data into the system.
+            disclosure.has_been_extracted = True
+            disclosure.addendum_content_raw = extracted_data[addendum]["text"]
+            disclosure.addendum_redacted = extracted_data[addendum][
+                "is_redacted"
             ]
-        ]
-    )
+            disclosure.is_amended = extracted_data.get("amended") or False
+            disclosure.report_type = get_report_type(extracted_data)
+            disclosure.save()
 
-    NonInvestmentIncome.objects.bulk_create(
-        [
-            NonInvestmentIncome(
-                financial_disclosure=disclosure,
-                redacted=any(
-                    v["is_redacted"] for v in non_investment_income.values()
-                ),
-                date_raw=non_investment_income["Date"]["text"],
-                source_type=non_investment_income["Source and Type"]["text"],
-                income_amount=non_investment_income["Income"]["text"],
+            Investment.objects.bulk_create(
+                [
+                    Investment(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"] for v in investment.values()
+                        ),
+                        description=investment["A"]["text"],
+                        page_number=investment["A"]["page_number"],
+                        has_inferred_values=investment["A"]["inferred_value"],
+                        income_during_reporting_period_code=investment["B1"][
+                            "text"
+                        ],
+                        income_during_reporting_period_type=investment["B2"][
+                            "text"
+                        ],
+                        gross_value_code=investment["C1"]["text"],
+                        gross_value_method=investment["C2"]["text"],
+                        transaction_during_reporting_period=investment["D1"][
+                            "text"
+                        ],
+                        transaction_date_raw=investment["D2"]["text"],
+                        transaction_date=get_date(
+                            investment["D2"]["text"], disclosure.year
+                        ),
+                        transaction_value_code=investment["D3"]["text"],
+                        transaction_gain_code=investment["D4"]["text"],
+                        transaction_partner=investment["D5"]["text"],
+                    )
+                    for investment in extracted_data["sections"][
+                        "Investments and Trusts"
+                    ]["rows"]
+                ]
             )
-            for non_investment_income in extracted_data["sections"][
-                "Non-Investment Income"
-            ]["rows"]
-        ]
-    )
 
-    SpouseIncome.objects.bulk_create(
-        [
-            SpouseIncome(
-                financial_disclosure=disclosure,
-                redacted=any(v["is_redacted"] for v in spouse_income.values()),
-                date_raw=spouse_income["Date"]["text"],
-                source_type=spouse_income["Source and Type"]["text"],
+            Agreement.objects.bulk_create(
+                [
+                    Agreement(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"] for v in agreement.values()
+                        ),
+                        date_raw=agreement["Date"]["text"],
+                        parties_and_terms=agreement["Parties and Terms"][
+                            "text"
+                        ],
+                    )
+                    for agreement in extracted_data["sections"]["Agreements"][
+                        "rows"
+                    ]
+                ]
             )
-            for spouse_income in extracted_data["sections"][
-                "Non Investment Income Spouse"
-            ]["rows"]
-        ]
-    )
+
+            Debt.objects.bulk_create(
+                [
+                    Debt(
+                        financial_disclosure=disclosure,
+                        redacted=any(v["is_redacted"] for v in debt.values()),
+                        creditor_name=debt["Creditor"]["text"],
+                        description=debt["Description"]["text"],
+                        value_code=debt["Value Code"]["text"],
+                    )
+                    for debt in extracted_data["sections"]["Liabilities"][
+                        "rows"
+                    ]
+                ]
+            )
+
+            Position.objects.bulk_create(
+                [
+                    Position(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"] for v in position.values()
+                        ),
+                        position=position["Position"]["text"],
+                        organization_name=position["Name of Organization"][
+                            "text"
+                        ],
+                    )
+                    for position in extracted_data["sections"]["Positions"][
+                        "rows"
+                    ]
+                ]
+            )
+
+            Gift.objects.bulk_create(
+                [
+                    Gift(
+                        financial_disclosure=disclosure,
+                        source=gift["Source"]["text"],
+                        description=gift["Description"]["text"],
+                        value=gift["Value"]["text"],
+                        redacted=any(v["is_redacted"] for v in gift.values()),
+                    )
+                    for gift in extracted_data["sections"]["Gifts"]["rows"]
+                ]
+            )
+
+            Reimbursement.objects.bulk_create(
+                [
+                    Reimbursement(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"] for v in reimbursement.values()
+                        ),
+                        source=reimbursement["Source"]["text"],
+                        date_raw=reimbursement["Dates"]["text"],
+                        location=reimbursement["Locations"]["text"],
+                        purpose=reimbursement["Purpose"]["text"],
+                        items_paid_or_provided=reimbursement[
+                            "Items Paid or Provided"
+                        ]["text"],
+                    )
+                    for reimbursement in extracted_data["sections"][
+                        "Reimbursements"
+                    ]["rows"]
+                ]
+            )
+
+            NonInvestmentIncome.objects.bulk_create(
+                [
+                    NonInvestmentIncome(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"]
+                            for v in non_investment_income.values()
+                        ),
+                        date_raw=non_investment_income["Date"]["text"],
+                        source_type=non_investment_income["Source and Type"][
+                            "text"
+                        ],
+                        income_amount=non_investment_income["Income"]["text"],
+                    )
+                    for non_investment_income in extracted_data["sections"][
+                        "Non-Investment Income"
+                    ]["rows"]
+                ]
+            )
+
+            SpouseIncome.objects.bulk_create(
+                [
+                    SpouseIncome(
+                        financial_disclosure=disclosure,
+                        redacted=any(
+                            v["is_redacted"] for v in spouse_income.values()
+                        ),
+                        date_raw=spouse_income["Date"]["text"],
+                        source_type=spouse_income["Source and Type"]["text"],
+                    )
+                    for spouse_income in extracted_data["sections"][
+                        "Non Investment Income Spouse"
+                    ]["rows"]
+                ]
+            )
+    except Exception as e:
+        logger.error(
+            msg=f"Error saving disclosure for {disclosure.person}",
+            extra=dict(error_msg=str(e)),
+        )
 
 
 def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
@@ -431,7 +477,9 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     )
 
     if not newly_enqueued:
-        logger.info(f"Process is already running {data['id']}.")
+        logger.error(
+            f"Process is already running {data['id']}. {disclosure_key}",
+        )
         return
 
     # Generate PDF content from our three paths
@@ -453,7 +501,8 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     pdf_bytes = pdf_response.content
 
     if pdf_response.status_code != 200:
-        logger.info("PDF generation failed.")
+        logger.error(msg="PDF generation failed.")
+        interface.delete(disclosure_key)
         return
 
     if was_previously_pdfed:
@@ -465,7 +514,11 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         sha1_hash = sha1(pdf_bytes)
         in_system = check_if_in_system(sha1_hash)
         if in_system:
-            logger.info("PDF already in system.")
+            # If we are given duplicate images as different files.  Sadly something to test for.
+            logger.error(
+                "PDF already in system.",
+                extra={"disclosure_id": disclosure_key},
+            )
             interface.delete(disclosure_key)
             return
 
@@ -473,7 +526,10 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         # Not actually present on aws.
         pg_count = get_page_count(pdf_bytes)
         if not pg_count:
-            logger.info(f"PDF failed for disclosure {data['id']}.")
+            logger.error(
+                msg=f"Page count failed",
+                extra={"disclosure_id": disclosure_key, "url": disclosure_url},
+            )
             interface.delete(disclosure_key)
             return
 
@@ -506,10 +562,15 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
 
     # Extract content from PDF
     content = extract_content(
-        pdf_bytes=pdf_bytes, disclosure_type=data["disclosure_type"]
+        pdf_bytes=pdf_bytes,
+        disclosure_type=data["disclosure_type"],
+        disclosure_key=disclosure_key,
     )
     if not content:
-        logger.info("Failed extraction!")
+        logger.warning(
+            msg="Failed extraction of content from PDF",
+            extra={"disclosure_id": disclosure_key, "url": disclosure_url},
+        )
         interface.delete(disclosure_key)
         return
 
