@@ -42,16 +42,16 @@
             <ul>
                 {% for summary in summaries %}
                     {% with describing_cluster=summary.describing_opinion.cluster %}
-                    <li>
+                    <li class="v-offset-below-1">
                         {{ summary.text|capfirst }}
                         <br/>
+                        <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
                         <span class="bullet-tail">
                           <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                               {{ describing_cluster.caption|safe|v_wrapper }}
                           </a>
                         </span>
                         <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
-                        <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
                     </li>
                   {% endwith %}
                 {% endfor %}
