@@ -8,7 +8,6 @@ from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import transaction
-from redis import Redis
 from requests import ReadTimeout
 
 from cl.celery_init import app
