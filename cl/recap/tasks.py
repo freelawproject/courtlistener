@@ -1535,7 +1535,7 @@ def process_recap_email(
 
     # Ensures we have PACER cookies ready to go.
     get_or_cache_pacer_cookies(
-        fq.user_id, settings.PACER_USERNAME, settings.PACER_PASSWORD
+        user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
     for rd in rds_created:
