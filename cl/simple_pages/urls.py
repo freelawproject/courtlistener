@@ -18,10 +18,10 @@ from cl.simple_pages.views import (
     markdown_help,
     old_terms,
     podcasts,
+    recap_email_help,
     robots,
     tag_help,
     validate_for_wot,
-    recap_email_help,
 )
 
 urlpatterns = [
