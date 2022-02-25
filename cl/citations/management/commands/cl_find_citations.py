@@ -1,9 +1,10 @@
 import sys
 import time
-from typing import Iterable
+from typing import Iterable, List, cast
 
 from django.conf import settings
 from django.core.management import CommandError, call_command
+from django.core.management.base import CommandParser
 
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
@@ -11,13 +12,14 @@ from cl.citations.tasks import (
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.types import OptionsType
 from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
-    help = "Parse citations and parentheticals out of documents."
+    help = "Parse citations and parenthetical out of documents."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--doc-id",
             type=int,
@@ -79,7 +81,7 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: List[str], **options: OptionsType) -> None:
         super(Command, self).handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
@@ -123,11 +125,11 @@ class Command(VerboseCommand):
         if options.get("all"):
             query = Opinion.objects.all()
         self.count = query.count()
-        self.average_per_s = 0
-        self.timings = []
+        self.average_per_s = 0.0
+        self.timings: List[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, options["queue"])
-        self.add_to_solr(options["queue"])
+        self.update_documents(opinion_pks, cast(str, options["queue"]))
+        self.add_to_solr(cast(str, options["queue"]))
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
