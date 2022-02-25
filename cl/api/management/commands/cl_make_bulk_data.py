@@ -174,7 +174,7 @@ class Command(VerboseCommand):
         # the table to disk as a compressed CSV.
         default_db = settings.DATABASES["default"]
         os.system(
-            """PGPASSWORD="{password}" psql -c "COPY \\"{table}}\\" ({columns}) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
+            """PGPASSWORD="{password}" psql -c "COPY \\"{table}\\" ({columns}) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
                 password=default_db["PASSWORD"],
                 table=csv_dump_info["table"],
                 columns=csv_dump_info["columns"],
