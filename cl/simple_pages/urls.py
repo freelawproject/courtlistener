@@ -18,6 +18,7 @@ from cl.simple_pages.views import (
     markdown_help,
     old_terms,
     podcasts,
+    recap_email_help,
     robots,
     tag_help,
     validate_for_wot,
@@ -41,6 +42,7 @@ urlpatterns = [
     path("help/delete-account/", delete_help, name="delete_help"),
     path("help/tags/", tag_help, name="tag_help"),
     path("help/search-operators/", advanced_search, name="advanced_search"),
+    path("help/recap/email/", recap_email_help, name="recap_email_help"),
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",
