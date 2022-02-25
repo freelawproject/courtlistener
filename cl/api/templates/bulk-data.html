@@ -24,7 +24,7 @@
 {% block content %}
     <div class="col-sm-7">
         <h1 id="about">Bulk Data</h1>
-        <p>For developers, legal researchers, journalists,  and anybody else that might be interested, we provide bulk files containing many types of our data. Several types of files are available as listed below, but in general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges. We do not offer bulk PDF downloads because of the size of such files.
+        <p>For developers, legal researchers, journalists,  and the public we provide bulk files containing many types of our data. Several types of files are available as listed below. In general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges. We do not offer bulk PDF downloads because of the size of such files.
         </p>
 
 
@@ -101,21 +101,28 @@
         <p>This bulk data is a work in progress and we expect it to grow and change.</p>
 
 
-        <h2 id="citation-data">Citation Bulk Data File</h2>
+        <h2 id="citation-data">Citation and Parenthetical Bulk Data File</h2>
         <p>
-            This is a CSV file that contains all of the citation relationships between opinions in our database. This file has millions of lines, one per citation between opinions.
+            For citations and parentheticals we generate flat CSV files that contain the relationships between opinions in our database. These files have millions of rows, one per citation or parenthetical between opinions.
         </p>
         <p>
-            This file can be obtained in a similar manner to the core data
-            types, by downloading the file that's available at:
+            These files can be downloaded in a similar manner to the core data
+            types, by downloading the files from:
         </p>
         <blockquote>
             <code>
                 <a href="/api/bulk-data/citations/all.csv.gz">{% get_full_host %}/api/bulk-data/citations/all.csv.gz</a>
             </code>
         </blockquote>
-        <p>The format of the file is three columns. The first column is the <code>ID</code> of the citing opinion; the second column is the <code>ID</code> of the cited opinion; and the third column is the <code>depth</code> of the citation (i.e., the number of those citing-cited dyads). Note that the <code>ID</code> fields are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
+        <p>Or:</p>
+        <blockquote>
+          <code>
+            <a href="/api/bulk-data/parentheticals/all.csv.gz">{% get_full_host %}/api/bulk-data/parentheticals/all.csv.gz</a>
+          </code>
+        </blockquote>
+        <p>The format of the citations file is three columns. The first column is the <code>ID</code> of the citing opinion; the second column is the <code>ID</code> of the cited opinion; and the third column is the <code>depth</code> of the citation (i.e., the number of those citing-cited dyads). Note that the <code>ID</code> fields are Opinion IDs, not OpinionCluster IDs, though in many cases these are equivalent. This was simplified when v3 of the API was released.
         </p>
+        <p>The format of the parentheticals file is similar, but with four columns corresponding to the <code>ID</code> of the describing opinion, the <code>ID</code> of the described opinion, the text of the description, and a score calculating the relevancy of the parenthetical.</p>
 
 
         <h2 id="citegeist">The CiteGeist Bulk Data File</h2>
