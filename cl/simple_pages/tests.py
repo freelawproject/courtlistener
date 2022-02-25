@@ -181,6 +181,7 @@ class SimplePagesTest(TestCase):
             {"viewname": "old_terms", "args": ["2"]},
             {"viewname": "terms"},
             {"viewname": "robots"},
+            {"viewname": "recap_email_help"},
         ]
         for reverse_param in reverse_params:
             with self.subTest(
