@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple, TypedDict, Union
+from typing import Any, Callable, Dict, List, Tuple, TypedDict, Union
 
 from django.http import HttpRequest
 from eyecite.models import (
@@ -90,3 +90,6 @@ SearchParam = TypedDict(
     total=False,
 )
 # fmt: on
+
+
+OptionsType = Dict[str, Union[str, Callable]]

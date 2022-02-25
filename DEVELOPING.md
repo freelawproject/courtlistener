@@ -248,15 +248,21 @@ In general, the easiest way to run the test suite is via Django's `test` command
 docker exec -it cl-django python /opt/courtlistener/manage.py test cl --exclude-tag selenium --keepdb
 ```
 
-The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by provided more details, such as `cl.search` to execute only tests in the search module.
+The `cl` parameter is the name of the Python package to search for tests. It's not required, but a good habit to learn as you can more specifically specify tests by providing more details. For example:
 
-`--exclude-tag selenium` is used to exclude selenium tests during local development. They'll be run on CI and they take awhile, so it's sort of best not to bother with them most of the time.
+ - `cl.search` to execute only tests in the search module, or...
+ - `cl.search.tests.SearchTest` to run a particular test class, or...
+ - `cl.search.tests.SearchTest.test_a_simple_text_query` to run a particular test.
+
+Also:
+
+`--exclude-tag selenium` is used to exclude selenium tests during local development. They'll be run on CI and they take a while, so it's sort of best not to bother with them most of the time.
 
 `--keepdb` will keep your database between tests, a big speed up.
 
-We use a custom test runner to make our tests a bit faster:
+We use a custom test runner to make our tests a even faster:
 
- 1. By default, it disables output. This makes tests slightly faster. You can enable output with our special command, `--enable-logging`.
+ 1. By default, it disables output aside from warnings. This makes tests slightly faster. You can enable output with our special command, `--enable-logging`.
 
  1. By default, it runs tests in parallel. Normally, you have to use the `--parallel` flag of the test command to do this, but developers forget. No more. If you want to override this so your tests run on a single core (why would you?) you could pass `--parallel=1`.
 

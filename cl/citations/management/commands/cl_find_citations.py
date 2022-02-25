@@ -1,9 +1,10 @@
 import sys
 import time
-from typing import Iterable
+from typing import Iterable, List, cast
 
 from django.conf import settings
 from django.core.management import CommandError, call_command
+from django.core.management.base import CommandParser
 
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
@@ -11,13 +12,14 @@ from cl.citations.tasks import (
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.types import OptionsType
 from cl.search.models import Opinion
 
 
 class Command(VerboseCommand):
-    help = "Parse citations and parentheticals out of documents."
+    help = "Parse citations and parenthetical out of documents."
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--doc-id",
             type=int,
@@ -38,6 +40,12 @@ class Command(VerboseCommand):
             "--filed-after",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
+            "update.",
+        )
+        parser.add_argument(
+            "--filed-before",
+            type=valid_date_time,
+            help="End date in ISO-8601 format for a range of documents to "
             "update.",
         )
         parser.add_argument(
@@ -79,12 +87,13 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: List[str], **options: OptionsType) -> None:
         super(Command, self).handle(*args, **options)
         both_list_and_endpoints = options.get("doc_id") is not None and (
             options.get("start_id") is not None
             or options.get("end_id") is not None
             or options.get("filed_after") is not None
+            or options.get("filed_before") is not None
             or options.get("modified_after") is not None
         )
         no_option = not any(
@@ -93,6 +102,7 @@ class Command(VerboseCommand):
                 options.get("start_id") is None,
                 options.get("end_id") is None,
                 options.get("filed_after") is None,
+                options.get("filed_before") is None,
                 options.get("modified_after") is None,
                 options.get("all") is False,
             ]
@@ -118,16 +128,20 @@ class Command(VerboseCommand):
             query = query.filter(
                 cluster__date_filed__gte=options["filed_after"]
             )
+        if options.get("filed_before"):
+            query = query.filter(
+                cluster__date_filed__lte=options["filed_before"]
+            )
         if options.get("modified_after"):
             query = query.filter(date_modified__gte=options["modified_after"])
         if options.get("all"):
             query = Opinion.objects.all()
         self.count = query.count()
-        self.average_per_s = 0
-        self.timings = []
+        self.average_per_s = 0.0
+        self.timings: List[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
-        self.update_documents(opinion_pks, options["queue"])
-        self.add_to_solr(options["queue"])
+        self.update_documents(opinion_pks, cast(str, options["queue"]))
+        self.add_to_solr(cast(str, options["queue"]))
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
