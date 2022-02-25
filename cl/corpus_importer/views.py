@@ -74,21 +74,21 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
         raise Http404("No judge found. :(")
 
     judge = judge_page[0]
-    qs_education = judge.educations.all()
-    qs_politics = judge.political_affiliations.all()
-    qs_positions = judge.positions.all()
-    qs_sources = judge.sources.all()
+    qs_politics = judge.political_affiliations.all().order_by("date_start")
+    qs_education = judge.educations.all().order_by("degree_year")
+    qs_positions = judge.positions.all().order_by("date_start")
+    qs_sources = judge.sources.all().order_by("date_accessed")
     if request.method == "POST":
         # Update the record and redirect to the next one
         person_form = PersonForm(request.POST, instance=judge)
-        education_formset = EducationFormSet(
-            request.POST,
-            queryset=qs_education,
-            instance=judge,
-        )
         politics_formset = PoliticalAffiliationFormSet(
             request.POST,
             queryset=qs_politics,
+            instance=judge,
+        )
+        education_formset = EducationFormSet(
+            request.POST,
+            queryset=qs_education,
             instance=judge,
         )
         positions_formset = PositionsFormSet(
@@ -104,15 +104,15 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
         if all(
             [
                 person_form.is_valid(),
-                education_formset.is_valid(),
                 politics_formset.is_valid(),
+                education_formset.is_valid(),
                 positions_formset.is_valid(),
                 sources_formset.is_valid(),
             ]
         ):
             person_form.save()
-            education_formset.save()
             politics_formset.save()
+            education_formset.save()
             positions_formset.save()
             sources_formset.save()
             manual_source, created = Source.objects.get_or_create(
@@ -129,12 +129,12 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
     else:
         # Just a regular GET. Load the forms with the current data
         person_form = PersonForm(instance=judge)
-        education_formset = EducationFormSet(
-            queryset=qs_education,
-            instance=judge,
-        )
         politics_formset = PoliticalAffiliationFormSet(
             queryset=qs_politics,
+            instance=judge,
+        )
+        education_formset = EducationFormSet(
+            queryset=qs_education,
             instance=judge,
         )
         positions_formset = PositionsFormSet(
@@ -173,8 +173,8 @@ def ca_judges(request: AuthenticatedHttpRequest) -> HttpResponse:
             "title": make_title_str(judge),
             # Forms
             "person_form": person_form,
-            "education_formset": education_formset,
             "politics_formset": politics_formset,
+            "education_formset": education_formset,
             "positions_formset": positions_formset,
             "sources_formset": sources_formset,
             # Etc

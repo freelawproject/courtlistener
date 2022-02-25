@@ -63,23 +63,23 @@
 
         <div class="form-group">
           <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
-            <h2 class="v-offset-above-3">Education {% if education_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
-          </div>
-        </div>
-        {{ education_formset.management_form }}
-        {% for education_form in education_formset %}
-          {% include "includes/field_section.html" with form=education_form %}
-          {% if not forloop.last  %}<hr>{% endif %}
-        {% endfor %}
-
-        <div class="form-group">
-          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
             <h2 class="v-offset-above-3">Politics {% if politics_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
           </div>
         </div>
         {{ politics_formset.management_form }}
         {% for politics_form in politics_formset %}
           {% include "includes/field_section.html" with form=politics_form %}
+          {% if not forloop.last  %}<hr>{% endif %}
+        {% endfor %}
+
+        <div class="form-group">
+          <div class="col-xs-offset-2 col-md-offset-3 col-sm-10">
+            <h2 class="v-offset-above-3">Education {% if education_formset.errors %}<i class="fa fa-warning red"></i>{% endif %}</h2>
+          </div>
+        </div>
+        {{ education_formset.management_form }}
+        {% for education_form in education_formset %}
+          {% include "includes/field_section.html" with form=education_form %}
           {% if not forloop.last  %}<hr>{% endif %}
         {% endfor %}
 
