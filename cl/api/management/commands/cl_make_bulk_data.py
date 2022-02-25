@@ -112,47 +112,72 @@ class Command(VerboseCommand):
         ]
 
         logger.info(
-            f"Starting bulk file creation with {len(kwargs_list)} celery tasks..."
+            f"Starting bulk file creation with {len(kwargs_list)} celery "
+            f"tasks..."
         )
         for kwargs in kwargs_list:
             make_bulk_data_and_swap_it_in(
                 courts, settings.BULK_DATA_DIR, kwargs
             )
 
-        # Make the citation bulk data
-        obj_type_str = "citations"
-        logger.info(" - Creating bulk data CSV for citations...")
-        tmp_destination = join(settings.BULK_DATA_DIR, "tmp", obj_type_str)
-        final_destination = join(settings.BULK_DATA_DIR, obj_type_str)
-        self.make_citation_data(tmp_destination)
-        logger.info("   - Swapping in the new citation archives...")
+        # Make the citation and parenthetical bulk data
+        csv_dump_infos = [
+            {
+                "obj_type_str": "citations",
+                "table": "search_opinionscited",
+                "columns": "citing_opinion_id, cited_opinion_id, depth",
+            },
+            {
+                "obj_type_str": "parentheticals",
+                "table": "search_parenthetical",
+                "columns": "describing_opinion_id, described_opinion_id, text, score",
+            },
+        ]
 
-        Path(final_destination).mkdir(parents=True, exist_ok=True)
-        shutil.move(
-            join(tmp_destination, "all.csv.gz"),
-            join(final_destination, "all.csv.gz"),
-        )
+        for csv_dump_info in csv_dump_infos:
+            obj_type_str = csv_dump_info["obj_type_str"]
+            logger.info(f" - Creating bulk data CSV for {obj_type_str}...")
+            tmp_destination = join(settings.BULK_DATA_DIR, "tmp", obj_type_str)
+            final_destination = join(settings.BULK_DATA_DIR, obj_type_str)
+            self.make_citation_data(tmp_destination, csv_dump_info)
+            logger.info(f"   - Swapping in the new {obj_type_str} archives...")
+
+            Path(final_destination).mkdir(parents=True, exist_ok=True)
+            shutil.move(
+                join(tmp_destination, "all.csv.gz"),
+                join(final_destination, "all.csv.gz"),
+            )
 
         logger.info("Done.\n")
 
     @staticmethod
-    def make_citation_data(tmp_destination: str) -> None:
-        """Because citations are paginated and because as of this moment there
-        are 11M citations in the database, we cannot provide users with a bulk
-        data file containing the complete objects for every citation.
+    def make_citation_data(
+        tmp_destination: str, csv_dump_info: Dict[str, str]
+    ) -> None:
+        """Dump the DB for citations and parentheticals to a CSV.
 
-        Instead of doing that, we dump our citation table with a shell command,
-        which provides people with compact and reasonable data they can import.
+        Generating a JSON file for every citation or parenthetical is not
+        good for anybody. Instead of doing that, we dump our citation and
+        parenthetical tables with a shell command. This provides people with
+        compact and reasonable data they can import.
+
+        :param tmp_destination: Where to create the CSV.
+        :param csv_dump_info: A dict containing info about how to select the
+        correct columns from the correct table in the DB.
         """
         Path(tmp_destination).mkdir(parents=True, exist_ok=True)
-        logger.info("   - Copying the citations table to disk...")
+        logger.info(
+            f"   - Copying the {csv_dump_info['obj_type_str']} table to disk..."
+        )
 
         # This command calls the psql COPY command and requests that it dump
-        # the citation table to disk as a compressed CSV.
+        # the table to disk as a compressed CSV.
         default_db = settings.DATABASES["default"]
         os.system(
-            """PGPASSWORD="{password}" psql -c "COPY \\"search_opinionscited\\" (citing_opinion_id, cited_opinion_id, depth) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
+            """PGPASSWORD="{password}" psql -c "COPY \\"{table}}\\" ({columns}) to stdout DELIMITER ',' CSV HEADER" --host {host} --dbname {database} --username {username} | gzip > {destination}""".format(
                 password=default_db["PASSWORD"],
+                table=csv_dump_info["table"],
+                columns=csv_dump_info["columns"],
                 host=default_db["HOST"],
                 database=default_db["NAME"],
                 username=default_db["USER"],
