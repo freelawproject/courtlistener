@@ -43,6 +43,12 @@ class Command(VerboseCommand):
             "update.",
         )
         parser.add_argument(
+            "--filed-before",
+            type=valid_date_time,
+            help="End date in ISO-8601 format for a range of documents to "
+            "update.",
+        )
+        parser.add_argument(
             "--modified-after",
             type=valid_date_time,
             help="The modification date ISO-8601 format for a range of "
@@ -87,6 +93,7 @@ class Command(VerboseCommand):
             options.get("start_id") is not None
             or options.get("end_id") is not None
             or options.get("filed_after") is not None
+            or options.get("filed_before") is not None
             or options.get("modified_after") is not None
         )
         no_option = not any(
@@ -95,6 +102,7 @@ class Command(VerboseCommand):
                 options.get("start_id") is None,
                 options.get("end_id") is None,
                 options.get("filed_after") is None,
+                options.get("filed_before") is None,
                 options.get("modified_after") is None,
                 options.get("all") is False,
             ]
@@ -119,6 +127,10 @@ class Command(VerboseCommand):
         if options.get("filed_after"):
             query = query.filter(
                 cluster__date_filed__gte=options["filed_after"]
+            )
+        if options.get("filed_before"):
+            query = query.filter(
+                cluster__date_filed__lte=options["filed_before"]
             )
         if options.get("modified_after"):
             query = query.filter(date_modified__gte=options["modified_after"])
