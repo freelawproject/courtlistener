@@ -22,6 +22,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
+from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
@@ -29,8 +30,6 @@ from cl.search.tasks import add_docket_to_solr_by_rds, add_items_to_solr
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
-
-OptionsType = Dict[str, Union[str, Callable]]
 
 
 def get_next_date_range(
