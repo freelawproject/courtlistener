@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
+{% load admin_urls %}
+
 
 {% block title %}California Judge Data Entry — Staff Members Only – CourtListener.com{% endblock %}
 
@@ -34,6 +36,10 @@
           <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}+site%3Aballotpedia.org" target="_blank">Ballotpedia</a></span>
           <span class="meta-data-value"><a href="https://www.martindale.com/search/attorneys/?term={{ judge.name_first }}%20{{ judge.name_last }}" target="_blank">Martindale</a></span>
           <span class="meta-data-value"><a href="https://trellis.law/judges/ca/?s={{ judge.name_last }}" target="_blank">Trellis</a></span>
+          {% if perms.people_db.change_person %}
+            <span class="meta-data-value"><a href="{% url 'admin:people_db_person_change' judge.id %}" target="_blank" class="btn btn-primary">Admin</a></span>
+          {% endif %}
+        </p>
 
         </p>
         <p>
