@@ -191,7 +191,7 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
 
 
 @receiver(post_save, sender=UserProfile)
-def assign_recap_email(sender, instance=None, created=False, **kwargs):
+def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()
