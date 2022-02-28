@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
 from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from django.conf import settings
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
     FullCaseCitation,
-    FullCitation,
     FullJournalCitation,
     FullLawCitation,
     Resource,
@@ -206,11 +205,11 @@ def filter_by_matching_antecedent(
 
 
 def resolve_fullcase_citation(
-    full_citation: FullCitation,
+    full_citation: FullCaseCitation,
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
-        db_search_results: List[ExtraSolrSearch] = search_db_for_fullcitation(
+        db_search_results: SolrResponse = search_db_for_fullcitation(
             full_citation
         )
 
