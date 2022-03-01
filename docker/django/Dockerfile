@@ -67,6 +67,9 @@ COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root
 RUN poetry install --no-root --extras flp
 
+# Download nltk corpuses
+RUN python -m nltk.downloader stopwords punkt
+
 # Remove unneeded utilities to slim the image
 RUN apt purge --assume-yes \
         build-essential curl gcc git python3-dev \
