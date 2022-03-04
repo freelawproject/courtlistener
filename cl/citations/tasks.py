@@ -11,7 +11,6 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
-from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -20,6 +19,7 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
+from cl.citations.score_parentheticals import parenthetical_score
 from cl.lib.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import (
     Opinion,
@@ -182,7 +182,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                                 describing_opinion_id=opinion.pk,
                                 described_opinion_id=_opinion.pk,
                                 text=clean,
-                                score=description_score(
+                                score=parenthetical_score(
                                     clean, opinion.cluster
                                 ),
                             )

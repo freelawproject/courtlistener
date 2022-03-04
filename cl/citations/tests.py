@@ -20,7 +20,6 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
-from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -41,6 +40,7 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -1062,7 +1062,7 @@ class DescriptionScoreTest(SimpleTestCase):
         failed_cases = []
         for (desc_a, desc_b, correct_idx) in test_cases:
             score_a, score_b = (
-                description_score(
+                parenthetical_score(
                     desc[0], OpinionCluster(citation_count=desc[1])
                 )
                 for desc in (desc_a, desc_b)
@@ -1082,7 +1082,7 @@ class DescriptionScoreTest(SimpleTestCase):
     def test_handles_zero_citation_count(self):
         # Just a basic smoke test to ensure it doesn't blow up when the citation count is 0
         cluster = OpinionCluster(citation_count=0)
-        result = description_score(
+        result = parenthetical_score(
             "some parenthetical, it's not important what", cluster
         )
         self.assertGreater(result, 0)
