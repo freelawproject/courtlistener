@@ -25,7 +25,7 @@ ALLOWED_NUM_WORDS_DEVIATION = 5
 MINIMUM_WORDS_DESCRIPTIVE = 10
 
 
-def description_score(
+def parenthetical_score(
     description: str, citing_opinion_cluster: OpinionCluster
 ) -> float:
     """

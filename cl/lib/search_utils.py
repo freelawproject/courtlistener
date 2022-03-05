@@ -10,6 +10,10 @@ from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse
 
+from cl.citations.group_parentheticals import (
+    ParentheticalGroup,
+    get_parenthetical_groups,
+)
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
@@ -1029,6 +1033,40 @@ def add_depth_counts(
             return cited_cluster
     else:
         return None
+
+
+def get_parenthetical_groups_with_cache(
+    cluster: OpinionCluster,
+) -> List[ParentheticalGroup]:
+    """
+    Given an opinion cluster, get its parentheticals and categorize them
+    into groups based on textual similarity.
+
+    :param cluster: The cluster to fetch and group parentheticals for
+    :return: A list of ParentheticalGroup's for the given cluster
+    """
+
+    cache_key = f"parenthetical_groups:{cluster.pk}"
+    cache = caches["db_cache"]
+    cached_groups, cached_num_parentheticals = cache.get(
+        cache_key, (None, None)
+    )
+    current_num_parentheticals = cluster.parentheticals.count()
+    if (
+        cached_groups is not None
+        # Groups will be recomputed when new parentheticals are added
+        and cached_num_parentheticals == current_num_parentheticals
+    ):
+        return cached_groups
+
+    # If the case has more than 1,000 parentheticals, only use the top 1,000
+    parentheticals = list(cluster.parentheticals[:1000])
+    groups = get_parenthetical_groups(parentheticals)
+    # Cache is in the DB (which lacks TTL primitives) and gets updated when
+    # new parentheticals are created. Thus, no need to expire it.
+    cache.set(cache_key, (groups, current_num_parentheticals), None)
+
+    return groups
 
 
 def get_citing_clusters_with_cache(
