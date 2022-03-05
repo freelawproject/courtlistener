@@ -544,7 +544,6 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             "cluster": cluster,
             "private": cluster.blocked,
             "parenthetical_groups": parenthetical_groups,
-            "summaries": cluster.parentheticals,
             "summaries_count": cluster.parentheticals.count(),
         },
     )
