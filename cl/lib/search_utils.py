@@ -1062,7 +1062,7 @@ def get_parenthetical_groups_with_cache(
     # If the case has more than 1,000 parentheticals, only use the top 1,000
     parentheticals = list(cluster.parentheticals[:1000])
     groups = get_parenthetical_groups(parentheticals)
-    # Cache is in the DB (which lacks TTL primitives) and gets updated when 
+    # Cache is in the DB (which lacks TTL primitives) and gets updated when
     # new parentheticals are created. Thus, no need to expire it.
     cache.set(cache_key, (groups, current_num_parentheticals), None)
 
