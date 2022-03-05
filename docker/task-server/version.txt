@@ -1,5 +1,6 @@
-1.0.77
+1.0.78
 
+1.0.78 - Add deps for parenthetical grouping
 1.0.77 - Improve logging for disclosures, improve parentheticals, fix bug in citation urls handling.
 1.0.76 - Bump courts-db.
 1.0.75 - Bump courts-db. Upgrade model to include parentheticals.
