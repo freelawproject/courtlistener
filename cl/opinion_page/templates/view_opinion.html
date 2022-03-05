@@ -94,10 +94,7 @@
                 {% with summary=group.representative %}
                 <li>
                   {{ summary.text|truncatewords:50|capfirst }}
-                    (from <a href="{{ summary.describing_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                      {# The below line needs to be all one line or spaces get inserted where they shouldn't be #}
-                      {{ summary.describing_opinion.cluster.caption|safe|truncatewords:10|v_wrapper }}</a>{% if group.size > 1 %}
-                        <span>and {{ group.size|add:"-1"|intcomma }} other{{ group.size|add:"-1"|pluralize }}</span>{% endif %})
+                    (from {{ group.size|intcomma }} case{{ group.size|pluralize }})
                 </li>
                 {% endwith %}
               {% endfor %}
