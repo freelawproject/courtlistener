@@ -10,7 +10,6 @@ from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
-from cl.lib.db_tools import queryset_generator
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import make_docket_number_core, make_upload_path
@@ -28,7 +27,6 @@ from cl.lib.storage import UUIDFileSystemStorage
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
-from cl.scrapers.models import UrlHash
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
 
@@ -59,63 +57,6 @@ class TestPacerUtils(TestCase):
             msg="Bankruptcy dockets that start blocked "
             "should stay blocked.",
         )
-
-
-class TestDBTools(TestCase):
-    # This fixture uses UrlHash objects b/c they've been around a long while
-    # and are wickedly simple objects.
-    fixtures = ["test_queryset_generator.json"]
-
-    def test_queryset_generator(self) -> None:
-        """Does the generator work properly with a variety of queries?"""
-        tests = [
-            {"query": UrlHash.objects.filter(pk__in=["BAD ID"]), "count": 0},
-            {"query": UrlHash.objects.filter(pk__in=["0"]), "count": 1},
-            {"query": UrlHash.objects.filter(pk__in=["0", "1"]), "count": 2},
-        ]
-        for test in tests:
-            print(
-                f"Testing queryset_generator with {test['count']} expected results...",
-                end="",
-            )
-            count = 0
-            for _ in queryset_generator(test["query"]):
-                count += 1
-            self.assertEqual(count, test["count"])
-            print("✓")
-
-    def test_queryset_generator_values_query(self) -> None:
-        """Do values queries work?"""
-        print(
-            "Testing raising an error when we can't get a PK in a values "
-            "query...",
-            end="",
-        )
-        self.assertRaises(
-            Exception,
-            queryset_generator(UrlHash.objects.values("sha1")),
-            msg="Values query did not fail when pk was not provided.",
-        )
-        print("✓")
-
-        print("Testing a good values query...", end="")
-        self.assertEqual(
-            sum(1 for _ in queryset_generator(UrlHash.objects.values())),
-            2,
-        )
-        print("✓")
-
-    def test_queryset_generator_chunking(self) -> None:
-        """Does chunking work properly without duplicates or omissions?"""
-        print(
-            "Testing if queryset_iterator chunking returns the right "
-            "number of results...",
-            end="",
-        )
-        expected_count = 2
-        results = queryset_generator(UrlHash.objects.all(), chunksize=1)
-        self.assertEqual(expected_count, sum(1 for _ in results))
-        print("✓")
 
 
 class TestStringUtils(SimpleTestCase):

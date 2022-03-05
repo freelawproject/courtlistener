@@ -9,7 +9,6 @@ from cl.lasc.models import QueuedCase, QueuedPDF
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 
 
 def date_search(options):
@@ -115,14 +114,15 @@ def process_pdf_queue(options):
 
     :return: None
     """
-    pdf_pks = queryset_generator(
+    pdf_pks = (
         QueuedPDF.objects.all()
         .order_by("-document_id")
         .values_list("pk", flat=True)
     )
+
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    for pdf_pk in pdf_pks:
+    for pdf_pk in pdf_pks.iterator():
         throttle.maybe_wait()
         tasks.download_pdf.apply_async(kwargs={"pdf_pk": pdf_pk}, queue=q)
 
