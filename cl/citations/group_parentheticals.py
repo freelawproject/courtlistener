@@ -36,15 +36,15 @@ from math import ceil
 from typing import Dict, List, Set
 
 from datasketch import MinHash, MinHashLSH
-from nltk import wordpunct_tokenize
-from nltk.corpus import stopwords
+from Stemmer import Stemmer
 
+from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical
 
 Graph = Dict[str, List[str]]
 
-STOP_WORDS = set(stopwords.words("english"))
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
+
 
 # Initializing the LSH/Minhashes is very slow because it has to generate
 # a ton of random numbers. But we can avoid repeating that work
@@ -53,6 +53,10 @@ GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 # to work, but it does, perfectly, and gives us a huge speed-up.
 _EMPTY_SIMILARITY_INDEX = MinHashLSH(threshold=0.33, num_perm=64)
 _EMPTY_MHASH = MinHash(num_perm=64)
+
+# We initialize the stemmer once and reuse it because it internally caches
+# frequently seen tokens, giving us a performance benefit if we reuse it.
+stemmer = Stemmer("english")
 
 
 @dataclass
@@ -245,12 +249,9 @@ def get_parenthetical_tokens(text: str) -> List[str]:
     # Remove non-alphanumeric and non-whitespace characters from text
     cleaned_text = re.sub(r"[^A-Za-z0-9 ]+", "", text).lower()
     # Split text into tokens and remove stop words (e.g. "that", "and", "of")
-    tokens = [
-        word
-        for word in wordpunct_tokenize(cleaned_text)
-        if word not in STOP_WORDS
-    ]
+    tokens = [word for word in cleaned_text.split() if word not in STOP_WORDS]
     # Treat "holding", "recognizing" etc. at first position as a stop word
     if len(tokens) > 0 and GERUND_WORD.match(tokens[0]):
         del tokens[0]
+    tokens = stemmer.stemWords(tokens)
     return tokens
