@@ -45,13 +45,16 @@ Graph = Dict[str, List[str]]
 
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 
+SIMILARITY_THRESHOLD = 0.4
 
 # Initializing the LSH/Minhashes is very slow because it has to generate
 # a ton of random numbers. But we can avoid repeating that work
 # every time we compute groups by simply using python's deepcopy
 # method to clone this reference object. It really seems too stupid
 # to work, but it does, perfectly, and gives us a huge speed-up.
-_EMPTY_SIMILARITY_INDEX = MinHashLSH(threshold=0.33, num_perm=64)
+_EMPTY_SIMILARITY_INDEX = MinHashLSH(
+    threshold=SIMILARITY_THRESHOLD, num_perm=64
+)
 _EMPTY_MHASH = MinHash(num_perm=64)
 
 # We initialize the stemmer once and reuse it because it internally caches
