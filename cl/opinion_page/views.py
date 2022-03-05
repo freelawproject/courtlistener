@@ -3,6 +3,7 @@ from itertools import groupby
 from typing import Dict, Optional, Tuple, Union
 from urllib.parse import urlencode
 
+import waffle
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
@@ -505,7 +506,13 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         related_search_params,
     ) = get_related_clusters_with_cache(cluster, request)
 
-    parenthetical_groups = get_parenthetical_groups_with_cache(cluster)
+    ignore_parenthetical_cache = not waffle.flag_is_active(
+        request, "parenthetical_caching"
+    )
+    parenthetical_groups = get_parenthetical_groups_with_cache(
+        cluster,
+        ignore_cache=ignore_parenthetical_cache,
+    )
     return render(
         request,
         "view_opinion.html",
