@@ -32,7 +32,7 @@ https://github.com/freelawproject/courtlistener/pull/1941
 import re
 from copy import deepcopy
 from dataclasses import dataclass
-from math import ceil
+from math import ceil, log10
 from typing import Dict, List, Set
 
 from datasketch import MinHash, MinHashLSH
@@ -45,16 +45,15 @@ Graph = Dict[str, List[str]]
 
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 
-SIMILARITY_THRESHOLD = 0.4
+MINIMUM_SIMILARITY_THRESHOLD = 0.33
+BASELINE_SIMILARITY_THRESHOLD = 0.45
 
 # Initializing the LSH/Minhashes is very slow because it has to generate
 # a ton of random numbers. But we can avoid repeating that work
 # every time we compute groups by simply using python's deepcopy
 # method to clone this reference object. It really seems too stupid
 # to work, but it does, perfectly, and gives us a huge speed-up.
-_EMPTY_SIMILARITY_INDEX = MinHashLSH(
-    threshold=SIMILARITY_THRESHOLD, num_perm=64
-)
+_EMPTY_SIMILARITY_INDEX_CACHE: Dict[float, MinHashLSH] = {}
 _EMPTY_MHASH = MinHash(num_perm=64)
 
 # We initialize the stemmer once and reuse it because it internally caches
@@ -91,7 +90,7 @@ def get_parenthetical_groups(
     if len(parentheticals) == 0:
         return []
 
-    similarity_index = deepcopy(_EMPTY_SIMILARITY_INDEX)
+    similarity_index = get_similarity_index(len(parentheticals))
     parenthetical_objects: Dict[str, Parenthetical] = {}
     parenthetical_minhashes: Dict[str, MinHash] = {}
 
@@ -125,6 +124,37 @@ def get_parenthetical_groups(
     return sorted(
         parenthetical_groups, key=lambda group: group.score, reverse=True
     )
+
+
+def get_similarity_index(num_parentheticals: int) -> MinHashLSH:
+    """
+    Get a MinHashLSH index with the correct similarity threshold given the
+    number of parentheticals. The similarity threshold for grouping decreases
+    logarithmically  as the number of parentheticals increases, as we want to
+    cluster more aggressively when there are many more parentheticals.
+
+    This method maintains a cache of empty MinHashLSH objects because initializing
+    the object is very expensive.
+
+    :param num_parentheticals: The number of parentheticals that will be grouped
+    using the index
+    :return: A MinHashLSH index with the correct similarity threshold for the given
+    number of parentheticals
+    """
+    # Round the threshold so we don't require precise matches of threshold in
+    # order to use a cached MinHashLSH
+    similarity_threshold = round(
+        max(
+            BASELINE_SIMILARITY_THRESHOLD - 0.05 * log10(num_parentheticals),
+            MINIMUM_SIMILARITY_THRESHOLD,
+        ),
+        2,
+    )
+    if similarity_threshold not in _EMPTY_SIMILARITY_INDEX_CACHE:
+        _EMPTY_SIMILARITY_INDEX_CACHE[similarity_threshold] = MinHashLSH(
+            threshold=similarity_threshold, num_perm=64
+        )
+    return deepcopy(_EMPTY_SIMILARITY_INDEX_CACHE[similarity_threshold])
 
 
 def get_similarity_graph(
