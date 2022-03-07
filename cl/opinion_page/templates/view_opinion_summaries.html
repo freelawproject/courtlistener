@@ -8,11 +8,7 @@
 {% block description %}Summaries of {{ title }}{% endblock %}
 {% block og_description %}
   {% if summaries_count > 0 %}
-    {{ summaries_count|intcomma }} summaries were extracted from other cases. The top one: &quot;{{ parenthetical_groups.0.representative.text }}
-    &quot;.
-  {% else %}
-    No summaries found for {{ title }}.
-  {% endif %}
+    {{ summaries_count|intcomma }} summaries were extracted from other cases — {{ parenthetical_groups.0.representative.text }}{% else %}No summaries found for {{ title }}{% endif %} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.
 {% endblock %}
 
 {% block navbar-o %}active{% endblock %}
@@ -40,22 +36,22 @@
         from other cases.</h3>
       {% if summaries_count > 0 %}
         <p>We looked through our complete collection of opinions for parenthetical summaries of this case and
-          organized them into the following {{ parenthetical_groups|length }}
-          group{{ parenthetical_groups|length|pluralize }}:</p>
+          organized them into {{ parenthetical_groups|length }}
+          group{{ parenthetical_groups|length|pluralize }}.</p>
       {% endif %}
       <hr>
       <ul>
         {% for group in parenthetical_groups %}
           {% with representative=group.representative %}
             {% with representative_cluster=representative.describing_opinion.cluster %}
-              <li class="v-offset-below-1">
+              <li class="v-offset-below-2">
                 {{ representative.text|capfirst }}
                 <br/>
                 <div class="summary-group-metadata">
                   <span class="bullet-tail">{{ representative_cluster.date_filed }}</span>
                   <span class="bullet-tail">
                           <a href="{{ representative_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                              {{ representative_cluster.caption|safe|v_wrapper }}
+                              {{ representative_cluster|best_case_name|safe }}
                           </a>
                         </span>
                   <span class="bullet-tail">{{ representative_cluster.docket.court }}</span>
@@ -78,7 +74,7 @@
                       <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
                       <span class="bullet-tail">
                           <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                              {{ describing_cluster.caption|safe|v_wrapper }}
+                              {{ describing_cluster|best_case_name|safe }}
                           </a>
                         </span>
                       <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
