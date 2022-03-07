@@ -333,6 +333,7 @@ REST_FRAMEWORK = {
         # Sent multiple emails, but no response.
         "bchecker": "1/hour",
         "JaneDoe": "1/hour",
+        "chinamkm": "1/hour",
         "shreyngd": "100/hour",
         "leo": "100/hour",
         "miffy": "100/hour",
