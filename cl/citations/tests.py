@@ -862,6 +862,10 @@ class FilterParentheticalTest(SimpleTestCase):
             "cited in Heart of Atlanta Motel v. United States",
             "quoting Hart Steel Co. v. Railroad Supply Co., 244 U.S. 294, 299, 37 S. Ct. 506, 508, 61 L. Ed. 1148 (1917)",
             "collecting cases",
+            "holding that too short",
+            "First Amendment",
+            "mislabeled product",
+            "Section 403(d)(2)",
         ]
         for i, parenthetical_text in enumerate(fixtures):
             with self.subTest(
@@ -879,12 +883,10 @@ class FilterParentheticalTest(SimpleTestCase):
             "where plaintif's complaint alleges facts which, if proven, would entitle plaintiff to relief under the Eighth Amendment, dismissal of complaint was inappropriate",
             "ruling that there is nothing either legal or illegal, only thinking makes it so",
             "testing that the mere presence of the word quotation doesn't get a parenthetical filtered out if it's long enough",
-            "First Amendment",
-            "mislabeled product",
             '"Look on my Works, ye Mighty, and despair"',
             '"Texas does not seek to have the Court interpret the Constitution, so much as disregard it."',
             "questioning whether he who made the Lamb made thee",
-            "Section 403(d)(2)",
+            "holding that just long enough",
         ]
 
         for i, parenthetical_text in enumerate(fixtures):
