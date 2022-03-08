@@ -45,7 +45,7 @@ Graph = Dict[str, List[str]]
 
 GERUND_WORD = re.compile(r"(?:\S+ing)", re.IGNORECASE)
 
-MINIMUM_SIMILARITY_THRESHOLD = 0.33
+MINIMUM_SIMILARITY_THRESHOLD = 0.35
 BASELINE_SIMILARITY_THRESHOLD = 0.50
 
 # Initializing the LSH/Minhashes is very slow because it has to generate
