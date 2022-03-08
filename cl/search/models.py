@@ -2235,6 +2235,20 @@ class OpinionCluster(AbstractDateTimeModel):
         )
 
     @property
+    def parenthetical_groups(self):
+        return (
+            ParentheticalGroup.objects.filter(
+                opinion__in=self.sub_opinions.values_list("pk", flat=True)
+            )
+            .prefetch_related(
+                "parentheticals__describing_opinion__cluster__citations",
+                "parentheticals__describing_opinion__cluster__docket__court",
+                "representative__describing_opinion__cluster__citations",
+            )
+            .order_by("-score")
+        )
+
+    @property
     def authority_count(self):
         return self.authorities.count()
 
@@ -2854,6 +2868,13 @@ class Parenthetical(models.Model):
     described_opinion = models.ForeignKey(
         Opinion, related_name="parentheticals", on_delete=models.CASCADE
     )
+    group = models.ForeignKey(
+        "ParentheticalGroup",
+        related_name="parentheticals",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
     text = models.TextField(
         help_text="The text of the description as written in the describing opinion",
     )
@@ -2868,6 +2889,35 @@ class Parenthetical(models.Model):
 
     class Meta:
         verbose_name_plural = "Opinion parentheticals"
+
+
+class ParentheticalGroup(models.Model):
+    opinion = models.ForeignKey(
+        Opinion,
+        related_name="parenthetical_groups",
+        on_delete=models.CASCADE,
+        help_text="The opinion that the parentheticals in the group describe",
+    )
+    representative = models.ForeignKey(
+        Parenthetical,
+        related_name="represented_group",
+        on_delete=models.CASCADE,
+        help_text="The representative (i.e. high-ranked and similar to the cluster as a whole) parenthetical for the group",
+    )
+    score = models.FloatField(
+        default=0.0,
+        help_text="A score between 0 and 1 representing the quality of the parenthetical group",
+    )
+    size = models.IntegerField(
+        help_text="The number of parentheticals that belong to the group"
+    )
+
+    def __str__(self) -> str:
+        return f"Parenthetical group for opinion {self.opinion_id} (score {self.score})"
+
+    class Meta:
+        verbose_name_plural = "Parenthetical groups"
+        indexes = [models.Index(fields=["score"])]
 
 
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
