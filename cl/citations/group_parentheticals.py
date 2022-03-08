@@ -9,7 +9,7 @@ information in the limited space we have and (b) identify which ideas are most
 often described so that we can rank them higher in the results.
 
 The main outward-facing function is :get_parenthetical_groups, which takes in
-a list of Parenthetical objects and returns a list of ParentheticalGroup
+a list of Parenthetical objects and returns a list of ComputedParentheticalGroup
 objects containing those parentheticals and certain metadata about the groups.
 
 Implementation-wise, we are doing an approximation of Jaccard similarity
@@ -62,30 +62,31 @@ stemmer = Stemmer("english")
 
 
 @dataclass
-class ParentheticalGroup:
+class ComputedParentheticalGroup:
+    # So named to avoid collision with the database model named ParentheticalGroup
     parentheticals: List[Parenthetical]
     representative: Parenthetical
     size: int
     score: float
 
 
-def get_parenthetical_groups(
+def compute_parenthetical_groups(
     parentheticals: List[Parenthetical],
-) -> List[ParentheticalGroup]:
+) -> List[ComputedParentheticalGroup]:
     """
     Given a list of parentheticals for a case, cluster them based on textual
-    similarity and returns a list of ParentheticalGroup objects containing
+    similarity and returns a list of ComputedParentheticalGroup objects containing
     these clusters and their metadata.
 
     For example, imagine that a case makes three important
     points of law, and that those are summarized in 200 parentheticals.
     In that case, what we'd want to do is take those 200 parentheticals
     and identify which of them are basically the same, and then merge
-    them into three ParentheticalGroups (one for each point of law).
+    them into three ComputedParentheticalGroups (one for each point of law).
     From there, we put those in a list and return the list of groups.
 
     :param parentheticals: A list of parentheticals to organize into groups
-    :return: A list of ParentheticalGroup's containing the given parentheticals
+    :return: A list of ComputedParentheticalGroup's containing the given parentheticals
     """
     if len(parentheticals) == 0:
         return []
@@ -108,7 +109,7 @@ def get_parenthetical_groups(
         parenthetical_minhashes, similarity_index
     )
 
-    parenthetical_groups: List[ParentheticalGroup] = []
+    parenthetical_groups: List[ComputedParentheticalGroup] = []
     visited_nodes: Set[str] = set()
     for node, neighbors in similarity_graph.items():
         if component := get_graph_component(
@@ -210,19 +211,19 @@ def get_group_from_component(
     component: List[str],
     parenthetical_objects: Dict[str, Parenthetical],
     similarity_graph: Graph,
-) -> ParentheticalGroup:
+) -> ComputedParentheticalGroup:
     """
     Given a list of parenthetical IDs representing a component, create a
-    ParentheticalGroup containing the corresponding parenthetical objects,
+    ComputedParentheticalGroup containing the corresponding parenthetical objects,
     the most representative parenthetical from among the component, and
     sort the parentheticals by their descriptiveness score.
 
-    :param component: A list of parenthetical IDs to turn into a ParentheticalGroup
+    :param component: A list of parenthetical IDs to turn into a ComputedParentheticalGroup
     :param parenthetical_objects: A dictionary mapping parenthetical IDs to the
     corresponding parenthetical objects
     :param similarity_graph: A dictionary containing similarity relationships
     between parentheticals
-    :return: A ParentheticalGroup corresponding to the given component
+    :return: A ComputedParentheticalGroup corresponding to the given component
     """
     pars_in_group = sorted(
         (parenthetical_objects[par_id] for par_id in component),
@@ -237,7 +238,7 @@ def get_group_from_component(
     representative = get_representative_parenthetical(
         pars_in_group, similarity_graph
     )
-    parenthetical_group = ParentheticalGroup(
+    parenthetical_group = ComputedParentheticalGroup(
         parentheticals=pars_in_group,
         representative=representative,
         size=len(pars_in_group),

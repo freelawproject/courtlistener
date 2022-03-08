@@ -25,9 +25,9 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
-    ParentheticalGroup,
+    ComputedParentheticalGroup,
+    compute_parenthetical_groups,
     get_graph_component,
-    get_parenthetical_groups,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
@@ -1230,7 +1230,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 # We flatten it into a single list and see if the algorithm
                 # comes up with the same groupings when we pass it the flat list
                 flat = list(itertools.chain.from_iterable(groups))
-                output_groups = get_parenthetical_groups(flat)
+                output_groups = compute_parenthetical_groups(flat)
                 output_sets = frozenset(
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )
