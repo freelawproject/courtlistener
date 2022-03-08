@@ -2224,29 +2224,17 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def parentheticals(self):
-        return (
-            Parenthetical.objects.filter(
-                described_opinion_id__in=self.sub_opinions.values_list(
-                    "pk", flat=True
-                )
+        return Parenthetical.objects.filter(
+            described_opinion_id__in=self.sub_opinions.values_list(
+                "pk", flat=True
             )
-            .prefetch_related("describing_opinion__cluster__citations")
-            .order_by("-score")
-        )
+        ).order_by("-score")
 
     @property
     def parenthetical_groups(self):
-        return (
-            ParentheticalGroup.objects.filter(
-                opinion__in=self.sub_opinions.values_list("pk", flat=True)
-            )
-            .prefetch_related(
-                "parentheticals__describing_opinion__cluster__citations",
-                "parentheticals__describing_opinion__cluster__docket__court",
-                "representative__describing_opinion__cluster__citations",
-            )
-            .order_by("-score")
-        )
+        return ParentheticalGroup.objects.filter(
+            opinion__in=self.sub_opinions.values_list("pk", flat=True)
+        ).order_by("-score")
 
     @property
     def authority_count(self):

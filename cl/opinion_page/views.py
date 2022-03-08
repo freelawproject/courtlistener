@@ -29,6 +29,10 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
+from cl.citations.parenthetical_utils import (
+    create_parenthetical_groups,
+    get_or_create_parenthetical_groups,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
@@ -40,7 +44,6 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
-    get_parenthetical_groups_with_cache,
     get_related_clusters_with_cache,
     make_get_string,
 )
@@ -506,13 +509,9 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         related_search_params,
     ) = get_related_clusters_with_cache(cluster, request)
 
-    ignore_parenthetical_cache = not waffle.flag_is_active(
-        request, "parenthetical_caching"
-    )
-    parenthetical_groups = get_parenthetical_groups_with_cache(
+    parenthetical_groups = get_or_create_parenthetical_groups(
         cluster,
-        ignore_cache=ignore_parenthetical_cache,
-    )
+    )[:3]
     return render(
         request,
         "view_opinion.html",
@@ -527,7 +526,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "citing_cluster_count": citing_cluster_count,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
-            "top_parenthetical_groups": parenthetical_groups[:3],
+            "top_parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
@@ -541,7 +540,14 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 @ratelimit_if_not_whitelisted
 def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    parenthetical_groups = get_parenthetical_groups_with_cache(cluster)
+    parenthetical_groups = list(
+        get_or_create_parenthetical_groups(cluster).prefetch_related(
+            "parentheticals__describing_opinion__cluster__citations",
+            "parentheticals__describing_opinion__cluster__docket__court",
+            "representative__describing_opinion__cluster__citations",
+            "representative__describing_opinion__cluster__docket__court",
+        )
+    )
 
     return render(
         request,
