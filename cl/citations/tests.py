@@ -50,6 +50,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -625,7 +626,7 @@ class UpdateTest(IndexedSolrTestCase):
         ]
         for described, num_parentheticals in description_test_pairs:
             with self.subTest(
-                f"Testing Parenthetical creation for {described}...",
+                f"Testing Parenthetical and ParentheticalGroup creation for {described}...",
                 described=described,
                 num_descriptions=num_parentheticals,
             ):
@@ -635,6 +636,15 @@ class UpdateTest(IndexedSolrTestCase):
                     ).count(),
                     num_parentheticals,
                 )
+                # Make sure at least one ParentheticalGroup is created if
+                # there is at least one parenthetical
+                if num_parentheticals > 0:
+                    self.assertGreaterEqual(
+                        ParentheticalGroup.objects.filter(
+                            opinion=described
+                        ).count(),
+                        1,
+                    )
 
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
         remove_citations_from_imported_fixtures()
