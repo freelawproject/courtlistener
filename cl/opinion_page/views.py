@@ -64,6 +64,7 @@ from cl.search.models import (
     Court,
     Docket,
     OpinionCluster,
+    Parenthetical,
     RECAPDocument,
 )
 from cl.search.views import do_search
@@ -511,7 +512,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
     parenthetical_groups = get_or_create_parenthetical_groups(
         cluster,
-    )[:3]
+    ).prefetch_related("representative",)[:3]
     return render(
         request,
         "view_opinion.html",
@@ -542,6 +543,10 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups = list(
         get_or_create_parenthetical_groups(cluster).prefetch_related(
+            Prefetch(
+                "parentheticals",
+                queryset=Parenthetical.objects.order_by("-score"),
+            ),
             "parentheticals__describing_opinion__cluster__citations",
             "parentheticals__describing_opinion__cluster__docket__court",
             "representative__describing_opinion__cluster__citations",
