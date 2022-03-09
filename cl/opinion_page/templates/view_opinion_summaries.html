@@ -66,7 +66,7 @@
                 </div>
               </li>
               <ul class="group-summaries collapse" id="group-summaries-{{ representative.pk }}">
-                {% for summary in group.parentheticals %}
+                {% for summary in group.parentheticals.all %}
                   {% with describing_cluster=summary.describing_opinion.cluster %}
                     <li class="v-offset-below-1">
                       {{ summary.text|capfirst }}

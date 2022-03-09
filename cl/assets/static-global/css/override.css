@@ -568,7 +568,7 @@ div.shown ul {
 .bullet-tail:last-child:after { content: none; }
 
 .group-summaries {
-  padding: 0 0.5em 0 0.5em !important;
+  padding: 0 1em 0 1em !important;
 }
 
 .summary-group-metadata {
