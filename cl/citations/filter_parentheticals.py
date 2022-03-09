@@ -10,7 +10,7 @@ _OPINION_TYPE_MODIFICATION = r"(in (the )?(judgment|result)s?( in part)?|in resu
 _FULL_OPINION_DESCRIPTOR = (
     f"({_OPINION_TYPES}( {_OPINION_TYPE_MODIFICATION})?)"
 )
-_REFERENTIAL = r"(quoting|citing|cited in|referencing)"
+_REFERENTIAL = r"(quoting|citing|cited in|referencing|adopted)"
 _AGGREGATOR_TYPES = r"(collecting|reviewing|listing)"
 _HONORIFICS = r"(Mr.?|Mister)"
 _JUDGE_NAME = rf"((.{{1,25}}J\.,?)|({_HONORIFICS} Justice .{{1,25}})|the Court|(.{{1,25}}Circuit Justice),?)"
