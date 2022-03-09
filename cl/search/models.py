@@ -381,31 +381,26 @@ class Docket(AbstractDateTimeModel):
         help_text="date cert was granted for this case, if applicable",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_cert_denied = models.DateField(
         help_text="the date cert was denied for this case, if applicable",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_reargued = models.DateField(
         help_text="the date the case was reargued",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_reargument_denied = models.DateField(
         help_text="the date the reargument was denied",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_filed = models.DateField(
         help_text="The date the case was filed.", blank=True, null=True
@@ -558,7 +553,6 @@ class Docket(AbstractDateTimeModel):
         ),
         null=True,
         blank=True,
-        db_index=True,
     )
     view_count = models.IntegerField(
         help_text="The number of times the docket has been seen.", default=0
@@ -585,13 +579,6 @@ class Docket(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["court_id", "id"]),
         ]
-        index_together = (
-            (
-                "ia_upload_failure_count",
-                "ia_needs_upload",
-                "ia_date_first_change",
-            ),
-        )
 
     def __str__(self) -> str:
         if self.case_name:
