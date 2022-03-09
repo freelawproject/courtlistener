@@ -16,7 +16,8 @@ def get_or_create_parenthetical_groups(
     :return: A list of ParentheticalGroup's for the given cluster
     """
     if cluster.parentheticals.filter(group__isnull=True).count():
-        create_parenthetical_groups(cluster)
+        with transaction.atomic():
+            create_parenthetical_groups(cluster)
     return cluster.parenthetical_groups
 
 
@@ -31,15 +32,14 @@ def create_parenthetical_groups(
     """
     parentheticals = list(cluster.parentheticals)
     computed_groups = compute_parenthetical_groups(parentheticals)
-    with transaction.atomic():
-        # Delete existing parenthetical groups for this cluster
-        cluster.parenthetical_groups.delete()
-        for cg in computed_groups:
-            group_to_create = ParentheticalGroup(
-                opinion=cg.representative.described_opinion,
-                representative=cg.representative,
-                score=cg.score,
-                size=cg.size,
-            )
-            group_to_create.save()
-            group_to_create.parentheticals.set(cg.parentheticals)
+    # Delete existing parenthetical groups for this cluster
+    cluster.parenthetical_groups.delete()
+    for cg in computed_groups:
+        group_to_create = ParentheticalGroup(
+            opinion=cg.representative.described_opinion,
+            representative=cg.representative,
+            score=cg.score,
+            size=cg.size,
+        )
+        group_to_create.save()
+        group_to_create.parentheticals.set(cg.parentheticals)
