@@ -8,6 +8,8 @@ from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import views
 from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
 
+from django_ses.views import SESEventWebhookView
+
 urlpatterns = [
     # Sign in/out and password pages
     path(
@@ -136,5 +138,10 @@ urlpatterns = [
     path(
         f"webhook/mailchimp/{settings.MAILCHIMP_SECRET}/",
         views.mailchimp_webhook,
+    ),
+    path(
+        "ses/event-webhook/",
+        SESEventWebhookView.as_view(),
+        name="handle-event-webhook",
     ),
 ]

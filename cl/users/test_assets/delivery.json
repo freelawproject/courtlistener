@@ -1,0 +1,12 @@
+{
+	"Type": "Notification",
+	"MessageId": "5134dfb5-635e-5649-9dfc-8516c97e75e9",
+	"TopicArn": "arn:aws:sns:us-east-1:364852123998:test-email",
+	"Subject": "Amazon SES Email Event Notification",
+	"Message": "{\"eventType\":\"Delivery\",\"mail\":{\"timestamp\":\"2022-03-10T07:25:19.842Z\",\"source\":\"test_1_example@gmail.com\",\"sourceArn\":\"arn:aws:ses:us-east-1:364852123998:identity/test_1_example@gmail.com\",\"sendingAccountId\":\"364852123998\",\"messageId\":\"0100017f72b7c262-61f7e0ca-df99-4dea-9df0-6b876b1d55e6-000000\",\"destination\":[\"success@simulator.amazonses.com\"],\"headersTruncated\":false,\"headers\":[{\"name\":\"From\",\"value\":\"test_1_example@gmail.com\"},{\"name\":\"To\",\"value\":\"success@simulator.amazonses.com\"},{\"name\":\"Subject\",\"value\":\"subject test\"},{\"name\":\"MIME-Version\",\"value\":\"1.0\"},{\"name\":\"Content-Type\",\"value\":\"multipart/alternative;  boundary=\\\"----=_Part_1533259_1102211523.1646897119847\\\"\"}],\"commonHeaders\":{\"from\":[\"test_1_example@gmail.com\"],\"to\":[\"success@simulator.amazonses.com\"],\"messageId\":\"0100017f72b7c262-61f7e0ca-df99-4dea-9df0-6b876b1d55e6-000000\",\"subject\":\"subject test\"},\"tags\":{\"ses:operation\":[\"SendEmail\"],\"ses:configuration-set\":[\"test-set\"],\"ses:source-ip\":[\"187.190.204.95\"],\"ses:from-domain\":[\"gmail.com\"],\"ses:caller-identity\":[\"root\"],\"ses:outgoing-ip\":[\"54.240.8.98\"]}},\"delivery\":{\"timestamp\":\"2022-03-10T07:25:20.384Z\",\"processingTimeMillis\":542,\"recipients\":[\"success@simulator.amazonses.com\"],\"smtpResponse\":\"250 2.6.0 Message received\",\"reportingMTA\":\"a8-98.smtp-out.amazonses.com\"}}\n",
+	"Timestamp": "2022-03-10T07:25:20.515Z",
+	"SignatureVersion": "1",
+	"Signature": "diMA2jblZk9rKXPl2CulYTUQWhaL3Mzfkah5H7441ztgKNGftSrUOA+Rn8Q5ycK/vgQSo706tsAVvBfA+Tem3wmnZDr7tMwi32+jf/Vv7qZ0Nqk8TlDiMlmhBcLrEI8r7Te1b1TriAASGAnOZbM48QfswUtY1Qf4DO5Ts5jUzXgy0aG+CErwZcx3MUKCDWMNfhmN7z3Ie5IsQ8bAkZVhew5JkDlTMSitihkuhEJCLIqfrf9moS7ma0wj3d5DGnGMI4r6R40Hvkxg+YhJMTZlGqM2VOsD2mlF0n84cGMJZxlPilMDzaeTZD0kI3OekmDehJL/xysxNRlnqD8Tt0NaeQ==",
+	"SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-7ff5318490ec183fbaddaa2a969abfda.pem",
+	"UnsubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:364852123998:test-email:8dc44811-ffbc-4dd9-9693-5d64aecbaf59"
+}
