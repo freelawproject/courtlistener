@@ -299,7 +299,7 @@ class BackoffEvent(AbstractDateTimeModel):
         return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
 
 
-class Email(AbstractDateTimeModel):
+class EmailSent(AbstractDateTimeModel):
     """Stores email messages."""
 
     user = models.ForeignKey(
@@ -314,7 +314,9 @@ class Email(AbstractDateTimeModel):
         null=True,
     )
     message_id = models.UUIDField(
-        help_text="Message ID", default=uuid.uuid4, editable=False
+        help_text="Unique message identifier",
+        default=uuid.uuid4,
+        editable=False,
     )
     from_email = models.CharField(
         help_text="From email address", max_length=254
@@ -323,19 +325,23 @@ class Email(AbstractDateTimeModel):
         help_text="Recipient email address",
         max_length=254,
         blank=True,
-        null=True,
     )
     bcc = models.CharField(
-        help_text="BCC email address", max_length=254, blank=True, null=True
+        help_text="BCC email address", max_length=254, blank=True
     )
     cc = models.CharField(
-        help_text="CC email address", max_length=254, blank=True, null=True
+        help_text="CC email address", max_length=254, blank=True
     )
-    subject = models.CharField(help_text="Subject", max_length=989, blank=True)
-    message = models.TextField(help_text="Message Body", blank=True)
+    reply_to = models.CharField(
+        help_text="Reply to address", max_length=254, blank=True
+    )
+    subject = models.TextField(help_text="Subject", blank=True)
+    plain_text = models.TextField(
+        help_text="Plain Text Message Body", blank=True
+    )
     html_message = models.TextField(help_text="HTML Message Body", blank=True)
     headers = models.JSONField(
-        help_text="Email Headers", blank=True, null=True
+        help_text="Original email Headers", blank=True, null=True
     )
 
     class Meta:
@@ -344,7 +350,7 @@ class Email(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
-        return f"Email: {self.message_id}, Status: {self.get_object_status_display()}"
+        return f"Email: {self.message_id}"
 
 
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
