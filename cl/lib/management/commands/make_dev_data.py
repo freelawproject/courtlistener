@@ -1,6 +1,4 @@
-from typing import Iterable, Union
-
-from django.core.management import CommandParser
+from django.core.management.base import CommandParser
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory
@@ -46,7 +44,7 @@ class Command(VerboseCommand):
             f"\n{factories_str}",
         )
 
-    def handle(self, *args: str, **options: Union[int, Iterable]):
+    def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         count = options["count"]
         logger.info(
@@ -66,7 +64,7 @@ class Command(VerboseCommand):
             for object_type in options["object_types"]:
                 Factory = FACTORIES[object_type]
                 logger.info(
-                    f"Making {count} items and their depedent parents using "
+                    f"Making {count} items and their dependant parents using "
                     f"object type #{object_type}: {Factory}"
                 )
                 Factory.create_batch(count)
