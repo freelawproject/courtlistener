@@ -1,5 +1,6 @@
-1.0.83
+1.0.84
 
+1.0.84 - Add factory boy
 1.0.83 - Add deps for parenthetical grouping
 1.0.82 - Improve logging for disclosures, improve parentheticals, fix bug in citation urls handling.
 1.0.81 - Bump courts-db.

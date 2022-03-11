@@ -96,6 +96,7 @@ scipy = "^1.8.0"
 numpy = "^1.22.2"
 datasketch = "^1.5.7"
 PyStemmer = "^2.0.1"
+factory-boy = "^3.2.1"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
