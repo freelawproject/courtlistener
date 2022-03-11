@@ -40,10 +40,13 @@ SUFFIXES = (
     ("4", "IV"),
 )
 SUFFIX_LOOKUP = {v.lower(): k for k, v in SUFFIXES}
+MALE = "m"
+FEMALE = "f"
+OTHER_GENDER = "o"
 GENDERS = (
-    ("m", "Male"),
-    ("f", "Female"),
-    ("o", "Other"),
+    (MALE, "Male"),
+    (FEMALE, "Female"),
+    (OTHER_GENDER, "Other"),
 )
 GRANULARITY_YEAR = "%Y"
 GRANULARITY_MONTH = "%Y-%m"
