@@ -374,7 +374,7 @@ class SNSWebhookTest(TestCase):
             mail_obj=mail_obj,
             raw_message=raw,
         )
-        signal_kwargs["%s_obj" % event_name] = event_obj
+        signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
     @mock.patch("cl.users.models.handle_hard_bounce")

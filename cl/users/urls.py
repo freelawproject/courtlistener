@@ -2,13 +2,12 @@ from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path, re_path
 from django.views.generic import RedirectView
+from django_ses.views import SESEventWebhookView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
 from cl.users import views
 from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
-
-from django_ses.views import SESEventWebhookView
 
 urlpatterns = [
     # Sign in/out and password pages
