@@ -341,17 +341,31 @@ class SNSWebhookTest(TestCase):
         test_dir = os.path.join(
             settings.INSTALL_ROOT, "cl", "users", "test_assets"
         )
-        with open(os.path.join(test_dir, "general_soft_bounce.json")) as file:
+        with open(
+            os.path.join(test_dir, "general_soft_bounce.json"),
+            encoding="utf-8",
+        ) as file:
             self.soft_bounce_asset = json.loads(file.read())
-        with open(os.path.join(test_dir, "msg_large_bounce.json")) as file:
+        with open(
+            os.path.join(test_dir, "msg_large_bounce.json"), encoding="utf-8"
+        ) as file:
             self.soft_bounce_msg_large_asset = json.loads(file.read())
-        with open(os.path.join(test_dir, "cnt_rejected_bounce.json")) as file:
+        with open(
+            os.path.join(test_dir, "cnt_rejected_bounce.json"),
+            encoding="utf-8",
+        ) as file:
             self.soft_bounce_cnt_rejected_asset = json.loads(file.read())
-        with open(os.path.join(test_dir, "hard_bounce.json")) as file:
+        with open(
+            os.path.join(test_dir, "hard_bounce.json"), encoding="utf-8"
+        ) as file:
             self.hard_bounce_asset = json.loads(file.read())
-        with open(os.path.join(test_dir, "complaint.json")) as file:
+        with open(
+            os.path.join(test_dir, "complaint.json"), encoding="utf-8"
+        ) as file:
             self.complaint_asset = json.loads(file.read())
-        with open(os.path.join(test_dir, "delivery.json")) as file:
+        with open(
+            os.path.join(test_dir, "delivery.json"), encoding="utf-8"
+        ) as file:
             self.delivery_asset = json.loads(file.read())
 
     def send_signal(self, test_asset, event_name, signal) -> None:
