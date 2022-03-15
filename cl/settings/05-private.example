@@ -93,8 +93,8 @@ MAILCHIMP_API_KEY = ""
 HCAPTCHA_SITEKEY = "10000000-ffff-ffff-ffff-000000000001"
 HCAPTCHA_SECRET = "0x0000000000000000000000000000000000000000"
 
-# Matomo token (used for reporting API)
-MATOMO_TOKEN = ""
+# Plausible Analytics token (used for finding top dockets to update)
+PLAUSIBLE_API_TOKEN = ""
 
 # PACER
 PACER_USERNAME = ""

@@ -1,3 +1,5 @@
+import random
+
 from django import template
 from django.core.exceptions import ValidationError
 from django.utils.formats import date_format
@@ -102,3 +104,8 @@ def get(mapping, key):
     """Emulates the dictionary get. Useful when keys have spaces or other
     punctuation."""
     return mapping.get(key, "")
+
+
+@register.simple_tag
+def random_int(a: int, b: int) -> int:
+    return random.randint(a, b)
