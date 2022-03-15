@@ -124,7 +124,7 @@ def update_judges_by_solr(candidate_id_map, debug):
     match_stats = defaultdict(int)
     # These IDs are ones that cannot be updated due to being identified as
     # problematic in FTM's data.
-    blacklisted_ids = defaultdict(set)
+    denylisted_ips = defaultdict(set)
     for court_id, candidate_list in candidate_id_map.items():
         for candidate in candidate_list:
             # Look up the candidate in Solr.
@@ -166,7 +166,7 @@ def update_judges_by_solr(candidate_id_map, debug):
 
                 # Get the person from the DB and update them.
                 pk = results[0]["id"]
-                if pk in blacklisted_ids:
+                if pk in denylisted_ips:
                     continue
                 p = Person.objects.get(pk=pk)
                 if p.ftm_eid:
@@ -176,8 +176,8 @@ def update_judges_by_solr(candidate_id_map, debug):
                             "This indicates a duplicate in FTM."
                         )
 
-                        blacklisted_ids[p.pk].add(candidate["eid"])
-                        blacklisted_ids[p.pk].add(p.ftm_eid)
+                        denylisted_ips[p.pk].add(candidate["eid"])
+                        denylisted_ips[p.pk].add(p.ftm_eid)
                         p.ftm_eid = ""
                         p.ftm_total_received = None
                     else:
@@ -201,7 +201,7 @@ def update_judges_by_solr(candidate_id_map, debug):
                 logger.info(f"  Found more than one match: {results}")
 
     print_stats(match_stats, candidate_id_map)
-    logger.info(f"Blacklisted IDs: {blacklisted_ids}")
+    logger.info(f"Denylisted IDs: {denylisted_ips}")
     conn.conn.http_connection.close()
 
 

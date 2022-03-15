@@ -12,15 +12,15 @@ from cl.visualizations.network_utils import new_title_for_viz
 from cl.visualizations.utils import emails
 
 
-def blacklisted_url(url):
-    """Check if a URL is blacklisted."""
-    blacklist = [
+def denylisted_url(url: str) -> bool:
+    """Check if a URL is denylisted."""
+    denylist = [
         "content_mobile.php",  # Mobile version of starger's site
         "https://www.courtlistener.com",  # Self-embeds.
         "localhost",
         "translate.google",  # Google translate
     ]
-    if len([b for b in blacklist if b in url]) > 0:
+    if len([b for b in denylist if b in url]) > 0:
         return True
     return False
 
@@ -46,7 +46,7 @@ def get_title(self, referer_id):
     retried_exceeded = self.request.retries >= self.max_retries
 
     referer = Referer.objects.get(pk=referer_id)
-    if blacklisted_url(referer.url):
+    if denylisted_url(referer.url):
         return
 
     try:

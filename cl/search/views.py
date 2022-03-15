@@ -24,7 +24,7 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
-from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
@@ -294,7 +294,7 @@ def get_homepage_stats():
 
 
 @never_cache
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def show_results(request: HttpRequest) -> HttpResponse:
     """
     This view can vary significantly, depending on how it is called:

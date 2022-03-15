@@ -41,7 +41,7 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -237,7 +237,7 @@ def core_docket_data(
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
@@ -279,7 +279,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     return render(request, "view_docket.html", context)
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_parties(
     request: HttpRequest,
     docket_id: int,
@@ -335,7 +335,7 @@ def view_parties(
     return render(request, "docket_parties.html", context)
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def docket_idb_data(
     request: HttpRequest,
     docket_id: int,
@@ -411,7 +411,7 @@ def make_thumb_if_needed(
     return rd
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
     docket_id: Optional[int] = None,
@@ -459,7 +459,7 @@ def view_recap_document(
 
 
 @never_cache
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
@@ -538,7 +538,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups = list(
@@ -567,7 +567,7 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
@@ -583,7 +583,7 @@ def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
