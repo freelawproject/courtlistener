@@ -85,7 +85,10 @@ def get_docket_ids() -> Set[int]:
             for item in j["results"]:
                 # j["results"] is a list of dicts that look like:
                 # {"entry_page": "/recap", "visitors": 68}
-                if item["visitors"] < 10:
+                # Note that Plausible's visitor count is divided by ten on
+                # CourtListener to save money. The value below is thus 10× what
+                # it appears to be.
+                if item["visitors"] < 3:
                     continue
 
                 url = item["entry_page"]
