@@ -104,14 +104,17 @@ pytest = "==4.4.*,>=4.4.0"
 pytest-django = "==3.10.*"
 black = {version = "21.6b0", allow-prereleases = true}
 flake8 = "^3.9.0"
-mypy = "^0.812"
 exrex = "^0.10.5"
-djangorestframework-stubs = "^1.4.0"
-django-stubs = "^1.7.0"
 lxml-stubs = "^0.1.1"
 tblib = "^1.7.0"
 pre-commit = "^2.13.0"
 flynt = "^0.65"
+mypy = "^0.931"
+types-python-dateutil = "^2.8.9"
+types-requests = "^2.27.12"
+types-redis = "^4.1.17"
+django-stubs = "^1.9.0"
+djangorestframework-stubs = "^1.4.0"
 
 [tool.poetry.extras]
 flp = ["reporters-db", "juriscraper"]
