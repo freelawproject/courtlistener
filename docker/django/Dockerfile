@@ -13,7 +13,7 @@ ENV PYTHONUNBUFFERED=1 \
     \
     # poetry
     # https://python-poetry.org/docs/configuration/#using-environment-variables
-    POETRY_VERSION=1.1.2 \
+    POETRY_VERSION=1.1.13 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -57,7 +57,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
-RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # copy project requirement files here to ensure they will be cached.
 WORKDIR $PYSETUP_PATH
@@ -69,7 +69,7 @@ RUN poetry install --no-root --extras flp
 
 # Remove unneeded utilities to slim the image
 RUN apt purge --assume-yes \
-        build-essential curl gcc git python3-dev \
+        build-essential curl gcc python3-dev \
         libffi-dev libxml2-dev libxslt-dev cmake\
     && apt autoremove --assume-yes
 
