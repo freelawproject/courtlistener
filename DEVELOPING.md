@@ -13,14 +13,14 @@ Not surprisingly, we have a lot of legal, and particularly IP, lawyers around he
 
 We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license for server code that isn't normally distributed to end users (like an app would be, say).
 
-The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. You can find a form for this purpose in the root of our project. If you have any questions about it, please don't hesitate to ask.
+The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. The first time you make a contribution to any of our repos, a bot will ask you sign it. Please do so. If you have any questions about it, please don't hesitate to ask.
 
 On with the show.
 
 
 # Discussing things
 
-We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones.
+We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more.
 
 
 ## Architecture
@@ -35,7 +35,7 @@ The major components of CourtListener are:
 
  - Tesseract - For OCR. It's getting good lately, which is nice since we convert hundreds of thousands of pages.
 
- - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose Sphinx early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times, and that logic might have been sound).
+ - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose Sphinx early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times, and that logic might have been sound). Lately, we've been moving towards Elastic.
 
  - React - For dynamic front-end features. We're slowly moving the trickiest parts of the front end over to React.
 
@@ -187,7 +187,7 @@ your code. We recommend [integrating it into your editor][black-ed].
     the PR's become impossible to read and risky to merge. This is a big reason
     we use black.
 
-1. We are beginning to use mypy to add type hints to our Python code. New code must include hints and updates to old code should add hints to the old code. The idea is for our hunts to gradually get better and more complete. Our Github Action for mypy is in lint.yml, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
+1. We are beginning to use mypy to add type hints to our Python code. New code must include hints and updates to old code should add hints to the old code. The idea is for our hints to gradually get better and more complete. Our Github Action for mypy is in lint.yml, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
 
 1. We use iSort to sort our imports. If your imports aren't sorted properly,
 iSort will tell you so when you push your code to Github. Again, we recommend
@@ -236,6 +236,21 @@ this is needed.
 [hr]: https://github.com/freelawproject/hr/blob/main/handbook/handbook.md
 [black]: https://black.readthedocs.io/en/stable/
 [black-ed]: https://black.readthedocs.io/en/stable/editor_integration.html
+
+
+## Adding a new dependency
+
+We use Poetry as our Python package manager instead of pip. It's pretty good, but nobody is used to it yet. It has very good docs you should use for everyday stuff, but the one thing to know about it is that to use it you need to shell into the docker image.
+
+So, once the docker image is running, do something like this:
+
+    docker exec -it cl-django bash
+
+Once you're inside the image, you'll then be able to do:
+
+    poetry add some-new-package
+
+That will do two things. First, it will add the dependency while you're using the container. That's cool, but will go away if you restart docker or the container. The second thing it does is update pyproject.toml and poetry.lock. With that done, you can make new docker images as described by the README's in the docker folders.
 
 
 ## Testing

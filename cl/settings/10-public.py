@@ -19,6 +19,8 @@ from cl.lib.redis_utils import make_redis_interface
 TEST_RUNNER = "cl.tests.runner.TestRunner"
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
 TESTING = "test" in sys.argv
 TEST_RUNNER = "cl.tests.runner.TestRunner"
 if TESTING:
