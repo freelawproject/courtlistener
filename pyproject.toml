@@ -6,7 +6,7 @@ classifiers = [
   "Operating System :: OS Independent",
   "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
   "Intended Audience :: Developers",
   "Intended Audience :: Legal Industry",
 ]
@@ -33,7 +33,7 @@ celery = "^4.3.0"
 certifi = "^2020.12.5"
 courts-db = "^0.9.46"
 disposable-email-domains = "*"
-Django = "^3.1.14"
+Django = "^3.2"
 django-cache-memoize = "==0.*"
 django-cors-headers = "^3.7.0"
 django-extensions = "^3.1.1"
@@ -66,7 +66,7 @@ pycparser = "^2.14"
 pyopenssl = "*"
 pyparsing = "^2.4.2"
 pypdf2 = "^1.26.0"
-python = ">=3.8, <3.11"
+python = ">=3.9, <3.11"
 python-dateutil = "^2.8.1"
 python-igraph = "0.9.1"
 python-magic = "^0.4.21"
