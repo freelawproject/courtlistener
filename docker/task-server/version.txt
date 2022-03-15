@@ -1,5 +1,6 @@
-1.0.79
+1.1.0
 
+1.1.0 - Update to Django 3.2 and Python 3.10
 1.0.79 - Add factory boy
 1.0.78 - Add deps for parenthetical grouping
 1.0.77 - Improve logging for disclosures, improve parentheticals, fix bug in citation urls handling.
