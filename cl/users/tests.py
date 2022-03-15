@@ -368,6 +368,11 @@ class SNSWebhookTest(TestCase):
         ) as file:
             self.delivery_asset = json.loads(file.read())
 
+        with open(
+            os.path.join(test_dir, "suppressed_bounce.json"), encoding="utf-8"
+        ) as file:
+            self.suppressed_asset = json.loads(file.read())
+
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
         :param test_asset: the json object that contains notification
@@ -465,6 +470,21 @@ class SNSWebhookTest(TestCase):
         ).exists()
         # Check if small_email_only was created
         self.assertEqual(email_flag_exists, True)
+
+        # Trigger another small_email_only event to check if
+        # no new ban register is created
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+        email_flag = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="flag",
+            flag="small_email_only",
+        )
+
+        # Checks no new ban object is created for this email address
+        self.assertEqual(email_flag.count(), 1)
+        self.assertEqual(email_flag[0].flag, "small_email_only")
 
     def test_handle_soft_bounce_small_only_exist(self) -> None:
         """This test checks if a small_email_only flag is not created for
@@ -589,22 +609,22 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
         ).update(next_retry_date=now() - timedelta(hours=3))
 
-        email_ban_event = BackoffEvent.objects.filter(
+        email_backoff = BackoffEvent.objects.filter(
             email_address="bounce@simulator.amazonses.com",
         )
         # Store parameters after first backoff event
-        retry_counter_before = email_ban_event[0].retry_counter
-        next_retry_date_before = email_ban_event[0].next_retry_date
+        retry_counter_before = email_backoff[0].retry_counter
+        next_retry_date_before = email_backoff[0].next_retry_date
         # Trigger second backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
         )
-        email_ban_event_after = BackoffEvent.objects.filter(
+        email_backoff_after = BackoffEvent.objects.filter(
             email_address="bounce@simulator.amazonses.com",
         )
         # Store parameters after second backoff notification event
-        retry_counter_after = email_ban_event_after[0].retry_counter
-        next_retry_date_after = email_ban_event_after[0].next_retry_date
+        retry_counter_after = email_backoff_after[0].retry_counter
+        next_retry_date_after = email_backoff_after[0].next_retry_date
 
         # Check parameters were updated
         self.assertNotEqual(retry_counter_before, retry_counter_after)
@@ -641,6 +661,20 @@ class SNSWebhookTest(TestCase):
         ).exists()
         # Check email address is now banned
         self.assertEqual(email_ban_exist, True)
+
+        # Trigger another notification event to check
+        # no new ban register is created
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="ban",
+        )
+
+        # Checks no new ban object is created for this email address
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].reason, "General")
 
     def test_handle_soft_bounce_max_retry_reached(self) -> None:
         """This test checks if the exponential waiting period
@@ -682,3 +716,116 @@ class SNSWebhookTest(TestCase):
         self.assertNotEqual(retry_counter_before, retry_counter_after)
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
+
+    @mock.patch("cl.users.models.logging")
+    def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
+        """This test checks if a warning is logged and email address is banned
+        when an unexpected hard bounceSubType event is received.
+        Also checks that if an email address is previously banned avoid
+        creating a new ban object for that email address
+        """
+        # Trigger a suppressed_asset event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        # Check if a warning is logged
+        warning_part_one = "Unexpected Suppressed hard bounce for "
+        warning_part_two = "bounce@simulator.amazonses.com"
+        mock_logging.warning.assert_called_with(
+            f"{warning_part_one}{warning_part_two}"
+        )
+        email_ban_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="ban",
+        ).count()
+
+        # Check if email address is now banned
+        self.assertEqual(email_ban_count, 1)
+
+        # Trigger another suppressed_asset event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="ban",
+        ).count()
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban_count, 1)
+
+    def test_handle_hard_bounce(self) -> None:
+        """This test checks if an email address is banned
+        when a hard bounce event is received.
+        Also checks that if an email address is previously banned avoid to
+        create a new ban register for that email address
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="ban",
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].reason, "General")
+
+        # Trigger another hard_bounce event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type="ban",
+        )
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].reason, "General")
+
+    @mock.patch("cl.users.models.schedule_failed_email")
+    def test_handle_delivery(self, mock_schedule) -> None:
+        """This test checks if a delivery notification is received
+        and exists a previous Backoffevent it's deleted and
+        schedule_failed_email function is called
+        """
+        # Trigger soft bounce event to create backoff event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+        # Trigger a delivery event
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+
+        # Check if backoff event was deleted
+        self.assertEqual(email_backoff_exists, False)
+
+        # Check if schedule_failed_email is called
+        mock_schedule.assert_called()
