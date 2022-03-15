@@ -270,7 +270,28 @@ def handle_hard_bounce(
      to whom the bounce notification pertains
     :return: None
     """
-    pass
+    unexpected_events = ["Suppressed", "OnAccountSuppressionList"]
+    for email in recipient_emails:
+        if bounceSubType in unexpected_events:
+            # Handle unexpected bounceSubType events, log a warning
+            logging.warning(
+                f"Unexpected {bounceSubType} hard bounce for {email}"
+            )
+            # After log the event ban the email address
+            # Only ban email address if it hasn't been previously banned
+            EmailFlag.objects.get_or_create(
+                email_address=email,
+                flag_type="ban",
+                defaults={"reason": bounceSubType},
+            )
+        else:
+            # Any other hard bounce even only ban the email address
+            # Only ban email address if it hasn't been previously banned
+            EmailFlag.objects.get_or_create(
+                email_address=email,
+                flag_type="ban",
+                defaults={"reason": bounceSubType},
+            )
 
 
 def handle_soft_bounce(
@@ -316,11 +337,14 @@ def handle_soft_bounce(
                     if retry_counter >= MAX_RETRY_COUNTER:
                         # Check if backoff event has reached
                         # max number of retries, if so ban email address
-                        EmailFlag.objects.create(
+                        # Only ban email address if not previously banned
+                        EmailFlag.objects.get_or_create(
                             email_address=email,
                             flag_type="ban",
-                            flag="max_retry_reached",
-                            reason=bounceSubType,
+                            defaults={
+                                "flag": "max_retry_reached",
+                                "reason": bounceSubType,
+                            },
                         )
                     else:
                         # If max number of retries has not been reached,
@@ -339,19 +363,13 @@ def handle_soft_bounce(
 
         elif bounceSubType in small_only_events:
             # Handle events that must trigger a small_email_only event
-            small_only_exists = EmailFlag.objects.filter(
+            # Create a small_email_only flag for email address
+            EmailFlag.objects.get_or_create(
                 email_address=email,
                 flag_type="flag",
                 flag="small_email_only",
-            ).exists()
-            # Create a small_email_only flag for email address
-            if not small_only_exists:
-                EmailFlag.objects.create(
-                    email_address=email,
-                    flag_type="flag",
-                    flag="small_email_only",
-                    reason=bounceSubType,
-                )
+                defaults={"reason": bounceSubType},
+            )
         else:
             # Handle other unexpected bounceSubType events, log a warning
             logging.warning(
@@ -373,6 +391,20 @@ def handle_delivery(message_id: str, recipient_emails: List[str]) -> None:
     """Handle a delivery notification received from SNS
     :param message_id: The unique message id assigned by Amazon SES
     :param recipient_emails: a list of email addresses one per recipient
+     to whom the delivery notification pertains
+    :return: None
+    """
+    for email in recipient_emails:
+        # Delete backoff event for this email address if exists
+        BackoffEvent.objects.filter(email_address=email).delete()
+        # Schedule failed emails for this recipient
+        schedule_failed_email(email)
+
+
+def schedule_failed_email(recipient_email: str) -> None:
+    """Schedule recipient's failed emails after receive
+       a delivery notification
+    :param recipient_email: the recipient email address
      to whom the delivery notification pertains
     :return: None
     """
