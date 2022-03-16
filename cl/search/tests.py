@@ -339,7 +339,6 @@ class AdvancedTest(IndexedSolrTestCase):
      Advanced query techniques
     """
     def setUp(self) -> None:
-        # Add additional user fixtures
         self.fixtures.append("test_objects_search.json")
 
         super(AdvancedTest, self).setUp()
@@ -367,10 +366,10 @@ class AdvancedTest(IndexedSolrTestCase):
         r = self.client.get(reverse("show_results"), {"q": "Howard NOT Honda"})
         self.assertIn("had no results", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "Howard ! Honda"})
+        r = self.client.get(reverse("show_results"), {"q": "Howard !Honda"})
         self.assertIn("had no results", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "Howard - Honda"})
+        r = self.client.get(reverse("show_results"), {"q": "Howard -Honda"})
         self.assertIn("had no results", r.content.decode())
 
     def test_query_phrase(self) -> None:
