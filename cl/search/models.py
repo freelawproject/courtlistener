@@ -2864,16 +2864,25 @@ class Parenthetical(models.Model):
         null=True,
     )
     text = models.TextField(
-        help_text="The text of the description as written in the describing opinion",
+        help_text="The text of the description as written in the describing "
+        "opinion",
     )
     score = models.FloatField(
         db_index=True,
         default=0.0,
-        help_text="A score between 0 and 1 representing how descriptive the parenthetical is",
+        help_text="A score between 0 and 1 representing how descriptive the "
+        "parenthetical is",
     )
 
     def __str__(self) -> str:
-        return f"{self.describing_opinion.id} description of {self.described_opinion.id} (score {self.score}): {self.text}"
+        return (
+            f"{self.describing_opinion.id} description of "
+            f"{self.described_opinion.id} (score {self.score}): {self.text}"
+        )
+
+    def get_absolute_url(self) -> str:
+        cluster = self.described_opinion.cluster
+        return reverse("view_summaries", args=[cluster.pk, cluster.slug])
 
     class Meta:
         verbose_name_plural = "Opinion parentheticals"
@@ -2890,18 +2899,26 @@ class ParentheticalGroup(models.Model):
         Parenthetical,
         related_name="represented_group",
         on_delete=models.CASCADE,
-        help_text="The representative (i.e. high-ranked and similar to the cluster as a whole) parenthetical for the group",
+        help_text="The representative (i.e. high-ranked and similar to the "
+        "cluster as a whole) parenthetical for the group",
     )
     score = models.FloatField(
         default=0.0,
-        help_text="A score between 0 and 1 representing the quality of the parenthetical group",
+        help_text="A score between 0 and 1 representing the quality of the "
+        "parenthetical group",
     )
     size = models.IntegerField(
         help_text="The number of parentheticals that belong to the group"
     )
 
     def __str__(self) -> str:
-        return f"Parenthetical group for opinion {self.opinion_id} (score {self.score})"
+        return (
+            f"Parenthetical group for opinion {self.opinion_id} "
+            f"(score {self.score})"
+        )
+
+    def get_absolute_url(self) -> str:
+        return self.representative.get_absolute_url()
 
     class Meta:
         verbose_name_plural = "Parenthetical groups"

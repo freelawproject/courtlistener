@@ -16,6 +16,7 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 
@@ -257,5 +258,14 @@ class ParentheticalAdmin(admin.ModelAdmin):
     raw_id_fields = (
         "describing_opinion",
         "described_opinion",
+        "group",
     )
     search_fields = ("=describing_opinion_id",)
+
+
+@admin.register(ParentheticalGroup)
+class ParentheticalGroupAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        "opinion",
+        "representative",
+    )

@@ -68,17 +68,20 @@
               <ul class="group-summaries collapse" id="group-summaries-{{ representative.pk }}">
                 {% for summary in group.parentheticals.all %}
                   {% with describing_cluster=summary.describing_opinion.cluster %}
-                    <li class="v-offset-below-1">
-                      {{ summary.text|capfirst }}
-                      <br/>
-                      <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
-                      <span class="bullet-tail">
+                    {# Don't duplicate the representative cluster in the nested group #}
+                    {% if describing_cluster != representative_cluster %}
+                      <li class="v-offset-below-1">
+                        {{ summary.text|capfirst }}
+                        <br/>
+                        <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
+                        <span class="bullet-tail">
                           <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
                               {{ describing_cluster|best_case_name|safe }}
                           </a>
                         </span>
-                      <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
-                    </li>
+                        <span class="bullet-tail">{{ describing_cluster.docket.court }}</span>
+                      </li>
+                    {% endif %}
                   {% endwith %}
                 {% endfor %}
               </ul>

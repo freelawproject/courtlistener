@@ -2,7 +2,6 @@
 {% load text_filters %}
 {% load humanize %}
 {% load static %}
-{% load waffle_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
@@ -80,30 +79,28 @@
             </div>
         </div>
 
-        {% flag "parentheticals" %}
-          {% if summaries_count > 0  %}
-          <div id="summaries" class="sidebar-section">
-            <h3><span>Summaries ({{ summaries_count|intcomma }})</span></h3>
-            <p class="bottom">Judge-written summaries of this case:</p>
-            <ul>
-              {% for group in top_parenthetical_groups %}
-                {% with summary=group.representative %}
-                <li>
-                  {{ summary.text|truncatewords:50|capfirst }}
-                    (from {{ group.size|intcomma }} case{{ group.size|pluralize }})
-                </li>
-                {% endwith %}
-              {% endfor %}
-            </ul>
-            <h4>
-              <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                 class="btn btn-default">
-                View All Summaries
-              </a>
-            </h4>
-          </div>
-          {% endif %}
-        {% endflag %}
+        {% if summaries_count > 0  %}
+        <div id="summaries" class="sidebar-section">
+          <h3><span>Summaries ({{ summaries_count|intcomma }})</span></h3>
+          <p class="bottom">Judge-written summaries of this case:</p>
+          <ul>
+            {% for group in top_parenthetical_groups %}
+              {% with summary=group.representative %}
+              <li>
+                {{ summary.text|truncatewords:50|capfirst }}
+                  (from {{ group.size|intcomma }} case{{ group.size|pluralize }})
+              </li>
+              {% endwith %}
+            {% endfor %}
+          </ul>
+          <h4>
+            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+               class="btn btn-default">
+              View All Summaries
+            </a>
+          </h4>
+        </div>
+        {% endif %}
 
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">
