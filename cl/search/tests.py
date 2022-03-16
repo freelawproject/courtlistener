@@ -1201,7 +1201,6 @@ class PagerankTest(TestCase):
                 "%s" % (key, pr_results[key], answers[key]),
             )
 
-
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
