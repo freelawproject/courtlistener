@@ -50,10 +50,10 @@
                 <div class="summary-group-metadata">
                   <span class="bullet-tail">{{ representative_cluster.date_filed }}</span>
                   <span class="bullet-tail">
-                          <a href="{{ representative_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                              {{ representative_cluster|best_case_name|safe }}
-                          </a>
-                        </span>
+                    <a href="{{ representative_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                        {{ representative_cluster|best_case_name|safe }}
+                    </a>
+                  </span>
                   <span class="bullet-tail">{{ representative_cluster.docket.court }}</span>
                   {% if group.size > 1 %}
                     <button class="toggle-group-summaries btn btn-link" type="button" data-toggle="collapse"
@@ -69,7 +69,7 @@
                 {% for summary in group.parentheticals.all %}
                   {% with describing_cluster=summary.describing_opinion.cluster %}
                     {# Don't duplicate the representative cluster in the nested group #}
-                    {% if describing_cluster != representative_cluster %}
+                    {% if summary != representative %}
                       <li class="v-offset-below-1">
                         {{ summary.text|capfirst }}
                         <br/>
