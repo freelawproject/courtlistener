@@ -334,6 +334,67 @@ class IndexingTest(EmptySolrTestCase):
         RECAPDocument.objects.all().delete()
 
 
+class AdvancedTest(IndexedSolrTestCase):
+    """
+     Advanced query techniques
+    """
+    def setUp(self) -> None:
+        # Add additional user fixtures
+        self.fixtures.append("test_objects_search.json")
+
+        super(AdvancedTest, self).setUp()
+
+    def test_a_intersection_query(self) -> None:
+        """Does AND queries work"""
+        r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_a_union_query(self) -> None:
+        """Does OR queries work"""
+        r = self.client.get(reverse("show_results"), {"q": "Howard OR Lissner"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("Lissner", r.content.decode())
+        self.assertIn("2 Opinions", r.content.decode())
+
+    def test_query_negation(self) -> None:
+        """Does negation query work"""
+        r = self.client.get(reverse("show_results"), {"q": "Howard"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+        r = self.client.get(reverse("show_results"), {"q": "Howard NOT Honda"})
+        self.assertIn("had no results", r.content.decode())
+
+        r = self.client.get(reverse("show_results"), {"q": "Howard ! Honda"})
+        self.assertIn("had no results", r.content.decode())
+
+        r = self.client.get(reverse("show_results"), {"q": "Howard - Honda"})
+        self.assertIn("had no results", r.content.decode())
+
+    def test_query_phrase(self) -> None:
+        """Can we query by phrase"""
+        r = self.client.get(reverse("show_results"), {"q": "Testing Supreme Court"})
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_query_grouped_and_sub_queries(self) -> None:
+        """Does grouped and sub queries work"""
+        r = self.client.get(reverse("show_results"), {"q": "(Lissner OR Honda) AND Howard"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("Lissner", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_query_fielded(self) -> None:
+        """Does fielded queries work"""
+        r = self.client.get(reverse("show_results"), {"q": "status:precedential"})
+        self.assertIn("docket number 2", r.content.decode())
+        self.assertIn("docket number 3", r.content.decode())
+        self.assertIn("2 Opinions", r.content.decode())
+
+
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
     def get_article_count(r):
@@ -1079,7 +1140,6 @@ class PagerankTest(TestCase):
                 msg="The answer for item %s was %s when it should have been "
                 "%s" % (key, pr_results[key], answers[key]),
             )
-
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
