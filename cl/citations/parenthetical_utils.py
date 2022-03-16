@@ -21,9 +21,7 @@ def get_or_create_parenthetical_groups(
     return cluster.parenthetical_groups
 
 
-def create_parenthetical_groups(
-    cluster: OpinionCluster,
-):
+def create_parenthetical_groups(cluster: OpinionCluster) -> None:
     """
     Given a cluster, (re)computes the parenthetical groups for its parentheticals
     and stores them in the database
