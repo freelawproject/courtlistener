@@ -45,6 +45,8 @@ class ParentheticalFactory(DjangoModelFactory):
         model = Parenthetical
 
     describing_opinion = SelfAttribute("described_opinion")
+    text = Faker("sentence")
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
 
 
 class ParentheticalFactoryWithParents(ParentheticalFactory):
@@ -52,8 +54,6 @@ class ParentheticalFactoryWithParents(ParentheticalFactory):
         "cl.search.factories.OpinionFactoryWithParents",
     )
     described_opinion = SelfAttribute("describing_opinion")
-    text = Faker("sentence")
-    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
 
 
 class OpinionFactory(DjangoModelFactory):
