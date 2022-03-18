@@ -1,9 +1,14 @@
 import logging
+from collections.abc import Sequence
 from datetime import timedelta
-from typing import List, Optional, Tuple, Union
 
 from django.contrib.auth.models import User
-from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.core.mail import (
+    EmailMessage,
+    EmailMultiAlternatives,
+    SafeMIMEMultipart,
+    SafeMIMEText,
+)
 from django.db import transaction
 from django.utils.timezone import now
 
@@ -11,8 +16,8 @@ from cl.users.models import (
     OBJECT_TYPES,
     SUB_TYPES,
     BackoffEvent,
-    Email,
     EmailFlag,
+    EmailSent,
 )
 
 
@@ -26,7 +31,7 @@ def get_bounce_subtype(event_sub_type: str) -> int:
 
 
 def handle_hard_bounce(
-    event_sub_type: str, recipient_emails: List[str]
+    event_sub_type: str, recipient_emails: list[str]
 ) -> None:
     """Ban any email address that receives a hard bounce.
 
@@ -63,7 +68,7 @@ def handle_hard_bounce(
 
 @transaction.atomic
 def handle_soft_bounce(
-    message_id: str, event_sub_type: str, recipient_emails: List[str]
+    message_id: str, event_sub_type: str, recipient_emails: list[str]
 ) -> None:
     """Handle a soft bounce notification received from SNS
 
@@ -181,7 +186,7 @@ def handle_soft_bounce(
             )
 
 
-def handle_complaint(recipient_emails: List[str]) -> None:
+def handle_complaint(recipient_emails: list[str]) -> None:
     """Handle a complaint notification received from SNS
 
     Ban email addresses that received a complaint.
@@ -200,7 +205,7 @@ def handle_complaint(recipient_emails: List[str]) -> None:
         )
 
 
-def handle_delivery(message_id: str, recipient_emails: List[str]) -> None:
+def handle_delivery(message_id: str, recipient_emails: list[str]) -> None:
     """Handle a delivery notification received from SNS
 
     :param message_id: The unique message id assigned by Amazon SES
@@ -225,88 +230,175 @@ def schedule_failed_email(recipient_email: str) -> None:
     pass
 
 
-def convert_list_to_str(
-    email_list: Optional[Union[List[str], Tuple[str]]] = None
-) -> str:
-    """Function to convert a list or tuple of email addresses to a string,
-    we only support storing one email address in an Email object.
+def convert_list_to_str(email_list: Sequence[str]) -> str:
+    """Return the first item of an iterable
+
+    Because we don't currently support more than one email address per message
+    in our EmailSent table, we always just grab the first one. If somebody
+    tries to send a message to multiple recipients, this method will raise an
+    exception.
+
+    :param email_list: A collection of email addresses (tuple, list, etc)
+    :raises NotImplemented exception if the collection has len > 1
+    :return str: The first email address in the collection
     """
     if email_list:
+        email_count = len(email_list)
+        if email_count > 1:
+            raise NotImplementedError(
+                f"Too many email addresses provided: {email_count}"
+            )
         return email_list[0]
     return ""
 
 
+def has_small_version(message: SafeMIMEText | SafeMIMEMultipart) -> bool:
+    """Function to check if a message has a small version available
+
+    :param message: The message to check
+    :return: True if the message has a small body version; otherwise False
+    """
+
+    # Check if the message contains a small version
+    for part in message.walk():
+        if (
+            part.get_content_type() == "text/plain_small"
+            or part.get_content_type() == "text/html_small"
+        ):
+            return True
+    return False
+
+
 def get_email_body(
-    message: Union[EmailMessage, EmailMultiAlternatives],
-    plain: str,
-    html: str,
-) -> List[str]:
+    message: SafeMIMEText | SafeMIMEMultipart,
+    small_version: bool,
+) -> tuple[str, str]:
     """Function to retrieve html and plain body content of an email
 
     :param message: the message to extract the body content
-    :param plain: the plain content type we are looking for
-    :param html: the html content type we are looking for
-    :return: plaintext_body and html_body list of strings
+    :param small_version: True if we need to extract the small body version,
+    False to return the normal body version.
+    :return: plaintext_body and html_body strings
     """
+
+    # Returns the content_type we need to extract
+    if small_version:
+        plain = "text/plain_small"
+        html = "text/html_small"
+    else:
+        plain = "text/plain"
+        html = "text/html"
+
     plaintext_body = ""
     html_body = ""
     for part in message.walk():
         if part.get_content_type() == plain:
             plaintext_body = part.get_payload()
-            if html_body:
-                break
+            break
+
+    for part in message.walk():
         if part.get_content_type() == html:
             html_body = part.get_payload()
-            if plaintext_body:
-                break
+            break
 
-    return [plaintext_body, html_body]
+    return plaintext_body, html_body
 
 
-def store_message(
-    from_email: str,
-    to: Union[List[str], Tuple[str]],
-    cc: Optional[Union[List[str], Tuple[str]]] = None,
-    bcc: Optional[Union[List[str], Tuple[str]]] = None,
-    subject: Optional[str] = "",
-    message: Optional[str] = "",
-    html_message: Optional[str] = "",
-    headers: Optional[str] = None,
-) -> str:
+def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """Stores an email message and returns its message_id, if the original
     message had attachments we store the small version without attachments
 
-        :param from_email: The from email address
-        :param to: The recipient email address
-        :param bcc: The bcc email address
-        :param cc: The cc email address
-        :param subject: The email subject
-        :param message: The plain email body
-        :param html_message: The html email body
-        :param headers: The original headers
-        :return message_id: The unique email message identifier
+    :param message: The  message to store
+    :return message_id: The unique email message identifier
     """
+    subject = message.subject
+    from_email = message.from_email
+    to = convert_list_to_str(message.to)
+    bcc = convert_list_to_str(message.bcc)
+    cc = convert_list_to_str(message.cc)
+    reply_to = convert_list_to_str(message.reply_to)
+    headers = message.extra_headers
+    body_message = message.message()
+    small_version = has_small_version(body_message)
+    plain_body, html_body = get_email_body(body_message, small_version)
 
-    to = convert_list_to_str(to)
-    cc = convert_list_to_str(cc)
-    bcc = convert_list_to_str(bcc)
-
-    # Look for the user by email address to assign it.
-    user_email = User.objects.filter(email=to)
-    if user_email.exists():
-        user_email = user_email[0]
+    # Look for the CL user by email address to assign it.
+    users = User.objects.filter(email=to)
+    if users.exists():
+        user = users[0]
     else:
-        user_email = None
+        user = None
 
-    email_stored = Email.objects.create(
-        user=user_email,
+    email_stored = EmailSent.objects.create(
+        user=user,
         from_email=from_email,
         to=to,
-        cc=cc,
         bcc=bcc,
+        cc=cc,
+        reply_to=reply_to,
         subject=subject,
-        message=message,
-        html_message=html_message,
+        plain_text=plain_body,
+        html_message=html_body,
         headers=headers,
     )
     return email_stored.message_id
+
+
+def compose_message(
+    message: EmailMessage | EmailMultiAlternatives, small_version: bool
+) -> EmailMessage | EmailMultiAlternatives:
+    """Composes an email message according to the version needed and
+    available content_type
+
+    :param message: The  message to compose
+    :param small_version: Whether to use the small version of an email
+    :return message: Returns a EmailMessage or EmailMultiAlternatives message
+    """
+    subject = message.subject
+    from_email = message.from_email
+    to = message.to
+    bcc = message.bcc
+    cc = message.cc
+    reply_to = message.reply_to
+    headers = message.extra_headers
+    body_message = message.message()
+    plain_body, html_body = get_email_body(body_message, small_version)
+
+    email: EmailMessage | EmailMultiAlternatives
+    if html_body:
+        if plain_body:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_body,
+                from_email=from_email,
+                to=to,
+                bcc=bcc,
+                cc=cc,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.attach_alternative(html_body, "text/html")
+        else:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=html_body,
+                from_email=from_email,
+                to=to,
+                bcc=bcc,
+                cc=cc,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.content_subtype = "html"
+    else:
+        email = EmailMessage(
+            subject=subject,
+            body=plain_body,
+            from_email=from_email,
+            to=to,
+            bcc=bcc,
+            cc=cc,
+            reply_to=reply_to,
+            headers=headers,
+        )
+    return email
