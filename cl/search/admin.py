@@ -1,8 +1,11 @@
 from django.contrib import admin
+from django.db.models import QuerySet
 from django.forms import ModelForm
 from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline
+from cl.lib.models import THUMBNAIL_STATUSES
+from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
@@ -19,6 +22,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.search.tasks import add_items_to_solr
 
 
 @admin.register(Opinion)
@@ -142,6 +146,55 @@ class RECAPDocumentAdmin(admin.ModelAdmin):
         "date_created",
         "date_modified",
     )
+
+    @admin.action(description="Seal Document")
+    def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
+        queryset.update(
+            date_upload=None,
+            is_available=False,
+            is_sealed=True,
+            sha1="",
+            page_count=None,
+            file_size=None,
+            ia_upload_failure_count=None,
+            thumbnail_status=THUMBNAIL_STATUSES.NEEDED,
+            plain_text="",
+            ocr_status=None,
+        )
+        ia_failures = []
+        for rd in queryset:
+            # Thumbnail
+            if rd.thumbnail:
+                rd.thumbnail.delete()
+
+            # PDF
+            if rd.filepath_local:
+                rd.filepath_local.delete()
+
+            # Internet Archive
+            url = rd.filepath_ia
+            r = delete_from_ia(url)
+            if not r.ok:
+                ia_failures.append(url)
+
+        # Update solr
+        add_items_to_solr.delay(
+            [rd.pk for rd in queryset], "search.RECAPDocument"
+        )
+
+        if ia_failures:
+            self.message_user(
+                request,
+                f"Failed to remove {len(ia_failures)} item(s) from Internet "
+                f"Archive. Please do so by hand. Sorry. The URL(s): "
+                f"{ia_failures}.",
+            )
+        else:
+            self.message_user(
+                request,
+                f"Successfully sealed and removed {queryset.count()} "
+                f"document(s).",
+            )
 
 
 class RECAPDocumentInline(admin.StackedInline):
