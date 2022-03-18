@@ -139,8 +139,8 @@ urlpatterns = [
         views.mailchimp_webhook,
     ),
     path(
-        "ses/event-webhook/",
+        "webhook/ses/",
         SESEventWebhookView.as_view(),
-        name="handle-event-webhook",
+        name="handle_ses_webhook",
     ),
 ]
