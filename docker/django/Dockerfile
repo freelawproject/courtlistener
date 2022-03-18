@@ -42,7 +42,9 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # For installing poetry and git-based deps
         curl git \
         # Other dependencies
-        libffi-dev libxml2-dev libxslt-dev procps vim cmake
+        libffi-dev libxml2-dev libxslt-dev procps vim cmake \
+        # For installing M2Crypto necessary for django-ses
+        libssl-dev swig
 
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://install.python-poetry.org | python3 -
