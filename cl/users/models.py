@@ -1,8 +1,7 @@
-import logging
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict
 
 from django.contrib.auth.models import User
 from django.core.exceptions import FieldError
@@ -11,14 +10,10 @@ from django.db.models import Sum
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
-from django_ses.signals import (
-    bounce_received,
-    complaint_received,
-    delivery_received,
-)
 from localflavor.us.models import USStateField
 
 from cl.api.utils import invert_user_logs
+from cl.lib.models import AbstractDateTimeModel
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -26,6 +21,36 @@ donation_exclusion_codes = [
     6,  # Failed
     7,  # Reclaimed/Refunded
 ]
+
+
+class SUB_TYPES(object):
+    """SNS Event Subtypes"""
+
+    UNDETERMINED = 0
+    GENERAL = 1
+    NOEMAIL = 2
+    SUPPRESSED = 3
+    ONACCOUNTSUPPRESSIONLIST = 4
+    MAILBOXFULL = 5
+    MESSAGETOOLARGE = 6
+    CONTENTREJECTED = 7
+    ATTACHMENTREJECTED = 8
+    COMPLAINT = 9
+    OTHER = 10
+
+    TYPES = (
+        (UNDETERMINED, "Undetermined"),
+        (GENERAL, "General"),
+        (NOEMAIL, "NoEmail"),
+        (SUPPRESSED, "Suppressed"),
+        (ONACCOUNTSUPPRESSIONLIST, "OnAccountSuppressionList"),
+        (MAILBOXFULL, "MailboxFull"),
+        (MESSAGETOOLARGE, "MessageTooLarge"),
+        (CONTENTREJECTED, "ContentRejected"),
+        (ATTACHMENTREJECTED, "AttachmentRejected"),
+        (COMPLAINT, "Complaint"),
+        (OTHER, "Other"),
+    )
 
 
 class BarMembership(models.Model):
@@ -180,34 +205,47 @@ class UserProfile(models.Model):
         verbose_name_plural = "user profiles"
 
 
-class EmailFlag(models.Model):
-    BAN = "ban"
-    FLAG = "flag"
-    FLAGS_TYPES = (
+class EmailFlag(AbstractDateTimeModel):
+    """Stores flags for email addresses
+
+    Two types of :object_type:
+    BAN: ban an email address and avoid sending any email
+    FLAG: flag an email address for a special treatment e.g small_email_only.
+    :flag: the actual flag assigned, like: small_email_only
+    :event_sub_type: the SNS bounce subtype that triggered the object
+    :email_address: an EmailFlag object belongs to an email address instead
+    of a user, in this way, if users change their email address this won't
+    affect new user email address.
+    """
+
+    BAN = 0
+    FLAG = 1
+    OBJECT_TYPES = (
         (BAN, "Email ban"),
         (FLAG, "Email flag"),
+    )
+    SMALL_ONLY = 0
+    MAX_RETRY_REACHED = 1
+    FLAGS = (
+        (SMALL_ONLY, "small_email_only"),
+        (MAX_RETRY_REACHED, "max_retry_reached"),
     )
     email_address = models.EmailField(
         help_text="Email address flagged.",
     )
-    flag_type = models.CharField(
-        help_text="The flag type assigned.",
-        choices=FLAGS_TYPES,
-        max_length=5,
+    object_type = models.SmallIntegerField(
+        help_text="The object type assigned: ban or flag",
+        choices=OBJECT_TYPES,
     )
-    flag = models.CharField(
-        help_text="The flag assigned to email address.",
-        max_length=25,
+    flag = models.SmallIntegerField(
+        help_text="The actual flag assigned, like: small_email_only",
+        choices=FLAGS,
         blank=True,
+        null=True,
     )
-    reason = models.CharField(
-        help_text="The notification subtype",
-        max_length=50,
-        blank=True,
-    )
-    date_created = models.DateTimeField(
-        help_text="The moment when the item was created.",
-        auto_now_add=True,
+    event_sub_type = models.SmallIntegerField(
+        help_text="The notification event subtype.",
+        choices=SUB_TYPES.TYPES,
     )
 
     class Meta:
@@ -216,10 +254,18 @@ class EmailFlag(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.get_flag_type_display()} for {self.email_address}"
+        return f"{self.get_object_type_display()} for {self.email_address}"
 
 
-class BackoffEvent(models.Model):
+class BackoffEvent(AbstractDateTimeModel):
+    """Stores backoff events for email addresses, this is created or updated
+    after receiving a soft bounce object for an email address.
+
+    :email_address: The backoff event is related to this email address
+    instead of a user, in this way, if users change their email address
+    this won't affect new user email address.
+    """
+
     email_address = models.EmailField(
         help_text="Email address under backoff event.",
     )
@@ -229,10 +275,6 @@ class BackoffEvent(models.Model):
     next_retry_date = models.DateTimeField(
         help_text="The datetime for next retry.",
     )
-    date_created = models.DateTimeField(
-        help_text="The moment when the item was created.",
-        auto_now_add=True,
-    )
 
     class Meta:
         indexes = [
@@ -240,7 +282,7 @@ class BackoffEvent(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Backoff event for {self.email_address}"
+        return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
 
 
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
@@ -259,211 +301,8 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     return recap_email
 
 
-def handle_hard_bounce(
-    message_id: str, bounceSubType: str, recipient_emails: List[str]
-) -> None:
-    """Handle a hard bounce notification received from SNS
-    :param message_id: The unique message id assigned by Amazon SES
-    :param bounceSubType: The subtype of the bounce, as determined
-     by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the bounce notification pertains
-    :return: None
-    """
-    unexpected_events = ["Suppressed", "OnAccountSuppressionList"]
-    for email in recipient_emails:
-        if bounceSubType in unexpected_events:
-            # Handle unexpected bounceSubType events, log a warning
-            logging.warning(
-                f"Unexpected {bounceSubType} hard bounce for {email}"
-            )
-            # After log the event ban the email address
-            # Only ban email address if it hasn't been previously banned
-            EmailFlag.objects.get_or_create(
-                email_address=email,
-                flag_type="ban",
-                defaults={"reason": bounceSubType},
-            )
-        else:
-            # Any other hard bounce even only ban the email address
-            # Only ban email address if it hasn't been previously banned
-            EmailFlag.objects.get_or_create(
-                email_address=email,
-                flag_type="ban",
-                defaults={"reason": bounceSubType},
-            )
-
-
-def handle_soft_bounce(
-    message_id: str, bounceSubType: str, recipient_emails: List[str]
-) -> None:
-    """Handle a soft bounce notification received from SNS
-    :param message_id: The unique message id assigned by Amazon SES
-    :param bounceSubType: The subtype of the bounce, as determined
-     by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the bounce notification pertains
-    :return: None
-    """
-
-    back_off_events = ["Undetermined", "General", "MailboxFull"]
-    small_only_events = ["MessageTooLarge", "AttachmentRejected"]
-
-    MAX_RETRY_COUNTER = 5
-    INITIAL_HOURS = 2
-
-    for email in recipient_emails:
-        if bounceSubType in back_off_events:
-            # Handle events that must trigger a backoff event
-            backoff_event = BackoffEvent.objects.filter(
-                email_address=email,
-            )
-            if not backoff_event.exists():
-                # Create a backoff event for an email address if not exists
-                # Initialize retry_counter and next_retry_date
-                next_retry_date = now() + timedelta(hours=INITIAL_HOURS)
-                BackoffEvent.objects.create(
-                    email_address=email,
-                    retry_counter=0,
-                    next_retry_date=next_retry_date,
-                )
-            else:
-                # If a previous backoff event exists
-                retry_counter = backoff_event[0].retry_counter
-                next_retry_date = backoff_event[0].next_retry_date
-
-                # Check if waiting period expired
-                if next_retry_date <= now():
-                    if retry_counter >= MAX_RETRY_COUNTER:
-                        # Check if backoff event has reached
-                        # max number of retries, if so ban email address
-                        # Only ban email address if not previously banned
-                        EmailFlag.objects.get_or_create(
-                            email_address=email,
-                            flag_type="ban",
-                            defaults={
-                                "flag": "max_retry_reached",
-                                "reason": bounceSubType,
-                            },
-                        )
-                    else:
-                        # If max number of retries has not been reached,
-                        # update backoff event, update retry_counter
-                        new_retry_counter = retry_counter + 1
-                        # Update new_next_retry_date exponentially
-                        new_next_retry_date = now() + timedelta(
-                            hours=pow(INITIAL_HOURS, new_retry_counter + 1)
-                        )
-                        BackoffEvent.objects.filter(
-                            email_address=email,
-                        ).update(
-                            retry_counter=new_retry_counter,
-                            next_retry_date=new_next_retry_date,
-                        )
-
-        elif bounceSubType in small_only_events:
-            # Handle events that must trigger a small_email_only event
-            # Create a small_email_only flag for email address
-            EmailFlag.objects.get_or_create(
-                email_address=email,
-                flag_type="flag",
-                flag="small_email_only",
-                defaults={"reason": bounceSubType},
-            )
-        else:
-            # Handle other unexpected bounceSubType events, log a warning
-            logging.warning(
-                f"Unexpected {bounceSubType} soft bounce for {email}"
-            )
-
-
-def handle_complaint(message_id: str, recipient_emails: List[str]) -> None:
-    """Handle a complaint notification received from SNS
-    :param message_id: The unique message id assigned by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the complaint notification pertains
-    :return: None
-    """
-    pass
-
-
-def handle_delivery(message_id: str, recipient_emails: List[str]) -> None:
-    """Handle a delivery notification received from SNS
-    :param message_id: The unique message id assigned by Amazon SES
-    :param recipient_emails: a list of email addresses one per recipient
-     to whom the delivery notification pertains
-    :return: None
-    """
-    for email in recipient_emails:
-        # Delete backoff event for this email address if exists
-        BackoffEvent.objects.filter(email_address=email).delete()
-        # Schedule failed emails for this recipient
-        schedule_failed_email(email)
-
-
-def schedule_failed_email(recipient_email: str) -> None:
-    """Schedule recipient's failed emails after receive
-       a delivery notification
-    :param recipient_email: the recipient email address
-     to whom the delivery notification pertains
-    :return: None
-    """
-    pass
-
-
 @receiver(post_save, sender=UserProfile)
 def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()
-
-
-@receiver(bounce_received)
-def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
-    """Receiver function to handle bounce notifications sent by Amazon SES via
-    SESEventWebhookView
-    """
-    if bounce_obj:
-        message_id = mail_obj["messageId"]
-        bounceType = bounce_obj["bounceType"]
-        bounceSubType = bounce_obj["bounceSubType"]
-        bouncedRecipients = bounce_obj["bouncedRecipients"]
-        recipient_emails = [
-            email["emailAddress"] for email in bouncedRecipients
-        ]
-        # If bounceType is Permanent, handle a hard bounce
-        # If bounceType is Transient, handle a soft bounce
-        if bounceType == "Permanent":
-            handle_hard_bounce(message_id, bounceSubType, recipient_emails)
-        elif bounceType == "Transient":
-            handle_soft_bounce(message_id, bounceSubType, recipient_emails)
-
-
-@receiver(complaint_received)
-def complaint_handler(
-    sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
-):
-    """Receiver function to handle complaint notifications sent by
-    Amazon SES via SESEventWebhookView
-    """
-
-    if complaint_obj:
-        message_id = mail_obj["messageId"]
-        complainedRecipients = complaint_obj["complainedRecipients"]
-        recipient_emails = [
-            email["emailAddress"] for email in complainedRecipients
-        ]
-        handle_complaint(message_id, recipient_emails)
-
-
-@receiver(delivery_received)
-def delivery_handler(
-    sender, mail_obj, delivery_obj, raw_message, *args, **kwargs
-):
-    """Receiver function to handle delivery notifications sent by
-    Amazon SES via SESEventWebhookView
-    """
-    if delivery_obj:
-        message_id = mail_obj["messageId"]
-        recipient_emails = mail_obj["destination"]
-        handle_delivery(message_id, recipient_emails)

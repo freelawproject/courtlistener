@@ -6,7 +6,7 @@ from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
-from cl.users.models import BarMembership, UserProfile
+from cl.users.models import BackoffEvent, BarMembership, EmailFlag, UserProfile
 
 
 def get_email_confirmed(obj):
@@ -52,6 +52,26 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "first_name",
         "last_name",
         "email",
+    )
+
+
+@admin.register(EmailFlag)
+class EmailFlagAdmin(admin.ModelAdmin):
+    list_display = (
+        "email_address",
+        "id",
+        "object_type",
+        "date_created",
+    )
+
+
+@admin.register(BackoffEvent)
+class BackoffEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "email_address",
+        "id",
+        "retry_counter",
+        "date_created",
     )
 
 

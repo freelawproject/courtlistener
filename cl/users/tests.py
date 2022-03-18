@@ -1,6 +1,6 @@
 import json
-import os
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
@@ -17,7 +17,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.models import BackoffEvent, EmailFlag, UserProfile
+from cl.users.models import SUB_TYPES, BackoffEvent, EmailFlag, UserProfile
 
 
 class UserTest(LiveServerTestCase):
@@ -338,38 +338,38 @@ class LiveUserTest(BaseSeleniumTest):
 
 class SNSWebhookTest(TestCase):
     def setUp(self) -> None:
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "users", "test_assets"
-        )
+
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+
         with open(
-            os.path.join(test_dir, "general_soft_bounce.json"),
+            Path.joinpath(test_dir, "general_soft_bounce.json"),
             encoding="utf-8",
         ) as file:
             self.soft_bounce_asset = json.loads(file.read())
         with open(
-            os.path.join(test_dir, "msg_large_bounce.json"), encoding="utf-8"
+            Path.joinpath(test_dir, "msg_large_bounce.json"), encoding="utf-8"
         ) as file:
             self.soft_bounce_msg_large_asset = json.loads(file.read())
         with open(
-            os.path.join(test_dir, "cnt_rejected_bounce.json"),
+            Path.joinpath(test_dir, "cnt_rejected_bounce.json"),
             encoding="utf-8",
         ) as file:
             self.soft_bounce_cnt_rejected_asset = json.loads(file.read())
         with open(
-            os.path.join(test_dir, "hard_bounce.json"), encoding="utf-8"
+            Path.joinpath(test_dir, "hard_bounce.json"), encoding="utf-8"
         ) as file:
             self.hard_bounce_asset = json.loads(file.read())
         with open(
-            os.path.join(test_dir, "complaint.json"), encoding="utf-8"
+            Path.joinpath(test_dir, "complaint.json"), encoding="utf-8"
         ) as file:
             self.complaint_asset = json.loads(file.read())
         with open(
-            os.path.join(test_dir, "delivery.json"), encoding="utf-8"
+            Path.joinpath(test_dir, "delivery.json"), encoding="utf-8"
         ) as file:
             self.delivery_asset = json.loads(file.read())
 
         with open(
-            os.path.join(test_dir, "suppressed_bounce.json"), encoding="utf-8"
+            Path.joinpath(test_dir, "suppressed_bounce.json"), encoding="utf-8"
         ) as file:
             self.suppressed_asset = json.loads(file.read())
 
@@ -396,7 +396,7 @@ class SNSWebhookTest(TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @mock.patch("cl.users.models.handle_hard_bounce")
+    @mock.patch("cl.users.signals.handle_hard_bounce")
     def test_hard_bounce_signal(self, mock_hard_bounce) -> None:
         """This test checks if handle_hard_bounce function is called
         when a hard bounce event is received
@@ -408,7 +408,7 @@ class SNSWebhookTest(TestCase):
         # Check if handle_hard_bounce is called
         mock_hard_bounce.assert_called()
 
-    @mock.patch("cl.users.models.handle_soft_bounce")
+    @mock.patch("cl.users.signals.handle_soft_bounce")
     def test_soft_bounce_signal(self, mock_soft_bounce) -> None:
         """This test checks if handle_soft_bounce function is called
         when a soft bounce event is received
@@ -420,7 +420,7 @@ class SNSWebhookTest(TestCase):
         # Check if handle_soft_bounce is called
         mock_soft_bounce.assert_called()
 
-    @mock.patch("cl.users.models.handle_complaint")
+    @mock.patch("cl.users.signals.handle_complaint")
     def test_complaint_signal(self, mock_complaint) -> None:
         """This test checks if handle_complaint function is called
         when a complaint event is received
@@ -432,7 +432,7 @@ class SNSWebhookTest(TestCase):
         # Check if handle_complaint is called
         mock_complaint.assert_called()
 
-    @mock.patch("cl.users.models.handle_delivery")
+    @mock.patch("cl.users.signals.handle_delivery")
     def test_delivery_signal(self, mock_delivery) -> None:
         """This test checks if handle_delivery function is called
         when a delivery event is received
@@ -453,8 +453,8 @@ class SNSWebhookTest(TestCase):
 
         email_flag_exists = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
         ).exists()
         self.assertEqual(email_flag_exists, False)
 
@@ -465,8 +465,8 @@ class SNSWebhookTest(TestCase):
 
         email_flag_exists = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
         ).exists()
         # Check if small_email_only was created
         self.assertEqual(email_flag_exists, True)
@@ -478,13 +478,13 @@ class SNSWebhookTest(TestCase):
         )
         email_flag = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
         )
 
         # Checks no new ban object is created for this email address
         self.assertEqual(email_flag.count(), 1)
-        self.assertEqual(email_flag[0].flag, "small_email_only")
+        self.assertEqual(email_flag[0].flag, EmailFlag.SMALL_ONLY)
 
     def test_handle_soft_bounce_small_only_exist(self) -> None:
         """This test checks if a small_email_only flag is not created for
@@ -494,14 +494,14 @@ class SNSWebhookTest(TestCase):
         # Create a small_email_only flag
         email_flag_count = EmailFlag.objects.create(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
-            reason="MessageTooLarge",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+            event_sub_type=SUB_TYPES.MESSAGETOOLARGE,
         )
         email_flag_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
         ).count()
         self.assertEqual(email_flag_count, 1)
 
@@ -512,14 +512,14 @@ class SNSWebhookTest(TestCase):
 
         email_flag_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="flag",
-            flag="small_email_only",
+            object_type=EmailFlag.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
         ).count()
 
         # Check if new small_email_only was not created
         self.assertEqual(email_flag_count, 1)
 
-    @mock.patch("cl.users.models.logging")
+    @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged when a
         unexpected bounceSubType event is received
@@ -630,9 +630,9 @@ class SNSWebhookTest(TestCase):
         self.assertNotEqual(retry_counter_before, retry_counter_after)
         self.assertNotEqual(next_retry_date_before, next_retry_date_after)
 
-    def test_handle_soft_bounce_not_max_retry_reached(self) -> None:
+    def test_handle_soft_bounce_max_retry_reached(self) -> None:
         """This test checks if a back_off event exists for
-        an email address and is not under waiting period and,
+        an email address and if is not under waiting period and if
         max_retry has been reached, email address is banned
         """
         # Trigger first backoff notification event
@@ -641,7 +641,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_exist = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         ).exists()
         # Check email address is not banned
         self.assertEqual(email_ban_exist, False)
@@ -657,7 +657,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_exist = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         ).exists()
         # Check email address is now banned
         self.assertEqual(email_ban_exist, True)
@@ -669,14 +669,14 @@ class SNSWebhookTest(TestCase):
         )
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         )
 
         # Checks no new ban object is created for this email address
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].reason, "General")
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
 
-    def test_handle_soft_bounce_max_retry_reached(self) -> None:
+    def test_handle_soft_bounce_compute_waiting_period(self) -> None:
         """This test checks if the exponential waiting period
         is computed properly
         """
@@ -717,7 +717,7 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
-    @mock.patch("cl.users.models.logging")
+    @mock.patch("cl.users.email_handlers.logging")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned
         when an unexpected hard bounceSubType event is received.
@@ -738,7 +738,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         ).count()
 
         # Check if email address is now banned
@@ -753,7 +753,7 @@ class SNSWebhookTest(TestCase):
 
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         ).count()
 
         # Check no additional email ban object is created
@@ -774,12 +774,12 @@ class SNSWebhookTest(TestCase):
 
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         )
 
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].reason, "General")
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
 
         # Trigger another hard_bounce event
         self.send_signal(
@@ -790,14 +790,49 @@ class SNSWebhookTest(TestCase):
 
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            flag_type="ban",
+            object_type=EmailFlag.BAN,
         )
 
         # Check no additional email ban object is created
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].reason, "General")
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
 
-    @mock.patch("cl.users.models.schedule_failed_email")
+    def test_handle_complaint(self) -> None:
+        """This test checks if an email address is banned
+        when a hard bounce event is received.
+        Also checks that if an email address is previously banned avoid to
+        create a new ban register for that email address
+        """
+
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=EmailFlag.BAN,
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+        # Trigger another hard_bounce event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=EmailFlag.BAN,
+        )
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+    @mock.patch("cl.users.email_handlers.schedule_failed_email")
     def test_handle_delivery(self, mock_schedule) -> None:
         """This test checks if a delivery notification is received
         and exists a previous Backoffevent it's deleted and
