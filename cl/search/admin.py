@@ -150,18 +150,6 @@ class RECAPDocumentAdmin(admin.ModelAdmin):
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
-        queryset.update(
-            date_upload=None,
-            is_available=False,
-            is_sealed=True,
-            sha1="",
-            page_count=None,
-            file_size=None,
-            ia_upload_failure_count=None,
-            thumbnail_status=THUMBNAIL_STATUSES.NEEDED,
-            plain_text="",
-            ocr_status=None,
-        )
         ia_failures = []
         for rd in queryset:
             # Thumbnail
@@ -177,6 +165,20 @@ class RECAPDocumentAdmin(admin.ModelAdmin):
             r = delete_from_ia(url)
             if not r.ok:
                 ia_failures.append(url)
+
+        queryset.update(
+            date_upload=None,
+            is_available=False,
+            is_sealed=True,
+            sha1="",
+            page_count=None,
+            file_size=None,
+            ia_upload_failure_count=None,
+            filepath_ia="",
+            thumbnail_status=THUMBNAIL_STATUSES.NEEDED,
+            plain_text="",
+            ocr_status=None,
+        )
 
         # Update solr
         add_items_to_solr.delay(
