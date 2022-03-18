@@ -1191,7 +1191,9 @@ class Race(models.Model):
         ("i", "American Indian or Alaska Native"),
         ("a", "Asian"),
         ("p", "Native Hawaiian or Other Pacific Islander"),
+        ("mena", "Middle Eastern/North African"),
         ("h", "Hispanic/Latino"),
+        ("o", "Other"),
     )
     race = models.CharField(
         choices=RACES,
