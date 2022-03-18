@@ -140,12 +140,13 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(admin.ModelAdmin):
+    search_fields = ("pk",)
     raw_id_fields = ("docket_entry", "tags")
-
     readonly_fields = (
         "date_created",
         "date_modified",
     )
+    actions = ("seal_documents",)
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
