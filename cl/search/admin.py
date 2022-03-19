@@ -140,7 +140,7 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(admin.ModelAdmin):
-    search_fields = ("pk",)
+    search_fields = ("pk__exact",)
     raw_id_fields = ("docket_entry", "tags")
     readonly_fields = (
         "date_created",

@@ -136,7 +136,7 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "name_last",
         "name_first",
         "fjc_id",
-        "pk",
+        "pk__exact",
     )
     list_filter = ("gender",)
     list_display = (
