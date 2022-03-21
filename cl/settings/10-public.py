@@ -621,46 +621,56 @@ CLOUDFRONT_DOMAIN = ""
 
 
 ####################################
-# Binary Transformers & Extractors #
+# Microservice Endpoints #
 ####################################
-BTE_URLS = {
-    # Testing
-    "heartbeat": {"url": f"{BTE_HOST}", "timeout": 5},
-    # Audio Processing
-    # this should change but currently in a PR so will alter later
-    "convert-audio": {"url": f"{BTE_HOST}/convert/audio", "timeout": 60 * 60},
-    # Document processing
+MICROSERVICE_URLS = {
+    # DOCTOR Endpoints
+    "doctor-heartbeat": {
+        "url": f"{DOCTOR_HOST}",
+        "timeout": 5,
+    },
+    # Extractor Endpoints
     "pdf-to-text": {
-        "url": f"{BTE_HOST}/document/pdf_to_text",
+        "url": f"{DOCTOR_HOST}/extract/pdf/text/",
         "timeout": 60 * 5,
     },
     "document-extract": {
-        "url": f"{BTE_HOST}/document/extract_text",
+        "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 15,
     },
-    "page-count": {"url": f"{BTE_HOST}/document/page_count", "timeout": 120},
-    "thumbnail": {"url": f"{BTE_HOST}/document/thumbnail", "timeout": 120},
-    "mime-type": {"url": f"{BTE_HOST}/document/mime_type", "timeout": 60},
-    # Image conversion
+    # Utils Endpoints
+    "page-count": {
+        "url": f"{DOCTOR_HOST}/utils/page-count/pdf/",
+        "timeout": 120,
+    },
+    "audio-duration": {
+        "url": f"{DOCTOR_HOST}/utils/audio/duration/",
+        "timeout": 2,
+    },
+    "mime-type": {
+        "url": f"{DOCTOR_HOST}/utils/mime-type/",
+        "timeout": 60,
+    },
+    # Converter Endpoints
+    "thumbnail": {
+        "url": f"{DOCTOR_HOST}/convert/pdf/thumbnail/",
+        "timeout": 120,
+    },
     "images-to-pdf": {
-        "url": f"{BTE_HOST}/financial_disclosure/images_to_pdf",
+        "url": f"{DOCTOR_HOST}/convert/images/pdf/",
         "timeout": 60 * 10,
     },
-    # Financial Disclosures
-    "extract-disclosure": {
-        "url": f"{BTE_HOST}/financial_disclosure/extract_record",
-        "timeout": 60 * 60 * 12,
+    "convert-audio": {
+        "url": f"{DOCTOR_HOST}/convert/audio/mp3/",
+        "timeout": 60 * 60,
     },
-    "extract-disclosure-jw": {
-        "url": f"{BTE_HOST}/financial_disclosure/extract_jw",
-        "timeout": 60 * 60 * 12,
+    # Disclosure Microservices
+    "disclosure-heartbeat": {
+        "url": f"{DISCLOSURE_HOST}",
+        "timeout": 5,
     },
-    "extract-disclosure-jef": {
-        "url": f"{BTE_HOST}/financial_disclosure/extract_jef",
-        "timeout": 60 * 60 * 5,
-    },
-    "extract-disclosure-pdf": {
-        "url": f"{BTE_HOST}/financial_disclosure/extract_pdf",
-        "timeout": 60 * 5,
+    "extract": {
+        "url": f"{DISCLOSURE_HOST}/extract/disclosure/",
+        "timeout": 60 * 60 * 2,
     },
 }
