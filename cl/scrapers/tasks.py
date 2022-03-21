@@ -1,4 +1,4 @@
-import base64
+import json
 import logging
 import random
 import re
@@ -36,9 +36,8 @@ from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
-from cl.lib.utils import is_iter
+from cl.lib.utils import is_iter, microservice
 from cl.recap.mergers import save_iquery_to_docket
-from cl.scrapers.transformer_extractor_utils import convert_and_clean_audio
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 DEVNULL = open("/dev/null", "w")
@@ -555,17 +554,46 @@ def process_audio_file(self, pk) -> None:
     :param pk: Audio file pk
     :return: None
     """
-    af = Audio.objects.get(pk=pk)
-    bte_audio_response = convert_and_clean_audio(af)
-    bte_audio_response.raise_for_status()
-    audio_obj = bte_audio_response.json()
-    cf = ContentFile(base64.b64decode(audio_obj["audio_b64"]))
-    file_name = f"{trunc(best_case_name(af).lower(), 72)}_cl.mp3"
-    af.file_with_date = af.docket.date_argued
-    af.local_path_mp3.save(file_name, cf, save=False)
-    af.duration = audio_obj["duration"]
-    af.processing_complete = True
-    af.save()
+    audio_obj = Audio.objects.get(pk=pk)
+    date_argued = audio_obj.docket.date_argued
+    if date_argued:
+        date_argued_str = date_argued.strftime("%Y-%m-%d")
+        date_argued_year = date_argued.year
+    else:
+        date_argued_str, date_argued_year = None, None
+
+    audio_data = {
+        "court_full_name": audio_obj.docket.court.full_name,
+        "court_short_name": audio_obj.docket.court.short_name,
+        "court_pk": audio_obj.docket.court.pk,
+        "court_url": audio_obj.docket.court.url,
+        "docket_number": audio_obj.docket.docket_number,
+        "date_argued": date_argued_str,
+        "date_argued_year": date_argued_year,
+        "case_name": audio_obj.case_name,
+        "case_name_full": audio_obj.case_name_full,
+        "case_name_short": audio_obj.case_name_short,
+        "download_url": audio_obj.download_url,
+    }
+    audio_response = microservice(
+        service="convert-audio",
+        doc=audio_obj,
+        params={"audio_data": json.dumps(audio_data)},
+    )
+    audio_response.raise_for_status()
+    cf = ContentFile(audio_response.content)
+    file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
+    audio_obj.file_with_date = audio_obj.docket.date_argued
+    audio_obj.local_path_mp3.save(file_name, cf, save=False)
+    audio_obj.duration = float(
+        microservice(
+            service="audio-duration",
+            file=audio_response.content,
+            filename="con.mp3",
+        ).text
+    )
+    audio_obj.processing_complete = True
+    audio_obj.save()
 
 
 @app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
