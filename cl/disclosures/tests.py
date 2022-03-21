@@ -17,6 +17,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
+from cl.lib.utils import microservice
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 
@@ -71,12 +72,13 @@ class DisclosureIngestionTest(TestCase):
         with open(self.jef_pdf, "rb") as f:
             pdf_bytes = f.read()
         Investment.objects.all().delete()
-        extractor_response = requests.post(
-            settings.BTE_URLS["extract-disclosure-jef"]["url"],
-            files={"file": ("file", pdf_bytes)},
-            timeout=settings.BTE_URLS["extract-disclosure-jef"]["timeout"],
-        )
-        extracted_data = extractor_response.json()
+
+        extracted_data = microservice(
+            service="extract-disclosure",
+            filename="file.pdf",
+            file=pdf_bytes,
+        ).json()
+
         test_disclosure = FinancialDisclosure.objects.get(pk=1)
         save_disclosure(
             extracted_data=extracted_data,
