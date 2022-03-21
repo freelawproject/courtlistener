@@ -155,9 +155,8 @@ def microservice(
 
     req = Request(
         method=method,
-        url=services[service]["url"],
+        url=services[service]["url"],  # type: ignore
     )
-    req.timeout = services[service]["timeout"]
     if filepath:
         with open(filepath, "rb") as f:
             req.files = {"file": (filepath, f.read())}
@@ -180,4 +179,7 @@ def microservice(
         req.data = data
     if params:
         req.params = params
-    return Session().send(req.prepare())
+
+    session = Session()
+    session.timeout = services[service]["timeout"]
+    return session.send(req.prepare())
