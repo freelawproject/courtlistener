@@ -180,4 +180,4 @@ def microservice(
     if params:
         req.params = params
 
-    return Session().send(req.prepare(), timeout=services[service]["timeout"])
+    return Session().send(req.prepare(), timeout=services[service]["timeout"])  # type: ignore
