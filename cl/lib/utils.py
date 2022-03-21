@@ -1,11 +1,14 @@
 import collections
-import errno
-import os
 import re
 from itertools import chain, islice, tee
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
+from django.conf import settings
 from django.db.models import QuerySet
+from requests import Request, Response, Session
+
+from cl.audio.models import Audio
+from cl.search.models import Opinion, RECAPDocument
 
 
 class _UNSPECIFIED(object):
@@ -118,3 +121,63 @@ def human_sort(
         sorter = lambda item: [convert(c) for c in re.split("([0-9]+)", item)]
 
     return sorted(unordered_list, key=sorter)
+
+
+def microservice(
+    service: str,
+    method: str = "POST",
+    doc: Any = None,
+    file: bytes = None,
+    filename: str = None,
+    filepath: str = None,
+    data=None,
+    params=None,
+) -> Response:
+    """Call a Microservice endpoint
+
+    This is a helper utility to call our microservices.  To see a list of Endpoints
+    check out the settings file cl/settings/public.py.
+
+    Because of the various ways our db is setup we have a few different params we use
+    in this function.
+
+    :param service: The service to call
+    :param method: The method to use (defaults to POST)
+    :param doc: The document as a db object
+    :param file: The file as a byte array
+    :param filename: The filename of the file
+    :param filepath: The filepath of the file
+    :param data: The data to send
+    :param params: The params to send
+    :return: The response from the microservice
+    """
+    services = settings.MICROSERVICE_URLS
+
+    req = Request(
+        method=method,
+        url=services[service]["url"],
+    )
+    req.timeout = services[service]["timeout"]
+    if filepath:
+        with open(filepath, "rb") as f:
+            req.files = {"file": (filepath, f.read())}
+    if doc and type(doc) == RECAPDocument:
+        req.files = {
+            "file": (doc.filepath_local.name, doc.filepath_local.read())
+        }
+    if doc and type(doc) == Opinion:
+        req.files = {"file": (doc.local_path.name, doc.local_path.read())}
+    if doc and type(doc) == Audio:
+        req.files = {
+            "file": (
+                doc.local_path_original_file.name,
+                doc.local_path_original_file.read(),
+            )
+        }
+    if file:
+        req.files = {"file": (filename, file)}
+    if data:
+        req.data = data
+    if params:
+        req.params = params
+    return Session().send(req.prepare())

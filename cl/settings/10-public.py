@@ -652,7 +652,7 @@ MICROSERVICE_URLS = {
         "timeout": 60,
     },
     # Converter Endpoints
-    "thumbnail": {
+    "generate-thumbnail": {
         "url": f"{DOCTOR_HOST}/convert/pdf/thumbnail/",
         "timeout": 120,
     },
@@ -669,7 +669,7 @@ MICROSERVICE_URLS = {
         "url": f"{DISCLOSURE_HOST}",
         "timeout": 5,
     },
-    "extract": {
+    "extract-disclosure": {
         "url": f"{DISCLOSURE_HOST}/extract/disclosure/",
         "timeout": 60 * 60 * 2,
     },
