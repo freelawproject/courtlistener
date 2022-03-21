@@ -7,9 +7,6 @@ from django.conf import settings
 from django.db.models import QuerySet
 from requests import Request, Response, Session
 
-from cl.audio.models import Audio
-from cl.search.models import Opinion, RECAPDocument
-
 
 class _UNSPECIFIED(object):
     pass
@@ -151,6 +148,9 @@ def microservice(
     :param params: The params to send
     :return: The response from the microservice
     """
+    from cl.audio.models import Audio
+    from cl.search.models import Opinion, RECAPDocument
+
     services = settings.MICROSERVICE_URLS
 
     req = Request(
