@@ -336,7 +336,7 @@ class IndexingTest(EmptySolrTestCase):
 
 class AdvancedTest(IndexedSolrTestCase):
     """
-     Advanced query techniques
+    Advanced query techniques
     """
     def setUp(self) -> None:
         self.fixtures.append("test_objects_search.json")
@@ -352,7 +352,9 @@ class AdvancedTest(IndexedSolrTestCase):
 
     def test_a_union_query(self) -> None:
         """Does OR queries work"""
-        r = self.client.get(reverse("show_results"), {"q": "Howard OR Lissner"})
+        r = self.client.get(
+            reverse("show_results"), {"q": "Howard OR Lissner"}
+        )
         self.assertIn("Howard", r.content.decode())
         self.assertIn("Lissner", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
@@ -374,13 +376,17 @@ class AdvancedTest(IndexedSolrTestCase):
 
     def test_query_phrase(self) -> None:
         """Can we query by phrase"""
-        r = self.client.get(reverse("show_results"), {"q": "Testing Supreme Court"})
+        r = self.client.get(
+            reverse("show_results"), {"q": "'Testing Supreme Court'"}
+        )
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
     def test_query_grouped_and_sub_queries(self) -> None:
         """Does grouped and sub queries work"""
-        r = self.client.get(reverse("show_results"), {"q": "(Lissner OR Honda) AND Howard"})
+        r = self.client.get(
+            reverse("show_results"), {"q": "(Lissner OR Honda) AND Howard"}
+        )
         self.assertIn("Howard", r.content.decode())
         self.assertIn("Honda", r.content.decode())
         self.assertIn("Lissner", r.content.decode())
@@ -388,11 +394,53 @@ class AdvancedTest(IndexedSolrTestCase):
 
     def test_query_fielded(self) -> None:
         """Does fielded queries work"""
-        r = self.client.get(reverse("show_results"), {"q": "status:precedential"})
+        r = self.client.get(
+            reverse("show_results"), {"q": "status:precedential"}
+        )
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("2 Opinions", r.content.decode())
 
+    def test_a_wildcard_query(self) -> None:
+        """Does a wildcard query work"""
+        r = self.client.get(reverse("show_results"), {"q": "Ho*"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+        r = self.client.get(reverse("show_results"), {"q": "?Ho"})
+        self.assertIn("Howard", r.content.decode())
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_a_fuzzy_query(self) -> None:
+        """Does a fuzzy query work"""
+        r = self.client.get(reverse("show_results"), {"q": "'lissna~0.2'"})
+        self.assertIn("Lissner", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_proximity_query(self) -> None:
+        """Does a proximity query work"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "'Testing Court'~3"}
+        )
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_range_query(self) -> None:
+        """Does a range query work"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "citation:([22 TO 33])"}
+        )
+        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+    def test_date_query(self) -> None:
+        """Does a date query work"""
+        r = self.client.get(
+            reverse("show_results"), {"q": "dateFiled:[2015-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"}
+        )
+        self.assertIn("3 Opinions", r.content.decode())
 
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
