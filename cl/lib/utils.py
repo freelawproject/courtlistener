@@ -1,6 +1,4 @@
 import collections
-import errno
-import os
 import re
 from itertools import chain, islice, tee
 from typing import Any, Iterable, List, Optional, Tuple, Union

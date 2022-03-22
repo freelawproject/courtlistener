@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import timedelta
 from unittest import mock
@@ -6,6 +7,7 @@ from django.conf import settings
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
+from cl.lib.microservice_utils import microservice
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
@@ -21,7 +23,6 @@ from cl.scrapers.tasks import (
     process_audio_file,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
-from cl.scrapers.transformer_extractor_utils import convert_and_clean_audio
 from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -442,12 +443,37 @@ class AudioFileTaskTest(TestCase):
         )
         mock.assert_called()
 
-    def test_BTE_audio_conversion(self) -> None:
+    def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
         audio_obj = Audio.objects.get(pk=1)
-        bte_respone_obj = convert_and_clean_audio(audio_obj)
+        date_argued = audio_obj.docket.date_argued
+        if date_argued:
+            date_argued_str = date_argued.strftime("%Y-%m-%d")
+            date_argued_year = date_argued.year
+        else:
+            date_argued_str, date_argued_year = None, None
+
+        audio_data = {
+            "court_full_name": audio_obj.docket.court.full_name,
+            "court_short_name": audio_obj.docket.court.short_name,
+            "court_pk": audio_obj.docket.court.pk,
+            "court_url": audio_obj.docket.court.url,
+            "docket_number": audio_obj.docket.docket_number,
+            "date_argued": date_argued_str,
+            "date_argued_year": date_argued_year,
+            "case_name": audio_obj.case_name,
+            "case_name_full": audio_obj.case_name_full,
+            "case_name_short": audio_obj.case_name_short,
+            "download_url": audio_obj.download_url,
+        }
+        audio_response = microservice(
+            service="convert-audio",
+            item=audio_obj,
+            params=audio_data,
+        )
+
         self.assertEqual(
-            bte_respone_obj.status_code,
+            audio_response.status_code,
             200,
             msg="Unsuccessful audio conversion",
         )

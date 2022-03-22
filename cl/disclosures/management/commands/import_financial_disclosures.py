@@ -1,6 +1,7 @@
 import json
 
-from cl.disclosures.tasks import has_been_extracted, import_disclosure
+from cl.disclosures.models import FinancialDisclosure
+from cl.disclosures.tasks import import_disclosure
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 
@@ -26,7 +27,9 @@ def import_financial_disclosures(
             continue
 
         # Check download_filepath to see if it has been processed before.
-        if has_been_extracted(data):
+        if FinancialDisclosure.objects.filter(
+            download_filepath=data["url"], has_been_extracted=True
+        ).exists():
             logger.info(f"Document already extracted and saved: {data['id']}.")
             continue
 
