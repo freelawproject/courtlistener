@@ -7,6 +7,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from redis import Redis
+from requests import Response
 
 from cl.celery_init import app
 from cl.disclosures.models import (
@@ -303,16 +305,26 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
 
 
 def save_and_upload_disclosure(
-    interface, disclosure_key, response, data
+    redis_db: Redis,
+    disclosure_key: str,
+    response: Response,
+    data: dict,
 ) -> Optional[FinancialDisclosure]:
+    """Save disclosure PDF to S3 and generate a FinancialDisclosure object.
 
+    :param redis_db: The redis db storing our disclosure keys
+    :param disclosure_key: The disclosure key for the redis db
+    :param response: The pdf data response object
+    :param data: The judge data as a dict
+    :return: Financial discsosure object or None
+    """
     sha1_hash = sha1(response.content)
     if FinancialDisclosure.objects.filter(sha1=sha1_hash).exists():
         logger.error(
             "PDF already in system.",
             extra={"disclosure_id": disclosure_key},
         )
-        interface.delete(disclosure_key)
+        redis_db.delete(disclosure_key)
         return
 
     page_count = microservice(
@@ -325,7 +337,7 @@ def save_and_upload_disclosure(
             msg=f"Page count failed",
             extra={"disclosure_id": disclosure_key, "url": data["url"]},
         )
-        interface.delete(disclosure_key)
+        redis_db.delete(disclosure_key)
         return
 
     # Make disclosure
@@ -359,10 +371,10 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     :param data: The disclosure information to process
     :return: None
     """
-    interface = make_redis_interface("CACHE")
+    redis_db = make_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
     newly_enqueued = create_redis_semaphore(
-        interface,
+        redis_db,
         disclosure_key,
         ttl=60 * 60 * 2,
     )
@@ -384,7 +396,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
             f"Failed to download {data['id']} {data['url']}",
             extra={"disclosure_id": data["id"]},
         )
-        interface.delete(disclosure_key)
+        redis_db.delete(disclosure_key)
         return
 
     # Check if disclosure already exists
@@ -394,7 +406,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
         disclosure = query[0]
     else:
         disclosure = save_and_upload_disclosure(
-            interface, disclosure_key, response, data
+            redis_db, disclosure_key, response, data
         )
         if not disclosure:
             logger.error(
@@ -409,7 +421,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
         disclosure_key=disclosure_key,
     )
     if not content:
-        interface.delete(disclosure_key)
+        redis_db.delete(disclosure_key)
         return
 
     # Save PDF content
@@ -427,4 +439,4 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
         )
 
     # Remove disclosure ID in redis for completed disclosure
-    interface.delete(disclosure_key)
+    redis_db.delete(disclosure_key)
