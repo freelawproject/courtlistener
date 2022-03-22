@@ -206,17 +206,7 @@ class UserProfile(models.Model):
 
 
 class EmailFlag(AbstractDateTimeModel):
-    """Stores flags for email addresses
-
-    Two types of :object_type:
-    BAN: ban an email address and avoid sending any email
-    FLAG: flag an email address for a special treatment e.g small_email_only.
-    :flag: the actual flag assigned, like: small_email_only
-    :event_sub_type: the SNS bounce subtype that triggered the object
-    :email_address: an EmailFlag object belongs to an email address instead
-    of a user, in this way, if users change their email address this won't
-    affect new user email address.
-    """
+    """Stores flags for email addresses."""
 
     BAN = 0
     FLAG = 1
@@ -231,20 +221,24 @@ class EmailFlag(AbstractDateTimeModel):
         (MAX_RETRY_REACHED, "max_retry_reached"),
     )
     email_address = models.EmailField(
-        help_text="Email address flagged.",
+        help_text="EmailFlag object is related to this email address instead "
+        "of a user, in this way, if users change their email address this "
+        "won't affect the user's new email address.",
     )
     object_type = models.SmallIntegerField(
-        help_text="The object type assigned: ban or flag",
+        help_text="The object type assigned, "
+        "Email ban: ban an email address and avoid sending any email. "
+        "Email flag: flag an email address for a special treatment.",
         choices=OBJECT_TYPES,
     )
     flag = models.SmallIntegerField(
-        help_text="The actual flag assigned, like: small_email_only",
+        help_text="The actual flag assigned, e.g: small_email_only.",
         choices=FLAGS,
         blank=True,
         null=True,
     )
     event_sub_type = models.SmallIntegerField(
-        help_text="The notification event subtype.",
+        help_text="The SNS bounce subtype that triggered the object.",
         choices=SUB_TYPES.TYPES,
     )
 
@@ -260,20 +254,18 @@ class EmailFlag(AbstractDateTimeModel):
 class BackoffEvent(AbstractDateTimeModel):
     """Stores backoff events for email addresses, this is created or updated
     after receiving a soft bounce object for an email address.
-
-    :email_address: The backoff event is related to this email address
-    instead of a user, in this way, if users change their email address
-    this won't affect new user email address.
     """
 
     email_address = models.EmailField(
-        help_text="Email address under backoff event.",
+        help_text="The backoff event is related to this email address "
+        "instead of a user, in this way, if users change their email address "
+        "this won't affect the user's new email address.",
     )
     retry_counter = models.SmallIntegerField(
         help_text="The retry counter for exponential backoff events.",
     )
     next_retry_date = models.DateTimeField(
-        help_text="The datetime for next retry.",
+        help_text="The next retry datetime for exponential backoff events.",
     )
 
     class Meta:
