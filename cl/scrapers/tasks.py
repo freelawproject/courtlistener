@@ -30,13 +30,14 @@ from cl.citations.tasks import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
+from cl.lib.microservice_utils import microservice
 from cl.lib.mojibake import fix_mojibake
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
-from cl.lib.utils import is_iter, microservice
+from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
 from cl.search.models import Docket, Opinion, RECAPDocument
 
