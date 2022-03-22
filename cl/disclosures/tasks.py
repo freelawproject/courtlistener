@@ -347,7 +347,7 @@ def save_and_upload_disclosure(
         person_id=data["person_id"],
         sha1=sha1_hash,
         has_been_extracted=False,
-        report_type=data.get("report_type", -1),
+        report_type=data.get("report_type", REPORT_TYPES.UNKNOWN),
         download_filepath=data.get("url"),
     )
 
