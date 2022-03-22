@@ -390,7 +390,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
     )
     response = requests.get(data["url"], timeout=60 * 20)
 
-    if response.status_code != 200:
+    if not response.ok:
         logger.error(
             f"Failed to download {data['id']} {data['url']}",
             extra={"disclosure_id": data["id"]},
