@@ -344,7 +344,7 @@ def save_and_upload_disclosure(
     disclosure = FinancialDisclosure(
         year=int(data["year"]),
         page_count=page_count,
-        person=Person.objects.get(id=data["person_id"]),
+        person_id=data["person_id"],
         sha1=sha1_hash,
         has_been_extracted=False,
         report_type=data.get("report_type", -1),
