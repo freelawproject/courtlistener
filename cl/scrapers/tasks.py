@@ -579,7 +579,7 @@ def process_audio_file(self, pk) -> None:
     audio_response = microservice(
         service="convert-audio",
         item=audio_obj,
-        params={"audio_data": json.dumps(audio_data)},
+        params=audio_data,
     )
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
