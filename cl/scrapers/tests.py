@@ -7,9 +7,9 @@ from django.conf import settings
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
+from cl.lib.microservice_utils import microservice
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.lib.utils import microservice
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
@@ -468,8 +468,8 @@ class AudioFileTaskTest(TestCase):
         }
         audio_response = microservice(
             service="convert-audio",
-            doc=audio_obj,
-            params={"audio_data": json.dumps(audio_data)},
+            item=audio_obj,
+            params=audio_data,
         )
 
         self.assertEqual(

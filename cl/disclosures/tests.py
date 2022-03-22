@@ -17,7 +17,7 @@ from cl.disclosures.models import (
     Reimbursement,
 )
 from cl.disclosures.tasks import save_disclosure
-from cl.lib.utils import microservice
+from cl.lib.microservice_utils import microservice
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 
@@ -75,7 +75,7 @@ class DisclosureIngestionTest(TestCase):
 
         extracted_data = microservice(
             service="extract-disclosure",
-            filename="file.pdf",
+            file_type="pdf",
             file=pdf_bytes,
         ).json()
 

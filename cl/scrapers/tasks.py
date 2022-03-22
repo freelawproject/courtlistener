@@ -577,7 +577,7 @@ def process_audio_file(self, pk) -> None:
     }
     audio_response = microservice(
         service="convert-audio",
-        doc=audio_obj,
+        item=audio_obj,
         params={"audio_data": json.dumps(audio_data)},
     )
     audio_response.raise_for_status()
@@ -589,7 +589,7 @@ def process_audio_file(self, pk) -> None:
         microservice(
             service="audio-duration",
             file=audio_response.content,
-            filename="con.mp3",
+            file_type="mp3",
         ).text
     )
     audio_obj.processing_complete = True

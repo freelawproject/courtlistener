@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import requests
 from dateutil.parser import ParserError, parse
@@ -7,7 +7,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from requests import ReadTimeout
 
 from cl.celery_init import app
 from cl.disclosures.models import (
@@ -24,10 +23,9 @@ from cl.disclosures.models import (
 )
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
+from cl.lib.microservice_utils import microservice
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
-from cl.lib.utils import microservice
-from cl.people_db.models import Person
 
 
 def make_disclosure_key(data_id: str) -> str:
@@ -55,29 +53,25 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
 
     response = microservice(
         service="generate-thumbnail",
-        filename="disclosure.pdf",
+        file_type="pdf",
         file=pdf_content,
     )
-    if response.status_code == 500:
+    if not response.ok:
         if self.request.retries == self.max_retries:
             disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             disclosure.save()
             return
         else:
-            raise self.retry(exc=ReadTimeout)
+            raise self.retry(exc=response.status_code)
 
-    if response.content is not None:
-        disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
-        disclosure.thumbnail.save(None, ContentFile(response.content))
-    else:
-        disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        disclosure.save()
+    disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
+    disclosure.thumbnail.save(None, ContentFile(response.content))
 
 
 def extract_content(
     pdf_bytes: bytes,
     disclosure_key: str,
-) -> Dict[str, Union[str, int]]:
+) -> dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
     Attempt extraction using multiple methods if necessary.
@@ -92,17 +86,11 @@ def extract_content(
     # long Trump extraction with ~5k investments
     response = microservice(
         service="extract-disclosure",
-        filename="file.pdf",
+        file_type="pdf",
         file=pdf_bytes,
     )
-    if response.status_code == 500:
-        logger.warning(
-            msg="Timeout occurred for PDF",
-            extra=dict(disclosure_key=disclosure_key),
-        )
-        return {}
 
-    if not response.json()["success"]:
+    if not response.ok:
         logger.warning(
             msg="Could not extract data from this document",
             extra=dict(
@@ -329,7 +317,7 @@ def save_and_upload_disclosure(
 
     page_count = microservice(
         service="page-count",
-        filename=data["url"].split("/")[-1],
+        file_type="pdf",
         file=response.content,
     ).content
     if not page_count:
@@ -351,7 +339,8 @@ def save_and_upload_disclosure(
         download_filepath=data.get("url"),
     )
 
-    # Save and upload & generate thumbnail
+    # Save method here uploads the file to s3 and also triggers thumbnail
+    # generation in the background via the save method in disclosure.models
     disclosure.filepath.save(
         f"{disclosure.person.slug}-disclosure.{data['year']}.pdf",
         ContentFile(response.content),
@@ -364,7 +353,7 @@ def save_and_upload_disclosure(
 
 
 @app.task(bind=True, max_retries=2, interval_start=10, ignore_result=True)
-def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
+def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     """Import disclosures into Courtlistener
 
     :param data: The disclosure information to process
@@ -409,7 +398,7 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         )
         if not disclosure:
             logger.error(
-                f"Upload to save disclosure {data['id']} {data['url']}",
+                f"Disclosure failed to save or upload to aws {data['id']} {data['url']}",
                 extra={"disclosure_id": data["id"]},
             )
             return

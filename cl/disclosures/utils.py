@@ -1,29 +1,8 @@
-from typing import Dict, Optional, Tuple, Union
-
-from django.conf import settings
-
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.people_db.models import Person
 
 
-def has_been_extracted(data: Dict[str, Union[str, int, list]]) -> bool:
-    """Has PDF been extracted
-
-    Method added to skip tiff to pdf conversion if
-    document has already been converted and saved but
-    not yet extracted.
-
-    :param data: File data
-    :return: Whether document has been extracted
-    """
-    from cl.disclosures.models import FinancialDisclosure
-
-    return FinancialDisclosure.objects.filter(
-        download_filepath=data["url"], has_been_extracted=True
-    ).exists()
-
-
-def make_disclosure_data(person: Person) -> Tuple[str, str]:
+def make_disclosure_data(person: Person) -> tuple[str, str]:
     """Make a CSV of the years and the IDs of somebody's disclosures
 
     :param person: The Person we're making data for
