@@ -157,9 +157,13 @@ def microservice(
         method=method,
         url=services[service]["url"],  # type: ignore
     )
+    # Add file from filepath
     if filepath:
         with open(filepath, "rb") as f:
             req.files = {"file": (filepath, f.read())}
+
+    # Handle our documents based on the type of model object
+    # Sadly these are not uniform
     if doc and type(doc) == RECAPDocument:
         req.files = {
             "file": (doc.filepath_local.name, doc.filepath_local.read())
@@ -173,10 +177,15 @@ def microservice(
                 doc.local_path_original_file.read(),
             )
         }
+    # Sometimes we will want to pass in a filename and the file bytes
+    # to avoid writing them to disk. Filename can often be generic
+    # and is used to identify the file extension for our microservices
     if file:
         req.files = {"file": (filename, file)}
+
     if data:
         req.data = data
+
     if params:
         req.params = params
 

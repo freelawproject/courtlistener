@@ -4,8 +4,9 @@ from typing import Dict, Optional, Union
 import requests
 from dateutil.parser import ParserError, parse
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from requests import ReadTimeout
 
 from cl.celery_init import app
@@ -324,7 +325,7 @@ def save_and_upload_disclosure(
             extra={"disclosure_id": disclosure_key},
         )
         interface.delete(disclosure_key)
-        # return
+        return
 
     page_count = microservice(
         service="page-count",
@@ -339,7 +340,7 @@ def save_and_upload_disclosure(
         interface.delete(disclosure_key)
         return
 
-        # Save Financial Disclosure here to AWS and move onward
+    # Make disclosure
     disclosure = FinancialDisclosure(
         year=int(data["year"]),
         page_count=page_count,
@@ -350,7 +351,7 @@ def save_and_upload_disclosure(
         download_filepath=data.get("url"),
     )
 
-    # Save and upload PDF
+    # Save and upload & generate thumbnail
     disclosure.filepath.save(
         f"{disclosure.person.slug}-disclosure.{data['year']}.pdf",
         ContentFile(response.content),
@@ -381,16 +382,13 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         logger.info(
             f"Process is already running {data['id']}. {disclosure_key}",
         )
-        interface.delete(disclosure_key)
-        # return
+        return
 
-    # Generate PDF content from our three paths
-    url = data["url"]
     logger.info(
         f"Processing row {data['id']} for person {data['person_id']} "
         f"in year {data['year']}"
     )
-    response = requests.get(url, timeout=60 * 20)
+    response = requests.get(data["url"], timeout=60 * 20)
 
     if response.status_code != 200:
         logger.error(
@@ -400,8 +398,8 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         interface.delete(disclosure_key)
         return
 
-    # Check if previously Uploaded to AWS
-    query = FinancialDisclosure.objects.filter(download_filepath=url)
+    # Check if disclosure already exists
+    query = FinancialDisclosure.objects.filter(download_filepath=data["url"])
     if len(query) > 0:
         # If previously uploaded, use disclosure else process new document
         disclosure = query[0]
@@ -426,7 +424,18 @@ def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
         return
 
     # Save PDF content
-    save_disclosure(extracted_data=content, disclosure=disclosure)
+    try:
+        save_disclosure(extracted_data=content, disclosure=disclosure)
+    except IntegrityError:
+        logger.exception(
+            f"Integrity error on saving disclosure {data['id']} {data['url']}",
+            extra={"disclosure_id": data["id"]},
+        )
+    except ValidationError:
+        logger.exception(
+            f"Validation Error up saving disclosure",
+            extra={"disclosure_id": data["id"]},
+        )
 
     # Remove disclosure ID in redis for completed disclosure
     interface.delete(disclosure_key)
