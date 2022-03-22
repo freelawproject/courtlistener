@@ -338,6 +338,7 @@ class AdvancedTest(IndexedSolrTestCase):
     """
     Advanced query techniques
     """
+
     def setUp(self) -> None:
         self.fixtures.append("test_objects_search.json")
 
@@ -408,23 +409,23 @@ class AdvancedTest(IndexedSolrTestCase):
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        r = self.client.get(reverse("show_results"), {"q": "?Ho"})
-        self.assertIn("Howard", r.content.decode())
-        self.assertIn("Honda", r.content.decode())
+        r = self.client.get(reverse("show_results"), {"q": "?owa*"})
+        self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
     def test_a_fuzzy_query(self) -> None:
         """Does a fuzzy query work"""
-        r = self.client.get(reverse("show_results"), {"q": "'lissna~0.2'"})
-        self.assertIn("Lissner", r.content.decode())
-        self.assertIn("1 Opinion", r.content.decode())
+        r = self.client.get(reverse("show_results"), {"q": "ond~"})
+        self.assertIn("docket number 2", r.content.decode())
+        self.assertIn("docket number 3", r.content.decode())
+        self.assertIn("2 Opinions", r.content.decode())
 
     def test_proximity_query(self) -> None:
         """Does a proximity query work"""
         r = self.client.get(
             reverse("show_results"), {"q": "'Testing Court'~3"}
         )
-        self.assertIn("Honda", r.content.decode())
+        self.assertIn("docket number 2", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
     def test_range_query(self) -> None:
@@ -432,15 +433,27 @@ class AdvancedTest(IndexedSolrTestCase):
         r = self.client.get(
             reverse("show_results"), {"q": "citation:([22 TO 33])"}
         )
-        self.assertIn("Honda", r.content.decode())
-        self.assertIn("1 Opinion", r.content.decode())
+        self.assertIn("docket number 2", r.content.decode())
+        self.assertIn("docket number 3", r.content.decode())
+        self.assertIn("2 Opinions", r.content.decode())
 
     def test_date_query(self) -> None:
         """Does a date query work"""
         r = self.client.get(
-            reverse("show_results"), {"q": "dateFiled:[2015-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"}
+            reverse("show_results"),
+            {"q": "dateFiled:[2015-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"},
         )
-        self.assertIn("3 Opinions", r.content.decode())
+        self.assertIn("docket number 3", r.content.decode())
+        self.assertIn("1 Opinion", r.content.decode())
+
+        r = self.client.get(
+            reverse("show_results"),
+            {"q": "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"},
+        )
+        self.assertIn("docket number 2", r.content.decode())
+        self.assertIn("docket number 3", r.content.decode())
+        self.assertIn("2 Opinions", r.content.decode())
+
 
 class SearchTest(IndexedSolrTestCase):
     @staticmethod
@@ -1187,6 +1200,7 @@ class PagerankTest(TestCase):
                 msg="The answer for item %s was %s when it should have been "
                 "%s" % (key, pr_results[key], answers[key]),
             )
+
 
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
