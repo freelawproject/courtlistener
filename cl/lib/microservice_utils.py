@@ -67,7 +67,7 @@ def microservice(
     # Sometimes we will want to pass in a filename and the file bytes
     # to avoid writing them to disk. Filename can often be generic
     # and is used to identify the file extension for our microservices
-    if file:
+    if file and file_type:
         req.files = {"file": (f"dummy.{file_type}", file)}
 
     if data:

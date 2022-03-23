@@ -17,11 +17,7 @@ from cl.scrapers.management.commands import (
     cl_scrape_oral_arguments,
 )
 from cl.scrapers.models import ErrorLog, UrlHash
-from cl.scrapers.tasks import (
-    extract_doc_content,
-    extract_from_txt,
-    process_audio_file,
-)
+from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
 from cl.search.models import Court, Opinion
@@ -119,25 +115,6 @@ class IngestionTest(IndexedSolrTestCase):
         extract_doc_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
-
-    def test_txt_extraction_with_bad_data(self) -> None:
-        """Can we extract text from nasty files lacking encodings?"""
-
-        path = os.path.join(
-            settings.MEDIA_ROOT,
-            "test",
-            "search",
-            "txt_file_with_no_encoding.txt",
-        )
-        content, err = extract_from_txt(path)
-        self.assertFalse(
-            err, f"Error reported while extracting text from {path}"
-        )
-        self.assertIn(
-            "¶  1.  DOOLEY, J.   Plaintiffs",
-            content,
-            f"Issue extracting/encoding text from file at: {path}",
-        )
 
 
 class ExtensionIdentificationTest(SimpleTestCase):

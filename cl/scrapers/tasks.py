@@ -10,14 +10,7 @@ import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.encoding import (
-    DjangoUnicodeDecodeError,
-    force_str,
-    smart_str,
-)
 from juriscraper.pacer import CaseQuery, PacerSession
-from lxml.etree import XMLSyntaxError
-from lxml.html.clean import Cleaner
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -45,78 +38,6 @@ logger = logging.getLogger(__name__)
 ExtractProcessResult = Tuple[str, Optional[str]]
 
 
-def get_clean_body_content(content: bytes) -> bytes:
-    """Parse out the body from an html string and clean it up"""
-    cleaner = Cleaner(
-        style=True, remove_tags=["a", "body", "font", "noscript", "img"]
-    )
-    try:
-        return cleaner.clean_html(content)
-    except XMLSyntaxError:
-        return (
-            b"Unable to extract the content from this file. Please try "
-            b"reading the original."
-        )
-
-
-def extract_from_doc(path: str) -> ExtractProcessResult:
-    """Extract text from docs.
-
-    We use antiword to pull the text out of MS Doc files.
-    """
-    process = subprocess.Popen(
-        ["antiword", path, "-i", "1"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL,
-    )
-    content, err = process.communicate()
-    if err is not None:
-        err = err.decode()
-    return content.decode(), err
-
-
-def extract_from_docx(path: str) -> ExtractProcessResult:
-    """Extract text from docx files
-
-    We use docx2txt to pull out the text. Pretty simple.
-    """
-    process = subprocess.Popen(
-        ["docx2txt", path, "-"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL,
-    )
-    content, err = process.communicate()
-    if err is not None:
-        err = err.decode()
-    return content.decode(), err
-
-
-def extract_from_html(path: str) -> Tuple[str, bool]:
-    """Extract from html.
-
-    A simple wrapper to go get content, and send it along.
-    """
-    try:
-        with open(path, "rb") as f:
-            content = f.read()
-        content = get_clean_body_content(content)
-        encodings = ["utf-8", "ISO8859", "cp1252"]
-        for encoding in encodings:
-            try:
-                content = force_str(content, encoding=encoding)
-            except DjangoUnicodeDecodeError:
-                continue
-            else:
-                return content, False
-
-        # Fell through, therefore unable to decode the string.
-        return "", True
-    except:
-        return "", True
-
-
 def make_pdftotext_process(path: str) -> subprocess.Popen:
     """Make a subprocess to hand to higher-level code."""
     return subprocess.Popen(
@@ -125,127 +46,6 @@ def make_pdftotext_process(path: str) -> subprocess.Popen:
         stdout=subprocess.PIPE,
         stderr=DEVNULL,
     )
-
-
-def pdf_has_images(path: str) -> bool:
-    """Check raw PDF for embedded images.
-
-    We need to check if a PDF contains any images.  If a PDF contains images it
-    likely has content that needs to be scanned.
-
-    :param path: Location of PDF to process.
-    :return: Does the PDF contain images?
-    :type: bool
-    """
-    with open(path, "rb") as pdf_file:
-        pdf_bytes = pdf_file.read()
-        return True if re.search(rb"/Image ?/", pdf_bytes) else False
-
-
-def ocr_needed(path: str, content: str) -> bool:
-    """Check if OCR is needed on a PDF
-
-    Check if images are in PDF or content is empty.
-
-    :param path: The path to the PDF
-    :param content: The content extracted from the PDF.
-    :return: Whether OCR should be run on the document.
-    """
-    if content.strip() == "" or pdf_has_images(path):
-        return True
-    return False
-
-
-def extract_from_pdf(
-    path: str,
-    opinion: Opinion,
-    ocr_available: bool = False,
-) -> ExtractProcessResult:
-    """Extract text from pdfs.
-
-    Start with pdftotext. If we we enabled OCR - and the the content is empty
-    or the PDF contains images, use tesseract. This pattern occurs because PDFs
-    can be images, text-based and a mix of the two. We check for images to
-    make sure we do OCR on mix-type PDFs.
-
-    If a text-based PDF we fix corrupt PDFs from ca9.
-
-    :param path: The path to the PDF
-    :param opinion: The Opinion associated with the PDF
-    :param ocr_available: Whether we should do OCR stuff
-    :return Tuple of the content itself and any errors we received
-    """
-    process = make_pdftotext_process(path)
-    content, err = process.communicate()
-    content = content.decode()
-    if err is not None:
-        err = err.decode()
-
-    if not ocr_available:
-        if "e" not in content:
-            # It's a corrupt PDF from ca9. Fix it.
-            content = fix_mojibake(content)
-    else:
-        if ocr_needed(path, content):
-            success, ocr_content = extract_by_ocr(path)
-            if success:
-                # Check content length and take the longer of the two
-                if len(ocr_content) > len(content):
-                    content = ocr_content
-                    opinion.extracted_by_ocr = True
-            elif content == "" or not success:
-                content = "Unable to extract document content."
-
-    return content, err
-
-
-def extract_from_txt(path: str) -> Tuple[str, bool]:
-    """Extract text from plain text files: A fool's errand.
-
-    Unfortunately, plain text files lack encoding information, so we have to
-    guess. We could guess ascii, but we may as well use a superset of ascii,
-    cp1252, and failing that try utf-8, ignoring errors. Most txt files we
-    encounter were produced by converting wpd or doc files to txt on a
-    Microsoft box, so assuming cp1252 as our first guess makes sense.
-
-    May we hope for a better world.
-    """
-    try:
-        err = False
-        with open(path, "rb") as f:
-            data = f.read()
-        try:
-            # Alas, cp1252 is probably still more popular than utf-8.
-            content = smart_str(data, encoding="cp1252")
-        except DjangoUnicodeDecodeError:
-            content = smart_str(data, encoding="utf-8", errors="ignore")
-    except:
-        err = True
-        content = ""
-    return content, err
-
-
-def extract_from_wpd(path: str, opinion: Opinion) -> ExtractProcessResult:
-    """Extract text from a Word Perfect file
-
-    Yes, courts still use these, so we extract their text using wpd2html. Once
-    that's done, we pull out the body of the HTML, and do some minor cleanup
-    on it.
-    """
-    process = subprocess.Popen(
-        ["wpd2html", path], shell=False, stdout=subprocess.PIPE, stderr=DEVNULL
-    )
-    content, err = process.communicate()
-
-    content = get_clean_body_content(content)
-    content = content.decode()
-    if err is not None:
-        err = err.decode()
-
-    if "not for publication" in content.lower():
-        opinion.precedential_status = "Unpublished"
-
-    return content, err
 
 
 def convert_file_to_txt(path: str) -> str:
@@ -315,6 +115,7 @@ def extract_doc_content(
     response = microservice(
         service="document-extract",
         item=opinion,
+        params={"ocr_available": ocr_available},
     )
     if response.status_code != 200:
         print(
