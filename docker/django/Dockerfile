@@ -30,10 +30,6 @@ ENV PYTHONUNBUFFERED=1 \
 # prepend poetry and venv to path
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
-
-# `builder-base` stage is used to build deps + create our virtual environment
-FROM python-base as builder-base
-
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
         --no-install-recommends \
@@ -64,14 +60,8 @@ WORKDIR $PYSETUP_PATH
 COPY poetry.lock pyproject.toml ./
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root
-RUN poetry install --no-root --extras flp
-
-# Remove unneeded utilities to slim the image
-RUN apt purge --assume-yes \
-        build-essential curl gcc python3-dev \
-        libffi-dev libxml2-dev libxslt-dev cmake\
-    && apt autoremove --assume-yes
+RUN poetry install --no-root && \
+    poetry install --no-root --extras flp
 
 # will become mountpoint of our code
 WORKDIR /opt
