@@ -319,26 +319,20 @@ def save_and_upload_disclosure(
     :return: Financial discsosure object or None
     """
     sha1_hash = sha1(response.content)
-    if FinancialDisclosure.objects.filter(sha1=sha1_hash).exists():
-        logger.error(
-            "PDF already in system.",
-            extra={"disclosure_id": disclosure_key},
-        )
-        redis_db.delete(disclosure_key)
-        return
+    disclosure = FinancialDisclosure.objects.filter(sha1=sha1_hash)
+    if len(disclosure) > 0:
+        return disclosure[0]
 
     page_count = microservice(
         service="page-count",
         file_type="pdf",
         file=response.content,
-    ).content
+    ).text
     if not page_count:
         logger.error(
             msg=f"Page count failed",
             extra={"disclosure_id": disclosure_key, "url": data["url"]},
         )
-        redis_db.delete(disclosure_key)
-        return
 
     # Make disclosure
     disclosure = FinancialDisclosure(
