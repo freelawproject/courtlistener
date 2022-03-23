@@ -6,7 +6,7 @@ classifiers = [
   "Operating System :: OS Independent",
   "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
   "Intended Audience :: Developers",
   "Intended Audience :: Legal Industry",
 ]
@@ -66,7 +66,7 @@ pycparser = "^2.14"
 pyopenssl = "*"
 pyparsing = "^2.4.2"
 pypdf2 = "^1.26.0"
-python = ">=3.9, <3.11"
+python = ">=3.10, <3.11"
 python-dateutil = "^2.8.1"
 python-igraph = "0.9.1"
 python-magic = "^0.4.21"
@@ -81,7 +81,7 @@ stripe = "^2.55.2"
 timeout-decorator = "*"
 tldextract = "*"
 unidecode = "*"
-usaddress = "*"
+usaddress = "^0.5.10"
 juriscraper = "2.4.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
