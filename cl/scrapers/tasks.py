@@ -1,4 +1,3 @@
-import json
 import logging
 import random
 import re
@@ -19,8 +18,6 @@ from django.utils.encoding import (
 from juriscraper.pacer import CaseQuery, PacerSession
 from lxml.etree import XMLSyntaxError
 from lxml.html.clean import Cleaner
-from PyPDF2 import PdfFileReader
-from PyPDF2.utils import PdfReadError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -259,41 +256,6 @@ def convert_file_to_txt(path: str) -> str:
     return p.communicate()[0].decode()
 
 
-def get_page_count(path: str, extension: str) -> Optional[int]:
-    """Get the number of pages, if appropriate mimetype.
-
-    :param path: A path to a binary (pdf, wpd, doc, txt, html, etc.)
-    :param extension: The extension of the binary.
-    :return: The number of pages if possible, else return None
-    """
-    if extension == "pdf":
-        try:
-            reader = PdfFileReader(path)
-            return int(reader.getNumPages())
-        except (
-            IOError,
-            ValueError,
-            TypeError,
-            KeyError,
-            AssertionError,
-            PdfReadError,
-        ):
-            # IOError: File doesn't exist. My bad.
-            # ValueError: Didn't get an int for the page count. Their bad.
-            # TypeError: NumberObject has no attribute '__getitem__'. Ugh.
-            # KeyError, AssertionError: assert xrefstream["/Type"] == "/XRef". WTF?
-            # PdfReadError: Something else. I have no words.
-            pass
-    elif extension == "wpd":
-        # Best solution appears to be to dig into the binary format
-        pass
-    elif extension == "doc":
-        # Best solution appears to be to dig into the XML of the file
-        # itself: http://stackoverflow.com/a/12972502/64911
-        pass
-    return None
-
-
 def update_document_from_text(opinion: Opinion) -> None:
     """Extract additional metadata from document text
 
@@ -358,7 +320,8 @@ def extract_doc_content(
         buffering=0,  # Make sure it's on disk when we try to use it
     ) as tmp:
         # Get file contents from S3 and put them in a temp file.
-        tmp.write(opinion.local_path.read())
+        file_contents = opinion.local_path.read()
+        tmp.write(file_contents)
 
         if extension == "doc":
             content, err = extract_from_doc(tmp.name)
@@ -380,7 +343,11 @@ def extract_doc_content(
             return
 
         # Do page count, if possible
-        opinion.page_count = get_page_count(tmp.name, extension)
+        opinion.page_count = microservice(
+            service="page-count",
+            file_type=extension,
+            file=file_contents,
+        ).content
 
     assert isinstance(
         content, str

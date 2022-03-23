@@ -53,6 +53,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
+from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -89,7 +90,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import (
     ClaimHistory,
     Court,
@@ -1590,13 +1591,9 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    with NamedTemporaryFile(
-        prefix="rd_for_page_size_",
-        suffix=".pdf",
-        buffering=0,
-    ) as tmp:
-        tmp.write(rd.filepath_local.read())
-        rd.page_count = get_page_count(tmp.name, "pdf")
+    rd.page_count = microservice(
+        service="page-count", file_type="pdf", file=rd.filepath_local.read()
+    ).content
 
     # Save and extract, skipping OCR.
     rd.save()
