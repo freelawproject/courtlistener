@@ -321,14 +321,11 @@ jinja2 = "*"
 
 [[package]]
 name = "courts-db"
-version = "0.9.46"
+version = "0.10.0"
 description = "Database of Courts"
 category = "main"
 optional = false
 python-versions = "*"
-
-[package.dependencies]
-six = "*"
 
 [[package]]
 name = "cryptography"
@@ -671,19 +668,19 @@ python-versions = "*"
 
 [[package]]
 name = "eyecite"
-version = "2.3.0"
+version = "2.3.3"
 description = "Tool for extracting legal citations from text strings."
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
-courts-db = ">=0.9.13,<0.10.0"
+courts-db = ">=0.10.0,<0.11.0"
 diff_match_patch_python = ">=1.0.2,<2.0.0"
 lxml = ">=4.6.3,<5.0.0"
 pyahocorasick = ">=1.2"
 regex = ">=2020.1.8"
-reporters-db = ">=3.2.1,<4.0.0"
+reporters-db = ">=3.2.2,<4.0.0"
 
 [[package]]
 name = "factory-boy"
@@ -1980,7 +1977,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "3de89e8e06d8268e494a38e38cdb3f55f68537d7f761697e2c96b3d7c3eb92f2"
+content-hash = "b90b981008a84895561eac5f6047793fde1805942bff40064387f78d93a13b0d"
 
 [metadata.files]
 amqp = [
@@ -2167,8 +2164,8 @@ coreschema = [
     {file = "coreschema-0.0.4.tar.gz", hash = "sha256:9503506007d482ab0867ba14724b93c18a33b22b6d19fb419ef2d239dd4a1607"},
 ]
 courts-db = [
-    {file = "courts-db-0.9.46.tar.gz", hash = "sha256:b6fbf3ba2c966865671e4144d823fb2461736103ea163db5a30a687bf26db5cf"},
-    {file = "courts_db-0.9.46-py2.py3-none-any.whl", hash = "sha256:46266f5c5e671e9a90647222e9589dcb967035f28eb6e89e87e1afed10d8dbda"},
+    {file = "courts-db-0.10.0.tar.gz", hash = "sha256:dc1b93f8d65620020b7cf07dd18c7c0d4fcbcf6b136f39dcd08669eaaa3b2d19"},
+    {file = "courts_db-0.10.0-py2.py3-none-any.whl", hash = "sha256:9a633b18b1b3efb09a99d8e739f131fcd93dd8f1495444e3efb6339f6c1be460"},
 ]
 cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-macosx_10_10_x86_64.whl", hash = "sha256:3d8427734c781ea5f1b41d6589c293089704d4759e34597dce91014ac125aad1"},
@@ -2295,8 +2292,8 @@ exrex = [
     {file = "exrex-0.10.5.tar.gz", hash = "sha256:3fb8b18fd9832eaff8b13dc042a4f63b13c5d684ee069f70a23ddfc6bcb708f3"},
 ]
 eyecite = [
-    {file = "eyecite-2.3.0-py3-none-any.whl", hash = "sha256:7820a25e84a09cc6e43fb8d05748a2c5e13b3f2d22f5a33bba1b86d788701357"},
-    {file = "eyecite-2.3.0.tar.gz", hash = "sha256:2ca1c4c6b632d4f7812e5264bb0fc772a055d07a9882912193e66763f8201069"},
+    {file = "eyecite-2.3.3-py3-none-any.whl", hash = "sha256:15592038c7565b2005fa4e135a325fcabf4ea84f2a5816cb913c2ec645c4c875"},
+    {file = "eyecite-2.3.3.tar.gz", hash = "sha256:9a8f6bba4690bc6dc7ec0751bdc1051f85b06c03548fbe8eb0645cb6888113a4"},
 ]
 factory-boy = [
     {file = "factory_boy-3.2.1-py2.py3-none-any.whl", hash = "sha256:eb02a7dd1b577ef606b75a253b9818e6f9eaf996d94449c9d5ebb124f90dc795"},
