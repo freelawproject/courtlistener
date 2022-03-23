@@ -1,7 +1,6 @@
 version: "3.7"
 volumes:
   cl-judge-pics:
-  cl-seal-rookery:
 networks:
   cl_net_overlay:
     driver: overlay
@@ -10,9 +9,9 @@ services:
   celery_prefork:
     image: freelawproject/task-server:latest
     depends_on:
-      - cl-binary-transformers-and-extractors
+      - cl-doctor
+      - cl-disclosures
       - cl-judge-pics
-      - cl-seal-rookery
     deploy:
       resources:
         limits:
@@ -25,7 +24,6 @@ services:
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
       - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     logging:
       driver: journald
     networks:
@@ -44,9 +42,9 @@ services:
   celery_prefork_bulk:
     image: freelawproject/task-server:latest
     depends_on:
-      - cl-binary-transformers-and-extractors
       - cl-judge-pics
-      - cl-seal-rookery
+      - cl-doctor
+      - cl-disclosures
     deploy:
       resources:
         limits:
@@ -59,7 +57,6 @@ services:
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
       - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
     logging:
       driver: journald
     networks:
@@ -84,25 +81,18 @@ services:
     volumes:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
 
-  cl-seal-rookery:
-    image: freelawproject/seal-rookery:latest
-    container_name: "cl-seal-rookery"
-    deploy:
-      restart_policy:
-        condition: none
-    volumes:
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+  cl-doctor:
+    image: freelawproject/doctor:latest
+    container_name: "cl-doctor"
+    networks:
+      - cl_net_overlay
+    logging:
+      driver: journald
 
-  cl-binary-transformers-and-extractors:
-      image: freelawproject/binary-transformers-and-extractors:latest
-      container_name: "cl-binary-transformers-and-extractors"
-      depends_on:
-        - cl-seal-rookery
-      logging:
-        driver: journald
-      ports:
-        - "5050:5050"
-      networks:
-        - cl_net_overlay
-      volumes:
-        - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+  cl-disclosures:
+    image: freelawproject/disclosure-extractor:latest
+    container_name: "cl-disclosures"
+    networks:
+      - cl_net_overlay
+    logging:
+      driver: journald
