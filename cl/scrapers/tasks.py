@@ -312,42 +312,27 @@ def extract_doc_content(
     larger scrape.
     """
     opinion = Opinion.objects.get(pk=pk)
+    response = microservice(
+        service="document-extract",
+        item=opinion,
+    )
+    if response.status_code != 200:
+        print(
+            "Error from document-extract microservice: {response.status_code}"
+        )
+        return
+
+    data = response.json()
+    content = data["content"]
     extension = opinion.local_path.name.split(".")[-1]
+    opinion.extracted_by_ocr = data["extracted_by_ocr"]
 
-    with NamedTemporaryFile(
-        prefix="extract_file_",
-        suffix=f".{extension}",
-        buffering=0,  # Make sure it's on disk when we try to use it
-    ) as tmp:
-        # Get file contents from S3 and put them in a temp file.
-        file_contents = opinion.local_path.read()
-        tmp.write(file_contents)
+    if data["page_count"]:
+        opinion.page_count = data["page_count"]
 
-        if extension == "doc":
-            content, err = extract_from_doc(tmp.name)
-        elif extension == "docx":
-            content, err = extract_from_docx(tmp.name)
-        elif extension == "html":
-            content, err = extract_from_html(tmp.name)
-        elif extension == "pdf":
-            content, err = extract_from_pdf(tmp.name, opinion, ocr_available)
-        elif extension == "txt":
-            content, err = extract_from_txt(tmp.name)
-        elif extension == "wpd":
-            content, err = extract_from_wpd(tmp.name, opinion)
-        else:
-            print(
-                "*****Unable to extract content due to unknown extension: %s "
-                "on opinion: %s****" % (extension, opinion)
-            )
-            return
-
-        # Do page count, if possible
-        opinion.page_count = microservice(
-            service="page-count",
-            file_type=extension,
-            file=file_contents,
-        ).content
+    assert isinstance(
+        content, str
+    ), f"content must be of type str, not {type(content)}"
 
     assert isinstance(
         content, str
@@ -356,9 +341,10 @@ def extract_doc_content(
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion)
 
-    if err:
-        print(err)
-        print(f"****Error extracting text from {extension}: {opinion}****")
+    if data["err"]:
+        print(
+            f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
+        )
         return
 
     # Save item, and index Solr if needed.

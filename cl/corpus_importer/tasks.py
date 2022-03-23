@@ -1592,8 +1592,9 @@ def update_rd_metadata(
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
     rd.page_count = microservice(
-        service="page-count", file_type="pdf", file=rd.filepath_local.read()
-    ).content
+        service="page-count",
+        item=rd,
+    ).text
 
     # Save and extract, skipping OCR.
     rd.save()

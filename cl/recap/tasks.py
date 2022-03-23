@@ -318,8 +318,9 @@ def process_recap_pdf(self, pk):
 
             # Do page count and extraction
             rd.page_count = microservice(
-                service="page-count", file_type="pdf", file=file_contents
-            ).content
+                service="page-count",
+                item=rd,
+            ).text
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
