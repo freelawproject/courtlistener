@@ -95,5 +95,15 @@ jobs:
       - name: Black Code Formatter
         uses: psf/black@stable
 
+  lint-isort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2-beta
+
+      - uses: actions/setup-python@v2
+        with:
+          # Once codebase is updated, this can easily be changed to any specific version.
+          python-version: "3.9"
+
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0
