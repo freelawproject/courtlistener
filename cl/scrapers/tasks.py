@@ -176,15 +176,18 @@ def extract_recap_pdf(
             continue
 
         content = response.json()["content"]
+        has_content = bool(content)
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if skip_ocr and content or content and not extracted_by_ocr:
-            rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
-        elif extracted_by_ocr and content:
-            rd.ocr_status = RECAPDocument.OCR_COMPLETE
-        elif extracted_by_ocr and not content:
-            rd.ocr_status = RECAPDocument.OCR_FAILED
-        else:
-            rd.ocr_status = RECAPDocument.OCR_NEEDED
+        match has_content, extracted_by_ocr:
+            case True, True:
+                rd.ocr_status = RECAPDocument.OCR_COMPLETE
+            case True, False:
+                if skip_ocr:
+                    rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+            case False, True:
+                rd.ocr_status = RECAPDocument.OCR_FAILED
+            case False, False:
+                rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
