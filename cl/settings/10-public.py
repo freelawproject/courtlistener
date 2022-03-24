@@ -651,6 +651,14 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/utils/mime-type/",
         "timeout": 60,
     },
+    "buffer-mime": {
+        "url": f"{DOCTOR_HOST}/utils/file/mime/",
+        "timeout": 60,
+    },
+    "buffer-extension": {
+        "url": f"{DOCTOR_HOST}/utils/file/extension/",
+        "timeout": 60,
+    },
     # Converter Endpoints
     "generate-thumbnail": {
         "url": f"{DOCTOR_HOST}/convert/pdf/thumbnail/",

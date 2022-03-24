@@ -56,7 +56,7 @@ def make_objects(
     item: Dict[str, Any],
     court: Court,
     sha1_hash: str,
-    content: str,
+    content: bytes,
 ) -> Tuple[Docket, Audio]:
     blocked = item["blocked_statuses"]
     if blocked:

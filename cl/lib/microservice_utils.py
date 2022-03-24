@@ -69,6 +69,8 @@ def microservice(
     # and is used to identify the file extension for our microservices
     if file and file_type:
         req.files = {"file": (f"dummy.{file_type}", file)}
+    elif file:
+        req.files = {"file": (f"filename", file)}
 
     if data:
         req.data = data

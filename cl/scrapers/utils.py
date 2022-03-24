@@ -1,12 +1,9 @@
-import mimetypes
 import os
-import re
 import sys
 import traceback
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
-import magic
 import requests
 from django.conf import settings
 from django.db.models import QuerySet
@@ -17,13 +14,19 @@ from requests import Response, Session
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.microservice_utils import microservice
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
 
 
 def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
-    mime = magic.from_buffer(r.content, mime=True)
-    extension = mimetypes.guess_extension(mime)
+    """"""
+    response = microservice(
+        service="buffer-extension",
+        params={"mime": True},
+    )
+    extension = response.json()["extension"]
+
     if extension == ".html":
         html_tree = html.fromstring(r.text)
         try:
@@ -57,43 +60,12 @@ def follow_redirections(r: Response, s: Session) -> Response:
     return r
 
 
-def get_extension(content: str) -> str:
+def get_extension(content: bytes) -> str:
     """A handful of workarounds for getting extensions we can trust."""
-    file_str = magic.from_buffer(content)
-    if file_str.startswith("Composite Document File V2 Document"):
-        # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
-        # in libmagic 5.11-2.
-        mime = "application/msword"
-    elif file_str == "(Corel/WP)":
-        mime = "application/vnd.wordperfect"
-    elif file_str == "C source, ASCII text":
-        mime = "text/plain"
-    elif file_str.startswith("WordPerfect document"):
-        mime = "application/vnd.wordperfect"
-    elif re.findall(
-        r"(Audio file with ID3.*MPEG.*layer III)|(.*Audio Media.*)", file_str
-    ):
-        mime = "audio/mpeg"
-    else:
-        # No workaround necessary
-        mime = magic.from_buffer(content, mime=True)
-    extension = mimetypes.guess_extension(mime)
-    if extension == ".obj":
-        # It could be a wpd, if it's not a PDF
-        if "PDF" in content[0:40]:
-            # Does 'PDF' appear in the beginning of the content?
-            extension = ".pdf"
-        else:
-            extension = ".wpd"
-    fixes = {
-        ".htm": ".html",
-        ".xml": ".html",
-        ".wsdl": ".html",
-        ".ksh": ".txt",
-        ".asf": ".wma",
-        ".dot": ".doc",
-    }
-    return fixes.get(extension, extension).lower()
+    return microservice(
+        service="buffer-extension",
+        file=content,
+    ).text
 
 
 def get_binary_content(
