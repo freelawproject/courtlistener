@@ -141,7 +141,7 @@ def signal_handler(signal, frame):
 
 def extract_recap_documents(
     docs: QuerySet,
-    skip_ocr: bool = False,
+    ocr_available: bool = True,
     order_by: Optional[str] = None,
     queue: Optional[str] = None,
 ) -> None:
@@ -149,9 +149,9 @@ def extract_recap_documents(
 
     :param docs: A queryset containing the RECAPDocuments to be processed.
     :type docs: Django Queryset
-    :param skip_ocr: Whether OCR should be completed (False) or whether items
+    :param ocr_available: Whether OCR should be completed (True) or whether items
     should simply be updated to have status OCR_NEEDED.
-    :type skip_ocr: Bool
+    :type ocr_available: Bool
     :param order_by: An optimization parameter. You may opt to order the
     processing by 'small-first' or 'big-first'.
     :type order_by: str
@@ -159,12 +159,12 @@ def extract_recap_documents(
     :type queue: str
     """
     docs = docs.exclude(filepath_local="")
-    if skip_ocr:
-        # Focus on the items that we don't know if they need OCR.
-        docs = docs.filter(ocr_status=None)
-    else:
+    if ocr_available:
         # We're doing OCR. Only work with those items that require it.
         docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
+    else:
+        # Focus on the items that we don't know if they need OCR.
+        docs = docs.filter(ocr_status=None)
 
     if order_by is not None:
         if order_by == "small-first":
@@ -176,7 +176,9 @@ def extract_recap_documents(
     throttle = CeleryThrottle(queue_name=queue)
     for i, pk in enumerate(docs.values_list("pk", flat=True)):
         throttle.maybe_wait()
-        extract_recap_pdf.apply_async((pk, skip_ocr), priority=5, queue=queue)
+        extract_recap_pdf.apply_async(
+            (pk, ocr_available), priority=5, queue=queue
+        )
         if i % 1000 == 0:
             msg = f"Sent {i + 1}/{count} tasks to celery so far."
             logger.info(msg)

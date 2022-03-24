@@ -21,6 +21,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -92,7 +93,6 @@ def extract_doc_content(
     response = microservice(
         service="document-extract",
         item=opinion,
-        params={"ocr_available": ocr_available},
     )
     if not response.ok:
         logging.warning(
@@ -100,10 +100,24 @@ def extract_doc_content(
         )
         return
 
+    content = response.json()["content"]
+    extracted_by_ocr = response.json()["extracted_by_ocr"]
+    # If OCR available, no content was found and the doucment is a PDF send it
+    # back for OCRing
+    if ocr_available and needs_ocr(content) and ".pdf" in opinion.local_path:
+        response = microservice(
+            service="pdf-to-text",
+            item=opinion,
+            params={"ocr_available": ocr_available},
+        )
+        if response.ok:
+            content = response.content
+            extracted_by_ocr = True
+
+
     data = response.json()
-    content = data["content"]
     extension = opinion.local_path.name.split(".")[-1]
-    opinion.extracted_by_ocr = data["extracted_by_ocr"]
+    opinion.extracted_by_ocr = extracted_by_ocr
 
     if data["page_count"]:
         opinion.page_count = data["page_count"]
@@ -150,7 +164,7 @@ def extract_doc_content(
 @app.task
 def extract_recap_pdf(
     pks: Union[int, List[int]],
-    skip_ocr: bool = False,
+    ocr_available: bool = True,
     check_if_needed: bool = True,
 ) -> List[int]:
     """Extract the contents from a RECAP PDF if necessary."""
@@ -168,21 +182,30 @@ def extract_recap_pdf(
 
         response = microservice(
             service="document-extract",
-            item=rd,
-            params={"ocr_available": not skip_ocr},
+            item=rd
         )
         if not response.ok:
             print("Error from microservice")
             continue
 
         content = response.json()["content"]
-        has_content = bool(content)
         extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if ocr_available and needs_ocr(content):
+            response = microservice(
+                service="pdf-to-text",
+                item=rd,
+                params={"ocr_available": ocr_available},
+            )
+            if response.ok:
+                content = response.content
+                extracted_by_ocr = True
+
+        has_content = bool(content)
         match has_content, extracted_by_ocr:
             case True, True:
                 rd.ocr_status = RECAPDocument.OCR_COMPLETE
             case True, False:
-                if skip_ocr:
+                if not ocr_available:
                     rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
             case False, True:
                 rd.ocr_status = RECAPDocument.OCR_FAILED
@@ -290,3 +313,4 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         tag_names=None,
         add_to_solr=True,
     )
+
