@@ -187,7 +187,7 @@ def extract_recap_pdf(
             case False, True:
                 rd.ocr_status = RECAPDocument.OCR_FAILED
             case False, False:
-                rd.ocr_status = RECAPDocument.OCR_NEEDED    
+                rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
