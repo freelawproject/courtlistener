@@ -20,7 +20,11 @@ from cl.search.models import RECAPDocument
 
 
 def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
-    """"""
+    """Test for meta data redirections
+
+    :param r: A response object
+    :return:  A boolean and value
+    """
     response = microservice(
         service="buffer-extension",
         params={"mime": True},
@@ -44,8 +48,7 @@ def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
                 return True, url
         except IndexError:
             return False, None
-    else:
-        return False, None
+    return False, None
 
 
 def follow_redirections(r: Response, s: Session) -> Response:
