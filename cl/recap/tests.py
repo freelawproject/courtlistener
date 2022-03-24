@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import date
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
@@ -470,7 +471,7 @@ class ProcessingQueueApiFilterTest(TestCase):
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
-    fixtures = ["canb_court.json"]
+    fixtures = ["canb_court.json", "nysd_court.json"]
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -478,13 +479,34 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets"
-        )
-        with open(os.path.join(test_dir, "recap_mail_receipt.json")) as file:
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+        with open(
+            Path.joinpath(test_dir, "recap_mail_receipt.json"),
+            encoding="utf-8",
+        ) as file:
             recap_mail_receipt = json.loads(file.read())
             self.data = {
                 "court": "akd",
+                "mail": recap_mail_receipt["mail"],
+                "receipt": recap_mail_receipt["receipt"],
+            }
+        with open(
+            Path.joinpath(test_dir, "recap_mail_magic.json"),
+            encoding="utf-8",
+        ) as file:
+            recap_mail_receipt = json.loads(file.read())
+            self.data_magic = {
+                "court": "nysd",
+                "mail": recap_mail_receipt["mail"],
+                "receipt": recap_mail_receipt["receipt"],
+            }
+        with open(
+            Path.joinpath(test_dir, "recap_mail_no_magic.json"),
+            encoding="utf-8",
+        ) as file:
+            recap_mail_receipt = json.loads(file.read())
+            self.data_no_magic = {
+                "court": "nysd",
                 "mail": recap_mail_receipt["mail"],
                 "receipt": recap_mail_receipt["receipt"],
             }
@@ -522,6 +544,54 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         self.assertEqual(EmailProcessingQueue.objects.count(), 0)
         self.client.post(self.path, self.data, format="json")
         self.assertEqual(EmailProcessingQueue.objects.count(), 1)
+        # self.assertEqual(0, 1)
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport.download_pdf_magic_link"
+    )
+    def test_email_processing_with_magic_number(
+        self, mock_download_pdf_magic_link
+    ):
+        """Test processing an email with a magic link, check if
+        download_pdf_magic_link is called to download document instead of
+        download_pdf
+        """
+
+        self.assertEqual(EmailProcessingQueue.objects.count(), 0)
+        self.assertEqual(RECAPDocument.objects.count(), 0)
+        self.client.post(self.path, self.data_magic, format="json")
+        # After receiving the  request, check if EmailProcessingQueue and
+        # RECAPDocument objects are created
+        self.assertEqual(EmailProcessingQueue.objects.count(), 1)
+        self.assertEqual(RECAPDocument.objects.count(), 1)
+
+        # If document url have a magic_number download_pdf_magic_link
+        # method is called
+        mock_download_pdf_magic_link.assert_called()
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.FreeOpinionReport.download_pdf_magic_link"
+    )
+    @mock.patch("cl.corpus_importer.tasks.FreeOpinionReport.download_pdf")
+    def test_email_processing_no_magic_link(
+        self, mock_download_pdf_magic_link, mock_download_pdf
+    ):
+        """Test processing an email without a valid magic link, don't try to
+        download the document, download_pdf_magic_link and download_pdf
+        shouldn't be called
+        """
+        self.assertEqual(EmailProcessingQueue.objects.count(), 0)
+        self.assertEqual(RECAPDocument.objects.count(), 0)
+        self.client.post(self.path, self.data_no_magic, format="json")
+        # After receiving the  request, check if EmailProcessingQueue and
+        # RECAPDocument objects are created
+        self.assertEqual(EmailProcessingQueue.objects.count(), 1)
+        self.assertEqual(RECAPDocument.objects.count(), 1)
+
+        # If document URL doesn't have a magic_number, download is ignored
+        # download_pdf or download_pdf_magic_link methods shouldn't be called
+        mock_download_pdf_magic_link.assert_not_called()
+        mock_download_pdf.assert_not_called()
 
 
 class DebugRecapUploadtest(TestCase):

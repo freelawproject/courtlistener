@@ -1495,6 +1495,7 @@ def download_pacer_pdf_by_rd(
     pacer_case_id: str,
     pacer_doc_id: int,
     cookies: RequestsCookieJar,
+    magic_number: Optional[str] = None,
 ) -> Optional[Response]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1505,15 +1506,27 @@ def download_pacer_pdf_by_rd(
     :param pacer_doc_id: The internal PACER document ID to download
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
     :return: requests.Response object usually containing a PDF, or None if that
     wasn't possible.
     """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
     try:
-        r = report.download_pdf(pacer_case_id, pacer_doc_id)
+        if magic_number:
+            # If a magic_number is passed as an argument try to download the
+            # document anonymously by magic link
+            de_seq_num = rd.docket_entry.pacer_sequence_number
+            r = report.download_pdf_magic_link(
+                pacer_case_id, pacer_doc_id, de_seq_num, magic_number
+            )
+        else:
+            # If no magic_number passed use normal method to fetch the document
+            r = report.download_pdf(pacer_case_id, pacer_doc_id)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
