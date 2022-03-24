@@ -1591,10 +1591,12 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    rd.page_count = microservice(
+    response = microservice(
         service="page-count",
         item=rd,
-    ).text
+    )
+    if response.ok:
+        rd.page_count = response.text
 
     # Save and extract, skipping OCR.
     rd.save()

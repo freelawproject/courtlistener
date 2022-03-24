@@ -295,6 +295,9 @@ def process_recap_pdf(self, pk):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
+    if not file_contents:
+        return None
+
     new_sha1 = sha1(file_contents)
     existing_document = all(
         [
@@ -317,10 +320,12 @@ def process_recap_pdf(self, pk):
             rd.filepath_local.save(file_name, cf, save=False)
 
             # Do page count and extraction
-            rd.page_count = microservice(
+            response = microservice(
                 service="page-count",
                 item=rd,
-            ).text
+            )
+            if response.ok:
+                rd.page_count = response.text
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
@@ -1144,6 +1149,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
         return
 
     court_id = rd.docket_entry.docket.court_id
+
     success, msg = update_rd_metadata(
         self,
         rd_pk,
