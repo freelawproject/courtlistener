@@ -95,8 +95,8 @@ def extract_doc_content(
         params={"ocr_available": ocr_available},
     )
     if not response.ok:
-        print(
-            "Error from document-extract microservice: {response.status_code}"
+        logging.warning(
+            f"Error from document-extract microservice: {response.status_code}"
         )
         return
 
@@ -112,15 +112,11 @@ def extract_doc_content(
         content, str
     ), f"content must be of type str, not {type(content)}"
 
-    assert isinstance(
-        content, str
-    ), f"content must be of type str, not {type(content)}"
-
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion)
 
     if data["err"]:
-        print(
+        logger.error(
             f"****Error: {data['err']}, extracting text from {extension}: {opinion}****"
         )
         return
