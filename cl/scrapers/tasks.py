@@ -1,9 +1,6 @@
 import logging
 import random
-import re
-import subprocess
 import traceback
-from tempfile import NamedTemporaryFile
 from typing import List, Optional, Tuple, Union
 
 import requests
@@ -21,11 +18,9 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.microservice_utils import microservice
-from cl.lib.mojibake import fix_mojibake
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
-from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -36,24 +31,6 @@ DEVNULL = open("/dev/null", "w")
 logger = logging.getLogger(__name__)
 
 ExtractProcessResult = Tuple[str, Optional[str]]
-
-
-def make_pdftotext_process(path: str) -> subprocess.Popen:
-    """Make a subprocess to hand to higher-level code."""
-    return subprocess.Popen(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=DEVNULL,
-    )
-
-
-def convert_file_to_txt(path: str) -> str:
-    tesseract_command = ["tesseract", path, "stdout", "-l", "eng"]
-    p = subprocess.Popen(
-        tesseract_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    return p.communicate()[0].decode()
 
 
 def update_document_from_text(opinion: Opinion) -> None:
@@ -117,7 +94,7 @@ def extract_doc_content(
         item=opinion,
         params={"ocr_available": ocr_available},
     )
-    if response.status_code != 200:
+    if not response.ok:
         print(
             "Error from document-extract microservice: {response.status_code}"
         )
@@ -193,30 +170,25 @@ def extract_recap_pdf(
             processed.append(pk)
             continue
 
-        with NamedTemporaryFile(
-            prefix="extract_file_",
-            suffix=".pdf",
-            buffering=0,  # Make sure it's on disk when we try to use it
-        ) as tmp:
-            tmp.write(rd.filepath_local.read())
-            process = make_pdftotext_process(tmp.name)
-            content, err = process.communicate()
-            content = content.decode()
+        response = microservice(
+            service="document-extract",
+            item=rd,
+            params={"ocr_available": not skip_ocr},
+        )
+        if not response.ok:
+            print("Error from microservice")
+            continue
 
-            if needs_ocr(content):
-                if not skip_ocr:
-                    # probably an image PDF. Send it to OCR.
-                    success, content = extract_by_ocr(tmp.name)
-                    if success:
-                        rd.ocr_status = RECAPDocument.OCR_COMPLETE
-                    elif content == "" or not success:
-                        content = "Unable to extract document content."
-                        rd.ocr_status = RECAPDocument.OCR_FAILED
-                else:
-                    content = ""
-                    rd.ocr_status = RECAPDocument.OCR_NEEDED
-            else:
-                rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+        content = response.json()["content"]
+        extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if skip_ocr and content or content and not extracted_by_ocr:
+            rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+        elif extracted_by_ocr and content:
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
+        elif extracted_by_ocr and not content:
+            rd.ocr_status = RECAPDocument.OCR_FAILED
+        else:
+            rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
@@ -224,80 +196,6 @@ def extract_recap_pdf(
         processed.append(pk)
 
     return processed
-
-
-def rasterize_pdf(path: str, destination: str) -> Tuple[str, str, int]:
-    """Convert the PDF into a multipage Tiff file.
-
-    This function uses ghostscript for processing and borrows heavily from:
-
-        https://github.com/jbarlow83/OCRmyPDF/blob/636d1903b35fed6b07a01af53769fea81f388b82/ocrmypdf/ghostscript.py#L11
-
-    """
-    # gs docs, see: http://ghostscript.com/doc/7.07/Use.htm
-    # gs devices, see: http://ghostscript.com/doc/current/Devices.htm
-    #
-    # Compression is a trade off. It takes twice as long to convert PDFs, but
-    # they're about 1-2% the size of the uncompressed version. They take about
-    # 30% of the RAM when Tesseract processes them. See:
-    # https://github.com/tesseract-ocr/tesseract/issues/431#issuecomment-250549208
-    gs = [
-        "gs",
-        "-dQUIET",  # Suppress printing routine info
-        "-dSAFER",  # Lock down the filesystem to only files on command line
-        "-dBATCH",  # Exit after finishing file. Don't wait for more commands.
-        "-dNOPAUSE",  # Don't pause after each page
-        "-sDEVICE=tiffgray",
-        "-sCompression=lzw",
-        "-r300x300",  # Set the resolution to 300 DPI.
-        "-o",
-        destination,
-        path,
-    ]
-    p = subprocess.Popen(
-        gs,
-        close_fds=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-    stdout, stderr = p.communicate()
-    return stdout, stderr, p.returncode
-
-
-def cleanup_ocr_text(txt: str) -> str:
-    """Do some basic cleanup to make OCR text better.
-
-    Err on the side of safety. Don't make fixes that could cause other issues.
-
-    :param txt: The txt output from the OCR engine.
-    :return: Txt output, cleaned up.
-    """
-    simple_replacements = (
-        ("Fi|ed", "Filed"),
-        (" Il ", " II "),
-    )
-    for replacement in simple_replacements:
-        txt = txt.replace(replacement[0], replacement[1])
-    return txt
-
-
-@app.task
-def extract_by_ocr(path: str) -> (bool, str):
-    """Extract the contents of a PDF using OCR."""
-    fail_msg = (
-        "Unable to extract the content from this file. Please try "
-        "reading the original."
-    )
-    with NamedTemporaryFile(prefix="ocr_", suffix=".tiff", buffering=0) as tmp:
-        out, err, returncode = rasterize_pdf(path, tmp.name)
-        if returncode != 0:
-            return False, fail_msg
-
-        txt = convert_file_to_txt(tmp.name)
-        txt = cleanup_ocr_text(txt)
-
-    return True, txt
 
 
 @app.task(bind=True, max_retries=1, countdown=2)
