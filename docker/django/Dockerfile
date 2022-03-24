@@ -41,14 +41,6 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         libpq-dev postgresql-client \
         # For installing poetry and git-based deps
         curl git \
-        # Document extraction and OCR tools
-        antiword docx2txt ghostscript libwpd-tools poppler-utils \
-        # Filetype identification (the python library is just a wrapper)
-        libmagic1 \
-        # Audio extraction/manipulation tools
-        ffmpeg \
-        # Image & OCR tools
-        imagemagick tesseract-ocr tesseract-ocr-eng \
         # Other dependencies
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
