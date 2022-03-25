@@ -169,7 +169,10 @@ def extract_recap_pdf(
             processed.append(pk)
             continue
 
-        response = microservice(service="document-extract", item=rd)
+        response = microservice(
+            service="document-extract",
+            item=rd,
+        )
         if not response.ok:
             print("Error from microservice")
             continue
