@@ -17,7 +17,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.models import SUB_TYPES, BackoffEvent, EmailFlag, UserProfile
+from cl.users.models import OBJECT_TYPES, SUB_TYPES, BackoffEvent, EmailFlag, UserProfile
 
 
 class UserTest(LiveServerTestCase):
@@ -453,7 +453,7 @@ class SNSWebhookTest(TestCase):
 
         email_flag_exists = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
         ).exists()
         self.assertEqual(email_flag_exists, False)
@@ -465,7 +465,7 @@ class SNSWebhookTest(TestCase):
 
         email_flag_exists = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
         ).exists()
         # Check if small_email_only was created
@@ -478,7 +478,7 @@ class SNSWebhookTest(TestCase):
         )
         email_flag = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
         )
 
@@ -494,13 +494,13 @@ class SNSWebhookTest(TestCase):
         # Create a small_email_only flag
         email_flag_count = EmailFlag.objects.create(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
             event_sub_type=SUB_TYPES.MESSAGETOOLARGE,
         )
         email_flag_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
         ).count()
         self.assertEqual(email_flag_count, 1)
@@ -512,7 +512,7 @@ class SNSWebhookTest(TestCase):
 
         email_flag_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.FLAG,
+            object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
         ).count()
 
@@ -641,7 +641,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_exist = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         ).exists()
         # Check email address is not banned
         self.assertEqual(email_ban_exist, False)
@@ -657,7 +657,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_exist = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         ).exists()
         # Check email address is now banned
         self.assertEqual(email_ban_exist, True)
@@ -669,7 +669,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         )
 
         # Checks no new ban object is created for this email address
@@ -738,7 +738,7 @@ class SNSWebhookTest(TestCase):
         )
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         ).count()
 
         # Check if email address is now banned
@@ -753,7 +753,7 @@ class SNSWebhookTest(TestCase):
 
         email_ban_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         ).count()
 
         # Check no additional email ban object is created
@@ -774,7 +774,7 @@ class SNSWebhookTest(TestCase):
 
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         )
 
         # Checks email address is now banned
@@ -790,7 +790,7 @@ class SNSWebhookTest(TestCase):
 
         email_ban = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         )
 
         # Check no additional email ban object is created
@@ -799,7 +799,7 @@ class SNSWebhookTest(TestCase):
 
     def test_handle_complaint(self) -> None:
         """This test checks if an email address is banned
-        when a hard bounce event is received.
+        when a complaint event is received.
         Also checks that if an email address is previously banned avoid to
         create a new ban register for that email address
         """
@@ -811,21 +811,21 @@ class SNSWebhookTest(TestCase):
 
         email_ban = EmailFlag.objects.filter(
             email_address="complaint@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         )
 
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
         self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
 
-        # Trigger another hard_bounce event
+        # Trigger another complaint event
         self.send_signal(
             self.complaint_asset, "complaint", signals.complaint_received
         )
 
         email_ban = EmailFlag.objects.filter(
             email_address="complaint@simulator.amazonses.com",
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
         )
 
         # Check no additional email ban object is created
@@ -864,3 +864,42 @@ class SNSWebhookTest(TestCase):
 
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
+
+
+
+    def test_update_ban_object(self) -> None:
+        """This test checks if an email ban object is updated when receiving
+        a new ban notification, e.g: complaint -> hard bounce
+        """
+
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned due to a complaint
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email ban is updated with the hard bounce subtype
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
