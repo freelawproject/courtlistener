@@ -4,8 +4,8 @@ from typing import List
 
 from django.utils.timezone import now
 
-from cl.users.models import SUB_TYPES, BackoffEvent, EmailFlag
-
+from cl.users.models import OBJECT_TYPES, SUB_TYPES, BackoffEvent, EmailFlag
+from django.db import transaction
 
 def get_bounce_subtype(event_sub_type: str) -> int:
     """Returns a bounce subtype integer from a bounce subtype string"""
@@ -47,11 +47,12 @@ def handle_hard_bounce(
         # Only ban email address if it hasn't been previously banned
         EmailFlag.objects.get_or_create(
             email_address=email,
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
             defaults={"event_sub_type": get_bounce_subtype(event_sub_type)},
         )
 
 
+@transaction.atomic
 def handle_soft_bounce(
     message_id: str, event_sub_type: str, recipient_emails: List[str]
 ) -> None:
@@ -101,22 +102,20 @@ def handle_soft_bounce(
         if event_sub_type in back_off_events:
             # TODO Queue email function
             # Handle events that must trigger a backoff event
-            backoff_event = BackoffEvent.objects.filter(
+
+            next_retry_date = now() + timedelta(hours=INITIAL_HOURS)
+            backoff_event, created = BackoffEvent.objects.select_for_update().get_or_create(
                 email_address=email,
+                defaults={
+                    "retry_counter": 0,
+                    "next_retry_date": next_retry_date
+                },
             )
-            if not backoff_event.exists():
-                # Create a backoff event for an email address if not exists
-                # Initialize retry_counter and next_retry_date
-                next_retry_date = now() + timedelta(hours=INITIAL_HOURS)
-                BackoffEvent.objects.create(
-                    email_address=email,
-                    retry_counter=0,
-                    next_retry_date=next_retry_date,
-                )
-            else:
+
+            if not created:
                 # If a previous backoff event exists
-                retry_counter = backoff_event[0].retry_counter
-                next_retry_date = backoff_event[0].next_retry_date
+                retry_counter = backoff_event.retry_counter
+                next_retry_date = backoff_event.next_retry_date
 
                 # Check if waiting period expired
                 if now() >= next_retry_date:
@@ -126,7 +125,7 @@ def handle_soft_bounce(
                         # Only ban email address if not previously banned
                         EmailFlag.objects.get_or_create(
                             email_address=email,
-                            object_type=EmailFlag.BAN,
+                            object_type=OBJECT_TYPES.BAN,
                             defaults={
                                 "flag": EmailFlag.MAX_RETRY_REACHED,
                                 "event_sub_type": get_bounce_subtype(
@@ -134,6 +133,7 @@ def handle_soft_bounce(
                                 ),
                             },
                         )
+                        # TODO checkif this update Email flag?
                     else:
                         # If max number of retries has not been reached,
                         # update backoff event, update retry_counter
@@ -154,7 +154,7 @@ def handle_soft_bounce(
             # Create a small_email_only flag for email address
             EmailFlag.objects.get_or_create(
                 email_address=email,
-                object_type=EmailFlag.FLAG,
+                object_type=OBJECT_TYPES.FLAG,
                 flag=EmailFlag.SMALL_ONLY,
                 defaults={
                     "event_sub_type": get_bounce_subtype(event_sub_type)
@@ -183,7 +183,7 @@ def handle_complaint(recipient_emails: List[str]) -> None:
         # Only ban email address if it hasn't been previously banned
         EmailFlag.objects.get_or_create(
             email_address=email,
-            object_type=EmailFlag.BAN,
+            object_type=OBJECT_TYPES.BAN,
             defaults={"event_sub_type": SUB_TYPES.COMPLAINT},
         )
 
