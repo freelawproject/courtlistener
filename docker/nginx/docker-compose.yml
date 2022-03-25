@@ -119,3 +119,5 @@ services:
     container_name: "cl-doctor"
     networks:
       - cl_net_overlay
+    logging:
+      driver: journald
