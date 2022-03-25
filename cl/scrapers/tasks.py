@@ -169,10 +169,7 @@ def extract_recap_pdf(
             processed.append(pk)
             continue
 
-        response = microservice(
-            service="document-extract",
-            item=rd
-        )
+        response = microservice(service="document-extract", item=rd)
         if not response.ok:
             print("Error from microservice")
             continue
@@ -302,4 +299,3 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         tag_names=None,
         add_to_solr=True,
     )
-
