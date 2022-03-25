@@ -93,6 +93,7 @@ def extract_doc_content(
     response = microservice(
         service="document-extract",
         item=opinion,
+        params={"ocr_available": ocr_available},
     )
     if not response.ok:
         logging.warning(
@@ -102,18 +103,6 @@ def extract_doc_content(
 
     content = response.json()["content"]
     extracted_by_ocr = response.json()["extracted_by_ocr"]
-    # If OCR available, no content was found and the doucment is a PDF send it
-    # back for OCRing
-    if ocr_available and needs_ocr(content) and ".pdf" in opinion.local_path:
-        response = microservice(
-            service="pdf-to-text",
-            item=opinion,
-            params={"ocr_available": ocr_available},
-        )
-        if response.ok:
-            content = response.content
-            extracted_by_ocr = True
-
 
     data = response.json()
     extension = opinion.local_path.name.split(".")[-1]
