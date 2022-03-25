@@ -1,7 +1,9 @@
-import collections
 import re
+from collections.abc import Iterable
 from itertools import chain, islice, tee
-from typing import Any, Iterable, List, Optional, Tuple, Union
+from typing import Any
+from typing import Iterable as IterableType
+from typing import List, Optional, Tuple
 
 from django.db.models import QuerySet
 
@@ -68,9 +70,9 @@ def previous_and_next(some_iterable):
     return zip(prevs, items, nexts)
 
 
-def is_iter(item):
+def is_iter(item: Any) -> bool:
     # See: http://stackoverflow.com/a/1952655/64911
-    if isinstance(item, collections.Iterable):
+    if isinstance(item, Iterable):
         return True
     return False
 
@@ -98,9 +100,9 @@ def alphanumeric_sort(query: QuerySet, sort_key: str) -> List[Any]:
 
 
 def human_sort(
-    unordered_list: Iterable[Union[str, Tuple[str, Any]]],
+    unordered_list: IterableType[str | Tuple[str, Any]],
     key: Optional[str] = None,
-) -> Iterable[Union[str, Tuple[str, Any]]]:
+) -> IterableType[str | Tuple[str, Any]]:
     """Human sort Lists of strings or list of dictionaries
 
     :param unordered_list: The list we want to sort

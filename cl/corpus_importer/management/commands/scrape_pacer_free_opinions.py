@@ -244,10 +244,12 @@ def ocr_available(options: OptionsType) -> None:
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
         if options["index"]:
-            extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q).apply_async()
+            extract_recap_pdf.si(pk, ocr_available=True).set(
+                queue=q
+            ).apply_async()
         else:
             chain(
-                extract_recap_pdf.si(pk, skip_ocr=False).set(queue=q),
+                extract_recap_pdf.si(pk, ocr_available=True).set(queue=q),
                 add_docket_to_solr_by_rds.s().set(queue=q),
             ).apply_async()
         if i % 1000 == 0:

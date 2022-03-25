@@ -404,7 +404,6 @@ def make_thumb_if_needed(
         make_png_thumbnail_for_instance(
             pk=rd.pk,
             klass=RECAPDocument,
-            file_attr="filepath_local",
             max_dimension=1068,
         )
         rd.refresh_from_db()

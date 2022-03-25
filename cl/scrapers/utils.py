@@ -1,12 +1,9 @@
-import mimetypes
 import os
-import re
 import sys
 import traceback
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
-import magic
 import requests
 from django.conf import settings
 from django.db.models import QuerySet
@@ -17,13 +14,23 @@ from requests import Response, Session
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.microservice_utils import microservice
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
 
 
 def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
-    mime = magic.from_buffer(r.content, mime=True)
-    extension = mimetypes.guess_extension(mime)
+    """Test for meta data redirections
+
+    :param r: A response object
+    :return:  A boolean and value
+    """
+    response = microservice(
+        service="buffer-extension",
+        params={"mime": True},
+    )
+    extension = response.json()["extension"]
+
     if extension == ".html":
         html_tree = html.fromstring(r.text)
         try:
@@ -41,8 +48,7 @@ def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
                 return True, url
         except IndexError:
             return False, None
-    else:
-        return False, None
+    return False, None
 
 
 def follow_redirections(r: Response, s: Session) -> Response:
@@ -57,43 +63,12 @@ def follow_redirections(r: Response, s: Session) -> Response:
     return r
 
 
-def get_extension(content: str) -> str:
+def get_extension(content: bytes) -> str:
     """A handful of workarounds for getting extensions we can trust."""
-    file_str = magic.from_buffer(content)
-    if file_str.startswith("Composite Document File V2 Document"):
-        # Workaround for issue with libmagic1==5.09-2 in Ubuntu 12.04. Fixed
-        # in libmagic 5.11-2.
-        mime = "application/msword"
-    elif file_str == "(Corel/WP)":
-        mime = "application/vnd.wordperfect"
-    elif file_str == "C source, ASCII text":
-        mime = "text/plain"
-    elif file_str.startswith("WordPerfect document"):
-        mime = "application/vnd.wordperfect"
-    elif re.findall(
-        r"(Audio file with ID3.*MPEG.*layer III)|(.*Audio Media.*)", file_str
-    ):
-        mime = "audio/mpeg"
-    else:
-        # No workaround necessary
-        mime = magic.from_buffer(content, mime=True)
-    extension = mimetypes.guess_extension(mime)
-    if extension == ".obj":
-        # It could be a wpd, if it's not a PDF
-        if "PDF" in content[0:40]:
-            # Does 'PDF' appear in the beginning of the content?
-            extension = ".pdf"
-        else:
-            extension = ".wpd"
-    fixes = {
-        ".htm": ".html",
-        ".xml": ".html",
-        ".wsdl": ".html",
-        ".ksh": ".txt",
-        ".asf": ".wma",
-        ".dot": ".doc",
-    }
-    return fixes.get(extension, extension).lower()
+    return microservice(
+        service="buffer-extension",
+        file=content,
+    ).text
 
 
 def get_binary_content(
@@ -166,7 +141,7 @@ def signal_handler(signal, frame):
 
 def extract_recap_documents(
     docs: QuerySet,
-    skip_ocr: bool = False,
+    ocr_available: bool = True,
     order_by: Optional[str] = None,
     queue: Optional[str] = None,
 ) -> None:
@@ -174,9 +149,9 @@ def extract_recap_documents(
 
     :param docs: A queryset containing the RECAPDocuments to be processed.
     :type docs: Django Queryset
-    :param skip_ocr: Whether OCR should be completed (False) or whether items
+    :param ocr_available: Whether OCR should be completed (True) or whether items
     should simply be updated to have status OCR_NEEDED.
-    :type skip_ocr: Bool
+    :type ocr_available: Bool
     :param order_by: An optimization parameter. You may opt to order the
     processing by 'small-first' or 'big-first'.
     :type order_by: str
@@ -184,12 +159,12 @@ def extract_recap_documents(
     :type queue: str
     """
     docs = docs.exclude(filepath_local="")
-    if skip_ocr:
-        # Focus on the items that we don't know if they need OCR.
-        docs = docs.filter(ocr_status=None)
-    else:
+    if ocr_available:
         # We're doing OCR. Only work with those items that require it.
         docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
+    else:
+        # Focus on the items that we don't know if they need OCR.
+        docs = docs.filter(ocr_status=None)
 
     if order_by is not None:
         if order_by == "small-first":
@@ -201,7 +176,9 @@ def extract_recap_documents(
     throttle = CeleryThrottle(queue_name=queue)
     for i, pk in enumerate(docs.values_list("pk", flat=True)):
         throttle.maybe_wait()
-        extract_recap_pdf.apply_async((pk, skip_ocr), priority=5, queue=queue)
+        extract_recap_pdf.apply_async(
+            (pk, ocr_available), priority=5, queue=queue
+        )
         if i % 1000 == 0:
             msg = f"Sent {i + 1}/{count} tasks to celery so far."
             logger.info(msg)

@@ -1,6 +1,8 @@
-1.1.0
+1.2.1
 
-1.1.0 - Update to Django 3.2 and Python 3.10
+1.2.1 - Remove PyPDF2 dependency and simplify dockerfile
+1.2.0 - Upgrade to Python 3.10
+1.1.0 - Update to Django 3.2 and Python 3.9
 1.0.84 - Add factory boy
 1.0.83 - Add deps for parenthetical grouping
 1.0.82 - Improve logging for disclosures, improve parentheticals, fix bug in citation urls handling.

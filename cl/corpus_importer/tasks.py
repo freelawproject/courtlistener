@@ -53,6 +53,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
+from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -89,7 +90,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import (
     ClaimHistory,
     Court,
@@ -598,7 +599,7 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    extract_recap_pdf(rd.pk, skip_ocr=True, check_if_needed=False)
+    extract_recap_pdf(rd.pk, ocr_available=False, check_if_needed=False)
     return {"result": result, "rd_pk": rd.pk}
 
 
@@ -1590,13 +1591,12 @@ def update_rd_metadata(
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
     rd.sha1 = sha1(force_bytes(response.content))
-    with NamedTemporaryFile(
-        prefix="rd_for_page_size_",
-        suffix=".pdf",
-        buffering=0,
-    ) as tmp:
-        tmp.write(rd.filepath_local.read())
-        rd.page_count = get_page_count(tmp.name, "pdf")
+    response = microservice(
+        service="page-count",
+        item=rd,
+    )
+    if response.ok:
+        rd.page_count = response.text
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -1774,7 +1774,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    extract_recap_pdf(rd.pk, skip_ocr=True)
+    extract_recap_pdf(rd.pk, ocr_available=False)
     add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 

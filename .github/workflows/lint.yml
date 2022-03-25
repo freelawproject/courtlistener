@@ -17,10 +17,10 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
-          python-version: "3.9"
+          python-version: "3.10"
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1.1.0
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
@@ -94,6 +94,16 @@ jobs:
 
       - name: Black Code Formatter
         uses: psf/black@stable
+
+  lint-isort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2-beta
+
+      - uses: actions/setup-python@v2
+        with:
+          # Once codebase is updated, this can easily be changed to any specific version.
+          python-version: "3.9"
 
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0
