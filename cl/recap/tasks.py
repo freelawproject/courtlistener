@@ -113,7 +113,7 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         process_recap_zip.delay(pq.pk)
 
 
-def do_pacer_fetch(fq):
+def do_pacer_fetch(fq: PacerFetchQueue):
     """Process a request made by a user to get an item from PACER.
 
     :param fq: The PacerFetchQueue item to process
