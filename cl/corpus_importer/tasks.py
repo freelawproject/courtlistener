@@ -1495,7 +1495,7 @@ def download_pacer_pdf_by_rd(
     pacer_case_id: str,
     pacer_doc_id: int,
     cookies: RequestsCookieJar,
-) -> Optional[FreeOpinionReport]:
+) -> Optional[Response]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
