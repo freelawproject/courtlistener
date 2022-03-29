@@ -17,7 +17,13 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.models import OBJECT_TYPES, SUB_TYPES, BackoffEvent, EmailFlag, UserProfile
+from cl.users.models import (
+    OBJECT_TYPES,
+    SUB_TYPES,
+    BackoffEvent,
+    EmailFlag,
+    UserProfile,
+)
 
 
 class UserTest(LiveServerTestCase):
@@ -865,8 +871,6 @@ class SNSWebhookTest(TestCase):
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
 
-
-
     def test_update_ban_object(self) -> None:
         """This test checks if an email ban object is updated when receiving
         a new ban notification, e.g: complaint -> hard bounce
@@ -886,7 +890,6 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_ban.count(), 1)
         self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
 
-
         # Trigger a hard_bounce event
         self.send_signal(
             self.hard_bounce_asset,
@@ -902,4 +905,3 @@ class SNSWebhookTest(TestCase):
         # Checks email ban is updated with the hard bounce subtype
         self.assertEqual(email_ban.count(), 1)
         self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
-
