@@ -6,9 +6,8 @@ from typing import Dict
 from django.contrib.auth.models import User
 from django.core.exceptions import FieldError
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum, UniqueConstraint
 from django.db.models.signals import post_save
-from django.db.models import UniqueConstraint, Q
 from django.dispatch import receiver
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
@@ -22,6 +21,7 @@ donation_exclusion_codes = [
     6,  # Failed
     7,  # Reclaimed/Refunded
 ]
+
 
 class BarMembership(models.Model):
     barMembership = USStateField(
@@ -174,6 +174,7 @@ class UserProfile(models.Model):
         verbose_name = "user profile"
         verbose_name_plural = "user profiles"
 
+
 class SUB_TYPES(object):
     """SNS Event Subtypes"""
 
@@ -203,14 +204,17 @@ class SUB_TYPES(object):
         (OTHER, "Other"),
     )
 
+
 class OBJECT_TYPES(object):
     """EmailFlag Object Types"""
+
     BAN = 0
     FLAG = 1
     TYPES = (
         (BAN, "Email ban"),
         (FLAG, "Email flag"),
     )
+
 
 class EmailFlag(AbstractDateTimeModel):
     """Stores flags for email addresses."""
@@ -251,9 +255,10 @@ class EmailFlag(AbstractDateTimeModel):
         # each email_address
         constraints = [
             UniqueConstraint(
-                fields=['email_address'],
+                fields=["email_address"],
                 condition=Q(object_type=OBJECT_TYPES.BAN),
-                name='unique_email_ban')
+                name="unique_email_ban",
+            )
         ]
 
     def __str__(self) -> str:
@@ -269,7 +274,7 @@ class BackoffEvent(AbstractDateTimeModel):
         help_text="The backoff event is related to this email address "
         "instead of a user, in this way, if users change their email address "
         "this won't affect the user's new email address, this unique.",
-        unique = True,
+        unique=True,
     )
     retry_counter = models.SmallIntegerField(
         help_text="The retry counter for exponential backoff events.",
