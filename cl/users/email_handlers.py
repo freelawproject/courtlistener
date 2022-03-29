@@ -2,10 +2,11 @@ import logging
 from datetime import timedelta
 from typing import List
 
+from django.db import transaction
 from django.utils.timezone import now
 
 from cl.users.models import OBJECT_TYPES, SUB_TYPES, BackoffEvent, EmailFlag
-from django.db import transaction
+
 
 def get_bounce_subtype(event_sub_type: str) -> int:
     """Returns a bounce subtype integer from a bounce subtype string"""
@@ -104,11 +105,14 @@ def handle_soft_bounce(
             # Handle events that must trigger a backoff event
 
             next_retry_date = now() + timedelta(hours=INITIAL_HOURS)
-            backoff_event, created = BackoffEvent.objects.select_for_update().get_or_create(
+            (
+                backoff_event,
+                created,
+            ) = BackoffEvent.objects.select_for_update().get_or_create(
                 email_address=email,
                 defaults={
                     "retry_counter": 0,
-                    "next_retry_date": next_retry_date
+                    "next_retry_date": next_retry_date,
                 },
             )
 
