@@ -80,6 +80,7 @@ TEMPLATES = [
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.security.SecurityMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -447,6 +448,14 @@ SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 ############
 # Security #
 ############
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_HSTS_SECONDS = 63_072_000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+
 RATELIMIT_VIEW = "cl.simple_pages.views.ratelimited"
 if DEVELOPMENT:
     SESSION_COOKIE_SECURE = False
@@ -589,6 +598,8 @@ if DEVELOPMENT:
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle
     "models.E034",
+    # Don't warn about HSTS being used
+    "security.W004",
 ]
 
 ###################
