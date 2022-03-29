@@ -1517,16 +1517,7 @@ def download_pacer_pdf_by_rd(
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
     try:
-        if magic_number:
-            # If a magic_number is passed as an argument try to download the
-            # document anonymously by magic link
-            de_seq_num = rd.docket_entry.pacer_sequence_number
-            r = report.download_pdf_magic_link(
-                pacer_case_id, pacer_doc_id, de_seq_num, magic_number
-            )
-        else:
-            # If no magic_number passed use normal method to fetch the document
-            r = report.download_pdf(pacer_case_id, pacer_doc_id)
+        r = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,

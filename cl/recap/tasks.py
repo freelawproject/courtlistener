@@ -1554,6 +1554,8 @@ def process_recap_email(
         # If we don't have a magic number avoid fetching the document
         if magic_number:
             fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
+        # TODO send an email to tell user that notification didn't have a
+        # magic link
 
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
