@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
@@ -283,8 +284,67 @@ class BackoffEvent(AbstractDateTimeModel):
         help_text="The next retry datetime for exponential backoff events.",
     )
 
+    @property
+    def under_waiting_period(self) -> bool:
+        """Does the backoff event is under waiting period?
+
+        :return bool: True if so, False if not.
+        """
+        if now() < self.next_retry_date:
+            return True
+        else:
+            return False
+
     def __str__(self) -> str:
         return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
+
+
+class Email(AbstractDateTimeModel):
+    """Stores email messages."""
+
+    user = models.ForeignKey(
+        User,
+        help_text="The user that this message is related to in case of users "
+        "change their email address we can send failed email to the user's "
+        "new email address, this is optional in case we send email to an"
+        "email address that doesn't belong to a CL user.",
+        related_name="emails",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    message_id = models.UUIDField(
+        help_text="Message ID", default=uuid.uuid4, editable=False
+    )
+    from_email = models.CharField(
+        help_text="From email address", max_length=254
+    )
+    to = models.CharField(
+        help_text="Recipient email address",
+        max_length=254,
+        blank=True,
+        null=True,
+    )
+    bcc = models.CharField(
+        help_text="BCC email address", max_length=254, blank=True, null=True
+    )
+    cc = models.CharField(
+        help_text="CC email address", max_length=254, blank=True, null=True
+    )
+    subject = models.CharField(help_text="Subject", max_length=989, blank=True)
+    message = models.TextField(help_text="Message Body", blank=True)
+    html_message = models.TextField(help_text="HTML Message Body", blank=True)
+    headers = models.JSONField(
+        help_text="Email Headers", blank=True, null=True
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["message_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Email: {self.message_id}, Status: {self.get_object_status_display()}"
 
 
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:

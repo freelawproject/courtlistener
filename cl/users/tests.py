@@ -6,7 +6,9 @@ from unittest import mock
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
 from django.test import Client
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
@@ -17,10 +19,12 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
+from cl.users.factories import UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
     SUB_TYPES,
     BackoffEvent,
+    Email,
     EmailFlag,
     UserProfile,
 )
@@ -905,3 +909,583 @@ class SNSWebhookTest(TestCase):
         # Checks email ban is updated with the hard bounce subtype
         self.assertEqual(email_ban.count(), 1)
         self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+
+class CustomBackendEmailTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+        with open(test_dir / "hard_bounce.json", encoding="utf-8") as file:
+            cls.hard_bounce_asset = json.load(file)
+        with open(
+            test_dir / "general_soft_bounce.json", encoding="utf-8"
+        ) as file:
+            cls.soft_bounce_asset = json.load(file)
+        with open(
+            test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as file:
+            cls.soft_bounce_msg_large_asset = json.load(file)
+
+        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
+        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+
+    def send_signal(self, test_asset, event_name, signal) -> None:
+        """Function to dispatch signal that mocks a SNS notification event
+        :param test_asset: the json object that contains notification
+        :param event_name: the signal event name
+        :param signal: the signal corresponding to the event
+        :return: None
+        """
+        # Prepare parameters
+        raw = json.dumps(test_asset)
+        notification = json.loads(raw)
+        message = json.loads(notification["Message"])
+        mail_obj = message.get("mail")
+        event_obj = message.get(event_name, {})
+
+        # Send signal
+        signal_kwargs = dict(
+            sender=self,
+            mail_obj=mail_obj,
+            raw_message=raw,
+        )
+        signal_kwargs[f"{event_name}_obj"] = event_obj
+        signal.send(**signal_kwargs)
+
+    def get_email_body(self, message):
+        """Function to retrieve text/html and text/plain body of an email
+        :param message: the message to extract the body content
+        :return: plaintext_body and html_body strings
+        """
+        plaintext_body = ""
+        html_body = ""
+        for part in message.walk():
+            if part.get_content_type() == "text/plain":
+                plaintext_body = part.get_payload()
+                if html_body:
+                    break
+            if part.get_content_type() == "text/html":
+                html_body = part.get_payload()
+                if plaintext_body:
+                    break
+
+        return plaintext_body, html_body
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_send_mail_function(self) -> None:
+        """This test checks if Django send_mail() works properly using the
+        custom email backend, the email should be stored automatically.
+        """
+        send_mail(
+            subject="This is the subject",
+            message="Body goes here",
+            html_message="<p>Body goes here</p>",
+            from_email="testing@courtlistener.com",
+            recipient_list=["success@simulator.amazonses.com"],
+        )
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    # check if I can get an error if form a bad emailmessage
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_email_message_class(self) -> None:
+        """This test checks if Django EmailMessage class works properly using
+        the custom email backend, the email should be stored automatically.
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["success@simulator.amazonses.com"],
+            ["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(
+            stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
+        )
+        self.assertEqual(
+            stored_email[0].cc, "cc_success@simulator.amazonses.com"
+        )
+        self.assertEqual(
+            stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message only has plain/text version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_multialternative_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending html and plain versions using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        html = "<p>Body goes here</p>"
+        msg.attach_alternative(html, "text/html")
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(
+            stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
+        )
+        self.assertEqual(
+            stored_email[0].cc, "cc_success@simulator.amazonses.com"
+        )
+        self.assertEqual(
+            stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has plain and html version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_multialternative_only_plain_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending plain version using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        # and origin headers are preserved
+        self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has only plain/text version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_multialternative_only_html_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending html version using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="<p>Body goes here</p>",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        msg.content_subtype = "html"
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.latest("id")
+        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email.message, "")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has only html/text version
+        self.assertEqual(plaintext_body, "")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_email_with_attachment(self) -> None:
+        """This test checks if Django EmailMessage class works
+        properly sending a message with an attachment using the custom
+        email backend.
+        """
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["success@simulator.amazonses.com"],
+            ["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_link_user_to_email(self) -> None:
+        """This test checks if a User is properly linked to a stored Email
+        is created, we search for the user by email address if found it's
+        assigned.
+        """
+        # Get user factory
+        user_email = self.user
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            [user_email.email],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].user.id, user_email.id)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_to_banned_email(self) -> None:
+        """This test checks if an email address is banned and we try to send
+        it an email, the message is discarded and not stored.
+        """
+
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+            fail_silently=False,
+        )
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Confirm if email is not stored
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 0)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_email_within_back_off(self) -> None:
+        """This test checks if an email address is under a backoff waiting
+        period and we try to send it an email, the message is stored but
+        not sent.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+            fail_silently=False,
+        )
+
+        # Confirm if email is stored
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_small_only_email(self) -> None:
+        """This test checks if an email address is flagged with a small email
+        only flag and try to send an email with an attachment, the small email
+        version is sent without attachment.
+        """
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+
+        email_flag_exists = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).exists()
+        # Check if small_email_only flag was created
+        self.assertEqual(email_flag_exists, True)
+
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = Email.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].message, "Body for small version")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm not attachment is sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Confirm small email only version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_no_small_only_email(self) -> None:
+        """This test checks if an email address is not flagged with a small
+        email only flag and we try to send an email with an attachment, the
+        normal email version is sent with its attachment.
+        """
+
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body for attachment version")
+        self.assertEqual(html_body, "<p>Body for attachment version</p>")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.users.email_backend.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        MAX_ATTACHMENT_SIZE=350000,
+    )
+    def test_sending_over_file_size_limit(self) -> None:
+        """This test checks if we try to send an email with an attachment that
+        exceeds the MAX_ATTACHMENT_SIZE set in settings, the small email
+        version is sent without an attachment.
+        """
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file that exceeds the MAX_ATTACHMENT_SIZE
+        email.attach_file(self.attachment_500)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is not sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = self.get_email_body(message)
+
+        # Confirm if small email version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
