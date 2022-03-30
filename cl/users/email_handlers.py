@@ -1,11 +1,19 @@
 import logging
 from datetime import timedelta
-from typing import List
+from typing import List, Optional, Tuple, Union
 
+from django.contrib.auth.models import User
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import transaction
 from django.utils.timezone import now
 
-from cl.users.models import OBJECT_TYPES, SUB_TYPES, BackoffEvent, EmailFlag
+from cl.users.models import (
+    OBJECT_TYPES,
+    SUB_TYPES,
+    BackoffEvent,
+    Email,
+    EmailFlag,
+)
 
 
 def get_bounce_subtype(event_sub_type: str) -> int:
@@ -215,3 +223,90 @@ def schedule_failed_email(recipient_email: str) -> None:
     :return: None
     """
     pass
+
+
+def convert_list_to_str(
+    email_list: Optional[Union[List[str], Tuple[str]]] = None
+) -> str:
+    """Function to convert a list or tuple of email addresses to a string,
+    we only support storing one email address in an Email object.
+    """
+    if email_list:
+        return email_list[0]
+    return ""
+
+
+def get_email_body(
+    message: Union[EmailMessage, EmailMultiAlternatives],
+    plain: str,
+    html: str,
+) -> List[str]:
+    """Function to retrieve html and plain body content of an email
+
+    :param message: the message to extract the body content
+    :param plain: the plain content type we are looking for
+    :param html: the html content type we are looking for
+    :return: plaintext_body and html_body list of strings
+    """
+    plaintext_body = ""
+    html_body = ""
+    for part in message.walk():
+        if part.get_content_type() == plain:
+            plaintext_body = part.get_payload()
+            if html_body:
+                break
+        if part.get_content_type() == html:
+            html_body = part.get_payload()
+            if plaintext_body:
+                break
+
+    return [plaintext_body, html_body]
+
+
+def store_message(
+    from_email: str,
+    to: Union[List[str], Tuple[str]],
+    cc: Optional[Union[List[str], Tuple[str]]] = None,
+    bcc: Optional[Union[List[str], Tuple[str]]] = None,
+    subject: Optional[str] = "",
+    message: Optional[str] = "",
+    html_message: Optional[str] = "",
+    headers: Optional[str] = None,
+) -> str:
+    """Stores an email message and returns its message_id, if the original
+    message had attachments we store the small version without attachments
+
+        :param from_email: The from email address
+        :param to: The recipient email address
+        :param bcc: The bcc email address
+        :param cc: The cc email address
+        :param subject: The email subject
+        :param message: The plain email body
+        :param html_message: The html email body
+        :param headers: The original headers
+        :return message_id: The unique email message identifier
+    """
+
+    to = convert_list_to_str(to)
+    cc = convert_list_to_str(cc)
+    bcc = convert_list_to_str(bcc)
+
+    # Look for the user by email address to assign it.
+    user_email = User.objects.filter(email=to)
+    if user_email.exists():
+        user_email = user_email[0]
+    else:
+        user_email = None
+
+    email_stored = Email.objects.create(
+        user=user_email,
+        from_email=from_email,
+        to=to,
+        cc=cc,
+        bcc=bcc,
+        subject=subject,
+        message=message,
+        html_message=html_message,
+        headers=headers,
+    )
+    return email_stored.message_id
