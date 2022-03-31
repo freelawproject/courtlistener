@@ -78,6 +78,7 @@ jobs:
         with:
           file: docker/django/Dockerfile
           push: true
+          target: django-dev
           tags: localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
@@ -86,6 +87,7 @@ jobs:
         with:
           file: docker/task-server/Dockerfile
           push: true
+          target: celery-dev
           tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache-celery
           cache-to: type=local,dest=/tmp/.buildx-cache-celery-new
