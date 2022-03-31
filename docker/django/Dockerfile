@@ -55,9 +55,10 @@ COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root && \
     poetry install --no-root --extras flp
 
-# will become mountpoint of our code
 WORKDIR /opt
 
+#Copy our code into development
+COPY . /opt/courtlistener
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
 RUN mkdir /var/log/courtlistener \
@@ -66,4 +67,92 @@ RUN mkdir /var/log/courtlistener \
   && chown -R www-data:www-data /var/log/juriscraper/ \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
+WORKDIR /opt/courtlistener
+
+FROM python-base as celery
+
+WORKDIR /usr/src/app
+
+## Needs to be two commands so second one can use variables from first.
+ENV \
+    CELERY_TASKS_DIR=/opt/courtlistener \
+    CELERY_USER_ID=33
+ENV \
+    PYTHONPATH="${PYTHONPATH}:${CELERY_TASKS_DIR}"
+
+USER ${CELERY_USER_ID}
+
+#freelawproject/task-server-dev:latest
+FROM celery as celery-dev
+
+CMD celery \
+    --app=cl worker \
+    --loglevel=info \
+    --events \
+    --concurrency=4 \
+    --pool=prefork \
+    --queues=io_bound,celery
+
+#freelawproject/task-server:latest
+FROM celery as celery-production
+
+CMD celery \
+    --app=cl worker \
+    --loglevel=info \
+    --events \
+    --pool=prefork \
+    --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined} \
+    --queues=celery \
+    --hostname=prefork@%h \
+    --prefetch-multiplier=1
+
+#freelawproject/task-server-bulk:latest
+FROM celery as celery-bulk
+
+CMD celery \
+    --app=cl worker \
+    --loglevel=info \
+    --events \
+    --pool=prefork \
+    --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined} \
+    --queues=batch1,batch2,iauploads \
+    --hostname=prefork@%h \
+    --prefetch-multiplier=5
+
+#freelawproject/courtlistener-django-dev:latest
+FROM python-base as django
+
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
+
+#freelawproject/courtlistener-django:latest
+FROM python-base as django-production
+
+CMD gunicorn cl_wsgi:application \
+    --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+    --user www-data \
+    --group www-data \
+    # Set high number of workers. Docs recommend 2-4× core count`
+    --workers ${NUM_WORKERS:-48} \
+    # Allow longer queries to solr.
+    --limit-request-line 6000 \
+    # Reset each worker once in a while
+    --max-requests 10000 \
+    --max-requests-jitter 100 \
+    --timeout 180 \
+    --bind 0.0.0.0:8000
+
+#freelawproject/courtlistener-scrape-rss:latest
+FROM python-base as scrape-rss
+
+USER www-data
+CMD /opt/courtlistener/manage.py scrape_rss
+
+
+#freelawproject/courtlistener-ia-uploader:latest  # <-- deprecated
+FROM python-base as ia-uploader
+
+USER www-data
+CMD /opt/courtlistener/manage.py upload_to_ia \
+        --action upload-recap-data-to-ia \
+        --queue iauploads \
+        --database replica \
