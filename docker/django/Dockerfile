@@ -120,7 +120,7 @@ CMD celery \
     --prefetch-multiplier=5
 
 #freelawproject/courtlistener-django-dev:latest
-FROM python-base as django
+FROM python-base as django-dev
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
 
