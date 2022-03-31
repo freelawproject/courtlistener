@@ -85,7 +85,7 @@ jobs:
       - name: Build latest docker celery image
         uses: docker/build-push-action@v2
         with:
-          file: docker/task-server/Dockerfile
+          file: docker/django/Dockerfile
           push: true
           target: celery-dev
           tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
