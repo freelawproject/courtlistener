@@ -69,6 +69,7 @@ RUN mkdir /var/log/courtlistener \
 
 WORKDIR /opt/courtlistener
 
+# freelawproject/courtlistener:latest-celery
 FROM python-base as celery
 
 WORKDIR /usr/src/app
@@ -82,50 +83,24 @@ ENV \
 
 USER ${CELERY_USER_ID}
 
-#freelawproject/task-server-dev:latest
-FROM celery as celery-dev
-
-CMD celery \
-    --app=cl worker \
-    --loglevel=info \
-    --events \
-    --concurrency=4 \
-    --pool=prefork \
-    --queues=io_bound,celery
-
-#freelawproject/task-server:latest
-FROM celery as celery-production
-
 CMD celery \
     --app=cl worker \
     --loglevel=info \
     --events \
     --pool=prefork \
-    --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined} \
-    --queues=celery \
     --hostname=prefork@%h \
-    --prefetch-multiplier=1
+    --queues=${CELERY_QUEUES} \
+    --concurrency=${CELERY_CONCURRENCY} \
+    --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER}
 
-#freelawproject/task-server-bulk:latest
-FROM celery as celery-bulk
 
-CMD celery \
-    --app=cl worker \
-    --loglevel=info \
-    --events \
-    --pool=prefork \
-    --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined} \
-    --queues=batch1,batch2,iauploads \
-    --hostname=prefork@%h \
-    --prefetch-multiplier=5
-
-#freelawproject/courtlistener-django-dev:latest
-FROM python-base as django-dev
+#freelawproject/courtlistener-web-dev:latest
+FROM python-base as web-dev
 
 CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
 
 #freelawproject/courtlistener-django:latest
-FROM python-base as django-production
+FROM python-base as web-prod
 
 CMD gunicorn cl_wsgi:application \
     --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
@@ -142,17 +117,8 @@ CMD gunicorn cl_wsgi:application \
     --bind 0.0.0.0:8000
 
 #freelawproject/courtlistener-scrape-rss:latest
-FROM python-base as scrape-rss
+FROM python-base as rss-scraper
 
 USER www-data
 CMD /opt/courtlistener/manage.py scrape_rss
 
-
-#freelawproject/courtlistener-ia-uploader:latest  # <-- deprecated
-FROM python-base as ia-uploader
-
-USER www-data
-CMD /opt/courtlistener/manage.py upload_to_ia \
-        --action upload-recap-data-to-ia \
-        --queue iauploads \
-        --database replica \

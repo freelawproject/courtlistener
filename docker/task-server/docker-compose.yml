@@ -7,7 +7,11 @@ networks:
     external: true
 services:
   celery_prefork:
-    image: freelawproject/task-server:latest
+    environment:
+      CELERY_CONCURRENCY: ${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
+      CELERY_QUEUES: celery
+      CELERY_PREFETCH_MULTIPLIER: 1
+    image: freelawproject/courtlistener:latest-celery
     depends_on:
       - cl-doctor
       - cl-disclosures
@@ -20,7 +24,6 @@ services:
       restart_policy:
         condition: on-failure
     volumes:
-      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
       - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
@@ -28,19 +31,13 @@ services:
       driver: journald
     networks:
       - cl_net_overlay
-    command: >
-      celery
-        --app=cl worker
-        --loglevel=info
-        --events
-        --pool=prefork
-        --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
-        --queues=celery
-        --hostname=prefork@%h
-        --prefetch-multiplier=1
 
   celery_prefork_bulk:
-    image: freelawproject/task-server:latest
+    environment:
+      CELERY_CONCURRENCY: ${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
+      CELERY_QUEUES: batch1,batch2
+      CELERY_PREFETCH_MULTIPLIER: 5
+    image: freelawproject/courtlistener:latest-celery
     depends_on:
       - cl-judge-pics
       - cl-doctor
@@ -53,7 +50,6 @@ services:
       restart_policy:
         condition: on-failure
     volumes:
-      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
       - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
@@ -61,16 +57,6 @@ services:
       driver: journald
     networks:
       - cl_net_overlay
-    command: >
-      celery
-        --app=cl worker
-        --loglevel=info
-        --events
-        --pool=prefork
-        --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
-        --queues=batch1,batch2,iauploads
-        --hostname=prefork@%h
-        --prefetch-multiplier=5
 
   cl-judge-pics:
     image: freelawproject/judge-pics:latest
