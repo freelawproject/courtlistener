@@ -78,8 +78,8 @@ jobs:
         with:
           file: docker/django/Dockerfile
           push: true
-          target: django-dev
-          tags: localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}
+          target: web-dev
+          tags: localhost:5000/freelawproject/courtlistener:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
       - name: Build latest docker celery image
@@ -87,8 +87,8 @@ jobs:
         with:
           file: docker/django/Dockerfile
           push: true
-          target: celery-dev
-          tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
+          target: celery
+          tags: localhost:5000/freelawproject/courtlistener:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache-celery
           cache-to: type=local,dest=/tmp/.buildx-cache-celery-new
 
