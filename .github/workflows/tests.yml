@@ -18,7 +18,7 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
-        tag_flags: ["--exclude-tag selenium", "--tag selenium"]
+        tag_flags: ["--exclude-tag selenium"]
     steps:
       - name: Check out solr
         uses: actions/checkout@v2-beta
@@ -99,8 +99,8 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
-          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/task-server:${{ github.sha }}"
-          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}"
+          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:${{ github.sha }}"
+          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:${{ github.sha }}"
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
