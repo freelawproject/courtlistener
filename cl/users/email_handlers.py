@@ -1,6 +1,6 @@
 import logging
+from collections.abc import Iterable
 from datetime import timedelta
-from typing import List, Optional, Tuple, Union
 
 from django.contrib.auth.models import User
 from django.core.mail import EmailMessage, EmailMultiAlternatives
@@ -11,8 +11,8 @@ from cl.users.models import (
     OBJECT_TYPES,
     SUB_TYPES,
     BackoffEvent,
-    Email,
     EmailFlag,
+    EmailSent,
 )
 
 
@@ -26,7 +26,7 @@ def get_bounce_subtype(event_sub_type: str) -> int:
 
 
 def handle_hard_bounce(
-    event_sub_type: str, recipient_emails: List[str]
+    event_sub_type: str, recipient_emails: list[str]
 ) -> None:
     """Ban any email address that receives a hard bounce.
 
@@ -63,7 +63,7 @@ def handle_hard_bounce(
 
 @transaction.atomic
 def handle_soft_bounce(
-    message_id: str, event_sub_type: str, recipient_emails: List[str]
+    message_id: str, event_sub_type: str, recipient_emails: list[str]
 ) -> None:
     """Handle a soft bounce notification received from SNS
 
@@ -181,7 +181,7 @@ def handle_soft_bounce(
             )
 
 
-def handle_complaint(recipient_emails: List[str]) -> None:
+def handle_complaint(recipient_emails: list[str]) -> None:
     """Handle a complaint notification received from SNS
 
     Ban email addresses that received a complaint.
@@ -200,7 +200,7 @@ def handle_complaint(recipient_emails: List[str]) -> None:
         )
 
 
-def handle_delivery(message_id: str, recipient_emails: List[str]) -> None:
+def handle_delivery(message_id: str, recipient_emails: list[str]) -> None:
     """Handle a delivery notification received from SNS
 
     :param message_id: The unique message id assigned by Amazon SES
@@ -225,22 +225,21 @@ def schedule_failed_email(recipient_email: str) -> None:
     pass
 
 
-def convert_list_to_str(
-    email_list: Optional[Union[List[str], Tuple[str]]] = None
-) -> str:
+def convert_list_to_str(email_list: Iterable[str]) -> str:
     """Function to convert a list or tuple of email addresses to a string,
     we only support storing one email address in an Email object.
     """
     if email_list:
-        return email_list[0]
+        for email in email_list:
+            return email
     return ""
 
 
 def get_email_body(
-    message: Union[EmailMessage, EmailMultiAlternatives],
+    message: EmailMessage | EmailMultiAlternatives,
     plain: str,
     html: str,
-) -> List[str]:
+) -> list[str]:
     """Function to retrieve html and plain body content of an email
 
     :param message: the message to extract the body content
@@ -265,48 +264,102 @@ def get_email_body(
 
 def store_message(
     from_email: str,
-    to: Union[List[str], Tuple[str]],
-    cc: Optional[Union[List[str], Tuple[str]]] = None,
-    bcc: Optional[Union[List[str], Tuple[str]]] = None,
-    subject: Optional[str] = "",
-    message: Optional[str] = "",
-    html_message: Optional[str] = "",
-    headers: Optional[str] = None,
+    to: Iterable[str],
+    bcc: Iterable[str],
+    cc: Iterable[str],
+    reply_to: Iterable[str],
+    subject: str,
+    message: str,
+    html_message: str,
+    headers: dict,
 ) -> str:
     """Stores an email message and returns its message_id, if the original
     message had attachments we store the small version without attachments
 
-        :param from_email: The from email address
-        :param to: The recipient email address
-        :param bcc: The bcc email address
-        :param cc: The cc email address
-        :param subject: The email subject
-        :param message: The plain email body
-        :param html_message: The html email body
-        :param headers: The original headers
-        :return message_id: The unique email message identifier
+    :param from_email: The from email address
+    :param to: The recipient email address
+    :param bcc: The bcc email address
+    :param cc: The cc email address
+    :param reply_to: The reply_to email address
+    :param subject: The email subject
+    :param message: The plain email body
+    :param html_message: The html email body
+    :param headers: The original headers
+    :return message_id: The unique email message identifier
     """
 
     to = convert_list_to_str(to)
     cc = convert_list_to_str(cc)
     bcc = convert_list_to_str(bcc)
+    reply_to = convert_list_to_str(reply_to)
 
-    # Look for the user by email address to assign it.
+    # Look for the CL user by email address to assign it.
     user_email = User.objects.filter(email=to)
     if user_email.exists():
         user_email = user_email[0]
     else:
         user_email = None
 
-    email_stored = Email.objects.create(
+    email_stored = EmailSent.objects.create(
         user=user_email,
         from_email=from_email,
         to=to,
-        cc=cc,
         bcc=bcc,
+        cc=cc,
+        reply_to=reply_to,
         subject=subject,
         message=message,
         html_message=html_message,
         headers=headers,
     )
     return email_stored.message_id
+
+
+def compose_message(
+    html_body: str,
+    plain_body: str,
+    from_email: str,
+    to: Iterable[str],
+    bcc: Iterable[str],
+    cc: Iterable[str],
+    reply_to: Iterable[str],
+    subject: str,
+    headers: dict,
+):
+    if html_body:
+        if plain_body:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_body,
+                from_email=from_email,
+                to=to,
+                bcc=bcc,
+                cc=cc,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.attach_alternative(html_body, "text/html")
+        else:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=html_body,
+                from_email=from_email,
+                to=to,
+                bcc=bcc,
+                cc=cc,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.content_subtype = "html"
+    else:
+        email = EmailMessage(
+            subject=subject,
+            body=plain_body,
+            from_email=from_email,
+            to=to,
+            bcc=bcc,
+            cc=cc,
+            reply_to=reply_to,
+            headers=headers,
+        )
+    return email

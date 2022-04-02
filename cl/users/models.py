@@ -299,7 +299,7 @@ class BackoffEvent(AbstractDateTimeModel):
         return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
 
 
-class Email(AbstractDateTimeModel):
+class EmailSent(AbstractDateTimeModel):
     """Stores email messages."""
 
     user = models.ForeignKey(
@@ -323,13 +323,15 @@ class Email(AbstractDateTimeModel):
         help_text="Recipient email address",
         max_length=254,
         blank=True,
-        null=True,
     )
     bcc = models.CharField(
-        help_text="BCC email address", max_length=254, blank=True, null=True
+        help_text="BCC email address", max_length=254, blank=True
     )
     cc = models.CharField(
-        help_text="CC email address", max_length=254, blank=True, null=True
+        help_text="CC email address", max_length=254, blank=True
+    )
+    reply_to = models.CharField(
+        help_text="Reply to address", max_length=254, blank=True
     )
     subject = models.CharField(help_text="Subject", max_length=989, blank=True)
     message = models.TextField(help_text="Message Body", blank=True)
@@ -344,7 +346,7 @@ class Email(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
-        return f"Email: {self.message_id}, Status: {self.get_object_status_display()}"
+        return f"Email: {self.message_id}"
 
 
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
