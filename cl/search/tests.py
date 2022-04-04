@@ -338,8 +338,9 @@ class AdvancedTest(IndexedSolrTestCase):
     """
     Advanced query techniques
     """
-    fixtures = ["test_objects_search.json"]
-    
+
+    fixtures = ["test_objects_search.json", "judge_judy.json"]
+
     def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
         r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
@@ -374,15 +375,15 @@ class AdvancedTest(IndexedSolrTestCase):
     def test_query_phrase(self) -> None:
         """Can we query by phrase"""
         r = self.client.get(
-            reverse("show_results"), {"q": "'Testing Supreme Court'"}
+            reverse("show_results"), {"q": "'Harvey Howard v. Antonin Honda'"}
         )
-        self.assertIn("Honda", r.content.decode())
+        self.assertIn("1895-06-09", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
         r = self.client.get(
-            reverse("show_results"), {"q": "'Supreme Testing Court'"}
+            reverse("show_results"), {"q": "'Antonin Honda v. Harvey Howard'"}
         )
-        self.assertIn("had no results", r.content.decode())
+        self.assertIn("1895-06-09", r.content.decode())
 
     def test_query_grouped_and_sub_queries(self) -> None:
         """Does grouped and sub queries work"""
