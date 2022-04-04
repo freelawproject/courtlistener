@@ -23,6 +23,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 TESTING = "test" in sys.argv
 TEST_RUNNER = "cl.tests.runner.TestRunner"
+
+DEBUG = True
 if TESTING:
     PAGINATION_COUNT = 10
     DEBUG = False
@@ -30,7 +32,6 @@ if TESTING:
         "django.contrib.auth.hashers.MD5PasswordHasher",
     ]
     CELERY_BROKER = "memory://"
-
 
 MAINTENANCE_MODE_ENABLED = False
 MAINTENANCE_MODE_ALLOW_STAFF = True

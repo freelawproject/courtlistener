@@ -1,5 +1,6 @@
 # Ignore everything...
 *
+*/assets/media*
 
 # Except a few things...
 !.circleci
@@ -8,7 +9,7 @@
 !pyproject.toml
 !docker
 !manage.py
+!*/assets/media/test/*
 
 # But no matter what, ignore these things.
-*/assets/media*
 */node_modules

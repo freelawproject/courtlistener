@@ -97,7 +97,9 @@ CMD celery \
 #freelawproject/courtlistener-web-dev:latest
 FROM python-base as web-dev
 
-CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
+CMD python /opt/courtlistener/manage.py migrate && \
+    python /opt/courtlistener/manage.py createcachetable && \
+    python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
 
 #freelawproject/courtlistener-django:latest
 FROM python-base as web-prod
