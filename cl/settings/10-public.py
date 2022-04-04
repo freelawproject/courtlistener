@@ -338,6 +338,8 @@ REST_FRAMEWORK = {
         "elios": "10/hour",
         # Sent multiple emails, but no response.
         "bchecker": "1/hour",
+        # No response
+        "zealousgalileo": "1/hour",
         "JaneDoe": "1/hour",
         "chinamkm": "1/hour",
         "shreyngd": "100/hour",
