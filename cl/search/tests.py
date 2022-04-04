@@ -375,15 +375,15 @@ class AdvancedTest(IndexedSolrTestCase):
     def test_query_phrase(self) -> None:
         """Can we query by phrase"""
         r = self.client.get(
-            reverse("show_results"), {"q": "'Harvey Howard v. Antonin Honda'"}
+            reverse("show_results"), {"q": '"Harvey Howard v. Antonin Honda"'}
         )
-        self.assertIn("1895-06-09", r.content.decode())
+        self.assertIn("Harvey Howard", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
         r = self.client.get(
-            reverse("show_results"), {"q": "'Antonin Honda v. Harvey Howard'"}
+            reverse("show_results"), {"q": '"Antonin Honda v. Harvey Howard"'}
         )
-        self.assertIn("1895-06-09", r.content.decode())
+        self.assertIn("had no results", r.content.decode())
 
     def test_query_grouped_and_sub_queries(self) -> None:
         """Does grouped and sub queries work"""
