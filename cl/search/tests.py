@@ -338,12 +338,8 @@ class AdvancedTest(IndexedSolrTestCase):
     """
     Advanced query techniques
     """
-
-    def setUp(self) -> None:
-        self.fixtures.append("test_objects_search.json")
-
-        super(AdvancedTest, self).setUp()
-
+    fixtures = ["test_objects_search.json"]
+    
     def test_a_intersection_query(self) -> None:
         """Does AND queries work"""
         r = self.client.get(reverse("show_results"), {"q": "Howard AND Honda"})
@@ -382,6 +378,11 @@ class AdvancedTest(IndexedSolrTestCase):
         )
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
+
+        r = self.client.get(
+            reverse("show_results"), {"q": "'Supreme Testing Court'"}
+        )
+        self.assertIn("had no results", r.content.decode())
 
     def test_query_grouped_and_sub_queries(self) -> None:
         """Does grouped and sub queries work"""
