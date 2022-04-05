@@ -81,7 +81,7 @@ class RssFeedData(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court,
         help_text="The court where the RSS feed was found",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name="rss_feed_data",
     )
     filepath = models.FileField(
