@@ -101,7 +101,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         "people_db.Person",
         help_text="The judge the case was assigned to.",
         related_name="original_court_info",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -113,7 +113,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         "people_db.Person",
         related_name="+",
         help_text="The judge that issued the final order in the case.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -260,7 +260,7 @@ class Docket(AbstractDateTimeModel):
     court = models.ForeignKey(
         "Court",
         help_text="The court where the docket was filed",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         db_index=True,
         related_name="dockets",
     )
@@ -274,7 +274,7 @@ class Docket(AbstractDateTimeModel):
             "normalize the value in appeal_from_str."
         ),
         related_name="+",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -293,7 +293,7 @@ class Docket(AbstractDateTimeModel):
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
         related_name="docket",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -304,7 +304,7 @@ class Docket(AbstractDateTimeModel):
             "case."
         ),
         related_name="docket",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -325,7 +325,7 @@ class Docket(AbstractDateTimeModel):
         "people_db.Person",
         related_name="assigning",
         help_text="The judge the case was assigned to.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -337,7 +337,7 @@ class Docket(AbstractDateTimeModel):
         "people_db.Person",
         related_name="referring",
         help_text="The judge to whom the 'assigned_to' judge is delegated.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -2578,7 +2578,7 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         help_text="The primary author of this opinion as a normalized field",
         related_name="opinions_written",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -2989,12 +2989,12 @@ class Tag(AbstractDateTimeModel):
 #     upper_court = models.ForeignKey(
 #         Court,
 #         related_name='lower_courts_reviewed',
-#         on_delete=models.CASCADE,
+#         on_delete=models.RESTRICT,
 #     )
 #     lower_court = models.ForeignKey(
 #         Court,
 #         related_name='reviewed_by',
-#         on_delete=models.CASCADE,
+#         on_delete=models.RESTRICT,
 #     )
 #     date_start = models.DateTimeField(
 #         help_text="The date this appellate review relationship began",
