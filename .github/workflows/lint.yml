@@ -96,13 +96,15 @@ jobs:
         uses: psf/black@stable
 
   lint-isort:
+    # This is an unfortunate necessity because the latest version of isort
+    # doesn't work with Python 3.10. To work around that, we simply run this
+    # in version 3.9, but someday we hope to simplify this again.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2-beta
 
       - uses: actions/setup-python@v2
         with:
-          # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.9"
 
       - name: isort Import Sorter
