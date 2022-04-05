@@ -39,8 +39,8 @@ services:
       - "8983:8983"
     # needs chmod 777
     volumes:
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
-      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
+      - ${CL_SOLR_CODE_DIR:-../../../../../courtlistener-solr-server}/data:/var/opt/solr/indices
+      - ${CL_SOLR_CODE_DIR:-../../../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
     networks:
       - cl_net_overlay
 
