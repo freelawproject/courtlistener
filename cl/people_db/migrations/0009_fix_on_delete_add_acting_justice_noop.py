@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0008_auto_20220309_1323'),
+        ('search', '0007_add_parenthetical_groups'),
         ('people_db', '0008_auto_20220309_1323'),
     ]
 
