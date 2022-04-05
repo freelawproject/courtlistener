@@ -109,6 +109,14 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose logs
 
+      - name: Show the docker startup for django
+        working-directory: courtlistener/docker/courtlistener
+        run: docker-compose logs cl-django --tail 25
+
+      - name: Show the docker startup for celery
+        working-directory: courtlistener/docker/courtlistener
+        run: docker-compose logs cl-celery --tail 25
+
       # Run the checks and tests
       - name: Check if migrations are missing
         run: docker exec cl-django python /opt/courtlistener/manage.py makemigrations --check --dry-run
