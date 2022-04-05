@@ -59,6 +59,8 @@ WORKDIR /opt
 
 #Copy our code into development
 COPY . /opt/courtlistener
+COPY courtlistener/cl/settings/05-private.example courtlistener/cl/settings/05-private.py
+
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
 RUN mkdir /var/log/courtlistener \

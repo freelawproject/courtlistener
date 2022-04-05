@@ -41,9 +41,9 @@ jobs:
         uses: actions/checkout@v2-beta
         with:
           path: courtlistener
-      - name: Create the private settings file
-        working-directory: courtlistener/cl/settings
-        run: cp 05-private.example 05-private.py
+#      - name: Create the private settings file
+#        working-directory: courtlistener/cl/settings
+#        run: cp 05-private.example 05-private.py
       - name: Add AWS creds to settings
         working-directory: courtlistener/cl/settings
         run: |
