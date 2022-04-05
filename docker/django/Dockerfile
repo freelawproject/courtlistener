@@ -59,7 +59,8 @@ WORKDIR /opt
 
 #Copy our code into development
 COPY . /opt/courtlistener
-COPY courtlistener/cl/settings/05-private.example courtlistener/cl/settings/05-private.py
+COPY cl/settings/05-private.example /opt/courtlistener/cl/settings/05-private.py
+
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -92,8 +93,8 @@ CMD celery \
     --pool=prefork \
     --hostname=prefork@%h \
     --queues=${CELERY_QUEUES} \
-    --concurrency=${CELERY_CONCURRENCY} \
-    --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER}
+    --concurrency=${CELERY_PREFORK_CONCURRENCY:-0} \
+    --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
 
 
 #freelawproject/courtlistener-web-dev:latest
