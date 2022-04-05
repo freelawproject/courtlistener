@@ -456,6 +456,18 @@ python-versions = ">=3.6"
 Django = ">=2.2"
 
 [[package]]
+name = "django-elasticsearch-dsl"
+version = "7.2.2"
+description = "Wrapper around elasticsearch-dsl-py for django models"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+elasticsearch-dsl = ">=7.2.0"
+six = "*"
+
+[[package]]
 name = "django-extensions"
 version = "3.1.1"
 description = "Extensions for Django"
@@ -657,6 +669,40 @@ description = "Dynamically return subset of Django REST Framework serializer fie
 category = "main"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "elasticsearch"
+version = "7.17.2"
+description = "Python client for Elasticsearch"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
+
+[package.dependencies]
+certifi = "*"
+urllib3 = ">=1.21.1,<2"
+
+[package.extras]
+async = ["aiohttp (>=3,<4)"]
+develop = ["requests (>=2.0.0,<3.0.0)", "coverage", "mock", "pyyaml", "pytest", "pytest-cov", "sphinx (<1.7)", "sphinx-rtd-theme", "black", "jinja2"]
+docs = ["sphinx (<1.7)", "sphinx-rtd-theme"]
+requests = ["requests (>=2.4.0,<3.0.0)"]
+
+[[package]]
+name = "elasticsearch-dsl"
+version = "7.4.0"
+description = "Python client for Elasticsearch"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[package.dependencies]
+elasticsearch = ">=7.0.0,<8.0.0"
+python-dateutil = "*"
+six = "*"
+
+[package.extras]
+develop = ["mock", "pytest (>=3.0.0)", "pytest-cov", "pytest-mock (<3.0.0)", "pytz", "coverage (<5.0.0)", "sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "exrex"
@@ -1977,7 +2023,7 @@ flp = ["reporters-db", "juriscraper"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "b90b981008a84895561eac5f6047793fde1805942bff40064387f78d93a13b0d"
+content-hash = "f91df1595f933994fb2c78653dabdcc83c7751aa2ac426d6bec1ac6edfa6bdc7"
 
 [metadata.files]
 amqp = [
@@ -2177,8 +2223,10 @@ cryptography = [
     {file = "cryptography-3.4.7-cp36-abi3-win_amd64.whl", hash = "sha256:de4e5f7f68220d92b7637fc99847475b59154b7a1b3868fb7385337af54ac9ca"},
     {file = "cryptography-3.4.7-pp36-pypy36_pp73-manylinux2010_x86_64.whl", hash = "sha256:26965837447f9c82f1855e0bc8bc4fb910240b6e0d16a664bb722df3b5b06873"},
     {file = "cryptography-3.4.7-pp36-pypy36_pp73-manylinux2014_x86_64.whl", hash = "sha256:eb8cc2afe8b05acbd84a43905832ec78e7b3873fb124ca190f574dca7389a87d"},
+    {file = "cryptography-3.4.7-pp37-pypy37_pp73-macosx_10_10_x86_64.whl", hash = "sha256:b01fd6f2737816cb1e08ed4807ae194404790eac7ad030b34f2ce72b332f5586"},
     {file = "cryptography-3.4.7-pp37-pypy37_pp73-manylinux2010_x86_64.whl", hash = "sha256:7ec5d3b029f5fa2b179325908b9cd93db28ab7b85bb6c1db56b10e0b54235177"},
     {file = "cryptography-3.4.7-pp37-pypy37_pp73-manylinux2014_x86_64.whl", hash = "sha256:ee77aa129f481be46f8d92a1a7db57269a2f23052d5f2433b4621bb457081cc9"},
+    {file = "cryptography-3.4.7-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:bf40af59ca2465b24e54f671b2de2c59257ddc4f7e5706dbd6930e26823668d3"},
     {file = "cryptography-3.4.7.tar.gz", hash = "sha256:3d10de8116d25649631977cb37da6cbdd2d6fa0e0281d014a5b7d337255ca713"},
 ]
 cssselect = [
@@ -2219,6 +2267,10 @@ django-cache-memoize = [
 django-cors-headers = [
     {file = "django-cors-headers-3.7.0.tar.gz", hash = "sha256:96069c4aaacace786a34ee7894ff680780ec2644e4268b31181044410fecd12e"},
     {file = "django_cors_headers-3.7.0-py3-none-any.whl", hash = "sha256:1ac2b1213de75a251e2ba04448da15f99bcfcbe164288ae6b5ff929dc49b372f"},
+]
+django-elasticsearch-dsl = [
+    {file = "django-elasticsearch-dsl-7.2.2.tar.gz", hash = "sha256:811d3909b3387fd55c19d9bbcf0e9a9b234f085df3f8422d59e7519a5f733e0e"},
+    {file = "django_elasticsearch_dsl-7.2.2-py2.py3-none-any.whl", hash = "sha256:3c58a254a6318b169eb904d41d802924b99ea8e53ddc2c596ebba90506cf47fa"},
 ]
 django-extensions = [
     {file = "django-extensions-3.1.1.tar.gz", hash = "sha256:674ad4c3b1587a884881824f40212d51829e662e52f85b012cd83d83fe1271d9"},
@@ -2287,6 +2339,14 @@ docopt = [
 drf-dynamic-fields = [
     {file = "drf_dynamic_fields-0.3.1-py2.py3-none-any.whl", hash = "sha256:fa5a7ea010476184d776b4b977d57d0090e651e8f897d83ed0c2f2bca9cbf704"},
     {file = "drf_dynamic_fields-0.3.1.tar.gz", hash = "sha256:de75969abff74332f339d082931f1815dc91c2ff1ed6e741bd33d1d5057dceb1"},
+]
+elasticsearch = [
+    {file = "elasticsearch-7.17.2-py2.py3-none-any.whl", hash = "sha256:f49ebaf9e9652a468db4dce5eb8a6a7ea33594ab988f6dadebf36f99772ac809"},
+    {file = "elasticsearch-7.17.2.tar.gz", hash = "sha256:1b1fa86cbfab39bf43dce1f76f737fc59d5a8e792e2a721e0b4437db44da5647"},
+]
+elasticsearch-dsl = [
+    {file = "elasticsearch-dsl-7.4.0.tar.gz", hash = "sha256:c4a7b93882918a413b63bed54018a1685d7410ffd8facbc860ee7fd57f214a6d"},
+    {file = "elasticsearch_dsl-7.4.0-py2.py3-none-any.whl", hash = "sha256:046ea10820b94c075081b528b4526c5bc776bda4226d702f269a5f203232064b"},
 ]
 exrex = [
     {file = "exrex-0.10.5.tar.gz", hash = "sha256:3fb8b18fd9832eaff8b13dc042a4f63b13c5d684ee069f70a23ddfc6bcb708f3"},
