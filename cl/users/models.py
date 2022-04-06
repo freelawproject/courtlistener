@@ -333,8 +333,10 @@ class EmailSent(AbstractDateTimeModel):
     reply_to = models.CharField(
         help_text="Reply to address", max_length=254, blank=True
     )
-    subject = models.CharField(help_text="Subject", max_length=989, blank=True)
-    message = models.TextField(help_text="Message Body", blank=True)
+    subject = models.TextField(help_text="Subject", blank=True)
+    plain_text = models.TextField(
+        help_text="Plain Text Message Body", blank=True
+    )
     html_message = models.TextField(help_text="HTML Message Body", blank=True)
     headers = models.JSONField(
         help_text="Email Headers", blank=True, null=True

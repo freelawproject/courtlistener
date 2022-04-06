@@ -28,6 +28,7 @@ from cl.users.models import (
     EmailSent,
     UserProfile,
 )
+from cl.users.email_handlers import get_email_body
 
 
 class UserTest(LiveServerTestCase):
@@ -347,41 +348,26 @@ class LiveUserTest(BaseSeleniumTest):
 
 
 class SNSWebhookTest(TestCase):
-    def setUp(self) -> None:
 
+    @classmethod
+    def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-
-        with open(
-            Path.joinpath(test_dir, "general_soft_bounce.json"),
-            encoding="utf-8",
-        ) as file:
-            self.soft_bounce_asset = json.loads(file.read())
-        with open(
-            Path.joinpath(test_dir, "msg_large_bounce.json"), encoding="utf-8"
-        ) as file:
-            self.soft_bounce_msg_large_asset = json.loads(file.read())
-        with open(
-            Path.joinpath(test_dir, "cnt_rejected_bounce.json"),
-            encoding="utf-8",
-        ) as file:
-            self.soft_bounce_cnt_rejected_asset = json.loads(file.read())
-        with open(
-            Path.joinpath(test_dir, "hard_bounce.json"), encoding="utf-8"
-        ) as file:
-            self.hard_bounce_asset = json.loads(file.read())
-        with open(
-            Path.joinpath(test_dir, "complaint.json"), encoding="utf-8"
-        ) as file:
-            self.complaint_asset = json.loads(file.read())
-        with open(
-            Path.joinpath(test_dir, "delivery.json"), encoding="utf-8"
-        ) as file:
-            self.delivery_asset = json.loads(file.read())
-
-        with open(
-            Path.joinpath(test_dir, "suppressed_bounce.json"), encoding="utf-8"
-        ) as file:
-            self.suppressed_asset = json.loads(file.read())
+        with (
+            open(test_dir / "general_soft_bounce.json", encoding="utf-8") as general_soft_bounce,
+            open(test_dir / "msg_large_bounce.json", encoding="utf-8") as msg_large_bounce,
+            open(test_dir / "cnt_rejected_bounce.json", encoding="utf-8") as cnt_rejected_bounce,
+            open(test_dir / "hard_bounce.json", encoding="utf-8") as hard_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(test_dir / "suppressed_bounce.json", encoding="utf-8") as suppressed_bounce
+        ):
+            cls.soft_bounce_asset = json.load(general_soft_bounce)
+            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
+            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
+            cls.hard_bounce_asset = json.load(hard_bounce)
+            cls.complaint_asset = json.load(complaint)
+            cls.delivery_asset = json.load(delivery)
+            cls.suppressed_asset = json.load(suppressed_bounce)
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -916,16 +902,14 @@ class CustomBackendEmailTest(TestCase):
     def setUpTestData(cls):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
-        with open(test_dir / "hard_bounce.json", encoding="utf-8") as file:
-            cls.hard_bounce_asset = json.load(file)
-        with open(
-            test_dir / "general_soft_bounce.json", encoding="utf-8"
-        ) as file:
-            cls.soft_bounce_asset = json.load(file)
-        with open(
-            test_dir / "msg_large_bounce.json", encoding="utf-8"
-        ) as file:
-            cls.soft_bounce_msg_large_asset = json.load(file)
+        with (
+            open(test_dir / "hard_bounce.json", encoding="utf-8") as hard_bounce,
+            open(test_dir / "general_soft_bounce.json", encoding="utf-8") as soft_bounce,
+            open(test_dir / "msg_large_bounce.json", encoding="utf-8") as large_bounce,
+        ):
+            cls.hard_bounce_asset = json.load(hard_bounce)
+            cls.soft_bounce_asset = json.load(soft_bounce)
+            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
 
         cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
         cls.attachment_500 = test_dir / "file_example_500kB.pdf"
@@ -953,25 +937,6 @@ class CustomBackendEmailTest(TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    def get_email_body(self, message):
-        """Function to retrieve text/html and text/plain body of an email
-        :param message: the message to extract the body content
-        :return: plaintext_body and html_body strings
-        """
-        plaintext_body = ""
-        html_body = ""
-        for part in message.walk():
-            if part.get_content_type() == "text/plain":
-                plaintext_body = part.get_payload()
-                if html_body:
-                    break
-            if part.get_content_type() == "text/html":
-                html_body = part.get_payload()
-                if plaintext_body:
-                    break
-
-        return plaintext_body, html_body
-
     @override_settings(
         EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
         BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -992,7 +957,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
         self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
-        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
 
         # Confirm if email is sent
@@ -1002,7 +967,7 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
@@ -1038,7 +1003,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
         self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
-        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(
             stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
         )
@@ -1059,7 +1024,7 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
@@ -1094,7 +1059,7 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
         self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
-        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
         self.assertEqual(
             stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
@@ -1113,11 +1078,11 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
-        # Compare body contents, this message has plain and html version
+        # Compare body contents, this message has a plain and html version
         self.assertEqual(plaintext_body, "Body goes here")
         self.assertEqual(html_body, "<p>Body goes here</p>")
 
@@ -1145,7 +1110,7 @@ class CustomBackendEmailTest(TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].message, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(stored_email[0].html_message, "")
 
         # Confirm if email is sent
@@ -1155,7 +1120,7 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Verify if the email unique identifier "X-CL-ID" header was added
         # and original headers are preserved
@@ -1190,7 +1155,7 @@ class CustomBackendEmailTest(TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.latest("id")
         self.assertEqual(stored_email.html_message, "<p>Body goes here</p>")
-        self.assertEqual(stored_email.message, "")
+        self.assertEqual(stored_email.plain_text, "")
 
         # Confirm if email is sent
         self.assertEqual(len(mail.outbox), 1)
@@ -1198,7 +1163,7 @@ class CustomBackendEmailTest(TestCase):
         message_sent = mail.outbox[0]
         message = message_sent.message()
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
@@ -1384,7 +1349,7 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(
             stored_email[0].html_message, "<p>Body for small version</p>"
         )
-        self.assertEqual(stored_email[0].message, "Body for small version")
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
 
         # Confirm if email is sent
         self.assertEqual(len(mail.outbox), 1)
@@ -1396,7 +1361,7 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Confirm small email only version is sent
         self.assertEqual(plaintext_body, "Body for small version")
@@ -1409,7 +1374,8 @@ class CustomBackendEmailTest(TestCase):
     def test_sending_no_small_only_email(self) -> None:
         """This test checks if an email address is not flagged with a small
         email only flag and we try to send an email with an attachment, the
-        normal email version is sent with its attachment.
+        normal email version is sent with its attachment, however, we store the
+        small email version in case we need it in the future.
         """
 
         email = EmailMultiAlternatives(
@@ -1442,11 +1408,21 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Confirm if normal email version is sent
         self.assertEqual(plaintext_body, "Body for attachment version")
         self.assertEqual(html_body, "<p>Body for attachment version</p>")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+
 
     @override_settings(
         EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
@@ -1488,7 +1464,7 @@ class CustomBackendEmailTest(TestCase):
         message = message_sent.message()
 
         # Extract body content from the message
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
 
         # Confirm if small email version is sent
         self.assertEqual(plaintext_body, "Body for small version")
@@ -1503,16 +1479,18 @@ class CustomBackendEmailTest(TestCase):
         a stored message.
         """
 
-        email = EmailMessage(
-            "This is the subject",
-            "Body goes here",
-            "testing@courtlistener.com",
-            ["success@simulator.amazonses.com"],
-            ["bcc_success@simulator.amazonses.com"],
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
-            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
-        email.send()
+        html = "<p>Body goes here</p>"
+        msg.attach_alternative(html, "text/html")
+        msg.send()
 
         # Confirm if email is sent
         self.assertEqual(len(mail.outbox), 1)
@@ -1523,15 +1501,17 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.get(message_id=message_id)
 
         # Compose and send the email based on the stored message
-        email = EmailMessage(
+        email = EmailMultiAlternatives(
             stored_email.subject,
-            stored_email.message,
+            stored_email.plain_text,
             stored_email.from_email,
             [stored_email.to],
             [stored_email.bcc],
             cc=[stored_email.cc],
             headers=stored_email.headers,
         )
+        html = stored_email.html_message
+        email.attach_alternative(html, "text/html")
         email.send()
 
         # Confirm if we have two stored messages
@@ -1544,10 +1524,11 @@ class CustomBackendEmailTest(TestCase):
         message_sent = mail.outbox[1]
         message = message_sent.message()
 
-        plaintext_body, html_body = self.get_email_body(message)
+        plaintext_body, html_body = get_email_body(message, small_version=False)
         # Compare second message sent with the original message content
         self.assertEqual(message_sent.subject, "This is the subject")
         self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["success@simulator.amazonses.com"])
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])

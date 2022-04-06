@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import transaction
 from django.utils.timezone import now
+from django.core.mail import SafeMIMEText, SafeMIMEMultipart
 
 from cl.users.models import (
     OBJECT_TYPES,
@@ -235,63 +236,74 @@ def convert_list_to_str(email_list: Iterable[str]) -> str:
     return ""
 
 
+def has_small_version(message: SafeMIMEText | SafeMIMEMultipart) -> bool:
+    """Function to check if a message has a small version available
+
+    :param message: The message to check
+    :return: True if the message has a small body version; otherwise False
+    """
+
+    # Check if the message contains a small version
+    for part in message.walk():
+        if (
+            part.get_content_type() == "text/plain_small"
+            or part.get_content_type() == "text/html_small"
+        ):
+            return True
+    return False
+
+
 def get_email_body(
-    message: EmailMessage | EmailMultiAlternatives,
-    plain: str,
-    html: str,
-) -> list[str]:
+    message: SafeMIMEText | SafeMIMEMultipart, small_version: bool
+) -> tuple[str, str]:
     """Function to retrieve html and plain body content of an email
 
     :param message: the message to extract the body content
-    :param plain: the plain content type we are looking for
-    :param html: the html content type we are looking for
-    :return: plaintext_body and html_body list of strings
+    :small_version: True if we need to extract the small body version,
+    False to return the normal body version.
+    :return: plaintext_body and html_body strings
     """
+
+    # Returns the content_type we need to extract
+    if small_version:
+        plain = "text/plain_small"
+        html = "text/html_small"
+    else:
+        plain = "text/plain"
+        html = "text/html"
+
     plaintext_body = ""
     html_body = ""
     for part in message.walk():
         if part.get_content_type() == plain:
             plaintext_body = part.get_payload()
-            if html_body:
-                break
+            break
+
+    for part in message.walk():
         if part.get_content_type() == html:
             html_body = part.get_payload()
-            if plaintext_body:
-                break
+            break
 
-    return [plaintext_body, html_body]
+    return plaintext_body, html_body
 
 
-def store_message(
-    from_email: str,
-    to: Iterable[str],
-    bcc: Iterable[str],
-    cc: Iterable[str],
-    reply_to: Iterable[str],
-    subject: str,
-    message: str,
-    html_message: str,
-    headers: dict,
-) -> str:
+def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """Stores an email message and returns its message_id, if the original
     message had attachments we store the small version without attachments
 
-    :param from_email: The from email address
-    :param to: The recipient email address
-    :param bcc: The bcc email address
-    :param cc: The cc email address
-    :param reply_to: The reply_to email address
-    :param subject: The email subject
-    :param message: The plain email body
-    :param html_message: The html email body
-    :param headers: The original headers
+    :param message: The  message to store
     :return message_id: The unique email message identifier
     """
-
-    to = convert_list_to_str(to)
-    cc = convert_list_to_str(cc)
-    bcc = convert_list_to_str(bcc)
-    reply_to = convert_list_to_str(reply_to)
+    subject = message.subject
+    from_email = message.from_email
+    to = convert_list_to_str(message.to)
+    bcc = convert_list_to_str(message.bcc)
+    cc = convert_list_to_str(message.cc)
+    reply_to = convert_list_to_str(message.reply_to)
+    headers = message.extra_headers
+    body_message = message.message()
+    small_version = has_small_version(body_message)
+    plain_body, html_body = get_email_body(body_message, small_version)
 
     # Look for the CL user by email address to assign it.
     user_email = User.objects.filter(email=to)
@@ -308,24 +320,32 @@ def store_message(
         cc=cc,
         reply_to=reply_to,
         subject=subject,
-        message=message,
-        html_message=html_message,
+        plain_text=plain_body,
+        html_message=html_body,
         headers=headers,
     )
     return email_stored.message_id
 
 
 def compose_message(
-    html_body: str,
-    plain_body: str,
-    from_email: str,
-    to: Iterable[str],
-    bcc: Iterable[str],
-    cc: Iterable[str],
-    reply_to: Iterable[str],
-    subject: str,
-    headers: dict,
-):
+    message: EmailMessage | EmailMultiAlternatives, small_version: bool
+) -> EmailMessage | EmailMultiAlternatives:
+    """Composes an email message according to the version needed and
+    available content_type
+
+    :param message: The  message to compose
+    :return message: Returns a EmailMessage or EmailMultiAlternatives message
+    """
+    subject = message.subject
+    from_email = message.from_email
+    to = message.to
+    bcc = message.bcc
+    cc = message.cc
+    reply_to = message.reply_to
+    headers = message.extra_headers
+    body_message = message.message()
+    plain_body, html_body = get_email_body(body_message, small_version)
+
     if html_body:
         if plain_body:
             email = EmailMultiAlternatives(
