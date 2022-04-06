@@ -1,5 +1,11 @@
+from collections.abc import Sequence
+
 from django.conf import settings
-from django.core.mail import get_connection
+from django.core.mail import (
+    EmailMessage,
+    EmailMultiAlternatives,
+    get_connection,
+)
 from django.core.mail.backends.base import BaseEmailBackend
 
 from cl.users.email_handlers import (
@@ -33,14 +39,18 @@ class EmailBackend(BaseEmailBackend):
     - Compose messages according to available content types
     """
 
-    def send_messages(self, email_messages):
+    def send_messages(
+        self,
+        email_messages: Sequence[EmailMessage | EmailMultiAlternatives],
+    ) -> int:
 
         if not email_messages:
-            return
+            return 0
         # Open a connection to the BASE_BACKEND set in settings (e.g: SES).
         base_backend = settings.BASE_BACKEND
         connection = get_connection(base_backend)
         connection.open()
+        msg_count = 0
         for email_message in email_messages:
             to = email_message.to
             message = email_message.message()
@@ -121,6 +131,8 @@ class EmailBackend(BaseEmailBackend):
             else:
                 # If not under backoff waiting period, continue sending.
                 email.send()
+                msg_count += 1
 
         # Close base backend connection
         connection.close()
+        return msg_count
