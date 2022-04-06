@@ -19,6 +19,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
+from cl.users.email_handlers import get_email_body
 from cl.users.factories import UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
@@ -28,7 +29,6 @@ from cl.users.models import (
     EmailSent,
     UserProfile,
 )
-from cl.users.email_handlers import get_email_body
 
 
 class UserTest(LiveServerTestCase):

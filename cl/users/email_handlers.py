@@ -3,10 +3,14 @@ from collections.abc import Iterable
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.core.mail import (
+    EmailMessage,
+    EmailMultiAlternatives,
+    SafeMIMEMultipart,
+    SafeMIMEText,
+)
 from django.db import transaction
 from django.utils.timezone import now
-from django.core.mail import SafeMIMEText, SafeMIMEMultipart
 
 from cl.users.models import (
     OBJECT_TYPES,
