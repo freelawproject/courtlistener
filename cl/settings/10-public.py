@@ -4,8 +4,32 @@ import re
 import sys
 from pathlib import Path
 
+import environ
 from django.contrib.messages import constants as message_constants
 from django.http import UnreadablePostError
+
+from cl.lib.redis_utils import make_redis_interface
+
+env = environ.Env(DEBUG=(bool, False), DEVELOPMENT=(bool, True))
+
+# Set the project base directory
+BASE_DIR = os.path.dirname(os.path.abspath("__file__"))
+
+# Take environment variables from .env file
+DEBUG = env("DEBUG")
+DEVELOPMENT = env("DEVELOPMENT")
+
+env_path = os.path.join(BASE_DIR, "cl", "settings", ".env")
+
+# Load the env files
+environ.Env.read_env(env_path)
+
+# AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
+# AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
+
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
 
 try:
     from judge_pics import judge_root
@@ -14,9 +38,6 @@ except ImportError:
     # Use random phrase to prevent access to root!
     judge_root = "/dummy-directory-john-stingily-granite/"
 
-from cl.lib.redis_utils import make_redis_interface
-
-TEST_RUNNER = "cl.tests.runner.TestRunner"
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"

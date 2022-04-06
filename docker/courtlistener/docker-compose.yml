@@ -39,8 +39,8 @@ services:
       - "8983:8983"
     # needs chmod 777
     volumes:
-      - ${CL_SOLR_CODE_DIR:-../../../../../courtlistener-solr-server}/data:/var/opt/solr/indices
-      - ${CL_SOLR_CODE_DIR:-../../../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
+      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/data:/var/opt/solr/indices
+      - ${CL_SOLR_CODE_DIR:-../../../courtlistener-solr-server}/solr/cores/:/etc/opt/solr:ro
     networks:
       - cl_net_overlay
 
@@ -59,6 +59,9 @@ services:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
   cl-django:
     container_name: cl-django
@@ -79,6 +82,9 @@ services:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
+    environment:
+       AWS_ACCESS_KEY_ID: ${AWS_S3_DEV_ACCESS_KEY_ID}
+       AWS_SECRET_ACCESS_KEY: ${AWS_S3_DEV_SECRET_ACCESS_KEY}
 
   cl-selenium:
     container_name: cl-selenium
@@ -110,6 +116,6 @@ services:
     container_name: "cl-judge-pics"
     volumes:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-    deploy:
-      restart_policy:
-        condition: none
+#    deploy:
+#      restart_policy:
+#        condition: none
