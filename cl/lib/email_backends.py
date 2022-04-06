@@ -1,5 +1,3 @@
-from threading import local
-
 from django.conf import settings
 from django.core.mail import get_connection
 from django.core.mail.backends.base import BaseEmailBackend
