@@ -62,6 +62,7 @@ from cl.recap.tasks import (
 )
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
+    Court,
     Docket,
     DocketEntry,
     OriginatingCourtInformation,
@@ -1750,6 +1751,7 @@ class IdbMergeTest(TestCase):
     def tearDown(self) -> None:
         FjcIntegratedDatabase.objects.all().delete()
         Docket.objects.all().delete()
+        Court.objects.all().delete()
 
     def test_merge_from_idb_chunk(self) -> None:
         """Can we successfully merge a chunk of IDB data?"""
