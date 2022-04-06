@@ -5,10 +5,10 @@ from django.core.mail import get_connection
 from django.core.mail.backends.base import BaseEmailBackend
 
 from cl.users.email_handlers import (
+    compose_message,
     convert_list_to_str,
     has_small_version,
     store_message,
-    compose_message,
 )
 from cl.users.models import OBJECT_TYPES, BackoffEvent, EmailFlag
 
