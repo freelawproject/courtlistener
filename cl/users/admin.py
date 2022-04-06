@@ -89,6 +89,7 @@ class EmailSentAdmin(admin.ModelAdmin):
         "subject",
         "date_created",
     )
+    raw_id_fields = ("user",)
 
 
 # Replace the normal User admin with our better one.
