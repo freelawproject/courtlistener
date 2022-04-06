@@ -83,7 +83,8 @@ jobs:
           cl/donate/utils.py \
           cl/tests/utils.py \
           cl/users/management/commands/cl_account_management.py \
-          cl/users/forms.py
+          cl/users/forms.py \
+          cl/users/email_handlers.py
 
       - name: Flynt f-string Formatter
         run: >
