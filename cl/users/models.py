@@ -314,7 +314,9 @@ class EmailSent(AbstractDateTimeModel):
         null=True,
     )
     message_id = models.UUIDField(
-        help_text="Message ID", default=uuid.uuid4, editable=False
+        help_text="Unique message identifier",
+        default=uuid.uuid4,
+        editable=False,
     )
     from_email = models.CharField(
         help_text="From email address", max_length=254
@@ -339,7 +341,7 @@ class EmailSent(AbstractDateTimeModel):
     )
     html_message = models.TextField(help_text="HTML Message Body", blank=True)
     headers = models.JSONField(
-        help_text="Email Headers", blank=True, null=True
+        help_text="Original email Headers", blank=True, null=True
     )
 
     class Meta:
