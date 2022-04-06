@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Sequence
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -230,13 +230,25 @@ def schedule_failed_email(recipient_email: str) -> None:
     pass
 
 
-def convert_list_to_str(email_list: Iterable[str]) -> str:
-    """Function to convert a list or tuple of email addresses to a string,
-    we only support storing one email address in an Email object.
+def convert_list_to_str(email_list: Sequence[str]) -> str:
+    """Return the first item of an iterable
+
+    Because we don't currently support more than one email address per message
+    in our EmailSent table, we always just grab the first one. If somebody
+    tries to send a message to multiple recipients, this method will raise an
+    exception.
+
+    :param email_list: A collection of email addresses (tuple, list, etc)
+    :raises NotImplemented exception if the collection has len > 1
+    :return str: The first email address in the collection
     """
     if email_list:
-        for email in email_list:
-            return email
+        email_count = len(email_list)
+        if email_count > 1:
+            raise NotImplementedError(
+                f"Too many email addresses provided: {email_count}"
+            )
+        return email_list[0]
     return ""
 
 
@@ -258,12 +270,13 @@ def has_small_version(message: SafeMIMEText | SafeMIMEMultipart) -> bool:
 
 
 def get_email_body(
-    message: SafeMIMEText | SafeMIMEMultipart, small_version: bool
+    message: SafeMIMEText | SafeMIMEMultipart,
+    small_version: bool,
 ) -> tuple[str, str]:
     """Function to retrieve html and plain body content of an email
 
     :param message: the message to extract the body content
-    :small_version: True if we need to extract the small body version,
+    :param small_version: True if we need to extract the small body version,
     False to return the normal body version.
     :return: plaintext_body and html_body strings
     """
@@ -310,14 +323,14 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     plain_body, html_body = get_email_body(body_message, small_version)
 
     # Look for the CL user by email address to assign it.
-    user_email = User.objects.filter(email=to)
-    if user_email.exists():
-        user_email = user_email[0]
+    users = User.objects.filter(email=to)
+    if users.exists():
+        user = users[0]
     else:
-        user_email = None
+        user = None
 
     email_stored = EmailSent.objects.create(
-        user=user_email,
+        user=user,
         from_email=from_email,
         to=to,
         bcc=bcc,
@@ -338,6 +351,7 @@ def compose_message(
     available content_type
 
     :param message: The  message to compose
+    :param small_version: Whether to use the small version of an email
     :return message: Returns a EmailMessage or EmailMultiAlternatives message
     """
     subject = message.subject
@@ -350,6 +364,7 @@ def compose_message(
     body_message = message.message()
     plain_body, html_body = get_email_body(body_message, small_version)
 
+    email: EmailMessage | EmailMultiAlternatives
     if html_body:
         if plain_body:
             email = EmailMultiAlternatives(
