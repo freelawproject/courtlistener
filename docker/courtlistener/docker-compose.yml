@@ -83,8 +83,8 @@ services:
     networks:
       - cl_net_overlay
     environment:
-       AWS_ACCESS_KEY_ID: ${AWS_S3_DEV_ACCESS_KEY_ID}
-       AWS_SECRET_ACCESS_KEY: ${AWS_S3_DEV_SECRET_ACCESS_KEY}
+       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
   cl-selenium:
     container_name: cl-selenium
