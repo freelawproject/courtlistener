@@ -60,6 +60,9 @@ services:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
   cl-django:
     container_name: cl-django
@@ -80,6 +83,9 @@ services:
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
+    environment:
+       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
 
   cl-selenium:
     container_name: cl-selenium

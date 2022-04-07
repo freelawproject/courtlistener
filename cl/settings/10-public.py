@@ -7,6 +7,9 @@ from pathlib import Path
 from django.contrib.messages import constants as message_constants
 from django.http import UnreadablePostError
 
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
 try:
     from judge_pics import judge_root
 except ImportError:
