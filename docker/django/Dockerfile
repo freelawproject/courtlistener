@@ -55,8 +55,12 @@ COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root && \
     poetry install --no-root --extras flp
 
-# will become mountpoint of our code
 WORKDIR /opt
+
+#Copy our code into development
+COPY . /opt/courtlistener
+COPY cl/settings/05-private.example /opt/courtlistener/cl/settings/05-private.py
+
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -66,4 +70,60 @@ RUN mkdir /var/log/courtlistener \
   && chown -R www-data:www-data /var/log/juriscraper/ \
   && mkdir -p /opt/courtlistener/cl/assets/static/
 
-CMD python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
+WORKDIR /opt/courtlistener
+
+# freelawproject/courtlistener:latest-celery
+FROM python-base as celery
+
+WORKDIR /usr/src/app
+
+## Needs to be two commands so second one can use variables from first.
+ENV \
+    CELERY_TASKS_DIR=/opt/courtlistener \
+    CELERY_USER_ID=33
+ENV \
+    PYTHONPATH="${PYTHONPATH}:${CELERY_TASKS_DIR}"
+
+USER ${CELERY_USER_ID}
+
+CMD celery \
+    --app=cl worker \
+    --loglevel=info \
+    --events \
+    --pool=prefork \
+    --hostname=prefork@%h \
+    --queues=${CELERY_QUEUES} \
+    --concurrency=${CELERY_PREFORK_CONCURRENCY:-0} \
+    --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
+
+
+#freelawproject/courtlistener-web-dev:latest
+FROM python-base as web-dev
+
+CMD python /opt/courtlistener/manage.py migrate && \
+    python /opt/courtlistener/manage.py createcachetable && \
+    python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
+
+#freelawproject/courtlistener-django:latest
+FROM python-base as web-prod
+
+CMD gunicorn cl_wsgi:application \
+    --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+    --user www-data \
+    --group www-data \
+    # Set high number of workers. Docs recommend 2-4× core count`
+    --workers ${NUM_WORKERS:-48} \
+    # Allow longer queries to solr.
+    --limit-request-line 6000 \
+    # Reset each worker once in a while
+    --max-requests 10000 \
+    --max-requests-jitter 100 \
+    --timeout 180 \
+    --bind 0.0.0.0:8000
+
+#freelawproject/courtlistener-scrape-rss:latest
+FROM python-base as rss-scraper
+
+USER www-data
+CMD /opt/courtlistener/manage.py scrape_rss
+

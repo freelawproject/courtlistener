@@ -43,12 +43,12 @@ jobs:
           path: courtlistener
       - name: Create the private settings file
         working-directory: courtlistener/cl/settings
-        run: cp 05-private.example 05-private.py
+        run: cp 05-private.example 06-private.py
       - name: Add AWS creds to settings
         working-directory: courtlistener/cl/settings
         run: |
-          echo "AWS_ACCESS_KEY_ID = '${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }}'" >> 05-private.py
-          echo "AWS_SECRET_ACCESS_KEY = '${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }}'" >> 05-private.py
+          echo "AWS_ACCESS_KEY_ID = '${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }}'" >> 06-private.py
+          echo "AWS_SECRET_ACCESS_KEY = '${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }}'" >> 06-private.py
 
       - name: Echo github actor name for debugging
         run: echo ${{ github.actor }}
@@ -78,15 +78,17 @@ jobs:
         with:
           file: docker/django/Dockerfile
           push: true
-          tags: localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}
+          target: web-dev
+          tags: localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
       - name: Build latest docker celery image
         uses: docker/build-push-action@v2
         with:
-          file: docker/task-server/Dockerfile
+          file: docker/django/Dockerfile
           push: true
-          tags: localhost:5000/freelawproject/task-server:${{ github.sha }}
+          target: celery
+          tags: localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache-celery
           cache-to: type=local,dest=/tmp/.buildx-cache-celery-new
 
@@ -97,8 +99,8 @@ jobs:
         working-directory: courtlistener/docker/courtlistener
         run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
-          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/task-server:${{ github.sha }}"
-          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener-django:${{ github.sha }}"
+          CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
+          DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
       - name: List docker images
         run: docker image ls -a --no-trunc
       - name: List docker container statuses
