@@ -5,14 +5,13 @@ volumes:
 services:
   cl-python:
     container_name: cl-python
-    image: freelawproject/courtlistener-django:latest
+    image: freelawproject/courtlistener:latest-web-prod
     depends_on:
       - cl-judge-pics
       - cl-selenium
     expose:
       - 8000
     volumes:
-      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
       - ${BULK_DIR:-/sata/}:/storage/
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     environment:
@@ -23,26 +22,11 @@ services:
     extra_hosts:
       - "localhost:192.168.0.122"
     restart: on-failure
-    command: >
-      bash -c "gunicorn cl_wsgi:application \
-        --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
-        --user www-data \
-        --group www-data \
-        `# Set high number of workers. Docs recommend 2-4× core count` \
-        --workers ${NUM_WORKERS:-48} \
-        `# Allow longer queries to solr.` \
-        --limit-request-line 6000 \
-        `# Reset each worker once in a while` \
-        --max-requests 10000 \
-        --max-requests-jitter 100 \
-        --timeout 180 \
-        --bind 0.0.0.0:8000"
 
   cl-scrape-rss:
     container_name: cl-scrape-rss
-    image: freelawproject/courtlistener-django:latest
+    image: freelawproject/courtlistener:latest-scrape-rss
     volumes:
-      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
       - ${BULK_DIR:-/sata/}:/storage/
       - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     logging:
@@ -51,7 +35,6 @@ services:
     extra_hosts:
       - "localhost:192.168.0.122"
     restart: on-failure
-    command: /opt/courtlistener/manage.py scrape_rss
 
   cl-ia-recap-uploader:
     container_name: cl-ia-recap-uploader

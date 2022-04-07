@@ -4,12 +4,12 @@
 REPO ?= freelawproject/courtlistener
 
 # The various tags available
-DOCKER_TAG = $(shell head -1 docker/django/version.txt)
-CELERY_TAG = $(shell head -1 docker/task-server/version.txt)
+DOCKER_TAG = $(shell head -1 docker/django/version.txt)-web
+CELERY_TAG = $(shell head -1 docker/task-server/version.txt)-celery
 WEB_PROD ?= latest-web-prod
 WEB_DEV ?= latest-web-dev
 CELERY_LATEST ?= latest-celery
-RSS_TAG ?= latest-rss-scraper
+RSS_TAG ?= latest-scrape-rss
 
 .PHONY: all image push multiarch_image multiarch_push x86_image x86_push
 
@@ -18,11 +18,11 @@ UNAME := $(shell uname -m)
 all: image
 
 development:
-	docker build --target web-dev -t $(REPO):$(DOCKER_TAG) -t $(REPO):$(WEB_DEV) --file docker/django/Dockerfile .
+	docker build --target web-dev -t $(REPO):$(DOCKER_TAG)-dev -t $(REPO):$(WEB_DEV) --file docker/django/Dockerfile .
 	docker build --target celery -t $(REPO):$(CELERY_TAG) -t $(REPO):$(CELERY_LATEST) --file docker/django/Dockerfile .
 
 image:
-	docker build --target web-prod -t $(REPO):$(DOCKER_TAG) -t $(REPO):$(WEB_PROD) --file docker/django/Dockerfile .
+	docker build --target web-prod -t $(REPO):$(DOCKER_TAG)-prod -t $(REPO):$(WEB_PROD) --file docker/django/Dockerfile .
 	docker build --target celery -t $(REPO):$(CELERY_TAG) -t $(REPO):$(CELERY_LATEST) --file docker/django/Dockerfile .
 	docker build --target rss-scraper -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
 
@@ -30,7 +30,7 @@ push: image
 	$(info Checking if valid architecture)
 	@if [ $(UNAME) = "x86_64" ]; then \
 	    echo "Architecture is OK. Pushing.";\
-	    docker push $(REPO):$(DOCKER_TAG);\
+	    docker push $(REPO):$(DOCKER_TAG)-prod;\
 	    docker push $(REPO):$(WEB_PROD);\
 	    docker push $(REPO):$(CELERY_TAG);\
 	    docker push $(REPO):$(CELERY_LATEST);\
@@ -45,12 +45,12 @@ multiarch_image:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
 	$(DOCKER) buildx rm
 	$(DOCKER) buildx create --use --name flp-builder
-	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG) --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG)-prod --file docker/django/Dockerfile .
 	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 
 multiarch_push:
-	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG) --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG)-prod --file docker/django/Dockerfile .
 	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
 
@@ -58,6 +58,6 @@ x86_push:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
 	$(DOCKER) buildx rm
 	$(DOCKER) buildx create --use --name flp-builder
-	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(DOCKER_TAG) --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG)-prod --file docker/django/Dockerfile .
+	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .

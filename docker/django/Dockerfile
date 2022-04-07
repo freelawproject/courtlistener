@@ -97,14 +97,14 @@ CMD celery \
     --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
 
 
-#freelawproject/courtlistener-web-dev:latest
+#freelawproject/courtlistener:latest-web-dev
 FROM python-base as web-dev
 
 CMD python /opt/courtlistener/manage.py migrate && \
     python /opt/courtlistener/manage.py createcachetable && \
     python /opt/courtlistener/manage.py runserver 0.0.0.0:8000
 
-#freelawproject/courtlistener-django:latest
+#freelawproject/courtlistener:latest-web-prod
 FROM python-base as web-prod
 
 CMD gunicorn cl_wsgi:application \
@@ -121,7 +121,7 @@ CMD gunicorn cl_wsgi:application \
     --timeout 180 \
     --bind 0.0.0.0:8000
 
-#freelawproject/courtlistener-scrape-rss:latest
+#freelawproject/courtlistener:latest-scrape-rss
 FROM python-base as rss-scraper
 
 USER www-data
