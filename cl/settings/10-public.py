@@ -272,6 +272,9 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 if DEVELOPMENT:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# Max email attachment to send in bytes, 350KB
+MAX_ATTACHMENT_SIZE = 350_000
+
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_ALERTS_EMAIL = "CourtListener Alerts <alerts@courtlistener.com>"
