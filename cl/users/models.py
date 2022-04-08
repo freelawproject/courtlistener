@@ -326,21 +326,25 @@ class EmailSent(AbstractDateTimeModel):
         models.CharField(max_length=254),
         help_text="List of email recipients",
         blank=True,
+        null=True,
     )
     bcc = ArrayField(
         models.CharField(max_length=254),
         help_text="List of BCC emails addresses",
         blank=True,
+        null=True,
     )
     cc = ArrayField(
         models.CharField(max_length=254),
         help_text="List of CC emails addresses",
         blank=True,
+        null=True,
     )
     reply_to = ArrayField(
         models.CharField(max_length=254),
         help_text="List of Reply to emails addresses",
         blank=True,
+        null=True,
     )
     subject = models.TextField(help_text="Subject", blank=True)
     plain_text = models.TextField(
