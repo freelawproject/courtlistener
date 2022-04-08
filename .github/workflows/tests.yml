@@ -92,8 +92,10 @@ jobs:
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker compose
         working-directory: courtlistener/docker/courtlistener
-        run: AWS_ACCESS_KEY_ID=${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }} docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
+        run: docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }}
           CELERY_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}"
           DJANGO_DOCKER_IMAGE: "localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}"
       - name: List docker images
