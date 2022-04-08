@@ -1,7 +1,17 @@
-# `python-base` sets up all our shared environment variables
-FROM python:3.10-slim as python-base
+ARG BUILD_ENV=prod
+FROM python:3.10-slim as build-dev
+ONBUILD COPY . /opt/courtlistener
 
-    # Let python output be fast
+FROM python:3.10-slim as build-prod
+ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
+WORKDIR /opt
+RUN tar xvfz courtlistener.tar.gz
+RUN mv /opt/courtlistener-main /opt/courtlistener
+RUN rm -r /opt/courtlistener.tar.gz
+
+# `python-base` sets up all our shared environment variables
+FROM build-${BUILD_ENV} as python-base
+
 ENV PYTHONUNBUFFERED=1 \
     \
     # pip
@@ -58,9 +68,7 @@ RUN poetry install --no-root && \
 WORKDIR /opt
 
 #Copy our code into development
-COPY . /opt/courtlistener
 COPY cl/settings/05-private.example /opt/courtlistener/cl/settings/05-private.py
-
 
 # We log to stdout by default, but we have a config for logging here. Even if
 # we don't use this logger, we need to have the file or else Python is unhappy.
@@ -74,8 +82,6 @@ WORKDIR /opt/courtlistener
 
 # freelawproject/courtlistener:latest-celery
 FROM python-base as celery
-
-WORKDIR /usr/src/app
 
 ## Needs to be two commands so second one can use variables from first.
 ENV \

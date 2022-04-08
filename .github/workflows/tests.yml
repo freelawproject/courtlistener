@@ -74,6 +74,8 @@ jobs:
           file: docker/django/Dockerfile
           push: true
           target: web-dev
+          build-args: |
+            BUILD_ENV=dev
           tags: localhost:5000/freelawproject/courtlistener:latest-web-dev-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
@@ -83,6 +85,8 @@ jobs:
           file: docker/django/Dockerfile
           push: true
           target: celery
+          build-args: |
+            BUILD_ENV=dev
           tags: localhost:5000/freelawproject/courtlistener:latest-celery-${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache-celery
           cache-to: type=local,dest=/tmp/.buildx-cache-celery-new
