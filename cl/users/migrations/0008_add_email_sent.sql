@@ -2,7 +2,7 @@ BEGIN;
 --
 -- Create model EmailSent
 --
-CREATE TABLE "users_emailsent" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "message_id" uuid NOT NULL, "from_email" varchar(254) NOT NULL, "to" varchar(254) NOT NULL, "bcc" varchar(254) NOT NULL, "cc" varchar(254) NOT NULL, "reply_to" varchar(254) NOT NULL, "subject" text NOT NULL, "plain_text" text NOT NULL, "html_message" text NOT NULL, "headers" jsonb NULL, "user_id" integer NULL);
+CREATE TABLE "users_emailsent" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "message_id" uuid NOT NULL, "from_email" varchar(300) NOT NULL, "to" varchar(254)[] NOT NULL, "bcc" varchar(254)[] NOT NULL, "cc" varchar(254)[] NOT NULL, "reply_to" varchar(254)[] NOT NULL, "subject" text NOT NULL, "plain_text" text NOT NULL, "html_message" text NOT NULL, "headers" jsonb NULL, "user_id" integer NULL);
 --
 -- Create index users_email_message_f49e38_idx on field(s) message_id of model emailsent
 --

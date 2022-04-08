@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from datetime import timedelta
+from email.utils import parseaddr
 
 from django.contrib.auth.models import User
 from django.core.mail import (
@@ -230,28 +231,6 @@ def schedule_failed_email(recipient_email: str) -> None:
     pass
 
 
-def convert_list_to_str(email_list: Sequence[str]) -> str:
-    """Return the first item of an iterable
-
-    Because we don't currently support more than one email address per message
-    in our EmailSent table, we always just grab the first one. If somebody
-    tries to send a message to multiple recipients, this method will raise an
-    exception.
-
-    :param email_list: A collection of email addresses (tuple, list, etc)
-    :raises NotImplemented exception if the collection has len > 1
-    :return str: The first email address in the collection
-    """
-    if email_list:
-        email_count = len(email_list)
-        if email_count > 1:
-            raise NotImplementedError(
-                f"Too many email addresses provided: {email_count}"
-            )
-        return email_list[0]
-    return ""
-
-
 def has_small_version(message: SafeMIMEText | SafeMIMEMultipart) -> bool:
     """Function to check if a message has a small version available
 
@@ -304,6 +283,25 @@ def get_email_body(
     return plaintext_body, html_body
 
 
+def normalize_addresses(email_list: Sequence[str]) -> list[str]:
+    """Takes a collection of email addresses and returns a list of the
+    normalized email addresses.
+    e.g: ["Admin User <success@simulator.amazonses.com>"] turns to
+    ["success@simulator.amazonses.com"]
+
+    :param email_list: A collection of email addresses (tuple, list, etc)
+    :return list[str]: A list with the normalized email addresses
+    """
+
+    normalized_addresses = []
+    for email in email_list:
+        raw_address = parseaddr(email)
+        # parseaddr returns a 2-tuple of ('realname', 'email'), selects email.
+        normalized_addresses.append(raw_address[1])
+
+    return normalized_addresses
+
+
 def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """Stores an email message and returns its message_id, if the original
     message had attachments we store the small version without attachments
@@ -313,19 +311,23 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """
     subject = message.subject
     from_email = message.from_email
-    to = convert_list_to_str(message.to)
-    bcc = convert_list_to_str(message.bcc)
-    cc = convert_list_to_str(message.cc)
-    reply_to = convert_list_to_str(message.reply_to)
+    to = normalize_addresses(message.to)
+    bcc = normalize_addresses(message.bcc)
+    cc = normalize_addresses(message.cc)
+    reply_to = normalize_addresses(message.reply_to)
     headers = message.extra_headers
     body_message = message.message()
     small_version = has_small_version(body_message)
     plain_body, html_body = get_email_body(body_message, small_version)
 
     # Look for the CL user by email address to assign it.
-    users = User.objects.filter(email=to)
-    if users.exists():
-        user = users[0]
+    # We only try to assign the message to an user if is a unique recipient
+    if len(to) == 1:
+        users = User.objects.filter(email=to[0])
+        if users.exists():
+            user = users[0]
+        else:
+            user = None
     else:
         user = None
 
@@ -402,3 +404,53 @@ def compose_message(
             headers=headers,
         )
     return email
+
+
+def under_backoff_waiting_period(email_address: str) -> bool:
+    """Returns True if the provided email address is under a backoff waiting
+    period, otherwise False.
+
+    :param email_address: The email address to verify
+    :return bool: True if the email address is under a waiting period, if not
+    False
+    """
+    backoff_event = BackoffEvent.objects.filter(
+        email_address=email_address,
+    ).first()
+    if backoff_event.under_waiting_period if backoff_event else False:
+        return True
+    return False
+
+
+def is_not_email_banned(email_address: str) -> bool:
+    """Returns True if the email address provided is not banned, otherwise
+    False.
+
+    :param email_address: The email address to verify
+    :return bool: True if the email address is not banned, otherwise False
+    """
+    banned_email = EmailFlag.objects.filter(
+        email_address=email_address,
+        object_type=OBJECT_TYPES.BAN,
+    )
+    if not banned_email.exists():
+        return True
+    return False
+
+
+def is_small_only_flagged(email_address: str) -> bool:
+    """Returns True if the email address is small email only flagged,
+    otherwise False.
+
+    :param email_address: The email address to verify
+    :return bool: True if the email address is small email only flagged,
+    if not False
+    """
+    small_only = EmailFlag.objects.filter(
+        email_address=email_address,
+        object_type=OBJECT_TYPES.FLAG,
+        flag=EmailFlag.SMALL_ONLY,
+    )
+    if small_only.exists():
+        return True
+    return False

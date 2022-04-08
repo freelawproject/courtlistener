@@ -19,7 +19,7 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.email_handlers import get_email_body
+from cl.users.email_handlers import get_email_body, normalize_addresses
 from cl.users.factories import UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
@@ -919,12 +919,18 @@ class CustomBackendEmailTest(TestCase):
                 test_dir / "general_soft_bounce.json", encoding="utf-8"
             ) as soft_bounce,
             open(
+                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
+            ) as general_soft_bounce_2,
+            open(
                 test_dir / "msg_large_bounce.json", encoding="utf-8"
             ) as large_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.soft_bounce_asset = json.load(soft_bounce)
+            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
             cls.soft_bounce_msg_large_asset = json.load(large_bounce)
+            cls.complaint_asset = json.load(complaint)
 
         cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
         cls.attachment_500 = test_dir / "file_example_500kB.pdf"
@@ -971,7 +977,9 @@ class CustomBackendEmailTest(TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
         self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
 
@@ -1019,16 +1027,18 @@ class CustomBackendEmailTest(TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
         self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(
-            stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
+            stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
         self.assertEqual(
-            stored_email[0].cc, "cc_success@simulator.amazonses.com"
+            stored_email[0].cc, ["cc_success@simulator.amazonses.com"]
         )
         self.assertEqual(
-            stored_email[0].reply_to, "reply_success@simulator.amazonses.com"
+            stored_email[0].reply_to, ["reply_success@simulator.amazonses.com"]
         )
         self.assertEqual(
             stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
@@ -1077,14 +1087,16 @@ class CustomBackendEmailTest(TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].to, "success@simulator.amazonses.com")
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
         self.assertEqual(stored_email[0].plain_text, "Body goes here")
         self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
         self.assertEqual(
-            stored_email[0].bcc, "bcc_success@simulator.amazonses.com"
+            stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
         self.assertEqual(
-            stored_email[0].cc, "cc_success@simulator.amazonses.com"
+            stored_email[0].cc, ["cc_success@simulator.amazonses.com"]
         )
         self.assertEqual(
             stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
@@ -1516,6 +1528,7 @@ class CustomBackendEmailTest(TestCase):
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
+            reply_to=["reply_success@simulator.amazonses.com"],
             headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
         html = "<p>Body goes here</p>"
@@ -1535,9 +1548,10 @@ class CustomBackendEmailTest(TestCase):
             stored_email.subject,
             stored_email.plain_text,
             stored_email.from_email,
-            [stored_email.to],
-            [stored_email.bcc],
-            cc=[stored_email.cc],
+            stored_email.to,
+            stored_email.bcc,
+            cc=stored_email.cc,
+            reply_to=stored_email.reply_to,
             headers=stored_email.headers,
         )
         html = stored_email.html_message
@@ -1563,5 +1577,465 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(html_body, "<p>Body goes here</p>")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["success@simulator.amazonses.com"])
+        self.assertEqual(
+            message_sent.bcc, ["bcc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            message_sent.cc, ["cc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            message_sent.reply_to, ["reply_success@simulator.amazonses.com"]
+        )
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
+
+    def test_normalize_addresses(self) -> None:
+        """Test if the normalize_addresses function parses and normalizes
+        properly different combinations of list recipients, returns a list of
+        normalized email addresses.
+        """
+        test_cases = (
+            (
+                [
+                    "success@simulator.amazonses.com",
+                    "bounce@simulator.amazonses.com",
+                    "complaint@simulator.amazonses.com",
+                ],
+                [
+                    "success@simulator.amazonses.com",
+                    "bounce@simulator.amazonses.com",
+                    "complaint@simulator.amazonses.com",
+                ],
+            ),
+            (
+                [
+                    "Admin User <success_1@simulator.amazonses.com>",
+                    "New User <bounce_1@simulator.amazonses.com>",
+                    "complaint_1@simulator.amazonses.com",
+                ],
+                [
+                    "success_1@simulator.amazonses.com",
+                    "bounce_1@simulator.amazonses.com",
+                    "complaint_1@simulator.amazonses.com",
+                ],
+            ),
+            (
+                [
+                    "<success_2@simulator.amazonses.com>",
+                    "<bounce_2@simulator.amazonses.com>",
+                    "complaint_2@simulator.amazonses.com",
+                ],
+                [
+                    "success_2@simulator.amazonses.com",
+                    "bounce_2@simulator.amazonses.com",
+                    "complaint_2@simulator.amazonses.com",
+                ],
+            ),
+            (
+                ["success@simulator.amazonses.com"],
+                ["success@simulator.amazonses.com"],
+            ),
+            ([], []),
+        )
+
+        for test, result in test_cases:
+            normalized_emails = normalize_addresses(test)
+            self.assertEqual(normalized_emails, result)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_email(self) -> None:
+        """Test if we can send a message to multiple recipients, bcc, cc, and
+        reply_to email addresses.
+
+        We should store recipients, bcc, cc, and reply_to as a list of
+        normalized email addresses.
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+                "bounce@simulator.amazonses.com",
+                "<complaint@simulator.amazonses.com>",
+            ],
+            ["BCC User <bcc@example.com>", "bcc@example.com"],
+            cc=["CC User <cc@example.com>", "cc@example.com"],
+            reply_to=["Reply User <another@example.com>", "reply@example.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        self.assertEqual(
+            message_sent.from_email, "User Admin <testing@courtlistener.com>"
+        )
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+        self.assertEqual(
+            message_sent.bcc, ["BCC User <bcc@example.com>", "bcc@example.com"]
+        )
+        self.assertEqual(
+            message_sent.cc, ["CC User <cc@example.com>", "cc@example.com"]
+        )
+        self.assertEqual(
+            message_sent.reply_to,
+            ["Reply User <another@example.com>", "reply@example.com"],
+        )
+
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body goes here")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(
+            stored_email[0].from_email,
+            "User Admin <testing@courtlistener.com>",
+        )
+        self.assertEqual(
+            stored_email[0].to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+        self.assertEqual(
+            stored_email[0].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
+        self.assertEqual(
+            stored_email[0].cc, ["cc@example.com", "cc@example.com"]
+        )
+        self.assertEqual(
+            stored_email[0].reply_to,
+            ["another@example.com", "reply@example.com"],
+        )
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_banned_email(self) -> None:
+        """When sending an email to multiple recipients we verify if each
+        recipient is not banned, we remove the banned email addresses from
+        the list of recipients to avoid sending email to those addresses
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Send only to no banned email addresses
+        message_sent = mail.outbox[0]
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_all_banned(self) -> None:
+        """When sending an email to multiple recipients and all of them are
+        banned, we discard the message, we don't send and store it.
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+        # Confirm if email is not stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 0)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_small_email_only(self) -> None:
+        """When sending an email to multiple recipients, if at least one of
+        the recipients requires a small version, we send the small email only
+        version for all recipients.
+        """
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=[
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        # Attach file and small email version
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm not attachment is sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Confirm we sent it to all recipients
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm small email only version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_no_small_email_only(self) -> None:
+        """When sending an email to multiple recipients and the message
+        has a small version but none of the recipients are small_email_only
+        flagged, we send the normal email version with attachments.
+        """
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=[
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body for attachment version")
+        self.assertEqual(html_body, "<p>Body for attachment version</p>")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+        self.assertEqual(
+            stored_email[0].to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_within_backoff(self) -> None:
+        """When sending an email to multiple recipients, if we detect an email
+        address that is under a backoff waiting period we should eliminate
+        that address from the recipient list to avoid sending to it
+        and queue for sending later.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "success_back@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint_back@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Send only to addresses that are not under a backoff waiting period
+        message_sent = mail.outbox[0]
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success_back@simulator.amazonses.com",
+                "complaint_back@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+    @override_settings(
+        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_sending_multiple_recipients_all_within_backoff(self) -> None:
+        """When sending an email to multiple recipients, if we detect that all
+        email addresses are under a backoff waiting period we don't send the
+        message, we should store the message.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset_2, "bounce", signals.bounce_received
+        )
+        msg_count = send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "bounce@simulator.amazonses.com",
+                "soft_bounce@simulator.amazonses.com",
+            ],
+        )
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(msg_count, 0)
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)

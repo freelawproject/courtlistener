@@ -10,11 +10,13 @@ from django.core.mail.backends.base import BaseEmailBackend
 
 from cl.users.email_handlers import (
     compose_message,
-    convert_list_to_str,
     has_small_version,
+    is_not_email_banned,
+    is_small_only_flagged,
+    normalize_addresses,
     store_message,
+    under_backoff_waiting_period,
 )
-from cl.users.models import OBJECT_TYPES, BackoffEvent, EmailFlag
 
 
 class EmailBackend(BaseEmailBackend):
@@ -52,18 +54,18 @@ class EmailBackend(BaseEmailBackend):
         connection.open()
         msg_count = 0
         for email_message in email_messages:
-            to = email_message.to
             message = email_message.message()
+            original_recipients = normalize_addresses(email_message.to)
+            recipient_list = []
 
-            # Verify if the recipient's email address is banned.
-            banned_email = EmailFlag.objects.filter(
-                email_address=convert_list_to_str(to),
-                object_type=OBJECT_TYPES.BAN,
-            )
-            if banned_email.exists():
+            # Verify a recipient's email address is banned.
+            for email_address in original_recipients:
+                if is_not_email_banned(email_address):
+                    recipient_list.append(email_address)
+
+            # If all recipients are banned, the message is discarded
+            if not recipient_list:
                 continue
-            # If the recipient's email address is not banned continue,
-            # otherwise the message is discarded.
 
             # Compute attachments total size in bytes
             attachment_size = 0
@@ -75,17 +77,17 @@ class EmailBackend(BaseEmailBackend):
 
             small_version = has_small_version(message)
             if small_version:
-                # If the message has a small version
-                small_only = EmailFlag.objects.filter(
-                    email_address=convert_list_to_str(to),
-                    object_type=OBJECT_TYPES.FLAG,
-                    flag=EmailFlag.SMALL_ONLY,
-                )
+                # Check if at least one recipient is small_email_only flagged
+                send_small = False
+                for email_address in recipient_list:
+                    if is_small_only_flagged(email_address):
+                        send_small = True
+                        break
                 if (
-                    small_only.exists()
+                    send_small
                     or attachment_size > settings.MAX_ATTACHMENT_SIZE
                 ):
-                    # If email address is small_only_email flagged or
+                    # If at least one recipient is small_only_email flagged or
                     # attachments exceed the MAX_ATTACHMENT_SIZE
 
                     # Compose small messages without attachments
@@ -95,8 +97,8 @@ class EmailBackend(BaseEmailBackend):
                     # If not small flag or not file size limit exceeded
                     # get rid of small version
 
-                    # Compose normal messages with attachments
-                    # according to available content types.
+                    # Compose normal messages with attachments according to
+                    # available content types.
                     # Discard text/plain_small and text/html_small
                     # content types.
                     email = compose_message(email_message, small_version=False)
@@ -107,29 +109,38 @@ class EmailBackend(BaseEmailBackend):
                             attachment[0], attachment[1], attachment[2]
                         )
             else:
-                # If not small version, send original message.
+                # If no small version is available, send the original message
                 email = email_message
 
-            # Use base backend connection to send the message
-            email.connection = connection
+            # Verify if email addresses are under a backoff waiting period
+            final_recipient_list = []
+            backoff_recipient_list = []
+            for email_address in recipient_list:
+                if under_backoff_waiting_period(email_address):
+                    # If a email address is under a waiting period
+                    # add to a backoff recipient list to queue the message
+                    backoff_recipient_list.append(email_address)
+                else:
+                    # If a email address is not under a waiting period
+                    # add to the final recipients list
+                    final_recipient_list.append(email_address)
+
+            if backoff_recipient_list:
+                # TODO QUEUE email
+                pass
 
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
             stored_id = store_message(email_message)
             # Add header with unique message_id to identify message
             email.extra_headers["X-CL-ID"] = stored_id
+            # Use base backend connection to send the message
+            email.connection = connection
 
-            # Verify if recipient email address is under a backoff event
-            backoff_event = BackoffEvent.objects.filter(
-                email_address=convert_list_to_str(to),
-            ).first()
-
-            # If backoff event exists, check if it's under waiting period
-            if backoff_event.under_waiting_period if backoff_event else False:
-                # TODO QUEUE email
-                pass
-            else:
-                # If not under backoff waiting period, continue sending.
+            # If we have recipients to send the message to, we send it.
+            if final_recipient_list:
+                # Update message with the final recipient list
+                email.to = final_recipient_list
                 email.send()
                 msg_count += 1
 

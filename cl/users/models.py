@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Dict
 
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
@@ -319,21 +320,27 @@ class EmailSent(AbstractDateTimeModel):
         editable=False,
     )
     from_email = models.CharField(
-        help_text="From email address", max_length=254
+        help_text="From email address", max_length=300
     )
-    to = models.CharField(
-        help_text="Recipient email address",
-        max_length=254,
+    to = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of email recipients",
         blank=True,
     )
-    bcc = models.CharField(
-        help_text="BCC email address", max_length=254, blank=True
+    bcc = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of BCC emails addresses",
+        blank=True,
     )
-    cc = models.CharField(
-        help_text="CC email address", max_length=254, blank=True
+    cc = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of CC emails addresses",
+        blank=True,
     )
-    reply_to = models.CharField(
-        help_text="Reply to address", max_length=254, blank=True
+    reply_to = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of Reply to emails addresses",
+        blank=True,
     )
     subject = models.TextField(help_text="Subject", blank=True)
     plain_text = models.TextField(
