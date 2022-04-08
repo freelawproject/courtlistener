@@ -553,16 +553,6 @@ LOGGING = {
             "formatter": "simple",
             "filters": ["skip_unreadable_posts"],
         },
-        # Use this if you're not yet dockerized. If dockerized, the stream
-        # handler will send everything to stdout, which is what you want.
-        "log_file": {
-            "level": "DEBUG",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "/var/log/courtlistener/django.log",
-            "maxBytes": 16777216,  # 16 megabytes
-            "formatter": "verbose",
-            "filters": ["skip_unreadable_posts"],
-        },
         "django.server": {
             "level": "INFO",
             "class": "logging.StreamHandler",
