@@ -130,13 +130,6 @@ DOCTOR_HOST = "http://cl-doctor:5050"
 DISCLOSURE_HOST = "http://cl-disclosures:5050"
 
 
-#########
-# Email #
-#########
-EMAIL_BACKEND = "cl.lib.email_backends.EmailBackend"
-BASE_BACKEND = "django_ses.SESBackend"
-
-
 ##########
 # Sentry #
 ##########

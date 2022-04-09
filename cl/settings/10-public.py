@@ -271,6 +271,11 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 #########
 if DEVELOPMENT:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = "cl.lib.email_backends.EmailBackend"
+    BASE_BACKEND = "django_ses.SESBackend"
+    AWS_SES_REGION_NAME = "us-west-2"
+    AWS_SES_REGION_ENDPOINT = "email.us-west-2.amazonaws.com"
 
 # Max email attachment to send in bytes, 350KB
 MAX_ATTACHMENT_SIZE = 350_000
