@@ -22,8 +22,7 @@ def view_person(request, pk, slug):
 
     title = make_title_str(person)
 
-    # img_path = make_person_picture_path(person)
-    img_path = portrait(person.id, ImageSizes.large)
+    img_path = portrait(person.id, ImageSizes.LARGE)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the

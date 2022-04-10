@@ -1031,7 +1031,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "judge-pics"
-version = "2.0.0"
+version = "2.0.1"
 description = "Database of Judge Pictures"
 category = "main"
 optional = false
@@ -2057,7 +2057,7 @@ flp = ["reporters-db", "juriscraper", "judge-pics"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "f17cdd247bed565feeadf5502216360a24ee49c479aa2564e42c95b35f13dcc6"
+content-hash = "bad0c8a174c2af65ad1caf6273cf675dd9741779614bda4451c1573a3bda56ed"
 
 [metadata.files]
 amqp = [
@@ -2489,8 +2489,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 judge-pics = [
-    {file = "judge-pics-2.0.0.tar.gz", hash = "sha256:f835cbe06a522a259ab920cda3cf29412c3c82ac714b8ba0b18472e4965770b3"},
-    {file = "judge_pics-2.0.0-py2.py3-none-any.whl", hash = "sha256:0c2efdd7357de7cfce4ab6b180ef3bf15c3e20a30c8097d8f86dea79ff862b39"},
+    {file = "judge-pics-2.0.1.tar.gz", hash = "sha256:b4dd5f4d342a94de804c3074d493c5a0ae23a7189516a437373bfead0e619b86"},
+    {file = "judge_pics-2.0.1-py2.py3-none-any.whl", hash = "sha256:0110199555bca735275cc98b07820149081a503f431778ec735649d4dfc8c104"},
 ]
 juriscraper = [
     {file = "juriscraper-2.4.10-py27-none-any.whl", hash = "sha256:52320a5e468cd7e534a113c1a18420bf2219c14021623ab7991799af1ac32ec6"},
