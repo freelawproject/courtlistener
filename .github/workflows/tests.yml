@@ -18,8 +18,7 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
-#        tag_flags: ["--exclude-tag selenium", "--tag selenium"]
-        tag_flags: ["--exclude-tag selenium"]
+        tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
         uses: actions/checkout@v2-beta
