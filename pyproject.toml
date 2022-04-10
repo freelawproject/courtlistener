@@ -31,6 +31,7 @@ beautifulsoup4 = "==4.9.*"
 boto3 = "^1.17.19"
 celery = "^4.3.0"
 certifi = "^2020.12.5"
+climage = "^0.1.3"
 courts-db = "^0.10.0"
 disposable-email-domains = "*"
 Django = "^3.2"
@@ -52,6 +53,7 @@ httplib2 = "*"
 internetarchive = "*"
 ipaddress = "^1.0.16"
 itypes = "^1.1.0"
+judge-pics = "^2.0.0"
 kombu = "^4.6.4"
 lxml = "==4.*"
 markdown2 = "==2.4.*"
@@ -117,7 +119,7 @@ django-stubs = "^1.9.0"
 djangorestframework-stubs = "^1.4.0"
 
 [tool.poetry.extras]
-flp = ["reporters-db", "juriscraper"]
+flp = ["reporters-db", "juriscraper", "judge-pics"]
 
 [tool.black]
 include = '''

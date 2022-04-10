@@ -279,6 +279,18 @@ python-versions = ">=3.6"
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
+name = "climage"
+version = "0.1.3"
+description = "Convert images to beautiful ANSI escape codes"
+category = "main"
+optional = false
+python-versions = ">=3.2"
+
+[package.dependencies]
+kdtree = "*"
+Pillow = "*"
+
+[[package]]
 name = "colorama"
 version = "0.4.4"
 description = "Cross-platform colored terminal text."
@@ -1018,6 +1030,20 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
+name = "judge-pics"
+version = "2.0.0"
+description = "Database of Judge Pictures"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+climage = "*"
+lxml = ">=4.0,<5.0"
+python-dateutil = ">=2.0,<3.0"
+requests = ">=2.0,<3.0"
+
+[[package]]
 name = "juriscraper"
 version = "2.4.10"
 description = "An API to scrape American court websites for metadata."
@@ -1039,6 +1065,14 @@ python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0-alpha-6"
 tldextract = "*"
+
+[[package]]
+name = "kdtree"
+version = "0.16"
+description = "A Python implemntation of a kd-tree"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "kombu"
@@ -2018,12 +2052,12 @@ optional = false
 python-versions = "*"
 
 [extras]
-flp = ["reporters-db", "juriscraper"]
+flp = ["reporters-db", "juriscraper", "judge-pics"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "f91df1595f933994fb2c78653dabdcc83c7751aa2ac426d6bec1ac6edfa6bdc7"
+content-hash = "f17cdd247bed565feeadf5502216360a24ee49c479aa2564e42c95b35f13dcc6"
 
 [metadata.files]
 amqp = [
@@ -2192,6 +2226,10 @@ chardet = [
 click = [
     {file = "click-8.0.1-py3-none-any.whl", hash = "sha256:fba402a4a47334742d782209a7c79bc448911afe1149d07bdabdf480b3e2f4b6"},
     {file = "click-8.0.1.tar.gz", hash = "sha256:8c04c11192119b1ef78ea049e0a6f0463e4c48ef00a30160c704337586f3ad7a"},
+]
+climage = [
+    {file = "climage-0.1.3-py3-none-any.whl", hash = "sha256:fa8bf7c18c31f713f74cba6f86c2ee43e81386ab8b094a9095bd06dc73287dc9"},
+    {file = "climage-0.1.3.tar.gz", hash = "sha256:3edb2bdf828093bfa1766c7878bbc29e058f3047ad5f1a63d75da48d50d9aaee"},
 ]
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
@@ -2450,9 +2488,17 @@ jsonpointer = [
     {file = "jsonpointer-2.1-py2.py3-none-any.whl", hash = "sha256:150f80c5badd02c757da6644852f612f88e8b4bc2f9852dcbf557c8738919686"},
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
+judge-pics = [
+    {file = "judge-pics-2.0.0.tar.gz", hash = "sha256:f835cbe06a522a259ab920cda3cf29412c3c82ac714b8ba0b18472e4965770b3"},
+    {file = "judge_pics-2.0.0-py2.py3-none-any.whl", hash = "sha256:0c2efdd7357de7cfce4ab6b180ef3bf15c3e20a30c8097d8f86dea79ff862b39"},
+]
 juriscraper = [
     {file = "juriscraper-2.4.10-py27-none-any.whl", hash = "sha256:52320a5e468cd7e534a113c1a18420bf2219c14021623ab7991799af1ac32ec6"},
     {file = "juriscraper-2.4.10.tar.gz", hash = "sha256:5573991ceed6eb541dcde4defad9bd3e28cca75a158989f40698d9ca97adaa8f"},
+]
+kdtree = [
+    {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
+    {file = "kdtree-0.16.tar.gz", hash = "sha256:386df6c7816a05e0fab974e3035df944f99ef68b5615f4a416771391e33d7534"},
 ]
 kombu = [
     {file = "kombu-4.6.11-py2.py3-none-any.whl", hash = "sha256:be48cdffb54a2194d93ad6533d73f69408486483d189fe9f5990ee24255b0e0a"},

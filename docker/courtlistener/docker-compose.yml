@@ -1,7 +1,6 @@
 # Run using `docker-compose up`
 version: "3.7"
-volumes:
-  cl-judge-pics:
+
 networks:
   cl_net_overlay:
     driver: bridge
@@ -51,13 +50,11 @@ services:
     depends_on:
       - cl-postgresql
       - cl-redis
-      - cl-judge-pics
       - cl-doctor
       - cl-disclosures
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
     environment:
@@ -73,14 +70,12 @@ services:
       - cl-celery
       - cl-solr
       - cl-selenium
-      - cl-judge-pics
       - cl-doctor
       - cl-disclosures
     ports:
       - "8000:8000"
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     networks:
       - cl_net_overlay
     environment:
@@ -111,12 +106,3 @@ services:
     container_name: "cl-disclosures"
     networks:
       - cl_net_overlay
-
-  cl-judge-pics:
-    image: freelawproject/judge-pics:latest
-    container_name: "cl-judge-pics"
-    volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-    deploy:
-      restart_policy:
-        condition: none

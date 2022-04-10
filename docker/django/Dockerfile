@@ -5,9 +5,9 @@ ONBUILD COPY . /opt/courtlistener
 FROM python:3.10-slim as build-prod
 ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
-RUN tar xvfz courtlistener.tar.gz
-RUN mv /opt/courtlistener-main /opt/courtlistener
-RUN rm -r /opt/courtlistener.tar.gz
+RUN tar xvfz courtlistener.tar.gz && \
+    mv /opt/courtlistener-main /opt/courtlistener && \
+    rm -r /opt/courtlistener.tar.gz
 
 # `python-base` sets up all our shared environment variables
 FROM build-${BUILD_ENV} as python-base
@@ -65,6 +65,7 @@ COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root && \
     poetry install --no-root --extras flp
 
+RUN poetry add judge-pics
 WORKDIR /opt
 
 #Copy our code into development
@@ -84,13 +85,8 @@ WORKDIR /opt/courtlistener
 FROM python-base as celery
 
 ## Needs to be two commands so second one can use variables from first.
-ENV \
-    CELERY_TASKS_DIR=/opt/courtlistener \
-    CELERY_USER_ID=33
-ENV \
-    PYTHONPATH="${PYTHONPATH}:${CELERY_TASKS_DIR}"
-
-USER ${CELERY_USER_ID}
+ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
+USER 33
 
 CMD celery \
     --app=cl worker \

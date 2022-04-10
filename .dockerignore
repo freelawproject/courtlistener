@@ -1,6 +1,5 @@
 # Ignore everything...
 *
-*/assets/media*
 
 # Except a few things...
 !.circleci
@@ -15,3 +14,4 @@
 */node_modules
 */settings/05-private.py
 */settings/.secrets
+*/docker/courtlistener/.env

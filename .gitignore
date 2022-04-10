@@ -34,6 +34,7 @@ cl/assets/static/
 
 # Dev personal stuff - never check in these things with keys or codes!
 cl/settings/*private.py
+docker/courtlistener/.env
 cl/settings/google_auth.json
 .DS_Store
 
