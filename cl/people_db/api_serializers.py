@@ -119,7 +119,7 @@ class PersonDisclosureSerializer(
         return make_disclosure_year_range(obj)
 
     def get_thumbnail_path(self, obj: Person) -> str:
-        return portait(person.id, ImageSize.small)
+        return portrait(obj.id, ImageSizes.SMALL)
 
     def get_newest_disclosure_url(self, obj: Person) -> str:
         """Get the URL of the"""
