@@ -47,10 +47,6 @@ jobs:
           pwd
           ls -al
 
-      - name: Create the private settings file
-        working-directory: cl/settings
-        run: cp 05-private.example 05-private.py
-
       # Add modules here as they're ready (remove them from the file-by-file
       # checker below as you do so).
       - name: mypy Static Type Cheker (packages)

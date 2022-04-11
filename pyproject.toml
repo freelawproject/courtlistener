@@ -100,6 +100,7 @@ PyStemmer = "^2.0.1"
 factory-boy = "^3.2.1"
 django-elasticsearch-dsl = "^7.2.2"
 django-ses = {extras = ["events"], version = "^3.0.1"}
+django-environ = "^0.8.1"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
