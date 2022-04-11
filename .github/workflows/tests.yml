@@ -46,6 +46,7 @@ jobs:
         working-directory: courtlistener/
         run: cp .env.example .env.dev
       - name: Update .env.dev file
+        working-directory: courtlistener/
         run: |
           echo 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }}' >> .env.dev
           echo 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }}' >> .env.dev
