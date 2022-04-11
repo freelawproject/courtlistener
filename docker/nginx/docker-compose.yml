@@ -1,19 +1,15 @@
 version: "3.7"
-volumes:
-  cl-judge-pics:
 
 services:
   cl-python:
     container_name: cl-python
     image: freelawproject/courtlistener:latest-web-prod
     depends_on:
-      - cl-judge-pics
       - cl-selenium
     expose:
       - 8000
     volumes:
       - ${BULK_DIR:-/sata/}:/storage/
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     environment:
       # Make it easy to connect to selenium. Juriscraper will pick up this var.
       - WEBDRIVER_CONN=http://cl-selenium:4444/wd/hub
@@ -22,19 +18,22 @@ services:
     extra_hosts:
       - "localhost:192.168.0.122"
     restart: on-failure
+    env_file:
+      - ../../.env
 
   cl-scrape-rss:
     container_name: cl-scrape-rss
     image: freelawproject/courtlistener:latest-scrape-rss
     volumes:
       - ${BULK_DIR:-/sata/}:/storage/
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
     logging:
       driver: journald
     user: www-data
     extra_hosts:
       - "localhost:192.168.0.122"
     restart: on-failure
+    env_file:
+      - ../../.env
 
   # Before renaming this service, see: freelawproject/courtlistener#1433
   cl-nginx:
@@ -43,8 +42,6 @@ services:
     depends_on:
       - cl-python
     volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - ${CL_BASE_DIR:-../..}:/opt/courtlistener
       - ${CERT_HOME:-/etc/letsencrypt}:/etc/letsencrypt:ro
       - ${BULK_DIR:-/sata/}:/storage/
     ports:
@@ -68,15 +65,6 @@ services:
     extra_hosts:
       - "localhost:192.168.0.122"
     restart: on-failure
-
-  cl-judge-pics:
-    image: freelawproject/judge-pics:latest
-    container_name: "cl-judge-pics"
-    volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-    deploy:
-      restart_policy:
-        condition: none
 
   cl-doctor:
     image: freelawproject/doctor:latest

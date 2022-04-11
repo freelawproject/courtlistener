@@ -9,7 +9,9 @@ env = environ.FileAwareEnv(
     ALLOWED_HOSTS=(list, []),
 )
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
-ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS", default=["localhost"])
+ALLOWED_HOSTS: List[str] = env(
+    "ALLOWED_HOSTS", default=["localhost", "www.courtlistener.com"]
+)
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, "cl/assets/static-global/"),)
