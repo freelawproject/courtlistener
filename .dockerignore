@@ -14,4 +14,4 @@
 */node_modules
 */settings/05-private.py
 */settings/.secrets
-*/docker/courtlistener/.env
+*.env.dev
