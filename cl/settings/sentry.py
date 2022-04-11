@@ -6,17 +6,18 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.redis import RedisIntegration
 
 env = environ.FileAwareEnv()
-SENTRY_DSN = env("SENTRY_DSN")
+SENTRY_DSN = env("SENTRY_DSN", default="")
 
 ignore_logger("internetarchive.session")
 ignore_logger("internetarchive.item")
 
-sentry_sdk.init(
-    dsn=SENTRY_DSN,
-    integrations=[
-        CeleryIntegration(),
-        DjangoIntegration(),
-        RedisIntegration(),
-    ],
-    ignore_errors=[KeyboardInterrupt],
-)
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            CeleryIntegration(),
+            DjangoIntegration(),
+            RedisIntegration(),
+        ],
+        ignore_errors=[KeyboardInterrupt],
+    )

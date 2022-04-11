@@ -153,7 +153,7 @@ ADMINS = (
 )
 
 MANAGERS = ADMINS
-API_READ_DATABASES: List[str] = env("API_READ_DATABASES")
+API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
 
 DOCKER_SELENIUM_HOST = env(
@@ -171,7 +171,7 @@ PACER_PASSWORD = env("PACER_PASSWORD", default="")
 IA_ACCESS_KEY = env("IA_ACCESS_KEY", default="")
 IA_SECRET_KEY = env("IA_SECRET_KEY", default="")
 IA_COLLECTIONS = []
-IA_OA_COLLECTIONS: List[str] = env("IA_OA_COLLECTIONS")
+IA_OA_COLLECTIONS: List[str] = env("IA_OA_COLLECTIONS", default=[])
 
 
 # Local time zone for this installation. Choices can be found here:

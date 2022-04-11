@@ -8,8 +8,8 @@ import environ
 env = environ.FileAwareEnv(
     ALLOWED_HOSTS=(list, []),
 )
-SECRET_KEY = env("SECRET_KEY")
-ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS")
+SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
+ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS", default=["localhost"])
 
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
 STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, "cl/assets/static-global/"),)

@@ -42,6 +42,10 @@ jobs:
         with:
           path: courtlistener
 
+      - name: Create the .env settings file
+        working-directory: courtlistener/
+        run: cp .env.example .env.dev
+
       - name: Echo github actor name for debugging
         run: echo ${{ github.actor }}
 
