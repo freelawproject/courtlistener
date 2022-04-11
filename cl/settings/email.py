@@ -9,6 +9,7 @@ DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 #########
 if DEVELOPMENT:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    BASE_BACKEND = EMAIL_BACKEND
 else:
     EMAIL_BACKEND = "cl.lib.email_backends.EmailBackend"
     BASE_BACKEND = "django_ses.SESBackend"
