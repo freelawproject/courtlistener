@@ -274,6 +274,14 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 #########
 if DEVELOPMENT:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = "cl.lib.email_backends.EmailBackend"
+    BASE_BACKEND = "django_ses.SESBackend"
+    AWS_SES_REGION_NAME = "us-west-2"
+    AWS_SES_REGION_ENDPOINT = "email.us-west-2.amazonaws.com"
+
+# Max email attachment to send in bytes, 350KB
+MAX_ATTACHMENT_SIZE = 350_000
 
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
@@ -551,16 +559,6 @@ LOGGING = {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "simple",
-            "filters": ["skip_unreadable_posts"],
-        },
-        # Use this if you're not yet dockerized. If dockerized, the stream
-        # handler will send everything to stdout, which is what you want.
-        "log_file": {
-            "level": "DEBUG",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "/var/log/courtlistener/django.log",
-            "maxBytes": 16777216,  # 16 megabytes
-            "formatter": "verbose",
             "filters": ["skip_unreadable_posts"],
         },
         "django.server": {

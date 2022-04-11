@@ -58,7 +58,7 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[email_address],
-            headers={f"X-Entity-Ref-ID": "docket.alert:{d.pk}"},
+            headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")

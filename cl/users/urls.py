@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path, re_path
 from django.views.generic import RedirectView
+from django_ses.views import SESEventWebhookView
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
@@ -136,5 +137,10 @@ urlpatterns = [
     path(
         f"webhook/mailchimp/{settings.MAILCHIMP_SECRET}/",
         views.mailchimp_webhook,
+    ),
+    path(
+        "webhook/ses/",
+        SESEventWebhookView.as_view(),
+        name="handle_ses_webhook",
     ),
 ]
