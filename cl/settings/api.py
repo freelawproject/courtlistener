@@ -1,8 +1,7 @@
 import environ
 
 env = environ.FileAwareEnv()
-
-DEVELOPMENT = env("DEVELOPMENT")
+DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
 #######
 # API #
