@@ -25,11 +25,11 @@ def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
     :param r: A response object
     :return:  A boolean and value
     """
-    response = microservice(
+    extension = microservice(
         service="buffer-extension",
+        file=r.content,
         params={"mime": True},
-    )
-    extension = response.json()["extension"]
+    ).text
 
     if extension == ".html":
         html_tree = html.fromstring(r.text)
@@ -92,39 +92,32 @@ def get_binary_content(
         msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
         return msg, None
     # noinspection PyBroadException
-    try:
-        if method == "LOCAL":
-            url = os.path.join(settings.MEDIA_ROOT, download_url)
-            mr = MockRequest(url=url)
-            r = mr.get()
-        else:
-            # Note that we do a GET even if site.method is POST. This is
-            # deliberate.
-            s = requests.session()
-            headers = {"User-Agent": "CourtListener"}
+    if method == "LOCAL":
+        url = os.path.join(settings.MEDIA_ROOT, download_url)
+        mr = MockRequest(url=url)
+        r = mr.get()
+    else:
+        # Note that we do a GET even if site.method is POST. This is
+        # deliberate.
+        s = requests.session()
+        headers = {"User-Agent": "CourtListener"}
 
-            r = s.get(
-                download_url,
-                verify=False,  # WA has a certificate we don't understand
-                headers=headers,
-                cookies=cookies,
-                timeout=300,
-            )
+        r = s.get(
+            download_url,
+            verify=False,  # WA has a certificate we don't understand
+            headers=headers,
+            cookies=cookies,
+            timeout=300,
+        )
 
-            # test for empty files (thank you CA1)
-            if len(r.content) == 0:
-                msg = (
-                    f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-                )
-                return msg, None
+        # test for empty files (thank you CA1)
+        if len(r.content) == 0:
+            msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
+            return msg, None
 
-            # test for and follow meta redirects
-            r = follow_redirections(r, s)
-
-            r.raise_for_status()
-    except:
-        msg = f"DownloadingError: {download_url}\n{traceback.format_exc()}"
-        return msg, None
+        # test for and follow meta redirects
+        r = follow_redirections(r, s)
+        r.raise_for_status()
 
     # Success!
     return "", r
