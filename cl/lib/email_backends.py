@@ -9,6 +9,7 @@ from django.core.mail import (
 from django.core.mail.backends.base import BaseEmailBackend
 
 from cl.users.email_handlers import (
+    add_bcc_random,
     compose_message,
     has_small_version,
     is_not_email_banned,
@@ -136,6 +137,12 @@ class EmailBackend(BaseEmailBackend):
             email.extra_headers["X-CL-ID"] = stored_id
             # Use base backend connection to send the message
             email.connection = connection
+
+            # Call the random function to determine if we should add or not
+            # a BCC to the message based on the EMAIL_BCC_COPY_RATE set
+            add_bcc = add_bcc_random(settings.EMAIL_BCC_COPY_RATE)
+            if add_bcc == True:
+                email.bcc.append(settings.BCC_EMAIL_ADDRESS)
 
             # If we have recipients to send the message to, we send it.
             if final_recipient_list:
