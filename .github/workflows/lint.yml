@@ -60,6 +60,7 @@ jobs:
           -p cl.corpus_importer \
           -p cl.lib \
           -p cl.opinion_page \
+          -p cl.settings \
           -p cl.simple_pages \
           -p cl.recap_rss
 
