@@ -62,10 +62,8 @@ WORKDIR $PYSETUP_PATH
 COPY poetry.lock pyproject.toml ./
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
-RUN poetry install --no-root && \
-    poetry install --no-root --extras flp
+RUN poetry install --no-root
 
-RUN poetry add judge-pics
 WORKDIR /opt
 
 # We log to stdout by default, but we have a config for logging here. Even if

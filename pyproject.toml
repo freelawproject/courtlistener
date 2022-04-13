@@ -119,9 +119,6 @@ django-stubs = "^1.9.0"
 djangorestframework-stubs = "^1.4.0"
 black = "^22.3.0"
 
-[tool.poetry.extras]
-flp = ["reporters-db", "juriscraper"]
-
 [tool.black]
 include = '''
 (
