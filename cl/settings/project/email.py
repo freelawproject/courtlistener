@@ -3,10 +3,6 @@ import environ
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
-
-#########
-# Email #
-#########
 if DEVELOPMENT:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     BASE_BACKEND = EMAIL_BACKEND
@@ -26,7 +22,3 @@ SCRAPER_ADMINS = (
     ("Slack Juriscraper Channel", "j9f4b5n5x7k8x2r1@flp-talk.slack.com"),
     ("PA", "arderyp@protonmail.com"),
 )
-
-# Mailchimp secret (used for webhook URLs)
-MAILCHIMP_SECRET = env("MAILCHIMP_SECRET", default="")
-MAILCHIMP_API_KEY = env("MAILCHIMP_API_KEY", default="")

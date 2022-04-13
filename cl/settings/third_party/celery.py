@@ -1,27 +1,12 @@
 import environ
 
+from .redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
+
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
-
-REDIS_HOST = env("REDIS_HOST", default="cl-redis")
-REDIS_PORT = env("REDIS_PORT", default=6379)
-
-#########
-# Redis #
-#########
-# Redis is configured with 16 databases out of the box. This keeps them neatly
-# mapped.
-REDIS_DATABASES = {
-    "CELERY": 0,
-    "CACHE": 1,
-    "STATS": 2,
-    "ALERTS": 3,
-}
-
-##########
-# CELERY #
-##########
+# This can be useful in a dev environment:
+# .virtualenvs/courtlistener/bin/celery worker -n w1 --app=cl  --loglevel=INFO
 if DEVELOPMENT:
     # In a development machine, these setting make sense
     CELERY_WORKER_CONCURRENCY = 2
@@ -56,23 +41,3 @@ CELERY_WORKER_DISABLE_RATE_LIMITS = True
 CELERY_RESULT_SERIALIZER = "pickle"
 CELERY_TASK_SERIALIZER = "pickle"
 CELERY_ACCEPT_CONTENT = {"json", "pickle"}
-
-
-####################
-# Cache & Sessions #
-####################
-CACHES = {
-    "default": {
-        "BACKEND": "redis_cache.RedisCache",
-        "LOCATION": f"{REDIS_HOST}:{REDIS_PORT}",
-        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
-    },
-    "db_cache": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "django_cache",
-        "OPTIONS": {"MAX_ENTRIES": 2.5e5},
-    },
-}
-# This sets Redis as the session backend. This is often advised against, but we
-# have pretty good persistency in Redis, so it's fairly well backed up.
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"

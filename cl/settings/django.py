@@ -1,24 +1,65 @@
-import os
-import sys
 from pathlib import Path
 from typing import List
 
 import environ
+from django.contrib.messages import constants as message_constants
+
+from .project.testing import TESTING
+from .third_party.redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
 
 env = environ.FileAwareEnv(
     ALLOWED_HOSTS=(list, []),
 )
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
 ALLOWED_HOSTS: List[str] = env(
-    "ALLOWED_HOSTS", default=["localhost", "www.courtlistener.com"]
+    "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
 
+
+############
+# Database #
+############
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_NAME", default="courtlistener"),
+        "USER": env("DB_USER", default="postgres"),
+        "PASSWORD": env("DB_PASSWORD", default="postgres"),
+        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
+        "HOST": env("DB_HOST", default="cl-postgres"),
+        # Disable DB serialization during tests for small speed boost
+        "TEST": {"SERIALIZE": False},
+    },
+}
+MAX_REPLICATION_LAG = 1e8  # 100MB
+API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
+
+
+####################
+# Cache & Sessions #
+####################
+CACHES = {
+    "default": {
+        "BACKEND": "redis_cache.RedisCache",
+        "LOCATION": f"{REDIS_HOST}:{REDIS_PORT}",
+        "OPTIONS": {"DB": REDIS_DATABASES["CACHE"], "MAX_ENTRIES": 1e5},
+    },
+    "db_cache": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+        "OPTIONS": {"MAX_ENTRIES": 2.5e5},
+    },
+}
+# This sets Redis as the session backend. This is often advised against, but we
+# have pretty good persistency in Redis, so it's fairly well backed up.
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+
+
+#####################################
+# Directories, Apps, and Middleware #
+#####################################
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
-STATICFILES_DIRS = (os.path.join(INSTALL_ROOT, "cl/assets/static-global/"),)
-
-# Where should the bulk data be stored?
-BULK_DATA_DIR = os.path.join(INSTALL_ROOT, "cl/assets/media/bulk-data/")
-
+STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 SITE_ROOT = environ.Path("__file__") - 1
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -26,45 +67,9 @@ MEDIA_ROOT = SITE_ROOT.path("cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = SITE_ROOT.path("cl/assets/static/")
 TEMPLATE_ROOT = SITE_ROOT.path("cl/assets/templates/")
-DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
-
-TESTING = "test" in sys.argv
-TEST_RUNNER = "cl.tests.runner.TestRunner"
-if TESTING:
-    PAGINATION_COUNT = 10
-    DEBUG = False
-    PASSWORD_HASHERS = [
-        "django.contrib.auth.hashers.MD5PasswordHasher",
-    ]
-    CELERY_BROKER = "memory://"
-
 
 if not any([TESTING, DEBUG]):
     STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
-
-
-MAINTENANCE_MODE_ENABLED = False
-MAINTENANCE_MODE_ALLOW_STAFF = True
-MAINTENANCE_MODE_ALLOWED_IPS = []
-MAINTENANCE_MODE = {
-    "enabled": MAINTENANCE_MODE_ENABLED,
-    "allow_staff": MAINTENANCE_MODE_ALLOW_STAFF,
-    "allowed_ips": MAINTENANCE_MODE_ALLOWED_IPS,
-}
-
-PLAUSIBLE_API_URL = "https://plausible.io/api/v1/stats/breakdown"
-
-
-################
-# Misc. Django #
-################
-SITE_ID = 1
-USE_I18N = False
-DEFAULT_CHARSET = "utf-8"
-LANGUAGE_CODE = "en-us"
-USE_TZ = True
-DATETIME_FORMAT = "N j, Y, P e"
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
 TEMPLATES = [
     {
@@ -151,78 +156,50 @@ INSTALLED_APPS = [
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME", default="courtlistener"),
-        "USER": env("DB_USER", default="postgres"),
-        "PASSWORD": env("DB_PASSWORD", default="postgres"),
-        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
-        "HOST": env("DB_HOST", default="cl-postgresql"),
-    },
+
+################
+# Misc. Django #
+################
+SITE_ID = 1
+USE_I18N = False
+DEFAULT_CHARSET = "utf-8"
+LANGUAGE_CODE = "en-us"
+USE_TZ = True
+DATETIME_FORMAT = "N j, Y, P e"
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
+# Local time zone for this installation. Choices can be found here:
+# http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
+# although not all choices may be available on all operating systems.
+# If running in a Windows environment this must be set to the same as your
+# system time zone.
+TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
+
+ADMINS = (
+    env("ADMIN_NAME", default="Joe Schmoe"),
+    env("ADMIN_EMAIL", default="joe@courtlistener.com"),
+)
+
+MANAGERS = ADMINS
+
+
+LOGIN_URL = "/sign-in/"
+LOGIN_REDIRECT_URL = "/"
+
+# These remap some of the the messages constants to correspond with bootstrap
+MESSAGE_TAGS = {
+    message_constants.DEBUG: "alert-warning",
+    message_constants.INFO: "alert-info",
+    message_constants.SUCCESS: "alert-success",
+    message_constants.WARNING: "alert-warning",
+    message_constants.ERROR: "alert-danger",
 }
 
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-############
-# Security #
-############
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_HSTS_SECONDS = 63_072_000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = "DENY"
-SECURE_REFERRER_POLICY = "same-origin"
-
-RATELIMIT_VIEW = "cl.simple_pages.views.ratelimited"
-
-if DEVELOPMENT:
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_DOMAIN = None
-    # For debug_toolbar
-    # INSTALLED_APPS.append('debug_toolbar')
-    INTERNAL_IPS = ("127.0.0.1",)
-
-    if TESTING:
-        db = DATABASES["default"]
-        db["ENCODING"] = "UTF8"
-        db["TEST_ENCODING"] = "UTF8"
-        db["CONN_MAX_AGE"] = 0
-else:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {
-            "min_length": 9,
-        },
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+SILENCED_SYSTEM_CHECKS = [
+    # Allow index names >30 characters, because we aren’t using Oracle
+    "models.E034",
+    # Don't warn about HSTS being used
+    "security.W004",
 ]
-
-##########
-# Waffle #
-##########
-WAFFLE_CREATE_MISSING_FLAGS = True
-WAFFLE_CREATE_MISSING_SWITCHES = True
-WAFFLE_CREATE_MISSING_SAMPLES = True
-
-
-try:
-    from judge_pics import judge_root
-except ImportError:
-    # When we're not in the full docker env, just fake it. Useful for e.g. mypy
-    # Use random phrase to prevent access to root!
-    judge_root = "/dummy-directory-john-stingily-granite/"

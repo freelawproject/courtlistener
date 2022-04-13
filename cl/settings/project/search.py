@@ -46,3 +46,17 @@ SOLR_EXAMPLE_CORE_PATH = os.path.join(
 )
 SOLR_TEMP_CORE_PATH_LOCAL = os.path.join(os.sep, "tmp", "solr")
 SOLR_TEMP_CORE_PATH_DOCKER = os.path.join(os.sep, "tmp", "solr")
+
+
+###################
+# Related content #
+###################
+RELATED_COUNT = 5
+RELATED_USE_CACHE = True
+RELATED_CACHE_TIMEOUT = 60 * 60 * 24 * 7
+RELATED_MLT_MAXQT = 10
+RELATED_MLT_MINTF = 5
+RELATED_MLT_MAXDF = 1000
+RELATED_MLT_MINWL = 3
+RELATED_MLT_MAXWL = 0
+RELATED_FILTER_BY_STATUS = "Precedential"

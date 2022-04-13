@@ -5,9 +5,6 @@ env = environ.FileAwareEnv()
 DISCLOSURE_HOST = env("DISCLOSURE_HOST", default="http://cl-disclosures:5050")
 DOCTOR_HOST = env("DOCTOR_HOST", default="http://cl-doctor:5050")
 
-####################################
-# Microservice Endpoints #
-####################################
 MICROSERVICE_URLS = {
     # DOCTOR Endpoints
     "doctor-heartbeat": {
