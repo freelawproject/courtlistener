@@ -1969,26 +1969,28 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
 
-    def call_bcc_random(self, bcc_rate, iterations) -> int:
+    def call_bcc_random(self, message, bcc_rate, iterations) -> int:
         """This function simulates n (iterations) calls to the add_bcc_random
         function and returns a counter_bcc that represents the number of
-        messages that are going to be bcc'ed.
+        messages that are bcc'ed.
         """
         counter_bcc = 0
         for i in range(iterations):
-            add = add_bcc_random(bcc_rate)
-            if add == True:
+            message = add_bcc_random(message, bcc_rate)
+            if message.bcc:
                 counter_bcc += 1
+            # Clean bcc to test next iteration.
+            message.bcc = []
         return counter_bcc
 
-    def average_bcc_random(self, bcc_rate, iterations) -> int:
+    def average_bcc_random(self, message, bcc_rate, iterations) -> int:
         """This function simulates 50 calls to the call_bcc_random
         function and returns the average number of times that add_bcc_random
         returned True.
         """
         total = 0
         for i in range(50):
-            val = self.call_bcc_random(bcc_rate, iterations)
+            val = self.call_bcc_random(message, bcc_rate, iterations)
             total = total + val
         average = total / 50
         return int(round(average))
@@ -2012,12 +2014,21 @@ class CustomBackendEmailTest(TestCase):
         # 1% are BCC'ed
         one_bcc_rate = 0.01
 
+        message = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "bounce@simulator.amazonses.com",
+            ],
+        )
+
         # Get the average number of times that add_bcc_random returns True
         # for different bcc_rate and 10_000 iterations
-        average_ten = self.average_bcc_random(ten_bcc_rate, 10_000)
-        average_one = self.average_bcc_random(one_bcc_rate, 10_000)
-        average_none = self.average_bcc_random(zero_bcc_rate, 10_000)
-        average_all = self.average_bcc_random(all_bcc_rate, 10_000)
+        average_ten = self.average_bcc_random(message, ten_bcc_rate, 10_000)
+        average_one = self.average_bcc_random(message, one_bcc_rate, 10_000)
+        average_none = self.average_bcc_random(message, zero_bcc_rate, 10_000)
+        average_all = self.average_bcc_random(message, all_bcc_rate, 10_000)
 
         # For 0.1 bcc rate of 10_000 calls we should get a number very close
         # to 1000, however, to ensure the test never fails we use a range

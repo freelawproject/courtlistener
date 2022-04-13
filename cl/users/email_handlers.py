@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from email.utils import parseaddr
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import (
     EmailMessage,
@@ -457,39 +458,26 @@ def is_small_only_flagged(email_address: str) -> bool:
     return False
 
 
-def add_bcc_random(bcc_rate: float) -> bool:
-    """This function uses randint() to obtain the probability of getting a
-    number below a threshold defined by our bcc_rate which is a float value
-    from 0 to 1.
-
-    This function has a precision of 0.01, so we can determine the percentage
-    of messages that we want to BCC by a 1% precision.
-
-    The general idea is to get a random integer value between 1 to 100 and
-    compare it with our bcc_rate, firstly we need to normalize the bcc_rate
-    so we multiply it by 100, normalized_bcc_rate = bcc_rate * 100
-
-    We compare the returned value by the randint(1,100) method with the
-    following expression: returned_value <= normalized_bcc_rate
-
-    If the returned_value is equal to or below our normalized_bcc_rate, it
-    returns True, otherwise False.
-
-    So we can translate the bcc_rate to a probability.
+def add_bcc_random(
+    message: EmailMessage | EmailMultiAlternatives,
+    bcc_rate: float,
+) -> EmailMessage | EmailMultiAlternatives:
+    """This function uses randint() to obtain the probability of BCC a message
+    based on the bcc_rate which is a float value from 0 to 1.
 
     e.g: if we want to bcc to the 10% of messages we should use a bcc_rate
     of 0.1, so we'd have a normalized_bcc_rate of 10, so it'll check if the
     random returned value by randint(1,100) is <= 10, which means, in theory,
     a probability of 1/10.
 
-    :param bcc_rate: The email bcc copy rate, is a float value between 0-1 that
+    :param bcc_rate: The email bcc copy rate, a float value between 0-1 that
     represent the percentage of messages that we want to add a BCC
-    :return bool: True if the returned_value matches the bcc_rate probability,
-    otherwise False.
+    :return EmailMessage | EmailMultiAlternatives: Returns the message with a
+    BCC added or not.
     """
 
     returned_value = random.randint(1, 100)
     normalized_bcc_rate = int(bcc_rate * 100)
     if returned_value <= normalized_bcc_rate:
-        return True
-    return False
+        message.bcc.append(settings.BCC_EMAIL_ADDRESS)
+    return message

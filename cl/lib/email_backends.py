@@ -138,11 +138,9 @@ class EmailBackend(BaseEmailBackend):
             # Use base backend connection to send the message
             email.connection = connection
 
-            # Call the random function to determine if we should add or not
-            # a BCC to the message based on the EMAIL_BCC_COPY_RATE set
-            add_bcc = add_bcc_random(settings.EMAIL_BCC_COPY_RATE)
-            if add_bcc == True:
-                email.bcc.append(settings.BCC_EMAIL_ADDRESS)
+            # Call add_bcc_random function to BCC the message based on the
+            # EMAIL_BCC_COPY_RATE set
+            email = add_bcc_random(email, settings.EMAIL_BCC_COPY_RATE)
 
             # If we have recipients to send the message to, we send it.
             if final_recipient_list:
