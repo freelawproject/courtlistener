@@ -222,7 +222,7 @@ def get_pdfs(options: OptionsType) -> None:
             delete_pacer_row.s(row.pk).set(queue=q),
         )
         if index:
-            c |= add_items_to_solr.s("search.RECAPDocument").set(queue=q)
+            c = c | add_items_to_solr.s("search.RECAPDocument").set(queue=q)
         c.apply_async()
         completed += 1
         if completed % 1000 == 0:
