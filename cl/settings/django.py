@@ -54,8 +54,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 #####################################
 # Directories, Apps, and Middleware #
 #####################################
-INSTALL_ROOT = Path(__file__).resolve().parents[1]
-STATICFILES_DIRS = (INSTALL_ROOT / "assets/static-global/",)
+INSTALL_ROOT = Path(__file__).resolve().parents[2]
+STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 SITE_ROOT = environ.Path("__file__") - 1
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
