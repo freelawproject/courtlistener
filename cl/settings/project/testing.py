@@ -14,7 +14,7 @@ TESTING = "test" in sys.argv
 TEST_RUNNER = "cl.tests.runner.TestRunner"
 if TESTING:
     PAGINATION_COUNT = 10
-    DEBUG = False
+    DEBUG = env.bool("TESTING_DEBUG", default=False)
     PASSWORD_HASHERS = [
         "django.contrib.auth.hashers.MD5PasswordHasher",
     ]
