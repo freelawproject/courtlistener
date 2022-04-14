@@ -1,3 +1,5 @@
+# type: ignore
+
 import environ
 from django.http import UnreadablePostError
 
