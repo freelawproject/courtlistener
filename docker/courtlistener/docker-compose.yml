@@ -54,7 +54,6 @@ services:
       - cl-disclosures
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/courtlistener/cl/assets/media
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
     networks:
       - cl_net_overlay
@@ -77,7 +76,6 @@ services:
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
-      - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/courtlistener/cl/assets/media
     networks:
       - cl_net_overlay
     env_file:
