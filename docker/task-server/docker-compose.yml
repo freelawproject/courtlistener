@@ -26,7 +26,7 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env
-      - ../../.env.celery
+      - ../../.env.celery_prefork
 
   celery_prefork_bulk:
     image: freelawproject/courtlistener:latest-celery
@@ -49,7 +49,7 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env
-      - ../../.env.bulk
+      - ../../.env.celery_bulk
 
 
   cl-doctor:
