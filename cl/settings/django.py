@@ -56,13 +56,12 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 #####################################
 INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
-SITE_ROOT = environ.Path("__file__") - 1
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
-MEDIA_ROOT = SITE_ROOT.path("cl/assets/media/")
+MEDIA_ROOT = INSTALL_ROOT / "cl/assets/media/"
 STATIC_URL = env.str("STATIC_URL", default="static/")
-STATIC_ROOT = SITE_ROOT.path("cl/assets/static/")
-TEMPLATE_ROOT = SITE_ROOT.path("cl/assets/templates/")
+STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
+TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
 
 if not any([TESTING, DEBUG]):
     STATICFILES_STORAGE = "cl.lib.storage.SubDirectoryS3ManifestStaticStorage"
