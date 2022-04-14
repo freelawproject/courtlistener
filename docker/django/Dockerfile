@@ -3,9 +3,9 @@ FROM python:3.10-slim as build-dev
 ONBUILD COPY . /opt/courtlistener
 
 FROM python:3.10-slim as build-prod
-ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
+ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
-RUN tar xvfz courtlistener.tar.gz && \
+ONBUILD RUN tar xvfz courtlistener.tar.gz && \
     mv /opt/courtlistener-main /opt/courtlistener && \
     rm -r /opt/courtlistener.tar.gz
 
