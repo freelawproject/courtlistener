@@ -4,11 +4,12 @@
 REPO ?= freelawproject/courtlistener
 
 # The various tags available
-DOCKER_TAG_DEV = $(shell head -1 docker/django/version.txt)-web-dev
-DOCKER_TAG_PROD = $(shell head -1 docker/django/version.txt)-web-prod
+VERSION = $(shell head -1 docker/django/version.txt)
+DOCKER_TAG_DEV = $(VERSION)-web-dev
+DOCKER_TAG_PROD = $(VERSION)-web-prod
 WEB_PROD ?= latest-web-prod
 WEB_DEV ?= latest-web-dev
-CELERY_TAG = $(shell head -1 docker/task-server/version.txt)-celery
+CELERY_TAG = $(VERSION)-celery
 CELERY_LATEST ?= latest-celery
 RSS_TAG ?= latest-scrape-rss
 
