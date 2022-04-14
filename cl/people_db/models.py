@@ -1221,6 +1221,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         ("w", "Whig"),
         ("j", "Jeffersonian Republican"),
         ("u", "National Union"),
+        ("z", "Reform Party"),
     )
     person = models.ForeignKey(
         Person,
