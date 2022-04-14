@@ -1,44 +1,6 @@
 ARG BUILD_ENV=prod
-FROM python:3.10-slim as build-dev
-ONBUILD COPY . /opt/courtlistener
 
-FROM python:3.10-slim as build-prod
-ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
-WORKDIR /opt
-ONBUILD RUN tar xvfz courtlistener.tar.gz && \
-    mv /opt/courtlistener-main /opt/courtlistener && \
-    rm -r /opt/courtlistener.tar.gz
-
-# `python-base` sets up all our shared environment variables
-FROM build-${BUILD_ENV} as python-base
-
-ENV PYTHONUNBUFFERED=1 \
-    \
-    # pip
-    # Disable the pip cache (yes, off is confusing)
-    PIP_NO_CACHE_DIR=off \
-    # Don't show the notice if there's a newer version of pip
-    PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PIP_DEFAULT_TIMEOUT=100 \
-    \
-    # poetry
-    # https://python-poetry.org/docs/configuration/#using-environment-variables
-    POETRY_VERSION=1.1.13 \
-    # make poetry install to this location
-    POETRY_HOME="/opt/poetry" \
-    # Don't build a virtualenv to save space
-    POETRY_VIRTUALENVS_CREATE=false \
-    # do not ask any interactive question
-    POETRY_NO_INTERACTION=1 \
-    \
-    # paths
-    # this is where our requirements + virtual environment will live
-    PYSETUP_PATH="/opt/pysetup" \
-    VENV_PATH="/opt/pysetup/.venv"
-
-
-# prepend poetry and venv to path
-ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+FROM python:3.10-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -54,8 +16,46 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
         # Other dependencies
         libffi-dev libxml2-dev libxslt-dev procps vim cmake
 
+# poetry
+# https://python-poetry.org/docs/configuration/#using-environment-variables
+ENV POETRY_VERSION=1.1.13 \
+    # make poetry install to this location
+    POETRY_HOME="/opt/poetry" \
+    # Don't build a virtualenv to save space
+    POETRY_VIRTUALENVS_CREATE=false \
+    # do not ask any interactive question
+    POETRY_NO_INTERACTION=1
+
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://install.python-poetry.org | python3 -
+
+
+FROM build-base as build-dev
+ONBUILD COPY . /opt/courtlistener
+
+
+FROM build-base as build-prod
+ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
+WORKDIR /opt
+ONBUILD RUN tar xvfz courtlistener.tar.gz && \
+    mv /opt/courtlistener-main /opt/courtlistener && \
+    rm -r /opt/courtlistener.tar.gz
+
+
+# `python-base` sets up all our shared environment variables
+FROM build-${BUILD_ENV} as python-base
+# re-establish variables from above
+ARG POETRY_HOME
+
+ENV PYTHONUNBUFFERED=1 \
+    # paths
+    # where to create the env
+    VENV_PATH="/opt/pysetup/.venv" \
+    # this is where our requirements + virtual environment will live
+    PYSETUP_PATH="/opt/pysetup"
+
+# prepend poetry and venv to path
+ENV PATH="/opt/poetry/bin:$VENV_PATH/bin:$PATH"
 
 # copy project requirement files here to ensure they will be cached.
 WORKDIR $PYSETUP_PATH
@@ -92,7 +92,6 @@ CMD celery \
     --queues=${CELERY_QUEUES} \
     --concurrency=${CELERY_PREFORK_CONCURRENCY:-0} \
     --prefetch-multiplier=${CELERY_PREFETCH_MULTIPLIER:-1}
-
 
 #freelawproject/courtlistener:latest-web-dev
 FROM python-base as web-dev
