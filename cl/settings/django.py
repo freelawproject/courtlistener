@@ -7,13 +7,9 @@ from django.contrib.messages import constants as message_constants
 from .project.testing import TESTING
 from .third_party.redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
 
-env = environ.FileAwareEnv(
-    ALLOWED_HOSTS=(list, []),
-)
+env = environ.FileAwareEnv()
+
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
-ALLOWED_HOSTS: List[str] = env(
-    "ALLOWED_HOSTS", default=["www.courtlistener.com"]
-)
 
 
 ############
@@ -59,7 +55,7 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 # Directories, Apps, and Middleware #
 #####################################
 INSTALL_ROOT = Path(__file__).resolve().parents[1]
-STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
+STATICFILES_DIRS = (INSTALL_ROOT / "assets/static-global/",)
 SITE_ROOT = environ.Path("__file__") - 1
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)

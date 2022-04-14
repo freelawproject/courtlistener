@@ -1,4 +1,5 @@
 import os
+from datetime import date
 
 import environ
 
@@ -48,7 +49,7 @@ GOOGLE_AUTH = {
 # Super Misc #
 ##############
 # Where should the bulk data be stored?
-BULK_DATA_DIR = INSTALL_ROOT / "cl" / "assets" / "media" / "bulk-data"
+BULK_DATA_DIR = INSTALL_ROOT / "assets" / "media" / "bulk-data"
 FUNDRAISING_MODE = env("FUNDRAISING_MODE", default=False)
 
 # Key for Follow the Money API

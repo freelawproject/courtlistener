@@ -2,9 +2,7 @@ import sys
 
 import environ
 
-env = environ.FileAwareEnv(
-    ALLOWED_HOSTS=(list, []),
-)
+env = environ.FileAwareEnv()
 
 
 DOCKER_SELENIUM_HOST = env(

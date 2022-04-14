@@ -5,6 +5,10 @@ from ..django import DATABASES, TESTING
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
+ALLOWED_HOSTS: list[str] = env(
+    "ALLOWED_HOSTS", default=["www.courtlistener.com"]
+)
+
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_HSTS_SECONDS = 63_072_000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
