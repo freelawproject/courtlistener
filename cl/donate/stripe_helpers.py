@@ -224,7 +224,7 @@ def process_stripe_callback(request: HttpRequest) -> HttpResponse:
             "webhook documentation for details."
         )
         is_charge = event["type"].startswith("charge")
-        is_live = event["livemode"] != settings.PAYMENT_TESTING_MODE
+        is_live = event["livemode"] != settings.DEVELOPMENT
         if all([is_charge, is_live]):
             charge = event["data"]["object"]
 

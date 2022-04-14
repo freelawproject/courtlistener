@@ -1,7 +1,6 @@
 # Run using `docker-compose up`
 version: "3.7"
-volumes:
-  cl-judge-pics:
+
 networks:
   cl_net_overlay:
     driver: bridge
@@ -47,45 +46,40 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/task-server:latest}
+    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery}
     depends_on:
       - cl-postgresql
       - cl-redis
-      - cl-judge-pics
       - cl-doctor
       - cl-disclosures
     volumes:
-      - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
     networks:
       - cl_net_overlay
+    env_file:
+      - ../../.env.dev
 
   cl-django:
     container_name: cl-django
-    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener-django:latest}
+    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener:latest-web-dev}
     depends_on:
       - cl-postgresql
       - cl-redis
       - cl-celery
       - cl-solr
       - cl-selenium
-      - cl-judge-pics
       - cl-doctor
       - cl-disclosures
     ports:
       - "8000:8000"
     volumes:
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
     networks:
       - cl_net_overlay
-    command: >
-      bash -c "python /opt/courtlistener/manage.py migrate
-      && python /opt/courtlistener/manage.py createcachetable
-      && python /opt/courtlistener/manage.py runserver 0.0.0.0:8000"
+    env_file:
+      - ../../.env.dev
 
   cl-selenium:
     container_name: cl-selenium
@@ -111,12 +105,3 @@ services:
     container_name: "cl-disclosures"
     networks:
       - cl_net_overlay
-
-  cl-judge-pics:
-    image: freelawproject/judge-pics:latest
-    container_name: "cl-judge-pics"
-    volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-    deploy:
-      restart_policy:
-        condition: none

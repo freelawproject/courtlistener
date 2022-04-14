@@ -9,18 +9,18 @@ But before we can get into that, we must address...
 
 ## Legal Matters
 
-Not surprisingly, we have a lot of legal, and particularly IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns.
+Not surprisingly, we have a lot of legal, and particularly, IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns.
 
-We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license for server code that isn't normally distributed to end users (like an app would be, say).
+We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license that's designed specifically for the kind of code that isn't distributed to end users (like an app would be, say).
 
-The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. The first time you make a contribution to any of our repos, a bot will ask you sign it. Please do so. If you have any questions about it, please don't hesitate to ask.
+The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. The first time you make a contribution to any of our repos, a bot will ask you sign the agreement. Please do so. If you have any questions about it, please don't hesitate to ask.
 
 On with the show.
 
 
 # Discussing things
 
-We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more.
+We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more, but mostly people seem to get into our Slack and ask things there. When they do that, the answers to their questions go into a black hole and only ever help the person that asked it. Ah well.
 
 
 ## Architecture
@@ -33,9 +33,11 @@ The major components of CourtListener are:
 
  - Celery - For running asynchronous tasks. We've been using this a long time. It causes a lot of annoyance and sometimes will have unsolvable bugs, but as of 2019 it's better than any of the competition that we've tried.
 
- - Tesseract - For OCR. It's getting good lately, which is nice since we convert hundreds of thousands of pages.
+ - Judge Pics and Court Seals microservices - These are services we host via S3. They're not complicated. They just give you a photo of a judge or a seal at a given URL.
 
- - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx a while back. We chose Sphinx early on literally because it had a smaller binary than Solr, and so seemed less intimidating (it was early times, and that logic might have been sound). Lately, we've been moving towards Elastic.
+ - [Doctor][dr] - This is our microservice for document and audio file conversions. Inside the service we do text extraction, OCR (using tesseract), mp3 enhancements, etc.
+
+ - Solr - For making things searchable. It's *decent*. Our version is currently very old, but it hangs in there. We've also tried Sphinx. Lately, we've been moving towards Elastic.
 
  - React - For dynamic front-end features. We're slowly moving the trickiest parts of the front end over to React.
 
@@ -45,6 +47,8 @@ The major components of CourtListener are:
 ### Pulling Everything Together
 
 We use a docker compose file to make development easier. Don't use it for production! It's not secure enough, and it uses bad practices for data storage. But if you're a dev, it should work nicely.
+
+Below is the process for getting everything working. If you get stuck, note that we run all tests in GitHub Actions and that there is a complete, automated setup script in `tests.yml` that you can consult.
 
 To set up a development server, do the following:
 
@@ -70,11 +74,12 @@ To set up a development server, do the following:
     sudo find solr -type f -exec chmod 664 {} \;
     ```
 
-1. Create a personal settings file. To do that, `cd` into courtlistener/cl/settings and run the following:
+1. Create a personal settings file. To do that, copy-paste the `.env.example` file to `.env.dev`, and then minimally uncomment these settings:
 
-    `cp 05-private.example 05-private.py`
+    - `ALLOWED_HOSTS`: This is needed so tests can pass. You can set it to `localhost` for more security, or set it to `*` if you're on a safe LAN.
+    - `SECRET_KEY`: This is a django setting that salts encryption algorithms, among other things. Just set it to something random, if you like.
 
-    That will get you pretty far, but CourtListener does rely on a number of cloud services. To make all features work, you'll need to get tokens for these services. The main one you'll run into almost immediately is AWS S3 (tests won't pass without it). To make that work, you'll need to create an access token for a user with S3 access. This isn't too terribly hard, but for partners we can do it for you. Just ask.
+    That will get you pretty far, but CourtListener does rely on a number of cloud services, as you'll see in the `env.example` file. To make all features work, you'll need to get tokens for these services. The main one you'll run into almost immediately is AWS S3 (tests won't pass without it). To make that work, you'll need to create an access token for a user with S3 access. This isn't terribly hard, but for partners we can do it for you. Just ask.
 
     See [below](#how-settings-work-in-courtlistener) for more information about settings files.
 
@@ -83,10 +88,6 @@ To set up a development server, do the following:
     `docker network create -d bridge --attachable cl_net_overlay`
 
     This is important so that each service in the compose file can have a hostname.
-
-1. Initialize the docker swarm:
-
-    `docker swarm init`
 
 1. `cd` into courtlistener/docker/courtlistener, then launch the server by running:
 
@@ -98,7 +99,7 @@ To set up a development server, do the following:
       - Increase Memory to at least 4GB and Swap to 2GB
       - Then Apply and Restart.
 
-1. Finally, create a new super user login by running this command, and entering the required information:
+1. Finally, create a new superuser login by running this command, and entering the required information:
 
     `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
 
@@ -131,29 +132,13 @@ But usually you won't need to look at these logs.
 
 ## How Settings Work in CourtListener
 
-The files in the `cl/settings` directory contain all of the settings for CourtListener. They are read in alphabetical order, with each subsequent file potentially overriding the previous one.
+CourtListener has two kinds of settings: Those that can and should be adjusted by end users and those that are the same for everybody. Ones that can be adjusted have sane, safe defaults that can be overridden by environment variables. Ones that should not be overridden are simply hardcoded until somebody makes the case that they should be adjustable.
 
-Thus, `10-public.py` contains default settings for CourtListener and Celery. To override it, simply create a file in `cl/settings` called `11-private.py`. Since `11` comes after `10` *alphabetically*, it'll override anything in `10-*`.
+For developers (it's different in prod), adjustable settings are configured via a file located at `cl/env.dev`. Variables set in that file are picked up via the docker compose file or a kubernetes manifest, which passes them to the docker image running your code. Finally, our django code uses [environ][env] to pick up and use those variables.
 
-Files ending in `-public.py` are meant to be distributed in the code base. Those ending in `-private.py` are meant to stay on your machine. In theory, our `.gitignore` file will ignore them.
+All defaults — for adjustable and fixed settings alike — can be found in the `cl/settings` directory, where they are organized into a few categories of settings (third-party vs. first-party, django, and misc).
 
-You can find an example file to use for `05-private.py` in `cl/settings`. It should have the defaults you need, but it's worth skimming through. Please don't rename this file; copy it instead. If you rename it, sooner or later you'll accidentally commit the missing file into a PR.
-
-Files that are read later (with higher numbered file names) have access to the
-context of files that are read earlier. For example, if `01-some-name.py`
-contains:
-
-    SOME_VAR = {'some-key': 'some-value'}
-
-You could create a file called `02-my-overrides.py` that contained:
-
-    SOME_VAR['some-key'] = 'some-other-value'
-
-That is, you can assume that `SOME_VAR` exists because it was declared in an
-earlier settings file. Your IDE will likely complain that `SOME_VAR` doesn't
-exist in `02-my-overrides.py`, but ignore your IDE. If you want to read the
-code behind all this, look in `settings.py` (in the root directory). It's
-short.
+This design comports with [factor three][3] of the 12-factor app guidelines.
 
 
 ## Guidelines for Contributions
@@ -387,3 +372,6 @@ We use Github Actions to run the full test and linting suite on every push. If t
 [django-testing]: https://docs.djangoproject.com/en/1.8/topics/testing/
 [hub-cl-testing]: https://hub.docker.com/r/freelawproject/courtlistener-testing/
 [hub-flp]: https://hub.docker.com/u/freelawproject/dashboard/
+[dr]: https://github.com/freelawproject/doctor/
+[env]: https://django-environ.readthedocs.io/en/latest/index.html
+[3]: https://12factor.net/config

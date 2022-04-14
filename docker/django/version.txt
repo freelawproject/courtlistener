@@ -1,5 +1,6 @@
-1.2.2
+2.0.0
 
+2.0.0 - Major overhaul of docker file in prepartion for migration to kubernetes. Merges celery and django images by tag.
 1.2.2 - Add django-ses
 1.2.1 - Remove PyPDF2 dependency and simplify dockerfile
 1.2.0 - Upgrade to Python 3.10

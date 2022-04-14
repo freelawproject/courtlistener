@@ -2,12 +2,15 @@
 *
 
 # Except a few things...
-!.circleci
 !cl
 !poetry.lock
 !pyproject.toml
 !docker
+!manage.py
 
 # But no matter what, ignore these things.
-*/assets/media*
-*/node_modules
+cl/assets/static
+cl/node_modules
+*.secrets
+*.env.dev
+*.env
