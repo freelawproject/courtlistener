@@ -1722,7 +1722,7 @@ class IdbMergeTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = Court.objects.get(id="scotus")
         cls.docket_1 = DocketFactory(
             case_name="BARTON v. State Board for Rodgers Educator Certification",
             docket_number_core="0600078",
@@ -1750,8 +1750,6 @@ class IdbMergeTest(TestCase):
 
     def tearDown(self) -> None:
         FjcIntegratedDatabase.objects.all().delete()
-        Docket.objects.all().delete()
-        Court.objects.all().delete()
 
     def test_merge_from_idb_chunk(self) -> None:
         """Can we successfully merge a chunk of IDB data?"""
