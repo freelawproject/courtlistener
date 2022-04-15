@@ -25,9 +25,15 @@ DATABASES = {
         "HOST": env("DB_HOST", default="cl-postgres"),
         # Disable DB serialization during tests for small speed boost
         "TEST": {"SERIALIZE": False},
+        "OPTIONS": {
+            # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
+            # "prefer" is fine in dev, but poor in prod, where it should be
+            # "require" or above.
+            "sslmode": env("DB_SSL_MODE", default="prefer"),
+        },
     },
 }
-MAX_REPLICATION_LAG = 1e8  # 100MB
+MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
 
