@@ -29,22 +29,6 @@ ENV POETRY_VERSION=1.1.13 \
 # install poetry - respects $POETRY_VERSION & $POETRY_HOME
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
-
-FROM build-base as build-dev
-ONBUILD COPY . /opt/courtlistener
-
-
-FROM build-base as build-prod
-ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
-WORKDIR /opt
-ONBUILD RUN tar xvfz courtlistener.tar.gz && \
-    mv /opt/courtlistener-main /opt/courtlistener && \
-    rm -r /opt/courtlistener.tar.gz
-
-
-# `python-base` sets up all our shared environment variables
-FROM build-${BUILD_ENV} as python-base
-# re-establish variables from above
 ARG POETRY_HOME
 
 ENV PYTHONUNBUFFERED=1 \
@@ -57,12 +41,36 @@ ENV PYTHONUNBUFFERED=1 \
 # prepend poetry and venv to path
 ENV PATH="/opt/poetry/bin:$VENV_PATH/bin:$PATH"
 
-# copy project requirement files here to ensure they will be cached.
+
+FROM build-base as build-dev
+
 WORKDIR $PYSETUP_PATH
+
 COPY poetry.lock pyproject.toml ./
+RUN poetry install --no-root
+
+ONBUILD COPY . /opt/courtlistener
+
+
+FROM build-base as build-prod
+
+WORKDIR $PYSETUP_PATH
+
+# copy project requirement files here to ensure they will be cached.
+ONBUILD ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock /opt/poetry.lock
+ONBUILD ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
 RUN poetry install --no-root
+
+ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
+WORKDIR /opt
+ONBUILD RUN tar xvfz courtlistener.tar.gz && \
+    mv /opt/courtlistener-main /opt/courtlistener && \
+    rm -r /opt/courtlistener.tar.gz
+
+# `python-base` sets up all our shared environment variables
+FROM build-${BUILD_ENV} as python-base
 
 WORKDIR /opt
 
