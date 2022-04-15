@@ -31,6 +31,13 @@ from cl.tests.cases import SimpleTestCase, TestCase
 class ScraperIngestionTest(TestCase):
     fixtures = ["test_court.json"]
 
+    def test_extension(self, mock):
+        r = microservice(
+            service="buffer-extension",
+            params={"mime": True},
+        )
+        self.assertEqual(r.status_code, 406)
+
     def test_ingest_opinions_from_scraper(self, mock) -> None:
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
