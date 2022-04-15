@@ -14,19 +14,19 @@ services:
       resources:
         limits:
           cpus: "${CELERY_PREFORK_CONCURRENCY}"
-          memory: "${CELERY_PREFORK_MEMORY:-1}GB"
+          memory: "${CELERY_MEMORY:-1}GB"
       restart_policy:
         condition: on-failure
     volumes:
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
+      - "${DJANGO_MEDIA_ROOT:-/sata-old}:/storage"
     logging:
       driver: journald
     networks:
       - cl_net_overlay
     env_file:
       - ../../.env
-      - ../../.env.celery_prefork
+      - ../../.env.celery
 
   celery_prefork_bulk:
     image: freelawproject/courtlistener:latest-celery
@@ -37,19 +37,19 @@ services:
       resources:
         limits:
           cpus: "${CELERY_PREFORK_BULK_CONCURRENCY}"
-          memory: "${CELERY_PREFORK_BULK_MEMORY:-1}GB"
+          memory: "${CELERY_MEMORY:-1}GB"
       restart_policy:
         condition: on-failure
     volumes:
       - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
+      - "${DJANGO_MEDIA_ROOT:-/sata-old}:/storage"
     logging:
       driver: journald
     networks:
       - cl_net_overlay
     env_file:
       - ../../.env
-      - ../../.env.celery_bulk
+      - ../../.env.celery
 
 
   cl-doctor:
