@@ -31,6 +31,7 @@ REST_FRAMEWORK = {
         "bchecker": "1/hour",
         # No response
         "zealousgalileo": "1/hour",
+        "tuhinharit": "1/hour",  # Deep pagination
         "JaneDoe": "1/hour",
         "chinamkm": "1/hour",
         "shreyngd": "100/hour",

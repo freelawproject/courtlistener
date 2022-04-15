@@ -25,9 +25,15 @@ DATABASES = {
         "HOST": env("DB_HOST", default="cl-postgres"),
         # Disable DB serialization during tests for small speed boost
         "TEST": {"SERIALIZE": False},
+        "OPTIONS": {
+            # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
+            # "prefer" is fine in dev, but poor in prod, where it should be
+            # "require" or above.
+            "sslmode": env("DB_SSL_MODE", default="prefer"),
+        },
     },
 }
-MAX_REPLICATION_LAG = 1e8  # 100MB
+MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
 
@@ -58,7 +64,7 @@ INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
-MEDIA_ROOT = INSTALL_ROOT / "cl/assets/media/"
+MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
 TEMPLATE_ROOT = INSTALL_ROOT / "cl/assets/templates/"
@@ -170,10 +176,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # system time zone.
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
-ADMINS = (
-    env("ADMIN_NAME", default="Joe Schmoe"),
-    env("ADMIN_EMAIL", default="joe@courtlistener.com"),
-)
+ADMINS = [
+    (
+        env("ADMIN_NAME", default="Joe Schmoe"),
+        env("ADMIN_EMAIL", default="joe@courtlistener.com"),
+    )
+]
 
 MANAGERS = ADMINS
 

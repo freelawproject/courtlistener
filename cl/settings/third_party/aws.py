@@ -3,6 +3,7 @@ import environ
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
+# S3
 if DEVELOPMENT:
     AWS_ACCESS_KEY_ID = env("AWS_DEV_ACCESS_KEY_ID", default="")
     AWS_SECRET_ACCESS_KEY = env("AWS_DEV_SECRET_ACCESS_KEY", default="")
@@ -24,3 +25,7 @@ if DEVELOPMENT:
 CLOUDFRONT_DOMAIN = env("CLOUDFRONT_DOMAIN", default="")
 
 AWS_LAMBDA_PROXY_URL = env("AWS_LAMBDA_PROXY_URL", default="")
+
+# SES
+AWS_SES_ACCESS_KEY_ID = env("AWS_SES_ACCESS_KEY_ID", default="")
+AWS_SES_SECRET_ACCESS_KEY = env("AWS_SES_SECRET_ACCESS_KEY", default="")
