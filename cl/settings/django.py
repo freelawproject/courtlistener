@@ -176,10 +176,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # system time zone.
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
-ADMINS = (
-    env("ADMIN_NAME", default="Joe Schmoe"),
-    env("ADMIN_EMAIL", default="joe@courtlistener.com"),
-)
+ADMINS = [
+    (
+        env("ADMIN_NAME", default="Joe Schmoe"),
+        env("ADMIN_EMAIL", default="joe@courtlistener.com"),
+    )
+]
 
 MANAGERS = ADMINS
 
