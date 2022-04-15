@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.templatetags.static import static
 
 from cl.lib import search_utils
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
@@ -18,9 +19,7 @@ class JurisdictionPodcast(JurisdictionFeed):
     summary = description
     iTunes_name = "Free Law Project"
     iTunes_email = "feeds@courtlistener.com"
-    iTunes_image_url = (
-        "https://www.courtlistener.com/static/png/producer-2000x2000.png"
-    )
+    iTunes_image_url = f"https://storage.courtlistener.com{static('png/producer-2000x2000.png')}"
     iTunes_explicit = "no"
     item_enclosure_mime_type = "audio/mpeg"
 
@@ -51,11 +50,13 @@ class JurisdictionPodcast(JurisdictionFeed):
             "iTunes_explicit": "no",
         }
         if hasattr(obj, "pk"):
-            path = f"/static/png/producer-{obj.pk}-2000x2000.png"
+            path = static(f"png/producer-{obj.pk}-2000x2000.png")
         else:
             # Not a jurisdiction API -- A search API.
-            path = "/static/png/producer-2000x2000.png"
-        extra_args["iTunes_image_url"] = f"https://www.courtlistener.com{path}"
+            path = static("png/producer-2000x2000.png")
+        extra_args[
+            "iTunes_image_url"
+        ] = f"https://storage.courtlistener.com{path}"
 
         return extra_args
 
