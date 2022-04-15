@@ -96,6 +96,8 @@ def get_binary_content(
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
+        r = follow_redirections(r, requests.Session())
+        r.raise_for_status()
     else:
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
