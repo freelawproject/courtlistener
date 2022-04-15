@@ -1,8 +1,10 @@
 import logging
+import random
 from collections.abc import Sequence
 from datetime import timedelta
 from email.utils import parseaddr
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import (
     EmailMessage,
@@ -454,3 +456,28 @@ def is_small_only_flagged(email_address: str) -> bool:
     if small_only.exists():
         return True
     return False
+
+
+def add_bcc_random(
+    message: EmailMessage | EmailMultiAlternatives,
+    bcc_rate: float,
+) -> EmailMessage | EmailMultiAlternatives:
+    """This function uses randint() to obtain the probability of BCC a message
+    based on the bcc_rate which is a float value from 0 to 1.
+
+    e.g: if we want to bcc to the 10% of messages we should use a bcc_rate
+    of 0.1, so we'd have a normalized_bcc_rate of 10, so it'll check if the
+    random returned value by randint(1,100) is <= 10, which means, in theory,
+    a probability of 1/10.
+
+    :param bcc_rate: The email bcc copy rate, a float value between 0-1 that
+    represent the percentage of messages that we want to add a BCC
+    :return EmailMessage | EmailMultiAlternatives: Returns the message with a
+    BCC added or not.
+    """
+
+    returned_value = random.randint(1, 100)
+    normalized_bcc_rate = int(bcc_rate * 100)
+    if returned_value <= normalized_bcc_rate:
+        message.bcc.append(settings.BCC_EMAIL_ADDRESS)
+    return message

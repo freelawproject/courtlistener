@@ -64,8 +64,6 @@ def make_alert_messages(
         msg.attach_alternative(html, "text/html")
         messages.append(msg)
 
-    # Add a bcc to the first message in the list so that we get a copy.
-    messages[0].bcc = ["docket-alert-testing@free.law"]
     return messages
 
 

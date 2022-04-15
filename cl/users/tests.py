@@ -19,7 +19,11 @@ from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.email_handlers import get_email_body, normalize_addresses
+from cl.users.email_handlers import (
+    add_bcc_random,
+    get_email_body,
+    normalize_addresses,
+)
 from cl.users.factories import UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
@@ -906,6 +910,11 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
 
 
+@override_settings(
+    EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+    BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_BCC_COPY_RATE=0,
+)
 class CustomBackendEmailTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -958,10 +967,6 @@ class CustomBackendEmailTest(TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_send_mail_function(self) -> None:
         """This test checks if Django send_mail() works properly using the
         custom email backend, the email should be stored automatically.
@@ -1000,12 +1005,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body goes here")
         self.assertEqual(html_body, "<p>Body goes here</p>")
 
-    # check if I can get an error if form a bad emailmessage
-
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_email_message_class(self) -> None:
         """This test checks if Django EmailMessage class works properly using
         the custom email backend, the email should be stored automatically.
@@ -1061,10 +1060,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body goes here")
         self.assertEqual(html_body, "")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_multialternative_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
         properly sending html and plain versions using the custom backend
@@ -1119,10 +1114,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body goes here")
         self.assertEqual(html_body, "<p>Body goes here</p>")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_multialternative_only_plain_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
         properly sending plain version using the custom backend
@@ -1165,10 +1156,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body goes here")
         self.assertEqual(html_body, "")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_multialternative_only_html_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
         properly sending html version using the custom backend
@@ -1208,10 +1195,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "")
         self.assertEqual(html_body, "<p>Body goes here</p>")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_email_with_attachment(self) -> None:
         """This test checks if Django EmailMessage class works
         properly sending a message with an attachment using the custom
@@ -1237,10 +1220,6 @@ class CustomBackendEmailTest(TestCase):
         # Confirm the attachment is sent
         self.assertEqual(len(message_sent.attachments), 1)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_link_user_to_email(self) -> None:
         """This test checks if a User is properly linked to a stored Email
         is created, we search for the user by email address if found it's
@@ -1263,10 +1242,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(stored_email.count(), 1)
         self.assertEqual(stored_email[0].user_id, user_email.id)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_to_banned_email(self) -> None:
         """This test checks if an email address is banned and we try to send
         it an email, the message is discarded and not stored.
@@ -1303,10 +1278,6 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 0)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_email_within_back_off(self) -> None:
         """This test checks if an email address is under a backoff waiting
         period and we try to send it an email, the message is stored but
@@ -1338,10 +1309,6 @@ class CustomBackendEmailTest(TestCase):
         # Confirm if email is not sent
         self.assertEqual(len(mail.outbox), 0)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_small_only_email(self) -> None:
         """This test checks if an email address is flagged with a small email
         only flag and try to send an email with an attachment, the small email
@@ -1406,10 +1373,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body for small version")
         self.assertEqual(html_body, "<p>Body for small version</p>")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_no_small_only_email(self) -> None:
         """This test checks if an email address is not flagged with a small
         email only flag and we try to send an email with an attachment, the
@@ -1465,8 +1428,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(stored_email[0].plain_text, "Body for small version")
 
     @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         MAX_ATTACHMENT_SIZE=350_000,
     )
     def test_sending_over_file_size_limit(self) -> None:
@@ -1512,10 +1473,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body for small version")
         self.assertEqual(html_body, "<p>Body for small version</p>")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_compose_message_from_db(self) -> None:
         """This test checks if we can compose and send a new message based on
         a stored message.
@@ -1642,10 +1599,6 @@ class CustomBackendEmailTest(TestCase):
             normalized_emails = normalize_addresses(test)
             self.assertEqual(normalized_emails, result)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_email(self) -> None:
         """Test if we can send a message to multiple recipients, bcc, cc, and
         reply_to email addresses.
@@ -1733,10 +1686,6 @@ class CustomBackendEmailTest(TestCase):
             ["another@example.com", "reply@example.com"],
         )
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_banned_email(self) -> None:
         """When sending an email to multiple recipients we verify if each
         recipient is not banned, we remove the banned email addresses from
@@ -1785,10 +1734,6 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_all_banned(self) -> None:
         """When sending an email to multiple recipients and all of them are
         banned, we discard the message, we don't send and store it.
@@ -1820,10 +1765,6 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 0)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_small_email_only(self) -> None:
         """When sending an email to multiple recipients, if at least one of
         the recipients requires a small version, we send the small email only
@@ -1890,10 +1831,6 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(plaintext_body, "Body for small version")
         self.assertEqual(html_body, "<p>Body for small version</p>")
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_no_small_email_only(self) -> None:
         """When sending an email to multiple recipients and the message
         has a small version but none of the recipients are small_email_only
@@ -1962,10 +1899,6 @@ class CustomBackendEmailTest(TestCase):
             ],
         )
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_within_backoff(self) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
@@ -2006,10 +1939,6 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
 
-    @override_settings(
-        EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
-        BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    )
     def test_sending_multiple_recipients_all_within_backoff(self) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
@@ -2039,3 +1968,177 @@ class CustomBackendEmailTest(TestCase):
         # Confirm if email is stored
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
+
+    def call_bcc_random(self, message, bcc_rate, iterations) -> int:
+        """This function simulates n (iterations) calls to the add_bcc_random
+        function and returns a counter_bcc that represents the number of
+        messages that are bcc'ed.
+        """
+        counter_bcc = 0
+        for i in range(iterations):
+            message = add_bcc_random(message, bcc_rate)
+            if message.bcc:
+                counter_bcc += 1
+            # Clean bcc to test next iteration.
+            message.bcc = []
+        return counter_bcc
+
+    def average_bcc_random(self, message, bcc_rate, iterations) -> int:
+        """This function simulates 50 calls to the call_bcc_random
+        function and returns the average number of times that add_bcc_random
+        returned True.
+        """
+        total = 0
+        for i in range(50):
+            val = self.call_bcc_random(message, bcc_rate, iterations)
+            total = total + val
+        average = total / 50
+        return int(round(average))
+
+    def test_add_bcc_random(self) -> None:
+        """Test the add_bcc_random function to verify if it produces the
+        expected results based on the bcc_rate provided.
+
+        We use call_bcc_random(bcc_rate, iterations) function with a bcc_rate
+        to simulate n calls of the add_bcc_random function, this functions
+        returns the total number of times that add_bcc_random returned True
+        """
+
+        # Test differnt BCC rates
+        # No messages are BCC'ed
+        zero_bcc_rate = 0
+        # All messages are BCC'ed
+        all_bcc_rate = 1
+        # 10% are BCC'ed
+        ten_bcc_rate = 0.1
+        # 1% are BCC'ed
+        one_bcc_rate = 0.01
+
+        message = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "bounce@simulator.amazonses.com",
+            ],
+        )
+
+        # Get the average number of times that add_bcc_random returns True
+        # for different bcc_rate and 10_000 iterations
+        average_ten = self.average_bcc_random(message, ten_bcc_rate, 10_000)
+        average_one = self.average_bcc_random(message, one_bcc_rate, 10_000)
+        average_none = self.average_bcc_random(message, zero_bcc_rate, 10_000)
+        average_all = self.average_bcc_random(message, all_bcc_rate, 10_000)
+
+        # For 0.1 bcc rate of 10_000 calls we should get a number very close
+        # to 1000, however, to ensure the test never fails we use a range
+        # between 900 and 1100
+        self.assertTrue(average_ten >= 900 and average_ten <= 1100)
+
+        # For 0.01 bcc rate of 10_000 calls we should get a number very close
+        # to 100, however, to ensure the test never fails we use a range
+        # between 90 and 110
+        self.assertTrue(average_one >= 90 and average_one <= 110)
+
+        # For 1 bcc rate of 10_000 calls we should get 10_000
+        self.assertEqual(average_all, 10_000)
+
+        # For 0 bcc rate of 10_000 calls we should get 0
+        self.assertEqual(average_none, 0)
+
+    @override_settings(EMAIL_BCC_COPY_RATE=1)
+    def test_add_bcc_to_emails(self) -> None:
+        """This test checks if bcc is added to the message when we use a
+        EMAIL_BCC_COPY_RATE = 1, all messages should be bcc'ed
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+        )
+
+        email.send()
+        # Verify if BCC was added to the message
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.bcc, [settings.BCC_EMAIL_ADDRESS])
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email[0].bcc, [])
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+            ("BCC User <bcc@example.com>", "bcc@example.com"),
+        )
+        email.send()
+        message_sent = mail.outbox[1]
+        # Verify if BCC was added to the message as an additional address
+        self.assertEqual(
+            message_sent.bcc,
+            [
+                "BCC User <bcc@example.com>",
+                "bcc@example.com",
+                settings.BCC_EMAIL_ADDRESS,
+            ],
+        )
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(
+            stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
+
+    @override_settings(EMAIL_BCC_COPY_RATE=0)
+    def test_avoid_add_bcc_to_emails(self) -> None:
+        """This test checks if bcc is not added to the message when we use a
+        EMAIL_BCC_COPY_RATE = 0, no messages should be bcc'ed
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+        )
+
+        email.send()
+        # Verify if the BCC was not added to the message
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.bcc, [])
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email[0].bcc, [])
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+            ("BCC User <bcc@example.com>", "bcc@example.com"),
+        )
+        email.send()
+        message_sent = mail.outbox[1]
+        # Verify if the BCC was not added to the message
+        self.assertEqual(
+            message_sent.bcc, ["BCC User <bcc@example.com>", "bcc@example.com"]
+        )
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(
+            stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
