@@ -63,16 +63,21 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 
 @admin.register(EmailFlag)
 class EmailFlagAdmin(admin.ModelAdmin):
+    search_fields = ("email_address",)
+    list_filter = ("object_type", "event_sub_type", "flag")
     list_display = (
         "email_address",
         "id",
         "object_type",
+        "event_sub_type",
+        "flag",
         "date_created",
     )
 
 
 @admin.register(BackoffEvent)
 class BackoffEventAdmin(admin.ModelAdmin):
+    search_fields = ("email_address",)
     list_display = (
         "email_address",
         "id",
@@ -83,6 +88,7 @@ class BackoffEventAdmin(admin.ModelAdmin):
 
 @admin.register(EmailSent)
 class EmailSentAdmin(admin.ModelAdmin):
+    search_fields = ("to",)
     list_display = (
         "to",
         "id",
