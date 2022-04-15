@@ -18,8 +18,8 @@ services:
       restart_policy:
         condition: on-failure
     volumes:
-      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata-old}:/storage"
+      - "/var/run/postgresql:/var/run/postgresql"
+      - "/sata-old:/storage"
     logging:
       driver: journald
     networks:
@@ -42,8 +42,8 @@ services:
       restart_policy:
         condition: on-failure
     volumes:
-      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata-old}:/storage"
+      - "/var/run/postgresql:/var/run/postgresql"
+      - "/sata-old:/storage"
     logging:
       driver: journald
     networks:
