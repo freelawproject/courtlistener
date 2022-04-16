@@ -1098,7 +1098,9 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
+def fetch_pacer_doc_by_rd(
+    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+) -> Optional[int]:
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1106,8 +1108,11 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
 
     :param rd_pk: The PK of the RECAP Document to get.
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
     :return: The RECAPDocument PK
     """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -1140,7 +1145,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     try:
         r = download_pacer_pdf_by_rd(
-            rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
+            rd.pk, pacer_case_id, rd.pacer_doc_id, cookies, magic_number
         )
     except (requests.RequestException, HTTPError):
         msg = "Failed to get PDF from network."
@@ -1487,6 +1492,7 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:
+
     start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
@@ -1539,11 +1545,17 @@ def process_recap_email(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
+    magic_number = docket_entry["pacer_magic_num"]
     for rd in rds_created:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )
-        fetch_pacer_doc_by_rd(rd.pk, fq.pk)
+
+        # If we don't have a magic number avoid fetching the document
+        if magic_number:
+            fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
+        # TODO send an email to tell user that notification didn't have a
+        # magic link
 
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)

@@ -1495,6 +1495,7 @@ def download_pacer_pdf_by_rd(
     pacer_case_id: str,
     pacer_doc_id: int,
     cookies: RequestsCookieJar,
+    magic_number: Optional[str] = None,
 ) -> Optional[Response]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1505,15 +1506,18 @@ def download_pacer_pdf_by_rd(
     :param pacer_doc_id: The internal PACER document ID to download
     :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
     logged-in PACER user.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
     :return: requests.Response object usually containing a PDF, or None if that
     wasn't possible.
     """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
     try:
-        r = report.download_pdf(pacer_case_id, pacer_doc_id)
+        r = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
