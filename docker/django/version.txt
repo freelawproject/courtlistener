@@ -1,5 +1,6 @@
-2.0.1
+2.0.2
 
+2.0.2 - Add the replica DB
 2.0.1 - Allow MEDIA_ROOT to be configurable; fix ADMINS
 2.0.0 - Major overhaul of docker file in prepartion for migration to kubernetes. Merges celery and django images by tag.
 1.2.2 - Add django-ses
