@@ -99,13 +99,15 @@ class ProcessingQueue(AbstractDateTimeModel):
         Court,
         help_text="The court where the upload was from",
         related_name="recap_processing_queue",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
     )
     uploader = models.ForeignKey(
         User,
         help_text="The user that uploaded the item to RECAP.",
         related_name="recap_processing_queue",
-        on_delete=models.CASCADE,
+        # Normal accounts don't upload, so if you've been given access, for now
+        # at least, you don't get to delete your account.
+        on_delete=models.RESTRICT,
     )
     pacer_case_id = models.CharField(
         help_text="The cased ID provided by PACER.",
@@ -165,21 +167,21 @@ class ProcessingQueue(AbstractDateTimeModel):
         Docket,
         help_text="The docket that was created or updated by this request.",
         null=True,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
     )
     docket_entry = models.ForeignKey(
         DocketEntry,
         help_text="The docket entry that was created or updated by this "
         "request, if applicable. Only applies to PDFs uploads.",
         null=True,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
     )
     recap_document = models.ForeignKey(
         RECAPDocument,
         help_text="The document that was created or updated by this request, "
         "if applicable. Only applies to PDFs uploads.",
         null=True,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
     )
 
     def __str__(self) -> str:
@@ -222,17 +224,21 @@ class ProcessingQueue(AbstractDateTimeModel):
 
 
 class EmailProcessingQueue(AbstractDateTimeModel):
+    """Where @recap.email emails go when received by the API"""
+
     uploader = models.ForeignKey(
         User,
         help_text="The user that sent in the email for processing.",
         related_name="recap_email_processing_queue",
-        on_delete=models.CASCADE,
+        # Normal users won't be uploading things to this API. ∴, if you've
+        # uploaded to it, your account is too special to delete.
+        on_delete=models.RESTRICT,
     )
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
         related_name="recap_email_processing_queue",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
     )
     message_id = models.TextField(
         help_text="The S3 message identifier, used to pull the file in the processing tasks.",
@@ -297,7 +303,9 @@ class PacerFetchQueue(AbstractDateTimeModel):
         User,
         help_text="The user that made the request.",
         related_name="pacer_fetch_queue_items",
-        on_delete=models.CASCADE,
+        # User accounts are not normally deleted; they're made into stubs. So,
+        # don't let these accounts get deleted either.
+        on_delete=models.RESTRICT,
     )
     status = models.SmallIntegerField(
         help_text="The current status of this request. Possible values "
@@ -326,7 +334,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
         Court,
         help_text="The court where the request will be made",
         related_name="pacer_fetch_queue_items",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
     )
 
@@ -336,7 +344,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
         help_text="The ID of the RECAP Document in the CourtListener databae "
         "that you wish to fetch or update.",
         related_name="pacer_fetch_queue_items",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
     )
 
@@ -348,7 +356,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
         help_text="The ID of an existing docket object in the CourtListener "
         "database that should be updated.",
         related_name="pacer_fetch_queue_items",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
     )
     pacer_case_id = models.CharField(
@@ -651,7 +659,7 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
         Court,
         help_text="Circuit in which the case was filed.",
         related_name="+",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -659,7 +667,7 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
         Court,
         help_text="District court in which the case was filed.",
         related_name="idb_cases",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         db_index=True,
         null=True,
         blank=True,

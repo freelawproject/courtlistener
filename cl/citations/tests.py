@@ -25,9 +25,9 @@ from cl.citations.filter_parentheticals import (
     is_parenthetical_descriptive,
 )
 from cl.citations.group_parentheticals import (
-    ParentheticalGroup,
+    ComputedParentheticalGroup,
+    compute_parenthetical_groups,
     get_graph_component,
-    get_parenthetical_groups,
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
@@ -50,6 +50,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -625,7 +626,7 @@ class UpdateTest(IndexedSolrTestCase):
         ]
         for described, num_parentheticals in description_test_pairs:
             with self.subTest(
-                f"Testing Parenthetical creation for {described}...",
+                f"Testing Parenthetical and ParentheticalGroup creation for {described}...",
                 described=described,
                 num_descriptions=num_parentheticals,
             ):
@@ -635,6 +636,15 @@ class UpdateTest(IndexedSolrTestCase):
                     ).count(),
                     num_parentheticals,
                 )
+                # Make sure at least one ParentheticalGroup is created if
+                # there is at least one parenthetical
+                if num_parentheticals > 0:
+                    self.assertGreaterEqual(
+                        ParentheticalGroup.objects.filter(
+                            opinion=described
+                        ).count(),
+                        1,
+                    )
 
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
         remove_citations_from_imported_fixtures()
@@ -862,6 +872,10 @@ class FilterParentheticalTest(SimpleTestCase):
             "cited in Heart of Atlanta Motel v. United States",
             "quoting Hart Steel Co. v. Railroad Supply Co., 244 U.S. 294, 299, 37 S. Ct. 506, 508, 61 L. Ed. 1148 (1917)",
             "collecting cases",
+            "holding that too short",
+            "First Amendment",
+            "mislabeled product",
+            "Section 403(d)(2)",
         ]
         for i, parenthetical_text in enumerate(fixtures):
             with self.subTest(
@@ -879,12 +893,10 @@ class FilterParentheticalTest(SimpleTestCase):
             "where plaintif's complaint alleges facts which, if proven, would entitle plaintiff to relief under the Eighth Amendment, dismissal of complaint was inappropriate",
             "ruling that there is nothing either legal or illegal, only thinking makes it so",
             "testing that the mere presence of the word quotation doesn't get a parenthetical filtered out if it's long enough",
-            "First Amendment",
-            "mislabeled product",
             '"Look on my Works, ye Mighty, and despair"',
             '"Texas does not seek to have the Court interpret the Constitution, so much as disregard it."',
             "questioning whether he who made the Lamb made thee",
-            "Section 403(d)(2)",
+            "holding that just long enough",
         ]
 
         for i, parenthetical_text in enumerate(fixtures):
@@ -1228,7 +1240,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                 # We flatten it into a single list and see if the algorithm
                 # comes up with the same groupings when we pass it the flat list
                 flat = list(itertools.chain.from_iterable(groups))
-                output_groups = get_parenthetical_groups(flat)
+                output_groups = compute_parenthetical_groups(flat)
                 output_sets = frozenset(
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )

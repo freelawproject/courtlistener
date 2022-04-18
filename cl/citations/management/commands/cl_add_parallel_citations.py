@@ -14,7 +14,6 @@ from cl.citations.match_citations import (
 )
 from cl.citations.tasks import identify_parallel_citations
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion, OpinionCluster
 
@@ -285,15 +284,14 @@ class Command(VerboseCommand):
             "## Entering phase one: Building a network object of "
             "all citations.\n"
         )
-        q = Opinion.objects.all()
+        opinions = Opinion.objects.all()
         if options.get("doc_id"):
-            q = q.filter(pk__in=options["doc_id"])
-        count = q.count()
-        opinions = queryset_generator(q, chunksize=10000)
+            opinions = opinions.filter(pk__in=options["doc_id"])
+        count = opinions.count()
 
         node_count = edge_count = completed = 0
         subtasks = []
-        for o in opinions:
+        for o in opinions.iterator():
             subtasks.append(
                 identify_parallel_citations.s(
                     get_citations(get_and_clean_opinion_text(o).cleaned_text)

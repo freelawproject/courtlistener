@@ -1,0 +1,12 @@
+{
+	"Type": "Notification",
+	"MessageId": "ef9786dd-ac11-55f0-b91e-dc7e0592ab5c",
+	"TopicArn": "arn:aws:sns:us-east-1:364852123998:test-email",
+	"Subject": "Amazon SES Email Event Notification",
+	"Message": "{\"eventType\":\"Complaint\",\"complaint\":{\"feedbackId\":\"0100017f72b55e10-2681b99d-b317-4a89-9336-be2d6b047e37-000000\",\"complaintSubType\":null,\"complainedRecipients\":[{\"emailAddress\":\"complaint@simulator.amazonses.com\"}],\"timestamp\":\"2022-03-10T07:22:43.174Z\",\"userAgent\":\"Amazon SES Mailbox Simulator\",\"complaintFeedbackType\":\"abuse\",\"arrivalDate\":\"2022-03-10T07:22:43.174Z\"},\"mail\":{\"timestamp\":\"2022-03-10T07:22:42.524Z\",\"source\":\"test_1_example@gmail.com\",\"sourceArn\":\"arn:aws:ses:us-east-1:364852123998:identity/test_1_example@gmail.com\",\"sendingAccountId\":\"364852123998\",\"messageId\":\"0100017f72b55bdc-0c6476c0-bc75-4601-9294-8d244d5f8dd2-000000\",\"destination\":[\"complaint@simulator.amazonses.com\"],\"headersTruncated\":false,\"headers\":[{\"name\":\"From\",\"value\":\"test_1_example@gmail.com\"},{\"name\":\"To\",\"value\":\"complaint@simulator.amazonses.com\"},{\"name\":\"Subject\",\"value\":\"test subject\"},{\"name\":\"MIME-Version\",\"value\":\"1.0\"},{\"name\":\"Content-Type\",\"value\":\"multipart/alternative;  boundary=\\\"----=_Part_1560464_1708107654.1646896962530\\\"\"}],\"commonHeaders\":{\"from\":[\"test_1_example@gmail.com\"],\"to\":[\"complaint@simulator.amazonses.com\"],\"messageId\":\"0100017f72b55bdc-0c6476c0-bc75-4601-9294-8d244d5f8dd2-000000\",\"subject\":\"test subject\"},\"tags\":{\"ses:operation\":[\"SendEmail\"],\"ses:configuration-set\":[\"test-set\"],\"ses:source-ip\":[\"187.190.204.95\"],\"ses:from-domain\":[\"gmail.com\"],\"ses:caller-identity\":[\"root\"]}}}\n",
+	"Timestamp": "2022-03-10T07:22:43.297Z",
+	"SignatureVersion": "1",
+	"Signature": "JG1i8K1Gqy41kNpUXL2FiqCfUJlRO73L9q2gDmBMx47aNlxTC+l7xzLCf7eYQk3YmYXXTmsa19Pplf70qOJVcdDggDpyxhhdLkHLD6yQM0mxsJn3ELWDXC0RDpvnBaTAPA6EyRgSHD5Tode/aFNawz0IwAAkR/MJMrwvQYTe6yxVdPm292Fy9LFFLlqlr6mEkArn9IEM/yoOkrb0IHp172eZy/E9dDjmi4/MGbNE/Bf30BrS8Ga0xrOqyO3PtoyNBdZ6hzqiivk1B5QiK8vuIbm/cagtPIprYKJzxXPgdVloQvygkoRUyAr32EZlah4B25aHsS/yInMDvrQeOI2N4g==",
+	"SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-7ff5318490ec183fbaddaa2a969abfda.pem",
+	"UnsubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:364852123998:test-email:8dc44811-ffbc-4dd9-9693-5d64aecbaf59"
+}

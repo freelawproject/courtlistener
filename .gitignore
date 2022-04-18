@@ -38,3 +38,5 @@ cl/settings/google_auth.json
 .DS_Store
 
 cl/node_modules
+/.env.dev
+/.env

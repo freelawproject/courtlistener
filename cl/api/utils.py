@@ -391,7 +391,7 @@ class BulkJsonHistory(object):
         self.json = self.load_json_file()
         super(BulkJsonHistory, self).__init__()
 
-    def load_json_file(self):
+    def load_json_file(self) -> Dict[str, Union[str, float]]:
         """Get the history file from disk and return it as data."""
         try:
             with open(self.path, "r") as f:
@@ -532,17 +532,20 @@ def invert_user_logs(
     for k, v in out.items():
         out[k] = OrderedDict(sorted(v.items(), key=lambda t: t[0]))
 
-    # Add usernames as alternate keys for every value possible.
-    if add_usernames:
-        for k, v in out.items():
-            try:
-                user = User.objects.get(pk=k)
-            except (User.DoesNotExist, ValueError):
-                pass
-            else:
-                out[user.username] = v
+    if not add_usernames:
+        return out
 
-    return out
+    # Add usernames as alternate keys for every value possible.
+    user_keyed_out = {}
+    for k, v in out.items():
+        try:
+            user = User.objects.get(pk=k)
+        except (User.DoesNotExist, ValueError):
+            user_keyed_out[k] = v
+        else:
+            user_keyed_out[user.username] = v
+
+    return user_keyed_out
 
 
 def get_user_ids_for_date_range(

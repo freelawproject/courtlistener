@@ -72,7 +72,9 @@ class Donation(AbstractDateTimeModel):
         User,
         help_text="The user that made the donation",
         related_name="donations",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     clearing_date = models.DateTimeField(null=True, blank=True)
     send_annual_reminder = models.BooleanField(
@@ -126,7 +128,9 @@ class MonthlyDonation(AbstractDateTimeModel):
         User,
         help_text="The user that made the donation",
         related_name="monthly_donations",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     enabled = models.BooleanField(
         help_text="Is this monthly donation enabled?", default=True

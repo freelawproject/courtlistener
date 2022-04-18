@@ -1,8 +1,6 @@
 # Run using `docker-compose up`
 version: "3.7"
-volumes:
-  cl-judge-pics:
-  cl-seal-rookery:
+
 networks:
   cl_net_overlay:
     driver: bridge
@@ -48,47 +46,40 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/task-server:latest}
+    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery}
     depends_on:
       - cl-postgresql
       - cl-redis
-      - cl-binary-transformers-and-extractors
-      - cl-judge-pics
-      - cl-seal-rookery
+      - cl-doctor
+      - cl-disclosures
     volumes:
-      - ${CL_BASE_DIR:-../..}/cl:/opt/celery/cl:ro
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - ${CL_BASE_DIR:-../..}/cl/assets/media:/opt/celery/cl/assets/media
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
     networks:
       - cl_net_overlay
+    env_file:
+      - ../../.env.dev
 
   cl-django:
     container_name: cl-django
-    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener-django:latest}
+    image: ${DJANGO_DOCKER_IMAGE:-freelawproject/courtlistener:latest-web-dev}
     depends_on:
       - cl-postgresql
       - cl-redis
       - cl-celery
       - cl-solr
       - cl-selenium
-      - cl-binary-transformers-and-extractors
-      - cl-judge-pics
-      - cl-seal-rookery
+      - cl-doctor
+      - cl-disclosures
     ports:
       - "8000:8000"
     volumes:
-      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+      - ${CL_BASE_DIR:-../../../courtlistener}:/opt/courtlistener
     networks:
       - cl_net_overlay
-    command: >
-      bash -c "python /opt/courtlistener/manage.py migrate
-      && python /opt/courtlistener/manage.py createcachetable
-      && python /opt/courtlistener/manage.py runserver 0.0.0.0:8000"
+    env_file:
+      - ../../.env.dev
 
   cl-selenium:
     container_name: cl-selenium
@@ -103,32 +94,14 @@ services:
     environment:
       - JAVA_OPTS=-Dwebdriver.chrome.whitelistedIps=
 
-  cl-judge-pics:
-    image: freelawproject/judge-pics:latest
-    container_name: "cl-judge-pics"
-    volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-    deploy:
-      restart_policy:
-        condition: none
-
-  cl-seal-rookery:
-    image: freelawproject/seal-rookery:latest
-    container_name: "cl-seal-rookery"
-    volumes:
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
-    deploy:
-      restart_policy:
-        condition: none
-
-  cl-binary-transformers-and-extractors:
-    image: freelawproject/binary-transformers-and-extractors:latest
-    container_name: "cl-binary-transformers-and-extractors"
-    depends_on:
-      - cl-seal-rookery
-    ports:
-      - "5050:5050"
+  cl-doctor:
+    image: freelawproject/doctor:latest
+    container_name: "cl-doctor"
     networks:
       - cl_net_overlay
-    volumes:
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+
+  cl-disclosures:
+    image: freelawproject/disclosure-extractor:latest
+    container_name: "cl-disclosures"
+    networks:
+      - cl_net_overlay

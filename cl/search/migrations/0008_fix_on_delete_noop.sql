@@ -1,0 +1,29 @@
+BEGIN;
+--
+-- Alter field appeal_from on docket
+--
+--
+-- Alter field assigned_to on docket
+--
+--
+-- Alter field court on docket
+--
+--
+-- Alter field idb_data on docket
+--
+--
+-- Alter field originating_court_information on docket
+--
+--
+-- Alter field referred_to on docket
+--
+--
+-- Alter field author on opinion
+--
+--
+-- Alter field assigned_to on originatingcourtinformation
+--
+--
+-- Alter field ordering_judge on originatingcourtinformation
+--
+COMMIT;

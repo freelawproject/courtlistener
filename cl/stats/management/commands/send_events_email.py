@@ -23,5 +23,5 @@ class Command(VerboseCommand):
                 subject=f"CourtListener events email for {today.date().isoformat()}",
                 message=template.render({"events": events}),
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=settings.MANAGERS,
+                recipient_list=[a[1] for a in settings.MANAGERS],
             )

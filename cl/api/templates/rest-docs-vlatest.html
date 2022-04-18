@@ -683,7 +683,7 @@
 
 
     <h3 id="financialdisclosure-endpoint">Financial Disclosure Endpoints</h3>
-    <p>This endpoint provides an API for financial disclosures of current and former federal judges beginning in 2004. You can learn more about which disclosures are included and the limitations of this data source on our <a href="{% url "coverage_fds" %}">coverage page for financial disclosures</a>.
+    <p>This endpoint provides an API for financial disclosures of current and former federal judges beginning in 1987. You can learn more about which disclosures are included and the limitations of this data source on our <a href="{% url "coverage_fds" %}">coverage page for financial disclosures</a>.
     </p>
     <h4 id="financialdisclosure-background">Background on the Information</h4>
     <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials disclose publicly their personal financial interests, to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.
@@ -818,7 +818,12 @@ PACER_TO_CL_IDS = {
       <li>
         <p><code>PDFs</code> (3) &mdash; To upload PDFs, you must include the <code>pacer_doc_id</code> and <code>document_number</code> fields. If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. Because some cases share documents, the <code>pacer_case_id</code> field should also be provided, though it's not a required field if it's unknown.
         </p>
-        <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times in the hopes that the docket gets processed in the meantime. If, after retrying several times, the a docket cannot be found, your upload will be marked as an orphan document. Later, if the docket is found, your PDF will be automatically associated with it, but until then it's not visible to users or any API.
+        <p><code>pacer_doc_id</code> is the number you see in URLs when purchasing documents on PACER and in the HTML when clicking document numbers on docket pages. For example, in the URL <code>ecf.flp.uscourts.gov/doc1/035021404350</code>, the <code>pacer_doc_id</code> is <code>035021404350</code>.
+        </p>
+        <p>There are three variables embedded in each <code>pacer_doc_id</code> number.The first three digits (in this case, <code>035</code>) are a code indicating the court. The fourth digit is a zero or one, and is used by PACER to determine if URL should load an attachment page for the document or instead take you directly to the purchase page (we believe this digit is why the URL mentions <code>/doc1/</code>). The remaining digits are the serial number of the document itself. <strong>When uploading to this endpoint, the fourth digit must always be normalized to a zero before uploading.</strong>
+        </p>
+        <p>The <code>document_number</code> is the number for the document that you see on the docket page and elsewhere. The <code>attachment_number</code> is the number you see on the attachment page and elsewhere.</p>
+        <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times in the hopes that the docket gets processed in the meantime. If, after retrying several times, the docket cannot be found, your upload will be marked as an orphan document. Later, if the docket is found, your PDF will be automatically associated with it, but until then it's not visible to users or any API.
         </p>
       </li>
       <li>

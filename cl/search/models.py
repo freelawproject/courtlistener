@@ -101,7 +101,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         "people_db.Person",
         help_text="The judge the case was assigned to.",
         related_name="original_court_info",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -113,7 +113,7 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         "people_db.Person",
         related_name="+",
         help_text="The judge that issued the final order in the case.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -260,7 +260,7 @@ class Docket(AbstractDateTimeModel):
     court = models.ForeignKey(
         "Court",
         help_text="The court where the docket was filed",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         db_index=True,
         related_name="dockets",
     )
@@ -274,7 +274,7 @@ class Docket(AbstractDateTimeModel):
             "normalize the value in appeal_from_str."
         ),
         related_name="+",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -293,7 +293,7 @@ class Docket(AbstractDateTimeModel):
         OriginatingCourtInformation,
         help_text="Lower court information for appellate dockets",
         related_name="docket",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -304,7 +304,7 @@ class Docket(AbstractDateTimeModel):
             "case."
         ),
         related_name="docket",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -325,7 +325,7 @@ class Docket(AbstractDateTimeModel):
         "people_db.Person",
         related_name="assigning",
         help_text="The judge the case was assigned to.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -337,7 +337,7 @@ class Docket(AbstractDateTimeModel):
         "people_db.Person",
         related_name="referring",
         help_text="The judge to whom the 'assigned_to' judge is delegated.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
     )
@@ -381,31 +381,26 @@ class Docket(AbstractDateTimeModel):
         help_text="date cert was granted for this case, if applicable",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_cert_denied = models.DateField(
         help_text="the date cert was denied for this case, if applicable",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_argued = models.DateField(
         help_text="the date the case was argued",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_reargued = models.DateField(
         help_text="the date the case was reargued",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_reargument_denied = models.DateField(
         help_text="the date the reargument was denied",
         blank=True,
         null=True,
-        db_index=True,
     )
     date_filed = models.DateField(
         help_text="The date the case was filed.", blank=True, null=True
@@ -558,7 +553,6 @@ class Docket(AbstractDateTimeModel):
         ),
         null=True,
         blank=True,
-        db_index=True,
     )
     view_count = models.IntegerField(
         help_text="The number of times the docket has been seen.", default=0
@@ -585,13 +579,6 @@ class Docket(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["court_id", "id"]),
         ]
-        index_together = (
-            (
-                "ia_upload_failure_count",
-                "ia_needs_upload",
-                "ia_date_first_change",
-            ),
-        )
 
     def __str__(self) -> str:
         if self.case_name:
@@ -2237,15 +2224,17 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def parentheticals(self):
-        return (
-            Parenthetical.objects.filter(
-                described_opinion_id__in=self.sub_opinions.values_list(
-                    "pk", flat=True
-                )
+        return Parenthetical.objects.filter(
+            described_opinion_id__in=self.sub_opinions.values_list(
+                "pk", flat=True
             )
-            .prefetch_related("describing_opinion__cluster__citations")
-            .order_by("-score")
-        )
+        ).order_by("-score")
+
+    @property
+    def parenthetical_groups(self):
+        return ParentheticalGroup.objects.filter(
+            opinion__in=self.sub_opinions.values_list("pk", flat=True)
+        ).order_by("-score")
 
     @property
     def authority_count(self):
@@ -2589,7 +2578,7 @@ class Opinion(AbstractDateTimeModel):
         "people_db.Person",
         help_text="The primary author of this opinion as a normalized field",
         related_name="opinions_written",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -2867,20 +2856,73 @@ class Parenthetical(models.Model):
     described_opinion = models.ForeignKey(
         Opinion, related_name="parentheticals", on_delete=models.CASCADE
     )
+    group = models.ForeignKey(
+        "ParentheticalGroup",
+        related_name="parentheticals",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
     text = models.TextField(
-        help_text="The text of the description as written in the describing opinion",
+        help_text="The text of the description as written in the describing "
+        "opinion",
     )
     score = models.FloatField(
         db_index=True,
         default=0.0,
-        help_text="A score between 0 and 1 representing how descriptive the parenthetical is",
+        help_text="A score between 0 and 1 representing how descriptive the "
+        "parenthetical is",
     )
 
     def __str__(self) -> str:
-        return f"{self.describing_opinion.id} description of {self.described_opinion.id} (score {self.score}): {self.text}"
+        return (
+            f"{self.describing_opinion.id} description of "
+            f"{self.described_opinion.id} (score {self.score}): {self.text}"
+        )
+
+    def get_absolute_url(self) -> str:
+        cluster = self.described_opinion.cluster
+        return reverse("view_summaries", args=[cluster.pk, cluster.slug])
 
     class Meta:
         verbose_name_plural = "Opinion parentheticals"
+
+
+class ParentheticalGroup(models.Model):
+    opinion = models.ForeignKey(
+        Opinion,
+        related_name="parenthetical_groups",
+        on_delete=models.CASCADE,
+        help_text="The opinion that the parentheticals in the group describe",
+    )
+    representative = models.ForeignKey(
+        Parenthetical,
+        related_name="represented_group",
+        on_delete=models.CASCADE,
+        help_text="The representative (i.e. high-ranked and similar to the "
+        "cluster as a whole) parenthetical for the group",
+    )
+    score = models.FloatField(
+        default=0.0,
+        help_text="A score between 0 and 1 representing the quality of the "
+        "parenthetical group",
+    )
+    size = models.IntegerField(
+        help_text="The number of parentheticals that belong to the group"
+    )
+
+    def __str__(self) -> str:
+        return (
+            f"Parenthetical group for opinion {self.opinion_id} "
+            f"(score {self.score})"
+        )
+
+    def get_absolute_url(self) -> str:
+        return self.representative.get_absolute_url()
+
+    class Meta:
+        verbose_name_plural = "Parenthetical groups"
+        indexes = [models.Index(fields=["score"])]
 
 
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
@@ -2947,12 +2989,12 @@ class Tag(AbstractDateTimeModel):
 #     upper_court = models.ForeignKey(
 #         Court,
 #         related_name='lower_courts_reviewed',
-#         on_delete=models.CASCADE,
+#         on_delete=models.RESTRICT,
 #     )
 #     lower_court = models.ForeignKey(
 #         Court,
 #         related_name='reviewed_by',
-#         on_delete=models.CASCADE,
+#         on_delete=models.RESTRICT,
 #     )
 #     date_start = models.DateTimeField(
 #         help_text="The date this appellate review relationship began",

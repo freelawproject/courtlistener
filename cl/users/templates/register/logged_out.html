@@ -4,13 +4,6 @@
 
 {% block sidebar %}{% endblock %}
 
-{% block matomo-scripts %}
-// User has just logged out, we reset the User ID
-_paq.push(['resetUserId']);
-
-// we also force a new visit to be created for the pageviews after logout
-_paq.push(['appendToTrackingUrl', 'new_visit=1']);
-{% endblock %}
 
 {% block content %}
     <div class="col-xs-1 col-sm-2 col-md-3"></div>

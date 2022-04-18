@@ -6,7 +6,6 @@ from django.template.loader import render_to_string
 
 from cl.lib.argparse_types import readable_dir
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.db_tools import queryset_generator
 from cl.search.models import Opinion
 
 
@@ -24,15 +23,13 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
 
-        ops = queryset_generator(
-            Opinion.objects.exclude(
-                Q(html="") | Q(html=None),
-                Q(html_lawbox="") | Q(html_lawbox=None),
-                Q(html_columbia="") | Q(html_columbia=None),
-            )
+        ops = Opinion.objects.exclude(
+            Q(html="") | Q(html=None),
+            Q(html_lawbox="") | Q(html_lawbox=None),
+            Q(html_columbia="") | Q(html_columbia=None),
         )
 
-        for op in ops:
+        for op in ops.iterator():
             content = render_to_string("simple_opinion.html", {"o": op})
             output_dir = os.path.join(
                 options["output_directory"],

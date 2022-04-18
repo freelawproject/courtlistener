@@ -2,10 +2,11 @@ from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from judge_pics.search import ImageSizes, portrait
 
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
-from cl.people_db.utils import make_person_picture_path, make_title_str
+from cl.people_db.utils import make_title_str
 
 
 def view_person(request, pk, slug):
@@ -21,7 +22,7 @@ def view_person(request, pk, slug):
 
     title = make_title_str(person)
 
-    img_path = make_person_picture_path(person)
+    img_path = portrait(person.id, ImageSizes.LARGE)
 
     # Regroup the positions by whether they're judgeships or other. This allows
     # us to use the {% ifchanged %} template tags to have two groups in the

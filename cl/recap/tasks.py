@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from tempfile import NamedTemporaryFile
 from typing import Dict, List, Optional, Tuple, Union
 from zipfile import ZipFile
 
@@ -12,7 +11,6 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
@@ -42,6 +40,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
+from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     get_or_cache_pacer_cookies,
@@ -74,7 +73,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
-from cl.scrapers.tasks import extract_recap_pdf, get_page_count
+from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
@@ -114,7 +113,7 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         process_recap_zip.delay(pq.pk)
 
 
-def do_pacer_fetch(fq):
+def do_pacer_fetch(fq: PacerFetchQueue):
     """Process a request made by a user to get an item from PACER.
 
     :param fq: The PacerFetchQueue item to process
@@ -286,7 +285,7 @@ def process_recap_pdf(self, pk):
 
     # Do the file, finally.
     try:
-        content = pq.filepath_local.read()
+        file_contents = pq.filepath_local.read()
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
@@ -296,7 +295,10 @@ def process_recap_pdf(self, pk):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    new_sha1 = sha1(content)
+    if not file_contents:
+        return None
+
+    new_sha1 = sha1(file_contents)
     existing_document = all(
         [
             rd.sha1 == new_sha1,
@@ -307,7 +309,7 @@ def process_recap_pdf(self, pk):
     if not existing_document:
         # Different sha1, it wasn't available, or it's missing from disk. Move
         # the new file over from the processing queue storage.
-        cf = ContentFile(content)
+        cf = ContentFile(file_contents)
         file_name = get_document_filename(
             rd.docket_entry.docket.court_id,
             rd.docket_entry.docket.pacer_case_id,
@@ -318,15 +320,13 @@ def process_recap_pdf(self, pk):
             rd.filepath_local.save(file_name, cf, save=False)
 
             # Do page count and extraction
-            extension = rd.filepath_local.name.split(".")[-1]
-            with NamedTemporaryFile(
-                prefix="rd_page_count_",
-                suffix=f".{extension}",
-                buffering=0,
-            ) as tmp:
-                tmp.write(content)
-                rd.page_count = get_page_count(tmp.name, extension)
-                rd.file_size = rd.filepath_local.size
+            response = microservice(
+                service="page-count",
+                item=rd,
+            )
+            if response.ok:
+                rd.page_count = response.text
+            rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
         rd.is_available = True
@@ -1098,7 +1098,9 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
+def fetch_pacer_doc_by_rd(
+    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
+) -> Optional[int]:
     """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
@@ -1106,8 +1108,11 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
 
     :param rd_pk: The PK of the RECAP Document to get.
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param magic_number: The magic number to fetch PACER documents for free
+    this is an optional field, only used by RECAP Email documents
     :return: The RECAPDocument PK
     """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -1140,7 +1145,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     try:
         r = download_pacer_pdf_by_rd(
-            rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
+            rd.pk, pacer_case_id, rd.pacer_doc_id, cookies, magic_number
         )
     except (requests.RequestException, HTTPError):
         msg = "Failed to get PDF from network."
@@ -1149,6 +1154,7 @@ def fetch_pacer_doc_by_rd(self, rd_pk: int, fq_pk: int) -> Optional[int]:
         return
 
     court_id = rd.docket_entry.docket.court_id
+
     success, msg = update_rd_metadata(
         self,
         rd_pk,
@@ -1486,6 +1492,7 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:
+
     start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
@@ -1538,11 +1545,17 @@ def process_recap_email(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
+    magic_number = docket_entry["pacer_magic_num"]
     for rd in rds_created:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )
-        fetch_pacer_doc_by_rd(rd.pk, fq.pk)
+
+        # If we don't have a magic number avoid fetching the document
+        if magic_number:
+            fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
+        # TODO send an email to tell user that notification didn't have a
+        # magic link
 
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)

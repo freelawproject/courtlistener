@@ -1,14 +1,14 @@
 import datetime
-import json
-from typing import Dict, List, Optional, Union
-from urllib.parse import quote
+from typing import Optional, Union
 
 import requests
 from dateutil.parser import ParserError, parse
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import transaction
-from requests import ReadTimeout
+from django.db import IntegrityError, transaction
+from redis import Redis
+from requests import Response
 
 from cl.celery_init import app
 from cl.disclosures.models import (
@@ -23,16 +23,11 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.disclosures.utils import has_been_extracted, has_been_pdfed
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
+from cl.lib.microservice_utils import microservice
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
-from cl.people_db.models import Person
-from cl.scrapers.transformer_extractor_utils import (
-    generate_thumbnail,
-    get_page_count,
-)
 
 
 def make_disclosure_key(data_id: str) -> str:
@@ -58,48 +53,32 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
     pdf_content = disclosure.filepath.read()
 
-    try:
-        thumbnail_content = generate_thumbnail(pdf_content)
-    except ReadTimeout as exc:
+    response = microservice(
+        service="generate-thumbnail",
+        file_type="pdf",
+        file=pdf_content,
+    )
+    if not response.ok:
         if self.request.retries == self.max_retries:
             disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             disclosure.save()
             return
         else:
-            raise self.retry(exc=exc)
+            raise self.retry(exc=response.status_code)
 
-    if thumbnail_content is not None:
-        disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
-        disclosure.thumbnail.save(None, ContentFile(thumbnail_content))
-    else:
-        disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
-        disclosure.save()
-
-
-def check_if_in_system(sha1_hash: str) -> bool:
-    """Check if pdf bytes hash sha1 in cl db.
-
-    :param sha1_hash: Sha1 hash
-    :return: Whether PDF is in db.
-    """
-    disclosures = FinancialDisclosure.objects.filter(sha1=sha1_hash)
-    if disclosures.exists():
-        logger.info("PDF already in system")
-        return True
-    return False
+    disclosure.thumbnail_status = THUMBNAIL_STATUSES.COMPLETE
+    disclosure.thumbnail.save(None, ContentFile(response.content))
 
 
 def extract_content(
     pdf_bytes: bytes,
-    disclosure_type: str,
     disclosure_key: str,
-) -> Dict[str, Union[str, int]]:
+) -> dict[str, Union[str, int]]:
     """Extract the content of the PDF.
 
     Attempt extraction using multiple methods if necessary.
 
     :param pdf_bytes: The byte array of the PDF
-    :param disclosure_type: Type of disclosure
     :param disclosure_key: The disclosure ID
     :return:The extracted content
     """
@@ -107,60 +86,23 @@ def extract_content(
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
-    try:
-        if disclosure_type == "pdf":
-            extractor_response = requests.post(
-                settings.BTE_URLS["extract-disclosure-pdf"]["url"],
-                files={"file": ("file", pdf_bytes)},
-                timeout=settings.BTE_URLS["extract-disclosure-pdf"]["timeout"],
-            )
-            if (
-                extractor_response.status_code == 200
-                and extractor_response.json()["success"] is False
-            ):
-                # Sometimes these vector PDFs are mixed with images
-                # In that case - try again with the image extractor
-                extractor_response = requests.post(
-                    settings.BTE_URLS["extract-disclosure"]["url"],
-                    files={"pdf_document": ("file", pdf_bytes)},
-                    timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
-                )
+    response = microservice(
+        service="extract-disclosure",
+        file_type="pdf",
+        file=pdf_bytes,
+    )
 
-        elif disclosure_type == "jw":
-            extractor_response = requests.post(
-                settings.BTE_URLS["extract-disclosure-jw"]["url"],
-                files={"file": ("file", pdf_bytes)},
-                timeout=settings.BTE_URLS["extract-disclosure-jw"]["timeout"],
-            )
-        elif disclosure_type == "jef":
-            extractor_response = requests.post(
-                settings.BTE_URLS["extract-disclosure-jef"]["url"],
-                files={"file": ("file", pdf_bytes)},
-                timeout=settings.BTE_URLS["extract-disclosure-jef"]["timeout"],
-            )
-        else:
-            extractor_response = requests.post(
-                settings.BTE_URLS["extract-disclosure"]["url"],
-                files={"pdf_document": ("file", pdf_bytes)},
-                timeout=settings.BTE_URLS["extract-disclosure"]["timeout"],
-            )
-    except ReadTimeout:
-        logger.warning(
-            msg="Timeout occurred for PDF",
-            extra=dict(disclosure_key=disclosure_key),
-        )
-        return {}
-
-    status = extractor_response.status_code
-    if status != 200 or extractor_response.json()["success"] is False:
+    if not response.ok:
         logger.warning(
             msg="Could not extract data from this document",
-            extra=dict(disclosure_key=disclosure_key, status=status),
+            extra=dict(
+                disclosure_key=disclosure_key, status=response.status_code
+            ),
         )
         return {}
 
     logger.info("Processing extracted data")
-    return extractor_response.json()
+    return response.json()
 
 
 def get_report_type(extracted_data: dict) -> int:
@@ -362,182 +304,133 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
     )
 
 
-def get_aws_url(data: Dict[str, Union[str, int, list]]) -> str:
-    """Get URL saved to download filepath
+def save_and_upload_disclosure(
+    redis_db: Redis,
+    disclosure_key: str,
+    response: Response,
+    data: dict,
+) -> Optional[FinancialDisclosure]:
+    """Save disclosure PDF to S3 and generate a FinancialDisclosure object.
 
-    :param data: File data
-    :return: URL or first URL on AWS
+    :param redis_db: The redis db storing our disclosure keys
+    :param disclosure_key: The disclosure key for the redis db
+    :param response: The pdf data response object
+    :param data: The judge data as a dict
+    :return: Financial discsosure object or None
     """
-    if data["disclosure_type"] in ["jw", "single", "jef", "pdf"]:
-        url = data["url"]
-    else:
-        url = data["urls"][0]
-    return url
+    sha1_hash = sha1(response.content)
+    disclosure = FinancialDisclosure.objects.filter(sha1=sha1_hash)
+    if len(disclosure) > 0:
+        return disclosure[0]
 
+    page_count = microservice(
+        service="page-count",
+        file_type="pdf",
+        file=response.content,
+    ).text
+    if not page_count:
+        logger.error(
+            msg=f"Page count failed",
+            extra={"disclosure_id": disclosure_key, "url": data["url"]},
+        )
 
-def get_disclosure_from_pdf_path(disclosure_url: str):
-    """Convenience method to get disclosure from download filepath
-
-    :param disclosure_url: The URL of the first link (if there are more than
-    one) of the source FD tiff(s)/PDF
-    :return: Financial Disclosure object
-    """
-    return FinancialDisclosure.objects.get(download_filepath=disclosure_url)
-
-
-def generate_or_download_disclosure_as_pdf(
-    data: Dict[str, Union[str, int, List[str]]],
-    pdf_url: Optional[str],
-) -> requests.Response:
-    """Generate or download PDF content from images or urls.
-
-    :param data: Data to process.
-    :param pdf_url: The URL of PDF in S3
-    :return: Response containing PDF
-    """
-    if pdf_url:
-        logger.info(f"Downloading PDF: {pdf_url}")
-        return requests.get(pdf_url, timeout=60 * 20)
-    elif data["disclosure_type"] == "jw":
-        logger.info(f"Downloading JW PDF: {quote(data['url'], safe=':/')}")
-        return requests.get(data["url"], timeout=60 * 20)
-    elif data["disclosure_type"] == "jef":
-        logger.info(f"Downloading JEF PDF: {quote(data['url'], safe=':/')}")
-        return requests.get(data["url"], timeout=60 * 20)
-    elif data["disclosure_type"] == "single":
-        urls = [data["url"]]
-    elif data["disclosure_type"] == "pdf":
-        return requests.get(data["url"], timeout=60 * 20)
-    else:
-        urls = data["urls"]
-    logger.info(f"Processing url:{quote(urls[0], safe=':/')}")
-    return requests.post(
-        settings.BTE_URLS["images-to-pdf"]["url"],
-        json=json.dumps({"urls": urls}),
-        timeout=settings.BTE_URLS["images-to-pdf"]["timeout"],
+    # Make disclosure
+    disclosure = FinancialDisclosure(
+        year=int(data["year"]),
+        page_count=page_count,
+        person_id=data["person_id"],
+        sha1=sha1_hash,
+        has_been_extracted=False,
+        report_type=data.get("report_type", REPORT_TYPES.UNKNOWN),
+        download_filepath=data.get("url"),
     )
+
+    # Save method here uploads the file to s3 and also triggers thumbnail
+    # generation in the background via the save method in disclosure.models
+    disclosure.filepath.save(
+        f"{disclosure.person.slug}-disclosure.{data['year']}.pdf",
+        ContentFile(response.content),
+    )
+    logger.info(
+        f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
+        f"{disclosure.filepath}"
+    )
+    return disclosure
 
 
 @app.task(bind=True, max_retries=2, interval_start=10, ignore_result=True)
-def import_disclosure(self, data: Dict[str, Union[str, int, list]]) -> None:
+def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     """Import disclosures into Courtlistener
 
     :param data: The disclosure information to process
     :return: None
     """
-    # Check download_filepath to see if it has been processed before.
-    if has_been_extracted(data):
-        logger.info(f"Document already extracted and saved: {data['id']}.")
-        return
-
-    interface = make_redis_interface("CACHE")
+    redis_db = make_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
     newly_enqueued = create_redis_semaphore(
-        interface,
+        redis_db,
         disclosure_key,
-        ttl=60 * 60 * 12,
+        ttl=60 * 60 * 2,
     )
 
     if not newly_enqueued:
-        logger.error(
+        logger.info(
             f"Process is already running {data['id']}. {disclosure_key}",
         )
         return
 
-    # Generate PDF content from our three paths
-    year = int(data["year"])
-    person_id = data["person_id"]
-    report_type = data.get("report_type", -1)
-
     logger.info(
-        f"Processing row {data['id']} for person {person_id} "
-        f"in year {year}"
+        f"Processing row {data['id']} for person {data['person_id']} "
+        f"in year {data['year']}"
     )
+    response = requests.get(data["url"], timeout=60 * 20)
 
-    # Check if we've already extracted
-    disclosure_url = get_aws_url(data)
-    was_previously_pdfed = has_been_pdfed(disclosure_url)
-    pdf_response = generate_or_download_disclosure_as_pdf(
-        data, was_previously_pdfed
-    )
-    pdf_bytes = pdf_response.content
-
-    if pdf_response.status_code != 200:
-        logger.error(msg="PDF generation failed.")
-        interface.delete(disclosure_key)
+    if not response.ok:
+        logger.error(
+            f"Failed to download {data['id']} {data['url']}",
+            extra={"disclosure_id": data["id"]},
+        )
+        redis_db.delete(disclosure_key)
         return
 
-    if was_previously_pdfed:
-        disclosure = get_disclosure_from_pdf_path(disclosure_url)
+    # Check if disclosure already exists
+    query = FinancialDisclosure.objects.filter(download_filepath=data["url"])
+    if len(query) > 0:
+        # If previously uploaded, use disclosure else process new document
+        disclosure = query[0]
     else:
-        logger.info("PDF generated successfully.")
-
-        # Sha1 hash - Check for duplicates
-        sha1_hash = sha1(pdf_bytes)
-        in_system = check_if_in_system(sha1_hash)
-        if in_system:
-            # If we are given duplicate images as different files.  Sadly something to test for.
+        disclosure = save_and_upload_disclosure(
+            redis_db, disclosure_key, response, data
+        )
+        if not disclosure:
             logger.error(
-                "PDF already in system.",
-                extra={"disclosure_id": disclosure_key},
+                f"Disclosure failed to save or upload to aws {data['id']} {data['url']}",
+                extra={"disclosure_id": data["id"]},
             )
-            interface.delete(disclosure_key)
             return
-
-        # Return page count - 0 indicates a failure of some kind.  Like PDF
-        # Not actually present on aws.
-        pg_count = get_page_count(pdf_bytes)
-        if not pg_count:
-            logger.error(
-                msg=f"Page count failed",
-                extra={"disclosure_id": disclosure_key, "url": disclosure_url},
-            )
-            interface.delete(disclosure_key)
-            return
-
-        # Save Financial Disclosure here to AWS and move onward
-        disclosure = FinancialDisclosure(
-            year=year,
-            page_count=pg_count,
-            person=Person.objects.get(id=person_id),
-            sha1=sha1_hash,
-            has_been_extracted=False,
-            report_type=report_type,
-            download_filepath=data.get("url")
-            if data.get("url")
-            else data.get("urls")[0],
-        )
-        # Save and upload PDF
-        disclosure.filepath.save(
-            f"{disclosure.person.slug}-disclosure.{year}.pdf",
-            ContentFile(pdf_bytes),
-        )
-        logger.info(
-            f"Uploaded to https://{settings.AWS_S3_CUSTOM_DOMAIN}/"
-            f"{disclosure.filepath}"
-        )
-
-    if report_type == REPORT_TYPES.NOMINATION:
-        logger.info("Skipping extraction for nomination forms.")
-        interface.delete(disclosure_key)
-        return
 
     # Extract content from PDF
     content = extract_content(
-        pdf_bytes=pdf_bytes,
-        disclosure_type=data["disclosure_type"],
+        pdf_bytes=response.content,
         disclosure_key=disclosure_key,
     )
     if not content:
-        logger.warning(
-            msg="Failed extraction of content from PDF",
-            extra={"disclosure_id": disclosure_key, "url": disclosure_url},
-        )
-        interface.delete(disclosure_key)
+        redis_db.delete(disclosure_key)
         return
 
     # Save PDF content
-    save_disclosure(extracted_data=content, disclosure=disclosure)
+    try:
+        save_disclosure(extracted_data=content, disclosure=disclosure)
+    except IntegrityError:
+        logger.exception(
+            f"Integrity error on saving disclosure {data['id']} {data['url']}",
+            extra={"disclosure_id": data["id"]},
+        )
+    except ValidationError:
+        logger.exception(
+            f"Validation Error up saving disclosure",
+            extra={"disclosure_id": data["id"]},
+        )
 
     # Remove disclosure ID in redis for completed disclosure
-    interface.delete(disclosure_key)
+    redis_db.delete(disclosure_key)

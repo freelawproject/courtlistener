@@ -10,11 +10,11 @@ _OPINION_TYPE_MODIFICATION = r"(in (the )?(judgment|result)s?( in part)?|in resu
 _FULL_OPINION_DESCRIPTOR = (
     f"({_OPINION_TYPES}( {_OPINION_TYPE_MODIFICATION})?)"
 )
-_REFERENTIAL = r"(quoting|citing|cited in|referencing)"
+_REFERENTIAL = r"(quoting|citing|cited in|referencing|adopted)"
 _AGGREGATOR_TYPES = r"(collecting|reviewing|listing)"
 _HONORIFICS = r"(Mr.?|Mister)"
 _JUDGE_NAME = rf"((.{{1,25}}J\.,?)|({_HONORIFICS} Justice .{{1,25}})|the Court|(.{{1,25}}Circuit Justice),?)"
-
+_TOO_SHORT = r"(\S+\s){0,3}\S*"
 
 PARENTHETICAL_REGEX_BLOCKLIST_RULES = [
     r".n banc",  # en banc or in banc
@@ -62,8 +62,7 @@ PARENTHETICAL_REGEX_BLOCKLIST_RULES = [
     r"here(in)?after(,)? .+",
     # Imbalanced parentheses (for when eyecite cuts off the parenthetical too soon) e.g. "holding Section 4(a"
     r"^.{1,35}\([^\)]{1,35}$",
-    # Single-word parentheticals, e.g., 'TILA'
-    r"\S*",
+    _TOO_SHORT,
 ]
 
 _SURROUNDING_CHARS = r'[.!;,"“” ]'
