@@ -190,14 +190,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # system time zone.
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
-ADMINS = [
+MANAGERS = [
     (
-        env("ADMIN_NAME", default="Joe Schmoe"),
-        env("ADMIN_EMAIL", default="joe@courtlistener.com"),
+        env("MANAGER_NAME", default="Joe Schmoe"),
+        env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
-
-MANAGERS = ADMINS
 
 
 LOGIN_URL = "/sign-in/"
