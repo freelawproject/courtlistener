@@ -51,6 +51,7 @@ class DocketFeed(Feed):
         )
         return (
             DocketEntry.objects.filter(docket=obj)
+            .exclude(date_filed__isnull=True)
             .prefetch_related(
                 Prefetch(
                     "recap_documents",

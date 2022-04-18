@@ -5,7 +5,6 @@ from django.db.models import Q
 from lxml.etree import XMLSyntaxError
 
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.db_tools import queryset_generator
 from cl.search.models import Docket
 
 
@@ -39,7 +38,7 @@ class Command(VerboseCommand):
             ds = ds.filter(pk__gte=options["start_pk"])
         count = ds.count()
         xml_error_ids = []
-        for i, d in enumerate(queryset_generator(ds, chunksize=50000)):
+        for i, d in enumerate(ds.iterator()):
             sys.stdout.write(
                 f"\rDoing docket: {i} of {count}, with pk: {d.pk}"
             )

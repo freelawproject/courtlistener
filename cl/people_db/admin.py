@@ -1,10 +1,10 @@
 from django.contrib import admin
+from django.db.models import QuerySet
 from django.forms import ModelForm
 from django.http import HttpRequest
 
 from cl.lib.admin import AdminTweaksMixin, NotesInline
 
-# RECAP imports
 # Judge DB imports
 from cl.people_db.models import (
     ABARating,
@@ -25,6 +25,7 @@ from cl.people_db.models import (
     School,
     Source,
 )
+from cl.search.tasks import add_items_to_solr, delete_items
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -135,6 +136,7 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "name_last",
         "name_first",
         "fjc_id",
+        "pk",
     )
     list_filter = ("gender",)
     list_display = (
@@ -144,6 +146,7 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
     )
     raw_id_fields = ("is_alias_of",)
     readonly_fields = ("has_photo",)
+    actions = ("update_in_solr", "delete_from_solr")
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -156,6 +159,24 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
         from cl.search.tasks import delete_items
 
         delete_items.delay([obj.pk], "people_db.Person")
+
+    @admin.action(description="Update selected people in Solr")
+    def update_in_solr(self, request: HttpRequest, queryset: QuerySet) -> None:
+        add_items_to_solr.delay([p.pk for p in queryset], "people_db.Person")
+        self.message_user(
+            request,
+            f"Successfully updated {queryset.count()} people in Solr",
+        )
+
+    @admin.action(description="Delete selected people from Solr")
+    def delete_from_solr(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> None:
+        delete_items.delay([p.pk for p in queryset], "people_db.Person")
+        self.message_user(
+            request,
+            f"Successfully deleted {queryset.count()} people from Solr",
+        )
 
 
 @admin.register(Race)

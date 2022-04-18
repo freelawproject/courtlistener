@@ -35,7 +35,7 @@
   <meta property="og:url" content="{% get_full_host %}{{ request.path }}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
-        content="{% block og_image %}{% get_full_host %}{% static "png/og-image-300x300.png" %}{% endblock %}"/>
+        content="{% block og_image %}{% static "png/og-image-300x300.png" %}{% endblock %}"/>
   <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
@@ -44,24 +44,26 @@
   {% endblock %}
 
   {% block icons %}
+  <link rel="icon" href="{% static "ico/favicon.ico" %}">
   {# Apple Touch Icons, from https://mathiasbynens.be/notes/touch-icons#sizes #}
-  <link rel="icon" sizes="192x192" href="/touch-icon-192x192.png">
+  <link rel="icon" sizes="192x192"
+        href="{% static "png/touch-icon-192x192.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="180x180"
-        href="/apple-touch-icon-180x180-precomposed.png">
+        href="{% static "png/apple-touch-icon-180x180-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="152x152"
-        href="/apple-touch-icon-152x152-precomposed.png">
+        href="{% static "png/apple-touch-icon-152x152-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="144x144"
-        href="/apple-touch-icon-144x144-precomposed.png">
+        href="{% static "png/apple-touch-icon-144x144-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="120x120"
-        href="/apple-touch-icon-120x120-precomposed.png">
+        href="{% static "png/apple-touch-icon-120x120-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="114x114"
-        href="/apple-touch-icon-114x114-precomposed.png">
+        href="{% static "png/apple-touch-icon-114x114-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="76x76"
-        href="/apple-touch-icon-76x76-precomposed.png">
+        href="{% static "png/apple-touch-icon-76x76-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed" sizes="72x72"
-        href="/apple-touch-icon-72x72-precomposed.png">
+        href="{% static "png/apple-touch-icon-72x72-precomposed.png" %}">
   <link rel="apple-touch-icon-precomposed"
-        href="/apple-touch-icon-precomposed.png">
+        href="{% static "png/apple-touch-icon-precomposed.png" %}">
   {% endblock %}
 
   <link href="{% static "css/font-awesome.css" %}" rel="stylesheet">
@@ -442,32 +444,15 @@
 {# Allows your own scripts in the footer. #}
 {% block footer-scripts %}{% endblock %}
 
+{# Record stats for non-superusers 1/10 times to save money #}
 {% if not user.is_superuser  %}
-  <!-- matomo -->
-  <script type="text/javascript">
-    var _paq = window._paq || [];
-    _paq.push(['trackPageView']);
-    _paq.push(['enableLinkTracking']);
-    {% if user.is_authenticated %}
-      _paq.push(['setUserId', '{{ user.pk }}']);
-    {% endif %}
-    (function () {
-      var u = "{{ MATOMO_FRONTEND_BASE_URL }}";
-      _paq.push(['setTrackerUrl', u + 'matomo.php']);
-      _paq.push(['setSiteId', '{{ MATOMO_SITE_ID }}']);
-      {% block matomo-scripts %}{% endblock %}
-      var d = document, g = d.createElement('script'),
-        s = d.getElementsByTagName('script')[0];
-      g.type = 'text/javascript';
-      g.async = true;
-      g.defer = true;
-      g.src = u + 'matomo.js';
-      s.parentNode.insertBefore(g, s);
-    })();
-  </script>
-  <noscript><p><img src="{{MATOMO_FRONTEND_BASE_URL }}/piwik.php?idsite={{ MATOMO_SITE_ID }}&rec=1"
-                    style="border:0;" alt=""/></p></noscript>
-  <!-- End Matomo Code -->
+  {% random_int 0 9 as rand %}
+  {% if rand == 0 %}
+    <script
+      defer
+      data-domain="courtlistener.com"
+      src="https://plausible.io/js/plausible.js"></script>
+  {% endif %}
 {% endif %}
 </body>
 </html>

@@ -3,6 +3,7 @@ from itertools import groupby
 from typing import Dict, Optional, Tuple, Union
 from urllib.parse import urlencode
 
+import waffle
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
@@ -28,6 +29,10 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
+from cl.citations.parenthetical_utils import (
+    create_parenthetical_groups,
+    get_or_create_parenthetical_groups,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
@@ -36,7 +41,7 @@ from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.ratelimiter import ratelimit_if_not_whitelisted
+from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -59,6 +64,7 @@ from cl.search.models import (
     Court,
     Docket,
     OpinionCluster,
+    Parenthetical,
     RECAPDocument,
 )
 from cl.search.views import do_search
@@ -231,7 +237,7 @@ def core_docket_data(
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     docket, context = core_docket_data(request, pk)
     increment_view_count(docket, request)
@@ -273,7 +279,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     return render(request, "view_docket.html", context)
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_parties(
     request: HttpRequest,
     docket_id: int,
@@ -329,7 +335,7 @@ def view_parties(
     return render(request, "docket_parties.html", context)
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def docket_idb_data(
     request: HttpRequest,
     docket_id: int,
@@ -398,14 +404,13 @@ def make_thumb_if_needed(
         make_png_thumbnail_for_instance(
             pk=rd.pk,
             klass=RECAPDocument,
-            file_attr="filepath_local",
             max_dimension=1068,
         )
         rd.refresh_from_db()
     return rd
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
     docket_id: Optional[int] = None,
@@ -453,7 +458,7 @@ def view_recap_document(
 
 
 @never_cache
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     """Using the cluster ID, return the cluster of opinions.
 
@@ -504,6 +509,9 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         related_search_params,
     ) = get_related_clusters_with_cache(cluster, request)
 
+    parenthetical_groups = get_or_create_parenthetical_groups(
+        cluster,
+    ).prefetch_related("representative",)[:3]
     return render(
         request,
         "view_opinion.html",
@@ -518,7 +526,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "citing_cluster_count": citing_cluster_count,
             "top_authorities": cluster.authorities_with_data[:5],
             "authorities_count": len(cluster.authorities_with_data),
-            "top_summaries": cluster.parentheticals[:3],
+            "top_parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
             "sub_opinion_ids": sub_opinion_ids,
             "related_algorithm": "mlt",
@@ -529,9 +537,21 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
+    parenthetical_groups = list(
+        get_or_create_parenthetical_groups(cluster).prefetch_related(
+            Prefetch(
+                "parentheticals",
+                queryset=Parenthetical.objects.order_by("-score"),
+            ),
+            "parentheticals__describing_opinion__cluster__citations",
+            "parentheticals__describing_opinion__cluster__docket__court",
+            "representative__describing_opinion__cluster__citations",
+            "representative__describing_opinion__cluster__docket__court",
+        )
+    )
 
     return render(
         request,
@@ -540,13 +560,13 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             "title": get_case_title(cluster),
             "cluster": cluster,
             "private": cluster.blocked,
-            "summaries": cluster.parentheticals,
+            "parenthetical_groups": parenthetical_groups,
             "summaries_count": cluster.parentheticals.count(),
         },
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
@@ -562,7 +582,7 @@ def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     )
 
 
-@ratelimit_if_not_whitelisted
+@ratelimit_deny_list
 def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
@@ -818,7 +838,6 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
@@ -868,7 +887,10 @@ def citation_redirector(
     slug_edition = {slugify(item): item for item in EDITIONS.keys()}
     proper_reporter = slug_edition.get(SafeText(reporter), None)
     if not proper_reporter:
-        return HttpResponse(status=404)
+        return throw_404(
+            request,
+            {"no_reporters": True, "reporter": reporter, "private": False},
+        )
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:

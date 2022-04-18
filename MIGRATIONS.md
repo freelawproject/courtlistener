@@ -59,7 +59,7 @@ The old process for this is [described in this excellent blog post]
 CourtListener [too][ex].
 
 [concur]: https://code.djangoproject.com/ticket/21039
-[dj-concur]: https://docs.djangoproject.com/en/3.1/ref/migration-operations/#django.db.migrations.operations.AddIndex
+[dj-concur]: https://docs.djangoproject.com/en/3.2/ref/contrib/postgres/operations/#concurrent-index-operations
 [concur-blog]: https://realpython.com/create-django-index-without-downtime/
 [ex]: https://github.com/freelawproject/courtlistener/pull/1132
 

@@ -1,18 +1,38 @@
+import json
 from datetime import timedelta
+from pathlib import Path
+from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
 from django.test import Client
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
+from django_ses import signals
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
-from cl.users.models import UserProfile
+from cl.users.email_handlers import (
+    add_bcc_random,
+    get_email_body,
+    normalize_addresses,
+)
+from cl.users.factories import UserFactory
+from cl.users.models import (
+    OBJECT_TYPES,
+    SUB_TYPES,
+    BackoffEvent,
+    EmailFlag,
+    EmailSent,
+    UserProfile,
+)
 
 
 class UserTest(LiveServerTestCase):
@@ -217,6 +237,12 @@ class ProfileTest(TestCase):
         )
         self.assertEqual(user_profile.user.pk, 1006)
 
+    def test_generate_recap_email_username_lowercase(self) -> None:
+        user_profile = UserProfile.objects.get(
+            recap_email="test.user@recap.email"
+        )
+        self.assertEqual(user_profile.user.pk, 1007)
+
 
 class DisposableEmailTest(TestCase):
     fixtures = ["authtest_data.json"]
@@ -322,4 +348,1797 @@ class LiveUserTest(BaseSeleniumTest):
         self.assertEqual(
             self.browser.current_url,
             f"{self.live_server_url}{reverse('password_reset_complete')}",
+        )
+
+
+class SNSWebhookTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+        with (
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as general_soft_bounce,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as msg_large_bounce,
+            open(
+                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
+            ) as cnt_rejected_bounce,
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(
+                test_dir / "suppressed_bounce.json", encoding="utf-8"
+            ) as suppressed_bounce,
+        ):
+            cls.soft_bounce_asset = json.load(general_soft_bounce)
+            cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
+            cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
+            cls.hard_bounce_asset = json.load(hard_bounce)
+            cls.complaint_asset = json.load(complaint)
+            cls.delivery_asset = json.load(delivery)
+            cls.suppressed_asset = json.load(suppressed_bounce)
+
+    def send_signal(self, test_asset, event_name, signal) -> None:
+        """Function to dispatch signal that mocks a SNS notification event
+        :param test_asset: the json object that contains notification
+        :param event_name: the signal event name
+        :param signal: the signal corresponding to the event
+        :return: None
+        """
+        # Prepare parameters
+        raw = json.dumps(test_asset)
+        notification = json.loads(raw)
+        message = json.loads(notification["Message"])
+        mail_obj = message.get("mail")
+        event_obj = message.get(event_name, {})
+
+        # Send signal
+        signal_kwargs = dict(
+            sender=self,
+            mail_obj=mail_obj,
+            raw_message=raw,
+        )
+        signal_kwargs[f"{event_name}_obj"] = event_obj
+        signal.send(**signal_kwargs)
+
+    @mock.patch("cl.users.signals.handle_hard_bounce")
+    def test_hard_bounce_signal(self, mock_hard_bounce) -> None:
+        """This test checks if handle_hard_bounce function is called
+        when a hard bounce event is received
+        """
+        # Trigger a hard bounce event
+        self.send_signal(
+            self.hard_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Check if handle_hard_bounce is called
+        mock_hard_bounce.assert_called()
+
+    @mock.patch("cl.users.signals.handle_soft_bounce")
+    def test_soft_bounce_signal(self, mock_soft_bounce) -> None:
+        """This test checks if handle_soft_bounce function is called
+        when a soft bounce event is received
+        """
+        # Trigger a soft bounce event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Check if handle_soft_bounce is called
+        mock_soft_bounce.assert_called()
+
+    @mock.patch("cl.users.signals.handle_complaint")
+    def test_complaint_signal(self, mock_complaint) -> None:
+        """This test checks if handle_complaint function is called
+        when a complaint event is received
+        """
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+        # Check if handle_complaint is called
+        mock_complaint.assert_called()
+
+    @mock.patch("cl.users.signals.handle_delivery")
+    def test_delivery_signal(self, mock_delivery) -> None:
+        """This test checks if handle_delivery function is called
+        when a delivery event is received
+        """
+        # Trigger a delivery event
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+
+        # Check if handle_delivery is called
+        mock_delivery.assert_called()
+
+    def test_handle_soft_bounce_create_small_only(self) -> None:
+        """This test checks if a small_email_only flag is created for
+        an email address if it doesn't exist previously when a
+        small_email_only soft bounce is received
+        """
+
+        email_flag_exists = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).exists()
+        self.assertEqual(email_flag_exists, False)
+
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+
+        email_flag_exists = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).exists()
+        # Check if small_email_only was created
+        self.assertEqual(email_flag_exists, True)
+
+        # Trigger another small_email_only event to check if
+        # no new ban register is created
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+        email_flag = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        )
+
+        # Checks no new ban object is created for this email address
+        self.assertEqual(email_flag.count(), 1)
+        self.assertEqual(email_flag[0].flag, EmailFlag.SMALL_ONLY)
+
+    def test_handle_soft_bounce_small_only_exist(self) -> None:
+        """This test checks if a small_email_only flag is not created for
+        an email address if it exists previously when a
+        small_email_only soft bounce is received
+        """
+        # Create a small_email_only flag
+        email_flag_count = EmailFlag.objects.create(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+            event_sub_type=SUB_TYPES.MESSAGETOOLARGE,
+        )
+        email_flag_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).count()
+        self.assertEqual(email_flag_count, 1)
+
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+
+        email_flag_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).count()
+
+        # Check if new small_email_only was not created
+        self.assertEqual(email_flag_count, 1)
+
+    @mock.patch("cl.users.email_handlers.logging")
+    def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
+        """This test checks if a warning is logged when a
+        unexpected bounceSubType event is received
+        """
+        # Trigger a content_rejected event
+        self.send_signal(
+            self.soft_bounce_cnt_rejected_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        # Check if warning is logged
+        warning_part_one = "Unexpected ContentRejected soft bounce for "
+        warning_part_two = "bounce@simulator.amazonses.com"
+        mock_logging.warning.assert_called_with(
+            f"{warning_part_one}{warning_part_two}"
+        )
+
+    def test_handle_soft_bounce_create_back_off(self) -> None:
+        """This test checks if a back_off event is created for
+        an email address if it doesn't exist previously when a
+        backoff type soft bounce is received
+        """
+        email_backoff_exists = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).exists()
+
+        self.assertEqual(email_backoff_exists, False)
+        # Trigger a backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_backoff_exists = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+    def test_handle_soft_bounce_waiting_back_off(self) -> None:
+        """This test checks if a back_off event exists for
+        an email address and is under waiting period,
+        backoff event is not updated
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+        if email_backoff_exists:
+            # Store parameters from backoff event
+            retry_counter_before = email_backoff_event[0].retry_counter
+            next_retry_date_before = email_backoff_event[0].next_retry_date
+
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_backoff_event_after = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # Store parameters after second backoff notification event
+        retry_counter_after = email_backoff_event_after[0].retry_counter
+        next_retry_date_after = email_backoff_event_after[0].next_retry_date
+
+        # Check parameters were not updated
+        self.assertEqual(retry_counter_before, retry_counter_after)
+        self.assertEqual(next_retry_date_before, next_retry_date_after)
+
+    def test_handle_soft_bounce_not_waiting_back_off(self) -> None:
+        """This test checks if a back_off event exists for
+        an email address and is not under waiting period and,
+        max_retry has not been reached, backoff event is updated
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Update next_retry_date to expire waiting time
+        BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).update(next_retry_date=now() - timedelta(hours=3))
+
+        email_backoff = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # Store parameters after first backoff event
+        retry_counter_before = email_backoff[0].retry_counter
+        next_retry_date_before = email_backoff[0].next_retry_date
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_after = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # Store parameters after second backoff notification event
+        retry_counter_after = email_backoff_after[0].retry_counter
+        next_retry_date_after = email_backoff_after[0].next_retry_date
+
+        # Check parameters were updated
+        self.assertNotEqual(retry_counter_before, retry_counter_after)
+        self.assertNotEqual(next_retry_date_before, next_retry_date_after)
+
+    def test_handle_soft_bounce_max_retry_reached(self) -> None:
+        """This test checks if a back_off event exists for
+        an email address and if is not under waiting period and if
+        max_retry has been reached, email address is banned
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban_exist = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        ).exists()
+        # Check email address is not banned
+        self.assertEqual(email_ban_exist, False)
+
+        # Update next_retry_date to expire waiting time and retry_counter to
+        # reach max_retry_counter
+        BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).update(next_retry_date=now() - timedelta(hours=3), retry_counter=5)
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban_exist = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        ).exists()
+        # Check email address is now banned
+        self.assertEqual(email_ban_exist, True)
+
+        # Trigger another notification event to check
+        # no new ban register is created
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks no new ban object is created for this email address
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+    def test_handle_soft_bounce_compute_waiting_period(self) -> None:
+        """This test checks if the exponential waiting period
+        is computed properly
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Update next_retry_date to expire waiting time and retry_counter to 4
+        BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).update(next_retry_date=now() - timedelta(hours=3), retry_counter=4)
+
+        email_ban_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # Store parameter after backoff event update
+        retry_counter_before = email_ban_event[0].retry_counter
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban_event_after = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # Store parametes after second backoff event update
+        retry_counter_after = email_ban_event_after[0].retry_counter
+        next_retry_date_after = email_ban_event_after[0].next_retry_date
+
+        # Hours expected for the final backoff waiting period
+        expected_waiting_period = 64
+
+        # Obtain waiting period in hours after backoff notification
+        waiting_period = next_retry_date_after - now()
+        actual_waiting_period = round(waiting_period.total_seconds() / 3600)
+
+        # Check retry counter is updated
+        self.assertNotEqual(retry_counter_before, retry_counter_after)
+        # Check expected waiting period equals to computed waiting period
+        self.assertEqual(expected_waiting_period, actual_waiting_period)
+
+    @mock.patch("cl.users.email_handlers.logging")
+    def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
+        """This test checks if a warning is logged and email address is banned
+        when an unexpected hard bounceSubType event is received.
+        Also checks that if an email address is previously banned avoid
+        creating a new ban object for that email address
+        """
+        # Trigger a suppressed_asset event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        # Check if a warning is logged
+        warning_part_one = "Unexpected Suppressed hard bounce for "
+        warning_part_two = "bounce@simulator.amazonses.com"
+        mock_logging.warning.assert_called_with(
+            f"{warning_part_one}{warning_part_two}"
+        )
+        email_ban_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        ).count()
+
+        # Check if email address is now banned
+        self.assertEqual(email_ban_count, 1)
+
+        # Trigger another suppressed_asset event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban_count = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        ).count()
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban_count, 1)
+
+    def test_handle_hard_bounce(self) -> None:
+        """This test checks if an email address is banned
+        when a hard bounce event is received.
+        Also checks that if an email address is previously banned avoid to
+        create a new ban register for that email address
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+        # Trigger another hard_bounce event
+        self.send_signal(
+            self.suppressed_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+    def test_handle_complaint(self) -> None:
+        """This test checks if an email address is banned
+        when a complaint event is received.
+        Also checks that if an email address is previously banned avoid to
+        create a new ban register for that email address
+        """
+
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+        # Trigger another complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Check no additional email ban object is created
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+    @mock.patch("cl.users.email_handlers.schedule_failed_email")
+    def test_handle_delivery(self, mock_schedule) -> None:
+        """This test checks if a delivery notification is received
+        and exists a previous Backoffevent it's deleted and
+        schedule_failed_email function is called
+        """
+        # Trigger soft bounce event to create backoff event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+        # Trigger a delivery event
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+
+        # Check if backoff event was deleted
+        self.assertEqual(email_backoff_exists, False)
+
+        # Check if schedule_failed_email is called
+        mock_schedule.assert_called()
+
+    def test_update_ban_object(self) -> None:
+        """This test checks if an email ban object is updated when receiving
+        a new ban notification, e.g: complaint -> hard bounce
+        """
+
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned due to a complaint
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email ban is updated with the hard bounce subtype
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+
+@override_settings(
+    EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+    BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_BCC_COPY_RATE=0,
+)
+class CustomBackendEmailTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+        with (
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as soft_bounce,
+            open(
+                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
+            ) as general_soft_bounce_2,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as large_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+        ):
+            cls.hard_bounce_asset = json.load(hard_bounce)
+            cls.soft_bounce_asset = json.load(soft_bounce)
+            cls.soft_bounce_asset_2 = json.load(general_soft_bounce_2)
+            cls.soft_bounce_msg_large_asset = json.load(large_bounce)
+            cls.complaint_asset = json.load(complaint)
+
+        cls.attachment_150 = test_dir / "file_sample_150kB.pdf"
+        cls.attachment_500 = test_dir / "file_example_500kB.pdf"
+
+    def send_signal(self, test_asset, event_name, signal) -> None:
+        """Function to dispatch signal that mocks a SNS notification event
+        :param test_asset: the json object that contains notification
+        :param event_name: the signal event name
+        :param signal: the signal corresponding to the event
+        :return: None
+        """
+        # Prepare parameters
+        raw = json.dumps(test_asset)
+        notification = json.loads(raw)
+        message = json.loads(notification["Message"])
+        mail_obj = message.get("mail")
+        event_obj = message.get(event_name, {})
+
+        # Send signal
+        signal_kwargs = dict(
+            sender=self,
+            mail_obj=mail_obj,
+            raw_message=raw,
+        )
+        signal_kwargs[f"{event_name}_obj"] = event_obj
+        signal.send(**signal_kwargs)
+
+    def test_send_mail_function(self) -> None:
+        """This test checks if Django send_mail() works properly using the
+        custom email backend, the email should be stored automatically.
+        """
+        send_mail(
+            subject="This is the subject",
+            message="Body goes here",
+            html_message="<p>Body goes here</p>",
+            from_email="testing@courtlistener.com",
+            recipient_list=["success@simulator.amazonses.com"],
+        )
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    def test_email_message_class(self) -> None:
+        """This test checks if Django EmailMessage class works properly using
+        the custom email backend, the email should be stored automatically.
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["success@simulator.amazonses.com"],
+            ["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+            reply_to=["reply_success@simulator.amazonses.com"],
+        )
+
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(
+            stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            stored_email[0].cc, ["cc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            stored_email[0].reply_to, ["reply_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message only has plain/text version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "")
+
+    def test_multialternative_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending html and plain versions using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        html = "<p>Body goes here</p>"
+        msg.attach_alternative(html, "text/html")
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].to, ["success@simulator.amazonses.com"]
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(
+            stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            stored_email[0].cc, ["cc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            stored_email[0].headers, {"X-Entity-Ref-ID": "9598e6b0-d88c-488e"}
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has a plain and html version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    def test_multialternative_only_plain_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending plain version using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].html_message, "")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        # and original headers are preserved
+        self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has only plain/text version
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "")
+
+    def test_multialternative_only_html_email(self) -> None:
+        """This test checks if Django EmailMultiAlternatives class works
+        properly sending html version using the custom backend
+        email,the email should be stored automatically.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="<p>Body goes here</p>",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        msg.content_subtype = "html"
+        msg.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.latest("id")
+        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email.plain_text, "")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        message_sent = mail.outbox[0]
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Verify if the email unique identifier "X-CL-ID" header was added
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        # Compare body contents, this message has only html/text version
+        self.assertEqual(plaintext_body, "")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+
+    def test_sending_email_with_attachment(self) -> None:
+        """This test checks if Django EmailMessage class works
+        properly sending a message with an attachment using the custom
+        email backend.
+        """
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["success@simulator.amazonses.com"],
+            ["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+
+    def test_link_user_to_email(self) -> None:
+        """This test checks if a User is properly linked to a stored Email
+        is created, we search for the user by email address if found it's
+        assigned.
+        """
+        # Get user factory
+        user_email = self.user
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            [user_email.email],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].user_id, user_email.id)
+
+    def test_sending_to_banned_email(self) -> None:
+        """This test checks if an email address is banned and we try to send
+        it an email, the message is discarded and not stored.
+        """
+
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+            fail_silently=False,
+        )
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Confirm if email is not stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 0)
+
+    def test_sending_email_within_back_off(self) -> None:
+        """This test checks if an email address is under a backoff waiting
+        period and we try to send it an email, the message is stored but
+        not sent.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+            fail_silently=False,
+        )
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_sending_small_only_email(self) -> None:
+        """This test checks if an email address is flagged with a small email
+        only flag and try to send an email with an attachment, the small email
+        version is sent without attachment.
+        """
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+
+        email_flag_exists = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.FLAG,
+            flag=EmailFlag.SMALL_ONLY,
+        ).exists()
+        # Check if small_email_only flag was created
+        self.assertEqual(email_flag_exists, True)
+
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm not attachment is sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm small email only version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
+
+    def test_sending_no_small_only_email(self) -> None:
+        """This test checks if an email address is not flagged with a small
+        email only flag and we try to send an email with an attachment, the
+        normal email version is sent with its attachment, however, we store the
+        small email version in case we need it in the future.
+        """
+
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we'll need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body for attachment version")
+        self.assertEqual(html_body, "<p>Body for attachment version</p>")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+
+    @override_settings(
+        MAX_ATTACHMENT_SIZE=350_000,
+    )
+    def test_sending_over_file_size_limit(self) -> None:
+        """This test checks if we try to send an email with an attachment that
+        exceeds the MAX_ATTACHMENT_SIZE set in settings, the small email
+        version is sent without an attachment.
+        """
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=["bounce@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        # When sending an email with an attachment is necessary to add a small
+        # email body in case we'll need to send a small email only version.
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file that exceeds the MAX_ATTACHMENT_SIZE
+        email.attach_file(self.attachment_500)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm the attachment is not sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm if small email version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
+
+    def test_compose_message_from_db(self) -> None:
+        """This test checks if we can compose and send a new message based on
+        a stored message.
+        """
+
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            reply_to=["reply_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        html = "<p>Body goes here</p>"
+        msg.attach_alternative(html, "text/html")
+        msg.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Retrieve the stored message by message_id
+        first_stored_email = EmailSent.objects.filter()[0]
+        message_id = first_stored_email.message_id
+        stored_email = EmailSent.objects.get(message_id=message_id)
+
+        # Compose and send the email based on the stored message
+        email = EmailMultiAlternatives(
+            stored_email.subject,
+            stored_email.plain_text,
+            stored_email.from_email,
+            stored_email.to,
+            stored_email.bcc,
+            cc=stored_email.cc,
+            reply_to=stored_email.reply_to,
+            headers=stored_email.headers,
+        )
+        html = stored_email.html_message
+        email.attach_alternative(html, "text/html")
+        email.send()
+
+        # Confirm if we have two stored messages
+        stored_email = EmailSent.objects.filter()
+        self.assertEqual(stored_email.count(), 2)
+
+        # Confirm if second email is sent
+        self.assertEqual(len(mail.outbox), 2)
+
+        message_sent = mail.outbox[1]
+        message = message_sent.message()
+
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+        # Compare second message sent with the original message content
+        self.assertEqual(message_sent.subject, "This is the subject")
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
+        self.assertEqual(message_sent.to, ["success@simulator.amazonses.com"])
+        self.assertEqual(
+            message_sent.bcc, ["bcc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            message_sent.cc, ["cc_success@simulator.amazonses.com"]
+        )
+        self.assertEqual(
+            message_sent.reply_to, ["reply_success@simulator.amazonses.com"]
+        )
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
+
+    def test_normalize_addresses(self) -> None:
+        """Test if the normalize_addresses function parses and normalizes
+        properly different combinations of list recipients, returns a list of
+        normalized email addresses.
+        """
+        test_cases = (
+            (
+                [
+                    "success@simulator.amazonses.com",
+                    "bounce@simulator.amazonses.com",
+                    "complaint@simulator.amazonses.com",
+                ],
+                [
+                    "success@simulator.amazonses.com",
+                    "bounce@simulator.amazonses.com",
+                    "complaint@simulator.amazonses.com",
+                ],
+            ),
+            (
+                [
+                    "Admin User <success_1@simulator.amazonses.com>",
+                    "New User <bounce_1@simulator.amazonses.com>",
+                    "complaint_1@simulator.amazonses.com",
+                ],
+                [
+                    "success_1@simulator.amazonses.com",
+                    "bounce_1@simulator.amazonses.com",
+                    "complaint_1@simulator.amazonses.com",
+                ],
+            ),
+            (
+                [
+                    "<success_2@simulator.amazonses.com>",
+                    "<bounce_2@simulator.amazonses.com>",
+                    "complaint_2@simulator.amazonses.com",
+                ],
+                [
+                    "success_2@simulator.amazonses.com",
+                    "bounce_2@simulator.amazonses.com",
+                    "complaint_2@simulator.amazonses.com",
+                ],
+            ),
+            (
+                ["success@simulator.amazonses.com"],
+                ["success@simulator.amazonses.com"],
+            ),
+            ([], []),
+        )
+
+        for test, result in test_cases:
+            normalized_emails = normalize_addresses(test)
+            self.assertEqual(normalized_emails, result)
+
+    def test_sending_multiple_recipients_email(self) -> None:
+        """Test if we can send a message to multiple recipients, bcc, cc, and
+        reply_to email addresses.
+
+        We should store recipients, bcc, cc, and reply_to as a list of
+        normalized email addresses.
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+                "bounce@simulator.amazonses.com",
+                "<complaint@simulator.amazonses.com>",
+            ],
+            ["BCC User <bcc@example.com>", "bcc@example.com"],
+            cc=["CC User <cc@example.com>", "cc@example.com"],
+            reply_to=["Reply User <another@example.com>", "reply@example.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        self.assertEqual(
+            message_sent.from_email, "User Admin <testing@courtlistener.com>"
+        )
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+        self.assertEqual(
+            message_sent.bcc, ["BCC User <bcc@example.com>", "bcc@example.com"]
+        )
+        self.assertEqual(
+            message_sent.cc, ["CC User <cc@example.com>", "cc@example.com"]
+        )
+        self.assertEqual(
+            message_sent.reply_to,
+            ["Reply User <another@example.com>", "reply@example.com"],
+        )
+
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body goes here")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(
+            stored_email[0].from_email,
+            "User Admin <testing@courtlistener.com>",
+        )
+        self.assertEqual(
+            stored_email[0].to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+        self.assertEqual(
+            stored_email[0].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
+        self.assertEqual(
+            stored_email[0].cc, ["cc@example.com", "cc@example.com"]
+        )
+        self.assertEqual(
+            stored_email[0].reply_to,
+            ["another@example.com", "reply@example.com"],
+        )
+
+    def test_sending_multiple_recipients_banned_email(self) -> None:
+        """When sending an email to multiple recipients we verify if each
+        recipient is not banned, we remove the banned email addresses from
+        the list of recipients to avoid sending email to those addresses
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        # Checks email address is now banned
+        self.assertEqual(email_ban.count(), 1)
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Send only to no banned email addresses
+        message_sent = mail.outbox[0]
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+    def test_sending_multiple_recipients_all_banned(self) -> None:
+        """When sending an email to multiple recipients and all of them are
+        banned, we discard the message, we don't send and store it.
+        """
+        # Trigger a hard_bounce event
+        self.send_signal(
+            self.hard_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        # Trigger a complaint event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+        # Confirm if email is not stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 0)
+
+    def test_sending_multiple_recipients_small_email_only(self) -> None:
+        """When sending an email to multiple recipients, if at least one of
+        the recipients requires a small version, we send the small email only
+        version for all recipients.
+        """
+        # Trigger a small_email_only soft bounce
+        self.send_signal(
+            self.soft_bounce_msg_large_asset, "bounce", signals.bounce_received
+        )
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=[
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        # Attach file and small email version
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        # Confirm not attachment is sent
+        self.assertEqual(len(message_sent.attachments), 0)
+
+        message = message_sent.message()
+
+        # Confirm we sent it to all recipients
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Confirm small email only version is sent
+        self.assertEqual(plaintext_body, "Body for small version")
+        self.assertEqual(html_body, "<p>Body for small version</p>")
+
+    def test_sending_multiple_recipients_no_small_email_only(self) -> None:
+        """When sending an email to multiple recipients and the message
+        has a small version but none of the recipients are small_email_only
+        flagged, we send the normal email version with attachments.
+        """
+        email = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body for attachment version",
+            from_email="testing@courtlistener.com",
+            to=[
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+
+        html = "<p>Body for attachment version</p>"
+        email.attach_alternative(html, "text/html")
+        small_plain = "Body for small version"
+        email.attach_alternative(small_plain, "text/plain_small")
+        small_html = "<p>Body for small version</p>"
+        email.attach_alternative(small_html, "text/html_small")
+        # Attach a file
+        email.attach_file(self.attachment_150)
+        email.send()
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm the attachment is sent
+        self.assertEqual(len(message_sent.attachments), 1)
+        message = message_sent.message()
+        # Extract body content from the message
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+        # Confirm if normal email version is sent
+        self.assertEqual(plaintext_body, "Body for attachment version")
+        self.assertEqual(html_body, "<p>Body for attachment version</p>")
+
+        # Retrieve stored email and compare content, small version should
+        # be stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body for small version</p>"
+        )
+        self.assertEqual(stored_email[0].plain_text, "Body for small version")
+        self.assertEqual(
+            stored_email[0].to,
+            [
+                "success@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint@simulator.amazonses.com",
+            ],
+        )
+
+    def test_sending_multiple_recipients_within_backoff(self) -> None:
+        """When sending an email to multiple recipients, if we detect an email
+        address that is under a backoff waiting period we should eliminate
+        that address from the recipient list to avoid sending to it
+        and queue for sending later.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "success_back@simulator.amazonses.com",
+                "bounce@simulator.amazonses.com",
+                "complaint_back@simulator.amazonses.com",
+            ],
+            fail_silently=False,
+        )
+
+        # Confirm if email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Send only to addresses that are not under a backoff waiting period
+        message_sent = mail.outbox[0]
+        self.assertEqual(
+            message_sent.to,
+            [
+                "success_back@simulator.amazonses.com",
+                "complaint_back@simulator.amazonses.com",
+            ],
+        )
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+    def test_sending_multiple_recipients_all_within_backoff(self) -> None:
+        """When sending an email to multiple recipients, if we detect that all
+        email addresses are under a backoff waiting period we don't send the
+        message, we should store the message.
+        """
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset_2, "bounce", signals.bounce_received
+        )
+        msg_count = send_mail(
+            "Subject here",
+            "Here is the message.",
+            "testing@courtlistener.com",
+            [
+                "bounce@simulator.amazonses.com",
+                "soft_bounce@simulator.amazonses.com",
+            ],
+        )
+        # Confirm if email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(msg_count, 0)
+
+        # Confirm if email is stored
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+    def call_bcc_random(self, message, bcc_rate, iterations) -> int:
+        """This function simulates n (iterations) calls to the add_bcc_random
+        function and returns a counter_bcc that represents the number of
+        messages that are bcc'ed.
+        """
+        counter_bcc = 0
+        for i in range(iterations):
+            message = add_bcc_random(message, bcc_rate)
+            if message.bcc:
+                counter_bcc += 1
+            # Clean bcc to test next iteration.
+            message.bcc = []
+        return counter_bcc
+
+    def average_bcc_random(self, message, bcc_rate, iterations) -> int:
+        """This function simulates 50 calls to the call_bcc_random
+        function and returns the average number of times that add_bcc_random
+        returned True.
+        """
+        total = 0
+        for i in range(50):
+            val = self.call_bcc_random(message, bcc_rate, iterations)
+            total = total + val
+        average = total / 50
+        return int(round(average))
+
+    def test_add_bcc_random(self) -> None:
+        """Test the add_bcc_random function to verify if it produces the
+        expected results based on the bcc_rate provided.
+
+        We use call_bcc_random(bcc_rate, iterations) function with a bcc_rate
+        to simulate n calls of the add_bcc_random function, this functions
+        returns the total number of times that add_bcc_random returned True
+        """
+
+        # Test differnt BCC rates
+        # No messages are BCC'ed
+        zero_bcc_rate = 0
+        # All messages are BCC'ed
+        all_bcc_rate = 1
+        # 10% are BCC'ed
+        ten_bcc_rate = 0.1
+        # 1% are BCC'ed
+        one_bcc_rate = 0.01
+
+        message = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "bounce@simulator.amazonses.com",
+            ],
+        )
+
+        # Get the average number of times that add_bcc_random returns True
+        # for different bcc_rate and 10_000 iterations
+        average_ten = self.average_bcc_random(message, ten_bcc_rate, 10_000)
+        average_one = self.average_bcc_random(message, one_bcc_rate, 10_000)
+        average_none = self.average_bcc_random(message, zero_bcc_rate, 10_000)
+        average_all = self.average_bcc_random(message, all_bcc_rate, 10_000)
+
+        # For 0.1 bcc rate of 10_000 calls we should get a number very close
+        # to 1000, however, to ensure the test never fails we use a range
+        # between 900 and 1100
+        self.assertTrue(average_ten >= 900 and average_ten <= 1100)
+
+        # For 0.01 bcc rate of 10_000 calls we should get a number very close
+        # to 100, however, to ensure the test never fails we use a range
+        # between 90 and 110
+        self.assertTrue(average_one >= 90 and average_one <= 110)
+
+        # For 1 bcc rate of 10_000 calls we should get 10_000
+        self.assertEqual(average_all, 10_000)
+
+        # For 0 bcc rate of 10_000 calls we should get 0
+        self.assertEqual(average_none, 0)
+
+    @override_settings(EMAIL_BCC_COPY_RATE=1)
+    def test_add_bcc_to_emails(self) -> None:
+        """This test checks if bcc is added to the message when we use a
+        EMAIL_BCC_COPY_RATE = 1, all messages should be bcc'ed
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+        )
+
+        email.send()
+        # Verify if BCC was added to the message
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.bcc, [settings.BCC_EMAIL_ADDRESS])
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email[0].bcc, [])
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+            ("BCC User <bcc@example.com>", "bcc@example.com"),
+        )
+        email.send()
+        message_sent = mail.outbox[1]
+        # Verify if BCC was added to the message as an additional address
+        self.assertEqual(
+            message_sent.bcc,
+            [
+                "BCC User <bcc@example.com>",
+                "bcc@example.com",
+                settings.BCC_EMAIL_ADDRESS,
+            ],
+        )
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(
+            stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
+
+    @override_settings(EMAIL_BCC_COPY_RATE=0)
+    def test_avoid_add_bcc_to_emails(self) -> None:
+        """This test checks if bcc is not added to the message when we use a
+        EMAIL_BCC_COPY_RATE = 0, no messages should be bcc'ed
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+        )
+
+        email.send()
+        # Verify if the BCC was not added to the message
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.bcc, [])
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email[0].bcc, [])
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "User Admin <testing@courtlistener.com>",
+            [
+                "Admin User <success@simulator.amazonses.com>",
+            ],
+            ("BCC User <bcc@example.com>", "bcc@example.com"),
+        )
+        email.send()
+        message_sent = mail.outbox[1]
+        # Verify if the BCC was not added to the message
+        self.assertEqual(
+            message_sent.bcc, ["BCC User <bcc@example.com>", "bcc@example.com"]
+        )
+        # Retrieve stored email and compare content, additional BCC shouldn't
+        # be stored because is not part of the original message
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(
+            stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )

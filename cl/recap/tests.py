@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import date
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
@@ -28,6 +29,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.mergers import (
     add_attorney,
@@ -58,7 +60,9 @@ from cl.recap.tasks import (
     process_recap_pdf,
     process_recap_zip,
 )
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
+    Court,
     Docket,
     DocketEntry,
     OriginatingCourtInformation,
@@ -72,7 +76,9 @@ from cl.tests.cases import SimpleTestCase, TestCase
 class RecapUploadsTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
-    fixtures = ["canb_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        CourtFactory(id="canb", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -470,7 +476,20 @@ class ProcessingQueueApiFilterTest(TestCase):
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
-    fixtures = ["canb_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+        with open(
+            test_dir / "recap_mail_receipt.json",
+            encoding="utf-8",
+        ) as file:
+            recap_mail_receipt = json.load(file)
+            cls.data = {
+                "court": cls.court.id,
+                "mail": recap_mail_receipt["mail"],
+                "receipt": recap_mail_receipt["receipt"],
+            }
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -478,16 +497,6 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
-        test_dir = os.path.join(
-            settings.INSTALL_ROOT, "cl", "recap", "test_assets"
-        )
-        with open(os.path.join(test_dir, "recap_mail_receipt.json")) as file:
-            recap_mail_receipt = json.loads(file.read())
-            self.data = {
-                "court": "akd",
-                "mail": recap_mail_receipt["mail"],
-                "receipt": recap_mail_receipt["receipt"],
-            }
 
     def test_non_pacer_court_fails(self):
         self.data["court"] = "scotus"
@@ -1447,7 +1456,9 @@ class RecapDocketTaskTest(TestCase):
 class ClaimsRegistryTaskTest(TestCase):
     """Can we handle claims registry uploads?"""
 
-    fixtures = ["canb_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        CourtFactory(id="canb", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -1709,7 +1720,33 @@ class IdbImportTest(SimpleTestCase):
 class IdbMergeTest(TestCase):
     """Can we successfully do heuristic matching"""
 
-    fixtures = ["fjc_data.json", "canb_court.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = Court.objects.get(id="scotus")
+        cls.docket_1 = DocketFactory(
+            case_name="BARTON v. State Board for Rodgers Educator Certification",
+            docket_number_core="0600078",
+            docket_number="No. 06-11-00078-CV",
+            court=cls.court,
+        )
+        cls.docket_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number_core="7101462",
+            docket_number="No. 07-11-1462-CR",
+            court=cls.court,
+        )
+        cls.fcj_1 = FjcIntegratedDatabaseFactory(
+            district=cls.court,
+            jurisdiction=3,
+            nature_of_suit=440,
+            docket_number="0600078",
+        )
+        cls.fcj_2 = FjcIntegratedDatabaseFactory(
+            district=cls.court,
+            jurisdiction=3,
+            nature_of_suit=440,
+            docket_number="7101462",
+        )
 
     def tearDown(self) -> None:
         FjcIntegratedDatabase.objects.all().delete()
@@ -1718,15 +1755,18 @@ class IdbMergeTest(TestCase):
         """Can we successfully merge a chunk of IDB data?"""
 
         self.assertEqual(Docket.objects.count(), 2)
-        self.assertEqual(Docket.objects.get(id=400).nature_of_suit, "")
-        create_or_merge_from_idb_chunk([1])
+        self.assertEqual(
+            Docket.objects.get(id=self.docket_1.id).nature_of_suit, ""
+        )
+        create_or_merge_from_idb_chunk([self.fcj_1.id])
         self.assertEqual(Docket.objects.count(), 2)
         self.assertEqual(
-            Docket.objects.get(id=400).nature_of_suit, "440 Civil rights other"
+            Docket.objects.get(id=self.docket_1.id).nature_of_suit,
+            "440 Civil rights other",
         )
 
     def test_create_from_idb_chunk(self) -> None:
         # Can we ignore dockets with CR in them that otherwise match?
         self.assertEqual(Docket.objects.count(), 2)
-        create_or_merge_from_idb_chunk([2])
+        create_or_merge_from_idb_chunk([self.fcj_2.id])
         self.assertEqual(Docket.objects.count(), 3)

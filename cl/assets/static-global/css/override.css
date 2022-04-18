@@ -567,6 +567,26 @@ div.shown ul {
 }
 .bullet-tail:last-child:after { content: none; }
 
+.group-summaries {
+  padding: 0 1em 0 1em !important;
+}
+
+.summary-group-metadata {
+  padding-top: 5px;
+}
+
+.toggle-group-summaries {
+  padding: 0;
+}
+.toggle-group-summaries:focus {
+  outline: none;
+}
+
+[aria-expanded="false"] > .expanded,
+[aria-expanded="true"] > .collapsed {
+  display: none;
+}
+
 .citation-name {
   font-size: 1.2em;
 }

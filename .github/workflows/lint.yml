@@ -17,10 +17,10 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
-          python-version: "3.8"
+          python-version: "3.10"
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1.1.0
+        uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
@@ -47,10 +47,6 @@ jobs:
           pwd
           ls -al
 
-      - name: Create the private settings file
-        working-directory: cl/settings
-        run: cp 05-private.example 05-private.py
-
       # Add modules here as they're ready (remove them from the file-by-file
       # checker below as you do so).
       - name: mypy Static Type Cheker (packages)
@@ -64,6 +60,7 @@ jobs:
           -p cl.corpus_importer \
           -p cl.lib \
           -p cl.opinion_page \
+          -p cl.settings \
           -p cl.simple_pages \
           -p cl.recap_rss
 
@@ -83,7 +80,8 @@ jobs:
           cl/donate/utils.py \
           cl/tests/utils.py \
           cl/users/management/commands/cl_account_management.py \
-          cl/users/forms.py
+          cl/users/forms.py \
+          cl/users/email_handlers.py
 
       - name: Flynt f-string Formatter
         run: >
@@ -94,6 +92,18 @@ jobs:
 
       - name: Black Code Formatter
         uses: psf/black@stable
+
+  lint-isort:
+    # This is an unfortunate necessity because the latest version of isort
+    # doesn't work with Python 3.10. To work around that, we simply run this
+    # in version 3.9, but someday we hope to simplify this again.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2-beta
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
 
       - name: isort Import Sorter
         uses: isort/isort-action@v0.1.0

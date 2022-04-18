@@ -1,4 +1,5 @@
-from django.conf import settings
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -25,6 +26,9 @@ from cl.visualizations.models import Referer, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
 from cl.visualizations.tasks import get_title
 from cl.visualizations.utils import build_visualization, message_dict
+
+# SCOTUS cases after this date aren't expected to have SCDB data.
+SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 
 
 def render_visualization_page(
@@ -103,7 +107,7 @@ def new_visualization(request: HttpRequest) -> HttpResponse:
     )
 
     context = {
-        "SCDB_LATEST_CASE": settings.SCDB_LATEST_CASE.isoformat(),
+        "SCDB_LATEST_CASE": SCDB_LATEST_CASE.isoformat(),
         "demo_viz": demo_viz,
         "private": True,
     }

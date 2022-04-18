@@ -40,10 +40,13 @@ SUFFIXES = (
     ("4", "IV"),
 )
 SUFFIX_LOOKUP = {v.lower(): k for k, v in SUFFIXES}
+MALE = "m"
+FEMALE = "f"
+OTHER_GENDER = "o"
 GENDERS = (
-    ("m", "Male"),
-    ("f", "Female"),
-    ("o", "Other"),
+    (MALE, "Male"),
+    (FEMALE, "Female"),
+    (OTHER_GENDER, "Other"),
 )
 GRANULARITY_YEAR = "%Y"
 GRANULARITY_MONTH = "%Y-%m"
@@ -77,7 +80,7 @@ class Person(AbstractDateTimeModel):
         help_text="Any nicknames or other aliases that a person has. For "
         "example, William Jefferson Clinton has an alias to Bill",
         related_name="aliases",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -397,7 +400,7 @@ class School(AbstractDateTimeModel):
     is_alias_of = models.ForeignKey(
         "self",
         help_text="Any alternate names that a school may have",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
     )
@@ -441,6 +444,7 @@ class Position(AbstractDateTimeModel):
     ADMINISTRATIVE_LAW_JUDGE = "ad-law-jud"
     # Acting
     ACTING_JUDGE = "act-jud"
+    ACTING_JUSTICE = "act-jus"
     ACTING_PRESIDING_JUDGE = "act-pres-jud"
     ADMINISTRATIVE_PRESIDING_JUSTICE = "ad-pres-jus"
     # Associate
@@ -520,10 +524,8 @@ class Position(AbstractDateTimeModel):
                 (ADMINISTRATIVE_LAW_JUDGE, "Administrative Law Judge"),
                 # Acting
                 (ACTING_JUDGE, "Acting Judge"),
-                (
-                    ACTING_PRESIDING_JUDGE,
-                    "Acting Presiding Judge",
-                ),
+                (ACTING_JUSTICE, "Acting Justice"),
+                (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge"),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
                 (ASSOCIATE_JUSTICE, "Associate Justice"),
@@ -721,7 +723,7 @@ class Position(AbstractDateTimeModel):
         help_text="If this was a judicial position, this is the jurisdiction "
         "where it was held.",
         related_name="court_positions",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -729,7 +731,7 @@ class Position(AbstractDateTimeModel):
         School,
         help_text="If this was an academic job, this is the school where the "
         "person worked.",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -757,7 +759,7 @@ class Position(AbstractDateTimeModel):
         "allows you to know the position a person held when an "
         "appointment was made.",
         related_name="appointed_positions",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -765,14 +767,14 @@ class Position(AbstractDateTimeModel):
         Person,
         help_text="If this is a clerkship, the supervising judge.",
         related_name="supervised_positions",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
     predecessor = models.ForeignKey(
         Person,
         help_text="The person that previously held this position",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
     )
@@ -1121,6 +1123,9 @@ class Education(AbstractDateTimeModel):
         ("jd", "Juris Doctor (J.D.)"),
         ("llm", "Master of Laws (LL.M)"),
         ("llb", "Bachelor of Laws (e.g. LL.B)"),
+        # N.B. you may be tempted to add LL.D. here. Don't. It's not a real
+        # degree. It's an honorarium and belongs with your awards, not your
+        # degrees.
         ("jsd", "Doctor of Law (J.S.D)"),
         ("phd", "Doctor of Philosophy (PhD)"),
         ("aa", "Associate (e.g. A.A.)"),
@@ -1139,9 +1144,9 @@ class Education(AbstractDateTimeModel):
     )
     school = models.ForeignKey(
         School,
-        help_text="The school where this education was compeleted",
+        help_text="The school where this education was completed",
         related_name="educations",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
     )
     degree_level = models.CharField(
         help_text="Normalized degree level, e.g. BA, JD.",
@@ -1185,7 +1190,9 @@ class Race(models.Model):
         ("i", "American Indian or Alaska Native"),
         ("a", "Asian"),
         ("p", "Native Hawaiian or Other Pacific Islander"),
+        ("mena", "Middle Eastern/North African"),
         ("h", "Hispanic/Latino"),
+        ("o", "Other"),
     )
     race = models.CharField(
         choices=RACES,
@@ -1214,6 +1221,7 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         ("w", "Whig"),
         ("j", "Jeffersonian Republican"),
         ("u", "National Union"),
+        ("z", "Reform Party"),
     )
     person = models.ForeignKey(
         Person,

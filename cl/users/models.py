@@ -1,18 +1,21 @@
 import re
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum, UniqueConstraint
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
 from cl.api.utils import invert_user_logs
+from cl.lib.models import AbstractDateTimeModel
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -174,12 +177,199 @@ class UserProfile(models.Model):
         verbose_name_plural = "user profiles"
 
 
+class SUB_TYPES(object):
+    """SNS Event Subtypes"""
+
+    UNDETERMINED = 0
+    GENERAL = 1
+    NOEMAIL = 2
+    SUPPRESSED = 3
+    ONACCOUNTSUPPRESSIONLIST = 4
+    MAILBOXFULL = 5
+    MESSAGETOOLARGE = 6
+    CONTENTREJECTED = 7
+    ATTACHMENTREJECTED = 8
+    COMPLAINT = 9
+    OTHER = 10
+
+    TYPES = (
+        (UNDETERMINED, "Undetermined"),
+        (GENERAL, "General"),
+        (NOEMAIL, "NoEmail"),
+        (SUPPRESSED, "Suppressed"),
+        (ONACCOUNTSUPPRESSIONLIST, "OnAccountSuppressionList"),
+        (MAILBOXFULL, "MailboxFull"),
+        (MESSAGETOOLARGE, "MessageTooLarge"),
+        (CONTENTREJECTED, "ContentRejected"),
+        (ATTACHMENTREJECTED, "AttachmentRejected"),
+        (COMPLAINT, "Complaint"),
+        (OTHER, "Other"),
+    )
+
+
+class OBJECT_TYPES(object):
+    """EmailFlag Object Types"""
+
+    BAN = 0
+    FLAG = 1
+    TYPES = (
+        (BAN, "Email ban"),
+        (FLAG, "Email flag"),
+    )
+
+
+class EmailFlag(AbstractDateTimeModel):
+    """Stores flags for email addresses."""
+
+    SMALL_ONLY = 0
+    MAX_RETRY_REACHED = 1
+    FLAGS = (
+        (SMALL_ONLY, "small_email_only"),
+        (MAX_RETRY_REACHED, "max_retry_reached"),
+    )
+    email_address = models.EmailField(
+        help_text="EmailFlag object is related to this email address instead "
+        "of a user, in this way, if users change their email address this "
+        "won't affect the user's new email address.",
+    )
+    object_type = models.SmallIntegerField(
+        help_text="The object type assigned, "
+        "Email ban: ban an email address and avoid sending any email. "
+        "Email flag: flag an email address for a special treatment.",
+        choices=OBJECT_TYPES.TYPES,
+    )
+    flag = models.SmallIntegerField(
+        help_text="The actual flag assigned, e.g: small_email_only.",
+        choices=FLAGS,
+        blank=True,
+        null=True,
+    )
+    event_sub_type = models.SmallIntegerField(
+        help_text="The SNS bounce subtype that triggered the object.",
+        choices=SUB_TYPES.TYPES,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email_address"]),
+        ]
+        # Creates a unique constraint to allow only one BAN object for
+        # each email_address
+        constraints = [
+            UniqueConstraint(
+                fields=["email_address"],
+                condition=Q(object_type=OBJECT_TYPES.BAN),
+                name="unique_email_ban",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_object_type_display()} for {self.email_address}"
+
+
+class BackoffEvent(AbstractDateTimeModel):
+    """Stores backoff events for email addresses, this is created or updated
+    after receiving a soft bounce object for an email address.
+    """
+
+    email_address = models.EmailField(
+        help_text="The backoff event is related to this email address "
+        "instead of a user, in this way, if users change their email address "
+        "this won't affect the user's new email address, this unique.",
+        unique=True,
+    )
+    retry_counter = models.SmallIntegerField(
+        help_text="The retry counter for exponential backoff events.",
+    )
+    next_retry_date = models.DateTimeField(
+        help_text="The next retry datetime for exponential backoff events.",
+    )
+
+    @property
+    def under_waiting_period(self) -> bool:
+        """Does the backoff event is under waiting period?
+
+        :return bool: True if so, False if not.
+        """
+        if now() < self.next_retry_date:
+            return True
+        else:
+            return False
+
+    def __str__(self) -> str:
+        return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
+
+
+class EmailSent(AbstractDateTimeModel):
+    """Stores email messages."""
+
+    user = models.ForeignKey(
+        User,
+        help_text="The user that this message is related to in case of users "
+        "change their email address we can send failed email to the user's "
+        "new email address, this is optional in case we send email to an"
+        "email address that doesn't belong to a CL user.",
+        related_name="emails",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    message_id = models.UUIDField(
+        help_text="Unique message identifier",
+        default=uuid.uuid4,
+        editable=False,
+    )
+    from_email = models.CharField(
+        help_text="From email address", max_length=300
+    )
+    to = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of email recipients",
+        blank=True,
+        null=True,
+    )
+    bcc = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of BCC emails addresses",
+        blank=True,
+        null=True,
+    )
+    cc = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of CC emails addresses",
+        blank=True,
+        null=True,
+    )
+    reply_to = ArrayField(
+        models.CharField(max_length=254),
+        help_text="List of Reply to emails addresses",
+        blank=True,
+        null=True,
+    )
+    subject = models.TextField(help_text="Subject", blank=True)
+    plain_text = models.TextField(
+        help_text="Plain Text Message Body", blank=True
+    )
+    html_message = models.TextField(help_text="HTML Message Body", blank=True)
+    headers = models.JSONField(
+        help_text="Original email Headers", blank=True, null=True
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["message_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Email: {self.message_id}"
+
+
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(
         append if append is not None else ""
     )
-    recap_email = f"{recap_email_header}@recap.email"
+    recap_email = f"{recap_email_header.lower()}@recap.email"
     user_profiles_with_match = UserProfile.objects.filter(
         recap_email=recap_email
     )
@@ -191,7 +381,7 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
 
 
 @receiver(post_save, sender=UserProfile)
-def assign_recap_email(sender, instance=None, created=False, **kwargs):
+def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()

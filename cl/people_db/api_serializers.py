@@ -1,4 +1,5 @@
 from drf_dynamic_fields import DynamicFieldsMixin
+from judge_pics.search import ImageSizes, portrait
 from rest_framework import serializers
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
@@ -19,7 +20,6 @@ from cl.people_db.models import (
     School,
     Source,
 )
-from cl.people_db.utils import make_person_picture_path
 from cl.search.api_serializers import CourtSerializer
 
 
@@ -119,7 +119,7 @@ class PersonDisclosureSerializer(
         return make_disclosure_year_range(obj)
 
     def get_thumbnail_path(self, obj: Person) -> str:
-        return make_person_picture_path(obj)
+        return portrait(obj.id, ImageSizes.SMALL)
 
     def get_newest_disclosure_url(self, obj: Person) -> str:
         """Get the URL of the"""

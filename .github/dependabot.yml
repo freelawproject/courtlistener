@@ -7,9 +7,16 @@ updates:
     # We only use dependabot for security updates. Unfortunately, since it can
     # no longer access Github secrets, tests don't get run by dependabot
     # properly and it is no longer useful.
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     ignore:
+    # Ignore all patch updates. Ignore minor updates to linting tools.
+    - dependency-name: '*'
+      update-types: ["version-update:semver-patch"]
     - dependency-name: black
+      update-types: ["version-update:semver-patch", "version-update:semver-minor"]
     - dependency-name: pylint
+      update-types: ["version-update:semver-patch", "version-update:semver-minor"]
     - dependency-name: flake8
+      update-types: ["version-update:semver-patch", "version-update:semver-minor"]
     - dependency-name: isort
+      update-types: ["version-update:semver-patch", "version-update:semver-minor"]

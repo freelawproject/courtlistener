@@ -71,7 +71,7 @@ class RssItemCache(models.Model):
     hash = models.CharField(max_length=64, unique=True, db_index=True)
 
 
-def make_rss_feed_path(instance, filename):
+def make_rss_feed_path(instance, filename: str) -> str:
     return make_path("pacer-rss-feeds", filename)
 
 
@@ -81,7 +81,7 @@ class RssFeedData(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court,
         help_text="The court where the RSS feed was found",
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name="rss_feed_data",
     )
     filepath = models.FileField(
@@ -92,14 +92,18 @@ class RssFeedData(AbstractDateTimeModel):
     )
 
     @property
-    def file_contents(self):
+    def file_contents(self) -> str:
         with open(self.filepath.path, "rb") as f:
             return bz2.decompress(f.read()).decode()
 
-    def print_file_contents(self):
+    def print_file_contents(self) -> None:
         print(self.file_contents)
 
-    def reprocess_item(self, metadata_only=False, index=True):
+    def reprocess_item(
+        self,
+        metadata_only: bool = False,
+        index: bool = True,
+    ) -> None:
         """Reprocess the RSS feed
 
         :param metadata_only: If True, only do the metadata, not the docket

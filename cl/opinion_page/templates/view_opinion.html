@@ -2,12 +2,12 @@
 {% load text_filters %}
 {% load humanize %}
 {% load static %}
-{% load waffle_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
-{% block og_description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}{{ cluster|best_case_name }}{% if summaries_count > 0 %} — {{ top_parenthetical_groups.0.representative.text|capfirst }}{% else %} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endif %}
+{% endblock %}
 
 {% block navbar-o %}active{% endblock %}
 
@@ -28,11 +28,6 @@
     {% endif %}
 {% endblock %}
 
-{% block matomo-scripts %}
-  {% if related_clusters %}
-  _paq.push(['trackEvent', 'viewRelated', 'viewRelated_{{ related_algorithm }}_seed_{{ cluster.pk }}', '{{ related_cluster_ids|join:"," }}']);
-  {% endif %}
-{% endblock %}
 
 {% block sidebar %}
     <div class="col-sm-3" id="sidebar">
@@ -84,29 +79,28 @@
             </div>
         </div>
 
-        {% flag "parentheticals" %}
-          {% if summaries_count > 0  %}
-          <div id="summaries" class="sidebar-section">
-            <h3><span>Summaries ({{ summaries_count|intcomma }})</span></h3>
-            <p class="bottom">Judge-written summaries of this case:</p>
-            <ul>
-              {% for summary in top_summaries %}
-                <li>
-                  {{ summary.text|truncatewords:50|capfirst }}
-                  (from <a href="{{ summary.describing_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                    {{ summary.describing_opinion.cluster.caption|safe|truncatewords:10|v_wrapper }}</a>)
-                </li>
-              {% endfor %}
-            </ul>
-            <h4>
-              <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                 class="btn btn-default">
-                View All Summaries
-              </a>
-            </h4>
-          </div>
-          {% endif %}
-        {% endflag %}
+        {% if summaries_count > 0  %}
+        <div id="summaries" class="sidebar-section">
+          <h3><span>Summaries ({{ summaries_count|intcomma }})</span></h3>
+          <p class="bottom">Judge-written summaries of this case:</p>
+          <ul>
+            {% for group in top_parenthetical_groups %}
+              {% with summary=group.representative %}
+              <li>
+                {{ summary.text|truncatewords:50|capfirst }}
+                  (from {{ group.size|intcomma }} case{{ group.size|pluralize }})
+              </li>
+              {% endwith %}
+            {% endfor %}
+          </ul>
+          <h4>
+            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+               class="btn btn-default">
+              View All Summaries
+            </a>
+          </h4>
+        </div>
+        {% endif %}
 
         {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">

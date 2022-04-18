@@ -11,7 +11,6 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
-from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
@@ -20,6 +19,8 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
+from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.score_parentheticals import parenthetical_score
 from cl.lib.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import (
     Opinion,
@@ -127,6 +128,33 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             if _opinion.pk not in all_cited_opinions:
                 opinion_ids_to_update.add(_opinion.pk)
 
+        clusters_to_update_par_groups_for = set()
+        parentheticals: List[Parenthetical] = []
+        for _opinion, _citations in citation_resolutions.items():
+            # Currently, eyecite has a bug where parallel citations are
+            # detected individually. We avoid creating duplicate parentheticals
+            # because of that by keeping track of what we've seen so far.
+            parenthetical_texts = set()
+            for _cit in _citations:
+                # If the citation has a descriptive parenthetical, clean
+                # it up and store it as a Parenthetical
+                if (
+                    (par_text := _cit.metadata.parenthetical)
+                    and par_text not in parenthetical_texts
+                    and is_parenthetical_descriptive(par_text)
+                ):
+                    clusters_to_update_par_groups_for.add(_opinion.cluster_id)
+                    parenthetical_texts.add(par_text)
+                    clean = clean_parenthetical_text(par_text)
+                    parentheticals.append(
+                        Parenthetical(
+                            describing_opinion_id=opinion.pk,
+                            described_opinion_id=_opinion.pk,
+                            text=clean,
+                            score=parenthetical_score(clean, opinion.cluster),
+                        )
+                    )
+
         # Finally, commit these changes to the database in a single
         # transcation block. Trigger a single Solr update as well, if
         # required.
@@ -161,26 +189,14 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
                 ]
             )
 
-            parentheticals = []
-            for _opinion, _citations in citation_resolutions.items():
-                for _cit in _citations:
-                    # If the citation has a descriptive parenthetical, clean
-                    # it up and store it as a Parenthetical
-                    if (
-                        par_text := _cit.metadata.parenthetical
-                    ) and is_parenthetical_descriptive(par_text):
-                        clean = clean_parenthetical_text(par_text)
-                        parentheticals.append(
-                            Parenthetical(
-                                describing_opinion_id=opinion.pk,
-                                described_opinion_id=_opinion.pk,
-                                text=clean,
-                                score=description_score(
-                                    clean, opinion.cluster
-                                ),
-                            )
-                        )
             Parenthetical.objects.bulk_create(parentheticals)
+
+            # Update parenthetical groups for clusters that we have added
+            # parentheticals for from this opinion
+            for cluster_id in clusters_to_update_par_groups_for:
+                create_parenthetical_groups(
+                    OpinionCluster.objects.get(pk=cluster_id)
+                )
 
             # Save all the changes to the citing opinion (send to solr later)
             opinion.save(index=False)

@@ -1,3 +1,5 @@
+import itertools
+from dataclasses import dataclass
 from typing import List, Tuple
 from unittest.mock import Mock
 
@@ -18,10 +20,16 @@ from cl.citations.annotate_citations import (
     create_cited_html,
     get_and_clean_opinion_text,
 )
-from cl.citations.description_score import description_score
 from cl.citations.filter_parentheticals import (
     clean_parenthetical_text,
     is_parenthetical_descriptive,
+)
+from cl.citations.group_parentheticals import (
+    ComputedParentheticalGroup,
+    compute_parenthetical_groups,
+    get_graph_component,
+    get_parenthetical_tokens,
+    get_representative_parenthetical,
 )
 from cl.citations.management.commands.cl_add_parallel_citations import (
     identify_parallel_citations,
@@ -32,6 +40,7 @@ from cl.citations.match_citations import (
     do_resolve_citations,
     resolve_fullcase_citation,
 )
+from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
@@ -41,6 +50,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     Parenthetical,
+    ParentheticalGroup,
 )
 from cl.tests.cases import SimpleTestCase
 
@@ -616,7 +626,7 @@ class UpdateTest(IndexedSolrTestCase):
         ]
         for described, num_parentheticals in description_test_pairs:
             with self.subTest(
-                f"Testing Parenthetical creation for {described}...",
+                f"Testing Parenthetical and ParentheticalGroup creation for {described}...",
                 described=described,
                 num_descriptions=num_parentheticals,
             ):
@@ -626,6 +636,27 @@ class UpdateTest(IndexedSolrTestCase):
                     ).count(),
                     num_parentheticals,
                 )
+                # Make sure at least one ParentheticalGroup is created if
+                # there is at least one parenthetical
+                if num_parentheticals > 0:
+                    self.assertGreaterEqual(
+                        ParentheticalGroup.objects.filter(
+                            opinion=described
+                        ).count(),
+                        1,
+                    )
+
+    def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
+        remove_citations_from_imported_fixtures()
+        citing = Opinion.objects.get(pk=11)
+        cited = Opinion.objects.get(pk=7)
+        find_citations_and_parentheticals_for_opinion_by_pks.delay([11])
+        self.assertEqual(
+            Parenthetical.objects.filter(
+                describing_opinion=citing, described_opinion=cited
+            ).count(),
+            1,
+        )
 
 
 class CitationFeedTest(IndexedSolrTestCase):
@@ -807,6 +838,7 @@ class FilterParentheticalTest(SimpleTestCase):
             "internal citations and quotations omitted",
             "citations and internal ellipses omitted",
             "quotation marks omitted; ellipses ours",
+            "headings and internal quotations omitted, emphasis and citations altered",
             "plurality opinion",
             "opinion of Breyer, J.",
             "opinion of Mister Justice Black",
@@ -826,9 +858,12 @@ class FilterParentheticalTest(SimpleTestCase):
             "Sotomayor, J., statement respecting denial of certiorari",
             "Roberts, C.J., concurring in part and dissenting in part",
             "Friendly, J., concurring in the judgment, concurring in part, and dissenting in part",
+            "Scalia, J., specially concurring in the judgment on this issue",
             "en banc",
             "per curiam",
             "same",
+            "standard of review",
+            "opinion of O'Connor, J., respecting the granting of an injunction",
             "no",
             "n. 3",
             "No. 12-345",
@@ -837,6 +872,10 @@ class FilterParentheticalTest(SimpleTestCase):
             "cited in Heart of Atlanta Motel v. United States",
             "quoting Hart Steel Co. v. Railroad Supply Co., 244 U.S. 294, 299, 37 S. Ct. 506, 508, 61 L. Ed. 1148 (1917)",
             "collecting cases",
+            "holding that too short",
+            "First Amendment",
+            "mislabeled product",
+            "Section 403(d)(2)",
         ]
         for i, parenthetical_text in enumerate(fixtures):
             with self.subTest(
@@ -853,12 +892,11 @@ class FilterParentheticalTest(SimpleTestCase):
             "accountant who gave lay opinion testimony might have qualified as expert",
             "where plaintif's complaint alleges facts which, if proven, would entitle plaintiff to relief under the Eighth Amendment, dismissal of complaint was inappropriate",
             "ruling that there is nothing either legal or illegal, only thinking makes it so",
-            "First Amendment",
-            "mislabeled product",
+            "testing that the mere presence of the word quotation doesn't get a parenthetical filtered out if it's long enough",
             '"Look on my Works, ye Mighty, and despair"',
             '"Texas does not seek to have the Court interpret the Constitution, so much as disregard it."',
             "questioning whether he who made the Lamb made thee",
-            "Section 403(d)(2)",
+            "holding that just long enough",
         ]
 
         for i, parenthetical_text in enumerate(fixtures):
@@ -1036,7 +1074,7 @@ class DescriptionScoreTest(SimpleTestCase):
         failed_cases = []
         for (desc_a, desc_b, correct_idx) in test_cases:
             score_a, score_b = (
-                description_score(
+                parenthetical_score(
                     desc[0], OpinionCluster(citation_count=desc[1])
                 )
                 for desc in (desc_a, desc_b)
@@ -1056,7 +1094,7 @@ class DescriptionScoreTest(SimpleTestCase):
     def test_handles_zero_citation_count(self):
         # Just a basic smoke test to ensure it doesn't blow up when the citation count is 0
         cluster = OpinionCluster(citation_count=0)
-        result = description_score(
+        result = parenthetical_score(
             "some parenthetical, it's not important what", cluster
         )
         self.assertGreater(result, 0)
@@ -1068,3 +1106,314 @@ class DescriptionScoreTest(SimpleTestCase):
         for case in failed_cases:
             output += f"\nDescription 0: {case[0]}\nDescription 1: {case[1]}\nExpected Winner: {case[2]}\n"
         return output
+
+
+@dataclass(frozen=True)
+class DummyParenthetical:
+    """
+    A simple dummy version of the Parenthetical class that doesn't require
+    describing_opinion and described_opinion, and is hashable. It is useful for
+    testing GroupParenthetical functionality
+    """
+
+    id: int
+    text: str
+    score: float
+
+    def __hash__(self):
+        return self.id
+
+    def __str__(self):
+        return str(self.id)
+
+    def __repr__(self):
+        return str(self.id)
+
+
+class GroupParentheticalsTest(SimpleTestCase):
+    def test_get_parenthetical_groups(self):
+        """
+        Test whether get_parenthetical_groups correctly sub-divides a given
+        list of parentheticals into clusters of parentheticals that are
+        textually similar to each other.
+        """
+        expected_groups = [
+            (
+                [
+                    DummyParenthetical(
+                        text='Holding that inmate must establish actual injury, rather than "theoretical deficiency" with legal library or legal assistance program to state constitutional claim for interference with access to courts',
+                        id=0,
+                        score=0,
+                    ),
+                    DummyParenthetical(
+                        text="Holding that a prisoner must show an actual injury to state a claim for denial of access to courts",
+                        id=1,
+                        score=0,
+                    ),
+                ],
+                [
+                    DummyParenthetical(
+                        text="Holding further that the legal claim affected must be one that either directly or collaterally attacks plaintiff’s conviction or sentence, or one that challenges the conditions of his confinement",
+                        id=2,
+                        score=0,
+                    )
+                ],
+            ),
+            (
+                [
+                    DummyParenthetical(
+                        text="Reiterating that the Excessive Fines Clause has its 13 roots in the Magna Carta, which “required that economic sanctions ‘be proportioned to the wrong’ and ‘not be so large as to deprive [an offender] of his livelihood’”",
+                        id=3,
+                        score=0,
+                    )
+                ],
+            ),
+            (
+                [
+                    DummyParenthetical(
+                        text='Finding that forfeitures are fines "if they constitute punishment for an offense"',
+                        id=4,
+                        score=0,
+                    ),
+                ],
+                [
+                    DummyParenthetical(
+                        text="Despite differing facts emphasized by the majority and dissent, the majority held that “Respondent’s crime was solely a reporting offense”",
+                        id=5,
+                        score=0,
+                    ),
+                ],
+                [
+                    DummyParenthetical(
+                        text="“[D]espite the differences between restitution and a traditional fine, restitution still implicates the prosecutorial powers of government[.]”",
+                        id=6,
+                        score=0,
+                    ),
+                ],
+            ),
+            (
+                [
+                    DummyParenthetical(
+                        text="Finding valid a federal law criminalizing the destruction or mutilation of a draft registration against a First Amendment challenge",
+                        id=10,
+                        score=0,
+                    ),
+                ],
+                [
+                    DummyParenthetical(
+                        text="Applying medium scrutiny test to state action having an incidental effect on right to free expression ",
+                        id=11,
+                        score=0,
+                    )
+                ],
+            ),
+            (
+                [
+                    DummyParenthetical(
+                        text="The loss of First Amendment freedoms, for even minimal period of time, unquestionably constitutes irreparable injury.",
+                        id=11,
+                        score=0,
+                    ),
+                    DummyParenthetical(
+                        text="The loss of First Amendment freedoms, for even minimal period of time, unquestionably constitutes irreparable injury.",
+                        id=12,
+                        score=0,
+                    ),
+                    DummyParenthetical(
+                        text="The loss of First Amendment freedoms, for even minimal period of time, unquestionably constitutes irreparable injury.",
+                        id=13,
+                        score=0,
+                    ),
+                ],
+                [
+                    DummyParenthetical(
+                        text=" Holding public employees could not be fired because of their politics unless they held “policymaking” or “confidential” positions ",
+                        id=14,
+                        score=0,
+                    ),
+                ],
+            ),
+        ]
+        for i, groups in enumerate(expected_groups):
+            with self.subTest(f"Testing {groups} are grouped correctly.", i=i):
+                # `groups` has the parentheticals divided into the correct groups.
+                # We flatten it into a single list and see if the algorithm
+                # comes up with the same groupings when we pass it the flat list
+                flat = list(itertools.chain.from_iterable(groups))
+                output_groups = compute_parenthetical_groups(flat)
+                output_sets = frozenset(
+                    [frozenset(pg.parentheticals) for pg in output_groups]
+                )
+                input_sets = frozenset([frozenset(g) for g in groups])
+                self.assertEquals(
+                    input_sets,
+                    output_sets,
+                    f"Got incorrect result from get_parenthetical_groups for: {groups}",
+                )
+
+    def test_get_representative_parenthetical(self):
+        """
+        Tests whether get_representative parenthetical identifies the correct
+        parenthetical as the most representative of the given list of
+        parentheticals based on its similarity to others and descriptiveness
+        score.
+        """
+        simgraph = {
+            "0": ["3"],
+            "1": ["2", "3", "7"],
+            "2": ["1"],
+            "3": ["0", "1"],
+            "4": ["5"],
+            "5": ["4"],
+            "6": [],
+            "7": ["1"],
+        }
+
+        parentheticals = [
+            DummyParenthetical(id=0, text="par0", score=1),
+            DummyParenthetical(id=1, text="par1", score=1),
+            DummyParenthetical(id=2, text="par2", score=1),
+            DummyParenthetical(id=3, text="par3", score=1),
+            DummyParenthetical(id=4, text="par4", score=1),
+            DummyParenthetical(id=5, text="par5", score=1),
+            DummyParenthetical(id=6, text="par6", score=1),
+            DummyParenthetical(id=7, text="par7", score=1),
+        ]
+        # Test pair format:
+        # (
+        #   (list of parentheticals to find the most representative one from, similarity graph),
+        #   correct representative parenthetical
+        #  )
+        test_pairs = [
+            ((parentheticals[0:3], simgraph), parentheticals[0]),
+            ((parentheticals[0:6], simgraph), parentheticals[1]),
+            ((parentheticals[0:1], simgraph), parentheticals[0]),
+            ((parentheticals[7:], simgraph), parentheticals[7]),
+        ]
+
+        for i, (
+            (parentheticals_to_test, simgraph_to_test),
+            representative,
+        ) in enumerate(test_pairs):
+            with self.subTest(
+                f"Testing that representative connected parenthetical is selected correctly.",
+                i=i,
+            ):
+                self.assertEquals(
+                    get_representative_parenthetical(
+                        parentheticals_to_test, simgraph_to_test
+                    ),
+                    representative,
+                    f"Got incorrect result from get_best_parenthetical_of_group for text (expected {representative}): {(parentheticals_to_test, simgraph_to_test)}",
+                )
+
+    def test_get_parenthetical_tokens(self):
+        """
+        Tests whether get_parenthetical_tokens correctly converts the text of a
+        parenthetical to a list of tokens
+        """
+        test_pairs = [
+            (
+                "Concluding that a TDCA claim failed because the plaintiffs always knew the answers to those questions",
+                [
+                    "tdca",
+                    "claim",
+                    "fail",
+                    "plaintiff",
+                    "alway",
+                    "knew",
+                    "answer",
+                    "question",
+                ],
+            ),
+            (
+                "Holding that in ruling upon an RCFC 12(b)(6) motion, the Court must accept as true the undisputed factual allegations in the complaint",
+                [
+                    "rule",
+                    "upon",
+                    "rcfc",
+                    "12b6",
+                    "motion",
+                    "court",
+                    "must",
+                    "accept",
+                    "true",
+                    "undisput",
+                    "factual",
+                    "alleg",
+                    "complaint",
+                ],
+            ),
+            ("", []),
+        ]
+        for i, (parenthetical_text, tokens) in enumerate(test_pairs):
+            with self.subTest(
+                f"Testing {parenthetical_text} is tokenized correctly.", i=i
+            ):
+                self.assertEquals(
+                    get_parenthetical_tokens(parenthetical_text),
+                    tokens,
+                    f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
+                )
+
+    def test_get_graph_component(self):
+        """
+        Tests whether get_graph_component correctly identifies the full
+        "connected component" of a given node in the graph (i.e. a list of
+        itself plus any nodes directly or indirectly connected to it)
+        """
+        test_pairs = [
+            (("1", {"1": []}, set()), ["1"]),
+            (("1", {"1": ["2"], "2": "1", "3": []}, set()), ["1", "2"]),
+            (
+                (
+                    "1",
+                    {
+                        "1": ["2", "3"],
+                        "2": "1",
+                        "3": ["1"],
+                        "4": ["5"],
+                        "5": ["4"],
+                    },
+                    set(),
+                ),
+                ["1", "2", "3"],
+            ),
+            (
+                (
+                    "2",
+                    {
+                        "1": ["2", "3"],
+                        "2": "1",
+                        "3": ["1"],
+                        "4": ["5"],
+                        "5": ["4"],
+                    },
+                    set(),
+                ),
+                ["1", "2", "3"],
+            ),
+            (
+                (
+                    "3",
+                    {
+                        "1": ["2", "3"],
+                        "2": "1",
+                        "3": ["1"],
+                        "4": ["5"],
+                        "5": ["4"],
+                    },
+                    set(),
+                ),
+                ["1", "2", "3"],
+            ),
+        ]
+        for i, (inputs, output) in enumerate(test_pairs):
+            with self.subTest(
+                f"Testing {inputs} connections are recognized correctly.", i=i
+            ):
+                self.assertEquals(
+                    sorted(get_graph_component(*inputs)),
+                    sorted(output),
+                    f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
+                )

@@ -1,0 +1,29 @@
+BEGIN;
+--
+-- Alter field school on education
+--
+--
+-- Alter field is_alias_of on person
+--
+--
+-- Alter field appointer on position
+--
+--
+-- Alter field court on position
+--
+--
+-- Alter field position_type on position
+--
+--
+-- Alter field predecessor on position
+--
+--
+-- Alter field school on position
+--
+--
+-- Alter field supervisor on position
+--
+--
+-- Alter field is_alias_of on school
+--
+COMMIT;

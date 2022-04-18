@@ -1,106 +1,70 @@
 version: "3.7"
-volumes:
-  cl-judge-pics:
-  cl-seal-rookery:
+
 networks:
   cl_net_overlay:
     driver: overlay
     external: true
 services:
   celery_prefork:
-    image: freelawproject/task-server:latest
+    image: freelawproject/courtlistener:latest-celery
     depends_on:
-      - cl-binary-transformers-and-extractors
-      - cl-judge-pics
-      - cl-seal-rookery
+      - cl-doctor
+      - cl-disclosures
     deploy:
       resources:
         limits:
           cpus: "${CELERY_PREFORK_CONCURRENCY}"
-          memory: "${CELERY_PREFORK_MEMORY:-1}GB"
+          memory: "${CELERY_MEMORY:-1}GB"
       restart_policy:
         condition: on-failure
     volumes:
-      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+      - "/var/run/postgresql:/var/run/postgresql"
+      - "/sata-old:/storage"
     logging:
       driver: journald
     networks:
       - cl_net_overlay
-    command: >
-      celery
-        --app=cl worker
-        --loglevel=info
-        --events
-        --pool=prefork
-        --concurrency=${CELERY_PREFORK_CONCURRENCY:?CELERY_PREFORK_CONCURRENCY not defined}
-        --queues=celery
-        --hostname=prefork@%h
-        --prefetch-multiplier=1
+    environment:
+     - CELERY_QUEUES=celery
+    env_file:
+      - ../../.env
 
   celery_prefork_bulk:
-    image: freelawproject/task-server:latest
+    image: freelawproject/courtlistener:latest-celery
     depends_on:
-      - cl-binary-transformers-and-extractors
-      - cl-judge-pics
-      - cl-seal-rookery
+      - cl-doctor
+      - cl-disclosures
     deploy:
       resources:
         limits:
           cpus: "${CELERY_PREFORK_BULK_CONCURRENCY}"
-          memory: "${CELERY_PREFORK_BULK_MEMORY:-1}GB"
+          memory: "${CELERY_MEMORY:-1}GB"
       restart_policy:
         condition: on-failure
     volumes:
-      - "${CL_CODE_DIR:?CL_CODE_DIR not defined}:/opt/celery:ro"
-      - "${POSTGRESQL_SOCK:-/dev/null}:/var/run/postgresql"
-      - "${DJANGO_MEDIA_ROOT:-/sata}:/storage"
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+      - "/var/run/postgresql:/var/run/postgresql"
+      - "/sata-old:/storage"
     logging:
       driver: journald
     networks:
       - cl_net_overlay
-    command: >
-      celery
-        --app=cl worker
-        --loglevel=info
-        --events
-        --pool=prefork
-        --concurrency=${CELERY_PREFORK_BULK_CONCURRENCY:?CELERY_PREFORK_BULK_CONCURRENCY not defined}
-        --queues=batch1,batch2,iauploads
-        --hostname=prefork@%h
-        --prefetch-multiplier=5
+    environment:
+     - CELERY_QUEUES=batch0,batch1,batch2,batch3
+    env_file:
+      - ../../.env
 
-  cl-judge-pics:
-    image: freelawproject/judge-pics:latest
-    container_name: "cl-judge-pics"
-    deploy:
-      restart_policy:
-        condition: none
-    volumes:
-      - cl-judge-pics:${PYTHON_PACKAGES}/judge_pics
+  cl-doctor:
+    image: freelawproject/doctor:latest
+    container_name: "cl-doctor"
+    networks:
+      - cl_net_overlay
+    logging:
+      driver: journald
 
-  cl-seal-rookery:
-    image: freelawproject/seal-rookery:latest
-    container_name: "cl-seal-rookery"
-    deploy:
-      restart_policy:
-        condition: none
-    volumes:
-      - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
-
-  cl-binary-transformers-and-extractors:
-      image: freelawproject/binary-transformers-and-extractors:latest
-      container_name: "cl-binary-transformers-and-extractors"
-      depends_on:
-        - cl-seal-rookery
-      ports:
-        - "5050:5050"
-      networks:
-        - cl_net_overlay
-      volumes:
-        - cl-seal-rookery:${PYTHON_PACKAGES}/seal_rookery
+  cl-disclosures:
+    image: freelawproject/disclosure-extractor:latest
+    container_name: "cl-disclosures"
+    networks:
+      - cl_net_overlay
+    logging:
+      driver: journald

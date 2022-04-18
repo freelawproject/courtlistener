@@ -1,7 +1,8 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Set
 
+import pytz
 import requests
 from django.conf import settings
 from requests import RequestException
@@ -25,27 +26,47 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     )
 
 
-def get_docket_ids(last_x_days: int) -> Set[int]:
+def get_docket_ids() -> Set[int]:
     """Get docket IDs to update via iquery
 
-    :param last_x_days: How many of the last days relative to today should we
-    inspect? E.g. 1 means just today, 2 means today and yesterday, etc.
     :return: docket IDs for which we should crawl iquery
     """
     docket_ids = set()
-    if hasattr(settings, "MATOMO_TOKEN"):
+    if hasattr(settings, "PLAUSIBLE_API_TOKEN"):
         try:
+            # Get the top 250 entry pages from the day
+            #
+            # curl 'https://plausible.io/api/v1/stats/breakdown?\
+            #     site_id=courtlistener.com&\
+            #     period=day&\
+            #     date=2022-03-14&\
+            #     property=visit:entry_page&\
+            #     metrics=visitors&\
+            #     limit=250' \
+            #   -H "Authorization: Bearer XXX" | jq
+            #
+            # This is meant to be run early in the morning. Each site in
+            # Plausible has a timezone setting. For CL, it's US/Pacific, so
+            # take today's date (early in the morning Pacific time), subtract
+            # one day, and that's your day for this.
+            yesterday = (
+                (datetime.now(pytz.timezone("US/Pacific")) - timedelta(days=1))
+                .date()
+                .isoformat()
+            )
             r = requests.get(
-                settings.MATOMO_REPORT_URL,
+                settings.PLAUSIBLE_API_URL,
                 timeout=10,
                 params={
-                    "idSite": settings.MATOMO_SITE_ID,
-                    "module": "API",
-                    "method": "Live.getLastVisitsDetails",
+                    "site_id": "courtlistener.com",
                     "period": "day",
-                    "format": "json",
-                    "date": f"last{last_x_days}",
-                    "token_auth": settings.MATOMO_TOKEN,
+                    "date": yesterday,
+                    "property": "visit:entry_page",
+                    "metrics": "visitors",
+                    "limit": "250",
+                },
+                headers={
+                    "Authorization": f"Bearer {settings.PLAUSIBLE_API_TOKEN}",
                 },
             )
             r.raise_for_status()
@@ -56,21 +77,22 @@ def get_docket_ids(last_x_days: int) -> Set[int]:
             RequestException,
         ) as e:
             logger.warning(
-                "iQuery scraper was unable to get results from Matomo. Got "
+                "iQuery scraper was unable to get results from Plausible. Got "
                 "exception: %s" % e
             )
         else:
-            for item in j:
-                for actiondetail in item["actionDetails"]:
-                    url = actiondetail.get("url")
-                    if url is None:
-                        continue
-                    match = re.search(
-                        r"^https://www\.courtlistener\.com/docket/([0-9]+)/",
-                        url,
-                    )
-                    if match is None:
-                        continue
+            # Filter to docket pages with some amount of traffic
+            for item in j["results"]:
+                # j["results"] is a list of dicts that look like:
+                # {"entry_page": "/recap", "visitors": 68}
+                # Note that Plausible's visitor count is divided by ten on
+                # CourtListener to save money. The value below is thus 10× what
+                # it appears to be.
+                if item["visitors"] < 3:
+                    continue
+
+                url = item["entry_page"]
+                if match := re.search(r"^/docket/([0-9]+)/", url):
                     docket_ids.add(match.group(1))
 
     # Add in docket IDs that have docket alerts or are favorited
@@ -113,14 +135,6 @@ class Command(VerboseCommand):
             "if set, should be the number of dockets to scrape",
             type=int,
         )
-        parser.add_argument(
-            "--day-count",
-            default=1,
-            type=int,
-            help="We will run iQuery for any case that was visited the last "
-            "XX days, as tracked in Matomo. By default, it's just the last 1 "
-            "day, but you can have it go back further via this parameter",
-        )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
@@ -128,7 +142,7 @@ class Command(VerboseCommand):
         if do_missing_date_filed:
             docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
         else:
-            docket_ids = get_docket_ids(last_x_days=options["day_count"])
+            docket_ids = get_docket_ids()
         # docket_ids = get_docket_ids().union(get_docket_ids_missing_info(100000)) #once initial scrape filling in date_filed is done, uncomment this to do these nightly
         logger.info(
             "iQuery crawling starting up. Will crawl %s dockets",

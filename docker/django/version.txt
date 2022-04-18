@@ -1,5 +1,15 @@
-1.0.81
+2.0.2
 
+2.0.2 - Add the replica DB
+2.0.1 - Allow MEDIA_ROOT to be configurable; fix ADMINS
+2.0.0 - Major overhaul of docker file in prepartion for migration to kubernetes. Merges celery and django images by tag.
+1.2.2 - Add django-ses
+1.2.1 - Remove PyPDF2 dependency and simplify dockerfile
+1.2.0 - Upgrade to Python 3.10
+1.1.0 - Update to Django 3.2 and Python 3.9
+1.0.84 - Add factory boy
+1.0.83 - Add deps for parenthetical grouping
+1.0.82 - Improve logging for disclosures, improve parentheticals, fix bug in citation urls handling.
 1.0.81 - Bump courts-db.
 1.0.80 - Bump courts-db.  Upgrade model to include parentheticals.
 1.0.79 - Bump courts-db, update throttle for researcher, remove mkdir_p function. Also add pacer modal.

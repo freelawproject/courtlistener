@@ -42,8 +42,8 @@ APPROVED_DOMAINS = [
 ]
 
 
-def ratelimit_if_not_whitelisted(view):
-    """A wrapper for the ratelimit function that adds a whitelist for approved
+def ratelimit_deny_list(view):
+    """A wrapper for the ratelimit function that adds an allowlist for approved
     crawlers.
     """
     ratelimited_view = ratelimiter_all_250_per_h(view)
@@ -53,7 +53,7 @@ def ratelimit_if_not_whitelisted(view):
         try:
             return ratelimited_view(request, *args, **kwargs)
         except Ratelimited as e:
-            if is_whitelisted(request):
+            if is_allowlisted(request):
                 return view(request, *args, **kwargs)
             else:
                 raise e
@@ -77,7 +77,7 @@ def get_ip_from_host(host: str) -> str:
 
 
 def host_is_approved(host: str) -> bool:
-    """Check whether the domain is in our approved whitelist."""
+    """Check whether the domain is in our approved allowlist."""
     return any(
         [
             host.endswith(approved_domain)
@@ -101,23 +101,23 @@ def verify_ip_address(ip_address: str) -> bool:
     return False
 
 
-def is_whitelisted(request: HttpRequest) -> bool:
-    """Checks if the IP address is whitelisted due to belonging to an approved
+def is_allowlisted(request: HttpRequest) -> bool:
+    """Checks if the IP address is allowlisted due to belonging to an approved
     crawler.
 
     Returns True if so, else False.
     """
     cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     cache = caches[cache_name]
-    whitelist_cache_prefix = "rl:whitelist"
+    allowlist_cache_prefix = "rl:allowlist"
     ip_address = request.META.get("REMOTE_ADDR")
     if ip_address is None:
         return False
 
-    whitelist_key = f"{whitelist_cache_prefix}:{ip_address}"
+    allowlist_key = f"{allowlist_cache_prefix}:{ip_address}"
 
-    # Check if the ip address is in our whitelist.
-    if cache.get(whitelist_key):
+    # Check if the ip address is in our allowlist.
+    if cache.get(allowlist_key):
         return True
 
     # If not whitelisted, verify the IP address and add it to the cache for
@@ -127,7 +127,7 @@ def is_whitelisted(request: HttpRequest) -> bool:
     if approved_crawler:
         # Add the IP to our cache with a one week expiration date
         a_week = 60 * 60 * 24 * 7
-        cache.set(whitelist_key, ip_address, a_week)
+        cache.set(allowlist_key, ip_address, a_week)
 
     return approved_crawler
 

@@ -3,8 +3,7 @@ import sys
 from django.conf import settings
 from django.core.management import call_command
 
-from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.db_tools import queryset_generator
+from cl.lib.command_utils import VerboseCommand
 from cl.search.models import OpinionCluster
 
 
@@ -71,16 +70,16 @@ class Command(VerboseCommand):
         if options["index"] == "concurrently":
             index_during_processing = True
 
-        q = OpinionCluster.objects.filter(citation_count__gt=0)
+        clusters = OpinionCluster.objects.filter(citation_count__gt=0)
         if options.get("doc_id"):
-            q = q.filter(pk__in=options["doc_id"])
-        items = queryset_generator(q, chunksize=10000)
-        for item in items:
+            clusters = clusters.filter(pk__in=options["doc_id"])
+
+        for cluster in clusters.iterator():
             count = 0
-            for sub_opinion in item.sub_opinions.all():
+            for sub_opinion in cluster.sub_opinions.all():
                 count += sub_opinion.citing_opinions.all().count()
 
-            item.citation_count = count
-            item.save(index=index_during_processing)
+            cluster.citation_count = count
+            cluster.save(index=index_during_processing)
 
         self.do_solr(options)
