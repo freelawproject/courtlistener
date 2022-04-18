@@ -1,7 +1,10 @@
 import logging
+from datetime import datetime
 from urllib.parse import urljoin
 
 import requests
+from celery import Task
+from celery.canvas import chain
 from django.conf import settings
 from rest_framework.status import (
     HTTP_200_OK,
@@ -11,6 +14,8 @@ from rest_framework.status import (
 
 from cl.celery_init import app
 from cl.lib.crypto import md5
+from cl.users.email_handlers import compose_stored_message
+from cl.users.models import STATUS_TYPES, FailedEmail
 
 logger = logging.getLogger(__name__)
 
@@ -102,3 +107,35 @@ def update_mailchimp(self, email, status):
             email,
             r.status_code,
         )
+
+
+@app.task(bind=True, max_retries=3, interval_start=5 * 60)
+def process_retry_email(
+    self: Task,
+    failed_pk: int,
+) -> int:
+    """Task to retry failed email messages"""
+
+    failed_email = FailedEmail.objects.get(pk=failed_pk)
+    if failed_email.status != STATUS_TYPES.SUCCESSFUL:
+        # Only execute this task if has not been previously processed.
+        failed_email.status = STATUS_TYPES.IN_PROGRESS
+        failed_email.save()
+        # Compose email from stored message.
+        email = compose_stored_message(failed_email.message_id)
+        try:
+            email.send()
+        except Exception as exc:
+            # In case of error when sending e.g: SES downtime, retry the task.
+            raise self.retry(exc=exc)
+        failed_email.status = STATUS_TYPES.SUCCESSFUL
+        failed_email.save()
+
+
+def send_failed_email(
+    failed_pk: int,
+    start: datetime,
+) -> None:
+    return chain(
+        process_retry_email.si(failed_pk),
+    ).apply_async(eta=start)

@@ -364,6 +364,66 @@ class EmailSent(AbstractDateTimeModel):
         return f"Email: {self.message_id}"
 
 
+class STATUS_TYPES(object):
+    """FailedEmail Status Types"""
+
+    WAITING = 0
+    ENQUEUED = 1
+    ENQUEUED_DELIVERY = 2
+    IN_PROGRESS = 3
+    SUCCESSFUL = 4
+    STATUS = (
+        (WAITING, "Waiting for a delivery signal to enqueue."),
+        (ENQUEUED, "Awaiting processing in queue after a backoff event."),
+        (
+            ENQUEUED_DELIVERY,
+            "Awaiting processing in queue due to a delivery event.",
+        ),
+        (IN_PROGRESS, "Item is currently being processed."),
+        (SUCCESSFUL, "Item processed successfully."),
+    )
+
+
+class FailedEmail(AbstractDateTimeModel):
+    """Stores enqueue failed messages."""
+
+    message_id = models.UUIDField(
+        help_text="Unique message identifier.",
+        default=uuid.uuid4,
+        editable=False,
+    )
+    recipient = models.EmailField(
+        help_text="The email address to which the delivery failed.",
+    )
+
+    status = models.SmallIntegerField(
+        help_text="The enqueue failed message status.",
+        default=STATUS_TYPES.WAITING,
+        choices=STATUS_TYPES.STATUS,
+    )
+    next_retry_date = models.DateTimeField(
+        help_text="The scheduled datetime to retry sending the message.",
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["recipient"]),
+        ]
+
+        constraints = [
+            UniqueConstraint(
+                fields=["recipient"],
+                condition=Q(status=STATUS_TYPES.ENQUEUED),
+                name="unique_failed_enqueued",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Failed Email: {self.message_id}"
+
+
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     username = user_profile.user.username
     recap_email_header = re.sub(r"[^0-9a-zA-Z]+", ".", username) + str(

@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from pathlib import Path
+from time import time
 from unittest import mock
 
 from django.conf import settings
@@ -21,16 +22,19 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
 from cl.users.email_handlers import (
     add_bcc_random,
+    compose_stored_message,
     get_email_body,
     normalize_addresses,
 )
 from cl.users.factories import UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
+    STATUS_TYPES,
     SUB_TYPES,
     BackoffEvent,
     EmailFlag,
     EmailSent,
+    FailedEmail,
     UserProfile,
 )
 
@@ -967,6 +971,12 @@ class CustomBackendEmailTest(TestCase):
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
 
+    def mock_send_failed_email(failed_pk, start):
+        """This function mocks the send_failed_email function to avoid calling
+        the celery task and avoid unxpected errors.
+        """
+        return None
+
     def test_send_mail_function(self) -> None:
         """This test checks if Django send_mail() works properly using the
         custom email backend, the email should be stored automatically.
@@ -1278,7 +1288,11 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 0)
 
-    def test_sending_email_within_back_off(self) -> None:
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_sending_email_within_back_off(self, mock_send_email) -> None:
         """This test checks if an email address is under a backoff waiting
         period and we try to send it an email, the message is stored but
         not sent.
@@ -1899,7 +1913,13 @@ class CustomBackendEmailTest(TestCase):
             ],
         )
 
-    def test_sending_multiple_recipients_within_backoff(self) -> None:
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_sending_multiple_recipients_within_backoff(
+        self, mock_send_email
+    ) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
         that address from the recipient list to avoid sending to it
@@ -1939,7 +1959,13 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
 
-    def test_sending_multiple_recipients_all_within_backoff(self) -> None:
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_sending_multiple_recipients_all_within_backoff(
+        self, mock_send_email
+    ) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
         message, we should store the message.
@@ -2141,4 +2167,576 @@ class CustomBackendEmailTest(TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
+        )
+
+
+@override_settings(
+    EMAIL_BACKEND="cl.lib.email_backends.EmailBackend",
+    BASE_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_BCC_COPY_RATE=0,
+)
+class RetryFailedEmailTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+        with (
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as soft_bounce,
+            open(
+                test_dir / "soft_bounce_with_id.json", encoding="utf-8"
+            ) as soft_bounce_with_id,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+        ):
+            cls.soft_bounce_asset = json.load(soft_bounce)
+            cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
+            cls.delivery_asset = json.load(delivery)
+
+    def send_signal(self, test_asset, event_name, signal) -> None:
+        """Function to dispatch signal that mocks a SNS notification event
+        :param test_asset: the json object that contains notification
+        :param event_name: the signal event name
+        :param signal: the signal corresponding to the event
+        :return: None
+        """
+        # Prepare parameters
+        raw = json.dumps(test_asset)
+        notification = json.loads(raw)
+        message = json.loads(notification["Message"])
+        mail_obj = message.get("mail")
+        event_obj = message.get(event_name, {})
+
+        # Send signal
+        signal_kwargs = dict(
+            sender=self,
+            mail_obj=mail_obj,
+            raw_message=raw,
+        )
+        signal_kwargs[f"{event_name}_obj"] = event_obj
+        signal.send(**signal_kwargs)
+
+    def mock_send_failed_email(failed_pk, start):
+        """This function mocks the send_failed_email function to avoid calling
+        the celery task and avoid unxpected errors.
+        """
+        return None
+
+    @mock.patch("cl.users.email_handlers.logging")
+    def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
+        """This test checks if a warning is logged when trying to enqueue a
+        message but the stored message doesn't exist anymore because it was
+        deleted.
+        """
+
+        # Create a backoff event message ID:
+        # 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+        # Check message is not queued
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 0)
+
+        # Check if warning is logged
+        mock_logging.warning.assert_called_with(
+            f"The message: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0 can't be "
+            "enqueued because it doesn't exist anymore."
+        )
+
+    def test_compose_message_from_db_retrieve_user_email(self) -> None:
+        """This test checks if we can compose an email object from the stored
+        message, and also verify if we can retrieve the updated user email
+        address in case it has changed.
+        """
+        # Get user factory
+        user_email = self.user
+
+        # Send a message to user_email
+        msg = EmailMultiAlternatives(
+            subject="This is the subject",
+            body="Body goes here",
+            from_email="testing@courtlistener.com",
+            to=[user_email.email],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            cc=["cc_success@simulator.amazonses.com"],
+            reply_to=["reply_success@simulator.amazonses.com"],
+            headers={f"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        html = "<p>Body goes here</p>"
+        msg.attach_alternative(html, "text/html")
+        msg.send()
+
+        # Retrieve stored email and it was linked to the CL user.
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(stored_email[0].user_id, user_email.id)
+
+        # Update user email address
+        user_email.email = "new_address@courtlistener.com"
+        user_email.save()
+        # Compose message from stored message and send.
+        message = compose_stored_message(stored_email[0].message_id)
+        message.send()
+        # Confirm if second email is sent
+        self.assertEqual(len(mail.outbox), 2)
+
+        message_sent = mail.outbox[1]
+        message = message_sent.message()
+
+        plaintext_body, html_body = get_email_body(
+            message, small_version=False
+        )
+
+        # Compare second message sent with the original message content
+        self.assertEqual(message_sent.subject, "This is the subject")
+        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
+        self.assertEqual(message_sent.to, ["new_address@courtlistener.com"])
+        self.assertEqual(
+            message_sent.reply_to, ["reply_success@simulator.amazonses.com"]
+        )
+        self.assertTrue(message_sent.extra_headers["X-CL-ID"])
+        self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
+
+    def test_compose_message_from_db_no_cl_user(self) -> None:
+        """This test checks if we can compose a message from the stored message
+        and check if the message doesn't have a related user we send it to the
+        message's original recipient.
+        """
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["anon_address@courtlistener.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
+            headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
+        )
+        email.send()
+
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        message = compose_stored_message(stored_email[0].message_id)
+        message.send()
+
+        # Confirm if the second email is sent and compare its content.
+        self.assertEqual(len(mail.outbox), 2)
+        message_sent = mail.outbox[1]
+        self.assertEqual(message_sent.to, ["anon_address@courtlistener.com"])
+        self.assertEqual(message_sent.bcc, [])
+
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_enqueue_email_backoff_event(self, mock_send_email) -> None:
+        """This test checks if an email is properly enqueued when the
+        recipient's email address is under a backoff event waiting period and
+        we send more messages to the user.
+        """
+
+        # Create a backoff event for bounce@simulator.amazonses.com
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email.send()
+
+        # Email is sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+        self.assertEqual(
+            stored_email[0].to, ["bounce@simulator.amazonses.com"]
+        )
+
+        # Check the message is queued
+        mock_send_email.assert_called()
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 1)
+
+        # The message should be enqueued as ENQUEUED status since there wasn't
+        # a previous ENQUEUED message.
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+        self.assertEqual(
+            failed_email[0].message_id, stored_email[0].message_id
+        )
+        EmailSent.objects.all().delete()
+
+        # Send another message
+        email = EmailMessage(
+            "This is the subject two",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email.send()
+
+        # This time since the recipient is under a backoff waiting period and
+        # it already has a ENQUEUE message, following messages are going to be
+        # enqueued in a WAITING status.
+
+        # Email is not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Retrieve stored email
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 1)
+
+        # Check the email is queued, now we have two FailedEmail objects.
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 2)
+
+        # Confirm if the second FailedEmail object status is WAITING
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.WAITING)
+        self.assertEqual(
+            failed_email[0].message_id, stored_email[0].message_id
+        )
+
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_enqueue_email_soft_bounce(self, mock_send_email) -> None:
+        """This test checks if we can queue a message properly after receiving
+        a soft bounce notification.
+        """
+
+        # Send a message
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email.send()
+        # Email is sent
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Retrieve the stored message and update its message_id for testing
+        stored_email = EmailSent.objects.all()[0]
+        stored_email.message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
+        stored_email.save()
+
+        self.assertEqual(stored_email.to, ["bounce@simulator.amazonses.com"])
+        self.assertEqual(
+            str(stored_email.message_id),
+            "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0",
+        )
+
+        # Create a backoff event for bounce@simulator.amazonses.com and
+        # Message ID: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+
+        # Check the soft bounce message related is queued
+        mock_send_email.assert_called()
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 1)
+
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+        self.assertEqual(
+            str(failed_email[0].message_id), stored_email.message_id
+        )
+
+        # Send another bounce notification for the same recipient
+        # the related message has to be created as a WAITING status since we
+        # have already an ENQUEUED message.
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+
+        # Check the message is queued
+        mock_send_email.assert_called()
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 2)
+
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.WAITING)
+        self.assertEqual(
+            str(failed_email[0].message_id), stored_email.message_id
+        )
+
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_enqueue_email_after_delivery(self, mock_send_email) -> None:
+        """This test checks if after a delivery notification, WAITING failed
+        messages are properly scheduled to retry them.
+        """
+
+        # Create a backoff event for bounce@simulator.amazonses.com
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_1 = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email_1.send()
+
+        email_2 = EmailMessage(
+            "This is the subject 2",
+            "Body goes here 2",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email_2.send()
+
+        email_3 = EmailMessage(
+            "This is the subject 3",
+            "Body goes here 3",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email_3.send()
+
+        # Messages are not sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Retrieve stored email and compare content
+        stored_email = EmailSent.objects.all()
+        self.assertEqual(stored_email.count(), 3)
+        self.assertEqual(
+            stored_email[0].to, ["bounce@simulator.amazonses.com"]
+        )
+
+        # Messages are queued, one in ENQUEUED status and two in WAITING.
+        mock_send_email.assert_called()
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
+        self.assertEqual(failed_email.count(), 1)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+        self.assertEqual(
+            failed_email[0].message_id, stored_email[0].message_id
+        )
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email.count(), 2)
+
+        # Trigger a delivery event
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+
+        # After the delivery notification the failed messages under WAITING status
+        # were scheduled, now under ENQUEUED_DELIVERY status
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
+        self.assertEqual(failed_email.count(), 1)
+
+        failed_email = FailedEmail.objects.filter(
+            status=STATUS_TYPES.ENQUEUED_DELIVERY
+        )
+        self.assertEqual(failed_email.count(), 2)
+
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_delete_failed_task_objects(self, mock_send_email) -> None:
+        """This test checks if delete_failed_tasks_objects function works
+        properly. We shouldn't eliminate objects whose next_retry_date is ahead
+        but the ones that are behind (those whose tasks have failed)
+        """
+
+        # Send a message and update its message_id
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email.send()
+        # Retrieve stored email and update message_id for testing
+        stored_email = EmailSent.objects.all()[0]
+        stored_email.message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
+        stored_email.save()
+
+        # Create a backoff event for bounce@simulator.amazonses.com and
+        # Message ID: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+
+        # Here we should have an ENQUEUE FailedEmail object.
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 1)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+
+        # Update next_retry_date to expire waiting time, simulating is going to
+        # expire soon.
+        BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        ).update(next_retry_date=now() + timedelta(minutes=1))
+
+        # The recipient is under a backoff event waiting period, so if we try
+        # to send two more messages they are going to fail and create two
+        # WAITING FailedEmail objects.
+        email_1 = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email_1.send()
+
+        email_2 = EmailMessage(
+            "This is the subject 2",
+            "Body goes here 2",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+
+        email_2.send()
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email.count(), 2)
+
+        # Trigger two delivery notifications to confirm that ENQUEUED_DELIVERY
+        # failed messages are not deleted.
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+        # We should have 3 FailedEmail objects now.
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
+        self.assertEqual(failed_email.count(), 1)
+        failed_email = FailedEmail.objects.filter(
+            status=STATUS_TYPES.ENQUEUED_DELIVERY
+        )
+        self.assertEqual(failed_email.count(), 2)
+
+        # Now simulate that the celery tasks of previous FailedEmail objects
+        # failed, set that they failed 35 minutes ago.
+        FailedEmail.objects.all().update(
+            next_retry_date=now() - timedelta(minutes=35)
+        )
+        # Trigger a new delivery notification
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+        # Failed objects are eliminated.
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 0)
+
+    @mock.patch(
+        "cl.users.email_handlers.send_failed_email",
+        side_effect=mock_send_failed_email,
+    )
+    def test_retry_datetime(self, mock_send_email) -> None:
+        """This test checks that retry times are properly computed."""
+
+        # Send a message
+        email = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email.send()
+        # Retrieve stored email and update message_id for testing
+        stored_email = EmailSent.objects.all()[0]
+        stored_email.message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
+        stored_email.save()
+
+        # Create a backoff event for bounce@simulator.amazonses.com and
+        # Message ID: 5e9b3e8e-93c8-497f-abd4-00f6ddd566f0
+        self.send_signal(
+            self.soft_bounce_with_id_asset, "bounce", signals.bounce_received
+        )
+
+        # Now we have one ENQUEUE FailedEmail object
+        failed_email = FailedEmail.objects.all()
+        self.assertEqual(failed_email.count(), 1)
+        self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
+
+        backoff = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+
+        # ENQUEUE FailedEmail object should be scheduled for one minute after
+        # the backoff event expires
+        self.assertEqual(
+            failed_email[0].next_retry_date,
+            backoff[0].next_retry_date + timedelta(milliseconds=60_000),
+        )
+
+        # Send 3 more messages that are going to be enqueued
+        email_1 = EmailMessage(
+            "This is the subject",
+            "Body goes here",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email_1.send()
+
+        email_2 = EmailMessage(
+            "This is the subject 2",
+            "Body goes here 2",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email_2.send()
+
+        email_3 = EmailMessage(
+            "This is the subject 2",
+            "Body goes here 2",
+            "testing@courtlistener.com",
+            ["bounce@simulator.amazonses.com"],
+        )
+        email_3.send()
+
+        failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
+        self.assertEqual(failed_email.count(), 3)
+        now_time = now()
+        # Trigger a delivery notification.
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+
+        # WAITING FailedEmail objects were scheduled with
+        # ENQUEUED_DELIVERY status
+        failed_email = FailedEmail.objects.filter(
+            status=STATUS_TYPES.ENQUEUED_DELIVERY
+        ).order_by("next_retry_date")
+        self.assertEqual(failed_email.count(), 3)
+
+        # Failed messages after a delivery notification should be scheduled to
+        # send one message per minute, one after the other.
+        expected_datetime_1 = now_time + timedelta(milliseconds=60_000)
+        expected_datetime_2 = now_time + timedelta(milliseconds=120_000)
+        expected_datetime_3 = now_time + timedelta(milliseconds=180_000)
+
+        self.assertEqual(
+            failed_email[0].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime_1.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self.assertEqual(
+            failed_email[1].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime_2.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self.assertEqual(
+            failed_email[2].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime_3.strftime("%Y-%m-%d %H:%M:%S"),
         )

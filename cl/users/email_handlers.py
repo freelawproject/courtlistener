@@ -1,7 +1,7 @@
 import logging
 import random
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 from email.utils import parseaddr
 
 from django.conf import settings
@@ -17,10 +17,12 @@ from django.utils.timezone import now
 
 from cl.users.models import (
     OBJECT_TYPES,
+    STATUS_TYPES,
     SUB_TYPES,
     BackoffEvent,
     EmailFlag,
     EmailSent,
+    FailedEmail,
 )
 
 
@@ -117,7 +119,6 @@ def handle_soft_bounce(
 
     for email in recipient_emails:
         if event_sub_type in back_off_events:
-            # TODO Queue email function
             # Handle events that must trigger a backoff event
 
             next_retry_date = now() + timedelta(hours=INITIAL_HOURS)
@@ -153,7 +154,6 @@ def handle_soft_bounce(
                                 ),
                             },
                         )
-                        # TODO checkif this update Email flag?
                     else:
                         # If max number of retries has not been reached,
                         # update backoff event, update retry_counter
@@ -168,6 +168,9 @@ def handle_soft_bounce(
                             retry_counter=new_retry_counter,
                             next_retry_date=new_next_retry_date,
                         )
+
+            # Enqueue the soft bounce related message to retry again later
+            enqueue_email([email], message_id)
 
         elif event_sub_type in small_only_events:
             # Handle events that must trigger a small_email_only event
@@ -208,7 +211,7 @@ def handle_complaint(recipient_emails: list[str]) -> None:
         )
 
 
-def handle_delivery(message_id: str, recipient_emails: list[str]) -> None:
+def handle_delivery(recipient_emails: list[str]) -> None:
     """Handle a delivery notification received from SNS
 
     :param message_id: The unique message id assigned by Amazon SES
@@ -221,16 +224,6 @@ def handle_delivery(message_id: str, recipient_emails: list[str]) -> None:
         BackoffEvent.objects.filter(email_address=email).delete()
         # Schedule failed emails for this recipient
         schedule_failed_email(email)
-
-
-def schedule_failed_email(recipient_email: str) -> None:
-    """Schedule recipient's failed emails after receive a delivery notification
-
-    :param recipient_email: the recipient email address
-     to whom the delivery notification pertains
-    :return: None
-    """
-    pass
 
 
 def has_small_version(message: SafeMIMEText | SafeMIMEMultipart) -> bool:
@@ -481,3 +474,205 @@ def add_bcc_random(
     if returned_value <= normalized_bcc_rate:
         message.bcc.append(settings.BCC_EMAIL_ADDRESS)
     return message
+
+
+def compose_stored_message(
+    message_id: str,
+) -> EmailMessage | EmailMultiAlternatives:
+    """Composes an email message from the data stored in EmailSent model.
+
+    :param message_id: The unique email message identifier
+    :return email: Returns an EmailMessage or EmailMultiAlternatives message
+    """
+
+    stored_message = EmailSent.objects.get(message_id=message_id)
+
+    # If the message has a related User, choose the user email address to
+    # ensure we send it to the updated user email address.
+    if stored_message.user:
+        to = [stored_message.user.email]
+    else:
+        to = stored_message.to
+    from_email = stored_message.from_email
+    reply_to = stored_message.reply_to
+    subject = stored_message.subject
+    plain_body = stored_message.plain_text
+    html_body = stored_message.html_message
+    headers = stored_message.headers
+
+    email: EmailMessage | EmailMultiAlternatives
+    if html_body:
+        if plain_body:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_body,
+                from_email=from_email,
+                to=to,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.attach_alternative(html_body, "text/html")
+        else:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=html_body,
+                from_email=from_email,
+                to=to,
+                reply_to=reply_to,
+                headers=headers,
+            )
+            email.content_subtype = "html"
+    else:
+        email = EmailMessage(
+            subject=subject,
+            body=plain_body,
+            from_email=from_email,
+            to=to,
+            reply_to=reply_to,
+            headers=headers,
+        )
+    return email
+
+
+def delete_failed_tasks_objects(recipient: str) -> None:
+    """Delete FailedEmail objects that their celery task failed after multiple
+    retries.
+
+    :param recipient: The recipient email to look for failed objects.
+    :return None:
+    """
+
+    # Look for possible failed objects according to their status.
+    failed_enqueued = FailedEmail.objects.filter(
+        recipient=recipient,
+        status__in=[
+            STATUS_TYPES.ENQUEUED_DELIVERY,
+            STATUS_TYPES.ENQUEUED,
+            STATUS_TYPES.IN_PROGRESS,
+        ],
+    )
+
+    # Give a 30 minutes gap to ensure tasks were max retried
+    # delete the task if is out of this time gap.
+    now_minus_30 = now() - timedelta(minutes=30)
+    for failed in failed_enqueued:
+        if now_minus_30 >= failed.next_retry_date:
+            failed.delete()
+
+
+def get_next_retry_date(recipient: str) -> datetime:
+    """Returns the next retry datetime to schedule a message based on the
+    recipient backoff event next retry date time.
+
+    :param recipient: The email address to look for a backoff event next retry
+    datetime.
+    :return datatime: The next retry datetime.
+    """
+
+    backoff_event = BackoffEvent.objects.filter(
+        email_address=recipient,
+    ).first()
+    if backoff_event:
+        # Return backoff event next_retry_date and add an additional minute
+        return backoff_event.next_retry_date + timedelta(minutes=1)
+
+    # In case we don't have an active backoff event it means that it was
+    # deleted due to an incoming delivery notification, in this case, we could
+    # retry messages as soon as possible.
+    return now()
+
+
+def is_message_stored(message_id: str) -> bool:
+    """Returns True if the message is stored in database.
+
+    :param message_id: The message unique identifier.
+    :return bool: True if the message is available in database, otherwise False
+    """
+    if message_id:
+        if EmailSent.objects.filter(message_id=message_id).exists():
+            return True
+    return False
+
+
+from cl.users.tasks import send_failed_email
+
+
+def schedule_failed_email(recipient_email: str) -> None:
+    """Schedule recipient's waiting failed emails after receiving a delivery
+    notification because it means the recipient's inbox is working again.
+
+    :param recipient_email: The recipient's email address to whom the delivery
+    notification belongs
+    :return: None
+    """
+
+    # Look for FailedEmail objects in WAITING status.
+    failed_messages = FailedEmail.objects.filter(
+        recipient=recipient_email, status=STATUS_TYPES.WAITING
+    )
+    # Before clean possible failed objects.
+    delete_failed_tasks_objects(recipient_email)
+
+    # Get the next retry datetime to schedule the message, in this case now()
+    scheduled_datetime = get_next_retry_date(recipient_email)
+    # If the recipient has multiple messages to retry we'll send one message
+    # per minute.
+    minutes = 1
+    for fail_message in failed_messages:
+        # Set schedule timen and update status to ENQUEUED_DELIVERY
+        next_retry_datetime = scheduled_datetime + timedelta(minutes=minutes)
+        fail_message.next_retry_date = next_retry_datetime
+        fail_message.status = STATUS_TYPES.ENQUEUED_DELIVERY
+        fail_message.save()
+        # Call celery task.
+        send_failed_email(fail_message.pk, next_retry_datetime)
+        minutes += 1
+
+
+def enqueue_email(recipients: list[str], message_id: str) -> None:
+    """Enqueue a message for a list of recipients, due to a soft bounce or if
+    the recipient is under a backoff event waiting period.
+
+    :param recipients: The list of recipients to enqueue the message.
+    :param message_id: The message unique identifier.
+    :return None:
+    """
+
+    if is_message_stored(message_id):
+        for recipient in recipients:
+            # Before clean possible failed objects.
+            delete_failed_tasks_objects(recipient)
+
+            # Get the next retry datetime to schedule the message, based on the
+            # active backoff event.
+            scheduled_datetime = get_next_retry_date(recipient)
+
+            # If not exists previously, enqueue the message as ENQUEUED status
+            failed, created = FailedEmail.objects.get_or_create(
+                recipient=recipient,
+                status=STATUS_TYPES.ENQUEUED,
+                defaults={
+                    "message_id": message_id,
+                    "next_retry_date": scheduled_datetime,
+                },
+            )
+            if created:
+                # If the ENQUEUED FailedEmail object was created, schedule the
+                # celery task, in this way we ensure we have a message to send
+                # to the user once the backoff event waiting period expires
+                send_failed_email(failed.pk, scheduled_datetime)
+            else:
+                # If the recipient has already a scheduled message, enqueue the
+                # next messages with WAITING status, these objects are going to
+                # be scheduled when receiving a delivery notification.
+                FailedEmail.objects.create(
+                    recipient=recipient,
+                    status=STATUS_TYPES.WAITING,
+                    message_id=message_id,
+                    next_retry_date=scheduled_datetime,
+                )
+    else:
+        logging.warning(
+            f"The message: {message_id} can't be enqueued because it "
+            "doesn't exist anymore."
+        )

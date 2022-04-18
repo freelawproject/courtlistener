@@ -13,13 +13,29 @@ from cl.users.email_handlers import (
 )
 
 
+def get_message_id(mail_obj: dict) -> str:
+    """Returns the unique message_id from the SES notification header.
+
+    :param mail_obj: The notification mail object to extract the message_id
+    :return message_id: The unique message_id
+    """
+
+    headers = mail_obj["headers"]
+    for header in headers:
+        if header["name"] == "X-CL-ID":
+            message_id = header["value"]
+            return message_id
+    return ""
+
+
 @receiver(bounce_received)
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """Receiver function to handle bounce notifications sent by Amazon SES via
     handle_event_webhook
     """
+
+    message_id = get_message_id(mail_obj)
     if bounce_obj:
-        message_id = mail_obj["messageId"]
         bounce_type = bounce_obj["bounceType"]
         bounce_sub_type = bounce_obj["bounceSubType"]
         bounced_recipients = bounce_obj["bouncedRecipients"]
@@ -59,6 +75,5 @@ def delivery_handler(
     Amazon SES via handle_event_webhook
     """
     if delivery_obj:
-        message_id = mail_obj["messageId"]
         recipient_emails = mail_obj["destination"]
-        handle_delivery(message_id, recipient_emails)
+        handle_delivery(recipient_emails)
