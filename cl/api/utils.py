@@ -354,6 +354,7 @@ class RECAPUploaders(DjangoModelPermissions):
 class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
     perms_map = {
         "POST": ["%(app_label)s.has_recap_upload_access"],
+        "GET": ["%(app_label)s.has_recap_upload_access"],
     }
 
 
