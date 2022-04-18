@@ -11,6 +11,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 from cl.users.email_handlers import (
     add_bcc_random,
     compose_message,
+    enqueue_email,
     has_small_version,
     is_not_email_banned,
     is_small_only_flagged,
@@ -126,13 +127,14 @@ class EmailBackend(BaseEmailBackend):
                     # add to the final recipients list
                     final_recipient_list.append(email_address)
 
-            if backoff_recipient_list:
-                # TODO QUEUE email
-                pass
-
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
             stored_id = store_message(email_message)
+
+            if backoff_recipient_list:
+                # Enqueue message for recipients under a waiting backoff period
+                enqueue_email(backoff_recipient_list, stored_id)
+
             # Add header with unique message_id to identify message
             email.extra_headers["X-CL-ID"] = stored_id
             # Use base backend connection to send the message
