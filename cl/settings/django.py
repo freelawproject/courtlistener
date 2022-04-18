@@ -33,6 +33,20 @@ DATABASES = {
         },
     },
 }
+if env("DB_REPLICA_HOST", default=""):
+    DATABASES["replica"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_REPLICA_NAME", default="courtlistener"),
+        "USER": env("DB_REPLICA_USER", default="postgres"),
+        "PASSWORD": env("DB_REPLICA_PASSWORD", default="postgres"),
+        "HOST": env("DB_REPLICA_HOST", default=""),
+        "PORT": "",
+        "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
+        "OPTIONS": {
+            "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
+        },
+    }
+
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
