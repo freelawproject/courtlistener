@@ -1,9 +1,10 @@
 from django.conf import settings
+from django.contrib.humanize.templatetags.humanize import intcomma
 from django.core.mail import send_mail
 from django.template import loader
 
-from cl.api.utils import get_replication_statuses
 from cl.lib.command_utils import VerboseCommand
+from cl.stats.utils import get_replication_statuses
 
 
 class Command(VerboseCommand):
@@ -21,8 +22,8 @@ class Command(VerboseCommand):
             for row in rows:
                 if row["lsn_distance"] > settings.MAX_REPLICATION_LAG:
                     bad_slots.append(
-                        "Slot '%s' on '%s' is lagging by %s bytes."
-                        % (row["slot_name"], server_name, row["lsn_distance"])
+                        f"Slot '{row['slot_name']}' on '{server_name}' is "
+                        f"lagging by {intcomma(row['lsn_distance'])} bytes."
                     )
 
         if bad_slots:

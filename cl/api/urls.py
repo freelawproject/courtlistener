@@ -158,11 +158,6 @@ urlpatterns = [
     ),
     path("api/bulk-info/", views.bulk_data_index, name="bulk_data_index"),
     path("api/replication/", views.replication_docs, name="replication_docs"),
-    path(
-        "api/replication/status/",
-        views.replication_status,
-        name="replication_status",
-    ),
     re_path(
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,

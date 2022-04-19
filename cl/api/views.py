@@ -7,7 +7,6 @@ from django.template import TemplateDoesNotExist
 from rest_framework import status
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from cl.api.utils import get_replication_statuses
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -83,15 +82,6 @@ def api_index(request: HttpRequest) -> HttpResponse:
 
 def replication_docs(request: HttpRequest) -> HttpResponse:
     return render(request, "replication.html", {"private": False})
-
-
-def replication_status(request: HttpRequest) -> HttpResponse:
-    statuses = get_replication_statuses()
-    return render(
-        request,
-        "replication_status.html",
-        {"private": True, "statuses": statuses},
-    )
 
 
 def bulk_data_index(request: HttpRequest) -> HttpResponse:

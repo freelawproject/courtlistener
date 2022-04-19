@@ -1,7 +1,45 @@
-from django.http import HttpRequest, HttpResponse
+from http import HTTPStatus
+
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
 
 from cl.celery_init import fail_task
 from cl.lib.redis_utils import make_redis_interface
+from cl.stats.utils import (
+    check_postgresql,
+    check_redis,
+    check_solr,
+    get_replication_statuses,
+)
+
+
+def health_check(request: HttpRequest) -> JsonResponse:
+    """Check if we can connect to various services."""
+    is_redis_up = check_redis()
+    is_postgresql_up = check_postgresql()
+    is_solr_up = check_solr()
+
+    status = HTTPStatus.OK
+    if not all([is_redis_up, is_postgresql_up, is_solr_up]):
+        status = HTTPStatus.INTERNAL_SERVER_ERROR
+
+    return JsonResponse(
+        {
+            "is_solr_up": is_solr_up,
+            "is_postgresql_up": is_postgresql_up,
+            "is_redis_up": is_redis_up,
+        },
+        status=status,
+    )
+
+
+def replication_status(request: HttpRequest) -> HttpResponse:
+    statuses = get_replication_statuses()
+    return render(
+        request,
+        "replication_status.html",
+        {"private": True, "statuses": statuses},
+    )
 
 
 def redis_writes(request: HttpRequest) -> HttpResponse:
