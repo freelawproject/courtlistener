@@ -1,8 +1,13 @@
 from collections import OrderedDict
 
+import redis
+import requests
+from django.conf import settings
+from django.db import OperationalError, connections
 from django.db.models import F
 from django.utils.timezone import now
 
+from cl.lib.redis_utils import make_redis_interface
 from cl.stats.models import Stat
 
 MILESTONES = OrderedDict(
@@ -62,3 +67,35 @@ def tally_stat(name, inc=1, date_logged=None):
         # stat doesn't have the new value when it's updated with a F object, so
         # we fake the return value instead of looking it up again for the user.
         return count_cache + inc
+
+
+def check_redis() -> bool:
+    r = make_redis_interface("STATS")
+    try:
+        r.ping()
+    except (redis.exceptions.ConnectionError, ConnectionRefusedError):
+        return False
+    return True
+
+
+def check_postgresql() -> bool:
+    """Just check if we can connect to postgresql"""
+    try:
+        for alias in connections:
+            with connections[alias].cursor() as c:
+                c.execute("SELECT 1")
+                c.fetchone()
+    except OperationalError:
+        return False
+    return True
+
+
+def check_solr() -> bool:
+    """Check if we can connect to Solr"""
+    s = requests.Session()
+    for domain in {settings.SOLR_HOST, settings.SOLR_RECAP_HOST}:
+        try:
+            s.get(f"{domain}/solr/admin/ping?wt=json", timeout=2)
+        except ConnectionError:
+            return False
+    return True
