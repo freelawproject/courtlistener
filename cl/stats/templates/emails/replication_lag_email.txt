@@ -13,5 +13,5 @@ You can see the current statuses at the following URL:
 
 And you can check it yourself with the following function:
 
-  from cl.api.utils import get_replication_statuses
+  from cl.stats.utils import get_replication_statuses
   statuses = get_replication_statuses()

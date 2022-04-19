@@ -7,6 +7,7 @@ from django.db import OperationalError, connections
 from django.db.models import F
 from django.utils.timezone import now
 
+from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
 from cl.stats.models import Stat
 
@@ -99,3 +100,46 @@ def check_solr() -> bool:
         except ConnectionError:
             return False
     return True
+
+
+def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
+    """Return the replication status information for all publishers
+
+    The easiest way to detect a problem in a replication set up is to monitor
+    the size of the publisher's change lag. That is, how many changes are on
+    the publisher that haven't been sent to the subscriber? This function will
+    query all DBs set up in the config file and send their replication status
+    information.
+
+    :return: The status of all configured publications
+    :rtype: A dict of server aliases point to lists of query results dicts:
+
+    {"replica": [{
+            slot_name: 'coupa',
+            lsn_distance: 33239
+        }, {
+            slot_name: 'maverick',
+            lsn_distance: 393478,
+        }],
+        "default": [{
+            slot_name: 'replica',
+            lsn_distance: 490348
+        }],
+    }
+    """
+    statuses = {}
+    query = """
+        SELECT
+            slot_name,
+            confirmed_flush_lsn,
+            pg_current_wal_lsn(),
+            (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
+        FROM pg_replication_slots;
+    """
+    for alias in connections:
+        with connections[alias].cursor() as cursor:
+            cursor.execute(query)
+            rows = fetchall_as_dict(cursor)
+            if rows:
+                statuses[alias] = rows
+    return statuses

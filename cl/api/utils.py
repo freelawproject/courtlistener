@@ -11,8 +11,6 @@ from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
-from django.core.mail import send_mail
-from django.db import connections
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -22,13 +20,12 @@ from django.views.decorators.vary import vary_on_headers
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import BasePermission, DjangoModelPermissions
+from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
-from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import make_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
@@ -610,46 +607,3 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     results = pipe.execute()
 
     return results[0] / results[1]
-
-
-def get_replication_statuses() -> Dict[str, List[Dict[str, Union[str, int]]]]:
-    """Return the replication status information for all publishers
-
-    The easiest way to detect a problem in a replication set up is to monitor
-    the size of the publisher's change lag. That is, how many changes are on
-    the publisher that haven't been sent to the subscriber? This function will
-    query all DBs set up in the config file and send their replication status
-    information.
-
-    :return: The status of all configured publications
-    :rtype: A dict of server aliases point to lists of query results dicts:
-
-    {"replica": [{
-            slot_name: 'coupa',
-            lsn_distance: 33239
-        }, {
-            slot_name: 'maverick',
-            lsn_distance: 393478,
-        }],
-        "default": [{
-            slot_name: 'replica',
-            lsn_distance: 490348
-        }],
-    }
-    """
-    statuses = {}
-    query = """
-        SELECT
-            slot_name,
-            confirmed_flush_lsn,
-            pg_current_wal_lsn(),
-            (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
-        FROM pg_replication_slots;
-    """
-    for alias in connections:
-        with connections[alias].cursor() as cursor:
-            cursor.execute(query)
-            rows = fetchall_as_dict(cursor)
-            if rows:
-                statuses[alias] = rows
-    return statuses

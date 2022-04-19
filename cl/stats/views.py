@@ -1,10 +1,16 @@
 from http import HTTPStatus
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
 
 from cl.celery_init import fail_task
 from cl.lib.redis_utils import make_redis_interface
-from cl.stats.utils import check_postgresql, check_redis, check_solr
+from cl.stats.utils import (
+    check_postgresql,
+    check_redis,
+    check_solr,
+    get_replication_statuses,
+)
 
 
 def health_check(request: HttpRequest) -> JsonResponse:
@@ -24,6 +30,15 @@ def health_check(request: HttpRequest) -> JsonResponse:
             "is_redis_up": is_redis_up,
         },
         status=status,
+    )
+
+
+def replication_status(request: HttpRequest) -> HttpResponse:
+    statuses = get_replication_statuses()
+    return render(
+        request,
+        "replication_status.html",
+        {"private": True, "statuses": statuses},
     )
 
 
