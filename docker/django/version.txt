@@ -1,5 +1,6 @@
-2.0.4
+2.0.5
 
+2.0.5 - Update code
 2.0.4 - Update code
 2.0.3 - Update code
 2.0.2 - Add the replica DB
