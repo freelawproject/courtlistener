@@ -3,14 +3,14 @@ from rest_framework import permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.utils import LoggingMixin, MediumAdjustablePagination
+from cl.api.utils import MediumAdjustablePagination
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import DocketTagSerializer, UserTagSerializer
 from cl.favorites.filters import DocketTagFilter, UserTagFilter
 from cl.favorites.models import DocketTag, UserTag
 
 
-class UserTagViewSet(LoggingMixin, ModelViewSet):
+class UserTagViewSet(ModelViewSet):
     permission_classes = [permissions.AllowAny]
     serializer_class = UserTagSerializer
     pagination_class = MediumAdjustablePagination
@@ -29,7 +29,7 @@ class UserTagViewSet(LoggingMixin, ModelViewSet):
         return UserTag.objects.filter(q).order_by("-id")
 
 
-class DocketTagViewSet(LoggingMixin, ModelViewSet):
+class DocketTagViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner]
     serializer_class = DocketTagSerializer
     filter_class = DocketTagFilter
