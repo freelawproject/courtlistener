@@ -505,6 +505,7 @@ class Position(AbstractDateTimeModel):
     # More roles
     USA_PRESIDENT = "pres"
     GOVERNOR = "gov"
+    MAYOR = "mayor"
     CLERK = "clerk"
     CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
     STAFF_ATTORNEY = "staff-atty"
@@ -604,6 +605,7 @@ class Position(AbstractDateTimeModel):
             (
                 (USA_PRESIDENT, "President of the United States"),
                 (GOVERNOR, "Governor"),
+                (MAYOR, "Mayor"),
             ),
         ),
         (
