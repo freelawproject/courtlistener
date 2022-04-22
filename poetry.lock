@@ -860,6 +860,17 @@ optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
+name = "fuzzywuzzy"
+version = "0.18.0"
+description = "Fuzzy string matching in python"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+speedup = ["python-levenshtein (>=0.12)"]
+
+[[package]]
 name = "geonamescache"
 version = "1.3.0"
 description = "Geonames data for continents, cities and US states."
@@ -1089,7 +1100,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "judge-pics"
-version = "2.0.1"
+version = "2.0.2"
 description = "Database of Judge Pictures"
 category = "main"
 optional = false
@@ -1097,8 +1108,10 @@ python-versions = "*"
 
 [package.dependencies]
 climage = "*"
+fuzzywuzzy = "*"
 lxml = ">=4.0,<5.0"
 python-dateutil = ">=2.0,<3.0"
+python-Levenshtein = "*"
 requests = ">=2.0,<3.0"
 
 [[package]]
@@ -1626,6 +1639,14 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 
 [package.dependencies]
 six = ">=1.5"
+
+[[package]]
+name = "python-levenshtein"
+version = "0.12.2"
+description = "Python extension for computing string edit distances and similarities."
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "python-magic"
@@ -2512,6 +2533,10 @@ flynt = [
 future = [
     {file = "future-0.18.2.tar.gz", hash = "sha256:b1bead90b70cf6ec3f0710ae53a525360fa360d306a86583adc6bf83a4db537d"},
 ]
+fuzzywuzzy = [
+    {file = "fuzzywuzzy-0.18.0-py2.py3-none-any.whl", hash = "sha256:928244b28db720d1e0ee7587acf660ea49d7e4c632569cad4f1cd7e68a5f0993"},
+    {file = "fuzzywuzzy-0.18.0.tar.gz", hash = "sha256:45016e92264780e58972dca1b3d939ac864b78437422beecebb3095f8efd00e8"},
+]
 geonamescache = [
     {file = "geonamescache-1.3.0-py3-none-any.whl", hash = "sha256:efa1dd28a87632303c5d882cc52718f04cf28e85f1cc7d6afdf8a6ba7c5ab1dc"},
     {file = "geonamescache-1.3.0.tar.gz", hash = "sha256:5a1fc774a3282d324952b87eb5c2c13684055e68e829526909c76c2fffb84f8f"},
@@ -2575,14 +2600,6 @@ igraph = [
     {file = "igraph-0.9.10-pp37-pypy37_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:fc806d2b5f75577037d9d5578b5d0d679b4d2e3e4240a752c9512ebc5c4dfd32"},
     {file = "igraph-0.9.10-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3a7a66142222769c7b4cba8b082d1d8bee58dfa075aba5ade0d2d477b9e35125"},
     {file = "igraph-0.9.10-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:0cb10202c00356467be0ff9606426b2937fb1afa14c6b66deddcea78d2ddd309"},
-    {file = "igraph-0.9.10-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:25b802e3d12c653d7a8bf97af31d749895f636002c63856c743f39033a53ef4d"},
-    {file = "igraph-0.9.10-pp38-pypy38_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:cf100439c385df8551ab89ad98a41ae0ec47eea248c4de0b1553951c50dfdd98"},
-    {file = "igraph-0.9.10-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1c7b188f84c11b1ec93fd10ee702b5bed285b1c0c3e81a4bafd591c72cde32b5"},
-    {file = "igraph-0.9.10-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:0cdd473ce627ac3d8744555f1b84a61ef94c47a9337433ac2de03118befbf3be"},
-    {file = "igraph-0.9.10-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:6fe02d59d7190b3676cbd7e553c9f7f13b5a50c4be2d424f980259ce3ad4aa9e"},
-    {file = "igraph-0.9.10-pp39-pypy39_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:8101ba1f83190eeec0c078a497fb06b77e750792219f68dc5d3a416ae79c7b97"},
-    {file = "igraph-0.9.10-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bbb33d124e5680eaeb76fab45424ee5faa0f9dfe8f54d51a3c6e9ec37b01afa3"},
-    {file = "igraph-0.9.10-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:9317fb9bcc37a92bd69e056e269e949e7a07d71c36fc4f5cc0bb41ae68aa71cd"},
     {file = "igraph-0.9.10.tar.gz", hash = "sha256:6f9d8e1d6105b34298591820e94d4d8b3f33f38068523769e7a555bf7c96accb"},
 ]
 internetarchive = [
@@ -2630,8 +2647,8 @@ jsonpointer = [
     {file = "jsonpointer-2.1.tar.gz", hash = "sha256:5a34b698db1eb79ceac454159d3f7c12a451a91f6334a4f638454327b7a89962"},
 ]
 judge-pics = [
-    {file = "judge-pics-2.0.1.tar.gz", hash = "sha256:b4dd5f4d342a94de804c3074d493c5a0ae23a7189516a437373bfead0e619b86"},
-    {file = "judge_pics-2.0.1-py2.py3-none-any.whl", hash = "sha256:0110199555bca735275cc98b07820149081a503f431778ec735649d4dfc8c104"},
+    {file = "judge-pics-2.0.2.tar.gz", hash = "sha256:c3b174766f862d227fb55754808d08527849ab3bbe5efd1d3d76d769a9d4344b"},
+    {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
 juriscraper = [
     {file = "juriscraper-2.4.11-py27-none-any.whl", hash = "sha256:95ff8956a19ff7e49b5198686cc70caf90479e82907dbbad21cb61b881c52d1e"},
@@ -3108,6 +3125,9 @@ python-crfsuite = [
 python-dateutil = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
+]
+python-levenshtein = [
+    {file = "python-Levenshtein-0.12.2.tar.gz", hash = "sha256:dc2395fbd148a1ab31090dd113c366695934b9e85fe5a4b2a032745efd0346f6"},
 ]
 python-magic = [
     {file = "python-magic-0.4.22.tar.gz", hash = "sha256:ca884349f2c92ce830e3f498c5b7c7051fe2942c3ee4332f65213b8ebff15a62"},
