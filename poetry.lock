@@ -440,7 +440,7 @@ python-versions = "*"
 
 [[package]]
 name = "django"
-version = "3.2.12"
+version = "3.2.13"
 description = "A high-level Python Web framework that encourages rapid development and clean, pragmatic design."
 category = "main"
 optional = false
@@ -2400,8 +2400,8 @@ distlib = [
     {file = "distlib-0.3.2.zip", hash = "sha256:106fef6dc37dd8c0e2c0a60d3fca3e77460a48907f335fa28420463a6f799736"},
 ]
 django = [
-    {file = "Django-3.2.12-py3-none-any.whl", hash = "sha256:9b06c289f9ba3a8abea16c9c9505f25107809fb933676f6c891ded270039d965"},
-    {file = "Django-3.2.12.tar.gz", hash = "sha256:9772e6935703e59e993960832d66a614cf0233a1c5123bc6224ecc6ad69e41e2"},
+    {file = "Django-3.2.13-py3-none-any.whl", hash = "sha256:b896ca61edc079eb6bbaa15cf6071eb69d6aac08cce5211583cfb41515644fdf"},
+    {file = "Django-3.2.13.tar.gz", hash = "sha256:6d93497a0a9bf6ba0e0b1a29cccdc40efbfc76297255b1309b3a884a688ec4b6"},
 ]
 django-cache-memoize = [
     {file = "django-cache-memoize-0.1.8.tar.gz", hash = "sha256:f85ca71ddfe3d61d561d5a382736f83148fb75e542585e7028b65d6d3681ec85"},
@@ -2600,6 +2600,14 @@ igraph = [
     {file = "igraph-0.9.10-pp37-pypy37_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:fc806d2b5f75577037d9d5578b5d0d679b4d2e3e4240a752c9512ebc5c4dfd32"},
     {file = "igraph-0.9.10-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3a7a66142222769c7b4cba8b082d1d8bee58dfa075aba5ade0d2d477b9e35125"},
     {file = "igraph-0.9.10-pp37-pypy37_pp73-win_amd64.whl", hash = "sha256:0cb10202c00356467be0ff9606426b2937fb1afa14c6b66deddcea78d2ddd309"},
+    {file = "igraph-0.9.10-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:25b802e3d12c653d7a8bf97af31d749895f636002c63856c743f39033a53ef4d"},
+    {file = "igraph-0.9.10-pp38-pypy38_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:cf100439c385df8551ab89ad98a41ae0ec47eea248c4de0b1553951c50dfdd98"},
+    {file = "igraph-0.9.10-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1c7b188f84c11b1ec93fd10ee702b5bed285b1c0c3e81a4bafd591c72cde32b5"},
+    {file = "igraph-0.9.10-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:0cdd473ce627ac3d8744555f1b84a61ef94c47a9337433ac2de03118befbf3be"},
+    {file = "igraph-0.9.10-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:6fe02d59d7190b3676cbd7e553c9f7f13b5a50c4be2d424f980259ce3ad4aa9e"},
+    {file = "igraph-0.9.10-pp39-pypy39_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:8101ba1f83190eeec0c078a497fb06b77e750792219f68dc5d3a416ae79c7b97"},
+    {file = "igraph-0.9.10-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bbb33d124e5680eaeb76fab45424ee5faa0f9dfe8f54d51a3c6e9ec37b01afa3"},
+    {file = "igraph-0.9.10-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:9317fb9bcc37a92bd69e056e269e949e7a07d71c36fc4f5cc0bb41ae68aa71cd"},
     {file = "igraph-0.9.10.tar.gz", hash = "sha256:6f9d8e1d6105b34298591820e94d4d8b3f33f38068523769e7a555bf7c96accb"},
 ]
 internetarchive = [
