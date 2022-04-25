@@ -166,6 +166,7 @@ INSTALLED_APPS = [
     "cl.stats",
     "cl.users",
     "cl.visualizations",
+    "django_elasticsearch_dsl",
 ]
 
 if DEVELOPMENT:
@@ -218,3 +219,12 @@ SILENCED_SYSTEM_CHECKS = [
     # Don't warn about HSTS being used
     "security.W004",
 ]
+
+# Elasticsearch
+ELASTICSEARCH_DSL_HOSTS = env("ELASTICSEARCH_DSL_HOSTS", default="localhost:9200")
+
+ELASTICSEARCH_DSL = {
+    'default': {
+        'hosts': ELASTICSEARCH_DSL_HOSTS
+    },
+}

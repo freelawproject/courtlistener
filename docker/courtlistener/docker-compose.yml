@@ -71,6 +71,7 @@ services:
       - cl-selenium
       - cl-doctor
       - cl-disclosures
+      - cl-es
     ports:
       - "8000:8000"
     volumes:
@@ -105,3 +106,23 @@ services:
     container_name: "cl-disclosures"
     networks:
       - cl_net_overlay
+
+  cl-es:
+    image: elasticsearch:7.8.1
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+
+  cl-elasticsearch-test:
+    image: elasticsearch:7.8.1
+    environment:
+      - cluster.name=docker-testing-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms128m -Xmx128m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
