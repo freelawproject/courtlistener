@@ -446,6 +446,7 @@ class Position(AbstractDateTimeModel):
     ACTING_JUDGE = "act-jud"
     ACTING_JUSTICE = "act-jus"
     ACTING_PRESIDING_JUDGE = "act-pres-jud"
+    ACTING_CHIEF_ADMINISTRATIVE_JUSTICE = "act-c-admin-jus"
     ADMINISTRATIVE_PRESIDING_JUSTICE = "ad-pres-jus"
     # Associate
     ASSOCIATE_JUDGE = "ass-jud"
@@ -457,6 +458,7 @@ class Position(AbstractDateTimeModel):
     CHIEF_JUDGE = "c-jud"
     CHIEF_JUSTICE = "c-jus"
     CHIEF_SPECIAL_MASTER = "c-spec-m"
+    CHIEF_ADMINISTRATIVE_JUSTICE = "c-admin-jus"
     PRESIDING_JUDGE = "pres-jud"
     PRESIDING_JUSTICE = "pres-jus"
     SUPERVISING_JUDGE = "sup-jud"
@@ -510,10 +512,15 @@ class Position(AbstractDateTimeModel):
     CLERK_CHIEF_DEPUTY = "clerk-chief-dep"
     STAFF_ATTORNEY = "staff-atty"
     PROFESSOR = "prof"
+    ADJUNCT_PROFESSOR = "adj-prof"
     PRACTITIONER = "prac"
     PROSECUTOR = "pros"
     PUBLIC_DEFENDER = "pub-def"
+    DISTRICT_ATTORNEY = "da"
+    ASSISTANT_DISTRICT_ATTORNEY = "ada"
     LEGISLATOR = "legis"
+    SENATOR = "sen"
+    STATE_SENATOR = "state-sen"
 
     POSITION_TYPES = (
         (
@@ -527,6 +534,10 @@ class Position(AbstractDateTimeModel):
                 (ACTING_JUDGE, "Acting Judge"),
                 (ACTING_JUSTICE, "Acting Justice"),
                 (ACTING_PRESIDING_JUDGE, "Acting Presiding Judge"),
+                (
+                    ACTING_CHIEF_ADMINISTRATIVE_JUSTICE,
+                    "Acting Chief Administrative Justice",
+                ),
                 # Associate
                 (ASSOCIATE_JUDGE, "Associate Judge"),
                 (ASSOCIATE_JUSTICE, "Associate Justice"),
@@ -537,6 +548,7 @@ class Position(AbstractDateTimeModel):
                 (CHIEF_JUDGE, "Chief Judge"),
                 (CHIEF_JUSTICE, "Chief Justice"),
                 (CHIEF_SPECIAL_MASTER, "Chief Special Master"),
+                (CHIEF_ADMINISTRATIVE_JUSTICE, "Chief Administrative Justice"),
                 (PRESIDING_JUDGE, "Presiding Judge"),
                 (PRESIDING_JUSTICE, "Presiding Justice"),
                 (SUPERVISING_JUDGE, "Supervising Judge"),
@@ -617,10 +629,15 @@ class Position(AbstractDateTimeModel):
             ),
         ),
         (PROFESSOR, "Professor"),
+        (ADJUNCT_PROFESSOR, "Adjunct Professor"),
         (PRACTITIONER, "Practitioner"),
         (PROSECUTOR, "Prosecutor"),
         (PUBLIC_DEFENDER, "Public Defender"),
+        (DISTRICT_ATTORNEY, "District Attorney"),
+        (ASSISTANT_DISTRICT_ATTORNEY, "Assistant District Attorney"),
         (LEGISLATOR, "Legislator"),
+        (SENATOR, "Senator"),
+        (STATE_SENATOR, "State Senator"),
     )
     POSITION_TYPE_GROUPS = make_choices_group_lookup(POSITION_TYPES)
     PRIVATE = 1
