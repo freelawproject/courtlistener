@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
+from django.core.management import call_command
 from django.test import Client
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -24,7 +25,7 @@ from cl.users.email_handlers import (
     get_email_body,
     normalize_addresses,
 )
-from cl.users.factories import UserFactory
+from cl.users.factories import EmailSentFactory, UserFactory
 from cl.users.models import (
     OBJECT_TYPES,
     SUB_TYPES,
@@ -2142,3 +2143,37 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
+
+
+class DeleteOldMessagesCommandTest(TestCase):
+    """Test cl_delete_old_messages command"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.msg1 = EmailSentFactory()
+        cls.msg2 = EmailSentFactory()
+        cls.msg3 = EmailSentFactory()
+
+    def test_delete_old_messages(self):
+        """This test checks if cl_delete_old_messages command works properly
+        it should delete only messages older than the specified number of days.
+        """
+
+        # Update date_created to simulate two messages are older than 15 days
+        self.msg1.date_created = now() - timedelta(days=16)
+        self.msg1.save()
+        self.msg2.date_created = now() - timedelta(days=16)
+        self.msg2.save()
+
+        stored_email = EmailSent.objects.all()
+        # Before deleting messages there should be 3 stored messages
+        self.assertEqual(stored_email.count(), 3)
+
+        # Delete messages older than 15 days.
+        args = [
+            "--older-than-days",
+            "15",
+        ]
+        call_command("cl_delete_old_messages", *args)
+        # After deleting there should be 1 message
+        self.assertEqual(stored_email.count(), 1)

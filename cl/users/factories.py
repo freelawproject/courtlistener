@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from factory import Faker, LazyFunction
 from factory.django import DjangoModelFactory
 
+from cl.users.models import EmailSent
+
 
 class UserFactory(DjangoModelFactory):
     class Meta:
@@ -22,3 +24,8 @@ class UserFactory(DjangoModelFactory):
 
 class SuperUserFactory(UserFactory):
     is_superuser = True
+
+
+class EmailSentFactory(DjangoModelFactory):
+    class Meta:
+        model = EmailSent
