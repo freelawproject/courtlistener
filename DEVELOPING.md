@@ -9,18 +9,18 @@ But before we can get into that, we must address...
 
 ## Legal Matters
 
-Not surprisingly, we have a lot of legal, and particularly, IP, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns.
+Not surprisingly, we have a lot of legal, and, in particular, intellectual property, lawyers around here. As a result, we endeavor to be a model for other open source projects in how we handle IP contributions and concerns.
 
-We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license that's designed specifically for the kind of code that isn't distributed to end users (like an app would be, say).
+We do this in a couple of ways. First, we use a copy-left license for CourtListener, the GNU GPL Affero license. Read the details in the license itself, but the high level is that it's a copy-left license that's designed specifically for the kind of code that's run on servers and isn't distributed to end users (like an app would be, say).
 
-The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. The first time you make a contribution to any of our repos, a bot will ask you sign the agreement. Please do so. If you have any questions about it, please don't hesitate to ask.
+The other thing we do is require a contributor license agreement from any non-employees or non-contractors that contribute code to the project. The first time you make a contribution to any of our repos, a bot will ask you sign the agreement. Please do so. If you have any questions about it, please ask.
 
 On with the show.
 
 
 # Discussing things
 
-We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more, but mostly people seem to get into our Slack and ask things there. When they do that, the answers to their questions go into a black hole and only ever help the person that asked it. Ah well.
+We host [a Discourse forum](https://flp.discourse.group/c/developer-discussions/8) where you can ask questions and search past ones. We should use this more, but mostly people seem to get into our Slack and ask things there. When they do that, the answers to their questions go into a black hole and only ever help the person that asked them. Ah well.
 
 
 ## Architecture
@@ -44,13 +44,13 @@ The major components of CourtListener are:
  - Python/Django/et al - And their associated bits and pieces.
 
 
-### Pulling Everything Together
+### Developer Installation
 
-We use a docker compose file to make development easier. Don't use it for production! It's not secure enough, and it uses bad practices for data storage. But if you're a dev, it should work nicely.
+We use a Docker Compose file to make development easier. Don't use it for production! It's not secure enough, and it uses bad practices for data storage. But if you're a dev, it should work nicely.
 
 Below is the process for getting everything working. If you get stuck, note that we run all tests in GitHub Actions and that there is a complete, automated setup script in `tests.yml` that you can consult.
 
-To set up a development server, do the following:
+To set up a development machine, do the following:
 
 1. Clone the [courtlistener](https://github.com/freelawproject/courtlistener) and [courtlistener-solr-server](https://github.com/freelawproject/courtlistener-solr-server) repositories so that they are side-by-side in the same folder.
 
@@ -83,7 +83,7 @@ To set up a development server, do the following:
 
     See [below](#how-settings-work-in-courtlistener) for more information about settings files.
 
-1. Next, create the bridge network that the docker relies on:
+1. Next, create the bridge network that docker relies on:
 
     `docker network create -d bridge --attachable cl_net_overlay`
 
@@ -97,7 +97,7 @@ To set up a development server, do the following:
 
       - Go to docker Settings/Resources/Advanced
       - Increase Memory to at least 4GB and Swap to 2GB
-      - Then Apply and Restart.
+      - Apply changes and Restart.
 
 1. Finally, create a new superuser login by running this command, and entering the required information:
 
@@ -120,6 +120,18 @@ A good next step is to [run the test suite](#testing) to verify that your develo
 
 [cl-solr]: https://github.com/freelawproject/courtlistener-solr-server
 
+### Problem Solving
+
+1. **It seems like dependencies are missing when I start docker.**
+
+Sometimes the code is ahead of the images that you pulled from docker hub because we haven't deployed the code in `main` yet. If so, build a fresh docker image for yourself with:
+
+    make development --file docker/django/Makefile
+
+Then run something like `docker restart cl-django` and you should be good, or if that fails, just restart the whole compose file.
+
+2. Add your problem here...
+
 
 ## Logs
 
@@ -129,12 +141,14 @@ You can see most of the logs via docker when you start it. CourtListener also ke
 
 But usually you won't need to look at these logs.
 
+Logs in production are currently only available to a few people, but once we move to Kubernetes, they'll be available to all.
+
 
 ## How Settings Work in CourtListener
 
 CourtListener has two kinds of settings: Those that can and should be adjusted by end users and those that are the same for everybody. Ones that can be adjusted have sane, safe defaults that can be overridden by environment variables. Ones that should not be overridden are simply hardcoded until somebody makes the case that they should be adjustable.
 
-For developers (it's different in prod), adjustable settings are configured via a file located at `cl/env.dev`. Variables set in that file are picked up via the docker compose file or a kubernetes manifest, which passes them to the docker image running your code. Finally, our django code uses [environ][env] to pick up and use those variables.
+For developers (it's different in prod), adjustable settings are configured via a file located at `.env.dev`. Variables set in that file are picked up via the docker compose file or a kubernetes manifest, which passes them to the docker image running your code. Finally, our django code uses [django-environ][env] to pick up and use those variables.
 
 All defaults — for adjustable and fixed settings alike — can be found in the `cl/settings` directory, where they are organized into a few categories of settings (third-party vs. first-party, django, and misc).
 
@@ -153,11 +167,44 @@ on a big feature, each commit should be a discrete step along the path of
 getting that feature ready to land. Bad or experimental work shouldn't be in a
 commit that you submit as part of a PR, if you can avoid it. Often you can clean up your commits with an interactive rebase followed by a force push to your branch.
 
-1. Your commit messages should use [the format defined by the Angular.js
+2. After a code review has begun, **do not force push**. If you do, it makes it difficult for the next review to identify your latest changes. It's better to have a messy commit log during review than to force your poor reviewer to look at the entire PR again just to see the one or two lines you changed. After the review is completed, a force push might be used to clean things up, but a squash merge might do it too, and those are easy.
+
+3. Your commit messages should use [the format defined by the Angular.js
 project][format]. This is pretty easy if you use [this plugin][format-plugin]
 for Intellij/PyCharm/et al.
 
-1. We use a number of linters to make our code better. Some of these are enforced by Github Actions, and others are not. The easiest way to do your work is to use [pre-commit][pc]. If you install that locally, then run `pre-commit install`, you'll check `black`, `isort`, `semgrep` (minimally), `codespell`, and possibly other things each time you commit. Unfortunately, `pre-commit` doesn't work well with `mypy`. More on that below.
+    Your commits should therefore look something like:
+
+        fix(component): Makes the whatsit do the thingsit
+
+        Some longer explanation might go here, explaining why the whatsit is
+        broken and how you fixed it.
+
+        Fixes: #xyz
+
+    We welcome LONG commit messages that could literally double as blog posts. If somebody is looking at the commit in five years, they *want* an essay, not a tweet.
+
+1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort.
+It doesn't have to be done — it doesn't even have to work! — but it should be
+clean, and it should be your best effort at clean *progress*. PRs are both a way
+of getting your work into the system and a way to *communicate* your work. The
+latter is more important. 10 small, clean PRs are about 50× better than a
+monolithic one that is fully functional.
+
+    Say you are developing a system that relies on regexes to do something. Why
+    not submit the regexes (and their tests!) in one PR and the thing that uses
+    those regexes in another? That'd be much easier to review than trying to
+    see the whole thing at once.
+
+4. We use a number of linters to make our code better. Some of these are enforced by Github Actions, and others are not. The easiest way to do your work is to use [pre-commit][pc].
+
+    You can run pre-commit with:
+
+        docker exec -it cl-django pre-commit run --all-files
+
+    You might also want to install it locally. If you do that, you can make it run automatically every time you do a commit, as a "pre-commit hook" (hence the name).
+
+    However you run it, when you do it'll run a bunch of linters including `black`, `isort`, and `flynt`. Unfortunately, `pre-commit` doesn't work well with `mypy`, but that'll need to pass too. More on that below.
 
 [pc]: https://pre-commit.com/
 
@@ -172,23 +219,11 @@ your code. We recommend [integrating it into your editor][black-ed].
     the PR's become impossible to read and risky to merge. This is a big reason
     we use black.
 
-1. We are beginning to use mypy to add type hints to our Python code. New code must include hints and updates to old code should add hints to the old code. The idea is for our hints to gradually get better and more complete. Our Github Action for mypy is in lint.yml, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
+1. We are beginning to use mypy to add type hints to our Python code. New code should include hints, and updates to old code should add hints to the old code. The idea is for our hints to gradually get better and more complete. Our Github Action for mypy is in `lint.yml`, and should be updated to run against any areas that have hints. This just takes a second once mypy is working properly on a file or module.
 
-1. We use iSort to sort our imports. If your imports aren't sorted properly,
+1. We use `iSort` to sort our imports. If your imports aren't sorted properly,
 iSort will tell you so when you push your code to Github. Again, we recommend
 getting iSort integrated into your editor or workflow.
-
-1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort.
-It doesn't have to be done — it doesn't even have to work! — but it should be
-clean, and it should be your best effort at clean *progress*. PRs are both a way
-of getting your work into the system and a way to *communicate* your work. The
-latter is more important. 10 small, clean PRs are about 10× better than a
-monolithic one that is fully functional.
-
-    Say you are developing a system that relies on regexes to do something. Why
-    not submit the regexes (and their tests!) in one PR and the thing that uses
-    those regexes in another? That'd be much easier to review than trying to
-    see the whole thing at once.
 
 1. We have an editorconfig, an eslint configuration, and a black configuration.
 Please use them.
@@ -196,18 +231,16 @@ Please use them.
 1. We do not yet have a Code of Conduct, but we do have [our employee
 manual][hr], and we expect all our employees and volunteers to abide by it.
 
-These guidelines are a little sloppy compared with many projects. Those
+Some of these guidelines are a little sloppy compared with many projects. Those
 projects have greater quality needs, are popular enough to demand a high
 bar, and can envision coding techniques as a part of their overall goal. We
 don't have to lead the industry with our approach, we just need to get good
 work done. That's the goal here.
 
+
 ### Special notes for special types of code
 
-1. If your PR includes a migration of the DB, we need SQL files for any tables
-that we replicate to customers. These can be easily made with the `sqlmigrate`
-command. See MIGRATIONS.md as well for details on smart migration files and why
-this is needed.
+1. If your PR includes a migration of the DB, we need SQL files for those migrations. These can be easily made with the `sqlmigrate` command. See MIGRATIONS.md as well for details on smart migration files and why this is needed.
 
 2. If you alter any react code, include minified builds and map files of the new JS in your PR so that they can be deployed. While developing, you will have non-minified versions of these files. To build the minified versions, do:
 
@@ -355,10 +388,9 @@ Once an amazing new feature has been added to CL or to an import dependency (ie 
 
 To do this:
 
-1) Update the version numbers and version logs in `docker/django/version.txt` & `docker/task-server/version.txt`.
+1) Update the version numbers and version logs in `docker/django/version.txt`.
 2) Push to `main`
-
-Docker hub, automatically builds new versions and will update `:latest`.
+3) Build and push new images with `make push --file docker/django/Makefile`
 
 
 ### CI/CD
