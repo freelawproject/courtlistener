@@ -99,6 +99,12 @@ To set up a development machine, do the following:
       - Increase Memory to at least 4GB and Swap to 2GB
       - Apply changes and Restart.
 
+1. Generate some dummy data for your database:
+
+        docker exec -it cl-django python /opt/courtlistener/manage.py make_dev_data
+
+    If this does not make an object that you want for your work, you should update it so it does. It's a relatively new tool and it's growing as we use it.
+
 1. Finally, create a new superuser login by running this command, and entering the required information:
 
     `docker exec -it cl-django python /opt/courtlistener/manage.py createsuperuser`
