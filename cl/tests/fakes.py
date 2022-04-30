@@ -64,5 +64,5 @@ class FakeFreeOpinionReport:
     def __init__(self, *args, **kwargs):
         pass
 
-    def download_pdf(self, *args, **kwargs):
-        return MagicMock(content=b"")
+    def download_pdf(self, *args, **kwargs) -> tuple[MagicMock, str]:
+        return MagicMock(content=b""), ""
