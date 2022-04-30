@@ -14,7 +14,6 @@ from rest_framework.versioning import URLPathVersioning
 
 from cl.api.utils import BulkJsonHistory, HyperlinkedModelSerializerWithId
 from cl.celery_init import app
-from cl.lib.db_tools import queryset_generator
 from cl.lib.timer import print_timing
 from cl.lib.utils import deepgetattr
 
@@ -150,64 +149,56 @@ def write_json_to_disk(
 
     if qs.count() == 0:
         print(
-            "   - No %s-type items in the DB or none that have changed. All "
-            "done here." % obj_type_str
+            f"   - No {obj_type_str}-type items in the DB or none that have changed. All done here."
         )
         history.mark_success_and_save()
         return 0
-    else:
-        if type(qs[0].pk) == int:
-            item_list = queryset_generator(qs)
-        else:
-            # Necessary for Court objects, which don't have ints for ids.
-            item_list = qs
 
-        i = 0
-        renderer = JSONRenderer()
-        r = RequestFactory().request()
-        r.META[
-            "SERVER_NAME"
-        ] = "www.courtlistener.com"  # Else, it's testserver
-        r.META["SERVER_PORT"] = "443"  # Else, it's 80
-        r.META["wsgi.url_scheme"] = "https"  # Else, it's http.
-        r.version = "v3"
-        r.versioning_scheme = URLPathVersioning()
-        context = dict(request=r)
-        for item in item_list:
-            if i % 1000 == 0:
-                print(f"Completed {i} items so far.")
-            json_str = renderer.render(
-                serializer(item, context=context).data,
-                accepted_media_type="application/json; indent=2",
+    item_list = qs.iterator()
+
+    i = 0
+    renderer = JSONRenderer()
+    r = RequestFactory().request()
+    r.META["SERVER_NAME"] = "www.courtlistener.com"  # Else, it's testserver
+    r.META["SERVER_PORT"] = "443"  # Else, it's 80
+    r.META["wsgi.url_scheme"] = "https"  # Else, it's http.
+    r.version = "v3"
+    r.versioning_scheme = URLPathVersioning()
+    context = dict(request=r)
+    for i, item in enumerate(item_list):
+        if i % 1000 == 0:
+            print(f"Completed {i} items so far.")
+        json_str = renderer.render(
+            serializer(item, context=context).data,
+            accepted_media_type="application/json; indent=2",
+        )
+
+        if court_attr is not None:
+            loc = join(
+                bulk_dir,
+                obj_type_str,
+                deepgetattr(item, court_attr),
+                f"{item.pk}.json",
             )
+        else:
+            # A non-jurisdiction-centric object.
+            loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
 
-            if court_attr is not None:
-                loc = join(
-                    bulk_dir,
-                    obj_type_str,
-                    deepgetattr(item, court_attr),
-                    f"{item.pk}.json",
-                )
-            else:
-                # A non-jurisdiction-centric object.
-                loc = join(bulk_dir, obj_type_str, f"{item.pk}.json")
+        try:
+            with open(loc, "wb") as f:
+                f.write(json_str)
+        except FileNotFoundError:
+            directory_path = Path(loc).parents[0]
+            logging.warning(
+                f"Bulk data directory not found, adding it now: {directory_path}"
+            )
+            # If we have new courts or object types since last generation,
+            # make the needed directories
+            Path(directory_path).mkdir(parents=True, exist_ok=True)
+            with open(loc, "wb") as f:
+                f.write(json_str)
 
-            try:
-                with open(loc, "wb") as f:
-                    f.write(json_str)
-            except FileNotFoundError:
-                directory_path = Path(loc).parents[0]
-                logging.warning(
-                    f"Bulk data directory not found, adding it now: {directory_path}"
-                )
-                # If we have new courts or object types since last generation,
-                # make the needed directories
-                Path(directory_path).mkdir(parents=True, exist_ok=True)
-                with open(loc, "wb") as f:
-                    f.write(json_str)
-            i += 1
+    print(f"   - {i} {obj_type_str} json files created.")
 
-        print(f"   - {i} {obj_type_str} json files created.")
-
-        history.mark_success_and_save()
-        return i
+    history.mark_success_and_save()
+    return i
