@@ -139,6 +139,19 @@ Then run something like `docker restart cl-django` and you should be good, or if
 2. Add your problem here...
 
 
+## Code upgrades
+
+Python and its ecosystem are always evolving. There are a number of best practices that we do to try to keep up:
+
+1. We are gradually adding type hints to our code. It's too difficult to do this all at once, so all new code should be hinted. If you have time while in a file, you should add hints where you can. It may help to enable an error in your IDE for unhinted code.
+
+    After you've added hints, you should add the file or the module to the list of supported modules in lint.yml. A great pull request will add a file or module to lint.yml.
+
+1. We no longer use django fixtures in tests. They are slow and confusing and should be removed when you see them. Instead, they should be replaced with `setupTestData()` and factories. Search the code for examples. New fixtures should be strictly avoided.
+
+1. Wherever possible, we should use `Pathlib` instead of `os.path` and friends. It's almost always nicer, and it's worth learning and using it.
+
+
 ## Logs
 
 You can see most of the logs via docker when you start it. CourtListener also keeps a log in the `cl-django` image that you can tail with:
