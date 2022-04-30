@@ -1144,7 +1144,7 @@ def fetch_pacer_doc_by_rd(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     try:
-        r = download_pacer_pdf_by_rd(
+        r, r_msg = download_pacer_pdf_by_rd(
             rd.pk, pacer_case_id, rd.pacer_doc_id, cookies, magic_number
         )
     except (requests.RequestException, HTTPError):
@@ -1159,6 +1159,7 @@ def fetch_pacer_doc_by_rd(
         self,
         rd_pk,
         r,
+        r_msg,
         court_id,
         pacer_case_id,
         rd.pacer_doc_id,

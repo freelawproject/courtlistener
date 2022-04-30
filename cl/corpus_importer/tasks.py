@@ -557,7 +557,7 @@ def get_and_process_free_pdf(
         password=settings.PACER_PASSWORD,
     )
     try:
-        r = download_pacer_pdf_by_rd(
+        r, r_msg = download_pacer_pdf_by_rd(
             rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
         )
     except PacerLoginException as exc:
@@ -582,6 +582,7 @@ def get_and_process_free_pdf(
         self,
         rd.pk,
         r,
+        r_msg,
         result.court_id,
         result.pacer_case_id,
         result.pacer_doc_id,
@@ -1496,7 +1497,7 @@ def download_pacer_pdf_by_rd(
     pacer_doc_id: int,
     cookies: RequestsCookieJar,
     magic_number: Optional[str] = None,
-) -> Optional[Response]:
+) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
@@ -1508,8 +1509,9 @@ def download_pacer_pdf_by_rd(
     logged-in PACER user.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
-    :return: requests.Response object usually containing a PDF, or None if that
-    wasn't possible.
+    :return: A two-tuple of requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
     """
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1517,42 +1519,47 @@ def download_pacer_pdf_by_rd(
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
     try:
-        r = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number
+        )
     except HTTPError as exc:
         if exc.response.status_code in [
             HTTP_500_INTERNAL_SERVER_ERROR,
             HTTP_504_GATEWAY_TIMEOUT,
         ]:
-            msg = "Ran into HTTPError while getting PDF: %s."
+            msg = (
+                f"Ran into HTTPError while getting PDF: "
+                f"{exc.response.status_code}."
+            )
             if self.request.retries == self.max_retries:
-                logger.error(msg, exc.response.status_code)
+                logger.error(msg)
                 self.request.chain = None
-                return None
-            logger.info(f"{msg} Retrying.", exc.response.status_code)
+                return None, msg
+            logger.info(f"{msg} Retrying.")
             raise self.retry(exc)
         else:
-            logger.error(
-                "Ran into unknown HTTPError while getting PDF: %s. "
-                "Aborting.",
-                exc.response.status_code,
+            msg = (
+                f"Ran into unknown HTTPError while getting PDF: "
+                f"{exc.response.status_code}. Aborting."
             )
+            logger.error(msg)
             self.request.chain = None
-            return None
+            return None, msg
     except requests.RequestException as exc:
-        logger.warning(
-            "Unable to get PDF for %s in %s", pacer_doc_id, pacer_case_id
-        )
+        msg = f"Unable to get PDF for {pacer_doc_id} in {pacer_case_id}"
+        logger.warning(msg)
         if self.request.retries == self.max_retries:
             self.request.chain = None
-            return None
+            return None, msg
         raise self.retry(exc=exc)
-    return r
+    return r, r_msg
 
 
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
     response: Optional[Response],
+    r_msg: str,
     court_id: str,
     pacer_case_id: str,
     pacer_doc_id: str,
@@ -1564,6 +1571,8 @@ def update_rd_metadata(
     :param self: The celery task
     :param rd_pk: The primary key of the RECAPDocument to work on
     :param response: A requests.Response object containing the PDF data.
+    :param r_msg: A message from the download function about an error that was
+    encountered.
     :param court_id: A CourtListener court ID to use for file names.
     :param pacer_case_id: The pacer_case_id to use in error logs.
     :param pacer_doc_id: The pacer_doc_id to use in error logs.
@@ -1575,10 +1584,14 @@ def update_rd_metadata(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     if response is None:
-        msg = (
-            "Unable to get PDF for RECAP Document '%s' "
-            "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
-        )
+        if r_msg:
+            # Send a specific message all the way from Juriscraper
+            msg = f"{r_msg}: {court_id=}, {rd_pk=}"
+        else:
+            msg = (
+                "Unable to get PDF for RECAP Document '%s' "
+                "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
+            )
         logger.error(msg)
         self.request.chain = None
         return False, msg
@@ -1656,7 +1669,7 @@ def get_pacer_doc_by_rd(
         return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
-    r = download_pacer_pdf_by_rd(
+    r, r_msg = download_pacer_pdf_by_rd(
         rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
     )
     court_id = rd.docket_entry.docket.court_id
@@ -1664,6 +1677,7 @@ def get_pacer_doc_by_rd(
         self,
         rd_pk,
         r,
+        r_msg,
         court_id,
         pacer_case_id,
         rd.pacer_doc_id,
@@ -1759,7 +1773,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
-    r = download_pacer_pdf_by_rd(
+    r, r_msg = download_pacer_pdf_by_rd(
         rd.pk, pacer_case_id, att_found["pacer_doc_id"], cookies
     )
     court_id = rd.docket_entry.docket.court_id
@@ -1767,6 +1781,7 @@ def get_pacer_doc_by_rd_and_description(
         self,
         rd_pk,
         r,
+        r_msg,
         court_id,
         pacer_case_id,
         rd.pacer_doc_id,
