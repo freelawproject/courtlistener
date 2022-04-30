@@ -191,6 +191,7 @@ class TennWorkersForm(forms.Form):
         label="Opinion PDF",
         required=True,
         validators=[FileExtensionValidator(["pdf"])],
+        widget=forms.FileInput(attrs={"accept": ".pdf"}),
     )
 
     def __init__(self, *args, **kwargs) -> None:
@@ -278,11 +279,16 @@ class TennWorkersForm(forms.Form):
 
     def make_panel(self) -> None:
         if self.pk == "tennworkcompapp":
-            self.cleaned_data["panel"] = [
-                self.cleaned_data["lead_author"],
-                self.cleaned_data.get("second_judge"),
-                self.cleaned_data.get("third_judge"),
-            ]
+            self.cleaned_data["panel"] = list(
+                filter(
+                    None,
+                    [
+                        self.cleaned_data["lead_author"],
+                        self.cleaned_data.get("second_judge"),
+                        self.cleaned_data.get("third_judge"),
+                    ],
+                )
+            )
         else:
             self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
 

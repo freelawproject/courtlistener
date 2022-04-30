@@ -493,7 +493,7 @@ class UploadPublication(TestCase):
         )
 
     def test_form_save(self, mock) -> None:
-        """Can we saves successfully to db?"""
+        """Can we save successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
 
@@ -506,6 +506,28 @@ class UploadPublication(TestCase):
         form.fields["lead_author"].queryset = qs
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_form_two_judges_2042(self, mock) -> None:
+        """Can we still save if there's only one or two judges on the panel?"""
+        pre_count = Opinion.objects.all().count()
+
+        # Remove a judge from the data
+        self.work_comp_app_data["third_judge"] = None
+
+        form = TennWorkersForm(
+            self.work_comp_app_data,
+            pk="tennworkcompapp",
+            files={"pdf_upload": self.pdf},
+        )
+        qs = Person.objects.filter(positions__court_id="tennworkcompapp")
+        form.fields["lead_author"].queryset = qs
+        form.fields["second_judge"].queryset = qs
+        # form.fields["third_judge"].queryset = qs
 
         if form.is_valid():
             form.save()
