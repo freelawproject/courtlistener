@@ -10,14 +10,23 @@ from cl.lib.redis_utils import make_redis_interface
 session_key = "session:pacer:cookies:user.%s"
 
 
-def log_into_pacer(username: str, password: str) -> RequestsCookieJar:
+def log_into_pacer(
+    username: str,
+    password: str,
+    client_code: str = None,
+) -> RequestsCookieJar:
     """Log into PACER and return the cookie jar
 
     :param username: A PACER username
     :param password: A PACER password
+    :param client_code: A PACER client_code
     :return: Request.CookieJar
     """
-    s = PacerSession(username=username, password=password)
+    s = PacerSession(
+        username=username,
+        password=password,
+        client_code=client_code,
+    )
     s.login()
     return s.cookies
 
@@ -26,6 +35,7 @@ def get_or_cache_pacer_cookies(
     user_pk: Union[str, int],
     username: str,
     password: str,
+    client_code: str = None,
 ) -> RequestsCookieJar:
     """Get PACER cookies for a user or create and cache fresh ones
 
@@ -41,6 +51,7 @@ def get_or_cache_pacer_cookies(
     Needed to create the key in Redis.
     :param username: The PACER username of the user
     :param password: The PACER password of the user
+    :param client_code: The PACER client code of the user
     :return: Cookies for the PACER user
     """
     r = make_redis_interface("CACHE", decode_responses=False)
@@ -49,7 +60,7 @@ def get_or_cache_pacer_cookies(
         return cookies
 
     # Unable to find cookies in cache. Login and cache new values.
-    cookies = log_into_pacer(username, password)
+    cookies = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
     r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
     return cookies
