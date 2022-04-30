@@ -362,7 +362,7 @@ class UploadPublication(TestCase):
 
     def test_access_upload_page(self, mock) -> None:
         """Can we successfully access upload page with access?"""
-        self.client.login(username="learned", password="thehandofjustice")
+        self.client.login(username="learned", password="password")
         response = self.client.get(
             reverse("court_publish_page", args=["tennworkcompcl"])
         )
@@ -370,7 +370,7 @@ class UploadPublication(TestCase):
 
     def test_redirect_without_access(self, mock) -> None:
         """Can we successfully redirect individuals without proper access?"""
-        self.client.login(username="test_user", password="simplepassword")
+        self.client.login(username="test_user", password="password")
         response = self.client.get(
             reverse("court_publish_page", args=["tennworkcompcl"])
         )
@@ -435,7 +435,7 @@ class UploadPublication(TestCase):
         )
 
     def test_tn_wc_app_upload(self, mock) -> None:
-        """Can we test appellate uplading?"""
+        """Can we test appellate uploading?"""
         form = TennWorkersForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",

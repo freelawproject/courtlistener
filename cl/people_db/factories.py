@@ -1,5 +1,5 @@
 from django.utils.timezone import now
-from factory import Faker, LazyFunction
+from factory import Faker, LazyFunction, RelatedFactory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 from localflavor.us.us_states import STATE_CHOICES
@@ -30,3 +30,9 @@ class PositionFactory(DjangoModelFactory):
         model = Position
 
     position_type = Position.JUDGE
+
+
+class PersonWithChildrenFactory(PersonFactory):
+    positions = RelatedFactory(
+        PositionFactory,
+    )

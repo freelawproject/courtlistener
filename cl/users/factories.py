@@ -18,3 +18,7 @@ class UserFactory(DjangoModelFactory):
     password = LazyFunction(lambda: make_password("password"))
     is_staff = False
     is_superuser = False
+
+
+class SuperUserFactory(UserFactory):
+    is_superuser = True

@@ -17,6 +17,7 @@ from cl.search.models import (
     SOURCES,
     Court,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     Parenthetical,
@@ -49,9 +50,9 @@ class ParentheticalFactory(DjangoModelFactory):
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
 
 
-class ParentheticalFactoryWithParents(ParentheticalFactory):
+class ParentheticalWithParentsFactory(ParentheticalFactory):
     describing_opinion = SubFactory(
-        "cl.search.factories.OpinionFactoryWithParents",
+        "cl.search.factories.OpinionWithParentsFactory",
     )
     described_opinion = SelfAttribute("describing_opinion")
 
@@ -67,7 +68,7 @@ class OpinionFactory(DjangoModelFactory):
     plain_text = Faker("text", max_nb_chars=2000)
 
 
-class OpinionFactoryWithChildren(OpinionFactory):
+class OpinionWithChildrenFactory(OpinionFactory):
 
     parentheticals = RelatedFactory(
         ParentheticalFactory,
@@ -75,9 +76,9 @@ class OpinionFactoryWithChildren(OpinionFactory):
     )
 
 
-class OpinionFactoryWithParents(OpinionFactory):
+class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
-        "cl.search.factories.OpinionClusterFactoryWithParents",
+        "cl.search.factories.OpinionClusterWithParentsFactory",
     )
 
 
@@ -98,23 +99,63 @@ class OpinionClusterFactory(DjangoModelFactory):
 
 class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
     sub_opinions = RelatedFactory(
-        OpinionFactoryWithChildren,
+        OpinionWithChildrenFactory,
         factory_related_name="cluster",
     )
 
 
-class OpinionClusterFactoryWithParents(OpinionClusterFactory):
+class DocketParentMixin(DjangoModelFactory):
     docket = SubFactory(
         "cl.search.factories.DocketFactory",
         # Set the case names on the docket to the ones on this object
-        case_name=LazyAttribute(lambda self: self.factory_parent.case_name),
+        # if it has them. Else generate the case name values.
+        case_name=LazyAttribute(
+            lambda self: getattr(
+                self.factory_parent,
+                "case_name",
+                str(Faker("case_name")),
+            )
+        ),
         case_name_short=LazyAttribute(
-            lambda self: self.factory_parent.case_name_short
+            lambda self: getattr(
+                self.factory_parent,
+                "case_name_short",
+                cnt.make_case_name_short(self.case_name),
+            )
         ),
         case_name_full=LazyAttribute(
-            lambda self: self.factory_parent.case_name_full
+            lambda self: getattr(
+                self.factory_parent,
+                "case_name_full",
+                str(Faker("case_name", full=True)),
+            )
         ),
     )
+
+
+class OpinionClusterWithParentsFactory(
+    OpinionClusterFactory,
+    DocketParentMixin,
+):
+    """Make an OpinionCluster with Docket parents"""
+
+    pass
+
+
+class DocketEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = DocketEntry
+
+    description = Faker("text", max_nb_chars=750)
+
+
+class DocketEntryWithParentsFactory(
+    DocketEntryFactory,
+    DocketParentMixin,
+):
+    """Make a DocketEntry with Docket parents"""
+
+    pass
 
 
 class DocketFactory(DjangoModelFactory):
@@ -135,7 +176,7 @@ class DocketFactory(DjangoModelFactory):
     slug = Faker("slug")
 
 
-class DocketFactoryWithChildren(DocketFactory):
+class DocketWithChildrenFactory(DocketFactory):
     clusters = RelatedFactory(
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
