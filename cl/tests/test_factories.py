@@ -1,5 +1,5 @@
 from cl.lib.management.commands.make_dev_data import FACTORIES
-from cl.search.factories import DocketFactoryWithChildren
+from cl.search.factories import DocketWithChildrenFactory
 from cl.search.models import Docket, Opinion, OpinionCluster, Parenthetical
 from cl.tests.cases import TestCase
 
@@ -18,7 +18,7 @@ class TestFactoryCreation(TestCase):
         self.assertEqual(Parenthetical.objects.count(), 0)
 
         # Make the docket
-        DocketFactoryWithChildren.create()
+        DocketWithChildrenFactory.create()
 
         # Check for a docket, opinion cluster, opinion, and parenthetical
         self.assertGreaterEqual(Docket.objects.count(), 1)

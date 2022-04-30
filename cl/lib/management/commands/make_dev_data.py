@@ -1,25 +1,34 @@
 from django.core.management.base import CommandParser
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.people_db.factories import PersonFactory
+from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
     CourtFactory,
+    DocketEntryWithParentsFactory,
     DocketFactory,
-    DocketFactoryWithChildren,
-    OpinionClusterFactoryWithParents,
-    OpinionFactoryWithParents,
-    ParentheticalFactoryWithParents,
+    DocketWithChildrenFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionWithParentsFactory,
+    ParentheticalWithParentsFactory,
 )
+from cl.users.factories import SuperUserFactory, UserFactory
 
 FACTORIES = {
-    0: CourtFactory,
-    1: DocketFactory,
-    2: OpinionClusterFactoryWithParents,
-    3: OpinionFactoryWithParents,
-    4: ParentheticalFactoryWithParents,
-    5: PersonFactory,
-    6: FjcIntegratedDatabaseFactory,
+    # Search app
+    100: CourtFactory,
+    101: DocketFactory,
+    102: OpinionClusterWithParentsFactory,
+    103: OpinionWithParentsFactory,
+    104: DocketEntryWithParentsFactory,
+    105: ParentheticalWithParentsFactory,
+    106: FjcIntegratedDatabaseFactory,
+    # People DB app
+    200: PersonFactory,
+    201: PersonWithChildrenFactory,
+    # Users
+    300: UserFactory,
+    301: SuperUserFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 
@@ -44,7 +53,7 @@ class Command(VerboseCommand):
             f"\n{factories_str}",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> None:
         super(Command, self).handle(*args, **options)
         count = options["count"]
         logger.info(
@@ -57,7 +66,12 @@ class Command(VerboseCommand):
             logger.info(
                 f"Making {count} dockets and all their dependent objects"
             )
-            DocketFactoryWithChildren.create_batch(count)
+            DocketWithChildrenFactory.create_batch(count)
+            logger.info(f"Making {count} judges and all their positions")
+            PersonWithChildrenFactory.create_batch(count)
+            logger.info(f"Making {count} users and super users")
+            UserFactory.create_batch(count)
+            SuperUserFactory.create_batch(count)
         else:
             # The user requested something specific. Build that thing and all
             # the parents above it.

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -16,7 +17,7 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
 )
 from cl.scrapers.tasks import extract_doc_content
 from cl.search.fields import CeilingDateField, FloorDateField
-from cl.search.models import Citation, Court, Docket, Opinion
+from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 
 class CitationRedirectorForm(forms.Form):
@@ -190,9 +191,10 @@ class TennWorkersForm(forms.Form):
         label="Opinion PDF",
         required=True,
         validators=[FileExtensionValidator(["pdf"])],
+        widget=forms.FileInput(attrs={"accept": ".pdf"}),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.pk = kwargs.pop("pk", None)
         super(TennWorkersForm, self).__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
@@ -220,10 +222,10 @@ class TennWorkersForm(forms.Form):
         self.fields["cite_reporter"].widget.attrs["readonly"] = True
 
     @staticmethod
-    def person_label(obj):
+    def person_label(obj) -> str:
         return obj.name_full
 
-    def validate_neutral_citation(self):
+    def validate_neutral_citation(self) -> None:
         volume = self.cleaned_data["cite_volume"]
         reporter = self.cleaned_data["cite_reporter"]
         page = self.cleaned_data["cite_page"]
@@ -244,7 +246,7 @@ class TennWorkersForm(forms.Form):
             )
         self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
-    def verify_unique_judges(self):
+    def verify_unique_judges(self) -> None:
         if self.pk == "tennworkcompapp":
             judges = [
                 self.cleaned_data["lead_author"],
@@ -258,7 +260,7 @@ class TennWorkersForm(forms.Form):
                     ValidationError("Please select each judge only once."),
                 )
 
-    def clean_pdf_upload(self):
+    def clean_pdf_upload(self) -> bytes:
         pdf_data = self.cleaned_data.get("pdf_upload").read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
@@ -275,17 +277,22 @@ class TennWorkersForm(forms.Form):
             )
         return pdf_data
 
-    def make_panel(self):
+    def make_panel(self) -> None:
         if self.pk == "tennworkcompapp":
-            self.cleaned_data["panel"] = [
-                self.cleaned_data["lead_author"],
-                self.cleaned_data.get("second_judge"),
-                self.cleaned_data.get("third_judge"),
-            ]
+            self.cleaned_data["panel"] = list(
+                filter(
+                    None,
+                    [
+                        self.cleaned_data["lead_author"],
+                        self.cleaned_data.get("second_judge"),
+                        self.cleaned_data.get("third_judge"),
+                    ],
+                )
+            )
         else:
             self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
 
-    def make_item_dict(self):
+    def make_item_dict(self) -> None:
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
             "cluster_source": "D",
@@ -304,7 +311,7 @@ class TennWorkersForm(forms.Form):
             "download_urls": "",
         }
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         super(TennWorkersForm, self).clean()
         self.validate_neutral_citation()
         self.make_panel()
@@ -312,7 +319,7 @@ class TennWorkersForm(forms.Form):
         self.verify_unique_judges()
         return self.cleaned_data
 
-    def save(self):
+    def save(self) -> OpinionCluster:
         """Save uploaded Tennessee Workers Comp/Appeal to db.
 
         :return: Cluster

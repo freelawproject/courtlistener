@@ -23,7 +23,9 @@ from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
+from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
+from cl.search.factories import CourtFactory
 from cl.search.models import (
     SEARCH_TYPES,
     Citation,
@@ -32,6 +34,7 @@ from cl.search.models import (
     OpinionCluster,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.users.factories import UserFactory
 
 
 class TitleTest(SimpleTestCase):
@@ -285,29 +288,43 @@ class OpinionSitemapTest(SitemapTest):
     side_effect=clobbering_get_name,
 )
 class UploadPublication(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Create courts
+        court_cl = CourtFactory.create(id="tennworkcompcl")
+        court_app = CourtFactory.create(id="tennworkcompapp")
 
-    fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
+        # Create judges
+        people = PersonFactory.create_batch(4)
+        for person in people[:3]:
+            PositionFactory.create(court=court_app, person=person)
+        PositionFactory.create(court=court_cl, person=people[3])
 
-    def setUp(self) -> None:
-        self.client = Client()
+        # Create users
+        cls.tenn_user = UserFactory.create(
+            username="learned",
+            email="learnedhand@scotus.gov",
+        )
         tenn_group = Group.objects.get(name="tenn_work_uploaders")
-        self.tenn_user = User.objects.create_user(
-            "learned", "learnedhand@scotus.gov", "thehandofjustice"
-        )
-        self.reg_user = User.objects.create_user(
-            "test_user", "test_user@scotus.gov", "simplepassword"
+        cls.tenn_user.groups.add(tenn_group)
+
+        cls.reg_user = UserFactory.create(
+            username="test_user",
+            email="test_user@scotus.gov",
         )
 
-        self.tenn_user.groups.add(tenn_group)
-
-        self.pdf = SimpleUploadedFile(
+        # Other stuff
+        cls.pdf = SimpleUploadedFile(
             "file.pdf",
             b"%PDF-1.trailer<</Root<</Pages<</Kids[<</MediaBox[0 0 3 3]>>]>>>>>>",
             content_type="application/pdf",
         )
-        self.png = SimpleUploadedFile(
+        cls.png = SimpleUploadedFile(
             "file.png", b"file_content", content_type="image/png"
         )
+
+    def setUp(self) -> None:
+        self.client = Client()
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
         self.work_comp_app_data = {
@@ -345,7 +362,7 @@ class UploadPublication(TestCase):
 
     def test_access_upload_page(self, mock) -> None:
         """Can we successfully access upload page with access?"""
-        self.client.login(username="learned", password="thehandofjustice")
+        self.client.login(username="learned", password="password")
         response = self.client.get(
             reverse("court_publish_page", args=["tennworkcompcl"])
         )
@@ -353,7 +370,7 @@ class UploadPublication(TestCase):
 
     def test_redirect_without_access(self, mock) -> None:
         """Can we successfully redirect individuals without proper access?"""
-        self.client.login(username="test_user", password="simplepassword")
+        self.client.login(username="test_user", password="password")
         response = self.client.get(
             reverse("court_publish_page", args=["tennworkcompcl"])
         )
@@ -418,7 +435,7 @@ class UploadPublication(TestCase):
         )
 
     def test_tn_wc_app_upload(self, mock) -> None:
-        """Can we test appellate uplading?"""
+        """Can we test appellate uploading?"""
         form = TennWorkersForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
@@ -476,7 +493,7 @@ class UploadPublication(TestCase):
         )
 
     def test_form_save(self, mock) -> None:
-        """Can we saves successfully to db?"""
+        """Can we save successfully to db?"""
 
         pre_count = Opinion.objects.all().count()
 
@@ -489,6 +506,28 @@ class UploadPublication(TestCase):
         form.fields["lead_author"].queryset = qs
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_form_two_judges_2042(self, mock) -> None:
+        """Can we still save if there's only one or two judges on the panel?"""
+        pre_count = Opinion.objects.all().count()
+
+        # Remove a judge from the data
+        self.work_comp_app_data["third_judge"] = None
+
+        form = TennWorkersForm(
+            self.work_comp_app_data,
+            pk="tennworkcompapp",
+            files={"pdf_upload": self.pdf},
+        )
+        qs = Person.objects.filter(positions__court_id="tennworkcompapp")
+        form.fields["lead_author"].queryset = qs
+        form.fields["second_judge"].queryset = qs
+        # form.fields["third_judge"].queryset = qs
 
         if form.is_valid():
             form.save()
