@@ -23,7 +23,9 @@ from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
+from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
+from cl.search.factories import CourtFactory
 from cl.search.models import (
     SEARCH_TYPES,
     Citation,
@@ -32,6 +34,7 @@ from cl.search.models import (
     OpinionCluster,
 )
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.users.factories import UserFactory
 
 
 class TitleTest(SimpleTestCase):
@@ -285,29 +288,43 @@ class OpinionSitemapTest(SitemapTest):
     side_effect=clobbering_get_name,
 )
 class UploadPublication(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Create courts
+        court_cl = CourtFactory.create(id="tennworkcompcl")
+        court_app = CourtFactory.create(id="tennworkcompapp")
 
-    fixtures = ["tenn_test_judges.json", "tennworkcomp_courts.json"]
+        # Create judges
+        people = PersonFactory.create_batch(4)
+        for person in people[:3]:
+            PositionFactory.create(court=court_app, person=person)
+        PositionFactory.create(court=court_cl, person=people[3])
 
-    def setUp(self) -> None:
-        self.client = Client()
+        # Create users
+        cls.tenn_user = UserFactory.create(
+            username="learned",
+            email="learnedhand@scotus.gov",
+        )
         tenn_group = Group.objects.get(name="tenn_work_uploaders")
-        self.tenn_user = User.objects.create_user(
-            "learned", "learnedhand@scotus.gov", "thehandofjustice"
-        )
-        self.reg_user = User.objects.create_user(
-            "test_user", "test_user@scotus.gov", "simplepassword"
+        cls.tenn_user.groups.add(tenn_group)
+
+        cls.reg_user = UserFactory.create(
+            username="test_user",
+            email="test_user@scotus.gov",
         )
 
-        self.tenn_user.groups.add(tenn_group)
-
-        self.pdf = SimpleUploadedFile(
+        # Other stuff
+        cls.pdf = SimpleUploadedFile(
             "file.pdf",
             b"%PDF-1.trailer<</Root<</Pages<</Kids[<</MediaBox[0 0 3 3]>>]>>>>>>",
             content_type="application/pdf",
         )
-        self.png = SimpleUploadedFile(
+        cls.png = SimpleUploadedFile(
             "file.png", b"file_content", content_type="image/png"
         )
+
+    def setUp(self) -> None:
+        self.client = Client()
 
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
         self.work_comp_app_data = {
