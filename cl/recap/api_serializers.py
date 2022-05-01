@@ -240,6 +240,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
     )
     pacer_username = serializers.CharField(write_only=True)
     pacer_password = serializers.CharField(write_only=True)
+    client_code = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = PacerFetchQueue
