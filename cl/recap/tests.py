@@ -339,6 +339,8 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             msg=f"Serializer did not validate. {serialized_fq.errors=}",
         )
 
+        serialized_fq.save()
+
     def test_key_serialization_with_client_code(self, mock) -> None:
         """Does the API have the fields we expect?"""
         self.fetch_attributes["client_code"] = "pauledgecomb"
@@ -351,6 +353,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
             serialized_fq.is_valid(),
             msg=f"Serializer did not validate. {serialized_fq.errors=}",
         )
+        serialized_fq.save()
 
         # Did the client code, user, and password get sent to the login function?
         mock.assert_called_with(
@@ -363,6 +366,20 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         self.assertCountEqual(
             serialized_fq.data.keys(),
             [
+                "id",
+                "court",
+                "docket",
+                "recap_document",
+                "date_created",
+                "date_modified",
+                "date_completed",
+                "status",
+                "message",
+                "pacer_case_id",
+                "docket_number",
+                "show_parties_and_counsel",
+                "show_terminated_parties",
+                "show_list_of_member_cases",
                 "request_type",
                 "de_date_start",
                 "de_date_end",
