@@ -891,7 +891,9 @@ PACER_TO_CL_IDS = {
     --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
     "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
 
-    <p>A known issue we currently have is that if we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it.
+    <p>If you have a client code, you can provide it to the API with the <code>client_code</code> parameter.</p>
+
+    <p>A known issue we currently have is that if we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it. If that's the case, you'll get an error message asking you to download the docket, which will get us the <code>pacer_doc_id</code> we need.
     </p>
 
     <p><strong>Attachment pages</strong> are the pages that you see in PACER after you click to download a document, if that document has attachments. These pages are free in PACER. Fetching attachment pages is done same as PDFs, above, but with <code>request_type</code> set to <code>3</code>.
