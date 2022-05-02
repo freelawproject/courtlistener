@@ -1,3 +1,4 @@
+import random
 import re
 from datetime import datetime, timedelta
 from typing import Set
@@ -164,6 +165,9 @@ class Command(VerboseCommand):
             "iQuery crawling starting up. Will crawl %s dockets",
             len(docket_ids),
         )
+        # Shuffle the dockets to make sure we don't hit one district all at
+        # once.
+        random.shuffle(list(docket_ids))
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date()
