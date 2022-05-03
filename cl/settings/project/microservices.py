@@ -27,7 +27,7 @@ MICROSERVICE_URLS = {
     },
     "audio-duration": {
         "url": f"{DOCTOR_HOST}/utils/audio/duration/",
-        "timeout": 2,
+        "timeout": 30,
     },
     "mime-type": {
         "url": f"{DOCTOR_HOST}/utils/mime-type/",
