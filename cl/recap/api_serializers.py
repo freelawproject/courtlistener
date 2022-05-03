@@ -240,6 +240,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
     )
     pacer_username = serializers.CharField(write_only=True)
     pacer_password = serializers.CharField(write_only=True)
+    client_code = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = PacerFetchQueue
@@ -312,7 +313,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 attrs["user"].pk,
                 username=attrs.pop("pacer_username"),
                 password=attrs.pop("pacer_password"),
-                client_code=attrs.get("client_code"),
+                client_code=attrs.pop("client_code", None),
             )
         except PacerLoginException as e:
             raise ValidationError(f"PacerLoginException: {e}")

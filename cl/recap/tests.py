@@ -4,11 +4,13 @@ import os
 from datetime import date
 from pathlib import Path
 from unittest import mock
+from unittest.mock import ANY
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import RequestFactory
 from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
 from rest_framework.status import (
@@ -29,6 +31,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.mergers import (
@@ -309,6 +312,81 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+
+@mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
+class RecapFetchApiSerializationTestCase(SimpleTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.get(username="recap")
+        self.fetch_attributes = {
+            "user": self.user,
+            "docket_id": 1,
+            "request_type": REQUEST_TYPE.DOCKET,
+            "pacer_username": "johncofey",
+            "pacer_password": "mrjangles",
+        }
+        self.request = RequestFactory().request()
+        self.request.user = self.user
+
+    def test_simple_request_serialization(self, mock) -> None:
+        """Can we serialize a simple request?"""
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        self.assertTrue(
+            serialized_fq.is_valid(),
+            msg=f"Serializer did not validate. {serialized_fq.errors=}",
+        )
+
+        serialized_fq.save()
+
+    def test_key_serialization_with_client_code(self, mock) -> None:
+        """Does the API have the fields we expect?"""
+        self.fetch_attributes["client_code"] = "pauledgecomb"
+
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        self.assertTrue(
+            serialized_fq.is_valid(),
+            msg=f"Serializer did not validate. {serialized_fq.errors=}",
+        )
+        serialized_fq.save()
+
+        # Did the client code, user, and password get sent to the login function?
+        mock.assert_called_with(
+            self.user.pk,
+            client_code=ANY,
+            password=ANY,
+            username=ANY,
+        )
+
+        self.assertCountEqual(
+            serialized_fq.data.keys(),
+            [
+                "id",
+                "court",
+                "docket",
+                "recap_document",
+                "date_created",
+                "date_modified",
+                "date_completed",
+                "status",
+                "message",
+                "pacer_case_id",
+                "docket_number",
+                "show_parties_and_counsel",
+                "show_terminated_parties",
+                "show_list_of_member_cases",
+                "request_type",
+                "de_date_start",
+                "de_date_end",
+                "de_number_start",
+                "de_number_end",
+            ],
+        )
 
 
 @mock.patch(

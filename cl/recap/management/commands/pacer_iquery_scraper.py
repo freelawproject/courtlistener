@@ -1,3 +1,4 @@
+import random
 import re
 from datetime import datetime, timedelta
 from typing import Set
@@ -9,7 +10,7 @@ from requests import RequestException
 from simplejson import JSONDecodeError
 
 from cl.alerts.models import DocketAlert
-from cl.favorites.models import Favorite
+from cl.favorites.models import DocketTag, Favorite
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import update_docket_info_iquery
@@ -19,8 +20,14 @@ from cl.search.models import Court, Docket
 def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     return set(
         Docket.objects.filter(
-            date_filed__isnull=True, source__in=Docket.RECAP_SOURCES
+            date_filed__isnull=True,
+            source__in=Docket.RECAP_SOURCES,
+            court__jurisdiction__in=[
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+            ],
         )
+        .exclude(pacer_case_id=None)
         .order_by("-view_count")[:num_to_get]
         .values_list("pk", flat=True)
     )
@@ -95,18 +102,28 @@ def get_docket_ids() -> Set[int]:
                 if match := re.search(r"^/docket/([0-9]+)/", url):
                     docket_ids.add(match.group(1))
 
-    # Add in docket IDs that have docket alerts or are favorited
+    # Add in docket IDs that have docket alerts, tags, or are favorited
     docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
     docket_ids.update(
-        Favorite.objects.exclude(docket_id=None).values_list(
+        Favorite.objects.exclude(docket_id=None)
+        .distinct("docket_id")
+        .values_list("docket_id", flat=True)
+    )
+    docket_ids.update(
+        DocketTag.objects.distinct("docket_id").values_list(
             "docket_id", flat=True
         )
     )
     docket_ids.update(
         Docket.objects.filter(
-            case_name__isnull=True, source__in=Docket.RECAP_SOURCES
+            case_name__isnull=True,
+            source__in=Docket.RECAP_SOURCES,
+            court__jurisdiction__in=[
+                Court.FEDERAL_DISTRICT,
+                Court.FEDERAL_BANKRUPTCY,
+            ],
         )
-        .order_by("?")
+        .exclude(pacer_case_id=None)
         .values_list("pk", flat=True)
     )
     return docket_ids
@@ -148,6 +165,9 @@ class Command(VerboseCommand):
             "iQuery crawling starting up. Will crawl %s dockets",
             len(docket_ids),
         )
+        # Shuffle the dockets to make sure we don't hit one district all at
+        # once.
+        random.shuffle(list(docket_ids))
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date()
@@ -177,7 +197,8 @@ class Command(VerboseCommand):
                     d.case_name,
                 ]
             ):
-                # Skip old terminated cases, but do them if we're missing date_filed or case_name
+                # Skip old terminated cases, but do them if we're missing
+                # date_filed or case_name
                 continue
 
             if not d.pacer_case_id:
@@ -188,7 +209,7 @@ class Command(VerboseCommand):
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
             ]:
-                # Appeals or other kind of court that got sweapt up. Punt.
+                # Appeals or other kind of court that got swept up. Punt.
                 continue
 
             update_docket_info_iquery.apply_async(
