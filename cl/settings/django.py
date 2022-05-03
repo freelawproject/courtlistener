@@ -221,10 +221,10 @@ SILENCED_SYSTEM_CHECKS = [
 ]
 
 # Elasticsearch
-ELASTICSEARCH_DSL_HOSTS = env("ELASTICSEARCH_DSL_HOSTS", default="localhost:9200")
+ELASTICSEARCH_DSL_HOSTS = env(
+    "ELASTICSEARCH_DSL_HOSTS", default="localhost:9200"
+)
 
 ELASTICSEARCH_DSL = {
-    'default': {
-        'hosts': ELASTICSEARCH_DSL_HOSTS
-    },
+    "default": {"hosts": ELASTICSEARCH_DSL_HOSTS},
 }
