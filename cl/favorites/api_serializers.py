@@ -8,6 +8,11 @@ from cl.search.models import Docket
 
 class UserTagSerializer(DynamicFieldsMixin, ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    description = serializers.CharField(
+        max_length=250_000,  # Huge, but small enough to prevent DOS. ~1MB
+        allow_blank=True,
+        required=False,
+    )
 
     class Meta:
         model = UserTag
