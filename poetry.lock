@@ -561,6 +561,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "django-override-storage"
+version = "0.3.2"
+description = "Django test helpers to manage file storage side effects."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
 name = "django-ratelimit"
 version = "3.0.1"
 description = "Cache-based rate-limiting for Django."
@@ -2131,7 +2139,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "5e708d94d3a15cfce8d4b7e793b828e6416f35118129312c3581dd9939f9f6ad"
+content-hash = "1317bbe2f9046241efa52b87b69fe92ee551f65be6bf11241f141132580c2800"
 
 [metadata.files]
 amqp = [
@@ -2440,6 +2448,10 @@ django-markdown-deux = [
 django-mathfilters = [
     {file = "django-mathfilters-1.0.0.tar.gz", hash = "sha256:c9b892ef6dfc893683e75cfd0279c187a601ca68f4684c38f9da44657fb64b07"},
     {file = "django_mathfilters-1.0.0-py3-none-any.whl", hash = "sha256:64200a21bb249fbf27be601d4bbb788779e09c6e063170c097cd82c4d18ebb83"},
+]
+django-override-storage = [
+    {file = "django-override-storage-0.3.2.tar.gz", hash = "sha256:995e1a42f056c9f9bc114077c11d67520ec7d8a752a59be62729e641562b133e"},
+    {file = "django_override_storage-0.3.2-py2.py3-none-any.whl", hash = "sha256:1f1a13274d66cc481b19d63c8bd43c94066824008bcdd26ec65d125b1ce8ec39"},
 ]
 django-ratelimit = [
     {file = "django-ratelimit-3.0.1.tar.gz", hash = "sha256:73223d860abd5c5d7b9a807fabb39a6220068129b514be8d78044b52607ab154"},
