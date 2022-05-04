@@ -1,0 +1,784 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE gov_uscourts_docket SYSTEM "docket.dtd">
+<gov_uscourts_docket>
+  <nonce>liWben</nonce>
+  <case_details>
+    <court>akd</court>
+    <docket_num>3:11-cv-00064</docket_num>
+    <case_name>Petro Star Inc. v. BP Oil Supply Co.</case_name>
+    <pacer_case_num>41664</pacer_case_num>
+    <date_case_filed>2011-04-04</date_case_filed>
+    <assigned_to>Ralph R. Beistline</assigned_to>
+    <case_cause>28:1332 Diversity-Breach of Contract</case_cause>
+    <nature_of_suit>190 Contract: Other</nature_of_suit>
+    <jury_demand>Plaintiff</jury_demand>
+    <jurisdiction>Federal Question</jurisdiction>
+  </case_details>
+  <party_list>
+    <party>
+      <name>Petro Star Inc.</name>
+      <type>Plaintiff</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>Bruce A. Moore</attorney_name>
+          <contact>Landye Bennett Blumstein LLP
+701 West Eighth Avenue, Suite 1200
+Anchorage, AK 99501
+907-276-5152
+Email: brucem@lbblawyers.com</contact>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Floyd G. Short</attorney_name>
+          <contact>Susman Godfrey, LLP
+1201 Third Avenue, Suite 3800
+Seattle, WA 98101
+206-373-7381
+Fax: 206-516-3883
+Email: fshort@susmangodfrey.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Parker C. Folse , III</attorney_name>
+          <contact>Susman Godfrey, LLP
+1201 Third Avenue, Suite 3800
+Seattle, WA 98101
+206-516-3860
+Fax: 206-516-3883
+Email: pfolse@SusmanGodfrey.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Genevieve J. Vose</attorney_name>
+          <contact>Susman Godfrey, LLP
+1201 Third Avenue, Suite 3800
+Seattle, WA 98101
+206-516-3880
+Fax: 206-516-3883
+Email: gvose@susmangodfrey.com</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael C. Geraghty</attorney_name>
+          <contact>Davis Wright Tremaine LLP (Seattle)
+1201 Third Avenue, Suite 2200
+Seattle, WA 98101-3045
+907-279-9574
+Fax: 907-276-4231
+Email: mgeraghty@dmgz.com</contact>
+          <attorney_role>TERMINATED: 01/30/2012</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Patricia L. Zobel</attorney_name>
+          <contact>DeLisio Moran Geraghty &amp; Zobel, P.C.
+943 W. 6th Avenue
+Anchorage, AK 99501
+907-279-9574
+Fax: 907-276-4231
+Email: pzobel@dmgz.com</contact>
+          <attorney_role>TERMINATED: 04/09/2012</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+    <party>
+      <name>BP Oil Supply Co.</name>
+      <type>Defendant</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>James F. Speyer</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-243-4141
+Fax: 213-243-4199
+Email: james.speyer@aporter.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Louis R. Veerman</attorney_name>
+          <contact>Guess &amp; Rudd P.C.
+510 L Street, Suite 700
+Anchorage, AK 99501
+907-793-2200
+Fax: 907-793-2299
+Email: dveerman@guessrudd.com</contact>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Ronald C. Redcay</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-423-4000
+Fax: 213-243-4199
+Email: ronald_redcay@aporter.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael Stephan McLaughlin</attorney_name>
+          <contact>Guess &amp; Rudd P.C.
+510 L Street, Suite 700
+Anchorage, AK 99501
+907-793-2200
+Fax: 907-793-2299
+Email: mmclaughlin@guessrudd.com</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>S. Albert Wang</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-243-4000
+Fax: 213-243-4199
+Email: s.albert.wang@aporter.com</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+    <party>
+      <name>BP Products North America Inc.</name>
+      <type>Defendant</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>James F. Speyer</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Louis R. Veerman</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Ronald C. Redcay</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael Stephan McLaughlin</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>S. Albert Wang</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+  </party_list>
+  <document_list>
+    <document doc_num="1" attachment_num="0">
+      <pacer_doc_id>0230856334</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>COMPLAINT against BP Oil Supply Co. (Filing fee $ 350. Receipt #ANC003598), filed by Petro Star Inc.(NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="2" attachment_num="0">
+      <pacer_doc_id>0230856337</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>Civil Cover Sheet. (NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="3" attachment_num="0">
+      <pacer_doc_id>0230856340</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>Corporate Disclosure Statement by Petro Star Inc. identifying Corporate Parent Arctic Slope Regional Corporation for Petro Star Inc. (NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="4" attachment_num="0">
+      <pacer_doc_id>0230856350</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>MOTION for Participation by Non-Resident Attorney Parker C. Folse, III by Petro Star Inc. (Attachments: # 1 Exhibit 1- Certificate of Good Standing, # 2 Proposed Order)(NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="5" attachment_num="0">
+      <pacer_doc_id>0230856355</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>DECLARATION of Parker C. Folse, III re 4 MOTION for Participation by Non-Resident Attorney Parker C. Folse, III by Petro Star Inc. (NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="6" attachment_num="0">
+      <pacer_doc_id>0230856360</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>MOTION for Participation by Non-Resident Attorney Floyd G. Short by Petro Star Inc. (Attachments: # 1 Exhibit 1- Certificate of Good Standing, # 2 Proposed Order)(NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="7" attachment_num="0">
+      <pacer_doc_id>0230856365</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>DECLARATION of Floyd G. Short re 6 MOTION for Participation by Non-Resident Attorney Floyd G. Short by Petro Star Inc. (NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="8" attachment_num="0">
+      <pacer_doc_id>0230856368</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>Unissued summons re Defendant BP Oil Supply Co. (NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="9" attachment_num="0">
+      <pacer_doc_id>0230858171</pacer_doc_id>
+      <date_filed>2011-04-06</date_filed>
+      <long_desc>Receipt #ANC003616 of $300.00 non-resident attorney payment for Parker C. Folse III and Floyd G. Short as to Plaintiff Petro Star Inc. re 4 MOTION for Participation by Non-Resident Attorney Parker C. Folse, III &amp; 6 MOTION for Participation by Non-Resident Attorney Floyd G. Short. (NXL, COURT STAFF) (Entered: 04/06/2011)</long_desc>
+    </document>
+    <document doc_num="10" attachment_num="0">
+      <date_filed>2011-04-06</date_filed>
+      <long_desc>CLERK'S NOTICE re 4 MOTION for Participation by Non-Resident Attorney Parker C. Folse, III and 6 MOTION for Participation by Non-Resident Attorney Floyd G. Short. The Applications to Appear Pro Hac Vice by Floyd G. Short and Parker C. Folse, III, at dockets 4 and 6 are authorized under D.Ak. LR 83.1(d). (LSC, COURT STAFF) (Entered: 04/06/2011)</long_desc>
+    </document>
+    <document doc_num="11" attachment_num="0">
+      <pacer_doc_id>0230868219</pacer_doc_id>
+      <date_filed>2011-04-20</date_filed>
+      <long_desc>SUMMONS Returned Executed by Petro Star Inc.. BP Oil Supply Co. served on 4/8/2011, answer due 4/29/2011. (Attachments: # 1 Exhibit 1 - Return Receipt from USPS)(Zobel, Patricia) (Entered: 04/20/2011)</long_desc>
+    </document>
+    <document doc_num="12" attachment_num="0">
+      <pacer_doc_id>0230892949</pacer_doc_id>
+      <date_filed>2011-05-31</date_filed>
+      <long_desc>NOTICE of Appearance by Louis R. Veerman on behalf of BP Oil Supply Co. (Veerman, Louis) (Entered: 05/31/2011)</long_desc>
+    </document>
+    <document doc_num="13" attachment_num="0">
+      <pacer_doc_id>0230892952</pacer_doc_id>
+      <date_filed>2011-05-31</date_filed>
+      <long_desc>ANSWER to 1 Complaint by BP Oil Supply Co..(Veerman, Louis) (Entered: 05/31/2011)</long_desc>
+    </document>
+    <document doc_num="14" attachment_num="0">
+      <pacer_doc_id>0230893369</pacer_doc_id>
+      <date_filed>2011-06-01</date_filed>
+      <long_desc>INITIAL CASE STATUS REPORT/CASE SCHEDULING AND PLANNING ORDER: Counsel for plaintiff shall serve and file the Rule 26 Meeting Report by 6/29/2011. (LSC, COURT STAFF) (Entered: 06/01/2011)</long_desc>
+    </document>
+    <document doc_num="15" attachment_num="0">
+      <pacer_doc_id>0230893661</pacer_doc_id>
+      <date_filed>2011-06-01</date_filed>
+      <long_desc>AMENDED DOCUMENT by BP Oil Supply Co.. Amendment to 12 Notice of Appearance. (Veerman, Louis) (Entered: 06/01/2011)</long_desc>
+    </document>
+    <document doc_num="16" attachment_num="0">
+      <pacer_doc_id>0230905883</pacer_doc_id>
+      <date_filed>2011-06-24</date_filed>
+      <long_desc>NOTICE  of Certification of Interested Entities and Persons by BP Oil Supply Co. (Veerman, Louis) (Entered: 06/24/2011)</long_desc>
+    </document>
+    <document doc_num="17" attachment_num="0">
+      <pacer_doc_id>0230907212</pacer_doc_id>
+      <date_filed>2011-06-28</date_filed>
+      <long_desc>MOTION for Leave to Appear by Non-Resident Attorney James F. Speyer by BP Oil Supply Co.. (Attachments: # 1 Proposed Order)(Speyer, James) (Entered: 06/28/2011)</long_desc>
+    </document>
+    <document doc_num="18" attachment_num="0">
+      <pacer_doc_id>0230907221</pacer_doc_id>
+      <date_filed>2011-06-28</date_filed>
+      <long_desc>DECLARATION of James F. Speyer re 17 MOTION for Leave to Appear by Non-Resident Attorney James F. Speyer by BP Oil Supply Co.. (Speyer, James) (Entered: 06/28/2011)</long_desc>
+    </document>
+    <document doc_num="19" attachment_num="0">
+      <pacer_doc_id>0230907287</pacer_doc_id>
+      <date_filed>2011-06-28</date_filed>
+      <long_desc>Receipt of $150.00 non-resident attorney payment for James F. Speyer as to Defendant BP Supply Oil Co.. re 17 MOTION for Leave to Appear by Non-Resident Attorney James F. Speyer. (BJK, COURT STAFF) (Entered: 06/28/2011)</long_desc>
+    </document>
+    <document doc_num="20" attachment_num="0">
+      <pacer_doc_id>0230907296</pacer_doc_id>
+      <date_filed>2011-06-28</date_filed>
+      <long_desc>MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney Ronald C. Redcay by BP Oil Supply Co.. (Attachments: # 1 Proposed Order)(Veerman, Louis) (Entered: 06/28/2011)</long_desc>
+    </document>
+    <document doc_num="21" attachment_num="0">
+      <pacer_doc_id>0230907300</pacer_doc_id>
+      <date_filed>2011-06-28</date_filed>
+      <long_desc>DECLARATION of Ronald C. Redcay re 20 MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney Ronald C. Redcay by BP Oil Supply Co.. (Veerman, Louis) (Entered: 06/28/2011)</long_desc>
+    </document>
+    <document doc_num="22" attachment_num="0">
+      <pacer_doc_id>0230907402</pacer_doc_id>
+      <date_filed>2011-06-29</date_filed>
+      <long_desc>Receipt of 150.00 non-resident attorney payment for Ronald C. Redcay as to Defendant BP Oil Supply Co.. re 20 MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney Ronald C. Redcay (BJK, COURT STAFF) (Entered: 06/29/2011)</long_desc>
+    </document>
+    <document doc_num="23" attachment_num="0">
+      <pacer_doc_id>0230907934</pacer_doc_id>
+      <date_filed>2011-06-29</date_filed>
+      <long_desc>REPORT of Rule 26(f) Planning Meeting. (Short, Floyd) (Entered: 06/29/2011)</long_desc>
+    </document>
+    <document doc_num="24" attachment_num="0">
+      <date_filed>2011-06-30</date_filed>
+      <long_desc>TEXT ORDER: The Motion to Appear and Participate by Attorney James F. Speyer at Docket 17 is GRANTED. (Jan, Chambers Staff) (Entered: 06/30/2011)</long_desc>
+    </document>
+    <document doc_num="25" attachment_num="0">
+      <date_filed>2011-06-30</date_filed>
+      <long_desc>TEXT ORDER: The Motion to Appear and Participate by Attorney Ronald C. Redcay at Docket 20 is GRANTED. (Jan, Chambers Staff) (Entered: 06/30/2011)</long_desc>
+    </document>
+    <document doc_num="26" attachment_num="0">
+      <pacer_doc_id>0230908106</pacer_doc_id>
+      <date_filed>2011-06-30</date_filed>
+      <long_desc>SCHEDULING AND PLANNING ORDER.(Jan, Chambers Staff) (Entered: 06/30/2011)</long_desc>
+    </document>
+    <document doc_num="27" attachment_num="0">
+      <pacer_doc_id>0230915606</pacer_doc_id>
+      <date_filed>2011-07-14</date_filed>
+      <long_desc>Proposed Protection Order by BP Oil Supply Co.. (Attachments: # 1 Exhibit A)(Veerman, Louis) Modified on 7/15/2011 to reflect error. See docket annotation dated 7/15/11 (LSC, COURT STAFF). (Entered: 07/14/2011)</long_desc>
+    </document>
+    <document doc_num="28" attachment_num="0">
+      <pacer_doc_id>0230916303</pacer_doc_id>
+      <date_filed>2011-07-15</date_filed>
+      <long_desc>MOTION for Protective Order by BP Oil Supply Co.. (Attachments: # 1 Proposed Order Proposed Order, # 2 Exhibit Exhibit A)(McLaughlin, Michael) (Entered: 07/15/2011)</long_desc>
+    </document>
+    <document doc_num="29" attachment_num="0">
+      <pacer_doc_id>0230922005</pacer_doc_id>
+      <date_filed>2011-07-29</date_filed>
+      <long_desc>MOTION for Extension of Time to File Motions to Add Other Parties or Amend the Pleadings - Stipulated by Petro Star Inc.. (Attachments: # 1 Proposed Order)(Short, Floyd) (Entered: 07/29/2011)</long_desc>
+    </document>
+    <document doc_num="30" attachment_num="0">
+      <date_filed>2011-08-01</date_filed>
+      <long_desc>RRB TEXT ORDER: The Stipulated Motion for Extension of Time at Docket 29 is GRANTED. The deadline for the parties to file motions to add other parties or amend the pleading is extended to August 10, 2011.(Jan, Chambers Staff) (Entered: 08/01/2011)</long_desc>
+    </document>
+    <document doc_num="31" attachment_num="0">
+      <pacer_doc_id>0230924614</pacer_doc_id>
+      <date_filed>2011-08-05</date_filed>
+      <long_desc>PROTECTIVE ORDER. (Jan, Chambers Staff) (Entered: 08/05/2011)</long_desc>
+    </document>
+    <document doc_num="32" attachment_num="0">
+      <pacer_doc_id>0230926452</pacer_doc_id>
+      <date_filed>2011-08-10</date_filed>
+      <long_desc>NOTICE of Consent to Amended Pleading by Petro Star Inc. (Short, Floyd) (Entered: 08/10/2011)</long_desc>
+    </document>
+    <document doc_num="33" attachment_num="0">
+      <pacer_doc_id>0230926455</pacer_doc_id>
+      <date_filed>2011-08-10</date_filed>
+      <long_desc>AMENDED COMPLAINT against BP Oil Supply Co., filed by Petro Star Inc..(Short, Floyd) (Entered: 08/10/2011)</long_desc>
+    </document>
+    <document doc_num="34" attachment_num="0">
+      <pacer_doc_id>0230939289</pacer_doc_id>
+      <date_filed>2011-09-09</date_filed>
+      <long_desc>ANSWER to 33 Amended Complaint by BP Oil Supply Co., BP Products North America Inc..(Speyer, James) (Entered: 09/09/2011)</long_desc>
+    </document>
+    <document doc_num="35" attachment_num="0">
+      <pacer_doc_id>0230939866</pacer_doc_id>
+      <date_filed>2011-09-12</date_filed>
+      <long_desc>NOTICE Waiver of Service of Summons and First Amended Complaint by Petro Star Inc. (Short, Floyd) (Entered: 09/12/2011)</long_desc>
+    </document>
+    <document doc_num="36" attachment_num="0">
+      <pacer_doc_id>0230952301</pacer_doc_id>
+      <date_filed>2011-10-17</date_filed>
+      <long_desc>MOTION to Substitute Attorney by Petro Star Inc.. (Attachments: # 1 Proposed Order Proposed Order)(Geraghty, Michael) (Entered: 10/17/2011)</long_desc>
+    </document>
+    <document doc_num="37" attachment_num="0">
+      <pacer_doc_id>0230952307</pacer_doc_id>
+      <date_filed>2011-10-17</date_filed>
+      <long_desc>NOTICE of Appearance by Michael C. Geraghty on behalf of Petro Star Inc. (Geraghty, Michael) (Entered: 10/17/2011)</long_desc>
+    </document>
+    <document doc_num="38" attachment_num="0">
+      <date_filed>2011-10-17</date_filed>
+      <long_desc>RRB TEXT ORDER: The Motion for Withdrawal and Substitution of Counsel at Docket 36 is GRANTED. Attorney Michael Geraghty is substituted as Plaintiff's local counsel in place of retired Attorney Patricia L. Zobel. (Jan, Chambers Staff) (Entered: 10/17/2011)</long_desc>
+    </document>
+    <document doc_num="39" attachment_num="0">
+      <pacer_doc_id>0230968222</pacer_doc_id>
+      <date_filed>2011-11-23</date_filed>
+      <long_desc>STIPULATION Stipulated Motion to Modify Case Schedule by Petro Star Inc.. (Attachments: # 1 Proposed Order)(Short, Floyd) (Entered: 11/23/2011)</long_desc>
+    </document>
+    <document doc_num="40" attachment_num="0">
+      <pacer_doc_id>0230968299</pacer_doc_id>
+      <date_filed>2011-11-23</date_filed>
+      <long_desc>ORDER Granting Stipulated Motion to Modify Case Schedule at Docket 39 . (Jan, Chamber Staff) (Entered: 11/23/2011)</long_desc>
+    </document>
+    <document doc_num="41" attachment_num="0">
+      <pacer_doc_id>0230987480</pacer_doc_id>
+      <date_filed>2012-01-12</date_filed>
+      <long_desc>STIPULATION Motion to Modify Expert Witness Disclosure Deadlines by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Proposed Order Granting Stipulated Motion to Modify Expert Witness Disclosure Deadlines)(Speyer, James) (Entered: 01/12/2012)</long_desc>
+    </document>
+    <document doc_num="42" attachment_num="0">
+      <date_filed>2012-01-12</date_filed>
+      <long_desc>RRB TEXT ORDER: The Stipulated Motion to Modify Expert Witness Disclosure Deadlines at Docket 41 is GRANTED. (Jan, Chambers Staff) (Entered: 01/12/2012)</long_desc>
+    </document>
+    <document doc_num="43" attachment_num="0">
+      <pacer_doc_id>0230990987</pacer_doc_id>
+      <date_filed>2012-01-20</date_filed>
+      <long_desc>MOTION to Compel DISCOVERY RESPONSES FROM BP PRODUCTS NORTH AMERICA INC. PURSUANT TO FEDERAL RULE OF CIVIL PROCEDURE 37 by Petro Star Inc.. (Attachments: # 1 Proposed Order)(Short, Floyd) (Entered: 01/20/2012)</long_desc>
+    </document>
+    <document doc_num="44" attachment_num="0">
+      <pacer_doc_id>0230990995</pacer_doc_id>
+      <date_filed>2012-01-20</date_filed>
+      <long_desc>DECLARATION of GENEVIEVE VOSE IN SUPPORT OF PETRO STAR INC.'S MOTION TO COMPEL DISCOVERY RESPONSES FROM BP PRODUCTS NORTH AMERICA INC. re 43 MOTION to Compel DISCOVERY RESPONSES FROM BP PRODUCTS NORTH AMERICA INC. PURSUANT TO FEDERAL RULE OF CIVIL PROCEDURE 37 by Petro Star Inc.. (Short, Floyd) (Entered: 01/20/2012)</long_desc>
+    </document>
+    <document doc_num="45" attachment_num="0">
+      <date_filed>2012-01-23</date_filed>
+      <long_desc>NOTICE RE DOCKET 44 : If not already done so, a chamber copy of DOCKET 44  needs to be provided to the court as it is over 25 pages in length. The chamber copy must be printed with the electronic filing header on each page and be attached to a copy of the notice of electronic filing. See D.Ak.LR 10.1(b) and the Administrative Policies and Procedures. Thank you. (Jan, Chambers Staff) (Entered: 01/23/2012)</long_desc>
+    </document>
+    <document doc_num="46" attachment_num="0">
+      <pacer_doc_id>0230995135</pacer_doc_id>
+      <date_filed>2012-01-30</date_filed>
+      <long_desc>MOTION to Withdraw as Attorney , Substitution (w/attached proposed Order) by Petro Star Inc..(Geraghty, Michael) (Entered: 01/30/2012)</long_desc>
+    </document>
+    <document doc_num="47" attachment_num="0">
+      <pacer_doc_id>0230995210</pacer_doc_id>
+      <date_filed>2012-01-30</date_filed>
+      <long_desc>NOTICE of Appearance by Patricia L. Zobel on behalf of Petro Star Inc. (Zobel, Patricia) (Entered: 01/30/2012)</long_desc>
+    </document>
+    <document doc_num="48" attachment_num="0">
+      <date_filed>2012-01-30</date_filed>
+      <long_desc>RRB TEXT ORDER: The Motion for Withdrawal of Counsel and Substitution at Docket 46 is GRANTED. Attorney Michael C. Geraghty is withdrawn as counsel and Attorney Patricia L. Zobel is substituted in as counsel for Plaintiff. (Jan, Chambers Staff) (Entered: 01/30/2012)</long_desc>
+    </document>
+    <document doc_num="49" attachment_num="0">
+      <pacer_doc_id>0230999116</pacer_doc_id>
+      <date_filed>2012-02-06</date_filed>
+      <long_desc>RESPONSE in Opposition re 43 MOTION to Compel DISCOVERY RESPONSES FROM BP PRODUCTS NORTH AMERICA INC. PURSUANT TO FEDERAL RULE OF CIVIL PROCEDURE 37 filed by BP Products North America Inc.. (Speyer, James) (Entered: 02/06/2012)</long_desc>
+    </document>
+    <document doc_num="50" attachment_num="0">
+      <pacer_doc_id>0230999119</pacer_doc_id>
+      <date_filed>2012-02-06</date_filed>
+      <long_desc>DECLARATION of Diane Colley in Support of BP Products North America Inc.'s Opposition to Petro Star Inc.'s Motion to Compel Pursuant to Federal Rule of Civil Procedure 37 re 49 Response in Opposition to Motion by BP Products North America Inc.. (Speyer, James) (Entered: 02/06/2012)</long_desc>
+    </document>
+    <document doc_num="51" attachment_num="0">
+      <pacer_doc_id>0230999122</pacer_doc_id>
+      <date_filed>2012-02-06</date_filed>
+      <long_desc>DECLARATION of Eddie T. Field in support of BP Products North America Inc.'s Opposition to Petro Star Inc.'s Motion to Compel Pursuant to Federal Rule of Civil Procedure 37 re 49 Response in Opposition to Motion by BP Products North America Inc.. (Speyer, James) (Entered: 02/06/2012)</long_desc>
+    </document>
+    <document doc_num="52" attachment_num="0">
+      <pacer_doc_id>0230999125</pacer_doc_id>
+      <date_filed>2012-02-06</date_filed>
+      <long_desc>DECLARATION of S. Albert Wang in support of BP Products North America Inc.'s Opposition to Petro Star Inc.'s Motion to Compel Pursuant to Federal Rule of Civil Procedure 37 re 49 Response in Opposition to Motion by BP Products North America Inc.. (Attachments: # 1 Exhibit A)(Speyer, James) (Entered: 02/06/2012)</long_desc>
+    </document>
+    <document doc_num="53" attachment_num="0">
+      <pacer_doc_id>02301001968</pacer_doc_id>
+      <date_filed>2012-02-13</date_filed>
+      <long_desc>REPLY to Response to Motion re 43 MOTION to Compel DISCOVERY RESPONSES FROM BP PRODUCTS NORTH AMERICA INC. PURSUANT TO FEDERAL RULE OF CIVIL PROCEDURE 37 filed by Petro Star Inc.. (Short, Floyd) (Entered: 02/13/2012)</long_desc>
+    </document>
+    <document doc_num="54" attachment_num="0">
+      <pacer_doc_id>02301001991</pacer_doc_id>
+      <date_filed>2012-02-13</date_filed>
+      <long_desc>DECLARATION of G. Vose in Support of Petro Star Inc.'s Reply on Its Motion to Compel Discovery Responses From BP Products North America Pursuant to Federal Rule of Civil Procedure 37 re 53 Reply to Response to Motion by Petro Star Inc.. (Attachments: # 1 Exhibit, # 2 Exhibit, # 3 Exhibit)(Short, Floyd) (Entered: 02/13/2012)</long_desc>
+    </document>
+    <document doc_num="55" attachment_num="0">
+      <date_filed>2012-02-27</date_filed>
+      <long_desc>ORDER SCHEDULING HEARING: A Status Conference/Discovery Review hearing will be held in this matter Friday, March 2, 2012, at 10:00 AM in Anchorage Courtroom 2 before Ralph R. Beistline. (Jan, Chambers Staff) (Entered: 02/27/2012)</long_desc>
+    </document>
+    <document doc_num="56" attachment_num="0">
+      <date_filed>2012-02-27</date_filed>
+      <long_desc>NOTICE RE HEARING: Parties/counsel needing to attend the Status Conference/Discovery Review hearing on March 2, 2012, telephonically may do so by filing a Notice of Telephonic Appearance and calling 907-677-6246 five minutes prior to the scheduled hearing.(Jan, Chambers Staff) (Entered: 02/27/2012)</long_desc>
+    </document>
+    <document doc_num="57" attachment_num="0">
+      <pacer_doc_id>02301009859</pacer_doc_id>
+      <date_filed>2012-03-01</date_filed>
+      <long_desc>MOTION for Leave to Appear Pro Hac Vice by Petro Star Inc.. (Attachments: # 1 Declaration of Genevieve Vose, # 2 Certificate of Good Standing, # 3 Proposed Order)(Zobel, Patricia) (Entered: 03/01/2012)</long_desc>
+    </document>
+    <document doc_num="58" attachment_num="0">
+      <pacer_doc_id>02301010007</pacer_doc_id>
+      <date_filed>2012-03-01</date_filed>
+      <long_desc>NOTICE of Unopposed Request to Reschedule March 2, 2012 Status Conference/Discovery Review Hearing by BP Oil Supply Co., BP Products North America Inc. re 55 Order, Set Hearings (Speyer, James) (Entered: 03/01/2012)</long_desc>
+    </document>
+    <document doc_num="59" attachment_num="0">
+      <date_filed>2012-03-01</date_filed>
+      <long_desc>ORDER RESCHEDULING HEARING: Pursuant to Docket 58 , the Status Conference/Discovery Review hearing is rescheduled and will be held on Monday, March 5, 2012, at 10:00 AM in Anchorage Courtroom 2 before Ralph R. Beistline. See Docket 56 regarding telephonic participation. (Jan, Chambers Staff) (Entered: 03/01/2012)</long_desc>
+    </document>
+    <document doc_num="60" attachment_num="0">
+      <pacer_doc_id>02301010629</pacer_doc_id>
+      <date_filed>2012-03-02</date_filed>
+      <long_desc>NOTICE of Telephonic Appearance at March 5, 2012 Status Conference by Petro Star Inc. (Short, Floyd) (Entered: 03/02/2012)</long_desc>
+    </document>
+    <document doc_num="61" attachment_num="0">
+      <pacer_doc_id>02301010709</pacer_doc_id>
+      <date_filed>2012-03-02</date_filed>
+      <long_desc>NOTICE of Telephonic Appearance of James F. Speyer for March 5, 2012 Status Conference/Discovery Review Hearing by BP Oil Supply Co., BP Products North America Inc. re 56 Notice (Other), Notice (Other) (Speyer, James) (Entered: 03/02/2012)</long_desc>
+    </document>
+    <document doc_num="62" attachment_num="0">
+      <pacer_doc_id>02301011044</pacer_doc_id>
+      <date_filed>2012-03-02</date_filed>
+      <long_desc>STATEMENT in Advance of March 5, 2012 Status Conference/Discovery Review Hearing filed jointly by Petro Star Inc. and by BP Oil Supply Co., BP Products North America Inc. re 59 Order,, Set Hearings,, Terminate Hearings,. (Attachments: # 1 Exhibit A)(Speyer, James) (Entered: 03/02/2012)</long_desc>
+    </document>
+    <document doc_num="63" attachment_num="0">
+      <pacer_doc_id>02301011188</pacer_doc_id>
+      <date_filed>2012-03-02</date_filed>
+      <long_desc>Receipt of $150.00 non-resident attorney payment for Genevieve Vose as to Plaintiff Petro Star, Inc.. re 57 MOTION for Leave to Appear Pro Hac Vice. (TYM, COURT STAFF) (Entered: 03/05/2012)</long_desc>
+    </document>
+    <document doc_num="64" attachment_num="0">
+      <date_filed>2012-03-05</date_filed>
+      <long_desc>CLERK'S NOTICE re 57 MOTION for Leave to Appear Pro Hac Vice. The Application to Appear Pro Hac Vice by Genevieve Vose, at docket 57 , is authorized under D.Ak. LR 83.1(d). (LSC, COURT STAFF) (Entered: 03/05/2012)</long_desc>
+    </document>
+    <document doc_num="65" attachment_num="0">
+      <pacer_doc_id>02301011592</pacer_doc_id>
+      <date_filed>2012-03-05</date_filed>
+      <long_desc>Minute Entry for proceedings held before Judge Ralph R. Beistline: Status Conference/Discovery Review Hearing held on 3/5/2012. Court accepted stipulation on Proposed Revised case schedule as listed on (Dkt 62-1). Court ordered Plaintiff to file stipulated order. (NXL, COURT STAFF) (Entered: 03/05/2012)</long_desc>
+    </document>
+    <document doc_num="66" attachment_num="0">
+      <pacer_doc_id>02301012461</pacer_doc_id>
+      <date_filed>2012-03-07</date_filed>
+      <long_desc>MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney S. ALBERT WANG by BP Oil Supply Co.. (Attachments: # 1 Proposed Order Proposed Order)(Veerman, Louis) (Entered: 03/07/2012)</long_desc>
+    </document>
+    <document doc_num="67" attachment_num="0">
+      <pacer_doc_id>02301012467</pacer_doc_id>
+      <date_filed>2012-03-07</date_filed>
+      <long_desc>DECLARATION of S. ALBERT WANG re 66 MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney S. ALBERT WANG by BP Oil Supply Co.. (Attachments: # 1 Exhibit Exhibit 1)(Veerman, Louis) (Entered: 03/07/2012)</long_desc>
+    </document>
+    <document doc_num="68" attachment_num="0">
+      <pacer_doc_id>02301012820</pacer_doc_id>
+      <date_filed>2012-03-07</date_filed>
+      <long_desc>Receipt of $150.00 non-resident attorney payment for S. Albert Wang as to Defendant BP Oil Supply Co.. re 66 MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney S. ALBERT WANG (TYM, COURT STAFF) (Entered: 03/07/2012)</long_desc>
+    </document>
+    <document doc_num="69" attachment_num="0">
+      <date_filed>2012-03-07</date_filed>
+      <long_desc>CLERK'S NOTICE re 66 MOTION for Leave to Appear Motion for Participation by Non-Resident Attorney S. ALBERT WANG. The Application to Appear Pro Hac Vice by S. Albert Wang, at docket 66 , is authorized under D.Ak. LR 83.1(d). (LSC, COURT STAFF) (Entered: 03/07/2012)</long_desc>
+    </document>
+    <document doc_num="70" attachment_num="0">
+      <pacer_doc_id>02301014014</pacer_doc_id>
+      <date_filed>2012-03-09</date_filed>
+      <long_desc>NOTICE Of Lodging of Order by Petro Star Inc. (Attachments: # 1 Proposed Order)(Short, Floyd) (Entered: 03/09/2012)</long_desc>
+    </document>
+    <document doc_num="71" attachment_num="0">
+      <pacer_doc_id>02301015491</pacer_doc_id>
+      <date_filed>2012-03-14</date_filed>
+      <long_desc>ORDER Granting in Part and Denying in Part Petro Star Inc.'s Motion to Compel Discovery and Revising Case Schedule. (Jan, Chambers Staff) (Entered: 03/14/2012)</long_desc>
+    </document>
+    <document doc_num="72" attachment_num="0">
+      <pacer_doc_id>02301026104</pacer_doc_id>
+      <date_filed>2012-04-06</date_filed>
+      <long_desc>MOTION to Substitute Attorney by Petro Star Inc.. (Attachments: # 1 Proposed Order)(Moore, Bruce) (Entered: 04/06/2012)</long_desc>
+    </document>
+    <document doc_num="73" attachment_num="0">
+      <pacer_doc_id>02301026127</pacer_doc_id>
+      <date_filed>2012-04-06</date_filed>
+      <long_desc>NOTICE of Appearance by Bruce A. Moore on behalf of Petro Star Inc. (Moore, Bruce) (Entered: 04/06/2012)</long_desc>
+    </document>
+    <document doc_num="74" attachment_num="0">
+      <date_filed>2012-04-09</date_filed>
+      <long_desc>RRB TEXT ORDER: The Motion for Withdrawal and Substitution at Docket 72 is GRANTED. Bruce A. Moore is substituted as Attorney for Plaintiff and Attorney Patricia L. Zobel is terminated. (Jan, Chambers Staff) (Entered: 04/09/2012)</long_desc>
+    </document>
+    <document doc_num="75" attachment_num="0">
+      <pacer_doc_id>02301055599</pacer_doc_id>
+      <date_filed>2012-06-14</date_filed>
+      <long_desc>STIPULATION Stipulated Motion to Modify Discovery Deadlines by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Proposed Order Granting Stipulated Motion to Modify Discovery Deadlines)(Speyer, James) (Entered: 06/14/2012)</long_desc>
+    </document>
+    <document doc_num="76" attachment_num="0">
+      <date_filed>2012-06-15</date_filed>
+      <long_desc>RRB TEXT ORDER: The Stipulated Motion to Modify Discovery Deadlines at Docket 75 is GRANTED. (Jan, Chambers Staff) (Entered: 06/15/2012)</long_desc>
+    </document>
+    <document doc_num="77" attachment_num="0">
+      <pacer_doc_id>02301065800</pacer_doc_id>
+      <date_filed>2012-07-11</date_filed>
+      <long_desc>Witness List by BP Oil Supply Co., BP Products North America Inc.. (Speyer, James) (Entered: 07/11/2012)</long_desc>
+    </document>
+    <document doc_num="78" attachment_num="0">
+      <pacer_doc_id>02301065812</pacer_doc_id>
+      <date_filed>2012-07-11</date_filed>
+      <long_desc>Witness List by Petro Star Inc.. (Short, Floyd) (Entered: 07/11/2012)</long_desc>
+    </document>
+    <document doc_num="79" attachment_num="0">
+      <pacer_doc_id>02301074507</pacer_doc_id>
+      <date_filed>2012-08-02</date_filed>
+      <long_desc>Joint STIPULATION Regarding Use of Testimony By or Relating to Certain Individuals by BP Oil Supply Co., BP Products North America Inc..(Speyer, James) (Entered: 08/02/2012)</long_desc>
+    </document>
+    <document doc_num="80" attachment_num="0">
+      <date_filed>2012-08-03</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The Stipulation Regarding Use of Testimony by or Relating to Certain Individuals at Docket 79 is GRANTED. (Jan, Chambers Staff) (Entered: 08/03/2012)</long_desc>
+    </document>
+    <document doc_num="81" attachment_num="0">
+      <pacer_doc_id>02301074907</pacer_doc_id>
+      <date_filed>2012-08-03</date_filed>
+      <long_desc>SUPPLEMENT to Final Witness List as to Experts by Petro Star Inc.. (Vose, Genevieve) Modified on 8/3/2012 to create relationship to document #78 (PXS, COURT STAFF). (Entered: 08/03/2012)</long_desc>
+    </document>
+    <document doc_num="82" attachment_num="0">
+      <pacer_doc_id>02301075887</pacer_doc_id>
+      <date_filed>2012-08-07</date_filed>
+      <long_desc>STIPULATION Stipulated Motion to Alter Discovery Deadlines for Two Depositions by BP Products North America Inc.. (Attachments: # 1 Proposed Order Granting Stipulated Motion to Alter Discovery Deadlines for Two Depositions)(Wang, S.) (Entered: 08/07/2012)</long_desc>
+    </document>
+    <document doc_num="83" attachment_num="0">
+      <pacer_doc_id>02301075891</pacer_doc_id>
+      <date_filed>2012-08-07</date_filed>
+      <long_desc>STIPULATION on Undisputed Issues Regarding Contract Authenticity by BP Products North America Inc..(Wang, S.) (Entered: 08/07/2012)</long_desc>
+    </document>
+    <document doc_num="84" attachment_num="0">
+      <pacer_doc_id>02301076047</pacer_doc_id>
+      <date_filed>2012-08-07</date_filed>
+      <long_desc>ORDER Granting Stipulated Motion to Alter Deadlines at Docket 82 . (Jan, Chambers Staff) (Entered: 08/07/2012)</long_desc>
+    </document>
+    <document doc_num="85" attachment_num="0">
+      <date_filed>2012-08-08</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The Stipulation on Undisputed Issues Regarding Contract Authenticity at Docket 83 is ACCEPTED. (Jan, Chambers Staff) (Entered: 08/08/2012)</long_desc>
+    </document>
+    <document doc_num="86" attachment_num="0">
+      <pacer_doc_id>02301089982</pacer_doc_id>
+      <date_filed>2012-09-13</date_filed>
+      <long_desc>Joint STIPULATION Stipulated Motion to Modify Dispositive Motion &amp; Motions in Limine Deadlines by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Proposed Order)(Speyer, James) (Entered: 09/13/2012)</long_desc>
+    </document>
+    <document doc_num="87" attachment_num="0">
+      <pacer_doc_id>02301090053</pacer_doc_id>
+      <date_filed>2012-09-14</date_filed>
+      <long_desc>ORDER Granting Stipulation to Extend Deadlines at Docket 86 . (Jan, Chambers Staff) (Entered: 09/14/2012)</long_desc>
+    </document>
+    <document doc_num="89" attachment_num="0">
+      <pacer_doc_id>02301096741</pacer_doc_id>
+      <date_filed>2012-09-28</date_filed>
+      <long_desc>MOTION for Summary Judgment  by BP Oil Supply Co., BP Products North America Inc..(Speyer, James) (Entered: 09/28/2012)</long_desc>
+    </document>
+    <document doc_num="90" attachment_num="0">
+      <pacer_doc_id>02301096750</pacer_doc_id>
+      <date_filed>2012-09-28</date_filed>
+      <long_desc>SEALED Memorandum in Support of Motion for Summary Judgment at 89 by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Wang Declaration in Support of Motion For Summary Judgment, # 2 Table of Contents to Exhibits to Wang Declaration, # 3 Exhibit A, # 4 Exhibit B - Part 1 of 2, # 5 Exhibit B - Part 2 of 2, # 6 Exhibit C, # 7 Exhibit D, # 8 Exhibit E, # 9 Exhibit F, # 10 Exhibit G, # 11 Exhibit H, # 12 Exhibit I, # 13 Exhibit J, # 14 Exhibit K, # 15 Exhibit L, # 16 Exhibit M, # 17 Exhibit N, # 18 Exhibit O, # 19 Exhibit P, # 20 Exhibit Q, # 21 Exhibit R, # 22 Exhibit S, # 23 Exhibit T, # 24 Exhibit U, # 25 Exhibit V, # 26 Exhibit W, # 27 Exhibit X, # 28 Exhibit Y, # 29 Exhibit Z, # 30 Exhibit AA, # 31 Exhibit BB, # 32 Exhibit CC, # 33 Exhibit DD, # 34 Exhibit EE, # 35 Exhibit FF, # 36 Exhibit GG, # 37 Exhibit HH, # 38 Exhibit II, # 39 Exhibit JJ, # 40 Exhibit KK, # 41 Exhibit LL, # 42 Exhibit MM)(Speyer, James) Modified on 10/3/2012 to reflect filing is Memo in Support (Jan, Chambers Staff). (Entered: 09/28/2012)</long_desc>
+    </document>
+    <document doc_num="91" attachment_num="0">
+      <pacer_doc_id>02301096814</pacer_doc_id>
+      <date_filed>2012-09-28</date_filed>
+      <long_desc>AFFIDAVIT in Support of Motion for Summary Judgment - Filing in Public Record of Wang Declaration and Public Exhibits Attached Thereto by BP Oil Supply Co., BP Products North America Inc. re 89 (Attachments: # 1 Table of Contents of Exhibits to Wang Declaration, # 2 Exhibit A, # 3 Exhibit B - Part 1 of 2, # 4 Exhibit B - Part 2 of 2, # 5 Exhibit C, # 6 Exhibit D, # 7 Exhibit E, # 8 Exhibit F, # 9 Exhibit G, # 10 Exhibit H, # 11 Exhibit I, # 12 Exhibit J, # 13 Exhibit K, # 14 Exhibit L, # 15 Exhibit M, # 16 Exhibit N, # 17 Exhibit O, # 18 Exhibit P, # 19 Exhibit Q, # 20 Exhibit R, # 21 Exhibit S, # 22 Exhibit T, # 23 Exhibit U, # 24 Exhibit V, # 25 Exhibit W, # 26 Exhibit X, # 27 Exhibit Y, # 28 Exhibit Z, # 29 Exhibit AA, # 30 Exhibit BB, # 31 Exhibit CC, # 32 Exhibit DD, # 33 Exhibit EE, # 34 Exhibit FF, # 35 Exhibit GG, # 36 Exhibit HH, # 37 Exhibit II, # 38 Exhibit JJ, # 39 Exhibit KK, # 40 Exhibit LL, # 41 Exhibit MM)(Speyer, James) Modified on 10/3/2012 to reflect Affidavit. (Jan, Chambers Staff). (Entered: 09/28/2012)</long_desc>
+    </document>
+    <document doc_num="92" attachment_num="0">
+      <date_filed>2012-10-01</date_filed>
+      <long_desc>NOTICE RE SEALED FILING: Due to the way some filings are entered into CMECF they do not appear on the Court's Docket. For identification purposes, Docket 88 is a Stipulated Motion to Seal Documents Relating to BP's Motion for Summary Judgment. (Jan, Chambers Staff) (Entered: 10/01/2012)</long_desc>
+    </document>
+    <document doc_num="93" attachment_num="0">
+      <date_filed>2012-10-03</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The Stipulated Motion to Seal Documents Relating to BPs Motion for Summary Judgment Pursuant to Local Rule 5.4(A) at Docket 88 is GRANTED. (Jan, Chambers Staff) Modified on 10/29/2012 (JPS, CHAMBERS STAFF). (Entered: 10/03/2012)</long_desc>
+    </document>
+    <document doc_num="96" attachment_num="0">
+      <date_filed>2012-11-01</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The invisibly filed Sealed Stipulated Motion at Docket 94 to Seal Documents Relating to Petro Star's Opposition to BP's Motion for Summary Judgment is GRANTED. (Jan, Chambers Staff) (Entered: 11/01/2012)</long_desc>
+    </document>
+    <document doc_num="97" attachment_num="0">
+      <date_filed>2012-11-01</date_filed>
+      <long_desc>NOTICE RE INVISIBLE FILINGS: Due to a lack of available filing events, some SEALED filings are invisible on the Court docket and are not electronically served on parties. For identification purposes, Docket 94  is a *SEALED* Stipulated Motion to File Petro Star's Opposition to BP's Motion for Summary Judgment under Seal. Docket 95  is Petro Star's *SEALED* Opposition to BP's Motion for Summary Judgment at Docket 89 (Jan, Chambers Staff) (Entered: 11/01/2012)</long_desc>
+    </document>
+    <document doc_num="99" attachment_num="0">
+      <pacer_doc_id>02301116327</pacer_doc_id>
+      <date_filed>2012-11-16</date_filed>
+      <long_desc>SEALED DOCUMENT re 89 MOTION for Summary Judgment  Reply in Support of Motion by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Colley Declaration in Support of BP's Motion for Summary Judgment, # 2 Exhibit A to Colley Declaration, # 3 Exhibit B to Colley Declaration, # 4 Second Wang Declaration in Support of BP's Motion for Summary Judgment, # 5 Table of Contents to Exhibits to Second Wang Declaration, # 6 Exhibit NN to Second Wang Declaration, # 7 Exhibit OO to Second Wang Declaration, # 8 Exhibit PP to Second Wang Declaration, # 9 Exhibit QQ to Second Wang Declaration, # 10 Exhibit RR to Second Wang Declaration, # 11 Exhibit SS to Second Wang Declaration, # 12 Exhibit TT to Second Wang Declaration)(Speyer, James) (Entered: 11/16/2012)</long_desc>
+    </document>
+    <document doc_num="100" attachment_num="0">
+      <pacer_doc_id>02301116342</pacer_doc_id>
+      <date_filed>2012-11-16</date_filed>
+      <long_desc>NOTICE Filing in Public Record of Second Wang Declaration and Public Exhibits Attached Thereto by BP Oil Supply Co., BP Products North America Inc. re 99 Sealed PDF Document,,, (Attachments: # 1 Table of Contents to Exhibits to Second Wang Declaration, # 2 Exhibit NN to Second Wang Declaration, # 3 Exhibit OO to Second Wang Declaration, # 4 Exhibit PP to Second Wang Declaration, # 5 Exhibit QQ to Second Wang Declaration, # 6 Exhibit RR to Second Wang Declaration, # 7 Exhibit SS to Second Wang Declaration, # 8 Exhibit TT to Second Wang Declaration)(Speyer, James) (Entered: 11/16/2012)</long_desc>
+    </document>
+    <document doc_num="101" attachment_num="0">
+      <date_filed>2012-11-19</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The invisible *SEALED* Joint Motion at Docket 98 to Seal Documents Relating to BP's Reply in Support of its Motion for Summary Judgment is GRANTED.(Jan, Chambers Staff) (Entered: 11/19/2012)</long_desc>
+    </document>
+    <document doc_num="102" attachment_num="0">
+      <pacer_doc_id>02301117502</pacer_doc_id>
+      <date_filed>2012-11-20</date_filed>
+      <long_desc>MOTION for Hearing re 89 MOTION for Summary Judgment  Request for Oral Argument Pursuant to D. AK. L.R. 7.2(A) by BP Oil Supply Co., BP Products North America Inc..(Wang, S.) (Entered: 11/20/2012)</long_desc>
+    </document>
+    <document doc_num="103" attachment_num="0">
+      <pacer_doc_id>02301117993</pacer_doc_id>
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>ERRATA Correcting [Proposed] Exhibits 2, 4, 8 and 23 to Opposition to Motion for Summary Judgment by Petro Star Inc. 95 Sealed Response in Opposition to Motion,,,,,,,, filed by Petro Star Inc.. (Attachments: # 1 Affidavit Declaration of F. Short, # 2 Exhibit [Proposed] Proposed Exhibit 2 [Filed Under Seal], # 3 Exhibit [Proposed] Exhibit 4 [Filed Under Seal], # 4 Exhibit Exhibit 8, # 5 Exhibit Exhibit 23)(Short, Floyd) (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="105" attachment_num="0">
+      <pacer_doc_id>02301118055</pacer_doc_id>
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>NOTICE of Supplemental Authority by Petro Star Inc. re 95 Sealed Response in Opposition to Motion,,,,,,,, (Short, Floyd) (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="106" attachment_num="0">
+      <pacer_doc_id>02301118080</pacer_doc_id>
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>STIPULATED MOTION for Leave to File Supplemental Factual Material Pursuant to Local Rule 7.1(i)(2) by Petro Star Inc.. (Attachments: # 1 Proposed Order)(Short, Floyd) Modified on 11/26/2012 to clarify docket text(PXS, COURT STAFF). (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="107" attachment_num="0">
+      <pacer_doc_id>02301118092</pacer_doc_id>
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>DECLARATION of Floyd G. Short re 106 MOTION for Leave to File Supplemental Factual Material Pursuant to Local Rule 7.1(i)(2) by Petro Star Inc.. (Attachments: # 1 Exhibit [Proposed] Exhibit 29 Filed Under Seal)(Short, Floyd) (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="109" attachment_num="0">
+      <pacer_doc_id>02301118101</pacer_doc_id>
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>MOTION for Hearing Petro Star Inc.'s Request for Oral Argument by Petro Star Inc. re 89 MOTION for Summary Judgment  (Short, Floyd) Modified on 11/26/2012 to correct event type (PXS, COURT STAFF). (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="110" attachment_num="0">
+      <date_filed>2012-11-21</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The Joint Motion to Seal at Docket 108 is GRANTED, (JPS, CHAMBERS STAFF) (Entered: 11/21/2012)</long_desc>
+    </document>
+    <document doc_num="111" attachment_num="0">
+      <date_filed>2012-11-28</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The invisible *SEALED* Stipulated Motion to Seal Documents Regarding Petro Star's Errata at Docket 104 is GRANTED. Plaintiff's filings that were filed under seal, pursuant to Section 6 of the Protective Order at Docket 31 , may remain under seal. (Jan, Chambers Staff) (Entered: 11/28/2012)</long_desc>
+    </document>
+    <document doc_num="112" attachment_num="0">
+      <date_filed>2012-11-28</date_filed>
+      <long_desc>JUDGE BEISTLINE TEXT ORDER: The Stipulated Motion for Leave for Petro Star to File Sealed Supplemental Factual Material at Docket 106 is GRANTED. Petro Star shall file the Third Declaration of Floyd G. Short in Support of Petro Star's Opposition to BP's Motion for Summary Judgment and attached exhibit comprising the supplemental factual material. (Jan, Chambers Staff) (Entered: 11/28/2012)</long_desc>
+    </document>
+    <document doc_num="113" attachment_num="0">
+      <pacer_doc_id>02301119966</pacer_doc_id>
+      <date_filed>2012-11-29</date_filed>
+      <long_desc>DECLARATION of Floyd Short (3rd) re 95 Sealed Response in Opposition to Motion,,,,,,,, 112 Order on Motion for Leave to File, 110 Order on Motion to Seal by Petro Star Inc.. (Short, Floyd) (Entered: 11/29/2012)</long_desc>
+    </document>
+    <document doc_num="114" attachment_num="0">
+      <pacer_doc_id>02301119969</pacer_doc_id>
+      <date_filed>2012-11-29</date_filed>
+      <long_desc>SEALED DOCUMENT re 113 Declaration Exhibit 29 to 3rd Declaration of F. Short [Filed Under Seal] by Petro Star Inc.. (Short, Floyd) (Entered: 11/29/2012)</long_desc>
+    </document>
+    <document doc_num="115" attachment_num="0">
+      <pacer_doc_id>02301123669</pacer_doc_id>
+      <date_filed>2012-12-07</date_filed>
+      <long_desc>ORDER GRANTING Motion for Summary Judgment at Docket 89 and Denying Motions for Hearing at Dockets 102 and 109 . (Jan, Chambers Staff) (Entered: 12/07/2012)</long_desc>
+    </document>
+    <document doc_num="116" attachment_num="0">
+      <pacer_doc_id>02301124594</pacer_doc_id>
+      <date_filed>2012-12-10</date_filed>
+      <long_desc>JUDGMENT that action dismissed on merits; def recover costs from plf. Signed by Judge Ralph R. Beistline on 12/10/12. (PRR, COURT STAFF) (Additional attachment(s) added on 1/3/2013: # 1 Judgment redistributed with costs added) (NKD, COURT STAFF). (Entered: 12/10/2012)</long_desc>
+      <upload_date>2014-12-04 23:56:59</upload_date>
+      <available>1</available>
+      <sha1>992f0607e3529e3e9d3d4c9b1446c987e8aedaaf</sha1>
+      <free_import>0</free_import>
+    </document>
+    <document doc_num="116" attachment_num="1">
+      <pacer_doc_id>02301132632</pacer_doc_id>
+      <short_desc>Judgment redistributed with costs added</short_desc>
+    </document>
+    <document doc_num="117" attachment_num="0">
+      <pacer_doc_id>02301129546</pacer_doc_id>
+      <date_filed>2012-12-21</date_filed>
+      <long_desc>BILL OF COSTS (Notice of Submission of Bill of Costs) by BP Oil Supply Co., BP Products North America Inc.. (Attachments: # 1 Completed Bill of Costs Form AO 133 with Explanation, # 2 Exhibit A, # 3 Exhibit B, # 4 Exhibit C, # 5 Declaration of S. Albert Wang in Support of BP's Bill of Costs)(Wang, S.) (Entered: 12/21/2012)</long_desc>
+    </document>
+    <document doc_num="118" attachment_num="0">
+      <date_filed>2012-12-21</date_filed>
+      <long_desc>RRB TEXT ORDER: In light of the Notice of Cost Bill Submission filed at docket 117 by BP Products North America Inc., successor-in-interest to BP Oil Supply Company, and the indicated agreement that plaintiff Petro Star Inc. will not object to the itemization and amounts of costs appearing on defendant's cost bill, the requirement under D.Ak. L.R. 54.1(a)(1)[B] that a cost bill hearing be set is hereby waived. The Clerk may proceed to tax costs without a hearing. (PRR, COURT STAFF) (Entered: 12/21/2012)</long_desc>
+    </document>
+    <document doc_num="119" attachment_num="0">
+      <pacer_doc_id>02301132626</pacer_doc_id>
+      <date_filed>2013-01-03</date_filed>
+      <long_desc>Costs Taxed: Total costs taxed by the clerk for defendants in the amount of $9,662.00. (NKD, COURT STAFF) (Entered: 01/03/2013)</long_desc>
+    </document>
+    <document doc_num="120" attachment_num="0">
+      <pacer_doc_id>02301132650</pacer_doc_id>
+      <date_filed>2013-01-03</date_filed>
+      <long_desc>NOTICE OF APPEAL by Petro Star Inc.. Filing fee $ 455. (Short, Floyd) (Entered: 01/03/2013)</long_desc>
+      <upload_date>2014-12-04 23:59:10</upload_date>
+      <available>1</available>
+      <sha1>defd0ae93edb86d80a595e49800ffdd70e55b748</sha1>
+      <free_import>0</free_import>
+    </document>
+    <document doc_num="121" attachment_num="0">
+      <pacer_doc_id>02301132857</pacer_doc_id>
+      <date_filed>2013-01-03</date_filed>
+      <long_desc>USCA Appeal Fees received $ 455 receipt number ANC006809 re 120 Notice of Appeal filed by Petro Star Inc. (BJK, COURT STAFF) (Entered: 01/03/2013)</long_desc>
+    </document>
+    <document doc_num="122" attachment_num="0">
+      <pacer_doc_id>02301132884</pacer_doc_id>
+      <date_filed>2013-01-03</date_filed>
+      <long_desc>USCA Case Number 13-35007 for 120 Notice of Appeal filed by Petro Star Inc. (Attachments: # 1 USCA General Information Packet, # 2 USCA Mediation Letter, # 3 USCA Mediation Questionnaire)(TYM, COURT STAFF) (Entered: 01/03/2013)</long_desc>
+    </document>
+    <document doc_num="123" attachment_num="0">
+      <pacer_doc_id>02301132892</pacer_doc_id>
+      <date_filed>2013-01-03</date_filed>
+      <long_desc>USCA Scheduling Order as to 120 Notice of Appeal filed by Petro Star Inc. The schedule is set as follows: Mediation Questionnaire due on 01/10/2013. Transcript ordered by 02/04/2013. Transcript due 03/04/2013. Appellant Petro Star, Inc. opening brief due 04/15/2013. Appellees BP Oil Supply Co. and BP Products North America, Inc. answering brief due 05/13/2013. Appellant's optional reply brief is due 14 days after service of the answering brief. (TYM, COURT STAFF) (Entered: 01/03/2013)</long_desc>
+    </document>
+    <document doc_num="124" attachment_num="0">
+      <pacer_doc_id>02301144675</pacer_doc_id>
+      <date_filed>2013-02-04</date_filed>
+      <long_desc>NOTICE OF NO TRANSCRIPT DESIGNATION of Record on Appeal by Petro Star Inc. re 120 Notice of Appeal (Short, Floyd) Modified on 2/5/2013 to clarify docket text (PXS, COURT STAFF). (Entered: 02/04/2013)</long_desc>
+    </document>
+    <document doc_num="125" attachment_num="0">
+      <pacer_doc_id>02301372029</pacer_doc_id>
+      <date_filed>2014-08-29</date_filed>
+      <long_desc>USCA Memorandum as to 120 Notice of Appeal filed by Petro Star Inc. REVERSED in part; AFFIRMED in part; REMANDED. Each party shall bear its own costs on appeal. (Attachments: # 1 USCA Concurrence / Dissent, # 2 USCA Post Judgment Form)(TYM, COURT STAFF) (Entered: 09/02/2014)</long_desc>
+    </document>
+    <document doc_num="126" attachment_num="0">
+      <pacer_doc_id>02301381064</pacer_doc_id>
+      <date_filed>2014-09-18</date_filed>
+      <long_desc>USCA ORDER as to 120 Notice of Appeal filed by Petro Star Inc. Appellant is requested to file a response, not to exceed fifteen pages, to appellees petition for rehearing filed September 12, 2014. The response shall be filed within twenty-one days of the date of this order. IT IS SO ORDERED. (TYM, COURT STAFF) (Entered: 09/19/2014)</long_desc>
+    </document>
+    <document doc_num="127" attachment_num="0">
+      <pacer_doc_id>02301394223</pacer_doc_id>
+      <date_filed>2014-10-22</date_filed>
+      <long_desc>USCA ORDER as to 120 Notice of Appeal filed by Petro Star Inc. Judges Wardlaw and Graber voted to deny appellees petition for rehearing, and Judge Wallace voted to grant the petition. The petition for rehearing is therefore DENIED. (TYM, COURT STAFF) (Entered: 10/22/2014)</long_desc>
+    </document>
+    <document doc_num="128" attachment_num="0">
+      <pacer_doc_id>02301398643</pacer_doc_id>
+      <date_filed>2014-10-31</date_filed>
+      <long_desc>USCA MANDATE as to 120 Notice of Appeal filed by Petro Star Inc. The judgment of this Court, entered August 29, 2014, takes effect this date.This constitutes the formal mandate of this Court issued pursuant to Rule 41(a) of the Federal Rules of Appellate Procedure. (TYM, COURT STAFF) (Entered: 10/31/2014)</long_desc>
+    </document>
+  </document_list>
+</gov_uscourts_docket>

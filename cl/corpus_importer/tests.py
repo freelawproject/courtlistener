@@ -26,8 +26,10 @@ from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
     Citation,
+    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -311,14 +313,23 @@ class PacerDocketParserTest(TestCase):
     NUM_FLOYD_ROLES = 3
     NUM_DOCKET_ENTRIES = 123
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
         docket_number = "3:11-cv-00064"
-        self.docket = find_docket_object("akd", "41664", docket_number)
-        self.docket.filepath_local = (
-            "/test/xml/gov.uscourts.akd.41664.docket.xml"
+        cls.docket = DocketFactory.create(
+            source=Docket.RECAP,
+            pacer_case_id="41664",
+            docket_number=docket_number,
+            court=Court.objects.get(id="akd"),
+            filepath_local__from_path=str(
+                settings.MEDIA_ROOT
+                / "test"
+                / "xml"
+                / "gov.uscourts.akd.41664.docket.xml"
+            ),
         )
-        self.docket.docket_number = docket_number
-        self.docket.save()
+
+    def setUp(self) -> None:
         process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE)
 
     def tearDown(self) -> None:

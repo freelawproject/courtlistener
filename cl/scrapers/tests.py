@@ -1,11 +1,13 @@
-import json
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
+from cl.audio.factories import AudioFactoryWithDocket, AudioFiles
 from cl.audio.models import Audio
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import clobbering_get_name
@@ -20,25 +22,23 @@ from cl.scrapers.models import ErrorLog, UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
-from cl.search.models import Court, Opinion
+from cl.search.factories import DocketFactory
+from cl.search.models import Court, Docket, Opinion
+from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
-@mock.patch(
-    "cl.lib.storage.get_name_by_incrementing",
-    side_effect=clobbering_get_name,
-)
 class ScraperIngestionTest(TestCase):
     fixtures = ["test_court.json"]
 
-    def test_extension(self, mock):
+    def test_extension(self):
         r = microservice(
             service="buffer-extension",
             params={"mime": True},
         )
         self.assertEqual(r.status_code, 406)
 
-    def test_ingest_opinions_from_scraper(self, mock) -> None:
+    def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
@@ -53,9 +53,8 @@ class ScraperIngestionTest(TestCase):
             opinions.count() == 6,
             f"Should have 6 test opinions, not {count}",
         )
-        mock.assert_called()
 
-    def test_ingest_oral_arguments(self, mock) -> None:
+    def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
@@ -67,26 +66,42 @@ class ScraperIngestionTest(TestCase):
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
         self.assertEqual(2, audio_files.count())
-        mock.assert_called()
 
-    def test_parsing_xml_opinion_site_to_site_object(self, mock) -> None:
+    def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
         site = test_opinion_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
-    def test_parsing_xml_oral_arg_site_to_site_object(self, mock) -> None:
+    def test_parsing_xml_oral_arg_site_to_site_object(self) -> None:
         """Does a basic parse of an oral arg site work?"""
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
 
-class IngestionTest(IndexedSolrTestCase):
+class IngestionTest(TestCase):
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+    ]
+
+    def setUp(self) -> None:
+        files = Opinion.objects.all()
+        for opinion in files:
+            opinion.file_with_date = datetime.today()
+            with open(Path(MEDIA_ROOT, opinion.local_path.name), "rb") as f:
+                content = f.read()
+            opinion.local_path.save(
+                opinion.local_path.name, ContentFile(content)
+            )
+
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
-        image_opinion = Opinion.objects.get(pk=1)
-        extract_doc_content(image_opinion.pk, ocr_available=False)
-        image_opinion.refresh_from_db()
-        self.assertIn("indiana", image_opinion.plain_text.lower())
+        doc_opinion = Opinion.objects.get(pk=1)
+        extract_doc_content(doc_opinion.pk, ocr_available=False)
+        doc_opinion.refresh_from_db()
+        self.assertIn("indiana", doc_opinion.plain_text.lower())
 
     def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
@@ -391,30 +406,33 @@ class DupcheckerWithFixturesTest(TestCase):
 
 
 class AudioFileTaskTest(TestCase):
-
-    fixtures = [
-        "judge_judy.json",
-        "test_objects_search.json",
-        "test_objects_audio.json",
-    ]
-
+    @classmethod
     @mock.patch(
-        "cl.lib.storage.get_name_by_incrementing",
-        side_effect=clobbering_get_name,
+        "cl.lib.model_helpers.make_upload_path", return_value="/tmp/foo"
     )
-    def test_process_audio_file(self, mock) -> None:
-        af = Audio.objects.get(pk=1)
-        af.duration = None
-        af.save()
-
-        expected_duration = 15.0
-        self.assertNotEqual(
-            af.duration,
-            expected_duration,
-            msg="Do we have no duration info at the outset?",
+    def setUpTestData(cls, mock) -> None:
+        docket = DocketFactory.create(
+            date_argued=datetime(year=2022, month=5, day=4),
+        )
+        cls.audio = AudioFactoryWithDocket.create(
+            id=11,
+            docket=docket,
+            source="C",
+            local_path_mp3__data=AudioFiles.one_second_mp3,
+            local_path_original_file__data=AudioFiles.one_second_mp3,
+        )
+        cls.audio = AudioFactoryWithDocket.create(
+            id=12,
+            docket=docket,
+            source="C",
+            local_path_mp3__data=AudioFiles.small_wav,
+            local_path_original_file__data=AudioFiles.small_wav,
         )
 
-        process_audio_file(pk=1)
+    def test_process_audio_file(self) -> None:
+        af = Audio.objects.get(pk=11)
+        expected_duration = 1.0
+        process_audio_file(pk=11)
         af.refresh_from_db()
         measured_duration: float = af.duration  # type: ignore
         # Use almost equal because measuring MP3's is wonky.
@@ -425,26 +443,18 @@ class AudioFileTaskTest(TestCase):
             msg="We should end up with the proper duration of about %s. "
             "Instead we got %s." % (expected_duration, measured_duration),
         )
-        mock.assert_called()
 
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
-        audio_obj = Audio.objects.get(pk=1)
-        date_argued = audio_obj.docket.date_argued
-        if date_argued:
-            date_argued_str = date_argued.strftime("%Y-%m-%d")
-            date_argued_year = date_argued.year
-        else:
-            date_argued_str, date_argued_year = None, None
-
+        audio_obj = Audio.objects.get(pk=12)
         audio_data = {
             "court_full_name": audio_obj.docket.court.full_name,
             "court_short_name": audio_obj.docket.court.short_name,
             "court_pk": audio_obj.docket.court.pk,
             "court_url": audio_obj.docket.court.url,
             "docket_number": audio_obj.docket.docket_number,
-            "date_argued": date_argued_str,
-            "date_argued_year": date_argued_year,
+            "date_argued": audio_obj.docket.date_argued.strftime("%Y-%m-%d"),
+            "date_argued_year": audio_obj.docket.date_argued.year,
             "case_name": audio_obj.case_name,
             "case_name_full": audio_obj.case_name_full,
             "case_name_short": audio_obj.case_name_short,

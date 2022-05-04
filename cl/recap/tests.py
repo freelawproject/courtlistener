@@ -32,7 +32,10 @@ from cl.people_db.models import (
     Role,
 )
 from cl.recap.api_serializers import PacerFetchQueueSerializer
-from cl.recap.factories import FjcIntegratedDatabaseFactory
+from cl.recap.factories import (
+    FjcIntegratedDatabaseFactory,
+    ProcessingQueueFactory,
+)
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.mergers import (
     add_attorney,
@@ -73,6 +76,7 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.users.factories import UserFactory
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -752,11 +756,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    @mock.patch(
-        "cl.lib.storage.get_name_by_incrementing",
-        side_effect=clobbering_get_name,
-    )
-    def test_recap_document_already_exists(self, mock_get_name, mock_extract):
+    def test_recap_document_already_exists(self, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
         self.rd.is_available = True
@@ -783,7 +783,6 @@ class RecapPdfTaskTest(TestCase):
 
         # Did we correctly avoid running document extraction?
         mock_extract.assert_not_called()
-        mock_get_name.assert_called()
 
     def test_only_the_docket_already_exists(self) -> None:
         """Never seen this docket entry before?
@@ -800,13 +799,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    @mock.patch(
-        "cl.lib.storage.get_name_by_incrementing",
-        side_effect=clobbering_get_name,
-    )
-    def test_docket_and_docket_entry_already_exist(
-        self, mock_get_name, mock_extract
-    ):
+    def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
         This is the good case. We simply create a new item.
@@ -818,7 +811,6 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(rd.filepath_local)
         self.assertIn("gov.uscourts.scotus.asdf.1.0", rd.filepath_local.name)
 
-        mock_get_name.assert_called()
         mock_extract.assert_called_once()
 
         self.pq.refresh_from_db()
@@ -852,19 +844,6 @@ class RecapZipTaskTest(TestCase):
     )
 
     def setUp(self) -> None:
-        user = User.objects.get(username="recap")
-        self.filename = "1-20-cv-10189-FDS.zip"
-        self.file_path = os.path.join(self.test_dir, self.filename)
-        with open(self.file_path, "rb") as f:
-            self.file_content = f.read()
-        f = SimpleUploadedFile(self.filename, self.file_content)
-        self.pq = ProcessingQueue.objects.create(
-            court_id="scotus",
-            uploader=user,
-            pacer_case_id="asdf",
-            filepath_local=f,
-            upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
-        )
         self.docket = Docket.objects.create(
             source=Docket.DEFAULT, court_id="scotus", pacer_case_id="asdf"
         )
@@ -890,23 +869,38 @@ class RecapZipTaskTest(TestCase):
         )
         self.docs = [self.doc12, self.doc12_att1]
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        filename = "1-20-cv-10189-FDS.zip"
+        user = User.objects.get(username="recap")
+
+        cls.pq = ProcessingQueueFactory.create(
+            id=11,
+            court_id="scotus",
+            uploader=user,
+            pacer_case_id="asdf",
+            filepath_local=os.path.join(cls.test_dir, filename),
+            upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
+        )
+
     def tearDown(self) -> None:
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf")
-    @mock.patch(
-        "cl.lib.storage.get_name_by_incrementing",
-        side_effect=clobbering_get_name,
-    )
-    def test_simple_zip_upload(self, mock_get_name, mock_extract):
+    def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
-        results = process_recap_zip(self.pq.pk)
-        self.pq.refresh_from_db()
-        self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        pq = ProcessingQueue.objects.get(id=11)
+        results = process_recap_zip(pq.pk)
+        pq.refresh_from_db()
+        self.assertEqual(
+            pq.status,
+            PROCESSING_STATUS.SUCCESSFUL,
+            msg=f"Status should be {PROCESSING_STATUS.SUCCESSFUL}",
+        )
         self.assertTrue(
-            self.pq.error_message.startswith(
+            pq.error_message.startswith(
                 "Successfully created ProcessingQueue objects: "
             ),
         )
@@ -932,7 +926,7 @@ class RecapZipTaskTest(TestCase):
             self.assertEqual(new_pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
         # Are the documents marked as available?
-        for doc in self.docs:
+        for doc in self.docs:  # is this correct.
             doc.refresh_from_db()
             self.assertTrue(
                 doc.is_available,
@@ -943,7 +937,6 @@ class RecapZipTaskTest(TestCase):
         # Was the mock called once per PDF in the zip?
         expected_call_count = len(results["new_pqs"])
         self.assertEqual(mock_extract.call_count, expected_call_count)
-        mock_get_name.assert_called()
 
 
 class RecapAddAttorneyTest(TestCase):

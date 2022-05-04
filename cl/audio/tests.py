@@ -1,12 +1,50 @@
+from datetime import datetime
+from unittest import mock
+
 from django.urls import reverse
 from lxml import etree
 
+from cl.audio.factories import AudioFactoryWithDocket, AudioFiles
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
+from cl.search.factories import DocketFactory
 from cl.search.models import SEARCH_TYPES
 
 
 class PodcastTest(IndexedSolrTestCase):
+
+    fixtures = [
+        "test_court.json",
+        "judge_judy.json",
+        "test_objects_search.json",
+        "authtest_data.json",
+    ]
+
+    @classmethod
+    @mock.patch(
+        "cl.lib.model_helpers.make_upload_path", return_value="/tmp/foo"
+    )
+    def setUpTestData(cls, mock) -> None:
+        docket = DocketFactory.create(
+            date_argued=datetime(year=2022, month=5, day=4),
+        )
+        cls.audio = AudioFactoryWithDocket.create(
+            id=1,
+            docket=docket,
+            source="C",
+            local_path_mp3__data=AudioFiles.one_second_mp3,
+            local_path_original_file__data=AudioFiles.one_second_mp3,
+            duration=1,
+        )
+        cls.audio = AudioFactoryWithDocket.create(
+            id=2,
+            docket=docket,
+            source="C",
+            local_path_mp3__data=AudioFiles.small_wav,
+            local_path_original_file__data=AudioFiles.small_wav,
+            duration=0,
+        )
+
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
         response = self.client.get(

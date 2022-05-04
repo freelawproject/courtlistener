@@ -121,7 +121,7 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
         61 --> 1:01
         3602 --> 1:00:02
     """
-    if seconds is None:
+    if type(seconds) is not int or seconds is None:
         seconds = 0
     seconds = int(seconds)
 

@@ -6,7 +6,7 @@ from factory import (
     SelfAttribute,
     SubFactory,
 )
-from factory.django import DjangoModelFactory
+from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice
 from juriscraper.lib.string_utils import CaseNameTweaker
 
@@ -21,6 +21,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     Parenthetical,
+    RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
 
@@ -174,6 +175,7 @@ class DocketFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
+    filepath_local = FileField(upload_to="/tmp/audio")
 
 
 class DocketWithChildrenFactory(DocketFactory):
@@ -181,3 +183,14 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+
+class RECAPDocumentWithParentsFactory(RECAPDocumentFactory, DocketParentMixin):
+    """Make a RECAPDocument with Docket parents"""
+
+    pass
