@@ -213,8 +213,7 @@ class DisclosureAPITest(TestCase):
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
-    @classmethod
-    def setUpTestData(cls) -> None:
+    def setUp(self) -> None:
         judge = PersonWithChildrenFactory.create(
             name_first="Judith",
             name_middle="",
