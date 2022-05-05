@@ -7,11 +7,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
-from cl.audio.factories import (
-    ONE_SECOND_MP3_BYTES,
-    SMALL_WAV_BYTES,
-    AudioWithParentsFactory,
-)
+from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.lib.microservice_utils import microservice
 from cl.scrapers.DupChecker import DupChecker
@@ -28,6 +24,7 @@ from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 
 class ScraperIngestionTest(TestCase):

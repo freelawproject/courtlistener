@@ -176,7 +176,7 @@ class DocketFactory(DjangoModelFactory):
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
     filepath_local = FileField(upload_to="/tmp/audio")
-    date_argued = Faker("date")
+    date_argued = Faker("date_object")
 
 
 class DocketWithChildrenFactory(DocketFactory):
