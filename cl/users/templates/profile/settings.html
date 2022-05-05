@@ -54,6 +54,17 @@
                         {% endfor %}
                     </p>
                 {% endif %}
+                {% if EMAIL_BROKEN_BANNER.0 %}
+                  {% if EMAIL_BROKEN_BANNER.1 == "PERMANENT" %}
+                    <div class="alert alert-danger" role="alert">
+                      {{ email_error_message }}
+                    </div>
+                  {% else %}
+                    <div class="alert alert-warning" role="alert">
+                      {{ email_error_message }}
+                    </div>
+                  {% endif %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="id_employer">Employer</label>

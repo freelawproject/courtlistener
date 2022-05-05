@@ -5,6 +5,7 @@ from time import time
 from unittest import mock
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
@@ -2740,3 +2741,279 @@ class RetryFailedEmailTest(TestCase):
             failed_email[2].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
             expected_datetime_3.strftime("%Y-%m-%d %H:%M:%S"),
         )
+
+
+class EmailBrokenTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
+        with (
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(
+                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
+            ) as mail_box_full_soft_bounce,
+            open(
+                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
+            ) as no_email_hard_bounce,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as msg_large_bounce,
+        ):
+            cls.hard_bounce_asset = json.load(hard_bounce)
+            cls.complaint_asset = json.load(complaint)
+            cls.delivery_asset = json.load(delivery)
+            cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
+            cls.mail_box_full_soft_bounce_asset = json.load(
+                mail_box_full_soft_bounce
+            )
+            cls.msg_large_bounce_asset = json.load(msg_large_bounce)
+
+        cls.user = UserFactory()
+
+    def send_signal(self, test_asset, event_name, signal) -> None:
+        """Function to dispatch signal that mocks a SNS notification event
+        :param test_asset: the json object that contains notification
+        :param event_name: the signal event name
+        :param signal: the signal corresponding to the event
+        :return: None
+        """
+        # Prepare parameters
+        raw = json.dumps(test_asset)
+        notification = json.loads(raw)
+        message = json.loads(notification["Message"])
+        mail_obj = message.get("mail")
+        event_obj = message.get(event_name, {})
+
+        # Send signal
+        signal_kwargs = dict(
+            sender=self,
+            mail_obj=mail_obj,
+            raw_message=raw,
+        )
+        signal_kwargs[f"{event_name}_obj"] = event_obj
+        signal.send(**signal_kwargs)
+
+    def test_multiple_bounce_subtypes(self) -> None:
+        """This test checks if we can assign properly the bounce subtype for
+        EmailFlag and BackoffEvent objects
+        """
+
+        # Trigger a hard bounce notification event
+        self.send_signal(
+            self.no_email_hard_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        # The bounce subtype should be NOEMAIL
+        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.NOEMAIL)
+
+        # Trigger a soft bounce notification event
+        self.send_signal(
+            self.mail_box_full_soft_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        # The bounce subtype should be MAILBOXFULL
+        self.assertEqual(
+            backoff_event[0].event_sub_type, SUB_TYPES.MAILBOXFULL
+        )
+
+    def test_broken_email_address_banner(self) -> None:
+        """This test checks if soft and hard bounces events properly trigger a
+        broken email address banner, a Permanent broken email address banner
+        overrides a previous Transient broken banner.
+        """
+
+        path = reverse("show_results")
+        # An anonymous user should never see the broken email banner.
+        r = self.client.get(path)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        user = self.user
+        user.email = "bounce@simulator.amazonses.com"
+        user.password = make_password("password")
+        user.save()
+        # Authenticate user
+        login = self.client.login(username=user.username, password="password")
+        r = self.client.get(path)
+
+        # The user's email has no problems, no banner showed
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        # Trigger a small_email_only flag
+        self.send_signal(
+            self.msg_large_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        self.assertEqual(email_ban.count(), 0)
+        r = self.client.get(path)
+        # An small_email_only EmailFlag object shouldn't trigger a broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        # Trigger a soft bounce notification event
+        self.send_signal(
+            self.mail_box_full_soft_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        self.assertEqual(backoff_event.count(), 1)
+        r = self.client.get(path)
+        # A mail_box_full soft bounce event should trigger a Transient broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "TRANSIENT")
+
+        # Trigger a hard bounce notification event
+        self.send_signal(
+            self.hard_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        self.assertEqual(email_ban.count(), 1)
+        r = self.client.get(path)
+        # A hard bounce event should trigger a Permanent broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+
+    def test_broken_email_banner_complaint(self) -> None:
+        """This test checks if a complaint notification properly triggers a
+        Permanent broken email banner.
+        """
+
+        path = reverse("show_results")
+        user = self.user
+        user.email = "complaint@simulator.amazonses.com"
+        user.password = make_password("password")
+        user.save()
+        login = self.client.login(username=user.username, password="password")
+        r = self.client.get(path)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        # Trigger a complaint notification event
+        self.send_signal(
+            self.complaint_asset, "complaint", signals.complaint_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="complaint@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        self.assertEqual(email_ban.count(), 1)
+        r = self.client.get(path)
+        # A complaint event should trigger a Permanent broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+
+    def test_broken_email_address_banner_first_permanent(self) -> None:
+        """This test checks if a Permanent broken email event comes first than
+        Transient broken email event, Permanent banner will be prioritized,
+        also checks if users change their email address the email broken banner
+        should dissapear.
+        """
+
+        path = reverse("show_results")
+        user = self.user
+        user.email = "bounce@simulator.amazonses.com"
+        user.password = make_password("password")
+        user.save()
+        # Authenticate user
+        login = self.client.login(username=user.username, password="password")
+        r = self.client.get(path)
+        # The user's email has no problems, no banner showed
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        # Trigger a hard bounce notification event
+        self.send_signal(
+            self.hard_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_ban = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            object_type=OBJECT_TYPES.BAN,
+        )
+        self.assertEqual(email_ban.count(), 1)
+        r = self.client.get(path)
+        # A hard bounce event should trigger a Permanent broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+
+        # Trigger a soft bounce notification event
+        self.send_signal(
+            self.mail_box_full_soft_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        self.assertEqual(backoff_event.count(), 1)
+        r = self.client.get(path)
+        # A backoff event is created but the Permanent broken email banner is
+        # prioritized
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+
+        # Simulate user changes their email address to solve the Permanent
+        # email error.
+        user.email = "new@simulator.amazonses.com"
+        user.save()
+        login = self.client.login(username=user.username, password="password")
+
+        r = self.client.get(path)
+        # The broken email banner is gone
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+    def test_broken_email_banner_delivery(self) -> None:
+        """This test checks if a delivery notification properly deactivate a
+        Transient broken email banner.
+        """
+
+        path = reverse("show_results")
+        user = self.user
+        user.email = "bounce@simulator.amazonses.com"
+        user.password = make_password("password")
+        user.save()
+        login = self.client.login(username=user.username, password="password")
+        r = self.client.get(path)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+
+        # Trigger a soft bounce notification event
+        self.send_signal(
+            self.mail_box_full_soft_bounce_asset,
+            "bounce",
+            signals.bounce_received,
+        )
+        backoff_event = BackoffEvent.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+        )
+        self.assertEqual(backoff_event.count(), 1)
+        r = self.client.get(path)
+
+        # A mail_box_full soft bounce event should trigger a Transient broken
+        # email banner
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "TRANSIENT")
+
+        # Trigger a delivery event
+        self.send_signal(
+            self.delivery_asset, "delivery", signals.delivery_received
+        )
+        # Delivery event eliminates the backoff event
+        self.assertEqual(backoff_event.count(), 0)
+
+        r = self.client.get(path)
+        # The broken email banner is gone
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)

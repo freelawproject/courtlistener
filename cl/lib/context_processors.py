@@ -4,6 +4,7 @@ from django.conf import settings
 from django.urls import reverse
 
 from cl.search.models import SEARCH_TYPES
+from cl.users.email_handlers import broken_email_address
 
 
 def inject_settings(request):
@@ -92,3 +93,8 @@ info_tips = (
 
 def inject_random_tip(request):
     return {"TIP": random.choice(info_tips)}
+
+
+def inject_broken_email_address(request):
+    """This function injects the status of the user's email address."""
+    return broken_email_address(request.user)
