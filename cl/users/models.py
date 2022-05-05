@@ -284,6 +284,11 @@ class BackoffEvent(AbstractDateTimeModel):
     next_retry_date = models.DateTimeField(
         help_text="The next retry datetime for exponential backoff events.",
     )
+    event_sub_type = models.SmallIntegerField(
+        help_text="The SNS bounce subtype that triggered the object.",
+        choices=SUB_TYPES.TYPES,
+        default=SUB_TYPES.UNDETERMINED,
+    )
 
     @property
     def under_waiting_period(self) -> bool:

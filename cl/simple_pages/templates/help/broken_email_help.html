@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Help with your email address – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Why is CourtListener unable to send me messages and how do I fix it?</h1>
+    <p class="lead">We send an incredible amount of email but sometimes our messages don't go through. In most cases, this is due to an email address being abandoned or changed and the solution is to <a href="{% url 'view_settings' %}">update your email address in your profile</a>.
+    </p>
+    <p>If your email address has not recently changed, it's possible it was an intermittent error. In that case, we will continue retrying for a time, in hopes that your email address starts working again.</p>
+    <p>A few other possible causes for this issue are:</p>
+    <ol>
+      <li><p>Your inbox is full. If this is the case, we will resume sending you emails once it is cleared out.</p></li>
+      <li><p>Your email address has been blocked.</p></li>
+      <li><p>We've received a complaint from your email provider indicating that you don't want to receive emails from us. Please consider changing your email address.</p></li>
+    </ol>
+    <p>You can see more details about this error in your <a href="{% url 'view_settings' %}">profile settings</a> (under your email address).</p>
+    <p>After your email address starts working again, we will send you emails that we were unable to deliver during the outage. If your email is down for more than X days, we will not resend emails earlier than that time.</p>
+    <p>If you are unsure what's wrong with your email address and the problem does not go away in X days, please <a href="{% url 'contact' %}">send us a support request</a>, so we can help sort things out.</p>
+  </div>
+{% endblock %}

@@ -102,6 +102,7 @@ TEMPLATES = [
                 "django.template.context_processors.static",
                 "cl.lib.context_processors.inject_settings",
                 "cl.lib.context_processors.inject_random_tip",
+                "cl.lib.context_processors.inject_broken_email_address",
             ),
             "debug": DEBUG,
         },

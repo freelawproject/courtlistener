@@ -82,6 +82,7 @@ class BackoffEventAdmin(admin.ModelAdmin):
         "email_address",
         "id",
         "retry_counter",
+        "event_sub_type",
         "date_created",
     )
 
