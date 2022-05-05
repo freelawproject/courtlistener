@@ -7,11 +7,13 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
-from cl.audio.factories import AudioFactoryWithDocket, AudioFiles
+from cl.audio.factories import (
+    ONE_SECOND_MP3_BYTES,
+    SMALL_WAV_BYTES,
+    AudioWithParentsFactory,
+)
 from cl.audio.models import Audio
 from cl.lib.microservice_utils import microservice
-from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import IndexedSolrTestCase
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
@@ -22,7 +24,7 @@ from cl.scrapers.models import ErrorLog, UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
-from cl.search.factories import DocketFactory
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -30,6 +32,15 @@ from cl.tests.cases import SimpleTestCase, TestCase
 
 class ScraperIngestionTest(TestCase):
     fixtures = ["test_court.json"]
+    #
+    # def setUpTestData(cls) -> None:
+    #     CourtFactory.create(
+    #         pk="ca1",
+    #     )
+    #     CourtFactory.create(
+    #         pk="test"
+    #     )
+    #
 
     def test_extension(self):
         r = microservice(
@@ -414,19 +425,19 @@ class AudioFileTaskTest(TestCase):
         docket = DocketFactory.create(
             date_argued=datetime(year=2022, month=5, day=4),
         )
-        cls.audio = AudioFactoryWithDocket.create(
+        cls.audio = AudioWithParentsFactory.create(
             id=11,
             docket=docket,
             source="C",
-            local_path_mp3__data=AudioFiles.one_second_mp3,
-            local_path_original_file__data=AudioFiles.one_second_mp3,
+            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
         )
-        cls.audio = AudioFactoryWithDocket.create(
+        cls.audio = AudioWithParentsFactory.create(
             id=12,
             docket=docket,
             source="C",
-            local_path_mp3__data=AudioFiles.small_wav,
-            local_path_original_file__data=AudioFiles.small_wav,
+            local_path_mp3__data=SMALL_WAV_BYTES,
+            local_path_original_file__data=SMALL_WAV_BYTES,
         )
 
     def test_process_audio_file(self) -> None:

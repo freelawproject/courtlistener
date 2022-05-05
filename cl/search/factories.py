@@ -176,6 +176,7 @@ class DocketFactory(DjangoModelFactory):
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
     filepath_local = FileField(upload_to="/tmp/audio")
+    date_argued = Faker("date")
 
 
 class DocketWithChildrenFactory(DocketFactory):
@@ -183,14 +184,3 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
-
-
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-
-class RECAPDocumentWithParentsFactory(RECAPDocumentFactory, DocketParentMixin):
-    """Make a RECAPDocument with Docket parents"""
-
-    pass
