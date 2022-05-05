@@ -21,6 +21,7 @@ from cl.disclosures.models import (
 from cl.disclosures.tasks import save_disclosure
 from cl.lib.microservice_utils import microservice
 from cl.people_db.factories import PersonWithChildrenFactory
+from cl.people_db.models import Person
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 
@@ -222,6 +223,10 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         FinancialDisclosureFactory.create(
             person=judge,
         )
+
+    def tearDown(self) -> None:
+        FinancialDisclosure.objects.all().delete()
+        Person.objects.all().delete()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_homepage(self) -> None:
