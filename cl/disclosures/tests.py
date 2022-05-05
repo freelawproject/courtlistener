@@ -215,10 +215,13 @@ class DisclosureAPITest(TestCase):
 class DisclosureReactLoadTest(BaseSeleniumTest):
     @classmethod
     def setUpTestData(cls) -> None:
-        PersonWithChildrenFactory.create(
+        judge = PersonWithChildrenFactory.create(
             name_first="Judith",
             name_middle="",
             name_last="Baker",
+        )
+        FinancialDisclosureFactory.create(
+            person=judge,
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
