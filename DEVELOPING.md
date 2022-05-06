@@ -113,6 +113,8 @@ To set up a development machine, do the following:
 
     `docker-compose -f docker-compose.yml -f docker-compose.tmpfs.yml up
 
+*M1 Mac/ARM Tip:* If you are running tests on Apple silicon you may need to change the selenium image to `image: seleniarm/standalone-chromium:latest` to properly run the tests.
+
 If you do that, you'll run postgresql in memory. That means it'll get wiped out whenever you restart docker, but it should provide a speed bump. We do this in CI, for example.
 
 So that should be it! You should now be able to access the following URLs:
