@@ -34,7 +34,6 @@ class CourtFactory(DjangoModelFactory):
     class Meta:
         model = Court
 
-    id = Faker("random_id")
     position = Faker("pyfloat", positive=True, right_digits=2, left_digits=3)
     short_name = Faker("court_name")
     url = Faker("url")

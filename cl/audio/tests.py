@@ -24,7 +24,6 @@ class PodcastTest(IndexedSolrTestCase):
     def setUpTestData(cls) -> None:
         cls.audio = AudioWithParentsFactory.create(
             id=1,
-            source="C",
             local_path_mp3__data=ONE_SECOND_MP3_BYTES,
             local_path_original_file__data=ONE_SECOND_MP3_BYTES,
             duration=1,
@@ -32,7 +31,6 @@ class PodcastTest(IndexedSolrTestCase):
         AudioWithParentsFactory.create(
             id=2,
             docket=cls.audio.docket,
-            source="C",
             local_path_mp3__data=SMALL_WAV_BYTES,
             local_path_original_file__data=SMALL_WAV_BYTES,
             duration=0,

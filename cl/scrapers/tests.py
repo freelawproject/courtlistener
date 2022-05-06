@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest import mock
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -20,8 +19,8 @@ from cl.scrapers.models import ErrorLog, UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_extension
-from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import Court, Docket, Opinion
+from cl.search.factories import DocketFactory
+from cl.search.models import Court, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -29,15 +28,6 @@ from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 class ScraperIngestionTest(TestCase):
     fixtures = ["test_court.json"]
-    #
-    # def setUpTestData(cls) -> None:
-    #     CourtFactory.create(
-    #         pk="ca1",
-    #     )
-    #     CourtFactory.create(
-    #         pk="test"
-    #     )
-    #
 
     def test_extension(self):
         r = microservice(
@@ -419,25 +409,21 @@ class AudioFileTaskTest(TestCase):
         docket = DocketFactory.create(
             date_argued=datetime(year=2022, month=5, day=4),
         )
-        cls.audio = AudioWithParentsFactory.create(
-            id=11,
+        cls.audio1 = AudioWithParentsFactory.create(
             docket=docket,
-            source="C",
             local_path_mp3__data=ONE_SECOND_MP3_BYTES,
             local_path_original_file__data=ONE_SECOND_MP3_BYTES,
         )
-        cls.audio = AudioWithParentsFactory.create(
-            id=12,
+        cls.audio2 = AudioWithParentsFactory.create(
             docket=docket,
-            source="C",
             local_path_mp3__data=SMALL_WAV_BYTES,
             local_path_original_file__data=SMALL_WAV_BYTES,
         )
 
     def test_process_audio_file(self) -> None:
-        af = Audio.objects.get(pk=11)
+        af = Audio.objects.get(pk=self.audio1.id)
         expected_duration = 1.0
-        process_audio_file(pk=11)
+        process_audio_file(pk=self.audio1.id)
         af.refresh_from_db()
         measured_duration: float = af.duration  # type: ignore
         # Use almost equal because measuring MP3's is wonky.
@@ -451,7 +437,7 @@ class AudioFileTaskTest(TestCase):
 
     def test_audio_conversion(self) -> None:
         """Can we convert wav to audio and update the metadata"""
-        audio_obj = Audio.objects.get(pk=12)
+        audio_obj = Audio.objects.get(pk=self.audio2.id)
         audio_data = {
             "court_full_name": audio_obj.docket.court.full_name,
             "court_short_name": audio_obj.docket.court.short_name,

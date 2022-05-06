@@ -875,7 +875,6 @@ class RecapZipTaskTest(TestCase):
         user = User.objects.get(username="recap")
 
         cls.pq = ProcessingQueueFactory.create(
-            id=11,
             court_id="scotus",
             uploader=user,
             pacer_case_id="asdf",
@@ -891,7 +890,7 @@ class RecapZipTaskTest(TestCase):
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
-        pq = ProcessingQueue.objects.get(id=11)
+        pq = ProcessingQueue.objects.get(id=self.pq.id)
         results = process_recap_zip(pq.pk)
         pq.refresh_from_db()
         self.assertEqual(
@@ -926,7 +925,7 @@ class RecapZipTaskTest(TestCase):
             self.assertEqual(new_pq.status, PROCESSING_STATUS.SUCCESSFUL)
 
         # Are the documents marked as available?
-        for doc in self.docs:  # is this correct.
+        for doc in self.docs:
             doc.refresh_from_db()
             self.assertTrue(
                 doc.is_available,

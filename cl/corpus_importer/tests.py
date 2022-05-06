@@ -306,8 +306,6 @@ class CourtMatchingTest(SimpleTestCase):
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
 
-    fixtures = ["court_test_asset.json"]
-
     NUM_PARTIES = 3
     NUM_PETRO_ATTYS = 6
     NUM_FLOYD_ROLES = 3

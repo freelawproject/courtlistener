@@ -10,6 +10,7 @@ class InvestmentFactory(DjangoModelFactory):
         model = Investment
 
     page_number = FuzzyInteger(50)
+    description = Faker("sentence")
 
 
 class FinancialDisclosurePositionFactory(DjangoModelFactory):

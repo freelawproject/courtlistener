@@ -1,5 +1,6 @@
 from factory import Faker
 from factory.django import DjangoModelFactory, FileField
+from factory.fuzzy import FuzzyChoice
 
 from cl.audio.models import Audio
 from cl.search.factories import DocketParentMixin
@@ -10,8 +11,7 @@ class AudioFactory(DjangoModelFactory):
     class Meta:
         model = Audio
 
-    id = Faker("random_id")
-    source = Faker("random_element", elements=SOURCES)
+    source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
     case_name = Faker("case_name")
     sha1 = Faker("sha1")
     download_url = Faker("url")

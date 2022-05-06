@@ -3,10 +3,7 @@ import os
 
 from django.conf import settings
 from django.urls import reverse
-from selenium.common.exceptions import (
-    InvalidArgumentException,
-    NoSuchElementException,
-)
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -16,6 +13,7 @@ from cl.disclosures.factories import (
     InvestmentFactory,
 )
 from cl.disclosures.models import (
+    CODES,
     FinancialDisclosure,
     Investment,
     NonInvestmentIncome,
@@ -49,19 +47,17 @@ class DisclosureIngestionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         judge = PersonWithChildrenFactory.create(id=2)
-        FinancialDisclosureFactory.create(
+        cls.test_disc = FinancialDisclosureFactory.create(
             person=judge,
-            id=1,
         )
         FinancialDisclosureFactory.create(
             person=judge,
-            id=2,
         )
 
     def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=1)
+        test_disclosure = FinancialDisclosure.objects.get(pk=self.test_disc.id)
         with open(self.test_file, "r") as f:
             extracted_data = json.load(f)
         Investment.objects.all().delete()
@@ -98,7 +94,7 @@ class DisclosureIngestionTest(TestCase):
             file=pdf_bytes,
         ).json()
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=1)
+        test_disclosure = FinancialDisclosure.objects.get(pk=self.test_disc.id)
         save_disclosure(
             extracted_data=extracted_data,
             disclosure=test_disclosure,
@@ -115,28 +111,26 @@ class DisclosureIngestionTest(TestCase):
 class DisclosureAPITest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
-        judge = PersonWithChildrenFactory.create(id=2)
+        cls.judge = PersonWithChildrenFactory.create()
         fd = FinancialDisclosureFactory.create(
-            person=judge,
+            person=cls.judge,
         )
         FinancialDisclosurePositionFactory.create_batch(
             2, financial_disclosure=fd
         )
         InvestmentFactory.create(
             financial_disclosure=fd,
-            transaction_value_code="A",
+            transaction_value_code=CODES.A,
             description="Harris Bank Inc",
         )
-        InvestmentFactory.create(
+        cls.investment_for_id = InvestmentFactory.create(
             financial_disclosure=fd,
-            id=878,
-            transaction_value_code="M",
+            transaction_value_code=CODES.M,
             description="Harris Bank and Trust Company",
         )
         InvestmentFactory.create(
             financial_disclosure=fd,
-            transaction_value_code="B",
-            description="Random and Trust Company",
+            transaction_value_code=CODES.B,
         )
         InvestmentFactory.create_batch(
             10, financial_disclosure=fd, redacted=True
@@ -159,14 +153,14 @@ class DisclosureAPITest(TestCase):
     def test_investment_filtering(self) -> None:
         """Can we filter investments by transaction value codes?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
-        self.q = {"transaction_value_code": "M"}
+        self.q = {"transaction_value_code": CODES.M}
         r = self.client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong Investment filter")
 
     def test_exact_filtering_by_id(self) -> None:
         """Can we filter investments by id?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
-        self.q = {"id": 878}
+        self.q = {"id": self.investment_for_id.id}
         r = self.client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Investment filtering by id failed."
@@ -197,7 +191,7 @@ class DisclosureAPITest(TestCase):
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
         )
-        self.q = {"person": 2}
+        self.q = {"person": self.judge.id}
         r = self.client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"],
@@ -210,7 +204,7 @@ class DisclosureAPITest(TestCase):
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
         )
-        q = {"investments__transaction_value_code": "M"}
+        q = {"investments__transaction_value_code": CODES.M}
 
         r = self.client.get(self.path, q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
