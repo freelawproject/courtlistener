@@ -415,10 +415,7 @@ class DupcheckerWithFixturesTest(TestCase):
 
 class AudioFileTaskTest(TestCase):
     @classmethod
-    @mock.patch(
-        "cl.lib.model_helpers.make_upload_path", return_value="/tmp/foo"
-    )
-    def setUpTestData(cls, mock) -> None:
+    def setUpTestData(cls) -> None:
         docket = DocketFactory.create(
             date_argued=datetime(year=2022, month=5, day=4),
         )
