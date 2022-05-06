@@ -309,7 +309,7 @@ class PacerDocketParserTest(TestCase):
     NUM_PARTIES = 3
     NUM_PETRO_ATTYS = 6
     NUM_FLOYD_ROLES = 3
-    NUM_DOCKET_ENTRIES = 123
+    NUM_DOCKET_ENTRIES = 3
 
     @classmethod
     def setUpTestData(cls) -> None:

@@ -373,7 +373,14 @@ def process_recap_zip(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    with ZipFile(pq.filepath_local.name, "r") as archive:
+    try:
+        filepath = str(pq.filepath_local.path)
+    except NotImplementedError:
+        # Implemented for testing purposes
+        # Because of a mistmatch between AWS and local testing
+        filepath = pq.filepath_local.name
+
+    with ZipFile(filepath, "r") as archive:
         # Security: Check for zip bombs.
         max_file_size = convert_size_to_bytes("200MB")
         for zip_info in archive.infolist():
