@@ -1,13 +1,11 @@
 import json
 import shutil
 from datetime import date, timedelta
-from pathlib import Path
 from typing import Any, Dict
 from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
-from django.core import mail
 from django.core.cache import cache
 from django.core.management import call_command
 from django.http import HttpRequest, JsonResponse

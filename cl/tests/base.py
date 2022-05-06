@@ -37,6 +37,7 @@ if "SELENIUM_TIMEOUT" in os.environ:
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
     SOLR_URLS=settings.SOLR_TEST_URLS,
+    ALLOWED_HOSTS=["*"],
 )
 class BaseSeleniumTest(SerializeSolrTestMixin, StaticLiveServerTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:

@@ -3,7 +3,10 @@ import os
 
 from django.conf import settings
 from django.urls import reverse
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import (
+    InvalidArgumentException,
+    NoSuchElementException,
+)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -258,8 +261,8 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         )
 
         with self.assertRaises(NoSuchElementException):
-            self.browser.find_element(By.CLASS_NAME, "tr-results")
+            self.browser.find_element(By.CSS_SELECTOR, ".tr-results")
 
         search_bar.send_keys("Judith")
-        results = self.browser.find_elements(By.CLASS_NAME, "tr-results")
+        results = self.browser.find_elements(By.CSS_SELECTOR, ".tr-results")
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")

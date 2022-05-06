@@ -1280,12 +1280,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         searchbox.submit()
         # without the cleanup_main_query function, there are 4 results
         # with the query, there should be none
-        self.assertRaises(
-            NoSuchElementException,
-            self.browser.find_element,
-            By.ID,
-            "result-count",
-        )
+        results = self.browser.find_elements(By.CSS_SELECTOR, "#result-count")
+        self.assertEqual(len(results), 0)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_toggle_to_oral_args_search_results(self) -> None:
@@ -1548,7 +1544,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         alert_bell.click()
 
         modal = wait.until(
-            EC.visibility_of_element_located((By.CLASS_NAME, "modal-body"))
+            EC.visibility_of_element_located((By.CSS_SELECTOR, ".modal-body"))
         )
         self.assertEqual("modal-body logged-in", modal.get_attribute("class"))
 
