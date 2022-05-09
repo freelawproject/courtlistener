@@ -27,6 +27,8 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
+from cl.scrapers.factories import PACERFreeDocumentLogFactory
+from cl.search.factories import CourtFactory
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -1178,6 +1180,10 @@ class JurisdictionFeedTest(TestCase):
 
 class PagerankTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        PACERFreeDocumentLogFactory.create()
 
     def test_pagerank_calculation(self) -> None:
         """Create a few items and fake citation relation among them, then

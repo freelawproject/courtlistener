@@ -25,6 +25,7 @@ from cl.scrapers.management.commands.cl_scrape_oral_arguments import (
     Command as OralArgumentCommand,
 )
 from cl.scrapers.test_assets import test_oral_arg_scraper
+from cl.search.factories import CourtFactory
 from cl.search.models import (
     Court,
     Docket,
@@ -944,6 +945,10 @@ class BulkDataTest(TestCase):
         ):
             OralArgumentCommand().scrape_court(site, full_crawl=True)
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+
     def tearDown(self) -> None:
         OpinionCluster.objects.all().delete()
         Docket.objects.all().delete()
@@ -969,5 +974,5 @@ class BulkDataTest(TestCase):
         self.assertTrue(Docket.objects.count() > 0, "No docket exist")
         self.assertTrue(Court.objects.count() > 0, "No courts exist")
         self.assertEqual(
-            Court.objects.get(pk="test").full_name, "Testing Supreme Court"
+            Court.objects.get(pk=self.court.id).full_name, self.court.full_name
         )

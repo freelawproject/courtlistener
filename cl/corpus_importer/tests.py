@@ -314,11 +314,12 @@ class PacerDocketParserTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         docket_number = "3:11-cv-00064"
+        cls.court = CourtFactory.create()
         cls.docket = DocketFactory.create(
             source=Docket.RECAP,
             pacer_case_id="41664",
             docket_number=docket_number,
-            court=Court.objects.get(id="akd"),
+            court=cls.court,
             filepath_local__from_path=str(
                 settings.MEDIA_ROOT
                 / "test"

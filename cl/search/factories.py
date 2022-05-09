@@ -1,3 +1,5 @@
+import string
+
 from factory import (
     Faker,
     Iterator,
@@ -7,7 +9,7 @@ from factory import (
     SubFactory,
 )
 from factory.django import DjangoModelFactory, FileField
-from factory.fuzzy import FuzzyChoice
+from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.people_db.factories import PersonFactory
@@ -21,7 +23,6 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     Parenthetical,
-    RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
 
@@ -34,8 +35,10 @@ class CourtFactory(DjangoModelFactory):
     class Meta:
         model = Court
 
+    id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     position = Faker("pyfloat", positive=True, right_digits=2, left_digits=3)
     short_name = Faker("court_name")
+    full_name = Faker("court_name")
     url = Faker("url")
     jurisdiction = FuzzyChoice(Court.JURISDICTIONS, getter=lambda c: c[0])
     in_use = True
@@ -183,3 +186,7 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
+
+
+class DevDataDocketWithChildrenFactory(DocketWithChildrenFactory):
+    filepath_local = None

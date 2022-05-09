@@ -86,6 +86,7 @@ class RecapUploadsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         CourtFactory(id="canb", jurisdiction="FB")
+        cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -95,7 +96,7 @@ class RecapUploadsTest(TestCase):
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
         f = SimpleUploadedFile("file.txt", b"file content more content")
         self.data = {
-            "court": "akd",
+            "court": self.court.id,
             "pacer_case_id": "asdf",
             "pacer_doc_id": 24,
             "document_number": 1,
@@ -109,7 +110,7 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
-        self.assertEqual(j["court"], "akd")
+        self.assertEqual(j["court"], self.court.id)
         self.assertEqual(j["document_number"], 1)
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()

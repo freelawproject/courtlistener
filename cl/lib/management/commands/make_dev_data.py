@@ -5,6 +5,7 @@ from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
     CourtFactory,
+    DevDataDocketWithChildrenFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
     DocketWithChildrenFactory,
@@ -66,7 +67,7 @@ class Command(VerboseCommand):
             logger.info(
                 f"Making {count} dockets and all their dependent objects"
             )
-            DocketWithChildrenFactory.create_batch(count)
+            DevDataDocketWithChildrenFactory.create_batch(count)
             logger.info(f"Making {count} judges and all their positions")
             PersonWithChildrenFactory.create_batch(count)
             logger.info(f"Making {count} users and super users")

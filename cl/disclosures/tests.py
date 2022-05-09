@@ -46,8 +46,8 @@ class DisclosureIngestionTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        judge = PersonWithChildrenFactory.create(id=2)
-        cls.test_disc = FinancialDisclosureFactory.create(
+        judge = PersonWithChildrenFactory.create()
+        cls.test_disclosure = FinancialDisclosureFactory.create(
             person=judge,
         )
         FinancialDisclosureFactory.create(
@@ -57,14 +57,13 @@ class DisclosureIngestionTest(TestCase):
     def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=self.test_disc.id)
         with open(self.test_file, "r") as f:
             extracted_data = json.load(f)
         Investment.objects.all().delete()
 
         save_disclosure(
             extracted_data=extracted_data,
-            disclosure=test_disclosure,
+            disclosure=self.test_disclosure,
         )
         investments = Investment.objects.all()
         reimbursements = Reimbursement.objects.all()
@@ -94,10 +93,9 @@ class DisclosureIngestionTest(TestCase):
             file=pdf_bytes,
         ).json()
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=self.test_disc.id)
         save_disclosure(
             extracted_data=extracted_data,
-            disclosure=test_disclosure,
+            disclosure=self.test_disclosure,
         )
         investments = Investment.objects.all()
         investment_count = investments.count()
