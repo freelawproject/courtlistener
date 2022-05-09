@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load text_filters %}
+
+{% block title %}Your Docket Alert is now Enabled – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3">&nbsp;</div>
+  <div class="col-xs-12 col-sm-8 col-md-6 well text-center">
+      <h1>You Have Enabled This Docket Alert</h1>
+      <h3>You're now subscribed for this docket:</h3>
+      <h3><span class="gray">"{{ docket_alert.docket|best_case_name|safe }} {% if docket_alert.docket.docket_number %}({{ docket_alert.docket.docket_number }}){% endif %}"</span></h3>
+      <p class="v-offset-above-2">If you wish to edit it further, click below.
+      </p>
+    <div class="v-offset-above-3">
+      <a href="{% url 'profile_alerts' %}"
+         class="btn btn-primary btn-lg btn-block">
+        <i class="fa fa-pencil"></i>&nbsp;Manage Alerts</a>
+    </div>
+  </div>
+  <div class="hidden-xs col-sm-1 col-md-2">&nbsp;</div>
+{% endblock %}

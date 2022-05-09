@@ -156,6 +156,18 @@
                 {% endif %}
             </div>
             <div class="form-group">
+              <label for="id_auto_subscribe">
+                  {{ profile_form.auto_subscribe }}
+                  Auto-subscribe to my recap.email cases</label>
+              {% if profile_form.auto_subscribe.errors %}
+                  <p class="help-block">
+                      {% for error in profile_form.auto_subscribe.errors %}
+                          {{ error|escape }}
+                      {% endfor %}
+                  </p>
+              {% endif %}
+          </div>
+            <div class="form-group">
                 <label for="id_wants_newsletter">
                     {{ profile_form.wants_newsletter }}
                     Send me the monthly newsletter</label>

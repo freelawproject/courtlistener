@@ -7,11 +7,13 @@ from unittest.mock import ANY
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
+from requests import HTTPError
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -20,6 +22,7 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
+from cl.alerts.models import DocketAlert
 from cl.lib.pacer import is_pacer_court_accessible
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -77,6 +80,7 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.users.factories import UserProfileFactory
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -564,7 +568,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with open(
-            test_dir / "recap_mail_receipt.json",
+            test_dir / "recap_mail_custom_receipt.json",
             encoding="utf-8",
         ) as file:
             recap_mail_receipt = json.load(file)
@@ -1845,6 +1849,446 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
+def mock_bucket_open(message_id, r):
+    """This function mocks bucket.open() method in order to call a
+    recap.email notification fixture.
+    """
+    test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+    recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
+    return recap_mail_example
+
+
+@mock.patch(
+    "cl.recap.tasks.RecapEmailSESStorage.open",
+    side_effect=mock_bucket_open,
+)
+@mock.patch(
+    "cl.recap.tasks.download_pacer_pdf_by_rd",
+    side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+)
+@mock.patch(
+    "cl.recap.tasks.get_or_cache_pacer_cookies",
+    side_effect=lambda x, y, z: None,
+)
+class RecapEmailDocketAlerts(TestCase):
+    """Test recap email docket alerts"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileFactory()
+        cls.user_profile_2 = UserProfileFactory()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+        with (
+            open(
+                test_dir / "recap_mail_custom_receipt.json",
+                encoding="utf-8",
+            ) as file,
+            open(
+                test_dir / "recap_mail_custom_receipt_2.json",
+                encoding="utf-8",
+            ) as file_2,
+            open(
+                test_dir / "recap_mail_custom_receipt_3.json",
+                encoding="utf-8",
+            ) as file_3,
+        ):
+            recap_mail_receipt = json.load(file)
+            recap_mail_receipt_2 = json.load(file_2)
+            recap_mail_receipt_3 = json.load(file_3)
+
+        cls.data = {
+            "court": cls.court.id,
+            "mail": recap_mail_receipt["mail"],
+            "receipt": recap_mail_receipt["receipt"],
+        }
+        cls.data_2 = {
+            "court": cls.court.id,
+            "mail": recap_mail_receipt_2["mail"],
+            "receipt": recap_mail_receipt_2["receipt"],
+        }
+
+        cls.data_3 = {
+            "court": cls.court.id,
+            "mail": recap_mail_receipt_3["mail"],
+            "receipt": recap_mail_receipt_3["receipt"],
+        }
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v3/recap-email/"
+
+        recipient_user = self.user_profile
+        recipient_user.user.email = "testing_1@mail.com"
+        recipient_user.user.save()
+        recipient_user.recap_email = "testing_1@recap.email"
+        recipient_user.auto_subscribe = True
+        recipient_user.save()
+        self.recipient_user = recipient_user
+
+        recipient_user_2 = self.user_profile_2
+        recipient_user_2.user.email = "testing_2@mail.com"
+        recipient_user_2.user.save()
+        recipient_user_2.recap_email = "testing_2@recap.email"
+        recipient_user_2.auto_subscribe = True
+        recipient_user_2.save()
+        self.recipient_user_2 = recipient_user_2
+
+    def test_new_recap_email_case_auto_subscription(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies that if a new recap.email notification comes in
+        (first time) and the user has the auto-subscribe option enabled, a new
+        DocketAlert subscription is created for that user-case pair and then
+        receives the docket alert email for this case.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+    def test_new_recap_email_case_auto_subscription_prev_user(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies that if two users with the auto-subscribe option
+        enabled are properly subscribed for a case when two recap.email
+        notifications come in, the second notification should be also delivered
+        for the previous user subscribed to the case.
+        """
+
+        # Trigger a new recap.email notification from testing_2@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data_3, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_2@recap.email"]
+        )
+
+        # A DocketAlert email for testing_2@recap.email should go out
+        recap_document = RECAPDocument.objects.all()
+        message_sent = mail.outbox[0]
+        self.assertEqual(recap_document.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+
+        # Trigger a new recap.email notification, same case, different document
+        # from testing_1@recap.email, auto-subscription option enabled
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case and user (testing_1@recap.email)
+        docket = recap_document[0].docket_entry.docket
+        self.assertEqual(recap_document.count(), 2)
+        self.assertEqual(Docket.objects.all().count(), 1)
+        docket_alert_2 = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert_2.count(), 1)
+
+        # 2 more emails should go out, one for testing_2@recap.email and one
+        # for testing_1@recap.email
+        message_sent = mail.outbox[1]
+        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+        message_sent = mail.outbox[2]
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+        self.assertEqual(len(mail.outbox), 3)
+
+    def test_new_recap_email_case_no_auto_subscription(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies that if a new recap.email notification comes in
+        and the user has auto-subscribe option disabled an Unsubscription
+        DocketAlert is created, then send a first user-case email with a
+        subscription link for the case.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option disabled
+        self.recipient_user.auto_subscribe = False
+        self.recipient_user.save()
+        self.client.post(self.path, self.data, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Unsubscription type, since user has the
+        # auto-subscribe False.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.UNSUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+
+        # A first user-case email should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn("[Sign-Up Needed]:", message.subject)
+
+    def test_new_recap_email_case_no_auto_subscription_prev_user(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test checks if a new recap.email (first time) notification
+        comes in and user has auto-subscribe option disabled, an unsubscription
+        DocketAlert is created then send a first user-case email with a
+        subscription link, it also has to be sent an alert to the previous user
+        subscribed to the case.
+        """
+
+        # Trigger a new recap.email notification from testing_2@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data_3, format="json")
+
+        # A DocketAlert email for testing_2@recap.email should go out
+        self.assertEqual(DocketAlert.objects.all().count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("1 New Docket Entry for", message_sent.subject)
+        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+
+        # Trigger a new recap.email notification, same case, different document
+        # from testing_1@recap.email, auto-subscription option disabled
+        self.recipient_user.auto_subscribe = False
+        self.recipient_user.save()
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Unsubscription type, since user has the
+        # auto-subscribe False.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        self.assertEqual(recap_document.count(), 2)
+        self.assertEqual(Docket.objects.count(), 1)
+        docket_alert_2 = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.UNSUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert_2.count(), 1)
+
+        # 2 more emails should go out, a first user-case email for
+        # testing_1@recap.email and one alert for testing_2@recap.email
+        self.assertEqual(len(mail.outbox), 3)
+        message_sent = mail.outbox[1]
+        self.assertNotIn("[Sign-Up Needed]", message_sent.subject)
+        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+        message_sent = mail.outbox[2]
+        self.assertIn("[Sign-Up Needed]:", message_sent.subject)
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+    def test_new_recap_email_subscribe_by_email_link(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies if a recap.email user with the auto-subscribe
+        option disabled can successfully subscribe to a case from the
+        subscription link contained within the first user-case email.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option disabled
+        self.recipient_user.auto_subscribe = False
+        self.recipient_user.save()
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Unsubscription type, since user has the
+        # auto-subscribe False.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.UNSUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+
+        # Subscribe to the case from first user-case email subscription link
+        self.client.get(
+            reverse(
+                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+            )
+        )
+        docket_alert_subscription = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        # The DocketAlert should be toggled to Subscription type.
+        self.assertEqual(docket_alert.count(), 0)
+        self.assertEqual(docket_alert_subscription.count(), 1)
+
+    def test_new_recap_email_unsubscribe_by_email_link(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies if a recap.email user can successfully
+        unsubscribe to a case from the unsubscription link.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Unsubscribe from email link
+        self.client.get(
+            reverse(
+                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+            )
+        )
+
+        # The DocketAlert should be toggled to Unsubscription type.
+        self.assertEqual(
+            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+        )
+
+        # The unsubscription confirmation email should go out
+        self.assertEqual(len(mail.outbox), 2)
+        message_sent = mail.outbox[1]
+        self.assertIn("[Unsubscribed]", message_sent.subject)
+
+        # Trigger a new recap.email notification, same case, different document
+        # from testing_1@recap.email
+        self.client.post(self.path, self.data_2, format="json")
+        # No new Subscription should be created.
+        self.assertEqual(docket_alert.count(), 1)
+        # No new notification for the same case should go out
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_new_recap_email_alerts_integration(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies if a user can successfully unsubscribe to a case
+        from the email unsubscription link, the user won't longer receive more
+        notifications for this case, we also send an unsubscription
+        confirmation email to the user.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option disabled
+        self.recipient_user.auto_subscribe = False
+        self.recipient_user.save()
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Unsubscription type, since user has the
+        # auto-subscribe False.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(
+            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+        )
+
+        # A first user-case email should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("[Sign-Up Needed]:", message_sent.subject)
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Subscribe to the case from first user-case email subscription link
+        self.client.get(
+            reverse(
+                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+            )
+        )
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+
+        # Trigger a new recap.email notification, same case, different document
+        # from testing_1@recap.email, auto-subscription option enabled
+        self.client.post(self.path, self.data_2, format="json")
+        # No new Subscription should be created.
+        self.assertEqual(docket_alert.count(), 1)
+
+        # A second notification for the same case should go out
+        self.assertEqual(len(mail.outbox), 2)
+        message_sent = mail.outbox[1]
+        self.assertIn("1 New Docket Entry for", message_sent.subject)
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Different recap documents created for the same Docket.
+        self.assertEqual(recap_document.count(), 2)
+        self.assertNotEqual(recap_document[0].pk, recap_document[1].pk)
+        self.assertNotEqual(
+            recap_document[0].docket_entry.pk,
+            recap_document[1].docket_entry.pk,
+        )
+        self.assertEqual(
+            recap_document[0].docket_entry.docket.pk,
+            recap_document[1].docket_entry.docket.pk,
+        )
+
+        # Unsubscribe from email link
+        self.client.get(
+            reverse(
+                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+            )
+        )
+
+        # The DocketAlert should be toggled to Unsubscription type.
+        self.assertEqual(
+            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+        )
+
+        # The unsubscription confirmation email should go out
+        self.assertEqual(len(mail.outbox), 3)
+        message_sent = mail.outbox[2]
+        self.assertIn("[Unsubscribed]", message_sent.subject)
 class CheckCourtConnectivityTest(TestCase):
     """Test the is_pacer_court_accessible method."""
 

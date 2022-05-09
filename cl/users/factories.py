@@ -1,9 +1,9 @@
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
-from factory import Faker, LazyFunction
+from factory import Faker, LazyFunction, SubFactory
 from factory.django import DjangoModelFactory
 
-from cl.users.models import EmailSent
+from cl.users.models import EmailSent, UserProfile
 
 
 class UserFactory(DjangoModelFactory):
@@ -29,3 +29,11 @@ class SuperUserFactory(UserFactory):
 class EmailSentFactory(DjangoModelFactory):
     class Meta:
         model = EmailSent
+
+
+class UserProfileFactory(DjangoModelFactory):
+    class Meta:
+        model = UserProfile
+
+    user = SubFactory(UserFactory)
+    email_confirmed = True

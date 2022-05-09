@@ -30,6 +30,7 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
+from cl.alerts.models import DocketAlert
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.celery_init import app
@@ -79,6 +80,7 @@ from cl.recap.models import (
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.users.models import UserProfile
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -1178,7 +1180,6 @@ def fetch_pacer_doc_by_rd(
         return
 
     court_id = rd.docket_entry.docket.court_id
-
     success, msg = update_rd_metadata(
         self,
         rd_pk,
@@ -1469,13 +1470,10 @@ def mark_fq_status(fq, msg, status):
     fq.save()
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(requests.RequestException,),
-    max_retries=5,
-    interval_start=5 * 60,
-)
-def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
+@app.task(bind=True, max_retries=5, interval_start=5 * 60)
+def send_docket_to_webhook(
+    self: Task, d_pk: int, since: datetime, epq_pk: int
+) -> None:
     """POSTS the PacerFetchQueue to the recipients webhook(s)
 
     :param d_pk: The Docket primary key
@@ -1520,6 +1518,39 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
         if not response.ok:
             webhook.failure_count = webhook.failure_count + 1
             webhook.save()
+
+
+
+def first_notification_case(docket_pk: int, user_pk: int) -> int | None:
+    """Determine if it's the first time that a recap.email notification comes
+    in for a case-user, create the DocketAlert object and determine if it's
+    needed to send the first case-user notification email based on the user's
+    auto subscription setting.
+
+    :param docket_pk: The PK of the docket related with the notification
+    :user_pk: The PK of the recap.email user from the notification came in
+    :return: The user PK if it's the first case-user notification and user
+    has auto-subscribe option enabled, otherwise None
+    """
+
+    user = User.objects.get(pk=user_pk)
+    docket_alert = DocketAlert.objects.filter(
+        docket_id=docket_pk, user_id=user_pk
+    )
+    if not docket_alert.exists():
+        if user.profile.auto_subscribe:
+            # Create a DocketAlert (Subscription by default)
+            DocketAlert.objects.create(docket_id=docket_pk, user_id=user_pk)
+        else:
+            # Create an Unsubscription DocketAlert
+            DocketAlert.objects.create(
+                docket_id=docket_pk,
+                user=user,
+                alert_type=DocketAlert.UNSUBSCRIPTION,
+            )
+            # Return user_pk to send the first case-user notification email
+            return user_pk
+    return None
 
 
 @app.task(
@@ -1604,11 +1635,16 @@ def process_recap_email(
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
+            recipient_user = UserProfile.objects.filter(
+                recap_email=epq.destination_emails[0]
+            )
+            user_id = first_notification_case(
+                docket.pk, recipient_user[0].user.pk
+            )
             chain(
-                send_docket_alert.si(docket.pk, start_time),
+                send_docket_alert.si(docket.pk, start_time, user_id),
                 send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
             ).apply_async()
-
     return {
         "docket_pk": docket.pk,
         "content_updated": bool(rds_created or content_updated),

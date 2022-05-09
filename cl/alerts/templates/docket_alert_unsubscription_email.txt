@@ -1,0 +1,17 @@
+
+{% load text_filters %}{% load humanize %}
+
+Your Docket Alert for {{ docket|best_case_name|safe }}
+{% if docket.docket_number %}({{ docket.docket_number }}){% endif %} has been disabled.
+
+To re-enable your subscription for this case, you can subscribe here:
+https://www.courtlistener.com{% url 'subscribe_docket_alert' docket_alert.secret_key %}
+
+************************
+This alert brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - Blog: https://free.law
+ - Twitter: http://twitter.com/freelawproject
+ - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+
+Please donate to support our work.

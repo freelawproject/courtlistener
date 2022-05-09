@@ -196,7 +196,7 @@ def user_has_alert(user: Union[AnonymousUser, User], docket: Docket) -> bool:
     has_alert = False
     if user.is_authenticated:
         has_alert = DocketAlert.objects.filter(
-            docket=docket, user=user
+            docket=docket, user=user, alert_type=DocketAlert.SUBSCRIPTION
         ).exists()
     return has_alert
 

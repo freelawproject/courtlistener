@@ -1,7 +1,11 @@
-
 {% load text_filters %}{% load humanize %}**************************
 CourtListener Docket Alert
 **************************
+
+Your account on CourtListener just received its first email from PACER related to the case below.
+Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
+Subscribe to this case to get ongoing updates:
+https://www.courtlistener.com{% url 'subscribe_docket_alert' docket_alert.secret_key %}
 
 {{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
 {{ docket.court }}
@@ -16,8 +20,9 @@ Download PDF from RECAP: {{ rd.filepath_local.url }}{% endif %}{% if rd.pacer_ur
 Buy PDF from PACER: {{ rd.pacer_url }}{% endif %}{% endif %}
 {% endfor %}{% endfor %}
 
-This alert was sent because you subscribed to this docket with your account on CourtListener.com.
-To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'unsubscribe_docket_alert' docket_alert.secret_key %}
+This alert was sent because you subscribed to this docket with your account on
+CourtListener.com. To disable this alert, view the docket on CourtListener.com
+and click the "disable" button.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
