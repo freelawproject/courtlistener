@@ -177,7 +177,7 @@ class DocketFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
-    filepath_local = FileField(upload_to="/tmp/audio")
+    filepath_local = FileField()
     date_argued = Faker("date_object")
 
 
@@ -186,7 +186,3 @@ class DocketWithChildrenFactory(DocketFactory):
         OpinionClusterFactoryWithChildren,
         factory_related_name="docket",
     )
-
-
-class DevDataDocketWithChildrenFactory(DocketWithChildrenFactory):
-    filepath_local = None
