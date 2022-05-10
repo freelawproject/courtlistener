@@ -2,7 +2,6 @@ import json
 import os
 from datetime import date, datetime
 from glob import iglob
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -21,15 +20,12 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
-from cl.lib.storage import clobbering_get_name
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
     Citation,
-    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -484,10 +480,14 @@ class HarvardTests(TestCase):
     Testing for cl.corpus_importer.management.commands.harvard_opinions
     """
 
-    fixtures = ["court_test_asset.json"]
     test_dir = os.path.join(
         settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
     )
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        for court in ["mass", "tax", "cadc", "kan", "bta"]:
+            CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
