@@ -66,7 +66,7 @@ class Command(VerboseCommand):
             logger.info(
                 f"Making {count} dockets and all their dependent objects"
             )
-            DocketWithChildrenFactory.create_batch(count, filepath_local=None)
+            DocketWithChildrenFactory.create_batch(count)
             logger.info(f"Making {count} judges and all their positions")
             PersonWithChildrenFactory.create_batch(count)
             logger.info(f"Making {count} users and super users")
