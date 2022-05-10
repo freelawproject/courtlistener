@@ -230,6 +230,9 @@ const onReturn = (e: KeyboardEvent, data: string | any[]) => {
     const location: string = data[0].newest_disclosure_url;
     onFocusKeyPress(e, location);
   }
+  else if (e.keyCode == 13) {
+    e.preventDefault()
+  }
 };
 
 export const DisclosureSearch = (small: boolean) => {
