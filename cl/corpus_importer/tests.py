@@ -31,6 +31,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.settings import INSTALL_ROOT, MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
@@ -309,6 +310,9 @@ class PacerDocketParserTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.fp = (
+            MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
+        )
         docket_number = "3:11-cv-00064"
         cls.court = CourtFactory.create()
         cls.docket = DocketFactory.create(
@@ -316,16 +320,11 @@ class PacerDocketParserTest(TestCase):
             pacer_case_id="41664",
             docket_number=docket_number,
             court=cls.court,
-            filepath_local__from_path=str(
-                settings.MEDIA_ROOT
-                / "test"
-                / "xml"
-                / "gov.uscourts.akd.41664.docket.xml"
-            ),
+            filepath_local__from_path=str(cls.fp),
         )
 
     def setUp(self) -> None:
-        process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE)
+        process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE, self.fp)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
@@ -481,7 +480,7 @@ class HarvardTests(TestCase):
     """
 
     test_dir = os.path.join(
-        settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
+        INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
     )
 
     @classmethod
