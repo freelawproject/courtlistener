@@ -1,4 +1,4 @@
-from factory import Iterator
+from factory import SubFactory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 
@@ -12,8 +12,8 @@ class FjcIntegratedDatabaseFactory(DjangoModelFactory):
         model = FjcIntegratedDatabase
 
     dataset_source = FuzzyChoice(DATASET_SOURCES, getter=lambda c: c[0])
-    circuit = Iterator(Court.objects.all())
-    district = Iterator(Court.objects.all())
+    circuit = SubFactory(Court)
+    district = SubFactory(Court)
 
 
 class ProcessingQueueFactory(DjangoModelFactory):
