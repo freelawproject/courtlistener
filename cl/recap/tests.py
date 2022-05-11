@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 from datetime import date
 from pathlib import Path
@@ -76,7 +75,6 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserFactory
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
