@@ -133,16 +133,16 @@
     {% endif %}
 
     <!-- Broken Email Banner -->
-    {% if EMAIL_BROKEN_BANNER.0 %}
-      {% if EMAIL_BROKEN_BANNER.1 == "PERMANENT" %}
+    {% if EMAIL_BROKEN_BANNER.show %}
+      {% if EMAIL_BROKEN_BANNER.type == "PERMANENT" %}
         <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
           <div class="container-fluid">
             <div class="row">
               <div class="col-lg-12">
-                <p class="navbar-text lead">Beginning at {{ EMAIL_BROKEN_BANNER.3 }}, your email address, {{ EMAIL_BROKEN_BANNER.2 }}, stopped receiving emails from our servers. We tried, but we were unable to fix this problem on our end. Please review your email address so we can continue sending you alerts and updates.
-                  </br>
+                <p class="navbar-text lead">Hi {{ request.user.first_name }}, our servers stopped sending emails to the address in your profile on {{EMAIL_BROKEN_BANNER.date|date:'M d, Y'}}. Please update your email address to begin receiving emails again. If you think this was incorrect please get in <a href="{% url 'contact' %}">contact here</a>.
+                </br>
                   <a href="{% url 'broken_email_help' %}"
-                    class="btn btn-default v-offset-above-1 pull-right">Fix This</a>
+                    class="btn btn-default v-offset-above-1 pull-right">Click here to learn more</a>
                 </p>
               </div>
 
@@ -154,10 +154,10 @@
           <div class="container-fluid">
             <div class="row">
               <div class="col-lg-12">
-                <p class="navbar-text lead">Beginning at {{ EMAIL_BROKEN_BANNER.3 }}, your email address, {{ EMAIL_BROKEN_BANNER.2 }}, stopped receiving emails from our servers. We are still attempting to fix this problem by resending messages. Please review your email address to resolve this issue.
+                <p class="navbar-text lead">Hi {{ request.user.first_name }}, it looks like our last few emails haven't gone through to your inbox. If this problem persists, our servers will automatically stop sending emails to the address in your account profile.
                   </br>
                   <a href="{% url 'broken_email_help' %}"
-                    class="btn btn-default v-offset-above-1 pull-right">Learn More</a>
+                    class="btn btn-default v-offset-above-1 pull-right">Click here to learn more</a>
                   </p>
               </div>
             </div>

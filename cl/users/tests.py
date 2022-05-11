@@ -30,9 +30,9 @@ from cl.users.email_handlers import (
 from cl.users.factories import EmailSentFactory, UserFactory
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.models import (
+    EMAIL_NOTIFICATIONS,
     OBJECT_TYPES,
     STATUS_TYPES,
-    SUB_TYPES,
     BackoffEvent,
     EmailFlag,
     EmailSent,
@@ -511,7 +511,7 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             object_type=OBJECT_TYPES.FLAG,
             flag=EmailFlag.SMALL_ONLY,
-            event_sub_type=SUB_TYPES.MESSAGETOOLARGE,
+            event_sub_type=EMAIL_NOTIFICATIONS.MESSAGE_TOO_LARGE,
         )
         email_flag_count = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
@@ -689,7 +689,9 @@ class SNSWebhookTest(TestCase):
 
         # Checks no new ban object is created for this email address
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
     def test_handle_soft_bounce_compute_waiting_period(self) -> None:
         """This test checks if the exponential waiting period
@@ -794,7 +796,9 @@ class SNSWebhookTest(TestCase):
 
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
         # Trigger another hard_bounce event
         self.send_signal(
@@ -810,7 +814,9 @@ class SNSWebhookTest(TestCase):
 
         # Check no additional email ban object is created
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
     def test_handle_complaint(self) -> None:
         """This test checks if an email address is banned
@@ -831,7 +837,9 @@ class SNSWebhookTest(TestCase):
 
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.COMPLAINT
+        )
 
         # Trigger another complaint event
         self.send_signal(
@@ -845,7 +853,9 @@ class SNSWebhookTest(TestCase):
 
         # Check no additional email ban object is created
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.COMPLAINT
+        )
 
     @mock.patch("cl.users.email_handlers.schedule_failed_email")
     def test_handle_delivery(self, mock_schedule) -> None:
@@ -897,7 +907,9 @@ class SNSWebhookTest(TestCase):
 
         # Checks email address is now banned due to a complaint
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.COMPLAINT)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.COMPLAINT
+        )
 
         # Trigger a hard_bounce event
         self.send_signal(
@@ -913,7 +925,9 @@ class SNSWebhookTest(TestCase):
 
         # Checks email ban is updated with the hard bounce subtype
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
 
 @override_settings(
@@ -1273,7 +1287,9 @@ class CustomBackendEmailTest(TestCase):
 
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
         send_mail(
             "Subject here",
@@ -1719,7 +1735,9 @@ class CustomBackendEmailTest(TestCase):
         )
         # Checks email address is now banned
         self.assertEqual(email_ban.count(), 1)
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.GENERAL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.GENERAL
+        )
 
         send_mail(
             "Subject here",
@@ -2840,7 +2858,9 @@ class EmailBrokenTest(TestCase):
             object_type=OBJECT_TYPES.BAN,
         )
         # The bounce subtype should be NOEMAIL
-        self.assertEqual(email_ban[0].event_sub_type, SUB_TYPES.NOEMAIL)
+        self.assertEqual(
+            email_ban[0].event_sub_type, EMAIL_NOTIFICATIONS.NO_EMAIL
+        )
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -2853,7 +2873,7 @@ class EmailBrokenTest(TestCase):
         )
         # The bounce subtype should be MAILBOXFULL
         self.assertEqual(
-            backoff_event[0].event_sub_type, SUB_TYPES.MAILBOXFULL
+            backoff_event[0].event_sub_type, EMAIL_NOTIFICATIONS.MAILBOX_FULL
         )
 
     def test_broken_email_address_banner(self) -> None:
@@ -2865,7 +2885,7 @@ class EmailBrokenTest(TestCase):
         path = reverse("show_results")
         # An anonymous user should never see the broken email banner.
         r = self.client.get(path)
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         user = self.user
         user.email = "bounce@simulator.amazonses.com"
@@ -2876,7 +2896,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
 
         # The user's email has no problems, no banner showed
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         # Trigger a small_email_only flag
         self.send_signal(
@@ -2890,7 +2910,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # An small_email_only EmailFlag object shouldn't trigger a broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -2905,7 +2925,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "TRANSIENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "TRANSIENT")
 
         # Trigger a hard bounce notification event
         self.send_signal(
@@ -2919,7 +2939,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
 
     def test_broken_email_banner_complaint(self) -> None:
         """This test checks if a complaint notification properly triggers a
@@ -2933,7 +2953,7 @@ class EmailBrokenTest(TestCase):
         user.save()
         login = self.client.login(username=user.username, password="password")
         r = self.client.get(path)
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         # Trigger a complaint notification event
         self.send_signal(
@@ -2947,7 +2967,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A complaint event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
 
     def test_broken_email_address_banner_first_permanent(self) -> None:
         """This test checks if a Permanent broken email event comes first than
@@ -2965,7 +2985,7 @@ class EmailBrokenTest(TestCase):
         login = self.client.login(username=user.username, password="password")
         r = self.client.get(path)
         # The user's email has no problems, no banner showed
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         # Trigger a hard bounce notification event
         self.send_signal(
@@ -2979,7 +2999,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -2994,7 +3014,7 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A backoff event is created but the Permanent broken email banner is
         # prioritized
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "PERMANENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
 
         # Simulate user changes their email address to solve the Permanent
         # email error.
@@ -3004,7 +3024,7 @@ class EmailBrokenTest(TestCase):
 
         r = self.client.get(path)
         # The broken email banner is gone
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
     def test_broken_email_banner_delivery(self) -> None:
         """This test checks if a delivery notification properly deactivate a
@@ -3018,7 +3038,7 @@ class EmailBrokenTest(TestCase):
         user.save()
         login = self.client.login(username=user.username, password="password")
         r = self.client.get(path)
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -3034,7 +3054,7 @@ class EmailBrokenTest(TestCase):
 
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][1], "TRANSIENT")
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "TRANSIENT")
 
         # Trigger a delivery event
         self.send_signal(
@@ -3045,4 +3065,4 @@ class EmailBrokenTest(TestCase):
 
         r = self.client.get(path)
         # The broken email banner is gone
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"][0], False)
+        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["show"], False)

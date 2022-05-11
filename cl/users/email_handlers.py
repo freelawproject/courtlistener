@@ -13,12 +13,13 @@ from django.core.mail import (
     SafeMIMEText,
 )
 from django.db import transaction
+from django.http import HttpRequest
 from django.utils.timezone import now
 
 from cl.users.models import (
+    EMAIL_NOTIFICATIONS,
     OBJECT_TYPES,
     STATUS_TYPES,
-    SUB_TYPES,
     BackoffEvent,
     EmailFlag,
     EmailSent,
@@ -28,11 +29,11 @@ from cl.users.models import (
 
 def get_bounce_subtype(event_sub_type: str) -> int:
     """Returns a bounce subtype integer from a bounce subtype string"""
-    sub_types_dict = dict(SUB_TYPES.TYPES)
+    sub_types_dict = dict(EMAIL_NOTIFICATIONS.TYPES)
     for key, value in sub_types_dict.items():
         if value == event_sub_type:
             return key
-    return SUB_TYPES.OTHER
+    return EMAIL_NOTIFICATIONS.OTHER
 
 
 def handle_hard_bounce(
@@ -208,7 +209,7 @@ def handle_complaint(recipient_emails: list[str]) -> None:
         EmailFlag.objects.get_or_create(
             email_address=email,
             object_type=OBJECT_TYPES.BAN,
-            defaults={"event_sub_type": SUB_TYPES.COMPLAINT},
+            defaults={"event_sub_type": EMAIL_NOTIFICATIONS.COMPLAINT},
         )
 
 
@@ -680,41 +681,25 @@ def enqueue_email(recipients: list[str], message_id: str) -> None:
 
 
 PERMANENT = {
-    SUB_TYPES.UNDETERMINED: "Error: Undetermined, your email provider sent a "
-    "bounce message. The bounce message didn't contain enough information for "
-    "us to determine the reason for the bounce.  Please consider changing "
-    "your email address.",
-    SUB_TYPES.GENERAL: "Error: General, your email provider sent a hard "
-    "bounce message, but didn't specify the reason for the hard bounce. "
+    EMAIL_NOTIFICATIONS.GENERAL: "Your email provider sent a hard "
+    "bounce message indicating we can't continue sending messages to your "
+    "current email address. "
     "Please consider changing your email address.",
-    SUB_TYPES.NOEMAIL: "Error: NoEmail, your email provider sent a bounce "
+    EMAIL_NOTIFICATIONS.NO_EMAIL: "Your email provider sent a bounce "
     "message indicating that your email address doesn't exist. Please "
     "consider changing your email address.",
-    SUB_TYPES.SUPPRESSED: "Error: Suppressed, your email address is on the "
-    "suppression list because it has a recent history of producing hard "
-    "bounces.  Please consider changing your email address.",
-    SUB_TYPES.ONACCOUNTSUPPRESSIONLIST: "Error: OnAccountSuppressionList, "
-    "your email address is on the account suppression list because it has a "
-    "recent history of producing hard bounces.  Please consider changing your "
-    "email address.",
-    SUB_TYPES.COMPLAINT: "Error: Complaint, we've received a complaint from "
+    EMAIL_NOTIFICATIONS.COMPLAINT: "We've received a complaint from "
     "your email provider indicating that you don't want to receive emails "
     "from us. Please consider changing your email address.",
-    SUB_TYPES.OTHER: "Error: Other, we were unable to identify the reason for "
-    "this permanent error with your email. Please consider changing your "
-    "email address.",
 }
 
 TRANSIENT = {
-    SUB_TYPES.GENERAL: "Error: General, your email provider sent a general "
-    "bounce message. We are still attempting to fix this problem by resending "
+    EMAIL_NOTIFICATIONS.GENERAL: "Your email provider sent a bounce message. "
+    "We are still attempting to fix this problem by resending "
     "messages.",
-    SUB_TYPES.MAILBOXFULL: "Error: MailboxFull, your email provider sent a "
+    EMAIL_NOTIFICATIONS.MAILBOX_FULL: "Your email provider sent a "
     "bounce message because your inbox was full. Please consider clearing out "
     "your email inbox.",
-    SUB_TYPES.OTHER: "Error: Other, we were unable to identify the reason for "
-    "this transient error with your email. We are still attempting to fix "
-    "this problem by resending messages.",
 }
 
 
@@ -728,16 +713,16 @@ def determine_email_error_message(type: str, subtype: int) -> str:
     """
 
     if type == "PERMANENT":
-        return PERMANENT.get(subtype, PERMANENT[SUB_TYPES.OTHER])
+        return PERMANENT.get(subtype, PERMANENT[EMAIL_NOTIFICATIONS.GENERAL])
     else:
-        return TRANSIENT.get(subtype, TRANSIENT[SUB_TYPES.OTHER])
+        return TRANSIENT.get(subtype, TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL])
 
 
-def broken_email_address(user: User) -> dict:
+def broken_email_address(request: HttpRequest) -> dict:
     """Determine if the user's email address has a conflict and the type of
     error, Permanent or Transient.
 
-    :param user: The user to verify.
+    :param request: The HttpRequest.
     :return dict: A dict with a tuple that returns the following values:
     0: (email broken) True or False
     1: (Type of error) Permanent or Transient
@@ -746,7 +731,14 @@ def broken_email_address(user: User) -> dict:
     4: The error sub-type to provide more details to the user.
     """
 
-    if user.is_authenticated:
+    # Some requests might not contain the user attribute in that case
+    # return None
+    try:
+        user = request.user
+    except AttributeError:
+        user = None
+
+    if user.is_authenticated if user else False:
         email_banned = EmailFlag.objects.filter(
             email_address=user.email, object_type=OBJECT_TYPES.BAN
         )
@@ -754,24 +746,22 @@ def broken_email_address(user: User) -> dict:
 
         if email_banned.exists():
             return {
-                "EMAIL_BROKEN_BANNER": (
-                    True,
-                    "PERMANENT",
-                    user.email,
-                    email_banned[0].date_created,
-                    email_banned[0].event_sub_type,
-                )
+                "EMAIL_BROKEN_BANNER": {
+                    "show": True,
+                    "type": "PERMANENT",
+                    "date": email_banned[0].date_created,
+                    "sub_type": email_banned[0].event_sub_type,
+                }
             }
 
         if backoff_event.exists():
             return {
-                "EMAIL_BROKEN_BANNER": (
-                    True,
-                    "TRANSIENT",
-                    user.email,
-                    backoff_event[0].date_created,
-                    backoff_event[0].event_sub_type,
-                )
+                "EMAIL_BROKEN_BANNER": {
+                    "show": True,
+                    "type": "TRANSIENT",
+                    "date": backoff_event[0].date_created,
+                    "sub_type": backoff_event[0].event_sub_type,
+                }
             }
 
-    return {"EMAIL_BROKEN_BANNER": (False,)}
+    return {"EMAIL_BROKEN_BANNER": {"show": False}}

@@ -97,4 +97,4 @@ def inject_random_tip(request):
 
 def inject_broken_email_address(request):
     """This function injects the status of the user's email address."""
-    return broken_email_address(request.user)
+    return broken_email_address(request)
