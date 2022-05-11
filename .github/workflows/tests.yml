@@ -48,8 +48,6 @@ jobs:
       - name: Update .env.dev file
         working-directory: courtlistener/
         run: |
-          echo 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_S3_DEV_ACCESS_KEY_ID }}' >> .env.dev
-          echo 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_S3_DEV_SECRET_ACCESS_KEY }}' >> .env.dev
           echo 'SECRET_KEY=Verbal-Kint-is-Keyser-Soze' >> .env.dev
           echo 'ALLOWED_HOSTS=*' >> .env.dev
 
