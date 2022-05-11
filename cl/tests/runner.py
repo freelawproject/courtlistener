@@ -5,6 +5,7 @@ import warnings
 from unittest import TestLoader
 
 from django.test.runner import DiscoverRunner
+from override_storage import override_storage
 
 from cl.tests.cases import (
     APITestCase,
@@ -73,6 +74,7 @@ class TestRunner(DiscoverRunner):
         finally:
             self.interactive = interactive
 
+    @override_storage()
     def run_tests(self, *args, **kwargs):
         # Show all warnings once, especially to show DeprecationWarning
         # messages which Python ignores by default

@@ -1,17 +1,17 @@
+import string
+
 from factory import (
     Faker,
-    Iterator,
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
     SubFactory,
 )
-from factory.django import DjangoModelFactory
-from factory.fuzzy import FuzzyChoice
+from factory.django import DjangoModelFactory, FileField
+from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.people_db.factories import PersonFactory
-from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.models import (
     DOCUMENT_STATUSES,
     SOURCES,
@@ -33,9 +33,10 @@ class CourtFactory(DjangoModelFactory):
     class Meta:
         model = Court
 
-    id = Faker("random_id")
+    id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     position = Faker("pyfloat", positive=True, right_digits=2, left_digits=3)
     short_name = Faker("court_name")
+    full_name = Faker("court_name")
     url = Faker("url")
     jurisdiction = FuzzyChoice(Court.JURISDICTIONS, getter=lambda c: c[0])
     in_use = True
@@ -162,10 +163,13 @@ class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    idb_data = SubFactory(FjcIntegratedDatabaseFactory)
+    idb_data = RelatedFactory(
+        "cl.recap.factories.FjcIntegratedDatabaseFactory",
+        factory_related_name="docket",
+    )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
-    court = Iterator(Court.objects.all())
-    appeal_from = Iterator(Court.objects.all())
+    court = SubFactory(CourtFactory)
+    appeal_from = SubFactory(CourtFactory)
     case_name_short = LazyAttribute(
         lambda self: cnt.make_case_name_short(self.case_name)
     )
@@ -174,6 +178,8 @@ class DocketFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
+    filepath_local = FileField(filename=None)
+    date_argued = Faker("date_object")
 
 
 class DocketWithChildrenFactory(DocketFactory):

@@ -1,16 +1,38 @@
+from datetime import datetime
+from unittest import mock
+
 from django.urls import reverse
 from lxml import etree
 
+from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.lib.test_helpers import IndexedSolrTestCase, SitemapTest
 from cl.search.models import SEARCH_TYPES
+from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 
 class PodcastTest(IndexedSolrTestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.audio = AudioWithParentsFactory.create(
+            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
+            duration=1,
+        )
+        AudioWithParentsFactory.create(
+            docket=cls.audio.docket,
+            local_path_mp3__data=SMALL_WAV_BYTES,
+            local_path_original_file__data=SMALL_WAV_BYTES,
+            duration=0,
+        )
+
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
         response = self.client.get(
-            reverse("jurisdiction_podcast", kwargs={"court": "test"})
+            reverse(
+                "jurisdiction_podcast",
+                kwargs={"court": self.audio.docket.court.id},
+            )
         )
         self.assertEqual(
             200,
@@ -43,7 +65,10 @@ class PodcastTest(IndexedSolrTestCase):
         """
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
-            {"q": "court:test", "type": SEARCH_TYPES.ORAL_ARGUMENT},
+            {
+                "q": f"court:{self.audio.docket.court}",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            },
         )
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."

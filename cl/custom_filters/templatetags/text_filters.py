@@ -121,14 +121,8 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
         61 --> 1:01
         3602 --> 1:00:02
     """
-    if seconds is None:
-        seconds = 0
+    seconds = 0 if not seconds else seconds
     seconds = int(seconds)
-
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
 
     len_day = 86400
     len_hour = 3600

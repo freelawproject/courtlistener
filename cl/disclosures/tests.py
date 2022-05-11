@@ -1,16 +1,19 @@
 import json
 import os
-import time
 
-import requests
 from django.conf import settings
-from django.contrib.auth.models import Permission, User
 from django.urls import reverse
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.disclosures.factories import (
+    FinancialDisclosureFactory,
+    FinancialDisclosurePositionFactory,
+    InvestmentFactory,
+)
 from cl.disclosures.models import (
+    CODES,
     FinancialDisclosure,
     Investment,
     NonInvestmentIncome,
@@ -18,12 +21,14 @@ from cl.disclosures.models import (
 )
 from cl.disclosures.tasks import save_disclosure
 from cl.lib.microservice_utils import microservice
+from cl.people_db.factories import PersonWithChildrenFactory
+from cl.people_db.models import Person
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 
 
 class DisclosureIngestionTest(TestCase):
-    fixtures = ["judge_judy.json", "disclosure.json"]
+
     test_file = os.path.join(
         settings.INSTALL_ROOT,
         "cl",
@@ -39,17 +44,26 @@ class DisclosureIngestionTest(TestCase):
         "JEF_format.pdf",
     )
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        judge = PersonWithChildrenFactory.create()
+        cls.test_disclosure = FinancialDisclosureFactory.create(
+            person=judge,
+        )
+        FinancialDisclosureFactory.create(
+            person=judge,
+        )
+
     def test_financial_disclosure_ingestion(self) -> None:
         """Can we successfully ingest disclosures at a high level?"""
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=1)
         with open(self.test_file, "r") as f:
             extracted_data = json.load(f)
         Investment.objects.all().delete()
 
         save_disclosure(
             extracted_data=extracted_data,
-            disclosure=test_disclosure,
+            disclosure=self.test_disclosure,
         )
         investments = Investment.objects.all()
         reimbursements = Reimbursement.objects.all()
@@ -79,10 +93,9 @@ class DisclosureIngestionTest(TestCase):
             file=pdf_bytes,
         ).json()
 
-        test_disclosure = FinancialDisclosure.objects.get(pk=1)
         save_disclosure(
             extracted_data=extracted_data,
-            disclosure=test_disclosure,
+            disclosure=self.test_disclosure,
         )
         investments = Investment.objects.all()
         investment_count = investments.count()
@@ -93,65 +106,34 @@ class DisclosureIngestionTest(TestCase):
         )
 
 
-class LoggedInDisclosureTestCase(TestCase):
-    fixtures = [
-        "authtest_data.json",
-        "disclosure.json",
-        "judge_judy.json",
-    ]
-
-    def setUp(self) -> None:
-        u = User.objects.get(pk=1001)
-        ps = Permission.objects.filter(codename="has_disclosure_api_access")
-        u.user_permissions.add(*ps)
-        self.assertTrue(
-            self.client.login(username="pandora", password="password")
+class DisclosureAPITest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.judge = PersonWithChildrenFactory.create()
+        fd = FinancialDisclosureFactory.create(
+            person=cls.judge,
         )
-        self.q = dict()
-
-
-class DisclosureAPIAccessTest(LoggedInDisclosureTestCase):
-    def test_basic_disclosure_api_query(self) -> None:
-        """Can we query the financial disclosures?"""
-        url = reverse("financialdisclosure-list", kwargs={"version": "v3"})
-        # 4 of the queries are from the setup
-        with self.assertNumQueries(12):
-            r = self.client.get(url)
-        self.assertEqual(r.status_code, 200, msg="API failed.")
-        self.assertEqual(r.json()["count"], 2, msg="Wrong API count.")
-
-    def test_gift_disclosure_api(self) -> None:
-        """Can we query the gifts?"""
-        url = reverse("gift-list", kwargs={"version": "v3"})
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200, msg="API failed.")
-        self.assertEqual(r.json()["count"], 1, msg="Wrong API count")
-
-    def test_investments_api(self) -> None:
-        """Can we query the investments?"""
-        url = reverse("investment-list", kwargs={"version": "v3"})
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200, msg="API failed.")
-        self.assertEqual(r.json()["count"], 9, msg="Wrong API count")
-
-    def test_anonymous_user(self) -> None:
-        """Can an anonymous user access disclosure content?"""
-        self.client.logout()
-        url = reverse("gift-list", kwargs={"version": "v3"})
-        r = self.client.get(url)
-        self.assertEqual(
-            r.status_code, 200, msg="Unauthorized content exposed."
+        FinancialDisclosurePositionFactory.create_batch(
+            2, financial_disclosure=fd
+        )
+        InvestmentFactory.create(
+            financial_disclosure=fd,
+            transaction_value_code=CODES.A,
+            description="Harris Bank Inc",
+        )
+        cls.investment_for_id = InvestmentFactory.create(
+            financial_disclosure=fd,
+            transaction_value_code=CODES.M,
+            description="Harris Bank and Trust Company",
+        )
+        InvestmentFactory.create(
+            financial_disclosure=fd,
+            transaction_value_code=CODES.B,
+        )
+        InvestmentFactory.create_batch(
+            10, financial_disclosure=fd, redacted=True
         )
 
-    def test_access_to_content_outside_authorization(self) -> None:
-        """Can a admin user access forbidden content?"""
-        self.client.login(username="admin", password="admin")
-        url = reverse("gift-list", kwargs={"version": "v3"})
-        r = self.client.get(url)
-        self.assertEqual(r.status_code, 200, msg="Admin lacking access.")
-
-
-class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_disclosure_position_api(self) -> None:
         """Can we query the financial disclosure position API?"""
         self.path = reverse(
@@ -169,14 +151,14 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
     def test_investment_filtering(self) -> None:
         """Can we filter investments by transaction value codes?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
-        self.q = {"transaction_value_code": "M"}
+        self.q = {"transaction_value_code": CODES.M}
         r = self.client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong Investment filter")
 
     def test_exact_filtering_by_id(self) -> None:
         """Can we filter investments by id?"""
         self.path = reverse("investment-list", kwargs={"version": "v3"})
-        self.q = {"id": 878}
+        self.q = {"id": self.investment_for_id.id}
         r = self.client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Investment filtering by id failed."
@@ -198,7 +180,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         r = self.client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"],
-            3,
+            10,
             msg="Investment filtering by redactions failed.",
         )
 
@@ -207,7 +189,7 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
         )
-        self.q = {"person": 2}
+        self.q = {"person": self.judge.id}
         r = self.client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"],
@@ -220,19 +202,26 @@ class DisclosureAPITest(LoggedInDisclosureTestCase):
         self.path = reverse(
             "financialdisclosure-list", kwargs={"version": "v3"}
         )
-        self.q["investments__transaction_value_code"] = "M"
+        q = {"investments__transaction_value_code": CODES.M}
 
-        r = self.client.get(self.path, self.q)
+        r = self.client.get(self.path, q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
-    fixtures = [
-        "test_court.json",
-        "authtest_data.json",
-        "disclosure.json",
-        "judge_judy.json",
-    ]
+    def setUp(self) -> None:
+        judge = PersonWithChildrenFactory.create(
+            name_first="Judith",
+            name_middle="",
+            name_last="Baker",
+        )
+        FinancialDisclosureFactory.create(
+            person=judge,
+        )
+
+    def tearDown(self) -> None:
+        FinancialDisclosure.objects.all().delete()
+        Person.objects.all().delete()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_homepage(self) -> None:
@@ -264,8 +253,8 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         )
 
         with self.assertRaises(NoSuchElementException):
-            self.browser.find_element(By.CLASS_NAME, "tr-results")
+            self.browser.find_element(By.CSS_SELECTOR, ".tr-results")
 
         search_bar.send_keys("Judith")
-        results = self.browser.find_elements(By.CLASS_NAME, "tr-results")
+        results = self.browser.find_elements(By.CSS_SELECTOR, ".tr-results")
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")

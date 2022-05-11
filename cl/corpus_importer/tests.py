@@ -2,7 +2,6 @@ import json
 import os
 from datetime import date, datetime
 from glob import iglob
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -21,11 +20,10 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.pacer import process_docket_data
-from cl.lib.storage import clobbering_get_name
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.mergers import find_docket_object
 from cl.recap.models import UPLOAD_TYPE
+from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
     Citation,
     Docket,
@@ -33,6 +31,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.settings import INSTALL_ROOT, MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
@@ -304,22 +303,28 @@ class CourtMatchingTest(SimpleTestCase):
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
 
-    fixtures = ["court_test_asset.json"]
-
     NUM_PARTIES = 3
     NUM_PETRO_ATTYS = 6
     NUM_FLOYD_ROLES = 3
-    NUM_DOCKET_ENTRIES = 123
+    NUM_DOCKET_ENTRIES = 3
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.fp = (
+            MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
+        )
+        docket_number = "3:11-cv-00064"
+        cls.court = CourtFactory.create()
+        cls.docket = DocketFactory.create(
+            source=Docket.RECAP,
+            pacer_case_id="41664",
+            docket_number=docket_number,
+            court=cls.court,
+            filepath_local__from_path=str(cls.fp),
+        )
 
     def setUp(self) -> None:
-        docket_number = "3:11-cv-00064"
-        self.docket = find_docket_object("akd", "41664", docket_number)
-        self.docket.filepath_local = (
-            "/test/xml/gov.uscourts.akd.41664.docket.xml"
-        )
-        self.docket.docket_number = docket_number
-        self.docket.save()
-        process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE)
+        process_docket_data(self.docket, UPLOAD_TYPE.IA_XML_FILE, self.fp)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
@@ -474,10 +479,14 @@ class HarvardTests(TestCase):
     Testing for cl.corpus_importer.management.commands.harvard_opinions
     """
 
-    fixtures = ["court_test_asset.json"]
     test_dir = os.path.join(
-        settings.INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
+        INSTALL_ROOT, "cl", "corpus_importer", "test_assets"
     )
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        for court in ["mass", "tax", "cadc", "kan", "bta"]:
+            CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()

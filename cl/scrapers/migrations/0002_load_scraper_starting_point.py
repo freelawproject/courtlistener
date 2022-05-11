@@ -6,11 +6,9 @@ from cl.lib.migration_utils import load_migration_fixture
 
 
 def load_fixture(apps, schema_editor):
-    if 'test' in sys.argv:
-        fixture = 'pacer_free_docs_initial_data_truncated'
-    else:
+    if 'test' not in sys.argv:
         fixture = 'pacer_free_docs_initial_data'
-    load_migration_fixture(apps, schema_editor, fixture, 'scrapers')
+        load_migration_fixture(apps, schema_editor, fixture, 'scrapers')
 
 
 def unload_fixture(apps, schema_editor):

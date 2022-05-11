@@ -154,10 +154,13 @@ def make_upload_path(instance, filename):
         # problems when importing Audio, Document, etc.
         d = instance.file_with_date
     except AttributeError:
-        raise NotImplementedError(
-            "This function cannot be used without a "
-            "file_with_date attribute."
-        )
+        from cl.audio.models import Audio
+        from cl.search.models import Opinion
+
+        if type(instance) == Audio:
+            d = instance.docket.date_argued
+        elif type(instance) == Opinion:
+            d = instance.cluster.date_filed
 
     return "%s/%s/%02d/%02d/%s" % (
         filename.split(".")[-1],

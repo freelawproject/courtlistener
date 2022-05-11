@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE gov_uscourts_docket SYSTEM "docket.dtd">
+<gov_uscourts_docket>
+  <nonce>liWben</nonce>
+  <case_details>
+    <court>akd</court>
+    <docket_num>3:11-cv-00064</docket_num>
+    <case_name>Petro Star Inc. v. BP Oil Supply Co.</case_name>
+    <pacer_case_num>41664</pacer_case_num>
+    <date_case_filed>2011-04-04</date_case_filed>
+    <assigned_to>Ralph R. Beistline</assigned_to>
+    <case_cause>28:1332 Diversity-Breach of Contract</case_cause>
+    <nature_of_suit>190 Contract: Other</nature_of_suit>
+    <jury_demand>Plaintiff</jury_demand>
+    <jurisdiction>Federal Question</jurisdiction>
+  </case_details>
+  <party_list>
+    <party>
+      <name>Petro Star Inc.</name>
+      <type>Plaintiff</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>Bruce A. Moore</attorney_name>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Floyd G. Short</attorney_name>
+          <contact>Susman Godfrey, LLP
+1201 Third Avenue, Suite 3800
+Seattle, WA 98101
+206-373-7381
+Fax: 206-516-3883
+Email: fshort@susmangodfrey.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Parker C. Folse , III</attorney_name>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Genevieve J. Vose</attorney_name>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael C. Geraghty</attorney_name>
+          <attorney_role>TERMINATED: 01/30/2012</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Patricia L. Zobel</attorney_name>
+          <attorney_role>TERMINATED: 04/09/2012</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+    <party>
+      <name>BP Oil Supply Co.</name>
+      <type>Defendant</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>James F. Speyer</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-243-4141
+Fax: 213-243-4199
+Email: james.speyer@aporter.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Louis R. Veerman</attorney_name>
+          <contact>Guess &amp; Rudd P.C.
+510 L Street, Suite 700
+Anchorage, AK 99501
+907-793-2200
+Fax: 907-793-2299
+Email: dveerman@guessrudd.com</contact>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Ronald C. Redcay</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-423-4000
+Fax: 213-243-4199
+Email: ronald_redcay@aporter.com</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael Stephan McLaughlin</attorney_name>
+          <contact>Guess &amp; Rudd P.C.
+510 L Street, Suite 700
+Anchorage, AK 99501
+907-793-2200
+Fax: 907-793-2299
+Email: mmclaughlin@guessrudd.com</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>S. Albert Wang</attorney_name>
+          <contact>Arnold &amp; Porter LLP
+777 S. Figueroa St, 44th Floor
+Los Angeles, CA 90017
+213-243-4000
+Fax: 213-243-4199
+Email: s.albert.wang@aporter.com</contact>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+    <party>
+      <name>BP Products North America Inc.</name>
+      <type>Defendant</type>
+      <attorney_list>
+        <attorney>
+          <attorney_name>James F. Speyer</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Louis R. Veerman</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Ronald C. Redcay</attorney_name>
+          <contact>(See above for address)</contact>
+          <attorney_role>LEAD ATTORNEY
+PRO HAC VICE
+ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>Michael Stephan McLaughlin</attorney_name>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+        <attorney>
+          <attorney_name>S. Albert Wang</attorney_name>
+          <attorney_role>ATTORNEY TO BE NOTICED</attorney_role>
+        </attorney>
+      </attorney_list>
+    </party>
+  </party_list>
+  <document_list>
+    <document doc_num="1" attachment_num="0">
+      <pacer_doc_id>0230856334</pacer_doc_id>
+      <date_filed>2011-04-04</date_filed>
+      <long_desc>COMPLAINT against BP Oil Supply Co. (Filing fee $ 350. Receipt #ANC003598), filed by Petro Star Inc.(NXL, COURT STAFF) (Entered: 04/04/2011)</long_desc>
+    </document>
+    <document doc_num="116" attachment_num="0">
+      <pacer_doc_id>02301124594</pacer_doc_id>
+      <date_filed>2012-12-10</date_filed>
+      <long_desc>JUDGMENT that action dismissed on merits; def recover costs from plf. Signed by Judge Ralph R. Beistline on 12/10/12. (PRR, COURT STAFF) (Additional attachment(s) added on 1/3/2013: # 1 Judgment redistributed with costs added) (NKD, COURT STAFF). (Entered: 12/10/2012)</long_desc>
+      <upload_date>2014-12-04 23:56:59</upload_date>
+      <available>1</available>
+      <sha1>992f0607e3529e3e9d3d4c9b1446c987e8aedaaf</sha1>
+      <free_import>0</free_import>
+    </document>
+    <document doc_num="116" attachment_num="1">
+      <pacer_doc_id>02301132632</pacer_doc_id>
+      <short_desc>Judgment redistributed with costs added</short_desc>
+    </document>
+  </document_list>
+</gov_uscourts_docket>

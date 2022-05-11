@@ -3,19 +3,15 @@
 
 import sys
 
-from django.contrib.auth.models import User
 from django.db import migrations
-from rest_framework.authtoken.models import Token
 
 from cl.lib.migration_utils import load_migration_fixture, make_new_user
 
 
 def load_fixture(apps, schema_editor):
-    if 'test' in sys.argv:
-        fixture = 'bar_membership_data_truncated'
-    else:
+    if 'test' not in sys.argv:
         fixture = 'bar_membership_data'
-    load_migration_fixture(apps, schema_editor, fixture, 'users')
+        load_migration_fixture(apps, schema_editor, fixture, 'users')
 
     # Add tenn user group permissions
     Group = apps.get_model("auth", "Group",)
