@@ -12,14 +12,6 @@ from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 
 
 class PodcastTest(IndexedSolrTestCase):
-
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-        "authtest_data.json",
-    ]
-
     @classmethod
     def setUpTestData(cls) -> None:
         cls.audio = AudioWithParentsFactory.create(
@@ -37,7 +29,10 @@ class PodcastTest(IndexedSolrTestCase):
     def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
         response = self.client.get(
-            reverse("jurisdiction_podcast", kwargs={"court": "test"})
+            reverse(
+                "jurisdiction_podcast",
+                kwargs={"court": self.audio.docket.court.id},
+            )
         )
         self.assertEqual(
             200,
@@ -70,7 +65,10 @@ class PodcastTest(IndexedSolrTestCase):
         """
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
-            {"q": "court:test", "type": SEARCH_TYPES.ORAL_ARGUMENT},
+            {
+                "q": f"court:{self.audio.docket.court}",
+                "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            },
         )
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."

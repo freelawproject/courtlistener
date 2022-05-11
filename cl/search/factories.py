@@ -167,8 +167,8 @@ class DocketFactory(DjangoModelFactory):
 
     idb_data = SubFactory(FjcIntegratedDatabaseFactory)
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
-    court = Iterator(Court.objects.all())
-    appeal_from = Iterator(Court.objects.all())
+    court = SubFactory(CourtFactory)
+    appeal_from = SubFactory(CourtFactory)
     case_name_short = LazyAttribute(
         lambda self: cnt.make_case_name_short(self.case_name)
     )
