@@ -18,6 +18,7 @@ jobs:
           - 5000:5000
     strategy:
       matrix:
+        apps: ["alerts", "api", "audio", "citations", "corpus_importer", "disclosures", "donate", "favorites", "opinion_page", "people_db", "recap", "scrapers", "search", "users"]
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
@@ -121,7 +122,7 @@ jobs:
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           python /opt/courtlistener/manage.py test
-          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
+          cl.${{ matrix.apps }} --verbosity=2 ${{ matrix.tag_flags }} --parallel
       - name: cp selenium results from docker to host
         if: failure()
         run: |
