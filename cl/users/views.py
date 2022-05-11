@@ -294,7 +294,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
         return HttpResponseRedirect(reverse("view_settings"))
 
-    email_broken = broken_email_address(request)
+    email_broken = broken_email_address(user)
     if email_broken["EMAIL_BROKEN_BANNER"]["show"]:
         email_error_message = determine_email_error_message(
             email_broken["EMAIL_BROKEN_BANNER"]["type"],

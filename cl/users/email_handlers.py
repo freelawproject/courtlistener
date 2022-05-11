@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from email.utils import parseaddr
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -13,7 +13,6 @@ from django.core.mail import (
     SafeMIMEText,
 )
 from django.db import transaction
-from django.http import HttpRequest
 from django.utils.timezone import now
 
 from cl.users.models import (
@@ -718,7 +717,7 @@ def determine_email_error_message(type: str, subtype: int) -> str:
         return TRANSIENT.get(subtype, TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL])
 
 
-def broken_email_address(request: HttpRequest) -> dict:
+def broken_email_address(user: User | AnonymousUser) -> dict:
     """Determine if the user's email address has a conflict and the type of
     error, Permanent or Transient.
 
@@ -731,14 +730,7 @@ def broken_email_address(request: HttpRequest) -> dict:
     4: The error sub-type to provide more details to the user.
     """
 
-    # Some requests might not contain the user attribute in that case
-    # return None
-    try:
-        user = request.user
-    except AttributeError:
-        user = None
-
-    if user.is_authenticated if user else False:
+    if user.is_authenticated:
         email_banned = EmailFlag.objects.filter(
             email_address=user.email, object_type=OBJECT_TYPES.BAN
         )
