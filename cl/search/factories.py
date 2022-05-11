@@ -2,7 +2,6 @@ import string
 
 from factory import (
     Faker,
-    Iterator,
     LazyAttribute,
     RelatedFactory,
     SelfAttribute,
@@ -13,7 +12,6 @@ from factory.fuzzy import FuzzyChoice, FuzzyText
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.people_db.factories import PersonFactory
-from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.models import (
     DOCUMENT_STATUSES,
     SOURCES,
@@ -165,7 +163,10 @@ class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    idb_data = SubFactory(FjcIntegratedDatabaseFactory)
+    idb_data = RelatedFactory(
+        "cl.recap.factories.FjcIntegratedDatabaseFactory",
+        factory_related_name="docket",
+    )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
     court = SubFactory(CourtFactory)
     appeal_from = SubFactory(CourtFactory)
