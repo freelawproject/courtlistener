@@ -34,6 +34,7 @@ header {
 .navbar-default .navbar-nav > li a {
   /* Layout fix. */
   border-bottom: 3px solid transparent;
+  color: #555555;
 }
 .subnav {
   min-height: 0;
@@ -1114,3 +1115,12 @@ emphasis {
   text-indent: 10px;
 }
 /* END Tax specific css tweak*/
+
+/*Improve contrast on alert boxes*/
+.alert-dismissible .navbar-text.lead, .alert-danger, .alert-warning {
+  color: #333333;
+}
+
+.alert-dismissible .btn-default {
+  border-color: #999999;
+}

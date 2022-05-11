@@ -54,8 +54,8 @@
                         {% endfor %}
                     </p>
                 {% endif %}
-                {% if EMAIL_BROKEN_BANNER.0 %}
-                  {% if EMAIL_BROKEN_BANNER.1 == "PERMANENT" %}
+                {% if EMAIL_BROKEN_BANNER.show %}
+                  {% if EMAIL_BROKEN_BANNER.type == "PERMANENT" %}
                     <div class="alert alert-danger" role="alert">
                       {{ email_error_message }}
                     </div>

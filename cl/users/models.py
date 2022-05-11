@@ -177,31 +177,31 @@ class UserProfile(models.Model):
         verbose_name_plural = "user profiles"
 
 
-class SUB_TYPES(object):
-    """SNS Event Subtypes"""
+class EMAIL_NOTIFICATIONS(object):
+    """SES Email Notifications Subtypes"""
 
     UNDETERMINED = 0
     GENERAL = 1
-    NOEMAIL = 2
+    NO_EMAIL = 2
     SUPPRESSED = 3
-    ONACCOUNTSUPPRESSIONLIST = 4
-    MAILBOXFULL = 5
-    MESSAGETOOLARGE = 6
-    CONTENTREJECTED = 7
-    ATTACHMENTREJECTED = 8
+    ON_ACCOUNT_SUPPRESSIONLIST = 4
+    MAILBOX_FULL = 5
+    MESSAGE_TOO_LARGE = 6
+    CONTENT_REJECTED = 7
+    ATTACHMENT_REJECTED = 8
     COMPLAINT = 9
     OTHER = 10
 
     TYPES = (
         (UNDETERMINED, "Undetermined"),
         (GENERAL, "General"),
-        (NOEMAIL, "NoEmail"),
+        (NO_EMAIL, "NoEmail"),
         (SUPPRESSED, "Suppressed"),
-        (ONACCOUNTSUPPRESSIONLIST, "OnAccountSuppressionList"),
-        (MAILBOXFULL, "MailboxFull"),
-        (MESSAGETOOLARGE, "MessageTooLarge"),
-        (CONTENTREJECTED, "ContentRejected"),
-        (ATTACHMENTREJECTED, "AttachmentRejected"),
+        (ON_ACCOUNT_SUPPRESSIONLIST, "OnAccountSuppressionList"),
+        (MAILBOX_FULL, "MailboxFull"),
+        (MESSAGE_TOO_LARGE, "MessageTooLarge"),
+        (CONTENT_REJECTED, "ContentRejected"),
+        (ATTACHMENT_REJECTED, "AttachmentRejected"),
         (COMPLAINT, "Complaint"),
         (OTHER, "Other"),
     )
@@ -224,13 +224,11 @@ class EmailFlag(AbstractDateTimeModel):
     SMALL_ONLY = 0
     MAX_RETRY_REACHED = 1
     FLAGS = (
-        (SMALL_ONLY, "small_email_only"),
-        (MAX_RETRY_REACHED, "max_retry_reached"),
+        (SMALL_ONLY, "Small Email Only"),
+        (MAX_RETRY_REACHED, "Max Retry Reached"),
     )
     email_address = models.EmailField(
-        help_text="EmailFlag object is related to this email address instead "
-        "of a user, in this way, if users change their email address this "
-        "won't affect the user's new email address.",
+        help_text="The email address the EmailFlag object is related to.",
     )
     object_type = models.SmallIntegerField(
         help_text="The object type assigned, "
@@ -239,14 +237,14 @@ class EmailFlag(AbstractDateTimeModel):
         choices=OBJECT_TYPES.TYPES,
     )
     flag = models.SmallIntegerField(
-        help_text="The actual flag assigned, e.g: small_email_only.",
+        help_text="The actual flag assigned, e.g: Small Email Only.",
         choices=FLAGS,
         blank=True,
         null=True,
     )
     event_sub_type = models.SmallIntegerField(
-        help_text="The SNS bounce subtype that triggered the object.",
-        choices=SUB_TYPES.TYPES,
+        help_text="The SES bounce subtype that triggered the object.",
+        choices=EMAIL_NOTIFICATIONS.TYPES,
     )
 
     class Meta:
@@ -273,9 +271,7 @@ class BackoffEvent(AbstractDateTimeModel):
     """
 
     email_address = models.EmailField(
-        help_text="The backoff event is related to this email address "
-        "instead of a user, in this way, if users change their email address "
-        "this won't affect the user's new email address, this unique.",
+        help_text="The email address the Backoff event is related to.",
         unique=True,
     )
     retry_counter = models.SmallIntegerField(
@@ -285,9 +281,9 @@ class BackoffEvent(AbstractDateTimeModel):
         help_text="The next retry datetime for exponential backoff events.",
     )
     event_sub_type = models.SmallIntegerField(
-        help_text="The SNS bounce subtype that triggered the object.",
-        choices=SUB_TYPES.TYPES,
-        default=SUB_TYPES.UNDETERMINED,
+        help_text="The SES bounce subtype that triggered the object.",
+        choices=EMAIL_NOTIFICATIONS.TYPES,
+        default=EMAIL_NOTIFICATIONS.UNDETERMINED,
     )
 
     @property
