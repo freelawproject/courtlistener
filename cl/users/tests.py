@@ -2873,7 +2873,8 @@ class EmailBrokenTest(TestCase):
         )
         # The bounce subtype should be MAILBOXFULL
         self.assertEqual(
-            backoff_event[0].event_sub_type, EMAIL_NOTIFICATIONS.MAILBOX_FULL
+            backoff_event[0].notification_subtype,
+            EMAIL_NOTIFICATIONS.MAILBOX_FULL,
         )
 
     def test_broken_email_address_banner(self) -> None:
@@ -2925,7 +2926,9 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "TRANSIENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "TRANSIENT"
+        )
 
         # Trigger a hard bounce notification event
         self.send_signal(
@@ -2939,7 +2942,9 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "PERMANENT"
+        )
 
     def test_broken_email_banner_complaint(self) -> None:
         """This test checks if a complaint notification properly triggers a
@@ -2967,7 +2972,9 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A complaint event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "PERMANENT"
+        )
 
     def test_broken_email_address_banner_first_permanent(self) -> None:
         """This test checks if a Permanent broken email event comes first than
@@ -2999,7 +3006,9 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "PERMANENT"
+        )
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -3014,7 +3023,9 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # A backoff event is created but the Permanent broken email banner is
         # prioritized
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "PERMANENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "PERMANENT"
+        )
 
         # Simulate user changes their email address to solve the Permanent
         # email error.
@@ -3054,7 +3065,9 @@ class EmailBrokenTest(TestCase):
 
         # A mail_box_full soft bounce event should trigger a Transient broken
         # email banner
-        self.assertEqual(r.context["EMAIL_BROKEN_BANNER"]["type"], "TRANSIENT")
+        self.assertEqual(
+            r.context["EMAIL_BROKEN_BANNER"]["error_type"], "TRANSIENT"
+        )
 
         # Trigger a delivery event
         self.send_signal(

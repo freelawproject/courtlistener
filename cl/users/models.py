@@ -184,7 +184,7 @@ class EMAIL_NOTIFICATIONS(object):
     GENERAL = 1
     NO_EMAIL = 2
     SUPPRESSED = 3
-    ON_ACCOUNT_SUPPRESSIONLIST = 4
+    ON_ACCOUNT_SUPPRESSION_LIST = 4
     MAILBOX_FULL = 5
     MESSAGE_TOO_LARGE = 6
     CONTENT_REJECTED = 7
@@ -197,7 +197,7 @@ class EMAIL_NOTIFICATIONS(object):
         (GENERAL, "General"),
         (NO_EMAIL, "NoEmail"),
         (SUPPRESSED, "Suppressed"),
-        (ON_ACCOUNT_SUPPRESSIONLIST, "OnAccountSuppressionList"),
+        (ON_ACCOUNT_SUPPRESSION_LIST, "OnAccountSuppressionList"),
         (MAILBOX_FULL, "MailboxFull"),
         (MESSAGE_TOO_LARGE, "MessageTooLarge"),
         (CONTENT_REJECTED, "ContentRejected"),
@@ -243,7 +243,7 @@ class EmailFlag(AbstractDateTimeModel):
         null=True,
     )
     event_sub_type = models.SmallIntegerField(
-        help_text="The SES bounce subtype that triggered the object.",
+        help_text="The SES notification subtype that triggered the object.",
         choices=EMAIL_NOTIFICATIONS.TYPES,
     )
 
@@ -280,8 +280,8 @@ class BackoffEvent(AbstractDateTimeModel):
     next_retry_date = models.DateTimeField(
         help_text="The next retry datetime for exponential backoff events.",
     )
-    event_sub_type = models.SmallIntegerField(
-        help_text="The SES bounce subtype that triggered the object.",
+    notification_subtype = models.SmallIntegerField(
+        help_text="The SES notification subtype that triggered the object.",
         choices=EMAIL_NOTIFICATIONS.TYPES,
         default=EMAIL_NOTIFICATIONS.UNDETERMINED,
     )

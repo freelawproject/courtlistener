@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from email.utils import parseaddr
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.auth.models import User
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -130,7 +130,7 @@ def handle_soft_bounce(
                 defaults={
                     "retry_counter": 0,
                     "next_retry_date": next_retry_date,
-                    "event_sub_type": get_bounce_subtype(event_sub_type),
+                    "notification_subtype": get_bounce_subtype(event_sub_type),
                 },
             )
 
@@ -693,67 +693,51 @@ PERMANENT = {
 }
 
 TRANSIENT = {
-    EMAIL_NOTIFICATIONS.GENERAL: "Your email provider sent a bounce message. "
-    "We are still attempting to fix this problem by resending "
-    "messages.",
+    EMAIL_NOTIFICATIONS.GENERAL: "The last messages we sent to your email "
+    "address have bounced back. We are still attempting to fix this problem "
+    "by resending messages.",
     EMAIL_NOTIFICATIONS.MAILBOX_FULL: "Your email provider sent a "
     "bounce message because your inbox was full. Please consider clearing out "
     "your email inbox.",
 }
 
 
-def determine_email_error_message(type: str, subtype: int) -> str:
-    """Determine the message to display to the user with more details
-    about the Permanent or Transient email address error.
-
-    :param type: The type of email address error, Permanent or Transient.
-    :param subtype: The error subtype returned by the SES notification.
-    :return str: The error message with more details.
-    """
-
-    if type == "PERMANENT":
-        return PERMANENT.get(subtype, PERMANENT[EMAIL_NOTIFICATIONS.GENERAL])
-    else:
-        return TRANSIENT.get(subtype, TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL])
-
-
-def broken_email_address(user: User | AnonymousUser) -> dict:
+def broken_email_address(email: str) -> dict:
     """Determine if the user's email address has a conflict and the type of
     error, Permanent or Transient.
 
-    :param request: The HttpRequest.
-    :return dict: A dict with a tuple that returns the following values:
-    0: (email broken) True or False
-    1: (Type of error) Permanent or Transient
-    2: The user's email address with the error
-    3: Datetime when the error started.
-    4: The error sub-type to provide more details to the user.
+    :param email: The user's email address if is logged in.
+    :return dict: A dictionary of values for the broken email adress banner.
     """
 
-    if user.is_authenticated:
+    if email:
         email_banned = EmailFlag.objects.filter(
-            email_address=user.email, object_type=OBJECT_TYPES.BAN
+            email_address=email, object_type=OBJECT_TYPES.BAN
         )
-        backoff_event = BackoffEvent.objects.filter(email_address=user.email)
-
         if email_banned.exists():
             return {
                 "EMAIL_BROKEN_BANNER": {
                     "show": True,
-                    "type": "PERMANENT",
+                    "error_type": "PERMANENT",
                     "date": email_banned[0].date_created,
-                    "sub_type": email_banned[0].event_sub_type,
+                    "msg": PERMANENT.get(
+                        email_banned[0].event_sub_type,
+                        PERMANENT[EMAIL_NOTIFICATIONS.GENERAL],
+                    ),
                 }
             }
 
+        backoff_event = BackoffEvent.objects.filter(email_address=email)
         if backoff_event.exists():
             return {
                 "EMAIL_BROKEN_BANNER": {
                     "show": True,
-                    "type": "TRANSIENT",
+                    "error_type": "TRANSIENT",
                     "date": backoff_event[0].date_created,
-                    "sub_type": backoff_event[0].event_sub_type,
+                    "msg": TRANSIENT.get(
+                        backoff_event[0].notification_subtype,
+                        TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
+                    ),
                 }
             }
-
     return {"EMAIL_BROKEN_BANNER": {"show": False}}

@@ -44,7 +44,7 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group  {% if EMAIL_BROKEN_BANNER.show %} {% if EMAIL_BROKEN_BANNER.error_type == 'PERMANENT' %} alert alert-danger {% else %}  alert alert-warning {% endif %} {% endif %}">
                 <label for="id_email">Email (will log you out until re-confirmed)*</label>
                 {{ user_form.email }}
                 {% if user_form.email.errors %}
@@ -53,17 +53,6 @@
                             {{ error|escape }}
                         {% endfor %}
                     </p>
-                {% endif %}
-                {% if EMAIL_BROKEN_BANNER.show %}
-                  {% if EMAIL_BROKEN_BANNER.type == "PERMANENT" %}
-                    <div class="alert alert-danger" role="alert">
-                      {{ email_error_message }}
-                    </div>
-                  {% else %}
-                    <div class="alert alert-warning" role="alert">
-                      {{ email_error_message }}
-                    </div>
-                  {% endif %}
                 {% endif %}
             </div>
             <div class="form-group">

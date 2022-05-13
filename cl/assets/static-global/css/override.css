@@ -189,6 +189,12 @@ a.button:active {
   .dl-horizontal dd {
     margin-left: 15px;
   }
+  .broken-email-banner{
+    padding-right: 0px;
+  }
+  .broken-email-banner .navbar-text{
+    float: left;
+  }
 }
 @media (min-width: 768px) {
   #main-query-box #id_q {
@@ -1119,8 +1125,13 @@ emphasis {
 /*Improve contrast on alert boxes*/
 .alert-dismissible .navbar-text.lead, .alert-danger, .alert-warning {
   color: #333333;
+  font-family: Helvetica;
 }
 
 .alert-dismissible .btn-default {
   border-color: #999999;
+}
+.h-captcha > div{
+  color: #333333!important;
+  font-family: Helvetica;
 }
