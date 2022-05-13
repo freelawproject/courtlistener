@@ -1,7 +1,6 @@
 import random
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest
 from django.urls import reverse
 
@@ -98,12 +97,14 @@ def inject_random_tip(request):
 
 
 def inject_broken_email_address(request: HttpRequest) -> dict:
-    """This function injects the status of the user's email address."""
+    """This function injects the status of the user's email address.
 
-    # Some requests might not contain the user attribute in that case
-    # return an AnonymousUser
-    try:
-        user = request.user
-    except AttributeError:
-        user = AnonymousUser()
-    return broken_email_address(user)
+    :param request: The HttpRequest.
+    return dict: A dictionary of values for the broken email address banner.
+    """
+
+    email = ""
+    if request.user.is_authenticated:
+        email = request.user.email
+
+    return broken_email_address(email)

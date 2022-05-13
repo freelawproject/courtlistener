@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
@@ -1166,6 +1167,7 @@ class JurisdictionFeedTest(TestCase):
 
         court = Court.objects.get(pk="test")
         request = HttpRequest()
+        request.user = AnonymousUser()
         request.path = "/feed"
         try:
             feed = FakeFeed().get_feed(court, request)

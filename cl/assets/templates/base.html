@@ -134,12 +134,16 @@
 
     <!-- Broken Email Banner -->
     {% if EMAIL_BROKEN_BANNER.show %}
-      {% if EMAIL_BROKEN_BANNER.type == "PERMANENT" %}
-        <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
+        <div class="navbar navbar-default subnav {% if EMAIL_BROKEN_BANNER.error_type == 'PERMANENT' %} alert-danger {% else %} alert-warning {% endif %} alert-dismissible broken-email-banner" role="navigation">
           <div class="container-fluid">
             <div class="row">
               <div class="col-lg-12">
-                <p class="navbar-text lead">Hi {{ request.user.first_name }}, our servers stopped sending emails to the address in your profile on {{EMAIL_BROKEN_BANNER.date|date:'M d, Y'}}. Please update your email address to begin receiving emails again. If you think this was incorrect please get in <a href="{% url 'contact' %}">contact here</a>.
+                <p class="navbar-text lead">
+                  {% if EMAIL_BROKEN_BANNER.error_type == "PERMANENT" %}
+                    Hi {{ request.user.first_name }}, our servers stopped sending emails to the address in your profile on {{EMAIL_BROKEN_BANNER.date|date:'M d, Y'}}. Please update your email address to begin receiving emails again. If you think this was incorrect please get in <a href="{% url 'contact' %}">contact here</a>.
+                  {% else %}
+                    Hi {{ request.user.first_name }}, it looks like our last few emails haven't gone through to your inbox. If this problem persists, our servers will automatically stop sending emails to the address in your account profile.
+                  {% endif %}
                 </br>
                   <a href="{% url 'broken_email_help' %}"
                     class="btn btn-default v-offset-above-1 pull-right">Click here to learn more</a>
@@ -149,21 +153,6 @@
             </div>
           </div>
         </div>
-      {% else %}
-        <div class="navbar navbar-default subnav alert-warning alert-dismissible" role="navigation">
-          <div class="container-fluid">
-            <div class="row">
-              <div class="col-lg-12">
-                <p class="navbar-text lead">Hi {{ request.user.first_name }}, it looks like our last few emails haven't gone through to your inbox. If this problem persists, our servers will automatically stop sending emails to the address in your account profile.
-                  </br>
-                  <a href="{% url 'broken_email_help' %}"
-                    class="btn btn-default v-offset-above-1 pull-right">Click here to learn more</a>
-                  </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% endif %}
     {% endif %}
 
     <!-- Static navbar -->
