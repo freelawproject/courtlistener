@@ -155,9 +155,13 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
                   return (
                     <tr key={entry.id} className={''}>
                       <td>
-                        <a title={'Go to PDF'} href={url + '#page=' + entry.page_number}>
-                          <i className="fa fa-file-text-o gray" />
-                        </a>
+                        {title == 'Investments' ? (
+                          <a title={'Go to PDF'} href={url + '#page=' + entry.page_number}>
+                            <i className="fa fa-file-text-o gray" />
+                          </a>
+                        ) : (
+                          ''
+                        )}
                         &nbsp;
                         {entry.redacted ? (
                           <i title={'Redaction present in row'} className="fa fa-file-excel-o black" />
