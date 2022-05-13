@@ -112,7 +112,12 @@ const MainSection = (
           </div>
         </div>
       ) : (
-        <h1 className={'text-center'}>Loading...</h1>
+        <div className={'col-md-9'}>
+          <div id={'loader'}>
+            <h1>Loading Disclosure</h1>
+            <img id="loading"></img>
+          </div>
+        </div>
       )}
     </div>
   );
