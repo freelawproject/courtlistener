@@ -115,7 +115,7 @@ const MainSection = (
         <div className={'col-md-9'}>
           <div id={'loader'}>
             <h1>Loading Disclosure</h1>
-            <img id="loading"></img>
+            <i className="fa fa-spinner fa-spin fa-3x fa-fw"></i>
           </div>
         </div>
       )}
