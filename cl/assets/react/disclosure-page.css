@@ -127,3 +127,8 @@ td.table-data-portrait {
 #update_page_size {
   padding-left: 16.6%
 }
+
+#loader {
+  text-align: center;
+  display: block;
+}
