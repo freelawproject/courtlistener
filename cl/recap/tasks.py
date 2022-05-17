@@ -525,7 +525,7 @@ def process_recap_docket(self, pk):
         content_object=d, upload_type=UPLOAD_TYPE.DOCKET
     )
     pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(text),
     )
 
@@ -698,7 +698,7 @@ def process_recap_claims_register(self, pk):
         content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
     )
     pacer_file.filepath.save(
-        # We only care about the ext w/UUIDFileSystemStorage
+        # We only care about the ext w/S3PrivateUUIDStorageTest
         "claims_registry.html",
         ContentFile(text),
     )
@@ -780,7 +780,7 @@ def process_recap_docket_history_report(self, pk):
         content_object=d, upload_type=UPLOAD_TYPE.DOCKET_HISTORY_REPORT
     )
     pacer_file.filepath.save(
-        # We only care about the ext w/UUIDFileSystemStorage
+        # We only care about the ext w/S3PrivateUUIDStorageTest
         "docket_history.html",
         ContentFile(text),
     )
@@ -877,7 +877,7 @@ def process_recap_appellate_docket(self, pk):
         content_object=d, upload_type=UPLOAD_TYPE.APPELLATE_DOCKET
     )
     pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(text),
     )
 
@@ -1535,7 +1535,7 @@ def process_recap_email(
         content_object=docket, upload_type=UPLOAD_TYPE.SES_EMAIL
     )
     pacer_file.filepath.save(
-        "docket.txt",  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.txt",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(body),
     )
 
