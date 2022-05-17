@@ -1,7 +1,4 @@
 import datetime
-import os
-import re
-import tempfile
 from typing import Tuple, TypedDict
 
 from django.core.files.base import ContentFile
@@ -23,10 +20,11 @@ from cl.lib.pacer import (
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
-from cl.lib.storage import UUIDFileSystemStorage
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import alphanumeric_sort
 from cl.people_db.models import Role
+from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.search.factories import DocketFactory
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
 
@@ -216,30 +214,20 @@ class TestModelHelpers(TestCase):
         self.assertEqual(make_docket_number_core(None), "")
 
 
-class UUIDFileSystemStorageTest(SimpleTestCase):
-    # Borrows from https://github.com/django/django/blob/9cbf48693dcd8df6cb22c183dcc94e7ce62b2921/tests/file_storage/tests.py#L89
-    databases = "__all__"
-
-    def setUp(self) -> None:
-        self.temp_dir = tempfile.mkdtemp()
-        self.storage = UUIDFileSystemStorage(
-            location=self.temp_dir, base_url="test_uuid_storage"
-        )
+class S3PrivateUUIDStorageTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket = DocketFactory.create()
 
     def test_file_save_with_path(self) -> None:
-        """Does saving a pathname create directories and filenames correctly?"""
-        self.assertFalse(self.storage.exists("path/to"))
-        file_name = "filename"
-        extension = "ext"
-        f = self.storage.save(
-            f"path/to/{file_name}.{extension}",
-            ContentFile("file with path"),
+        """Does saving a file create directories and filenames correctly?"""
+        pf = PacerHtmlFiles(
+            content_object=self.docket,
+            upload_type=UPLOAD_TYPE.DOCKET,
         )
-        self.assertTrue(self.storage.exists("path/to"))
-        dir_name_created, file_name_created = os.path.split(f)
-        file_root_created, extension_created = file_name_created.split(".", 1)
-        self.assertEqual(extension_created, extension)
-        self.assertTrue(re.match("[a-f0-9]{32}", file_root_created))
+        pf.filepath.save("test.html", ContentFile(b"asdf"))
+        self.assertIn("recap-data/", pf.filepath.name)
+        self.assertIn(".html", pf.filepath.name)
 
 
 class TestMimeLookup(SimpleTestCase):

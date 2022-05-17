@@ -6,7 +6,7 @@ from juriscraper.pacer import PacerRssFeed
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.storage import UUIDFileSystemStorage
+from cl.lib.storage import S3PrivateUUIDStorage
 from cl.search.models import Court
 
 
@@ -87,7 +87,7 @@ class RssFeedData(AbstractDateTimeModel):
     filepath = models.FileField(
         help_text="The path of the file in the local storage area.",
         upload_to=make_rss_feed_path,
-        storage=UUIDFileSystemStorage(),
+        storage=S3PrivateUUIDStorage(),
         max_length=150,
     )
 

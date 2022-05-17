@@ -1189,7 +1189,7 @@ def merge_pacer_docket_into_cl_docket(
     )
     pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
     pacer_file.filepath.save(
-        "docket.html",  # We only care about the ext w/UUIDFileSystemStorage
+        "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(report.response.text),
     )
 
@@ -1261,7 +1261,7 @@ def merge_attachment_page_data(
         content_object=de, upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE
     )
     pacer_file.filepath.save(
-        "attachment_page.html",  # Irrelevant b/c UUIDFileSystemStorage
+        "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
         ContentFile(text),
     )
 

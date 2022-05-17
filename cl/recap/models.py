@@ -3,11 +3,7 @@ from django.db import models
 
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel, AbstractFile
-from cl.lib.storage import (
-    AWSMediaStorage,
-    IncrementingAWSMediaStorage,
-    UUIDFileSystemStorage,
-)
+from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.recap.constants import DATASET_SOURCES, NOO_CODES, NOS_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 
@@ -64,7 +60,7 @@ class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
     filepath = models.FileField(
         help_text="The path of the original data from PACER.",
         upload_to=make_recap_data_path,
-        storage=UUIDFileSystemStorage(),
+        storage=S3PrivateUUIDStorage(),
         max_length=150,
     )
     upload_type = models.SmallIntegerField(
@@ -135,7 +131,7 @@ class ProcessingQueue(AbstractDateTimeModel):
     filepath_local = models.FileField(
         help_text="The path of the uploaded file.",
         upload_to=make_recap_processing_queue_path,
-        storage=UUIDFileSystemStorage(),
+        storage=S3PrivateUUIDStorage(),
         max_length=1000,
     )
     status = models.SmallIntegerField(

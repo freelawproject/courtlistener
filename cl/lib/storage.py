@@ -54,29 +54,10 @@ def get_name_by_incrementing(
     return name
 
 
-class UUIDFileSystemStorage(FileSystemStorage):
-    """Implements a simple UUID file system storage.
-
-    Useful when you don't care what the name of the file is, but you want it to
-    be unique. Keeps the path from upload_to param and the extension of the
-    original file.
-    """
-
-    def get_available_name(
-        self,
-        name: str,
-        max_length: Optional[int] = None,
-    ) -> str:
-        dir_name, file_name = os.path.split(name)
-        _, file_ext = os.path.splitext(file_name)
-        return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
-
-
 class AWSMediaStorage(S3Boto3Storage):
     """Implements AWS file system storage with a few overrides"""
 
     location = ""
-    AWS_DEFAULT_ACL = settings.AWS_DEFAULT_ACL
     file_overwrite = True
 
     def get_object_parameters(self, name: str) -> Dict[str, str]:
@@ -108,3 +89,25 @@ class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
 
 class RecapEmailSESStorage(S3Boto3Storage):
     bucket_name = "recap.email"
+
+
+class S3PrivateUUIDStorage(S3Boto3Storage):
+    """Implements a UUID file system storage.
+
+    Useful when you don't care what the name of the file is, but you want it to
+    be unique. Keeps the path from upload_to param and the extension of the
+    original file.
+    """
+
+    default_acl = "private"
+    bucket_name = "com-courtlistener-private-storage"
+    file_overwrite = True
+
+    def get_available_name(
+        self,
+        name: str,
+        max_length: Optional[int] = None,
+    ) -> str:
+        dir_name, file_name = os.path.split(name)
+        _, file_ext = os.path.splitext(file_name)
+        return os.path.join(dir_name, uuid.uuid4().hex + file_ext)

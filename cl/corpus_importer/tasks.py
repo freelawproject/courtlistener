@@ -1005,7 +1005,7 @@ def do_case_query_by_pacer_case_id(
         content_object=d, upload_type=UPLOAD_TYPE.CASE_REPORT_PAGE
     )
     pacer_file.filepath.save(
-        "case_report.html",  # We only care about the ext w/UUIDFileSystemStorage
+        "case_report.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(report.response.text),
     )
 
@@ -1426,7 +1426,7 @@ def get_bankr_claims_registry(
         content_object=d, upload_type=UPLOAD_TYPE.CLAIMS_REGISTER
     )
     pacer_file.filepath.save(
-        "random.html",  # We only care about the ext w/UUIDFileSystemStorage
+        "random.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
         ContentFile(report.response.text),
     )
 

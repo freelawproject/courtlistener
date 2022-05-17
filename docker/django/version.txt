@@ -1,5 +1,14 @@
-2.0.6
+2.0.14
 
+2.0.15 - Add django-override-storage
+2.0.14 - Update code
+2.0.13 - Update code
+2.0.12 - Update code
+2.0.11 - Update code
+2.0.10 - Update code
+2.0.9 - Update code
+2.0.8 - Update code
+2.0.7 - Update django dep
 2.0.6 - Update code
 2.0.5 - Update code
 2.0.4 - Update code
