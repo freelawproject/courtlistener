@@ -1190,7 +1190,7 @@ def merge_pacer_docket_into_cl_docket(
     pacer_file = PacerHtmlFiles(content_object=d, upload_type=upload_type)
     pacer_file.filepath.save(
         "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(report.response.text),
+        ContentFile(report.response.text.encode()),
     )
 
     rds_created, content_updated = add_docket_entries(
@@ -1262,7 +1262,7 @@ def merge_attachment_page_data(
     )
     pacer_file.filepath.save(
         "attachment_page.html",  # Irrelevant b/c S3PrivateUUIDStorageTest
-        ContentFile(text),
+        ContentFile(text.encode()),
     )
 
     # Create/update the attachment items.

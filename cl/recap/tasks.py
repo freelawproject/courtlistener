@@ -526,7 +526,7 @@ def process_recap_docket(self, pk):
     )
     pacer_file.filepath.save(
         "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(text),
+        ContentFile(text.encode()),
     )
 
     rds_created, content_updated = add_docket_entries(
@@ -700,7 +700,7 @@ def process_recap_claims_register(self, pk):
     pacer_file.filepath.save(
         # We only care about the ext w/S3PrivateUUIDStorageTest
         "claims_registry.html",
-        ContentFile(text),
+        ContentFile(text.encode()),
     )
 
     mark_pq_successful(pq, d_id=d.pk)
@@ -782,7 +782,7 @@ def process_recap_docket_history_report(self, pk):
     pacer_file.filepath.save(
         # We only care about the ext w/S3PrivateUUIDStorageTest
         "docket_history.html",
-        ContentFile(text),
+        ContentFile(text.encode()),
     )
 
     rds_created, content_updated = add_docket_entries(
@@ -878,7 +878,7 @@ def process_recap_appellate_docket(self, pk):
     )
     pacer_file.filepath.save(
         "docket.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(text),
+        ContentFile(text.encode()),
     )
 
     rds_created, content_updated = add_docket_entries(
@@ -1536,7 +1536,7 @@ def process_recap_email(
     )
     pacer_file.filepath.save(
         "docket.txt",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(body),
+        ContentFile(body.encode()),
     )
 
     rds_created, content_updated = add_docket_entries(

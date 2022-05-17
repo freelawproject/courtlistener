@@ -1006,7 +1006,7 @@ def do_case_query_by_pacer_case_id(
     )
     pacer_file.filepath.save(
         "case_report.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(report.response.text),
+        ContentFile(report.response.text.encode()),
     )
 
     logger.info(f"Created/updated docket: {d}")
@@ -1427,7 +1427,7 @@ def get_bankr_claims_registry(
     )
     pacer_file.filepath.save(
         "random.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(report.response.text),
+        ContentFile(report.response.text.encode()),
     )
 
     if not claims_data:
