@@ -1,11 +1,17 @@
 import random
+from datetime import datetime
 
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 
 from cl.search.models import SEARCH_TYPES
-from cl.users.email_handlers import broken_email_address
+from cl.users.models import (
+    EMAIL_NOTIFICATIONS,
+    OBJECT_TYPES,
+    BackoffEvent,
+    EmailFlag,
+)
 
 
 def inject_settings(request):
@@ -96,15 +102,56 @@ def inject_random_tip(request):
     return {"TIP": random.choice(info_tips)}
 
 
-def inject_broken_email_address(request: HttpRequest) -> dict:
+PERMANENT = {
+    EMAIL_NOTIFICATIONS.GENERAL: "Your email provider sent a hard "
+    "bounce message indicating we can't continue sending messages to your "
+    "current email address. "
+    "Please consider changing your email address.",
+    EMAIL_NOTIFICATIONS.NO_EMAIL: "Your email provider sent a bounce "
+    "message indicating that your email address doesn't exist. Please "
+    "consider changing your email address.",
+    EMAIL_NOTIFICATIONS.COMPLAINT: "We've received a complaint from "
+    "your email provider indicating that you don't want to receive emails "
+    "from us. Please consider changing your email address.",
+}
+
+TRANSIENT = {
+    EMAIL_NOTIFICATIONS.GENERAL: "The last messages we sent to your email "
+    "address have bounced back. We are still attempting to fix this problem "
+    "by resending messages.",
+    EMAIL_NOTIFICATIONS.MAILBOX_FULL: "Your email provider sent a "
+    "bounce message because your inbox was full. Please consider clearing out "
+    "your email inbox.",
+}
+
+
+def validate_email_address(
+    request: HttpRequest,
+) -> dict[str, datetime | str] | dict:
     """This function injects the status of the user's email address.
 
     :param request: The HttpRequest.
     return dict: A dictionary of values for the broken email address banner.
     """
-
-    email = ""
     if request.user.is_authenticated:
         email = request.user.email
-
-    return broken_email_address(email)
+        email_banned = EmailFlag.objects.filter(
+            email_address=email, object_type=OBJECT_TYPES.BAN
+        )
+        if email_banned.exists():
+            msg = PERMANENT.get(
+                email_banned[0].event_sub_type,
+                PERMANENT[EMAIL_NOTIFICATIONS.GENERAL],
+            )
+            return {
+                "email_banned_date": email_banned[0].date_created,
+                "email_msg": msg,
+            }
+        backoff_event = BackoffEvent.objects.filter(email_address=email)
+        if backoff_event.exists():
+            msg = TRANSIENT.get(
+                backoff_event[0].notification_subtype,
+                TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
+            )
+            return {"email_msg": msg}
+    return {}

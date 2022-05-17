@@ -37,7 +37,6 @@ from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
-from cl.users.email_handlers import broken_email_address
 from cl.users.forms import (
     CustomPasswordChangeForm,
     EmailConfirmationForm,
@@ -290,19 +289,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         user_form.save()
 
         return HttpResponseRedirect(reverse("view_settings"))
-
-    email_broken = broken_email_address(user.email)
-    if email_broken["EMAIL_BROKEN_BANNER"]["show"]:
-        if email_broken["EMAIL_BROKEN_BANNER"]["error_type"] == "PERMANENT":
-            msg_type = messages.ERROR
-        else:
-            msg_type = messages.WARNING
-        text_msg = email_broken["EMAIL_BROKEN_BANNER"]["msg"]
-        messages.add_message(
-            request,
-            msg_type,
-            text_msg,
-        )
 
     return render(
         request,
