@@ -2023,6 +2023,14 @@ python-versions = "*"
 types-urllib3 = "<1.27"
 
 [[package]]
+name = "types-simplejson"
+version = "3.17.6"
+description = "Typing stubs for simplejson"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "types-urllib3"
 version = "1.26.11"
 description = "Typing stubs for urllib3"
@@ -2139,7 +2147,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "1317bbe2f9046241efa52b87b69fe92ee551f65be6bf11241f141132580c2800"
+content-hash = "8739bff775c8bc99f2b3c2a23fbc02c1f6a9d07dc6e9b49b97a22c9a8a03df2f"
 
 [metadata.files]
 amqp = [
@@ -3442,6 +3450,10 @@ types-redis = [
 types-requests = [
     {file = "types-requests-2.27.12.tar.gz", hash = "sha256:fd1382fa2e28eac848faedb0332840204f06f0cb517008e3c7b8282ca53e56d2"},
     {file = "types_requests-2.27.12-py3-none-any.whl", hash = "sha256:120c949953b618e334bbe78de38e65aa261e1f48df021a05f0be833a848e4ba7"},
+]
+types-simplejson = [
+    {file = "types-simplejson-3.17.6.tar.gz", hash = "sha256:ffa2eddd49e8e4a61d552f1f17e620d90ec872788622424f2c61ac292fbc6fa8"},
+    {file = "types_simplejson-3.17.6-py3-none-any.whl", hash = "sha256:c92336cee5361b2a33c68b479ca3f24da2bfe39c7de5f49b3c017c21446cbfc7"},
 ]
 types-urllib3 = [
     {file = "types-urllib3-1.26.11.tar.gz", hash = "sha256:24d64e441168851eb05f1d022de18ae31558f5649c8f1117e384c2e85e31315b"},

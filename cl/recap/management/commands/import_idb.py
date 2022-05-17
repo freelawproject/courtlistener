@@ -1,7 +1,7 @@
 import re
 import sys
 from datetime import date
-from typing import Dict
+from typing import Dict, Optional
 
 from dateutil import parser
 from django.core.management import CommandError
@@ -21,7 +21,9 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Court
 
 
-def create_or_update_row(values: Dict[str, str]) -> FjcIntegratedDatabase:
+def create_or_update_row(
+    values: Dict[str, str],
+) -> Optional[FjcIntegratedDatabase]:
     fjc_filters = [
         {
             "district": values["district"],

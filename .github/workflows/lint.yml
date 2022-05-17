@@ -60,9 +60,9 @@ jobs:
           -p cl.corpus_importer \
           -p cl.lib \
           -p cl.opinion_page \
+          -p cl.recap_rss \
           -p cl.settings \
-          -p cl.simple_pages \
-          -p cl.recap_rss
+          -p cl.simple_pages
 
       # Add files here as they're ready
       - name: mypy Static Type Cheker (files)
@@ -78,6 +78,7 @@ jobs:
           cl/corpus_importer/management/commands/import_tn.py \
           cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
+          cl/recap/tasks.py \
           cl/tests/utils.py \
           cl/users/management/commands/cl_account_management.py \
           cl/users/forms.py \

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterator
 
 from juriscraper.pacer import DocketReport
 from tqdm import tqdm
@@ -36,7 +36,7 @@ def make_html(options: Dict[str, int]) -> None:
         upload_type=UPLOAD_TYPE.DOCKET
     ).order_by("pk")[offset:]
     total = pacer_files.count()
-    pacer_files = pacer_files.iterator()
+    pacer_file_iterator = pacer_files.iterator()
     progress_bar = tqdm(
         total=total,
         dynamic_ncols=True,
@@ -45,7 +45,7 @@ def make_html(options: Dict[str, int]) -> None:
     )
     process_map(
         _write_anon_item_to_disk,
-        pacer_files,
+        pacer_file_iterator,
         max_workers=options["processes"],
         tqdm_class=progress_bar,
         chunksize=500,
