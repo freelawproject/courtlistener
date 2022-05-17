@@ -130,8 +130,8 @@ def validate_email_address(
 ) -> dict[str, datetime | str] | dict:
     """This function injects the status of the user's email address.
 
-    :param request: The HttpRequest.
-    return dict: A dictionary of values for the broken email address banner.
+    :param request: Contains the user for checking if their email is valid.
+    return dict: The message and date for the user's email status.
     """
     if request.user.is_authenticated:
         email = request.user.email
