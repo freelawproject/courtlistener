@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Union
 from zipfile import ZipFile
 
@@ -357,7 +358,7 @@ def process_recap_pdf(self, pk):
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def process_recap_zip(self, pk):
+def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
     """Process a zip uploaded from a PACER district court
 
     The general process is to use our existing infrastructure. We open the zip,
@@ -373,9 +374,8 @@ def process_recap_zip(self, pk):
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     logger.info("Processing RECAP zip (debug is: %s): %s", pq.debug, pq)
-    filepath = pq.filepath_local.name
-
-    with ZipFile(filepath, "r") as archive:
+    zip_bytes = BytesIO(pq.filepath_local.read())
+    with ZipFile(zip_bytes, "r") as archive:
         # Security: Check for zip bombs.
         max_file_size = convert_size_to_bytes("200MB")
         for zip_info in archive.infolist():
