@@ -20,6 +20,7 @@ from juriscraper.pacer import (
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
 from cl.people_db.models import AttorneyOrganization, Role
+from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Court, Docket
 
@@ -273,9 +274,9 @@ def process_docket_data(
     return d.pk
 
 
-def normalize_attorney_role(r: str) -> dict[str, Optional[str | int]]:
+def normalize_attorney_role(r: str) -> RoleType:
     """Normalize attorney roles into the valid set"""
-    role = {"role": None, "date_action": None, "role_raw": r}
+    role: RoleType = {"role": None, "date_action": None, "role_raw": r}
 
     r = r.lower()
     # Bad values we can expect. Nuke these early so they don't cause problems.

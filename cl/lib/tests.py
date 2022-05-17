@@ -1,5 +1,5 @@
 import datetime
-from typing import Tuple, TypedDict
+from typing import Tuple, TypedDict, cast
 
 from django.core.files.base import ContentFile
 from django.db.models import F
@@ -396,7 +396,7 @@ class TestPACERPartyParsing(SimpleTestCase):
                 f"Normalizing PACER role of '{pair['q']}' to '{pair['a']}'...",
                 end="",
             )
-            result = normalize_attorney_role(pair["q"])
+            result = normalize_attorney_role(cast(str, pair["q"]))
             self.assertEqual(result, pair["a"])
             print("✓")
 
