@@ -877,7 +877,8 @@ class RecapZipTaskTest(TestCase):
             court_id="scotus",
             uploader=user,
             pacer_case_id="asdf",
-            filepath_local=os.path.join(cls.test_dir, filename),
+            filepath_local__from_path=os.path.join(cls.test_dir, filename),
+            filepath_local__filename="some.zip",
             upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
         )
 
@@ -890,6 +891,7 @@ class RecapZipTaskTest(TestCase):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
         pq = ProcessingQueue.objects.get(id=self.pq.id)
+        print(pq.__dict__)
         results = process_recap_zip(pq.pk)
         pq.refresh_from_db()
         self.assertEqual(

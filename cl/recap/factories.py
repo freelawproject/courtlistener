@@ -1,5 +1,5 @@
 from factory import SubFactory
-from factory.django import DjangoModelFactory
+from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice
 
 from cl.recap.constants import DATASET_SOURCES
@@ -19,3 +19,5 @@ class FjcIntegratedDatabaseFactory(DjangoModelFactory):
 class ProcessingQueueFactory(DjangoModelFactory):
     class Meta:
         model = ProcessingQueue
+
+    filepath_local = FileField(filename=None)
