@@ -44,9 +44,14 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group  {% if EMAIL_BROKEN_BANNER.show %} {% if EMAIL_BROKEN_BANNER.error_type == 'PERMANENT' %} alert alert-danger {% else %}  alert alert-warning {% endif %} {% endif %}">
+            <div class="form-group {% if email_msg %} alert alert-danger {% endif %}">
                 <label for="id_email">Email (will log you out until re-confirmed)*</label>
                 {{ user_form.email }}
+                {% if email_msg %}
+                    <p class="help-block">
+                        {{ email_msg|safe }}
+                    </p>
+                {% endif %}
                 {% if user_form.email.errors %}
                     <p class="help-block">
                         {% for error in user_form.email.errors %}
