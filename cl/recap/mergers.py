@@ -1,6 +1,7 @@
 # Code for merging PACER content into the DB
 import logging
 import re
+from copy import deepcopy
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -693,7 +694,7 @@ def add_docket_entries(d, docket_entries, tags=None):
     return rds_created, content_updated
 
 
-def check_json_for_terminated_entities(parties):
+def check_json_for_terminated_entities(parties) -> bool:
     """Check the parties and attorneys to find if any terminated entities
 
     If so, we can assume that the user checked the box for "Terminated Parties"
@@ -896,11 +897,20 @@ def add_parties_and_attorneys(d, parties):
         # we have.
         return
 
-    normalize_attorney_roles(parties)
+    # Recall that Python is pass by reference. This means that if we mutate
+    # the parties variable in this function and then retry this function (note
+    # the decorator it has), the second time this function runs, it will not be
+    # run with the initial value of the parties variable, but will instead be
+    # run with the mutated value! That will crash because the mutated variable
+    # no longer has the correct shape as it did when it was first passed.
+    # ∴, make a copy of parties as a first step, so that retries work.
+    local_parties = deepcopy(parties)
+
+    normalize_attorney_roles(local_parties)
 
     updated_parties = set()
     updated_attorneys = set()
-    for party in parties:
+    for party in local_parties:
         ps = Party.objects.filter(
             name=party["name"], party_types__docket=d
         ).distinct()
@@ -978,7 +988,7 @@ def add_parties_and_attorneys(d, parties):
             updated_attorneys.add(add_attorney(atty, p, d))
 
     disassociate_extraneous_entities(
-        d, parties, updated_parties, updated_attorneys
+        d, local_parties, updated_parties, updated_attorneys
     )
 
 

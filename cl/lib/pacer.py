@@ -273,7 +273,7 @@ def process_docket_data(
     return d.pk
 
 
-def normalize_attorney_role(r):
+def normalize_attorney_role(r: str) -> dict[str, Optional[str | int]]:
     """Normalize attorney roles into the valid set"""
     role = {"role": None, "date_action": None, "role_raw": r}
 
