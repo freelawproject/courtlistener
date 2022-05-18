@@ -24,7 +24,8 @@ from cl.users.email_handlers import (
     get_email_body,
     normalize_addresses,
 )
-from cl.users.factories import UserFactory
+from cl.users.factories import EmailSentFactory, UserFactory
+from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.models import (
     OBJECT_TYPES,
     SUB_TYPES,
@@ -2142,3 +2143,33 @@ class CustomBackendEmailTest(TestCase):
         self.assertEqual(
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
+
+
+class DeleteOldEmailsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.msg1 = EmailSentFactory()
+        cls.msg2 = EmailSentFactory()
+        cls.msg3 = EmailSentFactory()
+        # Update date_created to simulate two emails are older than 15 days
+        cls.msg1.date_created = now() - timedelta(days=16)
+        cls.msg1.save()
+        cls.msg2.date_created = now() - timedelta(days=16)
+        cls.msg2.save()
+
+    def test_delete_old_emails(self):
+        """This test checks if delete_old_emails function works properly
+        it should delete only emails older than the specified number of days.
+        """
+
+        stored_email = EmailSent.objects.all()
+        # Before deleting emails there should be 3 stored emails
+        self.assertEqual(stored_email.count(), 3)
+
+        # Delete emails older than 15 days.
+        older_than_days = 15
+        deleted = delete_old_emails(older_than_days)
+        self.assertEqual(deleted, 2)
+
+        # After deleting there should be 1 stored email
+        self.assertEqual(stored_email.count(), 1)
