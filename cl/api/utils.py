@@ -23,7 +23,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
-from rest_framework_filters import RelatedFilter
+from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.lib.redis_utils import make_redis_interface
@@ -78,6 +78,22 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
 
     def to_html(self, request, queryset, view):
         return ""
+
+
+class NoEmptyFilterSet(FilterSet):
+    """A custom filterset to ensure we don't get empty filter parameters."""
+
+    def __init__(
+        self, data=None, queryset=None, *, relationship=None, **kwargs
+    ):
+        # Remove any empty query parameters from the QueryDict. Fixes #2066
+        if data:
+            # Make a mutable copy so we can tweak it.
+            data = data.copy()
+            [data.pop(k) for k, v in list(data.items()) if not v]
+        super().__init__(
+            data=data, queryset=queryset, relationship=relationship, **kwargs
+        )
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
