@@ -102,7 +102,7 @@ TEMPLATES = [
                 "django.template.context_processors.static",
                 "cl.lib.context_processors.inject_settings",
                 "cl.lib.context_processors.inject_random_tip",
-                "cl.lib.context_processors.validate_email_address",
+                "cl.lib.context_processors.inject_email_ban_status",
             ),
             "debug": DEBUG,
         },

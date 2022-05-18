@@ -121,11 +121,11 @@ TRANSIENT = {
     "by resending messages.",
     EMAIL_NOTIFICATIONS.MAILBOX_FULL: "Your email provider sent a "
     "bounce message because your inbox was full. Please consider clearing out "
-    "your email inbox.",
+    "your inbox.",
 }
 
 
-def validate_email_address(
+def inject_email_ban_status(
     request: HttpRequest,
 ) -> dict[str, datetime | str] | dict:
     """This function injects the status of the user's email address.
@@ -144,8 +144,8 @@ def validate_email_address(
                 PERMANENT[EMAIL_NOTIFICATIONS.GENERAL],
             )
             return {
-                "email_banned_date": email_banned[0].date_created,
-                "email_msg": msg,
+                "EMAIL_BAN_DATE": email_banned[0].date_created,
+                "EMAIL_BAN_REASON": msg,
             }
         backoff_event = BackoffEvent.objects.filter(email_address=email)
         if backoff_event.exists():
@@ -153,5 +153,5 @@ def validate_email_address(
                 backoff_event[0].notification_subtype,
                 TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
             )
-            return {"email_msg": msg}
+            return {"EMAIL_BAN_REASON": msg}
     return {}

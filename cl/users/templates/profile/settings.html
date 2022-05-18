@@ -44,12 +44,12 @@
                     </div>
                 </div>
             </div>
-            <div class="form-group {% if email_msg %} alert alert-danger {% endif %}">
+            <div class="form-group {% if EMAIL_BAN_REASON %} alert alert-danger {% endif %}">
                 <label for="id_email">Email (will log you out until re-confirmed)*</label>
                 {{ user_form.email }}
-                {% if email_msg %}
+                {% if EMAIL_BAN_REASON %}
                     <p class="help-block">
-                        {{ email_msg|safe }}
+                        {{ EMAIL_BAN_REASON|safe }}
                     </p>
                 {% endif %}
                 {% if user_form.email.errors %}

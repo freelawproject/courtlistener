@@ -133,20 +133,21 @@
     {% endif %}
 
     <!-- Broken Email Banner -->
-    {% if email_msg %}
+    {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
         <div class="container-fluid">
           <div class="row">
             <div class="col-lg-12">
               <p class="navbar-text lead">
-                {% if email_banned_date %}
-                  Hi {{ request.user.first_name }}, our servers stopped sending emails to the address in your profile on {{email_banned_date|date:'M d, Y'}}. Please update your email address to begin receiving emails again. If you think this was incorrect please get in <a href="{% url 'contact' %}">contact here</a>.
+                <i class="fa fa-warning"></i>
+                {% if EMAIL_BAN_DATE %}
+                  We are currently unable to send emails to you. Please update your email address to continue receiving emails.
                 {% else %}
-                  Hi {{ request.user.first_name }}, it looks like our last few emails haven't gone through to your inbox. If this problem persists, our servers will automatically stop sending emails to the address in your account profile.
+                  We are having difficulty sending emails to you, but we're continuing to try. If this problem persists, our servers will automatically stop sending you messages.
                 {% endif %}
               </br>
                 <a href="{% url 'broken_email_help' %}"
-                  class="btn btn-default v-offset-above-1 pull-right">Click here to learn more</a>
+                  class="btn btn-default v-offset-above-1 pull-right">Learn More</a>
               </p>
             </div>
           </div>
