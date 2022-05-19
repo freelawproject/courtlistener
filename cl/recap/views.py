@@ -3,8 +3,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
+from cl.api.pagination import BigPagination
 from cl.api.utils import (
-    BigPagination,
     EmailProcessingQueueAPIUsers,
     LoggingMixin,
     RECAPUploaders,

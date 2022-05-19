@@ -14,7 +14,6 @@ class LegalProvider(BaseProvider):
         """Generate a random ID that can be used in a handful of places like:
 
          - The PK of the court (because they use chars)
-         - the cl_id field of people
 
         :return a str with random chars
         """

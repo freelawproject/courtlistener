@@ -15,7 +15,6 @@ class PersonFactory(DjangoModelFactory):
         model = Person
 
     date_completed = LazyFunction(now)
-    cl_id = Faker("random_id")
     name_first = Faker("name_female")
     name_last = Faker("last_name")
     name_suffix = FuzzyChoice(SUFFIXES, getter=lambda c: c[0])

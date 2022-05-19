@@ -1,3 +1,4 @@
+from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.forms import ModelForm
@@ -26,7 +27,7 @@ from cl.search.tasks import add_items_to_solr
 
 
 @admin.register(Opinion)
-class OpinionAdmin(admin.ModelAdmin):
+class OpinionAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "cluster",
         "author",
@@ -57,7 +58,7 @@ class OpinionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Citation)
-class CitationAdmin(admin.ModelAdmin):
+class CitationAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("cluster",)
     list_display = (
         "__str__",
@@ -77,7 +78,7 @@ class CitationInline(admin.TabularInline):
 
 
 @admin.register(OpinionCluster)
-class OpinionClusterAdmin(admin.ModelAdmin):
+class OpinionClusterAdmin(CursorPaginatorAdmin):
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
     raw_id_fields = (
@@ -123,7 +124,7 @@ class ClaimHistoryInline(admin.StackedInline):
 
 
 @admin.register(Claim)
-class ClaimAdmin(admin.ModelAdmin):
+class ClaimAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket", "tags")
 
     inlines = (ClaimHistoryInline,)
@@ -139,7 +140,7 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(admin.ModelAdmin):
+class RECAPDocumentAdmin(CursorPaginatorAdmin):
     search_fields = ("pk__exact",)
     raw_id_fields = ("docket_entry", "tags")
     readonly_fields = (
@@ -217,7 +218,7 @@ class RECAPDocumentInline(admin.StackedInline):
 
 
 @admin.register(DocketEntry)
-class DocketEntryAdmin(admin.ModelAdmin):
+class DocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (RECAPDocumentInline,)
     raw_id_fields = ("docket", "tags")
     readonly_fields = (
@@ -241,7 +242,7 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Docket)
-class DocketAdmin(admin.ModelAdmin):
+class DocketAdmin(CursorPaginatorAdmin):
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (
         DocketEntryInline,
@@ -295,7 +296,7 @@ class DocketAdmin(admin.ModelAdmin):
 
 
 @admin.register(OpinionsCited)
-class OpinionsCitedAdmin(admin.ModelAdmin):
+class OpinionsCitedAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "citing_opinion",
         "cited_opinion",
@@ -310,7 +311,7 @@ class OpinionsCitedAdmin(admin.ModelAdmin):
 
 
 @admin.register(Parenthetical)
-class ParentheticalAdmin(admin.ModelAdmin):
+class ParentheticalAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "describing_opinion",
         "described_opinion",
@@ -320,7 +321,7 @@ class ParentheticalAdmin(admin.ModelAdmin):
 
 
 @admin.register(ParentheticalGroup)
-class ParentheticalGroupAdmin(admin.ModelAdmin):
+class ParentheticalGroupAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "opinion",
         "representative",

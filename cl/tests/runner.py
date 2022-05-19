@@ -53,7 +53,7 @@ class TestRunner(DiscoverRunner):
             "--enable-logging",
             action="store_true",
             default=False,
-            help="Actually edit the database",
+            help="Display all log lines",
         )
         super().add_arguments(parser)
 

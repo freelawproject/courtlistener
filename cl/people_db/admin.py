@@ -1,3 +1,4 @@
+from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.forms import ModelForm
@@ -185,12 +186,12 @@ class RaceAdmin(admin.ModelAdmin):
 
 
 @admin.register(Party)
-class PartyAdmin(admin.ModelAdmin):
+class PartyAdmin(CursorPaginatorAdmin):
     search_fields = ("name",)
 
 
 @admin.register(PartyType)
-class PartyTypeAdmin(admin.ModelAdmin):
+class PartyTypeAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "party",
         "docket",
@@ -208,7 +209,7 @@ class CriminalCountAdmin(admin.ModelAdmin):
 
 
 @admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+class RoleAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "party",
         "attorney",
@@ -224,13 +225,13 @@ class RoleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Attorney)
-class AttorneyAdmin(admin.ModelAdmin):
+class AttorneyAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("organizations",)
     search_fields = ("name",)
 
 
 @admin.register(AttorneyOrganizationAssociation)
-class AttorneyOrgAssAdmin(admin.ModelAdmin):
+class AttorneyOrgAssAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "attorney",
         "attorney_organization",
@@ -245,7 +246,7 @@ class AttorneyOrgAssAdmin(admin.ModelAdmin):
 
 
 @admin.register(AttorneyOrganization)
-class AttorneyOrganizationAdmin(admin.ModelAdmin):
+class AttorneyOrganizationAdmin(CursorPaginatorAdmin):
     search_fields = (
         "name",
         "address1",

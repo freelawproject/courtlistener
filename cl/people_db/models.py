@@ -98,13 +98,6 @@ class Person(AbstractDateTimeModel):
         unique=True,
         db_index=True,
     )
-    cl_id = models.CharField(
-        max_length=30,
-        help_text="A unique identifier for judge, also indicating source of "
-        "data.",
-        unique=True,
-        db_index=True,
-    )
     slug = models.SlugField(
         help_text="A generated path for this item as used in CourtListener "
         "URLs",
@@ -272,7 +265,7 @@ class Person(AbstractDateTimeModel):
         out = {
             "id": self.pk,
             "fjc_id": self.fjc_id,
-            "cl_id": self.cl_id,
+            "cl_id": "none",  # Deprecated, but required by Solr
             "alias_ids": [alias.pk for alias in self.aliases.all()],
             "races": [r.get_race_display() for r in self.race.all()],
             "gender": self.get_gender_display(),

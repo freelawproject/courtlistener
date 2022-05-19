@@ -1,6 +1,5 @@
 import rest_framework_filters as filters
 from django.db.models import QuerySet
-from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
     ALL_TEXT_LOOKUPS,
@@ -8,6 +7,7 @@ from cl.api.utils import (
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
+    NoEmptyFilterSet,
 )
 from cl.people_db.lookup_utils import lookup_judge_by_name_components
 from cl.people_db.models import (
@@ -27,7 +27,7 @@ from cl.search.filters import CourtFilter
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 
-class SourceFilter(FilterSet):
+class SourceFilter(NoEmptyFilterSet):
     class Meta:
         model = Source
         fields = {
@@ -37,7 +37,7 @@ class SourceFilter(FilterSet):
         }
 
 
-class ABARatingFilter(FilterSet):
+class ABARatingFilter(NoEmptyFilterSet):
     class Meta:
         model = ABARating
         fields = {
@@ -50,7 +50,7 @@ class ABARatingFilter(FilterSet):
         }
 
 
-class PoliticalAffiliationFilter(FilterSet):
+class PoliticalAffiliationFilter(NoEmptyFilterSet):
     class Meta:
         model = PoliticalAffiliation
         fields = {
@@ -65,7 +65,7 @@ class PoliticalAffiliationFilter(FilterSet):
         }
 
 
-class SchoolFilter(FilterSet):
+class SchoolFilter(NoEmptyFilterSet):
     educations = filters.RelatedFilter(
         "cl.people_db.filters.EducationFilter",
         queryset=Education.objects.all(),
@@ -82,7 +82,7 @@ class SchoolFilter(FilterSet):
         }
 
 
-class EducationFilter(FilterSet):
+class EducationFilter(NoEmptyFilterSet):
     school = filters.RelatedFilter(SchoolFilter, queryset=School.objects.all())
     person = filters.RelatedFilter(
         "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
@@ -101,7 +101,7 @@ class EducationFilter(FilterSet):
         }
 
 
-class RetentionEventFilter(FilterSet):
+class RetentionEventFilter(NoEmptyFilterSet):
     class Meta:
         model = RetentionEvent
         fields = {
@@ -118,7 +118,7 @@ class RetentionEventFilter(FilterSet):
         }
 
 
-class PositionFilter(FilterSet):
+class PositionFilter(NoEmptyFilterSet):
     court = filters.RelatedFilter(CourtFilter, queryset=Court.objects.all())
     retention_events = filters.RelatedFilter(
         RetentionEventFilter, queryset=RetentionEvent.objects.all()
@@ -157,7 +157,7 @@ class PositionFilter(FilterSet):
         }
 
 
-class PersonDisclosureFilter(FilterSet):
+class PersonDisclosureFilter(NoEmptyFilterSet):
     """Filters for looking up judges in the disclosure pages"""
 
     fullname = filters.Filter(method="filter_fullname")
@@ -175,7 +175,7 @@ class PersonDisclosureFilter(FilterSet):
         fields = {}
 
 
-class PersonFilter(FilterSet):
+class PersonFilter(NoEmptyFilterSet):
     educations = filters.RelatedFilter(
         EducationFilter,
         queryset=Education.objects.all(),
@@ -249,7 +249,7 @@ class PersonFilter(FilterSet):
         }
 
 
-class PartyFilter(FilterSet):
+class PartyFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="dockets",
@@ -271,7 +271,7 @@ class PartyFilter(FilterSet):
         }
 
 
-class AttorneyFilter(FilterSet):
+class AttorneyFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",

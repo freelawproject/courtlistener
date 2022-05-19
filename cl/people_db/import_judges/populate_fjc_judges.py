@@ -421,31 +421,6 @@ def add_positions_from_row(item, person, testing, fix_nums=None):
             sources.save()
 
 
-def update_bankruptcy_and_magistrate(testing=False):
-
-    # Update bankruptcy positions.
-
-    positions = Position.object.filter(job_title__icontains="Bankruptcy")
-    for position in positions:
-        location = position.location
-        bcourt = match_court_string(location, bankruptcy=True)
-        if bcourt is None:
-            continue
-        position.court_id = bcourt
-        position.position_type = "jud"
-        if not testing:
-            position.save()
-
-        positions = Position.object.filter(job_title__icontains="Magistrate")
-        for position in positions:
-            location = position.location
-            mcourt = match_court_string(location, federal_district=True)
-            position.court_id = mcourt
-            position.position_type = "m-jud"
-            if not testing:
-                position.save()
-
-
 def make_federal_judge(item, testing=False):
     """Takes the federal judge data <item> and associates it with a Judge object.
     Returns a Judge object.
@@ -460,7 +435,7 @@ def make_federal_judge(item, testing=False):
     # if foreign-born, leave blank for now.
     if len(dob_state) > 2:
         dob_state = ""
-    name = f"{item['cl_id']}: {item['First Name']} {item['Last Name']} {str(date_dob)}"
+    name = f"{item['First Name']} {item['Last Name']} {str(date_dob)}"
     fjc_check = Person.objects.filter(fjc_id=item["jid"])
     if len(fjc_check) > 0:
         print(f"Warning: {name} exists")
@@ -505,7 +480,6 @@ def make_federal_judge(item, testing=False):
             name_suffix=get_suffix(item["Suffix"]),
             gender=gender,
             fjc_id=item["jid"],
-            cl_id=item["cl_id"],
             date_dob=date_dob,
             date_granularity_dob=date_granularity_dob,
             dob_city=dob_city,
@@ -663,13 +637,8 @@ def make_mag_bk_judge(item, testing=False):
     SOURCE: https://www.uscourts.gov/judicial-milestones/phyllis-m-jones
     """
 
-    name = "{CL_ID}: {NAME_FIRST} {NAME_LAST}".format(**item)
+    name = "{NAME_FIRST} {NAME_LAST}".format(**item)
     print(f"Now processing: {name}")
-
-    if Person.objects.filter(cl_id=item["CL_ID"]).exists():
-        raise ValidationError(
-            f"CL_ID already exists for the record being imported: {name}"
-        )
 
     if Person.objects.filter(
         name_first=item["NAME_FIRST"],
@@ -699,7 +668,6 @@ def make_mag_bk_judge(item, testing=False):
         name_last=item["NAME_LAST"],
         name_suffix=suffix,
         gender=gender,
-        cl_id=item["CL_ID"],
     )
 
     if not testing:

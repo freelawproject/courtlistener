@@ -1,6 +1,11 @@
-from rest_framework_filters import FilterSet, filters
+from rest_framework_filters import filters
 
-from cl.api.utils import ALL_TEXT_LOOKUPS, BOOLEAN_LOOKUPS, DATETIME_LOOKUPS
+from cl.api.utils import (
+    ALL_TEXT_LOOKUPS,
+    BOOLEAN_LOOKUPS,
+    DATETIME_LOOKUPS,
+    NoEmptyFilterSet,
+)
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -22,7 +27,7 @@ disclosure_fields = {
 }
 
 
-class AgreementFilter(FilterSet):
+class AgreementFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         "cl.disclosures.filters.FinancialDisclosureFilter",
         queryset=FinancialDisclosure.objects.all(),
@@ -34,7 +39,7 @@ class AgreementFilter(FilterSet):
         fields.update({"parties_and_terms": ALL_TEXT_LOOKUPS})
 
 
-class DebtFilter(FilterSet):
+class DebtFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         "cl.disclosures.filters.FinancialDisclosureFilter",
         queryset=FinancialDisclosure.objects.all(),
@@ -45,7 +50,7 @@ class DebtFilter(FilterSet):
         fields = disclosure_fields.copy()
 
 
-class FinancialDisclosureFilter(FilterSet):
+class FinancialDisclosureFilter(NoEmptyFilterSet):
 
     agreements = filters.RelatedFilter(
         AgreementFilter,
@@ -96,7 +101,7 @@ class FinancialDisclosureFilter(FilterSet):
         }
 
 
-class GiftFilter(FilterSet):
+class GiftFilter(NoEmptyFilterSet):
 
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
@@ -113,7 +118,7 @@ class GiftFilter(FilterSet):
         }
 
 
-class InvestmentFilter(FilterSet):
+class InvestmentFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -133,7 +138,7 @@ class InvestmentFilter(FilterSet):
         )
 
 
-class NonInvestmentIncomeFilter(FilterSet):
+class NonInvestmentIncomeFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -144,7 +149,7 @@ class NonInvestmentIncomeFilter(FilterSet):
         fields = disclosure_fields.copy()
 
 
-class PositionFilter(FilterSet):
+class PositionFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -155,7 +160,7 @@ class PositionFilter(FilterSet):
         fields = disclosure_fields.copy()
 
 
-class ReimbursementFilter(FilterSet):
+class ReimbursementFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),
@@ -166,7 +171,7 @@ class ReimbursementFilter(FilterSet):
         fields = disclosure_fields.copy()
 
 
-class SpouseIncomeFilter(FilterSet):
+class SpouseIncomeFilter(NoEmptyFilterSet):
     financial_disclosure = filters.RelatedFilter(
         FinancialDisclosureFilter,
         queryset=FinancialDisclosure.objects.all(),

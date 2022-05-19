@@ -17,13 +17,13 @@ from django.utils.encoding import force_str
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
+from ipware import get_client_ip
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
-from rest_framework_filters import RelatedFilter
+from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.lib.redis_utils import make_redis_interface
@@ -78,6 +78,22 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
 
     def to_html(self, request, queryset, view):
         return ""
+
+
+class NoEmptyFilterSet(FilterSet):
+    """A custom filterset to ensure we don't get empty filter parameters."""
+
+    def __init__(
+        self, data=None, queryset=None, *, relationship=None, **kwargs
+    ):
+        # Remove any empty query parameters from the QueryDict. Fixes #2066
+        if data:
+            # Make a mutable copy so we can tweak it.
+            data = data.copy()
+            [data.pop(k) for k, v in list(data.items()) if not v]
+        super().__init__(
+            data=data, queryset=queryset, relationship=relationship, **kwargs
+        )
 
 
 class SimpleMetadataWithFilters(SimpleMetadata):
@@ -207,7 +223,7 @@ class LoggingMixin(object):
                 )
         return response
 
-    def _get_response_ms(self):
+    def _get_response_ms(self) -> int:
         """
         Get the duration of the request response cycle in milliseconds.
         In case of negative duration 0 is returned.
@@ -220,6 +236,7 @@ class LoggingMixin(object):
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
+        client_ip, is_routable = get_client_ip(request)
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
@@ -237,6 +254,13 @@ class LoggingMixin(object):
         user_pk = user.pk or "AnonymousUser"
         pipe.zincrby("api:v3.user.counts", 1, user_pk)
         pipe.zincrby(f"api:v3.user.d:{d}.counts", 1, user_pk)
+
+        # Use a hash to store a per-day map between IP addresses and user pks
+        # Get a user pk with: `hget api:v3.d:2022-05-18.ip_map 172.19.0.1`
+        if client_ip is not None:
+            ip_key = f"api:v3.d:{d}.ip_map"
+            pipe.hset(ip_key, client_ip, user_pk)
+            pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
@@ -353,21 +377,6 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
         "POST": ["%(app_label)s.has_recap_upload_access"],
         "GET": ["%(app_label)s.has_recap_upload_access"],
     }
-
-
-class TinyAdjustablePagination(PageNumberPagination):
-    page_size = 5
-    page_size_query_param = "page_size"
-    max_page_size = 20
-
-
-class MediumAdjustablePagination(PageNumberPagination):
-    page_size = 50
-    page_size_query_param = "page_size"
-
-
-class BigPagination(PageNumberPagination):
-    page_size = 300
 
 
 class BulkJsonHistory(object):
@@ -552,10 +561,10 @@ def get_user_ids_for_date_range(
 ) -> Set[int]:
     """Get a list of user IDs that used the API during a span of time
 
-    :param start: The beginning of when you want to find users (default: all
-    time). A str to be interpreted by dateparser.
-    :param end: The end of when you want to find users (default today).  A
-    str to be interpreted by dateparser.
+    :param start: The beginning of when you want to find users. A str to be
+    interpreted by dateparser.
+    :param end: The end of when you want to find users.  A str to be
+    interpreted by dateparser.
     :return Set of user IDs during a time period. Will not contain anonymous
     users.
     """
