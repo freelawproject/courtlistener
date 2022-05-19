@@ -257,7 +257,7 @@ class ApiEventCreationTestCase(TestCase):
         Event.objects.all().delete()
         self.flush_stats()
 
-    def hit_the_api(self) -> None:
+    def hit_the_api(self):
         path = reverse("audio-list", kwargs={"version": "v3"})
         request = RequestFactory().get(path)
 
