@@ -1,3 +1,4 @@
+from admin_cursor_paginator import CursorPaginatorAdmin
 from django.conf import settings
 from django.contrib import admin
 from django.utils.safestring import mark_safe
@@ -37,7 +38,7 @@ class FinancialDisclosureAdmin(admin.ModelAdmin):
 
 
 @admin.register(Investment)
-class InvestmentAdmin(admin.ModelAdmin):
+class InvestmentAdmin(CursorPaginatorAdmin):
 
     raw_id_fields = ("financial_disclosure",)
 

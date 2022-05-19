@@ -1,3 +1,4 @@
+from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 
 from cl.recap.models import (
@@ -8,7 +9,7 @@ from cl.recap.models import (
 
 
 @admin.register(ProcessingQueue)
-class ProcessingQueueAdmin(admin.ModelAdmin):
+class ProcessingQueueAdmin(CursorPaginatorAdmin):
     list_display = (
         "__str__",
         "court",
@@ -34,7 +35,7 @@ class ProcessingQueueAdmin(admin.ModelAdmin):
 
 
 @admin.register(PacerFetchQueue)
-class PacerFetchQueueAdmin(admin.ModelAdmin):
+class PacerFetchQueueAdmin(CursorPaginatorAdmin):
     list_display = (
         "__str__",
         "court",
