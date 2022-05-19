@@ -19,7 +19,6 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
@@ -369,21 +368,6 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
         "POST": ["%(app_label)s.has_recap_upload_access"],
         "GET": ["%(app_label)s.has_recap_upload_access"],
     }
-
-
-class TinyAdjustablePagination(PageNumberPagination):
-    page_size = 5
-    page_size_query_param = "page_size"
-    max_page_size = 20
-
-
-class MediumAdjustablePagination(PageNumberPagination):
-    page_size = 50
-    page_size_query_param = "page_size"
-
-
-class BigPagination(PageNumberPagination):
-    page_size = 300
 
 
 class BulkJsonHistory(object):
