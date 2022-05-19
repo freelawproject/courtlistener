@@ -265,6 +265,7 @@ class Person(AbstractDateTimeModel):
         out = {
             "id": self.pk,
             "fjc_id": self.fjc_id,
+            "cl_id": "none",  # Deprecated, but required by Solr
             "alias_ids": [alias.pk for alias in self.aliases.all()],
             "races": [r.get_race_display() for r in self.race.all()],
             "gender": self.get_gender_display(),
