@@ -41,6 +41,7 @@ from cl.search.models import (
 )
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
+from cl.users.factories import UserFactory
 
 
 class BasicAPIPageTest(TestCase):
@@ -239,26 +240,24 @@ class ApiQueryCountTests(TransactionTestCase):
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
 
-    fixtures = ["user_with_recap_api_access.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
 
-    @staticmethod
-    def flush_stats():
+    def flush_stats(self) -> None:
         # Flush existing stats (else previous tests cause issues)
-        r = make_redis_interface("STATS")
-        r.flushdb()
+        self.r.flushdb()
 
     def setUp(self) -> None:
-        # Add the permissions to the user.
-        self.user = User.objects.get(pk=6)
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        self.user.user_permissions.add(*ps)
+        self.r = make_redis_interface("STATS")
         self.flush_stats()
+        self.endpoint_name = "audio-list"
 
     def tearDown(self) -> None:
         Event.objects.all().delete()
         self.flush_stats()
 
-    def hit_the_api(self):
+    def hit_the_api(self) -> None:
         path = reverse("audio-list", kwargs={"version": "v3"})
         request = RequestFactory().get(path)
 
@@ -270,7 +269,9 @@ class ApiEventCreationTestCase(TestCase):
         # Set the attributes needed in the absence of middleware
         request.user = self.user
         request.resolver_match = ResolverMatch(
-            view, {"version": "v3"}, "audio-list"
+            view,
+            {"version": "v3"},
+            self.endpoint_name,
         )
 
         view(request)
@@ -281,6 +282,30 @@ class ApiEventCreationTestCase(TestCase):
 
         expected_event_count = 1
         self.assertEqual(expected_event_count, Event.objects.count())
+
+    def test_api_logged_correctly(self) -> None:
+        self.hit_the_api()
+
+        # Global stats
+        self.assertEqual(self.r.get("api:v3.count"), "1")
+
+        # User stats
+        self.assertEqual(
+            self.r.zscore("api:v3.user.counts", self.user.pk), 1.0
+        )
+
+        # IP address
+        keys = self.r.keys("api:v3.d:*")
+        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        self.assertEqual(self.r.hlen(ip_key), 1)
+
+        # Endpoints
+        self.assertEqual(
+            self.r.zscore("api:v3.endpoint.counts", self.endpoint_name), 1
+        )
+
+        # Timings
+        self.assertAlmostEqual(int(self.r.get("api:v3.timing")), 10, delta=200)
 
 
 class DRFOrderingTests(TestCase):

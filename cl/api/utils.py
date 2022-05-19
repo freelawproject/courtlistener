@@ -223,7 +223,7 @@ class LoggingMixin(object):
                 )
         return response
 
-    def _get_response_ms(self):
+    def _get_response_ms(self) -> int:
         """
         Get the duration of the request response cycle in milliseconds.
         In case of negative duration 0 is returned.
