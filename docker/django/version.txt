@@ -1,5 +1,6 @@
-2.0.17
+2.0.18
 
+2.0.18 - Add cursor pagination to the admin
 2.0.17 - Update code & juriscraper
 2.0.16 - Update code
 2.0.15 - Add django-override-storage
