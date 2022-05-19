@@ -17,6 +17,7 @@ from django.utils.encoding import force_str
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
+from ipware import get_client_ip
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
@@ -235,6 +236,7 @@ class LoggingMixin(object):
     def _log_request(self, request):
         d = date.today().isoformat()
         user = request.user
+        client_ip, is_routable = get_client_ip(request)
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
@@ -252,6 +254,13 @@ class LoggingMixin(object):
         user_pk = user.pk or "AnonymousUser"
         pipe.zincrby("api:v3.user.counts", 1, user_pk)
         pipe.zincrby(f"api:v3.user.d:{d}.counts", 1, user_pk)
+
+        # Use a hash to store a per-day map between IP addresses and user pks
+        # Get a user pk with: `hget api:v3.d:2022-05-18.ip_map 172.19.0.1`
+        if client_ip is not None:
+            ip_key = f"api:v3.d:{d}.ip_map"
+            pipe.hset(ip_key, client_ip, user_pk)
+            pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.

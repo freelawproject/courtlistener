@@ -103,6 +103,7 @@ judge-pics = "^2.0.1"
 juriscraper = "^2.4.11"
 types-simplejson = "^3.17.6"
 django-admin-cursor-paginator = "^0.1.2"
+django-ipware = "^4.0.2"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
