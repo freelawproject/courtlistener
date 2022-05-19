@@ -561,10 +561,10 @@ def get_user_ids_for_date_range(
 ) -> Set[int]:
     """Get a list of user IDs that used the API during a span of time
 
-    :param start: The beginning of when you want to find users (default: all
-    time). A str to be interpreted by dateparser.
-    :param end: The end of when you want to find users (default today).  A
-    str to be interpreted by dateparser.
+    :param start: The beginning of when you want to find users. A str to be
+    interpreted by dateparser.
+    :param end: The end of when you want to find users.  A str to be
+    interpreted by dateparser.
     :return Set of user IDs during a time period. Will not contain anonymous
     users.
     """
