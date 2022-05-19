@@ -456,6 +456,17 @@ argon2 = ["argon2-cffi (>=19.1.0)"]
 bcrypt = ["bcrypt"]
 
 [[package]]
+name = "django-admin-cursor-paginator"
+version = "0.1.2"
+description = "Drop-in replacement for django admin default pagination that works fast with huge tables."
+category = "main"
+optional = false
+python-versions = ">=3.4"
+
+[package.dependencies]
+Django = ">=2.0"
+
+[[package]]
 name = "django-cache-memoize"
 version = "0.1.8"
 description = "Django utility for a memoization decorator that uses the Django cache framework."
@@ -2147,7 +2158,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "8739bff775c8bc99f2b3c2a23fbc02c1f6a9d07dc6e9b49b97a22c9a8a03df2f"
+content-hash = "67aa4eea0c6c2e1d9d37c9027c11d563d4302de8ef3bd9c57a8dbc5a7acef535"
 
 [metadata.files]
 amqp = [
@@ -2418,6 +2429,10 @@ distlib = [
 django = [
     {file = "Django-3.2.13-py3-none-any.whl", hash = "sha256:b896ca61edc079eb6bbaa15cf6071eb69d6aac08cce5211583cfb41515644fdf"},
     {file = "Django-3.2.13.tar.gz", hash = "sha256:6d93497a0a9bf6ba0e0b1a29cccdc40efbfc76297255b1309b3a884a688ec4b6"},
+]
+django-admin-cursor-paginator = [
+    {file = "django-admin-cursor-paginator-0.1.2.tar.gz", hash = "sha256:2211896d0b8a101042f6a6ee68879c561c05ca638f9ec4ff124ab28938df700a"},
+    {file = "django_admin_cursor_paginator-0.1.2-py3-none-any.whl", hash = "sha256:481393e2b899d7fb6386931560f43bf46251515813ac8a48b703887bd1432261"},
 ]
 django-cache-memoize = [
     {file = "django-cache-memoize-0.1.8.tar.gz", hash = "sha256:f85ca71ddfe3d61d561d5a382736f83148fb75e542585e7028b65d6d3681ec85"},
