@@ -622,7 +622,10 @@ $(document).ready(function(){
         </div>
         {% endfor %}
         <p>
-            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }}</a>
+            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }} in CourtListener</a>
+        </p>
+        <p>
+            <a href="/?type=r&q=&type=r&order_by=score%20desc&assigned_to={{ person.name_last }}" class="btn btn-primary">Search for All Cases Assigned to {{ person.name_last }} in RECAP</a>
         </p>
       </div>
     </div>
