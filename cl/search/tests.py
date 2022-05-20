@@ -919,6 +919,7 @@ class JudgeSearchTest(IndexedSolrTestCase):
     def test_sorting(self) -> None:
         """Can we do sorting on various fields?"""
         sort_fields = [
+            "score desc",
             "name_reverse asc",
             "dob desc,name_reverse asc",
             "dod desc,name_reverse asc",
