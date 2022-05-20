@@ -8,12 +8,10 @@
     <label for="id_order_by">Search Results Order:</label>
     {% with search_form.type.value as v %}
     <select class="external-input form-control" id="id_order_by" name="order_by">
-        {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS or v == SEARCH_TYPES.ORAL_ARGUMENT %}
-            <option value="score desc"
-                    {% if search_form.order_by.value == "score desc" %}
-                    selected="selected"
-                    {% endif %}>Relevance</option>
-        {% endif %}
+        <option value="score desc"
+                {% if search_form.order_by.value == "score desc" %}
+                selected="selected"
+                {% endif %}>Relevance</option>
 
         {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS %}
             <option value="dateFiled desc"
@@ -59,10 +57,6 @@
         {% endif %}
 
         {% if v == SEARCH_TYPES.PEOPLE %}
-            <option value="score desc"
-                    {% if search_form.order_by.value == "score desc" %}
-                        selected="selected"
-                    {% endif %}>Relevancy</option>
             <option value="name_reverse asc"
                     {% if search_form.order_by.value == "name_reverse asc" %}
                         selected="selected"
