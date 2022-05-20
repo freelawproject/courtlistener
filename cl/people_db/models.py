@@ -34,7 +34,6 @@ from cl.search.models import Court
 SUFFIXES = (
     ("jr", "Jr."),
     ("sr", "Sr."),
-    ("1", "I"),
     ("2", "II"),
     ("3", "III"),
     ("4", "IV"),
