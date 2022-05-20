@@ -59,6 +59,10 @@
         {% endif %}
 
         {% if v == SEARCH_TYPES.PEOPLE %}
+            <option value="score desc"
+                    {% if search_form.order_by.value == "score desc" %}
+                        selected="selected"
+                    {% endif %}>Relevancy</option>
             <option value="name_reverse asc"
                     {% if search_form.order_by.value == "name_reverse asc" %}
                         selected="selected"
