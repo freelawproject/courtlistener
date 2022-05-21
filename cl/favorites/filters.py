@@ -1,10 +1,8 @@
-from rest_framework_filters import FilterSet
-
-from cl.api.utils import BASIC_TEXT_LOOKUPS, BOOLEAN_LOOKUPS
+from cl.api.utils import BASIC_TEXT_LOOKUPS, BOOLEAN_LOOKUPS, NoEmptyFilterSet
 from cl.favorites.models import DocketTag, UserTag
 
 
-class UserTagFilter(FilterSet):
+class UserTagFilter(NoEmptyFilterSet):
     class Meta:
         model = UserTag
         fields = {
@@ -15,7 +13,7 @@ class UserTagFilter(FilterSet):
         }
 
 
-class DocketTagFilter(FilterSet):
+class DocketTagFilter(NoEmptyFilterSet):
     class Meta:
         model = DocketTag
         fields = {

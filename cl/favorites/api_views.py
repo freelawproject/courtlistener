@@ -3,7 +3,7 @@ from rest_framework import permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.utils import MediumAdjustablePagination
+from cl.api.pagination import MediumAdjustablePagination
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import DocketTagSerializer, UserTagSerializer
 from cl.favorites.filters import DocketTagFilter, UserTagFilter

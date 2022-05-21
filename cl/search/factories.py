@@ -34,7 +34,7 @@ class CourtFactory(DjangoModelFactory):
         model = Court
 
     id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
-    position = Faker("pyfloat", positive=True, right_digits=2, left_digits=3)
+    position = Faker("pyfloat", positive=True, right_digits=4, left_digits=3)
     short_name = Faker("court_name")
     full_name = Faker("court_name")
     url = Faker("url")

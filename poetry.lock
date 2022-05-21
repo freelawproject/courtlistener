@@ -456,6 +456,17 @@ argon2 = ["argon2-cffi (>=19.1.0)"]
 bcrypt = ["bcrypt"]
 
 [[package]]
+name = "django-admin-cursor-paginator"
+version = "0.1.2"
+description = "Drop-in replacement for django admin default pagination that works fast with huge tables."
+category = "main"
+optional = false
+python-versions = ">=3.4"
+
+[package.dependencies]
+Django = ">=2.0"
+
+[[package]]
 name = "django-cache-memoize"
 version = "0.1.8"
 description = "Django utility for a memoization decorator that uses the Django cache framework."
@@ -528,6 +539,14 @@ description = "Django hCaptcha provides a simple way to protect your django form
 category = "main"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "django-ipware"
+version = "4.0.2"
+description = "A Django application to retrieve user's IP address"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 
 [[package]]
 name = "django-localflavor"
@@ -2147,7 +2166,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "8739bff775c8bc99f2b3c2a23fbc02c1f6a9d07dc6e9b49b97a22c9a8a03df2f"
+content-hash = "3fa3747f1ad9ff1ecf909d54028cc1db40f01f53f72ff32cca029f4ee90d929f"
 
 [metadata.files]
 amqp = [
@@ -2419,6 +2438,10 @@ django = [
     {file = "Django-3.2.13-py3-none-any.whl", hash = "sha256:b896ca61edc079eb6bbaa15cf6071eb69d6aac08cce5211583cfb41515644fdf"},
     {file = "Django-3.2.13.tar.gz", hash = "sha256:6d93497a0a9bf6ba0e0b1a29cccdc40efbfc76297255b1309b3a884a688ec4b6"},
 ]
+django-admin-cursor-paginator = [
+    {file = "django-admin-cursor-paginator-0.1.2.tar.gz", hash = "sha256:2211896d0b8a101042f6a6ee68879c561c05ca638f9ec4ff124ab28938df700a"},
+    {file = "django_admin_cursor_paginator-0.1.2-py3-none-any.whl", hash = "sha256:481393e2b899d7fb6386931560f43bf46251515813ac8a48b703887bd1432261"},
+]
 django-cache-memoize = [
     {file = "django-cache-memoize-0.1.8.tar.gz", hash = "sha256:f85ca71ddfe3d61d561d5a382736f83148fb75e542585e7028b65d6d3681ec85"},
     {file = "django_cache_memoize-0.1.8-py3-none-any.whl", hash = "sha256:81b00714b50917431ce12a4544e0630a70c86fed27755a82186efc2945b8f8b3"},
@@ -2445,6 +2468,10 @@ django-filter = [
 ]
 django-hcaptcha = [
     {file = "django-hCaptcha-0.1.0.tar.gz", hash = "sha256:2b80197c07bb8444249bcce3758b0472d369cca309fb02d7abcd0a856431b76b"},
+]
+django-ipware = [
+    {file = "django-ipware-4.0.2.tar.gz", hash = "sha256:602a58325a4808bd19197fef2676a0b2da2df40d0ecf21be414b2ff48c72ad05"},
+    {file = "django_ipware-4.0.2-py2.py3-none-any.whl", hash = "sha256:878dbb06a87e25550798e9ef3204ed70a200dd8b15e47dcef848cf08244f04c9"},
 ]
 django-localflavor = [
     {file = "django-localflavor-3.1.tar.gz", hash = "sha256:ac2fa377bbcba4cae95e97077d9e77c7f22b3d93e4845e2e133ba7e664043a44"},

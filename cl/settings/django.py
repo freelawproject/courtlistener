@@ -144,6 +144,7 @@ INSTALLED_APPS = [
     "django_filters",
     "storages",
     "waffle",
+    "admin_cursor_paginator",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",

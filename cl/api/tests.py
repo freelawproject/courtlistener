@@ -8,12 +8,18 @@ from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import Client, RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import ResolverMatch, reverse
 from django.utils.timezone import now
+from rest_framework.exceptions import NotFound
+from rest_framework.request import Request
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
+from rest_framework.test import APIRequestFactory
 
+from cl.api.pagination import ShallowOnlyPageNumberPagination
 from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
@@ -35,6 +41,7 @@ from cl.search.models import (
 )
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
+from cl.users.factories import UserFactory
 
 
 class BasicAPIPageTest(TestCase):
@@ -170,6 +177,19 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("audio-list", kwargs={"version": "v3"})
             self.client.get(path)
 
+    def test_no_bad_query_on_empty_parameters(self) -> None:
+        with CaptureQueriesContext(connection) as ctx:
+            # Test issue 2066, ensuring that we ignore empty filters.
+            path = reverse("docketentry-list", kwargs={"version": "v3"})
+            self.client.get(path, {"docket__id": ""})
+            for query in ctx.captured_queries:
+                bad_query = 'IN (SELECT U0."id" FROM "search_docket" U0)'
+                if bad_query in query["sql"]:
+                    self.fail(
+                        f"DRF made a nasty query we thought we "
+                        f"banished: {bad_query=}"
+                    )
+
     def test_search_api_query_counts(self) -> None:
         with self.assertNumQueries(7):
             path = reverse("docket-list", kwargs={"version": "v3"})
@@ -220,20 +240,18 @@ class ApiQueryCountTests(TransactionTestCase):
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
 
-    fixtures = ["user_with_recap_api_access.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
 
-    @staticmethod
-    def flush_stats():
+    def flush_stats(self) -> None:
         # Flush existing stats (else previous tests cause issues)
-        r = make_redis_interface("STATS")
-        r.flushdb()
+        self.r.flushdb()
 
     def setUp(self) -> None:
-        # Add the permissions to the user.
-        self.user = User.objects.get(pk=6)
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        self.user.user_permissions.add(*ps)
+        self.r = make_redis_interface("STATS")
         self.flush_stats()
+        self.endpoint_name = "audio-list"
 
     def tearDown(self) -> None:
         Event.objects.all().delete()
@@ -251,7 +269,9 @@ class ApiEventCreationTestCase(TestCase):
         # Set the attributes needed in the absence of middleware
         request.user = self.user
         request.resolver_match = ResolverMatch(
-            view, {"version": "v3"}, "audio-list"
+            view,
+            {"version": "v3"},
+            self.endpoint_name,
         )
 
         view(request)
@@ -262,6 +282,30 @@ class ApiEventCreationTestCase(TestCase):
 
         expected_event_count = 1
         self.assertEqual(expected_event_count, Event.objects.count())
+
+    def test_api_logged_correctly(self) -> None:
+        self.hit_the_api()
+
+        # Global stats
+        self.assertEqual(self.r.get("api:v3.count"), "1")
+
+        # User stats
+        self.assertEqual(
+            self.r.zscore("api:v3.user.counts", self.user.pk), 1.0
+        )
+
+        # IP address
+        keys = self.r.keys("api:v3.d:*")
+        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        self.assertEqual(self.r.hlen(ip_key), 1)
+
+        # Endpoints
+        self.assertEqual(
+            self.r.zscore("api:v3.endpoint.counts", self.endpoint_name), 1
+        )
+
+        # Timings
+        self.assertAlmostEqual(int(self.r.get("api:v3.timing")), 10, delta=200)
 
 
 class DRFOrderingTests(TestCase):
@@ -352,11 +396,11 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         # People born after the day before her birthday
         before = correct_date - timedelta(days=1)
         self.q = {"date_dob__gt": before.isoformat()}
-        self.assertCountInResults(5)
+        self.assertCountInResults(1)
 
         # Flip the logic. This should return no results.
         self.q = {"date_dob__lt": before.isoformat()}
-        self.assertCountInResults(11)
+        self.assertCountInResults(0)
 
     def test_nested_judge_filtering(self) -> None:
         """Can we filter across various relations?
@@ -504,7 +548,7 @@ class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
         # Note the exclamation mark. In a URL this would look like
         # "?judge!=1". Fun stuff.
         self.q["person!"] = 2
-        self.assertCountInResults(9)
+        self.assertCountInResults(1)  # Bill
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
@@ -835,6 +879,36 @@ class DRFFieldSelectionTest(TestCase):
         self.assertEqual(
             len(r.data["results"][0].keys()), len(fields_to_return)
         )
+
+
+class DRFPaginationTest(SimpleTestCase):
+    # Liberally borrows from drf.tests.test_pagination.py
+
+    def setUp(self) -> None:
+        class ExamplePagination(ShallowOnlyPageNumberPagination):
+            page_size = 5
+            max_pagination_depth = 10
+
+        self.pagination = ExamplePagination()
+        self.queryset = range(1, 101)
+
+    def paginate_queryset(self, request: Request):
+        return list(self.pagination.paginate_queryset(self.queryset, request))
+
+    def test_page_one(self) -> None:
+        request = Request(APIRequestFactory().get("/"))
+        queryset = self.paginate_queryset(request)
+        self.assertEqual(queryset, [1, 2, 3, 4, 5])
+
+    def test_page_two(self) -> None:
+        request = Request(APIRequestFactory().get("/", {"page": 2}))
+        queryset = self.paginate_queryset(request)
+        self.assertEqual(queryset, [6, 7, 8, 9, 10])
+
+    def test_deep_pagination(self) -> None:
+        with self.assertRaises(NotFound):
+            request = Request(APIRequestFactory().get("/", {"page": 20}))
+            self.paginate_queryset(request)
 
 
 class DRFRecapPermissionTest(TestCase):

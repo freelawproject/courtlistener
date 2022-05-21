@@ -1,11 +1,11 @@
 import rest_framework_filters as filters
-from rest_framework_filters import FilterSet
 
 from cl.api.utils import (
     ALL_TEXT_LOOKUPS,
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
+    NoEmptyFilterSet,
 )
 from cl.audio.models import Audio
 from cl.people_db.models import Party, Person
@@ -23,7 +23,7 @@ from cl.search.models import (
 )
 
 
-class CourtFilter(FilterSet):
+class CourtFilter(NoEmptyFilterSet):
     dockets = filters.RelatedFilter(
         "cl.search.filters.DocketFilter", queryset=Docket.objects.all()
     )
@@ -45,7 +45,7 @@ class CourtFilter(FilterSet):
         }
 
 
-class TagFilter(FilterSet):
+class TagFilter(NoEmptyFilterSet):
     class Meta:
         model = Tag
         fields = {
@@ -54,7 +54,7 @@ class TagFilter(FilterSet):
         }
 
 
-class DocketFilter(FilterSet):
+class DocketFilter(NoEmptyFilterSet):
     court = filters.RelatedFilter(CourtFilter, queryset=Court.objects.all())
     clusters = filters.RelatedFilter(
         "cl.search.filters.OpinionClusterFilter",
@@ -97,7 +97,7 @@ class DocketFilter(FilterSet):
         }
 
 
-class OpinionFilter(FilterSet):
+class OpinionFilter(NoEmptyFilterSet):
     # Cannot to reference to opinions_cited here, due to it being a self join,
     # which is not supported (possibly for good reasons?)
     cluster = filters.RelatedFilter(
@@ -124,7 +124,7 @@ class OpinionFilter(FilterSet):
         }
 
 
-class CitationFilter(FilterSet):
+class CitationFilter(NoEmptyFilterSet):
     class Meta:
         model = Citation
         fields = {
@@ -135,7 +135,7 @@ class CitationFilter(FilterSet):
         }
 
 
-class OpinionClusterFilter(FilterSet):
+class OpinionClusterFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     panel = filters.RelatedFilter(
         "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
@@ -169,7 +169,7 @@ class OpinionClusterFilter(FilterSet):
         }
 
 
-class OpinionsCitedFilter(FilterSet):
+class OpinionsCitedFilter(NoEmptyFilterSet):
     citing_opinion = filters.RelatedFilter(
         OpinionFilter, queryset=Opinion.objects.all()
     )
@@ -184,7 +184,7 @@ class OpinionsCitedFilter(FilterSet):
         }
 
 
-class DocketEntryFilter(FilterSet):
+class DocketEntryFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     recap_documents = filters.RelatedFilter(
         "cl.search.filters.RECAPDocumentFilter",
@@ -203,7 +203,7 @@ class DocketEntryFilter(FilterSet):
         }
 
 
-class RECAPDocumentFilter(FilterSet):
+class RECAPDocumentFilter(NoEmptyFilterSet):
     docket_entry = filters.RelatedFilter(
         DocketEntryFilter, queryset=DocketEntry.objects.all()
     )

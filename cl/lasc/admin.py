@@ -1,10 +1,11 @@
+from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 
 from cl.lasc.models import Docket, DocumentFiled
 from cl.lib.admin import AdminTweaksMixin
 
 
-class Base(admin.ModelAdmin, AdminTweaksMixin):
+class Base(CursorPaginatorAdmin, AdminTweaksMixin):
 
     readonly_fields = (
         "date_created",

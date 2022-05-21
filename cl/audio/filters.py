@@ -1,13 +1,12 @@
 import rest_framework_filters as filters
-from rest_framework_filters import FilterSet
 
-from cl.api.utils import DATE_LOOKUPS, DATETIME_LOOKUPS
+from cl.api.utils import DATE_LOOKUPS, DATETIME_LOOKUPS, NoEmptyFilterSet
 from cl.audio.models import Audio
 from cl.search.filters import DocketFilter
 from cl.search.models import SOURCES, Docket
 
 
-class AudioFilter(FilterSet):
+class AudioFilter(NoEmptyFilterSet):
     docket = filters.RelatedFilter(DocketFilter, queryset=Docket.objects.all())
     source = filters.MultipleChoiceFilter(choices=SOURCES)
 

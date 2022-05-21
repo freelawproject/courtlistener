@@ -18,7 +18,12 @@ Substitute the relevant alias pk in the "is_alias_of" field
 
 
 def load_fixture(apps, schema_editor):
-    load_migration_fixture(apps, schema_editor, "ca_govs", "people_db")
+    """Noop"""
+
+    # Previously, this ran the code below, but to slim down the repo and to
+    # simplify our lives, I'm commenting it out and yanking the files.
+
+    #load_migration_fixture(apps, schema_editor, "ca_govs", "people_db")
 
     # Do positions
     # TODO POST-IMPORTATION:
@@ -27,9 +32,9 @@ def load_fixture(apps, schema_editor):
     # not present in the fixtures, we can't import their positions here.
     # You will need to manually add the two positions at the bottom to the db
     # using the admin panel
-    load_migration_fixture(
-        apps, schema_editor, "ca_govs_positions", "people_db"
-    )
+    # load_migration_fixture(
+    #     apps, schema_editor, "ca_govs_positions", "people_db"
+    # )
 
 
 def unload_fixture(apps, schema_editor):

@@ -1,6 +1,9 @@
-from rest_framework_filters import FilterSet
-
-from cl.api.utils import BASIC_TEXT_LOOKUPS, DATE_LOOKUPS, DATETIME_LOOKUPS
+from cl.api.utils import (
+    BASIC_TEXT_LOOKUPS,
+    DATE_LOOKUPS,
+    DATETIME_LOOKUPS,
+    NoEmptyFilterSet,
+)
 from cl.recap.models import (
     EmailProcessingQueue,
     FjcIntegratedDatabase,
@@ -9,7 +12,7 @@ from cl.recap.models import (
 )
 
 
-class ProcessingQueueFilter(FilterSet):
+class ProcessingQueueFilter(NoEmptyFilterSet):
     class Meta:
         model = ProcessingQueue
         fields = {
@@ -20,7 +23,7 @@ class ProcessingQueueFilter(FilterSet):
         }
 
 
-class EmailProcessingQueueFilter(FilterSet):
+class EmailProcessingQueueFilter(NoEmptyFilterSet):
     class Meta:
         model = EmailProcessingQueue
         fields = {
@@ -30,7 +33,7 @@ class EmailProcessingQueueFilter(FilterSet):
         }
 
 
-class PacerFetchQueueFilter(FilterSet):
+class PacerFetchQueueFilter(NoEmptyFilterSet):
     class Meta:
         model = PacerFetchQueue
         fields = {
@@ -44,7 +47,7 @@ class PacerFetchQueueFilter(FilterSet):
         }
 
 
-class FjcIntegratedDatabaseFilter(FilterSet):
+class FjcIntegratedDatabaseFilter(NoEmptyFilterSet):
     class Meta:
         model = FjcIntegratedDatabase
         fields = {
