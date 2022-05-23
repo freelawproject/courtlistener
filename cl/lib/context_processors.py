@@ -6,12 +6,7 @@ from django.http import HttpRequest
 from django.urls import reverse
 
 from cl.search.models import SEARCH_TYPES
-from cl.users.models import (
-    EMAIL_NOTIFICATIONS,
-    OBJECT_TYPES,
-    BackoffEvent,
-    EmailFlag,
-)
+from cl.users.models import EMAIL_NOTIFICATIONS, FLAG_TYPES, EmailFlag
 
 
 def inject_settings(request):
@@ -136,18 +131,20 @@ def inject_email_ban_status(
     if request.user.is_authenticated:
         email = request.user.email
         email_banned = EmailFlag.objects.filter(
-            email_address=email, object_type=OBJECT_TYPES.BAN
+            email_address=email, flag_type=FLAG_TYPES.BAN
         )
         if email_banned.exists():
             msg = PERMANENT.get(
-                email_banned[0].event_sub_type,
+                email_banned[0].notification_subtype,
                 PERMANENT[EMAIL_NOTIFICATIONS.GENERAL],
             )
             return {
                 "EMAIL_BAN_DATE": email_banned[0].date_created,
                 "EMAIL_BAN_REASON": msg,
             }
-        backoff_event = BackoffEvent.objects.filter(email_address=email)
+        backoff_event = EmailFlag.objects.filter(
+            email_address=email, flag_type=FLAG_TYPES.BACKOFF
+        )
         if backoff_event.exists():
             msg = TRANSIENT.get(
                 backoff_event[0].notification_subtype,

@@ -14,7 +14,6 @@ from rest_framework.status import (
 
 from cl.celery_init import app
 from cl.lib.crypto import md5
-from cl.users.email_handlers import compose_stored_message
 from cl.users.models import STATUS_TYPES, FailedEmail
 
 logger = logging.getLogger(__name__)
@@ -118,11 +117,11 @@ def process_retry_email(
 
     failed_email = FailedEmail.objects.get(pk=failed_pk)
     if failed_email.status != STATUS_TYPES.SUCCESSFUL:
-        # Only execute this task if has not been previously processed.
+        # Only execute this task if it has not been previously processed.
         failed_email.status = STATUS_TYPES.IN_PROGRESS
         failed_email.save()
         # Compose email from stored message.
-        email = compose_stored_message(failed_email.message_id)
+        email = failed_email.stored_email.convert_to_email_multipart()
         try:
             email.send()
         except Exception as exc:

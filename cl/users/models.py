@@ -7,6 +7,7 @@ from typing import Dict
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
 from django.db.models.signals import post_save
@@ -191,6 +192,7 @@ class EMAIL_NOTIFICATIONS(object):
     ATTACHMENT_REJECTED = 8
     COMPLAINT = 9
     OTHER = 10
+    MAX_RETRY_REACHED = 11
 
     TYPES = (
         (UNDETERMINED, "Undetermined"),
@@ -204,87 +206,68 @@ class EMAIL_NOTIFICATIONS(object):
         (ATTACHMENT_REJECTED, "AttachmentRejected"),
         (COMPLAINT, "Complaint"),
         (OTHER, "Other"),
+        (MAX_RETRY_REACHED, "MaxRetryReached"),
     )
 
 
-class OBJECT_TYPES(object):
-    """EmailFlag Object Types"""
+class FLAG_TYPES(object):
+    """EmailFlag Flag Types"""
 
     BAN = 0
-    FLAG = 1
+    BACKOFF = 1
     TYPES = (
-        (BAN, "Email ban"),
-        (FLAG, "Email flag"),
+        (BAN, "Email banned"),
+        (BACKOFF, "Email backoff event"),
     )
 
 
 class EmailFlag(AbstractDateTimeModel):
     """Stores flags for email addresses."""
 
-    SMALL_ONLY = 0
-    MAX_RETRY_REACHED = 1
-    FLAGS = (
-        (SMALL_ONLY, "Small Email Only"),
-        (MAX_RETRY_REACHED, "Max Retry Reached"),
-    )
     email_address = models.EmailField(
         help_text="The email address the EmailFlag object is related to.",
     )
-    object_type = models.SmallIntegerField(
-        help_text="The object type assigned, "
+    flag_type = models.SmallIntegerField(
+        help_text="The flag type assigned, "
         "Email ban: ban an email address and avoid sending any email. "
-        "Email flag: flag an email address for a special treatment.",
-        choices=OBJECT_TYPES.TYPES,
-    )
-    flag = models.SmallIntegerField(
-        help_text="The actual flag assigned, e.g: Small Email Only.",
-        choices=FLAGS,
-        blank=True,
-        null=True,
-    )
-    event_sub_type = models.SmallIntegerField(
-        help_text="The SES notification subtype that triggered the object.",
-        choices=EMAIL_NOTIFICATIONS.TYPES,
-    )
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["email_address"]),
-        ]
-        # Creates a unique constraint to allow only one BAN object for
-        # each email_address
-        constraints = [
-            UniqueConstraint(
-                fields=["email_address"],
-                condition=Q(object_type=OBJECT_TYPES.BAN),
-                name="unique_email_ban",
-            )
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.get_object_type_display()} for {self.email_address}"
-
-
-class BackoffEvent(AbstractDateTimeModel):
-    """Stores backoff events for email addresses, this is created or updated
-    after receiving a soft bounce object for an email address.
-    """
-
-    email_address = models.EmailField(
-        help_text="The email address the Backoff event is related to.",
-        unique=True,
-    )
-    retry_counter = models.SmallIntegerField(
-        help_text="The retry counter for exponential backoff events.",
-    )
-    next_retry_date = models.DateTimeField(
-        help_text="The next retry datetime for exponential backoff events.",
+        "Email backoff event: an active backoff event.",
+        choices=FLAG_TYPES.TYPES,
+        default=FLAG_TYPES.BAN,
     )
     notification_subtype = models.SmallIntegerField(
         help_text="The SES notification subtype that triggered the object.",
         choices=EMAIL_NOTIFICATIONS.TYPES,
         default=EMAIL_NOTIFICATIONS.UNDETERMINED,
     )
+    retry_counter = models.SmallIntegerField(
+        help_text="The retry counter for exponential backoff events.",
+        blank=True,
+        null=True,
+    )
+    next_retry_date = models.DateTimeField(
+        help_text="The next retry datetime for exponential backoff events.",
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email_address"]),
+        ]
+        # Creates a unique constraint to allow only one BAN and Backoff Event
+        # object for each email_address
+        constraints = [
+            UniqueConstraint(
+                fields=["email_address"],
+                condition=Q(flag_type=FLAG_TYPES.BAN),
+                name="unique_email_ban",
+            ),
+            UniqueConstraint(
+                fields=["email_address"],
+                condition=Q(flag_type=FLAG_TYPES.BACKOFF),
+                name="unique_email_backoff",
+            ),
+        ]
 
     @property
     def under_waiting_period(self) -> bool:
@@ -298,7 +281,7 @@ class BackoffEvent(AbstractDateTimeModel):
             return False
 
     def __str__(self) -> str:
-        return f"Backoff event for {self.email_address}, next: {self.next_retry_date}"
+        return f"{self.get_flag_type_display()} for {self.email_address}"
 
 
 class EmailSent(AbstractDateTimeModel):
@@ -361,6 +344,38 @@ class EmailSent(AbstractDateTimeModel):
             models.Index(fields=["message_id"]),
         ]
 
+    def convert_to_email_multipart(
+        self,
+    ) -> EmailMessage | EmailMultiAlternatives:
+        """Composes an email multipart message from the data stored.
+
+        :return email: Return an EmailMessage or EmailMultiAlternatives message
+        """
+
+        # Get the required fields to compose the email multipart message
+        keys_to_use = ("subject", "from_email", "reply_to", "headers", "to")
+        msg_dict = {k: v for k, v in self.__dict__.items() if k in keys_to_use}
+
+        # If the message has a related User, choose the user email address to
+        # ensure we send it to the updated user email address.
+        if self.user:
+            msg_dict["to"] = [self.user.email]
+
+        email: EmailMessage | EmailMultiAlternatives
+        if self.html_message:
+            if self.plain_text:
+                msg_dict["body"] = self.plain_text
+                email = EmailMultiAlternatives(**msg_dict)
+                email.attach_alternative(self.html_message, "text/html")
+            else:
+                msg_dict["body"] = self.html_message
+                email = EmailMultiAlternatives(**msg_dict)
+                email.content_subtype = "html"
+        else:
+            msg_dict["body"] = self.plain_text
+            email = EmailMessage(**msg_dict)
+        return email
+
     def __str__(self) -> str:
         return f"Email: {self.message_id}"
 
@@ -388,15 +403,15 @@ class STATUS_TYPES(object):
 class FailedEmail(AbstractDateTimeModel):
     """Stores enqueue failed messages."""
 
-    message_id = models.UUIDField(
-        help_text="Unique message identifier.",
-        default=uuid.uuid4,
-        editable=False,
+    stored_email = models.ForeignKey(
+        EmailSent,
+        help_text="The related stored email message.",
+        related_name="failed_emails",
+        on_delete=models.CASCADE,
     )
     recipient = models.EmailField(
         help_text="The email address to which the delivery failed.",
     )
-
     status = models.SmallIntegerField(
         help_text="The enqueue failed message status.",
         default=STATUS_TYPES.WAITING,
@@ -412,7 +427,6 @@ class FailedEmail(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["recipient"]),
         ]
-
         constraints = [
             UniqueConstraint(
                 fields=["recipient"],
