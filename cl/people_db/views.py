@@ -39,7 +39,7 @@ def view_person(request, pk, slug):
     # Use Solr to get relevant opinions that the person wrote
     conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
     q = {
-        "q": "author_id:{p} OR panel_ids:{p}".format(p=person.pk),
+        "q": f"author_id:{person.pk} OR panel_ids:{person.pk}",
         "fl": [
             "id",
             "court_id",
@@ -80,6 +80,24 @@ def view_person(request, pk, slug):
     }
     oral_arguments_heard = conn.query().add_extra(**q).execute()
     conn.conn.http_connection.close()
+    conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
+    q = {
+        "q": f"assigned_to_id:{person.pk} OR referred_to_id:{person.pk}",
+        "fl": [
+            "id",
+            "docket_absolute_url",
+            "caseName",
+            "dateFiled",
+            "docketNumber",
+        ],
+        "fq": "{!collapse field=docket_id sort='type asc'}",
+        "rows": 5,
+        "start": 0,
+        "sort": "dateFiled desc",
+        "caller": "view_person",
+    }
+    recap_cases_assigned = conn.query().add_extra(**q).execute()
+    conn.conn.http_connection.close()
     return render(
         request,
         "view_person.html",
@@ -96,6 +114,7 @@ def view_person(request, pk, slug):
             "educations": person.educations.all().order_by("-degree_year"),
             "authored_opinions": authored_opinions,
             "oral_arguments_heard": oral_arguments_heard,
+            "recap_cases_assigned": recap_cases_assigned,
             "ftm_last_updated": settings.FTM_LAST_UPDATED,
             "private": False,
         },
