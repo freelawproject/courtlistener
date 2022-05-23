@@ -1259,10 +1259,12 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             from cl.scrapers.tasks import extract_recap_pdf
 
             tasks.append(extract_recap_pdf.si(self.pk))
-        # if index:
-        from cl.search.tasks import add_items_to_solr
+        if index:
+            from cl.search.tasks import add_items_to_solr
 
-        tasks.append(add_items_to_solr.si([self.pk], "search.RECAPDocument"))
+            tasks.append(
+                add_items_to_solr.si([self.pk], "search.RECAPDocument")
+            )
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -2707,11 +2709,10 @@ class Opinion(AbstractDateTimeModel):
         **kwargs: Dict,
     ) -> None:
         super(Opinion, self).save(*args, **kwargs)
-        # if index:
-        print("\n\n\n*******\n\n\n")
-        from cl.search.tasks import add_items_to_solr
+        if index:
+            from cl.search.tasks import add_items_to_solr
 
-        add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
+            add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
 
     def as_search_dict(self) -> Dict[str, Any]:
         """Create a dict that can be ingested by Solr."""
