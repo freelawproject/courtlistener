@@ -55,7 +55,7 @@ def view_person(request, pk, slug):
         ],
         "rows": 5,
         "start": 0,
-        "sort": "score desc",
+        "sort": "dateFiled desc",
         "caller": "view_person",
     }
     authored_opinions = conn.query().add_extra(**q).execute()
