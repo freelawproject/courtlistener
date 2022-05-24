@@ -87,6 +87,7 @@ def view_person(request, pk, slug):
             "id",
             "docket_absolute_url",
             "caseName",
+            "court_citation_string",
             "dateFiled",
             "docketNumber",
         ],

@@ -649,7 +649,7 @@ $(document).ready(function(){
       <div class="col-xs-12">
         <h3 id="assigned-cases">
           <i class="fa-gavel fa gray"></i>
-          Cases assigned or referred to {{ person.name_last }} ({{ recap_cases_assigned.result.numFound|intcomma }})
+          Cases Assigned or Referred to {{ person.name_last }} ({{ recap_cases_assigned.result.numFound|intcomma }})
         </h3>
         <hr class="top">
 
@@ -674,25 +674,10 @@ $(document).ready(function(){
               {% endif %}
             </time>
           </div>
-          {% if o.citation %}
-            <div class="inline nowrap">
-              <span class="meta-data-header">Citations: </span>
-              <span class="meta-data-value">{{ o.citation|safeseq|join:", " }}</span>
-            </div>
-          {% endif %}
           {% if o.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
               <span class="meta-data-value">{{ o.docketNumber|safe }}</span>
-            </div>
-          {% endif %}
-          {% if o.citeCount > 0 %}
-            <div class="bottom" class="inline nowrap">
-            <span class="meta-data-value">
-              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})">
-                Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}
-              </a>
-            </span>
             </div>
           {% endif %}
           </article>
@@ -700,7 +685,7 @@ $(document).ready(function(){
         </div>
         {% endfor %}
         <p>
-			<a href="/?type=r&q=&type=r&order_by=score%20desc&assigned_to={{ person.name_first }} {{ person.name_last }}" class="btn btn-primary">Search for All Cases Assigned to {{ person.name_last }} in RECAP</a>
+            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc" class="btn btn-primary">Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
         </p>
       </div>
     </div>
