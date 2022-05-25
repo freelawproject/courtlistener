@@ -45,6 +45,10 @@ class PositionAdmin(admin.ModelAdmin):
         "supervisor",
         "predecessor",
     )
+    search_fields = (
+        "person__name_last",
+        "person__name_first",
+    )
 
     def save_model(
         self,
