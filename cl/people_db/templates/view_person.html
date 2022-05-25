@@ -644,12 +644,12 @@ $(document).ready(function(){
     </div>
     {% endif %}
 
-  {% if recap_cases_assigned.result.numFound > 0 %}
+  {% if recap_cases_assigned|length > 0 %}
     <div class="row v-offset-below-3">
       <div class="col-xs-12">
         <h3 id="assigned-cases">
           <i class="fa-gavel fa gray"></i>
-          Cases Assigned or Referred to {{ person.name_last }} ({{ recap_cases_assigned.result.numFound|intcomma }})
+          Cases Assigned or Referred to {{ person.name_last }} ({{ recap_cases_assigned|length|intcomma }})
         </h3>
         <hr class="top">
 
@@ -659,25 +659,25 @@ $(document).ready(function(){
           <article class="v-offset-below-2">
           <h4 class="bottom">
             <a href="{{ o.docket_absolute_url }}">
-              {{ o.caseName|safe|v_wrapper }}
-              ({% if o.court_id != 'scotus' %}{{ o.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ o.dateFiled|date:"Y" }})
+              {{ o.doclist.docs.0.caseName|safe|v_wrapper }}
+              ({% if o.doclist.docs.0.court_id != 'scotus' %}{{ o.doclist.docs.0.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ o.doclist.docs.0.dateFiled|date:"Y" }})
             </a>
           </h4>
           <div class="inline nowrap">
             <span class="meta-data-header">Date Filed:</span>
             <time class="meta-data-value"
-                datetime="{{ o.dateFiled|date:'Y-m-d' }}">
-              {% if o.dateFiled %}
-                {{ o.dateFiled|date:"F jS, Y" }}
+                datetime="{{ o.doclist.docs.0.dateFiled|date:'Y-m-d' }}">
+              {% if o.doclist.docs.0.dateFiled %}
+                {{ o.doclist.docs.0.dateFiled|date:"F jS, Y" }}
               {% else %}
                 Unknown Date
               {% endif %}
             </time>
           </div>
-          {% if o.docketNumber %}
+          {% if o.doclist.docs.0.docketNumber %}
             <div class="inline nowrap">
               <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ o.docketNumber|safe }}</span>
+              <span class="meta-data-value">{{ o.doclist.docs.0.docketNumber|safe }}</span>
             </div>
           {% endif %}
           </article>
