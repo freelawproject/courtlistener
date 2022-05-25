@@ -6,7 +6,13 @@ from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
-from cl.users.models import BarMembership, EmailFlag, EmailSent, UserProfile
+from cl.users.models import (
+    BarMembership,
+    EmailFlag,
+    EmailSent,
+    FailedEmail,
+    UserProfile,
+)
 
 
 def get_email_confirmed(obj):
@@ -78,6 +84,17 @@ class EmailSentAdmin(admin.ModelAdmin):
         "date_created",
     )
     raw_id_fields = ("user",)
+
+
+@admin.register(FailedEmail)
+class FailedEmailAdmin(admin.ModelAdmin):
+    search_fields = ("recipient",)
+    list_display = (
+        "recipient",
+        "id",
+        "status",
+        "date_created",
+    )
 
 
 # Replace the normal User admin with our better one.

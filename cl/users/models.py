@@ -436,7 +436,7 @@ class FailedEmail(AbstractDateTimeModel):
         ]
 
     def __str__(self) -> str:
-        return f"Failed Email: {self.message_id}"
+        return f"Failed Email: {self.stored_email.message_id}"
 
 
 def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:

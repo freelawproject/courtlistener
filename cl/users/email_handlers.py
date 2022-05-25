@@ -489,7 +489,7 @@ def schedule_failed_email(recipient_email: str) -> None:
     # Look for FailedEmail objects with WAITING status.
     failed_messages = FailedEmail.objects.filter(
         recipient=recipient_email, status=STATUS_TYPES.WAITING
-    )
+    ).order_by("date_created")
     # Before clean possible failed task objects.
     delete_failed_tasks_objects(recipient_email)
 
