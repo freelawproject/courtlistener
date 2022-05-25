@@ -38,6 +38,9 @@
             target="_blank"
             rel="nofollow">Buy on PACER</a>
           {% endif %}
+            <a href="{{ rd.pacerdash_url }}"
+            target="_blank"
+            rel="nofollow">Buy on PacerDash</a>
         </li>
       {% endif %}
     </ul>
@@ -48,17 +51,21 @@
     {% else %}
       {% if rd.pacer_url %}
         {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-              <a href="{{ rd.pacer_url }}"
-              data-toggle="modal" data-target="#modal-buy-pacer"
-              class="open_buy_pacer_modal btn btn-primary"
-              target="_blank"
-              rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
-            {% else%}
-              <a href="{{ rd.pacer_url }}"
-              class="btn btn-primary"
-              target="_blank"
-              rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
-            {% endif %}
+          <a href="{{ rd.pacer_url }}"
+          data-toggle="modal" data-target="#modal-buy-pacer"
+          class="open_buy_pacer_modal btn btn-primary"
+          target="_blank"
+          rel="nofollow"><i class="fa fa-external-link"></i>Buy on PACER</a>
+        {% else%}
+          <a href="{{ rd.pacer_url }}"
+          class="btn btn-primary"
+          target="_blank"
+          rel="nofollow"><i class="fa fa-external-link"></i>Buy on PACER</a>
+        {% endif %}
+        <a href="{{ rd.pacerdash_url }}"
+          class="btn btn-default"
+          target="_blank"
+          rel="nofollow"><i class="fa fa-external-link"></i>Buy on PacerDash</a>
       {% endif %}
     {% endif %}
   {% endif %}

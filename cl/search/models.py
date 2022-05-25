@@ -1187,6 +1187,17 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 )
 
     @property
+    def pacerdash_url(self):
+        """Construct the PacerDash URL, if we can. Else, return None."""
+
+        if self.pacer_doc_id:
+            return (
+                "https://www.pacerdash.com/court-listener-checkouts/"
+                f"{self.pacer_doc_id}"
+            )
+        return ""
+
+    @property
     def has_valid_pdf(self) -> bool:
         return self.is_available and self.filepath_local
 

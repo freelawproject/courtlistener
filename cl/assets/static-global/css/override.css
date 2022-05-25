@@ -1135,3 +1135,14 @@ emphasis {
   color: #333333!important;
   font-family: Helvetica;
 }
+/* Buy on Pacerdash custom styles*/
+.btn-pacerdash {
+  padding: 0px;
+  min-width: auto;
+  left: 15px;
+}
+.btn-pacerdash > li > a{
+  padding: 3px 5px;
+  font-size: 11px;
+}
+/* END  Buy on Pacerdash custom styles */
