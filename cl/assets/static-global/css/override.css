@@ -1137,12 +1137,12 @@ emphasis {
 }
 /* Buy on Pacerdash custom styles*/
 .btn-pacerdash {
-  padding: 0px;
+  padding: 0px 3px;
   min-width: auto;
-  left: 15px;
+  left: 16px;
 }
 .btn-pacerdash > li > a{
-  padding: 3px 5px;
+  padding: 2px 5px;
   font-size: 11px;
 }
 /* END  Buy on Pacerdash custom styles */

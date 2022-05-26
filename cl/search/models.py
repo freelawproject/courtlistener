@@ -1187,7 +1187,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 )
 
     @property
-    def pacerdash_url(self):
+    def pacerdash_url(self) -> str:
         """Construct the PacerDash URL, if we can. Else, return None."""
 
         if self.pacer_doc_id:

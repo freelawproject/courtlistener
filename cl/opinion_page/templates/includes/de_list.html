@@ -89,32 +89,28 @@
                             Internet Archive</a>
                         </li>
                       {% endif %}
-                      {% if rd|price != "0.00" %}
                         {% if rd.pacer_url %}
                           <li role="separator" class="divider"></li>
                           <li>
-                            {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                               <a href="{{ rd.pacer_url }}"
-                              class="open_buy_pacer_modal"
-                              data-toggle="modal" data-target="#modal-buy-pacer"
-                              target="_blank"
-                              rel="nofollow">Buy on
-                              PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                            {% else%}
-                              <a href="{{ rd.pacer_url }}"
+                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                  class="open_buy_pacer_modal"
+                                  data-toggle="modal" data-target="#modal-buy-pacer"
+                                {% endif %}
                                 target="_blank"
-                                rel="nofollow">Buy on
-                                PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                            {% endif %}
+                                rel="nofollow">
+                                  {% if rd|price != "0.00" %}Buy on PACER{% else %}From PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                              </a>
                           </li>
-                          <li>
-                              <a href="{{ rd.pacerdash_url }}"
-                              target="_blank"
-                              rel="nofollow">
-                              Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
-                          </li>
+                          {% if rd.pacerdash_url and rd|price != "0.00" %}
+                            <li>
+                                <a href="{{ rd.pacerdash_url }}"
+                                target="_blank"
+                                rel="nofollow">
+                                Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
+                            </li>
+                          {% endif %}
                         {% endif %}
-                      {% endif %}
                     </ul>
                   {% else %}
                     {# We don't have it #}
@@ -122,18 +118,17 @@
                       <span class="btn btn-primary btn-xs disabled">Sealed on PACER</span>
                     {% else %}
                       {% if rd.pacer_url %}
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          <a href="{{ rd.pacer_url }}"
-                          class="open_buy_pacer_modal btn btn-default btn-xs"
-                          data-toggle="modal" data-target="#modal-buy-pacer"
-                          target="_blank"
-                          rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                        {% else%}
-                          <a href="{{ rd.pacer_url }}"
+                        <a href="{{ rd.pacer_url }}"
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                            class="open_buy_pacer_modal btn btn-default btn-xs"
+                            data-toggle="modal" data-target="#modal-buy-pacer"
+                          {% else%}
                             class="btn btn-default btn-xs"
+                          {% endif %}
                             target="_blank"
-                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}</a>
-                        {% endif %}
+                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                        </a>
+                        {% if rd.pacerdash_url %}
                           <button type="button"
                             class="btn btn-default btn-xs dropdown-toggle"
                             data-toggle="dropdown"
@@ -142,13 +137,14 @@
                           <span class="caret"></span>
                           <span class="sr-only">Toggle Dropdown</span>
                           </button>
-                          <ul class="dropdown-menu btn-pacerdash">
-                            <li>
-                              <a href="{{ rd.pacerdash_url }}"
-                                target="_blank"
-                                rel="nofollow">Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
-                            </li>
-                          </ul>
+                            <ul class="dropdown-menu btn-pacerdash">
+                              <li>
+                                <a href="{{ rd.pacerdash_url }}"
+                                  target="_blank"
+                                  rel="nofollow">Buy on PacerDash {% if rd.page_count %}(${{ rd|pacerdash_price }}){% endif %}</a>
+                              </li>
+                            </ul>
+                        {% endif %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
@@ -169,24 +165,17 @@
                             </span>
                     {% else %}
                       {% if rd.pacer_url %}
-
-                        {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                          <a href="{{ rd.pacer_url }}"
-                          data-toggle="modal" data-target="#modal-buy-pacer"
-                          target="_blank" class="open_buy_pacer_modal btn btn-default btn-xs"
+                        <a href="{{ rd.pacer_url }}"
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                            data-toggle="modal" data-target="#modal-buy-pacer"
+                            class="open_buy_pacer_modal btn btn-default btn-xs"
+                          {% else%}
+                            class="btn btn-default btn-xs"
+                          {% endif %}
+                          target="_blank"
                           rel="nofollow"
-                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
-
-                        {% else%}
-
-                          <a href="{{ rd.pacer_url }}"
-                           class="btn btn-default btn-xs"
-                           target="_blank"
-                           rel="nofollow"
-                           title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i></a>
-
-                        {% endif %}
-
+                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
+                        </a>
                       {% endif %}
                     {% endif %}
                   {% endif %}
