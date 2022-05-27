@@ -70,7 +70,7 @@ def update_document_from_text(opinion: Opinion) -> None:
             )
 
 
-@app.task
+@app.task(bind=True, max_retries=2, countdown=2)
 def extract_doc_content(
     pk: int,
     ocr_available: bool = False,
@@ -150,7 +150,7 @@ def extract_doc_content(
     )
 
 
-@app.task
+@app.task(bind=True, max_retries=2, countdown=2)
 def extract_recap_pdf(
     pks: Union[int, List[int]],
     ocr_available: bool = True,
@@ -209,7 +209,7 @@ def extract_recap_pdf(
     return processed
 
 
-@app.task(bind=True, max_retries=1, countdown=2)
+@app.task(bind=True, max_retries=2, countdown=2)
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
