@@ -72,6 +72,7 @@ def update_document_from_text(opinion: Opinion) -> None:
 
 @app.task(bind=True, max_retries=2, countdown=2)
 def extract_doc_content(
+    self,
     pk: int,
     ocr_available: bool = False,
     citation_jitter: bool = False,
@@ -83,6 +84,7 @@ def extract_doc_content(
 
     This implementation uses local paths.
 
+    :param self: The Celery task
     :param pk: The opinion primary key to work on
     :param ocr_available: Whether the PDF converting function should use OCR
     :param citation_jitter: Whether to apply jitter before running the citation
@@ -152,6 +154,7 @@ def extract_doc_content(
 
 @app.task(bind=True, max_retries=2, countdown=2)
 def extract_recap_pdf(
+    self,
     pks: Union[int, List[int]],
     ocr_available: bool = True,
     check_if_needed: bool = True,
