@@ -479,14 +479,14 @@ dev = ["flake8", "tox", "twine", "therapist", "black"]
 
 [[package]]
 name = "django-cors-headers"
-version = "3.7.0"
+version = "3.12.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
-Django = ">=2.2"
+Django = ">=3.2"
 
 [[package]]
 name = "django-elasticsearch-dsl"
@@ -2166,7 +2166,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "3fa3747f1ad9ff1ecf909d54028cc1db40f01f53f72ff32cca029f4ee90d929f"
+content-hash = "b93cfcf2c1aba1bee9b9706ad905bc0547a2b3a1c77a90be9fe0c73fb32bf665"
 
 [metadata.files]
 amqp = [
@@ -2447,8 +2447,8 @@ django-cache-memoize = [
     {file = "django_cache_memoize-0.1.8-py3-none-any.whl", hash = "sha256:81b00714b50917431ce12a4544e0630a70c86fed27755a82186efc2945b8f8b3"},
 ]
 django-cors-headers = [
-    {file = "django-cors-headers-3.7.0.tar.gz", hash = "sha256:96069c4aaacace786a34ee7894ff680780ec2644e4268b31181044410fecd12e"},
-    {file = "django_cors_headers-3.7.0-py3-none-any.whl", hash = "sha256:1ac2b1213de75a251e2ba04448da15f99bcfcbe164288ae6b5ff929dc49b372f"},
+    {file = "django-cors-headers-3.12.0.tar.gz", hash = "sha256:5f07e2ff8a95c887698e748588a4a0b2ad0ad1b5a292e2d33132f1253e2a97cb"},
+    {file = "django_cors_headers-3.12.0-py3-none-any.whl", hash = "sha256:39d1d5acb872c1860ecfd88b8572bfbb3a1f201b5685ede951d71fc57c7dfae5"},
 ]
 django-elasticsearch-dsl = [
     {file = "django-elasticsearch-dsl-7.2.2.tar.gz", hash = "sha256:811d3909b3387fd55c19d9bbcf0e9a9b234f085df3f8422d59e7519a5f733e0e"},
