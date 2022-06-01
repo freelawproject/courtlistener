@@ -7,8 +7,10 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from redis import ConnectionError as RedisConnectionError
 from redis import Redis
 from requests import Response
+from requests.exceptions import RequestException
 
 from cl.celery_init import app
 from cl.disclosures.models import (
@@ -360,7 +362,13 @@ def save_and_upload_disclosure(
     return disclosure
 
 
-@app.task(bind=True, max_retries=2, interval_start=10, ignore_result=True)
+@app.task(
+    bind=True,
+    autoretry_for=(RequestException, RedisConnectionError),
+    max_retries=2,
+    interval_start=10,
+    ignore_result=True,
+)
 def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     """Import disclosures into Courtlistener
 

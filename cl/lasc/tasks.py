@@ -304,7 +304,12 @@ def update_case(lasc, clean_data):
         save_json(lasc.case_data, content_obj=docket)
 
 
-@app.task(ignore_result=True, max_retries=3, retry_backoff=15)
+@app.task(
+    ignore_result=True,
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=15,
+)
 def add_case_from_filepath(filepath):
     """Add case to database from filepath
 
