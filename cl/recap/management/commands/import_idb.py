@@ -14,6 +14,7 @@ from cl.recap.constants import (
     CV_2017,
     CV_2020,
     CV_2021,
+    CV_2022,
     DATASET_SOURCES,
     IDB_FIELD_DATA,
 )
@@ -209,6 +210,7 @@ class Command(VerboseCommand, CommandUtils):
                     CV_2017,
                     CV_2020,
                     CV_2021,
+                    CV_2022,
                     CR_2017,
                 ]:
                     raise NotImplementedError(
