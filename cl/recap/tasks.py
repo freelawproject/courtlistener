@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from zipfile import ZipFile
 
 import requests
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.conf import settings
@@ -25,6 +26,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
+from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
@@ -185,7 +187,11 @@ def mark_pq_status(pq, msg, status, message_property_name="error_message"):
 
 
 @app.task(
-    bind=True, max_retries=2, interval_start=5 * 60, interval_step=10 * 60
+    bind=True,
+    autoretry_for=(requests.ConnectionError,),
+    max_retries=2,
+    interval_start=5 * 60,
+    interval_step=10 * 60,
 )
 def process_recap_pdf(self, pk):
     """Process an uploaded PDF from the RECAP API endpoint.
@@ -357,7 +363,7 @@ def process_recap_pdf(self, pk):
     return rd
 
 
-@app.task(bind=True, max_retries=5, ignore_result=True)
+@app.task(bind=True, ignore_result=True)
 def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
     """Process a zip uploaded from a PACER district court
 
@@ -897,9 +903,7 @@ def process_recap_appellate_docket(self, pk):
     }
 
 
-@app.task(
-    bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
-)
+@app.task(bind=True)
 def process_recap_appellate_attachment(self, pk):
     """Process the appellate attachment pages.
 
@@ -1094,6 +1098,7 @@ def update_docket_from_hidden_api(data):
 
 @app.task(
     bind=True,
+    autoretry_for=(RedisConnectionError,),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1179,6 +1184,7 @@ def fetch_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
+    autoretry_for=(RedisConnectionError,),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1324,6 +1330,7 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1443,7 +1450,12 @@ def mark_fq_status(fq, msg, status):
     fq.save()
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.RequestException,),
+    max_retries=5,
+    interval_start=5 * 60,
+)
 def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
     """POSTS the PacerFetchQueue to the recipients webhook(s)
 
@@ -1491,7 +1503,17 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
             webhook.save()
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60)
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+        PacerLoginException,
+        RedisConnectionError,
+    ),
+    max_retries=5,
+    interval_start=5 * 60,
+)
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:

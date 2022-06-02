@@ -7,7 +7,9 @@ import requests
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery, PacerSession
+from redis import ConnectionError as RedisConnectionError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -70,7 +72,12 @@ def update_document_from_text(opinion: Opinion) -> None:
             )
 
 
-@app.task(bind=True, max_retries=2, countdown=2)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError,),
+    max_retries=2,
+    retry_backoff=10,
+)
 def extract_doc_content(
     self,
     pk: int,
@@ -152,7 +159,12 @@ def extract_doc_content(
     )
 
 
-@app.task(bind=True, max_retries=2, countdown=2)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError,),
+    max_retries=2,
+    retry_backoff=10,
+)
 def extract_recap_pdf(
     self,
     pks: Union[int, List[int]],
@@ -212,7 +224,12 @@ def extract_recap_pdf(
     return processed
 
 
-@app.task(bind=True, max_retries=2, countdown=2)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError,),
+    max_retries=2,
+    retry_backoff=10,
+)
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
@@ -263,7 +280,13 @@ def process_audio_file(self, pk) -> None:
     audio_obj.save()
 
 
-@app.task(bind=True, max_retries=2, interval_start=5, interval_step=5)
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=2,
+    interval_start=5,
+    interval_step=5,
+)
 @throttle_task("1/s", key="court_id")
 def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     """Update the docket info from iquery

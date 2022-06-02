@@ -33,6 +33,7 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from pyexpat import ExpatError
+from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.cookies import RequestsCookieJar
 from requests.exceptions import HTTPError, RequestException
@@ -287,7 +288,12 @@ def download_recap_item(
                 shutil.copyfile(tmp.name, location)
 
 
-@app.task(bind=True, max_retries=2, soft_time_limit=240)
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=2,
+    soft_time_limit=240,
+)
 def get_and_save_free_document_report(
     self: Task,
     court_id: str,
@@ -524,6 +530,7 @@ def process_free_opinion_result(
 
 @app.task(
     bind=True,
+    autoretry_for=(RedisConnectionError,),
     max_retries=15,
     interval_start=5,
     interval_step=5,
@@ -608,7 +615,7 @@ class OverloadedException(Exception):
     pass
 
 
-@app.task(bind=True, max_retries=15, interval_start=5, interval_step=5)
+@app.task(bind=True)
 def upload_pdf_to_ia(self: Task, rd_pk: int) -> None:
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
@@ -834,6 +841,7 @@ def make_fjc_idb_lookup_params(
 
 @app.task(
     bind=True,
+    autoretry_for=(RedisConnectionError,),
     max_retries=5,
     interval_start=5 * 60,
     interval_step=10 * 60,
@@ -936,6 +944,7 @@ def get_pacer_case_id_and_title(
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException, RequestException),
     max_retries=5,
     interval_start=5 * 60,
     interval_step=10 * 60,
@@ -1063,6 +1072,7 @@ def filter_docket_by_tags(
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
     max_retries=10,
     interval_start=1 * 60,
     interval_step=5 * 60,
@@ -1138,6 +1148,7 @@ def make_docket_by_iquery(
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=10,
     interval_start=1 * 60,
     interval_step=5 * 60,
@@ -1239,6 +1250,7 @@ def get_docket_by_pacer_case_id(
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=2,
     interval_start=5 * 60,
     interval_step=10 * 60,
@@ -1314,6 +1326,7 @@ def get_appellate_docket_by_docket_number(
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=5,
     interval_start=5,
     interval_step=5,
@@ -1366,6 +1379,7 @@ def get_attachment_page_by_rd(
 # Retry 10 times. First one after 1m, then again every 5 minutes.
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=10,
     interval_start=1 * 60,
     interval_step=5 * 60,
@@ -1441,13 +1455,7 @@ def get_bankr_claims_registry(
     return data
 
 
-@app.task(
-    bind=True,
-    max_retries=15,
-    interval_start=5,
-    interval_step=5,
-    ignore_result=True,
-)
+@app.task(bind=True, ignore_result=True)
 def make_attachment_pq_object(
     self: Task,
     attachment_report: AttachmentPage,
@@ -1485,6 +1493,7 @@ def make_attachment_pq_object(
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=15,
     interval_start=5,
     interval_step=5,
@@ -1641,6 +1650,7 @@ def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException, RequestException),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1692,13 +1702,7 @@ def get_pacer_doc_by_rd(
     return rd.pk
 
 
-@app.task(
-    bind=True,
-    max_retries=15,
-    interval_start=5,
-    interval_step=5,
-    ignore_result=True,
-)
+@app.task(bind=True, ignore_result=True)
 def get_pacer_doc_by_rd_and_description(
     self: Task,
     rd_pk: int,
@@ -1799,6 +1803,7 @@ def get_pacer_doc_by_rd_and_description(
 
 @app.task(
     bind=True,
+    autoretry_for=(PacerLoginException,),
     max_retries=15,
     interval_start=5,
     interval_step=5,
