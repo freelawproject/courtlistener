@@ -1,4 +1,16 @@
-2.0.18
+2.0.19
+
+## Current
+
+**2.0.19 - 2022-06-02**
+
+Features:
+ - Add new exception to Retry tasks
+ - Add client import project
+ - Bump juriscraper
+ - Improve version/changelog
+
+## Previous Versions
 
 2.0.18 - Add cursor pagination to the admin
 2.0.17 - Update code & juriscraper
