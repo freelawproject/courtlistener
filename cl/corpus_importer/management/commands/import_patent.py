@@ -5,7 +5,6 @@ from django.conf import settings
 from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
-    filter_docket_by_tags,
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
     make_fjc_idb_lookup_params,
@@ -26,7 +25,7 @@ def get_dockets(options: dict) -> None:
     """Get Patent litigation from the past 10 years.
 
     :param options: Options for scraping
-    :return:
+    :return: None
     """
 
     start = options["skip_until"]
@@ -52,10 +51,11 @@ def get_dockets(options: dict) -> None:
             continue
         if i and i > stop:
             # Stop processing case at # if not 0
-            continue
+            break
 
         dockets = Docket.objects.filter(idb_data=item)
         docket_in_system = dockets.exists()
+        throttle.maybe_wait()
         if not docket_in_system:
             params = make_fjc_idb_lookup_params(item)
             chain(
@@ -66,9 +66,6 @@ def get_dockets(options: dict) -> None:
                     cookies=session.cookies,
                     **params,
                 ).set(queue=q),
-                filter_docket_by_tags.s(PATENT_TAGS, item.district_id).set(
-                    queue=q
-                ),
                 get_docket_by_pacer_case_id.s(
                     court_id=item.district_id,
                     cookies=session.cookies,
@@ -84,7 +81,6 @@ def get_dockets(options: dict) -> None:
             ).apply_async()
         else:
             d = dockets[0]
-            throttle.maybe_wait()
             logger.info(f"{i} Doing docket with pk: {d.pk}")
             chain(
                 get_docket_by_pacer_case_id.s(
