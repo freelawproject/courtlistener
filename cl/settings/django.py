@@ -11,7 +11,6 @@ env = environ.FileAwareEnv()
 
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
 
-
 ############
 # Database #
 ############
@@ -50,7 +49,6 @@ if env("DB_REPLICA_HOST", default=""):
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
-
 ####################
 # Cache & Sessions #
 ####################
@@ -69,7 +67,6 @@ CACHES = {
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-
 
 #####################################
 # Directories, Apps, and Middleware #
@@ -145,6 +142,7 @@ INSTALLED_APPS = [
     "storages",
     "waffle",
     "admin_cursor_paginator",
+    "django_elasticsearch_dsl",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
@@ -172,7 +170,6 @@ INSTALLED_APPS = [
 if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
 
-
 ################
 # Misc. Django #
 ################
@@ -197,7 +194,6 @@ MANAGERS = [
         env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
-
 
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"

@@ -1,0 +1,17 @@
+# Run using `docker-compose up`
+# Service only for development purposes
+version: "3.7"
+
+services:
+  cl-es:
+    container_name: cl-es
+    image: elasticsearch:7.8.1
+    environment:
+      - discovery.type=single-node
+      - cluster.name=courtlistener-cluster
+    ports:
+      - "9200:9200"
+
+  cl-django:
+    depends_on:
+      - cl-es
