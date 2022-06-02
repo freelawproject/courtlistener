@@ -74,7 +74,7 @@ def update_document_from_text(opinion: Opinion) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
     max_retries=2,
     retry_backoff=10,
 )
@@ -161,7 +161,7 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
     max_retries=2,
     retry_backoff=10,
 )
@@ -226,7 +226,7 @@ def extract_recap_pdf(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
     max_retries=2,
     retry_backoff=10,
 )

@@ -450,7 +450,14 @@ def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
         }
 
 
-@app.task(bind=True, max_retries=5, ignore_result=True)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=5,
+    interval_start=5 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
 def process_recap_docket(self, pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
@@ -1098,7 +1105,7 @@ def update_docket_from_hidden_api(data):
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
+    autoretry_for=(RedisConnectionError, PacerLoginException),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1184,7 +1191,7 @@ def fetch_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
+    autoretry_for=(RedisConnectionError, PacerLoginException),
     max_retries=3,
     interval_start=5,
     interval_step=5,

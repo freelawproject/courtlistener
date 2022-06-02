@@ -36,7 +36,12 @@ from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.cookies import RequestsCookieJar
-from requests.exceptions import HTTPError, RequestException
+from requests.exceptions import (
+    ConnectionError,
+    HTTPError,
+    ReadTimeout,
+    RequestException,
+)
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.status import (
@@ -530,7 +535,12 @@ def process_free_opinion_result(
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
+    autoretry_for=(
+        ConnectionError,
+        PacerLoginException,
+        ReadTimeout,
+        RedisConnectionError,
+    ),
     max_retries=15,
     interval_start=5,
     interval_step=5,
@@ -1702,7 +1712,14 @@ def get_pacer_doc_by_rd(
     return rd.pk
 
 
-@app.task(bind=True, ignore_result=True)
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, ReadTimeout),
+    max_retries=15,
+    interval_start=5,
+    interval_step=5,
+    ignore_result=True,
+)
 def get_pacer_doc_by_rd_and_description(
     self: Task,
     rd_pk: int,
