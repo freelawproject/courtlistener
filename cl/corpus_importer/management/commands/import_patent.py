@@ -45,6 +45,7 @@ def get_dockets(options: dict) -> None:
     ).order_by("date_filed")
     i = 0
     for item in items:
+        logger.info(f"{i}: Doing FJC_ID with pk: {item.id}")
         i += 1
         if i and i < start:
             # Start processing case at # if not 0.
@@ -84,7 +85,7 @@ def get_dockets(options: dict) -> None:
         else:
             d = dockets[0]
             throttle.maybe_wait()
-            logger.info("%s: Doing docket with pk: %s", i, d.pk)
+            logger.info(f"{i} Doing docket with pk: {d.pk}")
             chain(
                 get_docket_by_pacer_case_id.s(
                     data={"pacer_case_id": d.pacer_case_id},
