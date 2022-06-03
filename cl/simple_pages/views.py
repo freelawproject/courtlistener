@@ -133,6 +133,10 @@ def recap_email_help(request: HttpRequest) -> HttpResponse:
     return render(request, "help/recap_email_help.html", {"private": False})
 
 
+def broken_email_help(request: HttpRequest) -> HttpResponse:
+    return render(request, "help/broken_email_help.html", {"private": True})
+
+
 def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""

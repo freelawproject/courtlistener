@@ -289,6 +289,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         user_form.save()
 
         return HttpResponseRedirect(reverse("view_settings"))
+
     return render(
         request,
         "profile/settings.html",

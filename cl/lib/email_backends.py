@@ -10,10 +10,8 @@ from django.core.mail.backends.base import BaseEmailBackend
 
 from cl.users.email_handlers import (
     add_bcc_random,
-    compose_message,
-    has_small_version,
+    enqueue_email,
     is_not_email_banned,
-    is_small_only_flagged,
     normalize_addresses,
     store_message,
     under_backoff_waiting_period,
@@ -36,9 +34,6 @@ class EmailBackend(BaseEmailBackend):
     - Stores a message in DB, generates a unique message_id.
     - Verifies if the recipient's email address is under a backoff event
     waiting period.
-    - Verifies if the recipient's email address is small_email_only flagged
-    or if attachments exceed MAX_ATTACHMENT_SIZE, if so send the small email
-    version.
     - Compose messages according to available content types
     """
 
@@ -68,71 +63,29 @@ class EmailBackend(BaseEmailBackend):
             if not recipient_list:
                 continue
 
-            # Compute attachments total size in bytes
-            attachment_size = 0
-            for attachment in email_message.attachments:
-                # An attachment is a tuple: (filename, content, mimetype)
-                # with attachment[1] we obtain the base64 file content
-                # so we can obtain the file size in bytes with len()
-                attachment_size = len(attachment[1]) + attachment_size
-
-            small_version = has_small_version(message)
-            if small_version:
-                # Check if at least one recipient is small_email_only flagged
-                send_small = False
-                for email_address in recipient_list:
-                    if is_small_only_flagged(email_address):
-                        send_small = True
-                        break
-                if (
-                    send_small
-                    or attachment_size > settings.MAX_ATTACHMENT_SIZE
-                ):
-                    # If at least one recipient is small_only_email flagged or
-                    # attachments exceed the MAX_ATTACHMENT_SIZE
-
-                    # Compose small messages without attachments
-                    # according to available content types
-                    email = compose_message(email_message, small_version=True)
-                else:
-                    # If not small flag or not file size limit exceeded
-                    # get rid of small version
-
-                    # Compose normal messages with attachments according to
-                    # available content types.
-                    # Discard text/plain_small and text/html_small
-                    # content types.
-                    email = compose_message(email_message, small_version=False)
-                    # Add attachments
-                    for attachment in email_message.attachments:
-                        # An attachment is a tuple:filename, content, mimetype
-                        email.attach(
-                            attachment[0], attachment[1], attachment[2]
-                        )
-            else:
-                # If no small version is available, send the original message
-                email = email_message
+            email = email_message
 
             # Verify if email addresses are under a backoff waiting period
             final_recipient_list = []
             backoff_recipient_list = []
             for email_address in recipient_list:
                 if under_backoff_waiting_period(email_address):
-                    # If a email address is under a waiting period
+                    # If an email address is under a waiting period
                     # add to a backoff recipient list to queue the message
                     backoff_recipient_list.append(email_address)
                 else:
-                    # If a email address is not under a waiting period
+                    # If an email address is not under a waiting period
                     # add to the final recipients list
                     final_recipient_list.append(email_address)
-
-            if backoff_recipient_list:
-                # TODO QUEUE email
-                pass
 
             # Store message in DB and obtain the unique
             # message_id to add in headers to identify the message
             stored_id = store_message(email_message)
+
+            if backoff_recipient_list:
+                # Enqueue message for recipients under a waiting backoff period
+                enqueue_email(backoff_recipient_list, stored_id)
+
             # Add header with unique message_id to identify message
             email.extra_headers["X-CL-ID"] = stored_id
             # Use base backend connection to send the message
