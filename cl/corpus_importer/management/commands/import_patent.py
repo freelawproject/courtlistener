@@ -48,10 +48,10 @@ def get_dockets(options: dict) -> None:
     for item in items:
         logger.info(f"{i}: Doing FJC_ID with pk: {item.id}")
         i += 1
-        if i and i < start:
+        if start and (i < start):
             # Start processing case at # if not 0.
             continue
-        if i and i > stop:
+        if stop and (i > stop):
             # Stop processing case at # if not 0
             break
 

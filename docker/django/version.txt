@@ -1,5 +1,6 @@
-2.0.22
+2.0.23
 
+2.0.23 - Bug fix
 2.0.22 - Update code
 2.0.21 - Update code
 2.0.20 - Update code
