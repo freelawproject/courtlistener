@@ -37,10 +37,12 @@ def get_dockets(options: dict) -> None:
     session.login()
 
     NOS_CODES = [PATENT, PATENT_ANDA]
+    DISTRICTS = ["ded", "txwd"]
     START_DATE = "2012-01-01"
     items = FjcIntegratedDatabase.objects.filter(
         nature_of_suit__in=NOS_CODES,
         date_filed__gt=START_DATE,
+        district__in=DISTRICTS,
     ).order_by("date_filed")
     i = 0
     for item in items:
