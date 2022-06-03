@@ -140,9 +140,7 @@ def handle_soft_bounce(
                             email_address=email,
                             flag_type=FLAG_TYPES.BAN,
                             defaults={
-                                "notification_subtype": EMAIL_NOTIFICATIONS.INVERTED[
-                                    "MaxRetryReached"
-                                ],
+                                "notification_subtype": EMAIL_NOTIFICATIONS.MAX_RETRY_REACHED,
                             },
                         )
                     else:
