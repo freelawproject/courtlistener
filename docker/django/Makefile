@@ -47,21 +47,21 @@ protects against arm64 builds being accidentally deployed to the server (which u
 
 multiarch_image:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
-	$(DOCKER) buildx rm
-	$(DOCKER) buildx create --use --name flp-builder
-	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
+	docker buildx rm
+	docker buildx create --use --name flp-builder
+	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 
 multiarch_push:
-	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
 
 x86_push:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
-	$(DOCKER) buildx rm
-	$(DOCKER) buildx create --use --name flp-builder
-	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	$(DOCKER) buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
+	docker buildx rm
+	docker buildx create --use --name flp-builder
+	docker buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
