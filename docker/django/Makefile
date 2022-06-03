@@ -11,7 +11,8 @@ WEB_PROD ?= latest-web-prod
 WEB_DEV ?= latest-web-dev
 CELERY_TAG = $(VERSION)-celery
 CELERY_LATEST ?= latest-celery
-RSS_TAG ?= latest-scrape-rss
+RSS_TAG ?= $(VERSION)-scrape-rss
+RSS_LATEST ?= latest-scrape-rss
 
 .PHONY: all image push multiarch_image multiarch_push x86_image x86_push
 
@@ -26,7 +27,7 @@ development:
 image:
 	docker build --target web-prod -t $(REPO):$(DOCKER_TAG_PROD) -t $(REPO):$(WEB_PROD) --file docker/django/Dockerfile .
 	docker build --target celery -t $(REPO):$(CELERY_TAG) -t $(REPO):$(CELERY_LATEST) --file docker/django/Dockerfile .
-	docker build --target rss-scraper -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
+	docker build --target rss-scraper -t $(REPO):$(RSS_TAG) -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
 
 push: image
 	$(info Checking if valid architecture)
@@ -39,6 +40,7 @@ push: image
 	    docker push $(REPO):$(CELERY_TAG);\
 	    docker push $(REPO):$(CELERY_LATEST);\
 	    docker push $(REPO):$(RSS_TAG);\
+	    docker push $(REPO):$(RSS_LATEST);\
 	else \
 		echo "Only arm64 machines can push single-architecture builds. If you want to \
 push a build, try 'make multiarch_push', which builds for both arm64 and amd64. This \
@@ -51,12 +53,12 @@ multiarch_image:
 	docker buildx create --use --name flp-builder
 	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
 	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
+	docker buildx build --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
 
 multiarch_push:
 	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t $(REPO):$(RSS_TAG) -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
 
 x86_push:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -64,4 +66,4 @@ x86_push:
 	docker buildx create --use --name flp-builder
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
-	docker buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG) --file docker/django/Dockerfile .
+	docker buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG)  -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
