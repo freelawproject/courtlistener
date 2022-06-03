@@ -140,12 +140,12 @@
             <div class="col-lg-12">
               <p class="navbar-text lead">
                 <i class="fa fa-warning"></i>
-                {% if EMAIL_BAN_DATE %}
+                {% if EMAIL_BAN_PERMANENT %}
                   We are currently unable to send emails to you. Please update your email address to continue receiving emails.
                 {% else %}
                   We are having difficulty sending emails to you, but we're continuing to try. If this problem persists, our servers will automatically stop sending you messages.
                 {% endif %}
-              </br>
+                </br>
                 <a href="{% url 'broken_email_help' %}"
                   class="btn btn-default v-offset-above-1 pull-right">Learn More</a>
               </p>

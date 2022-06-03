@@ -3,6 +3,7 @@ from datetime import datetime
 from urllib.parse import urljoin
 
 import requests
+from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
 from django.conf import settings
@@ -109,7 +110,7 @@ def update_mailchimp(self, email, status):
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60)
-def process_retry_email(
+def send_failed_email(
     self: Task,
     failed_pk: int,
 ) -> int:
@@ -124,17 +125,11 @@ def process_retry_email(
         email = failed_email.stored_email.convert_to_email_multipart()
         try:
             email.send()
-        except Exception as exc:
+        except (
+            botocore_exception.HTTPClientError,
+            botocore_exception.ConnectionError,
+        ) as exc:
             # In case of error when sending e.g: SES downtime, retry the task.
             raise self.retry(exc=exc)
         failed_email.status = STATUS_TYPES.SUCCESSFUL
         failed_email.save()
-
-
-def send_failed_email(
-    failed_pk: int,
-    start: datetime,
-) -> None:
-    return chain(
-        process_retry_email.si(failed_pk),
-    ).apply_async(eta=start)

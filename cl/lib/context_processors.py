@@ -1,5 +1,4 @@
 import random
-from datetime import datetime
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -122,7 +121,7 @@ TRANSIENT = {
 
 def inject_email_ban_status(
     request: HttpRequest,
-) -> dict[str, datetime | str] | dict:
+) -> dict[str, str | bool]:
     """This function injects the status of the user's email address.
 
     :param request: Contains the user for checking if their email is valid.
@@ -138,10 +137,7 @@ def inject_email_ban_status(
                 email_banned[0].notification_subtype,
                 PERMANENT[EMAIL_NOTIFICATIONS.GENERAL],
             )
-            return {
-                "EMAIL_BAN_DATE": email_banned[0].date_created,
-                "EMAIL_BAN_REASON": msg,
-            }
+            return {"EMAIL_BAN_PERMANENT": True, "EMAIL_BAN_REASON": msg}
         backoff_event = EmailFlag.objects.filter(
             email_address=email, flag_type=FLAG_TYPES.BACKOFF
         )
@@ -150,5 +146,5 @@ def inject_email_ban_status(
                 backoff_event[0].notification_subtype,
                 TRANSIENT[EMAIL_NOTIFICATIONS.GENERAL],
             )
-            return {"EMAIL_BAN_REASON": msg}
+            return {"EMAIL_BAN_PERMANENT": False, "EMAIL_BAN_REASON": msg}
     return {}

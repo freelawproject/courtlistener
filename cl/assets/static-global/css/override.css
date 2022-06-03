@@ -1126,7 +1126,6 @@ emphasis {
 .alert-dismissible .navbar-text.lead, .alert-danger, .alert-warning,
 .alert-danger .help-block {
   color: #333333;
-  font-family: Helvetica;
 }
 
 .alert-dismissible .btn-default {

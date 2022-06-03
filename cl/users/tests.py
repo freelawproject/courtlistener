@@ -394,9 +394,7 @@ class SNSWebhookTest(TestCase):
         :return: None
         """
         # Prepare parameters
-        raw = json.dumps(test_asset)
-        notification = json.loads(raw)
-        message = json.loads(notification["Message"])
+        message = json.loads(test_asset["Message"])
         mail_obj = message.get("mail")
         event_obj = message.get(event_name, {})
 
@@ -404,7 +402,7 @@ class SNSWebhookTest(TestCase):
         signal_kwargs = dict(
             sender=self,
             mail_obj=mail_obj,
-            raw_message=raw,
+            raw_message=test_asset,
         )
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
@@ -910,9 +908,7 @@ class CustomBackendEmailTest(TestCase):
         :return: None
         """
         # Prepare parameters
-        raw = json.dumps(test_asset)
-        notification = json.loads(raw)
-        message = json.loads(notification["Message"])
+        message = json.loads(test_asset["Message"])
         mail_obj = message.get("mail")
         event_obj = message.get(event_name, {})
 
@@ -920,16 +916,10 @@ class CustomBackendEmailTest(TestCase):
         signal_kwargs = dict(
             sender=self,
             mail_obj=mail_obj,
-            raw_message=raw,
+            raw_message=test_asset,
         )
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
-
-    def mock_send_failed_email(failed_pk, start):
-        """This function mocks the send_failed_email function to avoid calling
-        the celery task and avoid unxpected errors.
-        """
-        return None
 
     def test_send_mail_function(self) -> None:
         """This test checks if Django send_mail() works properly using the
@@ -1236,7 +1226,7 @@ class CustomBackendEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_sending_email_within_back_off(self, mock_send_email) -> None:
         """This test checks if an email address is under a backoff waiting
@@ -1561,7 +1551,7 @@ class CustomBackendEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_within_backoff(
         self, mock_send_email
@@ -1607,7 +1597,7 @@ class CustomBackendEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_all_within_backoff(
         self, mock_send_email
@@ -1877,9 +1867,7 @@ class RetryFailedEmailTest(TestCase):
         :return: None
         """
         # Prepare parameters
-        raw = json.dumps(test_asset)
-        notification = json.loads(raw)
-        message = json.loads(notification["Message"])
+        message = json.loads(test_asset["Message"])
         mail_obj = message.get("mail")
         event_obj = message.get(event_name, {})
 
@@ -1887,16 +1875,10 @@ class RetryFailedEmailTest(TestCase):
         signal_kwargs = dict(
             sender=self,
             mail_obj=mail_obj,
-            raw_message=raw,
+            raw_message=test_asset,
         )
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
-
-    def mock_send_failed_email(failed_pk, start):
-        """This function mocks the send_failed_email function to avoid calling
-        the celery task and avoid unexpected errors.
-        """
-        return None
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_avoid_enqueue_a_non_existing_message(self, mock_logging) -> None:
@@ -2008,7 +1990,7 @@ class RetryFailedEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_enqueue_email_backoff_event(self, mock_send_email) -> None:
         """This test checks if an email is properly enqueued when the
@@ -2041,7 +2023,6 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Check the message is queued
-        mock_send_email.assert_called()
         failed_email = FailedEmail.objects.all()
         self.assertEqual(failed_email.count(), 1)
 
@@ -2081,7 +2062,7 @@ class RetryFailedEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_enqueue_email_soft_bounce(self, mock_send_email) -> None:
         """This test checks if we can queue a message properly after receiving
@@ -2117,7 +2098,6 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Check the soft bounce message related is queued
-        mock_send_email.assert_called()
         failed_email = FailedEmail.objects.all()
         self.assertEqual(failed_email.count(), 1)
 
@@ -2132,7 +2112,6 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Check the message is queued
-        mock_send_email.assert_called()
         failed_email = FailedEmail.objects.all()
         self.assertEqual(failed_email.count(), 2)
 
@@ -2142,7 +2121,7 @@ class RetryFailedEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_enqueue_email_after_delivery(self, mock_send_email) -> None:
         """This test checks if after a delivery notification, WAITING failed
@@ -2192,7 +2171,6 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Messages are queued, one in ENQUEUED status and two in WAITING.
-        mock_send_email.assert_called()
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
         self.assertEqual(failed_email.count(), 1)
         self.assertEqual(failed_email[0].status, STATUS_TYPES.ENQUEUED)
@@ -2217,7 +2195,7 @@ class RetryFailedEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_delete_failed_task_objects(self, mock_send_email) -> None:
         """This test checks if delete_failed_tasks_objects function works
@@ -2310,7 +2288,7 @@ class RetryFailedEmailTest(TestCase):
 
     @mock.patch(
         "cl.users.email_handlers.send_failed_email",
-        side_effect=mock_send_failed_email,
+        side_effect=lambda x: None,
     )
     def test_retry_datetime(self, mock_send_email) -> None:
         """This test checks that retry times are properly computed."""
@@ -2449,9 +2427,7 @@ class EmailBrokenTest(TestCase):
         :return: None
         """
         # Prepare parameters
-        raw = json.dumps(test_asset)
-        notification = json.loads(raw)
-        message = json.loads(notification["Message"])
+        message = json.loads(test_asset["Message"])
         mail_obj = message.get("mail")
         event_obj = message.get(event_name, {})
 
@@ -2459,7 +2435,7 @@ class EmailBrokenTest(TestCase):
         signal_kwargs = dict(
             sender=self,
             mail_obj=mail_obj,
-            raw_message=raw,
+            raw_message=test_asset,
         )
         signal_kwargs[f"{event_name}_obj"] = event_obj
         signal.send(**signal_kwargs)
@@ -2534,8 +2510,8 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
 
         # A mail_box_full soft bounce event should trigger a Transient broken
-        # email banner, we have a msg and no EMAIL_BAN_DATE
-        self.assertEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        # email banner, we have a msg and no EMAIL_BAN_PERMANENT
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), False)
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a hard bounce notification event
@@ -2549,9 +2525,9 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(email_ban.count(), 1)
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
-        # email banner, we have a msg and EMAIL_BAN_DATE
+        # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
-        self.assertNotEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
     def test_broken_email_banner_complaint(self) -> None:
         """This test checks if a complaint notification properly triggers a
@@ -2578,9 +2554,9 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(email_ban.count(), 1)
         r = self.client.get(path)
         # A complaint event should trigger a Permanent broken
-        # email banner, we have a msg and EMAIL_BAN_DATE
+        # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
-        self.assertNotEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
     def test_broken_email_address_banner_first_permanent(self) -> None:
         """This test checks if a Permanent broken email event comes first than
@@ -2611,9 +2587,9 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(email_ban.count(), 1)
         r = self.client.get(path)
         # A hard bounce event should trigger a Permanent broken
-        # email banner, we have a msg and EMAIL_BAN_DATE
+        # email banner, we have a msg and EMAIL_BAN_PERMANENT
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
-        self.assertNotEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
         # Trigger a soft bounce notification event
         self.send_signal(
@@ -2630,7 +2606,7 @@ class EmailBrokenTest(TestCase):
         # A backoff event is created but the Permanent broken email banner is
         # prioritized
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
-        self.assertNotEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), True)
 
         # Simulate user changes their email address to solve the Permanent
         # email error.
@@ -2670,8 +2646,8 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
 
         # A mail_box_full soft bounce event should trigger a Transient broken
-        # email banner, we have a msg and no EMAIL_BAN_DATE
-        self.assertEqual(r.context.get("EMAIL_BAN_DATE"), None)
+        # email banner, we have a msg and no EMAIL_BAN_PERMANENT
+        self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), False)
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
         # Trigger a delivery event

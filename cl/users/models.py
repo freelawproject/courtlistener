@@ -16,6 +16,7 @@ from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
 from cl.api.utils import invert_user_logs
+from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 
 donation_exclusion_codes = [
@@ -191,8 +192,7 @@ class EMAIL_NOTIFICATIONS(object):
     CONTENT_REJECTED = 7
     ATTACHMENT_REJECTED = 8
     COMPLAINT = 9
-    OTHER = 10
-    MAX_RETRY_REACHED = 11
+    MAX_RETRY_REACHED = 10
 
     TYPES = (
         (UNDETERMINED, "Undetermined"),
@@ -205,9 +205,9 @@ class EMAIL_NOTIFICATIONS(object):
         (CONTENT_REJECTED, "ContentRejected"),
         (ATTACHMENT_REJECTED, "AttachmentRejected"),
         (COMPLAINT, "Complaint"),
-        (OTHER, "Other"),
         (MAX_RETRY_REACHED, "MaxRetryReached"),
     )
+    INVERTED = invert_choices_group_lookup(TYPES)
 
 
 class FLAG_TYPES(object):
