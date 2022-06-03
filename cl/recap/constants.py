@@ -488,6 +488,7 @@ NOS_CODES = (
     (SELECTIVE_SERVICE, "810 Selective service"),
     (COPYRIGHT, "820 Copyright"),
     (PATENT, "830 Patent"),
+    (PATENT_ANDA, "835 Patent Abbreviated New Drug Application (ANDA)"),
     (TRADEMARK, "840 Trademark"),
     (SECURITIES_COMMODITIES_EXCHANGE, "850 Securities, Commodities, Exchange"),
     (SOCIAL_SECURITY, "860 Social security"),
