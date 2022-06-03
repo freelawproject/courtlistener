@@ -1106,7 +1106,7 @@ def update_docket_from_hidden_api(data):
 @app.task(
     bind=True,
     autoretry_for=(RedisConnectionError, PacerLoginException),
-    max_retries=3,
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
@@ -1192,7 +1192,7 @@ def fetch_pacer_doc_by_rd(
 @app.task(
     bind=True,
     autoretry_for=(RedisConnectionError, PacerLoginException),
-    max_retries=3,
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
@@ -1338,7 +1338,7 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException, RedisConnectionError),
-    max_retries=3,
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
