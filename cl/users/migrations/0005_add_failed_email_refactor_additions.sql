@@ -3,26 +3,7 @@ BEGIN;
 -- Create model FailedEmail
 --
 CREATE TABLE "users_failedemail" ("id" serial NOT NULL PRIMARY KEY, "date_created" timestamp with time zone NOT NULL, "date_modified" timestamp with time zone NOT NULL, "recipient" varchar(254) NOT NULL, "status" smallint NOT NULL, "next_retry_date" timestamp with time zone NULL);
---
--- Delete model BackoffEvent
---
-DROP TABLE "users_backoffevent" CASCADE;
---
--- Remove constraint unique_email_ban from model emailflag
---
-DROP INDEX IF EXISTS "unique_email_ban";
---
--- Remove field event_sub_type from emailflag
---
-ALTER TABLE "users_emailflag" DROP COLUMN "event_sub_type" CASCADE;
---
--- Remove field flag from emailflag
---
-ALTER TABLE "users_emailflag" DROP COLUMN "flag" CASCADE;
---
--- Remove field object_type from emailflag
---
-ALTER TABLE "users_emailflag" DROP COLUMN "object_type" CASCADE;
+
 --
 -- Add field flag_type to emailflag
 --
