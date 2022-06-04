@@ -95,6 +95,7 @@ class FailedEmailAdmin(admin.ModelAdmin):
         "status",
         "date_created",
     )
+    raw_id_fields = ("stored_email",)
 
 
 # Replace the normal User admin with our better one.
