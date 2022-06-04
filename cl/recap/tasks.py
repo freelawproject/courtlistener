@@ -1366,23 +1366,25 @@ def fetch_docket(self, fq_pk):
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
-        msg = "Network error getting pacer_case_id for fq: %s."
+        msg = f"Network error getting pacer_case_id for fq: {fq_pk}."
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except PacerLoginException as exc:
-        msg = "PacerLoginException while getting pacer_case_id for fq: %s."
+        msg = (
+            f"PacerLoginException while getting pacer_case_id for fq: {fq_pk}."
+        )
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except ParsingException:
