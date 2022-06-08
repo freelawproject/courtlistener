@@ -31,74 +31,76 @@ def make_alert_messages(
     d: Docket,
     new_des: QuerySet,
     email_addresses: "ValuesQuerySet[User, Optional[str]]",  # type: ignore
-    user_pk: Optional[int] = None,
+    first_time_recipients: Optional[list[int]] = None,
 ) -> List[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
     :param new_des: The new docket entries
     :param email_addresses: A list of user email addresses to send to
-    :param user_pk: The user PK if it's needed to send the first case-user
-    notification email.
+    :param first_time_recipients: The recipients user_pk if needed to send the
+    first case-user notification email.
     :return: A list of email messages to send
     """
 
     case_name = trunc(best_case_name(d), 100, ellipsis="...")
     messages = []
-    if user_pk:
-        txt_template = loader.get_template(
-            "docket_alert_first_notification_email.txt"
-        )
-        html_template = loader.get_template(
-            "docket_alert_first_notification_email.html"
-        )
-        subject_template = loader.get_template(
-            "docket_alert_first_notification_subject.txt"
-        )
-        subject = subject_template.render(
-            {
-                "docket": d,
-                "count": new_des.count(),
-                "case_name": case_name,
-            }
-        ).strip()  # Remove newlines that editors can insist on adding.
-        docket_alert = DocketAlert.objects.get(docket=d, user_id=user_pk)
-        email_context = {
-            "new_des": new_des,
-            "docket": d,
-            "docket_alert": docket_alert,
-        }
-        recap_email_user = User.objects.get(pk=user_pk)
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=txt_template.render(email_context),
-            from_email=settings.DEFAULT_ALERTS_EMAIL,
-            to=[recap_email_user.email],
-            headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
-        )
-        html = html_template.render(email_context)
-        msg.attach_alternative(html, "text/html")
-        messages.append(msg)
+    txt_template = loader.get_template("docket_alert_email.txt")
+    html_template = loader.get_template("docket_alert_email.html")
+    subject_template = loader.get_template("docket_alert_subject.txt")
+    subject_dict = {
+        "docket": d,
+        "count": new_des.count(),
+        "case_name": case_name,
+        "first_email": False,
+        "auto_subscribe": False,
+    }
+    email_context = {
+        "new_des": new_des,
+        "docket": d,
+        "docket_alert": None,
+        "first_email": False,
+        "auto_subscribe": False,
+    }
+    if first_time_recipients:
+        for user_pk in first_time_recipients:
+            recap_email_user = User.objects.get(pk=user_pk)
+            if recap_email_user.profile.auto_subscribe:
+                first_email = auto_subscribe = True
+                docket_alert = DocketAlert.objects.create(
+                    docket=d, user_id=user_pk
+                )
+            else:
+                first_email, auto_subscribe = True, False
+                docket_alert = DocketAlert.objects.create(
+                    docket=d,
+                    user_id=user_pk,
+                    alert_type=DocketAlert.UNSUBSCRIPTION,
+                )
+            subject_dict["auto_subscribe"] = auto_subscribe
+            subject_dict["first_email"] = first_email
+            subject = subject_template.render(subject_dict).strip()
+            email_context["docket_alert"] = docket_alert
+            email_context["first_email"] = first_email
+            email_context["auto_subscribe"] = auto_subscribe
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=txt_template.render(email_context),
+                from_email=settings.DEFAULT_ALERTS_EMAIL,
+                to=[recap_email_user.email],
+                headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            )
+            html = html_template.render(email_context)
+            msg.attach_alternative(html, "text/html")
+            messages.append(msg)
 
     if email_addresses:
-        txt_template = loader.get_template("docket_alert_email.txt")
-        html_template = loader.get_template("docket_alert_email.html")
-        subject_template = loader.get_template("docket_alert_subject.txt")
-        subject = subject_template.render(
-            {
-                "docket": d,
-                "count": new_des.count(),
-                "case_name": case_name,
-            }
-        ).strip()  # Remove newlines that editors can insist on adding.
+        subject = subject_template.render(subject_dict).strip() # Remove
+        # newlines that editors can insist on adding.
         for email_address in email_addresses:
             user = User.objects.get(email=email_address)
             docket_alert = DocketAlert.objects.get(docket=d, user=user)
-            email_context = {
-                "new_des": new_des,
-                "docket": d,
-                "docket_alert": docket_alert,
-            }
+            email_context["docket_alert"] = docket_alert
             msg = EmailMultiAlternatives(
                 subject=subject,
                 body=txt_template.render(email_context),
@@ -116,13 +118,15 @@ def make_alert_messages(
 # Ignore the result or else we'll use a lot of memory.
 @app.task(ignore_result=True)
 def send_docket_alert(
-    d_pk: int, since: datetime, user_pk: Optional[int] = None
+    d_pk: int,
+    since: datetime,
+    first_time_recipients: Optional[list[int]] = None,
 ) -> None:
     """Send an alert for a given docket
 
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
-    :param user_pk: The user PK if it's needed to send the first case-user
+    :param first_time_recipients: The users PK if to send the first case-user
     notification email.
     :return: None
     """
@@ -135,7 +139,7 @@ def send_docket_alert(
         .distinct()
         .values_list("email", flat=True)
     )
-    if not email_addresses and not user_pk:
+    if not email_addresses and not first_time_recipients:
         # Nobody subscribed to the docket.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -148,7 +152,9 @@ def send_docket_alert(
         return
 
     # Notify every user that's subscribed to this alert.
-    messages = make_alert_messages(d, new_des, email_addresses, user_pk)
+    messages = make_alert_messages(
+        d, new_des, email_addresses, first_time_recipients
+    )
     connection = get_connection()
     connection.send_messages(messages)
 

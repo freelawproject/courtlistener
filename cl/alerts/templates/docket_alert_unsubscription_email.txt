@@ -1,10 +1,10 @@
 
 {% load text_filters %}{% load humanize %}
 
-Your Docket Alert for {{ docket|best_case_name|safe }}
-{% if docket.docket_number %}({{ docket.docket_number }}){% endif %} has been disabled.
+You have been unsubscribed from {{ docket|best_case_name|safe }}
+{% if docket.docket_number %}({{ docket.docket_number }}){% endif %}.
 
-To re-enable your subscription for this case, you can subscribe here:
+If this action was taken in error or was not completed by you, you can re-subscribe here:
 https://www.courtlistener.com{% url 'subscribe_docket_alert' docket_alert.secret_key %}
 
 ************************

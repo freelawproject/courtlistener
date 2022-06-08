@@ -1,1 +1,1 @@
-Your Docket Alert for {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %} has been disabled.
+You are now unsubscribed from {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}.

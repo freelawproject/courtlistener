@@ -1520,38 +1520,44 @@ def send_docket_to_webhook(
             webhook.save()
 
 
+def first_time_users(
+    docket_pk: int,
+    email_recipients: list[dict[str, str | list[str]]],
+) -> list[int]:
+    """Get the recap.email recipients and determine if it's the first time that
+     a recap.email notification comes in for a case-user.
 
-def first_notification_case(docket_pk: int, user_pk: int) -> int | None:
-    """Determine if it's the first time that a recap.email notification comes
-    in for a case-user, create the DocketAlert object and determine if it's
-    needed to send the first case-user notification email based on the user's
-    auto subscription setting.
-
-    :param docket_pk: The PK of the docket related with the notification
-    :user_pk: The PK of the recap.email user from the notification came in
-    :return: The user PK if it's the first case-user notification and user
-    has auto-subscribe option enabled, otherwise None
+    :param email_recipients: List of dicts that contains the notification
+    email recipients in the format: "name": name, "email_addresses": [""]
+    :param docket_pk: The PK of the docket related to the notification
+    :return: List of recap.email addresses if it's the first time the
+     recap.email notification comes in for this case-user
     """
-
-    user = User.objects.get(pk=user_pk)
-    docket_alert = DocketAlert.objects.filter(
-        docket_id=docket_pk, user_id=user_pk
+    # Extract all email addresses from email_recipients
+    email_addresses = [
+        email
+        for email_address in email_recipients
+        for email in email_address["email_addresses"]
+    ]
+    # Select only @recap.email addresses
+    recap_email_recipients = [
+        recap_email
+        for recap_email in email_addresses
+        if "@recap.email" in recap_email
+    ]
+    recap_profiles = UserProfile.objects.filter(
+        recap_email__in=recap_email_recipients
     )
-    if not docket_alert.exists():
-        if user.profile.auto_subscribe:
-            # Create a DocketAlert (Subscription by default)
-            DocketAlert.objects.create(docket_id=docket_pk, user_id=user_pk)
-        else:
-            # Create an Unsubscription DocketAlert
-            DocketAlert.objects.create(
-                docket_id=docket_pk,
-                user=user,
-                alert_type=DocketAlert.UNSUBSCRIPTION,
-            )
-            # Return user_pk to send the first case-user notification email
-            return user_pk
-    return None
+    first_time_recipients = []
+    for recap_user in recap_profiles:
+        user_pk = recap_user.user.pk
+        docket_alert = DocketAlert.objects.filter(
+            docket_id=docket_pk, user_id=user_pk
+        )
+        if not docket_alert.exists():
+            first_time_recipients.append(user_pk)
 
+    return first_time_recipients
 
 @app.task(
     bind=True,
@@ -1567,6 +1573,15 @@ def first_notification_case(docket_pk: int, user_pk: int) -> int | None:
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:
+    """Processes a recap.email when it comes in, fetches the free document and
+    triggers docket alerts and webhooks.
+
+    :param self: The task
+    :param epq_pk: The EmailProcessingQueue object pk
+    :param user_pk: The API user that sent this notification
+    :return: An optional dict to pass to the next task with the docket_pk and a
+     bool True if there was content updated, otherwise False
+    """
 
     start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
@@ -1635,14 +1650,13 @@ def process_recap_email(
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
-            recipient_user = UserProfile.objects.filter(
-                recap_email=epq.destination_emails[0]
-            )
-            user_id = first_notification_case(
-                docket.pk, recipient_user[0].user.pk
+            first_time_recipients = first_time_users(
+                docket.pk, data["email_recipients"]
             )
             chain(
-                send_docket_alert.si(docket.pk, start_time, user_id),
+                send_docket_alert.si(
+                    docket.pk, start_time, first_time_recipients
+                ),
                 send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
             ).apply_async()
     return {

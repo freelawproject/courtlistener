@@ -1,1 +1,0 @@
-Would you like to subscribe to this case? {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}

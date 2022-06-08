@@ -100,25 +100,24 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         if not docket_pk:
             msg = "Unable to alter alert. Please provide ID attribute"
             return HttpResponse(msg)
-        subscription_alert = DocketAlert.objects.filter(
+        existing_alert = DocketAlert.objects.filter(
             user=request.user,
             docket_id=docket_pk,
-            alert_type=DocketAlert.SUBSCRIPTION,
         )
-        unsubscription_alert = DocketAlert.objects.filter(
-            user=request.user,
-            docket_id=docket_pk,
-            alert_type=DocketAlert.UNSUBSCRIPTION,
-        )
-        if subscription_alert.exists():
-            subscription_alert.update(alert_type=DocketAlert.UNSUBSCRIPTION)
-            msg = "Alert disabled successfully"
-        elif unsubscription_alert.exists():
-            unsubscription_alert.update(alert_type=DocketAlert.SUBSCRIPTION)
-            msg = "Alerts are now enabled for this docket"
+        if existing_alert.exists():
+            alert = existing_alert.first()
+            if alert.alert_type == DocketAlert.SUBSCRIPTION:
+                alert.alert_type = DocketAlert.UNSUBSCRIPTION
+                alert.save()
+                msg = "Alert disabled successfully"
+            else:
+                alert.alert_type = DocketAlert.SUBSCRIPTION
+                alert.save()
+                msg = "Alerts are now enabled for this docket"
         else:
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
             msg = "Alerts are now enabled for this docket"
+
         return HttpResponse(msg)
     else:
         return HttpResponseNotAllowed(
@@ -179,10 +178,8 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
 @ratelimit_deny_list
 def subscribe_docket_alert(request, secret_key):
     docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
-    if docket_alert.alert_type == DocketAlert.UNSUBSCRIPTION:
-        docket_alert.alert_type = DocketAlert.SUBSCRIPTION
-        docket_alert.save()
-
+    docket_alert.alert_type = DocketAlert.SUBSCRIPTION
+    docket_alert.save()
     return render(
         request,
         "enable_docket_alert.html",
@@ -193,13 +190,10 @@ def subscribe_docket_alert(request, secret_key):
 @ratelimit_deny_list
 def unsubscribe_docket_alert(request, secret_key):
     docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
-    if docket_alert.alert_type == DocketAlert.SUBSCRIPTION:
-        docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
-        docket_alert.save()
-        # Send Unsubscription confirmation email to the user
-        chain(
-            send_unsubscription_confirmation.si(docket_alert.pk),
-        ).apply_async()
+    docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
+    docket_alert.save()
+    # Send Unsubscription confirmation email to the user
+    send_unsubscription_confirmation.delay(docket_alert.pk)
     return render(
         request,
         "disable_docket_alert.html",
