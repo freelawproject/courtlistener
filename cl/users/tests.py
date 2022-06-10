@@ -1,9 +1,12 @@
 import json
+import logging
 from datetime import timedelta
 from pathlib import Path
 from time import time
 from unittest import mock
+from urllib.parse import urljoin
 
+import requests
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
@@ -15,7 +18,7 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import HTTP_200_OK
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -59,7 +62,7 @@ class UserTest(LiveServerTestCase):
                 r.status_code,
                 HTTP_200_OK,
                 msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                    "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
     def test_creating_a_new_user(self) -> None:
@@ -120,16 +123,16 @@ class UserTest(LiveServerTestCase):
                         next_param,
                         response.content.decode(),
                         msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                            "not cleaned by the sanitize_redirection function."
+                            % next_param,
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
                         msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                            "was sanitized when it should not have been."
+                            % next_param,
                     )
 
     def test_signing_in(self) -> None:
@@ -160,7 +163,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+                "Instead got %s" % r.status_code,
         )
         self.assertIn(
             "has been confirmed",
@@ -169,7 +172,7 @@ class UserTest(LiveServerTestCase):
         )
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
-        self,
+            self,
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
@@ -193,7 +196,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+                "Instead got %s" % r.status_code,
         )
         ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
         for up in ups:
@@ -360,23 +363,23 @@ class SNSWebhookTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
+                open(
+                    test_dir / "general_soft_bounce.json", encoding="utf-8"
+                ) as general_soft_bounce,
+        open(
+        test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as msg_large_bounce,
+        open(
+            test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
+        ) as cnt_rejected_bounce,
+        open(
+            test_dir / "hard_bounce.json", encoding="utf-8"
+        ) as hard_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+        open(
+            test_dir / "suppressed_bounce.json", encoding="utf-8"
+        ) as suppressed_bounce,
         ):
             cls.soft_bounce_asset = json.load(general_soft_bounce)
             cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
@@ -877,19 +880,19 @@ class CustomBackendEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+                open(
+                    test_dir / "hard_bounce.json", encoding="utf-8"
+                ) as hard_bounce,
+        open(
+        test_dir / "general_soft_bounce.json", encoding="utf-8"
+        ) as soft_bounce,
+        open(
+            test_dir / "general_soft_bounce_2.json", encoding="utf-8"
+        ) as general_soft_bounce_2,
+        open(
+            test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as large_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.soft_bounce_asset = json.load(soft_bounce)
@@ -1554,7 +1557,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_within_backoff(
-        self, mock_send_email
+            self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
@@ -1600,7 +1603,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_all_within_backoff(
-        self, mock_send_email
+            self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
@@ -1847,13 +1850,13 @@ class RetryFailedEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+                open(
+                    test_dir / "general_soft_bounce.json", encoding="utf-8"
+                ) as soft_bounce,
+        open(
+        test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
+        ) as soft_bounce_with_id,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
@@ -2394,20 +2397,20 @@ class EmailBrokenTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
+                open(
+                    test_dir / "hard_bounce.json", encoding="utf-8"
+                ) as hard_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+        open(
+            test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
+        ) as mail_box_full_soft_bounce,
+        open(
+            test_dir / "no_email_hard_bounce.json", encoding="utf-8"
+        ) as no_email_hard_bounce,
+        open(
+            test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as msg_large_bounce,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
@@ -2660,3 +2663,140 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
+
+
+def abort_or_retry(task, exc):
+    """Abort a task if we've run out of retries. Else, retry it."""
+    if task.request.retries == task.max_retries:
+        return
+    else:
+        raise task.retry(exc=exc)
+
+
+log = logging.getLogger(__name__)
+
+
+class MoosendTest(TestCase):
+    mailing_list_id = "19b62b36-aacd-49a3-929f-e86e6a99ebf6"  # freelawproject first mailing list id
+    email = "testing@courtlistener.com"  # Test email address
+    invalid_email = "invalid@mail"
+
+    # Test are done using "freelawproject first mailing list" mailing list from moosend freelaw account
+
+    def test_subscribe(self) -> None:
+        """
+        Subscribe email to mailing list
+        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/add-or-update-subscribers
+        """
+        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/subscribe.json"
+        params = {"apikey": settings.MOOSEND_API_KEY}
+
+        r = requests.post(
+            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
+            params=params,
+            json={
+                "Email": self.email,
+            },
+            timeout=30,
+        )
+
+        # Json response from API
+        j = r.json()
+
+        # Check code is 0 == subscription created/updated correctly
+        self.assertEqual(j.get("Code"), 0)
+
+        # Check user subscribe types is 1 == Subscribed
+        self.assertEqual(j.get("Context").get("SubscribeType"), 1)
+
+    def test_unsubscribe(self):
+        """
+        Unsubscribe email from mailing list (doesn't remove it, just shelve it)
+        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/remove-or-unsubscribe-subscribers/unsubscribing-subscribers-from-mailing-list
+        """
+        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/unsubscribe.json"
+        params = {"apikey": settings.MOOSEND_API_KEY}
+
+        # First we subscribe user
+        self.test_subscribe()
+
+        # Then we unsubscribe it
+        r = requests.post(
+            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
+            params=params,
+            json={
+                "Email": self.email,
+            },
+            timeout=30,
+        )
+
+        # Json response from API
+        j = r.json()
+
+        # Check code is 0 == unsubscribed correctly
+        self.assertEqual(j.get("Code"), 0)
+
+    def test_remove_subscriber(self):
+        """
+        Remove email from mailing list (removed completely, not shelved)
+        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/remove-or-unsubscribe-subscribers/removing-a-subscriber
+        """
+        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/remove.json"
+        params = {"apikey": settings.MOOSEND_API_KEY}
+
+        # First we subscribe user
+        self.test_subscribe()
+
+        # Then we remove it
+        r = requests.post(
+            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
+            params=params,
+            json={
+                "Email": self.email,
+            },
+            timeout=30,
+        )
+
+        # Json response from API
+        j = r.json()
+
+        # Check code is 0 == removed correctly
+        self.assertEqual(j.get("Code"), 0)
+
+    def test_invalid_email_subscribe(self):
+        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/subscribe.json"
+        params = {"apikey": settings.MOOSEND_API_KEY}
+
+        r = requests.post(
+            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
+            params=params,
+            json={
+                "Email": self.invalid_email,
+            },
+            timeout=30,
+        )
+
+        # Json response from API
+        j = r.json()
+
+        # Code is different than 0 == error
+        self.assertNotEqual(j.get("Code"), 0)
+
+    def test_invalid_email_unsubscribe(self):
+        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/unsubscribe.json"
+        params = {"apikey": settings.MOOSEND_API_KEY}
+
+        r = requests.post(
+            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
+            params=params,
+            json={
+                "Email": self.invalid_email,
+            },
+            timeout=30,
+        )
+
+        # Json response from API
+        j = r.json()
+
+        # Code is different than 0 == error
+        self.assertNotEqual(j.get("Code"), 0)
