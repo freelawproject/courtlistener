@@ -105,14 +105,11 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             docket_id=docket_pk,
         )
         if existing_alert.exists():
-            alert = existing_alert.first()
-            if alert.alert_type == DocketAlert.SUBSCRIPTION:
-                alert.alert_type = DocketAlert.UNSUBSCRIPTION
-                alert.save()
+            if existing_alert[0].alert_type == DocketAlert.SUBSCRIPTION:
+                existing_alert.update(alert_type=DocketAlert.UNSUBSCRIPTION)
                 msg = "Alert disabled successfully"
             else:
-                alert.alert_type = DocketAlert.SUBSCRIPTION
-                alert.save()
+                existing_alert.update(alert_type=DocketAlert.SUBSCRIPTION)
                 msg = "Alerts are now enabled for this docket"
         else:
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)

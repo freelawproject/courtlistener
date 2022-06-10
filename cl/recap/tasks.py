@@ -1530,7 +1530,7 @@ def first_time_users(
     :param email_recipients: List of dicts that contains the notification
     email recipients in the format: "name": name, "email_addresses": [""]
     :param docket_pk: The PK of the docket related to the notification
-    :return: List of recap.email addresses if it's the first time the
+    :return: List of recap.email user_pks if it's the first time the
      recap.email notification comes in for this case-user
     """
     # Extract all email addresses from email_recipients
@@ -1558,6 +1558,7 @@ def first_time_users(
             first_time_recipients.append(user_pk)
 
     return first_time_recipients
+
 
 @app.task(
     bind=True,

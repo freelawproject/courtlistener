@@ -15,6 +15,7 @@ from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.search.models import Docket, DocketEntry
 from cl.stats.utils import tally_stat
+from cl.users.models import UserProfile
 
 
 def make_alert_key(d_pk: int) -> str:
@@ -38,7 +39,7 @@ def make_alert_messages(
     :param d: The docket to work on
     :param new_des: The new docket entries
     :param email_addresses: A list of user email addresses to send to
-    :param first_time_recipients: The recipients user_pk if needed to send the
+    :param first_time_recipients: The recipient user_pks if needed to send the
     first case-user notification email.
     :return: A list of email messages to send
     """
@@ -65,7 +66,8 @@ def make_alert_messages(
     if first_time_recipients:
         for user_pk in first_time_recipients:
             recap_email_user = User.objects.get(pk=user_pk)
-            if recap_email_user.profile.auto_subscribe:
+            user_profile = UserProfile.objects.get(user=recap_email_user)
+            if user_profile.auto_subscribe:
                 first_email = auto_subscribe = True
                 docket_alert = DocketAlert.objects.create(
                     docket=d, user_id=user_pk
@@ -95,7 +97,7 @@ def make_alert_messages(
             messages.append(msg)
 
     if email_addresses:
-        subject = subject_template.render(subject_dict).strip() # Remove
+        subject = subject_template.render(subject_dict).strip()  # Remove
         # newlines that editors can insist on adding.
         for email_address in email_addresses:
             user = User.objects.get(email=email_address)
@@ -126,8 +128,8 @@ def send_docket_alert(
 
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
-    :param first_time_recipients: The users PK if to send the first case-user
-    notification email.
+    :param first_time_recipients: The recipient user_pks if needed to send the
+    first case-user notification email.
     :return: None
     """
 
