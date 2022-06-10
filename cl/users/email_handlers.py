@@ -145,7 +145,12 @@ def handle_soft_bounce(
                                 "notification_subtype": EMAIL_NOTIFICATIONS.MAX_RETRY_REACHED,
                             },
                         )
-                        # After ban email address, delete Backoff Event
+                        # After ban an email address, delete Backoff Event in
+                        # case we ever delete a ban for an email address if the
+                        # email address fails again we'll create a new backoff
+                        # event and start the retry counter again avoiding
+                        # unexpected behavior like the one described here:
+                        # https://github.com/freelawproject/courtlistener/pull/2115
                         EmailFlag.objects.filter(
                             email_address=email, flag_type=FLAG_TYPES.BACKOFF
                         ).delete()
