@@ -145,7 +145,7 @@ def handle_soft_bounce(
                                 "notification_subtype": EMAIL_NOTIFICATIONS.MAX_RETRY_REACHED,
                             },
                         )
-                        # After ban an email address, delete Backoff Event. 
+                        # After ban an email address, delete Backoff Event.
                         # This way, if we delete the ban on the email address,
                         # the backoff event gets a fresh start.
                         # https://github.com/freelawproject/courtlistener/pull/2115
