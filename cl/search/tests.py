@@ -14,7 +14,6 @@ from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -27,8 +26,9 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     SolrTestCase,
 )
+from cl.people_db.models import Person, FEMALE
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.factories import CourtFactory
+from cl.search.documents import ParentheticalDocument
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
@@ -42,6 +42,8 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
     sort_cites,
+    Parenthetical,
+    ParentheticalGroup,
 )
 from cl.search.tasks import add_docket_to_solr_by_rds
 from cl.search.views import do_search
@@ -51,7 +53,6 @@ from cl.tests.utils import get_with_wait
 
 
 class UpdateIndexCommandTest(SolrTestCase):
-
     args = [
         "--type",
         "search.Opinion",
@@ -880,7 +881,6 @@ class RelatedSearchTest(IndexedSolrTestCase):
 
 
 class GroupedSearchTest(EmptySolrTestCase):
-
     fixtures = ["opinions-issue-550.json"]
 
     def setUp(self) -> None:
@@ -1680,3 +1680,102 @@ class CaptionTest(TestCase):
         # Now sort the messed up list, and check if it worked.
         cs_sorted = sorted(cs_shuffled, key=sort_cites)
         self.assertEqual(cs, cs_sorted)
+
+
+class ElasticSearchTest(TestCase):
+    fixtures = ["test_court.json"]
+
+    def rebuild_index(self):
+        """
+        Create and populate the Elasticsearch index and mapping
+        """
+        args = [
+            "--rebuild",
+        ]
+        call_command("search_index", "--rebuild")
+
+    def setUp(self) -> None:
+        # Data from make_dev_data commmand
+        self.docket = Docket.objects.create(
+            case_name="Peck, Williams and Freeman v. Stephens",
+            court_id="test",
+            source=Docket.DEFAULT,
+            docket_number="1:98-cr-35856",
+            docket_number_core="9835856",
+            pacer_case_id="272262",
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="Peck, Williams and Freeman v. Stephens",
+            case_name_short="Stephens",
+            docket=self.docket,
+            date_filed=date(1978, 3, 10),
+            source="H",
+            precedential_status="Published",
+        )
+
+        self.person = Person.objects.create(
+            name_first="Sharon Navarro", name_last="Carpenter", gender=FEMALE
+        )
+
+        self.o = Opinion.objects.create(
+            cluster=self.oc,
+            author=self.person,
+            type="Plurality Opinion",
+            sha1="6872c55064015d816e51a653241f38d35e78a02a",
+            plain_text="Compare recently always material authority. Drug water population letter. Property probably "
+            "soon add product. Mind happy although interesting pretty pattern represent. Administration "
+            "either short special artist. Skin yet member fish describe which recognize. Assume rock "
+            "everything phone similar wear. Example speak free sort.",
+        )
+
+        self.p = Parenthetical.objects.create(
+            describing_opinion=self.o,
+            described_opinion=self.o,
+            group=None,
+            text="At responsibility learn point year rate.",
+            score=0.3236,
+        )
+
+        self.pg = ParentheticalGroup.objects.create(
+            opinion=self.o, representative=self.p, score=0.3236, size=1
+        )
+
+        self.p.group = self.pg
+        self.p.save()
+
+        self.rebuild_index()
+
+    def test_search_1(self) -> None:
+
+        # {'query': {'bool': {'filter': [{'term': {'text': 'responsibility'}}]}}}
+        s = ParentheticalDocument.search().filter(
+            "term", text="responsibility"
+        )
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 1)
+
+        # {'query': {'match': {'text': 'responsibility'}}}
+        s2 = ParentheticalDocument.search().query(
+            "match", text="responsibility"
+        )
+        print(s2.to_dict())
+        print(s2.count())
+        self.assertEqual(s2.count(), 1)
+
+        # {'query': {'bool': {'filter': [{'bool': {'must_not': [{'term': {'text': 'responsibility'}}]}}]}}}
+        s3 = ParentheticalDocument.search().exclude(
+            "term", text="responsibility"
+        )
+        print(s3.to_dict())
+        print(s3.count())
+        self.assertEqual(s3.count(), 0)
+
+        # {'query': {'bool': {'filter': [{'term': {'text': 'responsibility'}}, {'term': {'group': 2}}]}}}
+        s4 = ParentheticalDocument.search().filter(
+            "term", text="responsibility"
+        )
+        s4 = s4.filter("term", group=2)
+        print(s4.to_dict())
+        print(s4.count())
+        self.assertEqual(s4.count(), 0)

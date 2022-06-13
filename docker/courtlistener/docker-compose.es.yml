@@ -9,8 +9,11 @@ services:
     environment:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
+      - xpack.security.enabled=false
     ports:
       - "9200:9200"
+    networks:
+      - cl_net_overlay
 
   cl-django:
     depends_on:
