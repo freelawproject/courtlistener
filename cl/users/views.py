@@ -47,7 +47,12 @@ from cl.users.forms import (
     WebhookForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
+from cl.users.tasks import (
+    subscribe_to_moosend,
+    unsubscribe_from_moosend,
+    subscribe_to_mailchimp,
+    update_mailchimp,
+)
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -248,7 +253,8 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
             # Unsubscribe the old address in mailchimp (we'll
             # resubscribe it when they confirm it later).
-            update_mailchimp.delay(old_email, "unsubscribed")
+            # update_mailchimp.delay(old_email, "unsubscribed")
+            unsubscribe_from_moosend.delay(old_email)
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
@@ -279,10 +285,12 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             if new_wants_newsletter is True and not changed_email:
                 # They just subscribed. If they didn't *also* update their
                 # email address, subscribe them.
-                subscribe_to_mailchimp.delay(new_email)
+                # subscribe_to_mailchimp.delay(new_email)
+                subscribe_to_moosend.delay(new_email)
             elif new_wants_newsletter is False:
                 # They just unsubscribed
-                update_mailchimp.delay(new_email, "unsubscribed")
+                # update_mailchimp.delay(new_email, "unsubscribed")
+                unsubscribe_from_moosend.delay(new_email)
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -318,7 +326,8 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         request.user.monthly_donations.all().update(enabled=False)
         request.user.scotus_maps.all().update(deleted=True)
         user = convert_to_stub_account(request.user)
-        update_mailchimp.delay(request.user.email, "unsubscribed")
+        # update_mailchimp.delay(request.user.email, "unsubscribed")
+        unsubscribe_from_moosend.delay(request.user.email)
         update_session_auth_hash(request, user)
         logout(request)
         return HttpResponseRedirect(reverse("delete_profile_done"))
@@ -516,7 +525,8 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         if up.wants_newsletter:
-            subscribe_to_mailchimp.delay(up.user.email)
+            # subscribe_to_mailchimp.delay(up.user.email)
+            subscribe_to_moosend.delay(up.user.email)
         up.email_confirmed = True
         up.save()
 
