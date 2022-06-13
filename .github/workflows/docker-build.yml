@@ -1,0 +1,52 @@
+name: Docker Build and Push
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: Set Variables
+        id: step1
+        run: |
+          VERSION=$(head -1 ./docker/django/version.txt)
+          echo $VERSION
+          echo "::set-output name=cl_tag::freelawproject/courtlistener:${VERSION}-web-prod"
+          echo "::set-output name=cl_tags::freelawproject/courtlistener:${VERSION}-web-prod,freelawproject/courtlistener:latest-web-prod"
+          echo "::set-output name=celery_tags::freelawproject/courtlistener:${VERSION}-celery,freelawproject/courtlistener:latest-celery"
+          echo "::set-output name=rss_tags::freelawproject/courtlistener:${VERSION}-scrape-rss,freelawproject/courtlistener:latest-scrape-rss"
+      - id: step2
+        continue-on-error: true
+        run: |
+          docker manifest inspect ${{ steps.step1.outputs.cl_tag }}
+
+      - name: Build and Push Courtlistener
+        uses: docker/build-push-action@v2
+        if: steps.step2.outcome != 'success'
+        with:
+          file: docker/django/Dockerfile
+          push: false
+          target: web-prod
+          tags: ${{ steps.step1.outputs.cl_tags }}
+
+      - name: Build and Push Celery
+        uses: docker/build-push-action@v2
+        if: steps.step2.outcome != 'success'
+        with:
+          file: docker/django/Dockerfile
+          push: false
+          target: celery
+          tags: ${{ steps.step1.outputs.celery_tags }}
+
+      - name: Build and Push RSS Scraper
+        uses: docker/build-push-action@v2
+        if: steps.step2.outcome != 'success'
+        with:
+          file: docker/django/Dockerfile
+          push: false
+          target: rss-scraper
+          tags: ${{ steps.step1.outputs.rss_tags }}
