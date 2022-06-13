@@ -46,6 +46,7 @@ def handle_hard_bounce(
     we are going to log a warning and also ban the email address.
     """
     unexpected_events = ["Suppressed", "OnAccountSuppressionList"]
+    recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
         if notification_subtype in unexpected_events:
             # Handle unexpected notification_subtype events, log a warning
@@ -105,6 +106,7 @@ def handle_soft_bounce(
     MAX_RETRY_COUNTER = 5
     INITIAL_HOURS = 2
 
+    recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
         if notification_subtype in back_off_events:
             # Handle events that must trigger a backoff event
@@ -143,6 +145,13 @@ def handle_soft_bounce(
                                 "notification_subtype": EMAIL_NOTIFICATIONS.MAX_RETRY_REACHED,
                             },
                         )
+                        # After ban an email address, delete Backoff Event.
+                        # This way, if we delete the ban on the email address,
+                        # the backoff event gets a fresh start.
+                        # https://github.com/freelawproject/courtlistener/pull/2115
+                        EmailFlag.objects.filter(
+                            email_address=email, flag_type=FLAG_TYPES.BACKOFF
+                        ).delete()
                     else:
                         # If max number of retries has not been reached,
                         # update backoff event, update retry_counter
@@ -181,6 +190,7 @@ def handle_complaint(recipient_emails: list[str]) -> None:
      to whom the complaint notification pertains
     :return: None
     """
+    recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
         # Only ban email address if it hasn't been previously banned
         EmailFlag.objects.get_or_create(
@@ -198,6 +208,7 @@ def handle_delivery(recipient_emails: list[str]) -> None:
      to whom the delivery notification pertains
     :return: None
     """
+    recipient_emails = normalize_addresses(recipient_emails)
     for email in recipient_emails:
         # Delete backoff event for this email address if exists
         EmailFlag.objects.filter(
