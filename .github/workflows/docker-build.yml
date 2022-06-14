@@ -1,0 +1,27 @@
+name: Automate docker build and push
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: Set Variables
+        id: step1
+        run: |
+          VERSION=$(head -1 ./docker/django/version.txt)
+          echo "::set-output name=cl_tag::freelawproject/courtlistener:${VERSION}-web-prod"
+      # Step 2 inspects the manifest by tag.  if the tag has never been built
+      # on docker hub, go ahead and continue on and build and push
+      - id: step2
+        continue-on-error: true
+        run: |
+          docker manifest inspect ${{ steps.step1.outputs.cl_tag }}
+      - name: Fetch current version
+        if: steps.step2.outcome != 'success'
+        run: |
+          make push --file docker/django/Makefile
