@@ -49,10 +49,7 @@ from cl.users.forms import (
     WebhookForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import (
-    subscribe_to_moosend,
-    unsubscribe_from_moosend,
-)
+from cl.users.tasks import subscribe_to_moosend, unsubscribe_from_moosend
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
