@@ -44,7 +44,7 @@ def subscribe_to_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAULT_L
             url=urljoin(settings.MOOSEND_API_URL, path),
             params=params,
             json={
-                "Email": self.email,
+                "Email": email,
             },
             timeout=30,
         )
@@ -78,7 +78,7 @@ def unsubscribe_from_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAU
             url=urljoin(settings.MOOSEND_API_URL, path),
             params=params,
             json={
-                "Email": self.email,
+                "Email": email,
             },
             timeout=30,
         )
