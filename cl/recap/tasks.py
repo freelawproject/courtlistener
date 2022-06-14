@@ -80,7 +80,6 @@ from cl.recap.models import (
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
-from cl.users.models import UserProfile
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -1545,17 +1544,17 @@ def first_time_users(
         for recap_email in email_addresses
         if "@recap.email" in recap_email
     ]
-    recap_profiles = UserProfile.objects.filter(
-        recap_email__in=recap_email_recipients
+
+    recap_users = User.objects.filter(
+        profile__recap_email__in=recap_email_recipients
     )
     first_time_recipients = []
-    for recap_user in recap_profiles:
-        user_pk = recap_user.user.pk
+    for user in recap_users:
         docket_alert = DocketAlert.objects.filter(
-            docket_id=docket_pk, user_id=user_pk
+            docket_id=docket_pk, user_id=user.pk
         )
         if not docket_alert.exists():
-            first_time_recipients.append(user_pk)
+            first_time_recipients.append(user.pk)
 
     return first_time_recipients
 

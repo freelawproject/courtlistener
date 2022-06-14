@@ -1,1 +1,1 @@
-You are now unsubscribed from {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}.
+[Unsubscribed]: {{ case_name|safe }}{% if docket.docket_number %} ({{ docket.docket_number }}){% endif %}.

@@ -2,7 +2,7 @@ from celery.canvas import chain
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.mail import EmailMultiAlternatives
-from django.http import HttpResponse, HttpResponseNotAllowed
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
@@ -173,26 +173,36 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 @ratelimit_deny_list
-def subscribe_docket_alert(request, secret_key):
-    docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
-    docket_alert.alert_type = DocketAlert.SUBSCRIPTION
-    docket_alert.save()
+def subscribe_docket_alert(
+    request: HttpRequest, secret_key: str
+) -> HttpResponse:
+    """Subscribe a user to a docket alert based on the alert secret_key."""
+    docket_alert = flip_docket_alert(secret_key, DocketAlert.SUBSCRIPTION)
     return render(
         request,
-        "enable_docket_alert.html",
-        {"docket_alert": docket_alert, "private": True},
+        "docket_alert.html",
+        {"docket_alert": docket_alert, "private": True, "enabled": True},
     )
 
 
 @ratelimit_deny_list
-def unsubscribe_docket_alert(request, secret_key):
-    docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
-    docket_alert.alert_type = DocketAlert.UNSUBSCRIPTION
-    docket_alert.save()
+def unsubscribe_docket_alert(
+    request: HttpRequest, secret_key: str
+) -> HttpResponse:
+    """Unsubscribe a user from a docket alert based on the alert secret_key."""
+    docket_alert = flip_docket_alert(secret_key, DocketAlert.UNSUBSCRIPTION)
     # Send Unsubscription confirmation email to the user
     send_unsubscription_confirmation.delay(docket_alert.pk)
     return render(
         request,
-        "disable_docket_alert.html",
-        {"docket_alert": docket_alert, "private": True},
+        "docket_alert.html",
+        {"docket_alert": docket_alert, "private": True, "enabled": False},
     )
+
+
+def flip_docket_alert(secret_key: str, alert_type: int) -> DocketAlert:
+    """Flip the alert_type for a docket alert."""
+    docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
+    docket_alert.alert_type = alert_type
+    docket_alert.save()
+    return docket_alert
