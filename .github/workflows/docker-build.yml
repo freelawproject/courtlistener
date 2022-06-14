@@ -15,6 +15,8 @@ jobs:
         run: |
           VERSION=$(head -1 ./docker/django/version.txt)
           echo "::set-output name=cl_tag::freelawproject/courtlistener:${VERSION}-web-prod"
+      # Step 2 inspects the manifest by tag.  if the tag has never been built
+      # on docker hub, go ahead and continue on and build and push
       - id: step2
         continue-on-error: true
         run: |
