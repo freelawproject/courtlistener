@@ -5,20 +5,11 @@ import requests
 from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-)
 
 from cl.celery_init import app
-from cl.lib.crypto import md5
 from cl.users.models import STATUS_TYPES, FailedEmail
 
 logger = logging.getLogger(__name__)
-
-MC_BASE_URL = "https://us14.api.mailchimp.com/"
-MC_LIST_ID = "ba547fa86b"
 
 
 def abort_or_retry(task, exc):
@@ -32,7 +23,9 @@ def abort_or_retry(task, exc):
 @app.task(
     bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
 )
-def subscribe_to_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID):
+def subscribe_to_moosend(
+    self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID
+):
     """
     Subscribe email address to moosend mailing list, perform update if email address is already registered.
     """
@@ -59,13 +52,18 @@ def subscribe_to_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAULT_L
         logger.info("Successfully subscribed %s to moosend", email)
     else:
         error = j.get("Error", "Unknown error")
-        logger.warning("Did not subscribe '%s' to moosend: '%s'", (email, error), )
+        logger.warning(
+            "Did not subscribe '%s' to moosend: '%s'",
+            (email, error),
+        )
 
 
 @app.task(
     bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
 )
-def unsubscribe_from_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID):
+def unsubscribe_from_moosend(
+    self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID
+):
     """
     Unsubscribe email address from moosend mailing list
     """
@@ -93,92 +91,16 @@ def unsubscribe_from_moosend(self, email, mailing_list_id=settings.MOOSEND_DEFAU
         logger.info("Successfully removed %s from moosend mailing list", email)
     else:
         error = j.get("Error", "Unknown error")
-        logger.warning("Did not remove '%s' from moosend mailing list: '%s'", (email, error), )
-
-
-@app.task(
-    bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
-)
-def subscribe_to_mailchimp(self, email, mailing_list_id=MC_LIST_ID):
-    path = f"/3.0/lists/{mailing_list_id}/members/"
-    try:
-        r = requests.post(
-            urljoin(MC_BASE_URL, path),
-            json={
-                "email_address": email,
-                "status": "subscribed",
-                "merge_fields": {},
-            },
-            headers={"Authorization": f"apikey {settings.MAILCHIMP_API_KEY}"},
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        abort_or_retry(self, exc)
-        return
-
-    if r.status_code == HTTP_200_OK:
-        logger.info("Successfully subscribed %s to mailchimp", email)
-    elif r.status_code == HTTP_400_BAD_REQUEST:
-        j = r.json()
-        if j["title"] == "Member Exists":
-            logger.info(
-                "User with email '%s' already exists in mailchimp. "
-                "Attempting via PATCH request.",
-                email,
-            )
-            update_mailchimp(email, "subscribed")
-    else:
-        j = r.json()
         logger.warning(
-            "Did not subscribe '%s' to mailchimp: '%s: %s'",
-            (email, r.status_code, j["title"]),
-        )
-
-
-@app.task(
-    bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
-)
-def update_mailchimp(self, email, status, mailing_list_id=MC_LIST_ID):
-    allowed_statuses = ["unsubscribed", "subscribed"]
-    assert status in allowed_statuses, f"'{status}' is not an allowed status."
-    md5_hash = md5(email)
-    path = f"/3.0/lists/{mailing_list_id}/members/{md5_hash}"
-    try:
-        r = requests.patch(
-            urljoin(MC_BASE_URL, path),
-            json={"status": status},
-            headers={"Authorization": f"apikey {settings.MAILCHIMP_API_KEY}"},
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        abort_or_retry(self, exc)
-        return
-    if r.status_code == HTTP_200_OK:
-        logger.info(
-            "Successfully completed '%s' command on '%s' in mailchimp.",
-            status,
-            email,
-        )
-    elif r.status_code == HTTP_404_NOT_FOUND:
-        logger.info(
-            "Did not complete '%s' command on '%s' in mailchimp. "
-            "Address not found.",
-            status,
-            email,
-        )
-    else:
-        logger.warning(
-            "Did not complete '%s' command on '%s' in mailchimp: '%s: %s'",
-            status,
-            email,
-            r.status_code,
+            "Did not remove '%s' from moosend mailing list: '%s'",
+            (email, error),
         )
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60)
 def send_failed_email(
-        self: Task,
-        failed_pk: int,
+    self: Task,
+    failed_pk: int,
 ) -> int:
     """Task to retry failed email messages"""
 
@@ -192,8 +114,8 @@ def send_failed_email(
         try:
             email.send()
         except (
-                botocore_exception.HTTPClientError,
-                botocore_exception.ConnectionError,
+            botocore_exception.HTTPClientError,
+            botocore_exception.ConnectionError,
         ) as exc:
             # In case of error when sending e.g: SES downtime, retry the task.
             raise self.retry(exc=exc)
