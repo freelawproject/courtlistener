@@ -317,7 +317,7 @@ class ParentheticalAdmin(CursorPaginatorAdmin):
         "described_opinion",
         "group",
     )
-    search_fields = ("=describing_opinion_id",)
+    search_fields = ("=describing_opinion__id",)
 
 
 @admin.register(ParentheticalGroup)

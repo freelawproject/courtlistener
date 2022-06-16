@@ -432,6 +432,7 @@ To do this:
 
 We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
 
+We also automatically build and push new docker images using github actions when merging new code into main (with version bumps).
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux

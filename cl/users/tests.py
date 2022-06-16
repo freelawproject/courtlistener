@@ -593,10 +593,13 @@ class SNSWebhookTest(TestCase):
 
         # Update next_retry_date to expire waiting time and retry_counter to
         # reach max_retry_counter
-        EmailFlag.objects.filter(
+        backoff_event = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
-        ).update(next_retry_date=now() - timedelta(hours=3), retry_counter=5)
+        )
+        backoff_event.update(
+            next_retry_date=now() - timedelta(hours=3), retry_counter=5
+        )
         # Trigger second backoff notification event
         self.send_signal(
             self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -605,8 +608,9 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BAN,
         ).exists()
-        # Check email address is now banned
+        # Check email address is now banned and backoff event deleted
         self.assertEqual(email_ban_exist, True)
+        self.assertEqual(backoff_event.count(), 0)
 
         # Trigger another notification event to check
         # no new ban register is created

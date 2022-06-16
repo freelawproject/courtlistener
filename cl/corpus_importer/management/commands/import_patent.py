@@ -1,4 +1,5 @@
 import os
+import time
 
 from celery import chain
 from django.conf import settings
@@ -30,7 +31,13 @@ def get_dockets(options: dict) -> None:
 
     start = options["skip_until"]
     stop = options["limit"]
-    """Get the dockets by the particular judge."""
+    # Add code to simplify the logic for iterating.
+    if stop:
+        if start:
+            stop = start + stop
+        else:
+            stop = 1 + stop
+
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
     session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
@@ -46,14 +53,18 @@ def get_dockets(options: dict) -> None:
     ).order_by("date_filed")
     i = 0
     for item in items:
-        logger.info(f"{i}: Doing FJC_ID with pk: {item.id}")
         i += 1
         if start and (i < start):
-            # Start processing case at # if not 0.
+            # Start processing case at # if not none.
+            logger.info(f"Skipping row #{i}")
             continue
-        if stop and (i > stop):
-            # Stop processing case at # if not 0
+        if stop and (i == stop):
+            # Stop processing case at # if not none.
+            logger.info(f"Stopping at row #{i}")
             break
+        # Add timed sleep to avoid banning in Western Texas
+        time.sleep(1)
+        logger.info(f"{i}: Doing FJC_ID with pk: {item.id}")
 
         dockets = Docket.objects.filter(idb_data=item)
         docket_in_system = dockets.exists()
