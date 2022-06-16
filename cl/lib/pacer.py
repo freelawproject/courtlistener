@@ -4,7 +4,7 @@ import re
 import socket
 from collections import OrderedDict
 from datetime import date, datetime, timezone
-from typing import Optional, TypedDict
+from typing import Mapping, Optional, TypedDict
 
 import requests
 import usaddress
@@ -608,9 +608,9 @@ def log_pacer_court_connection(
     """Log the problem with the court in Redis.
 
     :param connection_info: A dict as returned by
-    check_pacer_court_connectivity method
-    :param court_id: The court ID
-    :param server_ip: The server IP address
+    check_pacer_court_connectivity method.
+    :param court_id: The court ID.
+    :param server_ip: The server IP address.
     :return: None
     """
     r = make_redis_interface("STATS")
@@ -627,9 +627,12 @@ def log_pacer_court_connection(
     else:
         connection_ok = "False"
 
-    pipe.hset(ip_key, "connection_ok", connection_ok)
-    pipe.hset(ip_key, "status_code", status_code)
-    pipe.hset(ip_key, "time", t)
+    log_info: Mapping[str | bytes, str | int] = {
+        "connection_ok": connection_ok,
+        "status_code": status_code,
+        "time": t,
+    }
+    pipe.hset(ip_key, mapping=log_info)
     pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
     pipe.execute()
 
@@ -638,7 +641,7 @@ def is_pacer_court_accessible(court_id: str) -> bool:
     """Check the connectivity for the given court.
 
     :param court_id: The court ID to check.
-    :return: True if connection was successful, False otherwise
+    :return: True if connection was successful, False otherwise.
     """
 
     pacer_court_id = map_cl_to_pacer_id(court_id)
