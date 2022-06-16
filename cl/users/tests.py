@@ -22,7 +22,6 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.users.tasks import update_moosend_subscription
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
 from cl.users.email_handlers import (
@@ -41,6 +40,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+from cl.users.tasks import update_moosend_subscription
 
 
 class UserTest(LiveServerTestCase):
@@ -63,7 +63,7 @@ class UserTest(LiveServerTestCase):
                 r.status_code,
                 HTTP_200_OK,
                 msg="Got wrong status code for page at: {path}. "
-                    "Status Code: {code}".format(path=path, code=r.status_code),
+                "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
     def test_creating_a_new_user(self) -> None:
@@ -124,16 +124,16 @@ class UserTest(LiveServerTestCase):
                         next_param,
                         response.content.decode(),
                         msg="'%s' found in HTML of response. This suggests it was "
-                            "not cleaned by the sanitize_redirection function."
-                            % next_param,
+                        "not cleaned by the sanitize_redirection function."
+                        % next_param,
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
                         msg="'%s' not found in HTML of response. This suggests it "
-                            "was sanitized when it should not have been."
-                            % next_param,
+                        "was sanitized when it should not have been."
+                        % next_param,
                     )
 
     def test_signing_in(self) -> None:
@@ -164,7 +164,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-                "Instead got %s" % r.status_code,
+            "Instead got %s" % r.status_code,
         )
         self.assertIn(
             "has been confirmed",
@@ -173,7 +173,7 @@ class UserTest(LiveServerTestCase):
         )
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
-            self,
+        self,
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
@@ -197,7 +197,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-                "Instead got %s" % r.status_code,
+            "Instead got %s" % r.status_code,
         )
         ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
         for up in ups:
@@ -364,23 +364,23 @@ class SNSWebhookTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-                open(
-                    test_dir / "general_soft_bounce.json", encoding="utf-8"
-                ) as general_soft_bounce,
-        open(
-        test_dir / "msg_large_bounce.json", encoding="utf-8"
-        ) as msg_large_bounce,
-        open(
-            test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-        ) as cnt_rejected_bounce,
-        open(
-            test_dir / "hard_bounce.json", encoding="utf-8"
-        ) as hard_bounce,
-        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-        open(
-            test_dir / "suppressed_bounce.json", encoding="utf-8"
-        ) as suppressed_bounce,
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as general_soft_bounce,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as msg_large_bounce,
+            open(
+                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
+            ) as cnt_rejected_bounce,
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(
+                test_dir / "suppressed_bounce.json", encoding="utf-8"
+            ) as suppressed_bounce,
         ):
             cls.soft_bounce_asset = json.load(general_soft_bounce)
             cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
@@ -881,19 +881,19 @@ class CustomBackendEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-                open(
-                    test_dir / "hard_bounce.json", encoding="utf-8"
-                ) as hard_bounce,
-        open(
-        test_dir / "general_soft_bounce.json", encoding="utf-8"
-        ) as soft_bounce,
-        open(
-            test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-        ) as general_soft_bounce_2,
-        open(
-            test_dir / "msg_large_bounce.json", encoding="utf-8"
-        ) as large_bounce,
-        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as soft_bounce,
+            open(
+                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
+            ) as general_soft_bounce_2,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as large_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.soft_bounce_asset = json.load(soft_bounce)
@@ -1558,7 +1558,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_within_backoff(
-            self, mock_send_email
+        self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
@@ -1604,7 +1604,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_all_within_backoff(
-            self, mock_send_email
+        self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
@@ -1851,13 +1851,13 @@ class RetryFailedEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-                open(
-                    test_dir / "general_soft_bounce.json", encoding="utf-8"
-                ) as soft_bounce,
-        open(
-        test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-        ) as soft_bounce_with_id,
-        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(
+                test_dir / "general_soft_bounce.json", encoding="utf-8"
+            ) as soft_bounce,
+            open(
+                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
+            ) as soft_bounce_with_id,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
@@ -2398,20 +2398,20 @@ class EmailBrokenTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-                open(
-                    test_dir / "hard_bounce.json", encoding="utf-8"
-                ) as hard_bounce,
-        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-        open(
-            test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-        ) as mail_box_full_soft_bounce,
-        open(
-            test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-        ) as no_email_hard_bounce,
-        open(
-            test_dir / "msg_large_bounce.json", encoding="utf-8"
-        ) as msg_large_bounce,
+            open(
+                test_dir / "hard_bounce.json", encoding="utf-8"
+            ) as hard_bounce,
+            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+            open(
+                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
+            ) as mail_box_full_soft_bounce,
+            open(
+                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
+            ) as no_email_hard_bounce,
+            open(
+                test_dir / "msg_large_bounce.json", encoding="utf-8"
+            ) as msg_large_bounce,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
