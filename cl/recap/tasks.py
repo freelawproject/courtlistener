@@ -44,7 +44,7 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
-from cl.lib.pacer import check_court_connectivity, map_cl_to_pacer_id
+from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
@@ -1128,14 +1128,17 @@ def fetch_pacer_doc_by_rd(
     """
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
     # Check court connectivity, if fails retry the task, hopefully, it'll be
     # retried in a different not blocked node
-    if not check_court_connectivity(rd.docket_entry.docket.court_id):
+    if not is_pacer_court_accessible(rd.docket_entry.docket.court_id):
         if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
             return
         raise self.retry()
 
-    fq = PacerFetchQueue.objects.get(pk=fq_pk)
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     if rd.is_available:

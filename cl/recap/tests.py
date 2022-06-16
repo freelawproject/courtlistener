@@ -20,7 +20,7 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
-from cl.lib.pacer import check_court_connectivity
+from cl.lib.pacer import is_pacer_court_accessible
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
@@ -1846,7 +1846,7 @@ class IdbMergeTest(TestCase):
 
 
 class CheckCourtConnectivityTest(TestCase):
-    """Test the check_court_connectivity method."""
+    """Test the is_pacer_court_accessible method."""
 
     def setUp(self) -> None:
         self.r = make_redis_interface("CACHE")
@@ -1860,8 +1860,8 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_check_pacer_court_connectivity_pass(self, mock_check_court):
-        court_status = check_court_connectivity("alnb")
+    def test_is_pacer_court_accessible_pass(self, mock_check_court):
+        court_status = is_pacer_court_accessible("alnb")
         self.assertEqual(court_status, True)
 
     @mock.patch(
@@ -1872,6 +1872,6 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_check_pacer_court_connectivity_fails(self, mock_check_court):
-        court_status = check_court_connectivity("alnb")
+    def test_is_pacer_court_accessible_fails(self, mock_check_court):
+        court_status = is_pacer_court_accessible("alnb")
         self.assertEqual(court_status, False)

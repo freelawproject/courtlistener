@@ -543,7 +543,7 @@ class ConnectionType(TypedDict):
 
 
 def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
-    """Check if PACER is accessible for the given court.
+    """Check PACER connection status for the given court.
 
     :param court_id: The court ID to check.
     :returns: A dict with the court connection status.
@@ -555,9 +555,9 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
     status_code = None
     try:
         r = requests.get(url, timeout=5)
-        if r.status_code == requests.codes.ok:
-            connection_ok = True
         status_code = r.status_code
+        r.raise_for_status()
+        connection_ok = True
     except requests.exceptions.RequestException as e:
         connection_ok = False
 
@@ -569,7 +569,7 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
     return blocked_dict
 
 
-def get_or_cache_court_status(court_id: str, server_ip: str) -> bool:
+def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     """Get the court status from Redis or cache it if it's not there.
 
     :param court_id: The court ID to check.
@@ -577,9 +577,9 @@ def get_or_cache_court_status(court_id: str, server_ip: str) -> bool:
     :return: True if connection was successful, False otherwise.
     """
 
-    court_status_key = "status:pacer:court.%s:ip.%s"
+    court_status_key = f"status:pacer:court.{court_id}:ip.{server_ip}"
     r = make_redis_interface("CACHE", decode_responses=False)
-    pickle_status = r.get(court_status_key % (court_id, server_ip))
+    pickle_status = r.get(court_status_key)
     if pickle_status:
         court_status = pickle.loads(pickle_status)
         return court_status
@@ -589,19 +589,18 @@ def get_or_cache_court_status(court_id: str, server_ip: str) -> bool:
     current_status = connection_info["connection_ok"]
 
     # Stores court connection status with court ID and server IP as key.
-    # 10 minutes expiration time.
-    status_expiration = 60 * 10
-    court_key = court_status_key % (court_id, server_ip)
-    r.set(court_key, pickle.dumps(current_status), ex=status_expiration)
+    # 30 seconds expiration time.
+    status_expiration = 30
+    r.set(court_status_key, pickle.dumps(current_status), ex=status_expiration)
     if connection_info["connection_ok"]:
         return True
 
     # If court connection failed, log the error and return False.
-    log_the_problem(connection_info, court_id, server_ip)
+    log_pacer_court_connection(connection_info, court_id, server_ip)
     return False
 
 
-def log_the_problem(
+def log_pacer_court_connection(
     connection_info: ConnectionType,
     court_id: str,
     server_ip: str,
@@ -635,11 +634,11 @@ def log_the_problem(
     pipe.execute()
 
 
-def check_court_connectivity(court_id: str) -> bool:
+def is_pacer_court_accessible(court_id: str) -> bool:
     """Check the connectivity for the given court.
 
     :param court_id: The court ID to check.
-    :return: True if connection was successful, False otherwise.
+    :return: True if connection was successful, False otherwise
     """
 
     pacer_court_id = map_cl_to_pacer_id(court_id)
@@ -647,5 +646,5 @@ def check_court_connectivity(court_id: str) -> bool:
     hostname = socket.gethostname()
     ip_addr = socket.gethostbyname(hostname)
 
-    court_status = get_or_cache_court_status(pacer_court_id, ip_addr)
+    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
     return court_status
