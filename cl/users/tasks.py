@@ -23,14 +23,24 @@ def abort_or_retry(task, exc):
 @app.task(
     bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
 )
-def subscribe_to_moosend(
-    self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID
-):
+def update_moosend_subscription(self: Task, email: str, action: str) -> None:
+    """Subscribe or unsubscribe email address to moosend mailing list.
+
+    Perform update if email address is already registered.
+
+    :param self: The celery task
+    :param email: The user's email address
+    :param action: Action to perfom on moosend
+    :return: None
     """
-    Subscribe email address to moosend mailing list, perform update if email address is already registered.
-    """
-    path = f"/v3/subscribers/{mailing_list_id}/subscribe.json"
+    allowed_actions = ["subscribe", "unsubscribe"]
+    assert action in allowed_actions, f"'{action}' is not an allowed action."
     params = {"apikey": settings.MOOSEND_API_KEY}
+
+    if action == "subscribe":
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/subscribe.json"
+    else:
+        path = f"/v3/subscribers/{settings.MOOSEND_DEFAULT_LIST_ID}/unsubscribe.json"
 
     try:
         r = requests.post(
@@ -49,51 +59,18 @@ def subscribe_to_moosend(
     code = j.get("Code")
 
     if code == 0:
-        logger.info("Successfully subscribed %s to moosend", email)
+        logger.info(
+            "Successfully completed '%s' action on '%s' in moosend.",
+            action,
+            email,
+        )
     else:
         error = j.get("Error", "Unknown error")
         logger.warning(
-            "Did not subscribe '%s' to moosend: '%s'",
-            (email, error),
-        )
-
-
-@app.task(
-    bind=True, max_retries=5, interval_start=5 * 60, interval_step=5 * 60
-)
-def unsubscribe_from_moosend(
-    self, email, mailing_list_id=settings.MOOSEND_DEFAULT_LIST_ID
-):
-    """
-    Unsubscribe email address from moosend mailing list
-    """
-
-    path = f"/v3/subscribers/{mailing_list_id}/unsubscribe.json"
-    params = {"apikey": settings.MOOSEND_API_KEY}
-
-    try:
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path),
-            params=params,
-            json={
-                "Email": email,
-            },
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        abort_or_retry(self, exc)
-        return
-
-    j = r.json()
-    code = j.get("Code")
-
-    if code == 0:
-        logger.info("Successfully removed %s from moosend mailing list", email)
-    else:
-        error = j.get("Error", "Unknown error")
-        logger.warning(
-            "Did not remove '%s' from moosend mailing list: '%s'",
-            (email, error),
+            "Did not complete '%s' action on '%s' in moosend: '%s'",
+            action,
+            email,
+            error,
         )
 
 

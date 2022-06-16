@@ -22,6 +22,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.users.tasks import update_moosend_subscription
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import LiveServerTestCase, TestCase
 from cl.users.email_handlers import (
@@ -62,7 +63,7 @@ class UserTest(LiveServerTestCase):
                 r.status_code,
                 HTTP_200_OK,
                 msg="Got wrong status code for page at: {path}. "
-                "Status Code: {code}".format(path=path, code=r.status_code),
+                    "Status Code: {code}".format(path=path, code=r.status_code),
             )
 
     def test_creating_a_new_user(self) -> None:
@@ -123,16 +124,16 @@ class UserTest(LiveServerTestCase):
                         next_param,
                         response.content.decode(),
                         msg="'%s' found in HTML of response. This suggests it was "
-                        "not cleaned by the sanitize_redirection function."
-                        % next_param,
+                            "not cleaned by the sanitize_redirection function."
+                            % next_param,
                     )
                 else:
                     self.assertIn(
                         next_param,
                         response.content.decode(),
                         msg="'%s' not found in HTML of response. This suggests it "
-                        "was sanitized when it should not have been."
-                        % next_param,
+                            "was sanitized when it should not have been."
+                            % next_param,
                     )
 
     def test_signing_in(self) -> None:
@@ -163,7 +164,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+                "Instead got %s" % r.status_code,
         )
         self.assertIn(
             "has been confirmed",
@@ -172,7 +173,7 @@ class UserTest(LiveServerTestCase):
         )
 
     def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
-        self,
+            self,
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
@@ -196,7 +197,7 @@ class UserTest(LiveServerTestCase):
             200,
             r.status_code,
             msg="Did not get 200 code when activating account. "
-            "Instead got %s" % r.status_code,
+                "Instead got %s" % r.status_code,
         )
         ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
         for up in ups:
@@ -363,23 +364,23 @@ class SNSWebhookTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as general_soft_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
-            open(
-                test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
-            ) as cnt_rejected_bounce,
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-            open(
-                test_dir / "suppressed_bounce.json", encoding="utf-8"
-            ) as suppressed_bounce,
+                open(
+                    test_dir / "general_soft_bounce.json", encoding="utf-8"
+                ) as general_soft_bounce,
+        open(
+        test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as msg_large_bounce,
+        open(
+            test_dir / "cnt_rejected_bounce.json", encoding="utf-8"
+        ) as cnt_rejected_bounce,
+        open(
+            test_dir / "hard_bounce.json", encoding="utf-8"
+        ) as hard_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+        open(
+            test_dir / "suppressed_bounce.json", encoding="utf-8"
+        ) as suppressed_bounce,
         ):
             cls.soft_bounce_asset = json.load(general_soft_bounce)
             cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
@@ -880,19 +881,19 @@ class CustomBackendEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "general_soft_bounce_2.json", encoding="utf-8"
-            ) as general_soft_bounce_2,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as large_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+                open(
+                    test_dir / "hard_bounce.json", encoding="utf-8"
+                ) as hard_bounce,
+        open(
+        test_dir / "general_soft_bounce.json", encoding="utf-8"
+        ) as soft_bounce,
+        open(
+            test_dir / "general_soft_bounce_2.json", encoding="utf-8"
+        ) as general_soft_bounce_2,
+        open(
+            test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as large_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.soft_bounce_asset = json.load(soft_bounce)
@@ -1557,7 +1558,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_within_backoff(
-        self, mock_send_email
+            self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect an email
         address that is under a backoff waiting period we should eliminate
@@ -1603,7 +1604,7 @@ class CustomBackendEmailTest(TestCase):
         side_effect=lambda x: None,
     )
     def test_sending_multiple_recipients_all_within_backoff(
-        self, mock_send_email
+            self, mock_send_email
     ) -> None:
         """When sending an email to multiple recipients, if we detect that all
         email addresses are under a backoff waiting period we don't send the
@@ -1850,13 +1851,13 @@ class RetryFailedEmailTest(TestCase):
         cls.user = UserFactory()
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "general_soft_bounce.json", encoding="utf-8"
-            ) as soft_bounce,
-            open(
-                test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
-            ) as soft_bounce_with_id,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+                open(
+                    test_dir / "general_soft_bounce.json", encoding="utf-8"
+                ) as soft_bounce,
+        open(
+        test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
+        ) as soft_bounce_with_id,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
@@ -2397,20 +2398,20 @@ class EmailBrokenTest(TestCase):
     def setUpTestData(cls):
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
-            open(
-                test_dir / "hard_bounce.json", encoding="utf-8"
-            ) as hard_bounce,
-            open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
-            open(
-                test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
-            ) as mail_box_full_soft_bounce,
-            open(
-                test_dir / "no_email_hard_bounce.json", encoding="utf-8"
-            ) as no_email_hard_bounce,
-            open(
-                test_dir / "msg_large_bounce.json", encoding="utf-8"
-            ) as msg_large_bounce,
+                open(
+                    test_dir / "hard_bounce.json", encoding="utf-8"
+                ) as hard_bounce,
+        open(test_dir / "complaint.json", encoding="utf-8") as complaint,
+        open(test_dir / "delivery.json", encoding="utf-8") as delivery,
+        open(
+            test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
+        ) as mail_box_full_soft_bounce,
+        open(
+            test_dir / "no_email_hard_bounce.json", encoding="utf-8"
+        ) as no_email_hard_bounce,
+        open(
+            test_dir / "msg_large_bounce.json", encoding="utf-8"
+        ) as msg_large_bounce,
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
@@ -2665,147 +2666,81 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
 
-def abort_or_retry(task, exc):
-    """Abort a task if we've run out of retries. Else, retry it."""
-    if task.request.retries == task.max_retries:
-        return
-    else:
-        raise task.retry(exc=exc)
+class MockResponse:
+    """
+    A class to Mock API response
+    """
 
+    def __init__(self, json_data, status_code):
+        self.json_data = json_data
+        self.status_code = status_code
 
-log = logging.getLogger(__name__)
+    def json(self):
+        return self.json_data
 
 
 class MoosendTest(TestCase):
-    # mailing_list_id = "19b62b36-aacd-49a3-929f-e86e6a99ebf6"  # freelawproject first mailing list id
-    mailing_list_id = "1736771c-5457-4948-8b64-c44ba48c0b7e"  # freelawproject newsletter mailing list
     email = "testing@courtlistener.com"  # Test email address
-    invalid_email = "invalid@mail"
 
-    # Test are done using "freelawproject first mailing list" mailing list from moosend freelaw account
-
-    def test_subscribe(self) -> None:
-        """
-        Subscribe email to mailing list
-        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/add-or-update-subscribers
-        """
-        path_endpoint = (
-            f"/v3/subscribers/{self.mailing_list_id}/subscribe.json"
-        )
-        params = {"apikey": settings.MOOSEND_API_KEY}
-
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
-            params=params,
-            json={
-                "Email": self.email,
+    def mock_subscribe_valid(*args, **kwargs):
+        data = {
+            "Code": 0,
+            "Error": None,
+            "Context": {
+                "ID": "38fb8eb6-cca5-43d5-b61b-2c36334ad7d0",
+                "Name": None,
+                "Mobile": None,
+                "Email": "testing@courtlistener.com",
+                "CreatedOn": "/Date(1655320447877)/",
+                "UpdatedOn": None,
+                "UnsubscribedOn": None,
+                "UnsubscribedFromID": None,
+                "SubscribeType": 1,
+                "SubscribeMethod": 2,
+                "CustomFields": [],
+                "RemovedOn": None,
+                "Tags": [],
             },
-            timeout=30,
-        )
+        }
 
-        # Json response from API
-        j = r.json()
+        return MockResponse(data, 200)
 
-        # Check code is 0 == subscription created/updated correctly
-        self.assertEqual(j.get("Code"), 0)
+    def mock_unsubscribe_valid(*args, **kwargs):
+        data = {"Code": 0, "Error": None, "Context": None}
+        return MockResponse(data, 200)
 
-        # Check user subscribe types is 1 == Subscribed
-        self.assertEqual(j.get("Context").get("SubscribeType"), 1)
+    @mock.patch(
+        "cl.users.tasks.requests.post", side_effect=mock_subscribe_valid
+    )
+    def test_subscribe(self, mocked_post) -> None:
+        """This test checks that moosend mailing list subscription is successful"""
+        logger = logging.getLogger("cl.users.tasks")
+        action = "subscribe"
+        with mock.patch.object(logger, "info") as mock_info:
+            # update_moosend_subscription.apply_async(args=[self.email, "subscribe"])
+            update_moosend_subscription.delay(self.email, action)
+            # It's implemented like this because logging library is optimized to use %s formatting style, avoids call
+            # __str__() method automatically, also logs from update_moosend_subscription are in %s style
+            mock_info.assert_called_once_with(
+                "Successfully completed '%s' action on '%s' in moosend.",
+                action,
+                self.email,
+            )
 
-    def test_unsubscribe(self):
-        """
-        Unsubscribe email from mailing list (doesn't remove it, just shelve it)
-        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/remove-or-unsubscribe-subscribers/unsubscribing-subscribers-from-mailing-list
-        """
-        path_endpoint = (
-            f"/v3/subscribers/{self.mailing_list_id}/unsubscribe.json"
-        )
-        params = {"apikey": settings.MOOSEND_API_KEY}
-
-        # First we subscribe user
-        self.test_subscribe()
-
-        # Then we unsubscribe it
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
-            params=params,
-            json={
-                "Email": self.email,
-            },
-            timeout=30,
-        )
-
-        # Json response from API
-        j = r.json()
-
-        # Check code is 0 == unsubscribed correctly
-        self.assertEqual(j.get("Code"), 0)
-
-    def test_remove_subscriber(self):
-        """
-        Remove email from mailing list (removed completely, not shelved)
-        API Doc: https://moosendapp.docs.apiary.io/#reference/subscribers/remove-or-unsubscribe-subscribers/removing-a-subscriber
-        """
-        path_endpoint = f"/v3/subscribers/{self.mailing_list_id}/remove.json"
-        params = {"apikey": settings.MOOSEND_API_KEY}
-
-        # First we subscribe user
-        self.test_subscribe()
-
-        # Then we remove it
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
-            params=params,
-            json={
-                "Email": self.email,
-            },
-            timeout=30,
-        )
-
-        # Json response from API
-        j = r.json()
-
-        # Check code is 0 == removed correctly
-        self.assertEqual(j.get("Code"), 0)
-
-    def test_invalid_email_subscribe(self):
-        path_endpoint = (
-            f"/v3/subscribers/{self.mailing_list_id}/subscribe.json"
-        )
-        params = {"apikey": settings.MOOSEND_API_KEY}
-
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
-            params=params,
-            json={
-                "Email": self.invalid_email,
-            },
-            timeout=30,
-        )
-
-        # Json response from API
-        j = r.json()
-
-        # Code is different than 0 == error
-        self.assertNotEqual(j.get("Code"), 0)
-
-    def test_invalid_email_unsubscribe(self):
-        path_endpoint = (
-            f"/v3/subscribers/{self.mailing_list_id}/unsubscribe.json"
-        )
-        params = {"apikey": settings.MOOSEND_API_KEY}
-
-        r = requests.post(
-            url=urljoin(settings.MOOSEND_API_URL, path_endpoint),
-            params=params,
-            json={
-                "Email": self.invalid_email,
-            },
-            timeout=30,
-        )
-
-        # Json response from API
-        j = r.json()
-
-        # Code is different than 0 == error
-        self.assertNotEqual(j.get("Code"), 0)
+    @mock.patch(
+        "cl.users.tasks.requests.post", side_effect=mock_unsubscribe_valid
+    )
+    def test_unsubscribe(self, mocked_post) -> None:
+        """This test checks that moosend mailing list unsubscription is successful"""
+        logger = logging.getLogger("cl.users.tasks")
+        action = "unsubscribe"
+        with mock.patch.object(logger, "info") as mock_info:
+            # update_moosend_subscription.apply_async(args=[self.email, "subscribe"])
+            update_moosend_subscription.delay(self.email, action)
+            # It's implemented like this because logging library is optimized to use %s formatting style, avoids call
+            # __str__() method automatically, also logs from update_moosend_subscription are in %s style
+            mock_info.assert_called_once_with(
+                "Successfully completed '%s' action on '%s' in moosend.",
+                action,
+                self.email,
+            )

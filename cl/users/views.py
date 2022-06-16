@@ -49,7 +49,7 @@ from cl.users.forms import (
     WebhookForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import subscribe_to_moosend, unsubscribe_from_moosend
+from cl.users.tasks import update_moosend_subscription
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -250,7 +250,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
             # Unsubscribe the old address in moosend (we'll
             # resubscribe it when they confirm it later).
-            unsubscribe_from_moosend.delay(old_email)
+            update_moosend_subscription.delay(old_email, "unsubscribe")
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
@@ -281,10 +281,10 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             if new_wants_newsletter is True and not changed_email:
                 # They just subscribed. If they didn't *also* update their
                 # email address, subscribe them.
-                subscribe_to_moosend.delay(new_email)
+                update_moosend_subscription.delay(new_email, "subscribe")
             elif new_wants_newsletter is False:
                 # They just unsubscribed
-                unsubscribe_from_moosend.delay(new_email)
+                update_moosend_subscription.delay(new_email, "unsubscribe")
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -320,7 +320,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         request.user.monthly_donations.all().update(enabled=False)
         request.user.scotus_maps.all().update(deleted=True)
         user = convert_to_stub_account(request.user)
-        unsubscribe_from_moosend.delay(request.user.email)
+        update_moosend_subscription.delay(request.user.email, "unsubscribe")
         update_session_auth_hash(request, user)
         logout(request)
         return HttpResponseRedirect(reverse("delete_profile_done"))
@@ -518,7 +518,7 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         if up.wants_newsletter:
-            subscribe_to_moosend.delay(up.user.email)
+            update_moosend_subscription.delay(up.user.email, "subscribe")
         up.email_confirmed = True
         up.save()
 
