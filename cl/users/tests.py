@@ -2,11 +2,8 @@ import json
 import logging
 from datetime import timedelta
 from pathlib import Path
-from time import time
 from unittest import mock
-from urllib.parse import urljoin
 
-import requests
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
@@ -18,7 +15,7 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
+from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -2717,10 +2714,10 @@ class MoosendTest(TestCase):
         logger = logging.getLogger("cl.users.tasks")
         action = "subscribe"
         with mock.patch.object(logger, "info") as mock_info:
-            # update_moosend_subscription.apply_async(args=[self.email, "subscribe"])
             update_moosend_subscription.delay(self.email, action)
-            # It's implemented like this because logging library is optimized to use %s formatting style, avoids call
-            # __str__() method automatically, also logs from update_moosend_subscription are in %s style
+            # It's implemented like this because logging library is optimized to use %s
+            # formatting style, avoids call  __str__() method automatically, also logs
+            # from update_moosend_subscription are in %s style
             mock_info.assert_called_once_with(
                 "Successfully completed '%s' action on '%s' in moosend.",
                 action,
@@ -2735,10 +2732,10 @@ class MoosendTest(TestCase):
         logger = logging.getLogger("cl.users.tasks")
         action = "unsubscribe"
         with mock.patch.object(logger, "info") as mock_info:
-            # update_moosend_subscription.apply_async(args=[self.email, "subscribe"])
             update_moosend_subscription.delay(self.email, action)
-            # It's implemented like this because logging library is optimized to use %s formatting style, avoids call
-            # __str__() method automatically, also logs from update_moosend_subscription are in %s style
+            # It's implemented like this because logging library is optimized to use %s
+            # formatting style, avoids call __str__() method automatically, also logs
+            # from update_moosend_subscription are in %s style
             mock_info.assert_called_once_with(
                 "Successfully completed '%s' action on '%s' in moosend.",
                 action,
