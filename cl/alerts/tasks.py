@@ -32,15 +32,15 @@ def make_alert_messages(
     d: Docket,
     new_des: QuerySet,
     email_addresses: "ValuesQuerySet[User, Optional[str]]",  # type: ignore
-    first_time_recipients: list[int] = [],
+    recap_email_recipients: list[str] = [],
 ) -> List[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
     :param new_des: The new docket entries
     :param email_addresses: A list of user email addresses to send to
-    :param first_time_recipients: The recipient user_pks if needed to send the
-    first case-user notification email.
+    :param recap_email_recipients: The recap_email addresses if needed to send
+    the first case-user notification email.
     :return: A list of email messages to send
     """
 
@@ -63,50 +63,59 @@ def make_alert_messages(
         "first_email": False,
         "auto_subscribe": False,
     }
-    if email_addresses:
-        for email_address in email_addresses:
-            user = User.objects.get(email=email_address)
-            if user.pk in first_time_recipients:
-                user_profile = UserProfile.objects.get(user=user)
-                first_email = True
-                if user_profile.auto_subscribe:
-                    # First time recipient, auto_subscribe True
-                    auto_subscribe = True
-                    docket_alert = DocketAlert.objects.create(
-                        docket=d, user_id=user.pk
-                    )
-                else:
-                    # First time recipient, auto_subscribe False
-                    auto_subscribe = False
-                    docket_alert = DocketAlert.objects.create(
-                        docket=d,
-                        user_id=user.pk,
-                        alert_type=DocketAlert.UNSUBSCRIPTION,
-                    )
-            else:
-                # Not first time recipient
-                first_email = auto_subscribe = False
-                docket_alert = DocketAlert.objects.get(docket=d, user=user)
 
-            subject_context["first_email"] = first_email
-            subject_context["auto_subscribe"] = auto_subscribe
-            email_context["docket_alert"] = docket_alert
-            email_context["first_email"] = first_email
-            email_context["auto_subscribe"] = auto_subscribe
-            subject = subject_template.render(
-                subject_context
-            ).strip()  # Remove
-            # newlines that editors can insist on adding.
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=txt_template.render(email_context),
-                from_email=settings.DEFAULT_ALERTS_EMAIL,
-                to=[email_address],
-                headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
-            )
-            html = html_template.render(email_context)
-            msg.attach_alternative(html, "text/html")
-            messages.append(msg)
+    # Concatenate current subscriptions addresses and recap_email_recipients
+    email_addresses_list = list(email_addresses) + recap_email_recipients
+    for email_address in email_addresses_list:
+        if email_address in recap_email_recipients:
+            user_profile = UserProfile.objects.get(recap_email=email_address)
+            # Override user's @recap.email with the actual user's email address
+            email_address = user_profile.user.email
+            docket_alert_exist = DocketAlert.objects.filter(
+                docket_id=d, user_id=user_profile.user.pk
+            ).exists()
+            # If a docket alert exists for this @recap.email user, avoid
+            # sending the first email.
+            if docket_alert_exist:
+                continue
+            first_email = True
+            if user_profile.auto_subscribe:
+                # First time recipient, auto_subscribe True
+                auto_subscribe = True
+                docket_alert = DocketAlert.objects.create(
+                    docket=d, user_id=user_profile.user.pk
+                )
+            else:
+                # First time recipient, auto_subscribe False
+                auto_subscribe = False
+                docket_alert = DocketAlert.objects.create(
+                    docket=d,
+                    user_id=user_profile.user.pk,
+                    alert_type=DocketAlert.UNSUBSCRIPTION,
+                )
+        else:
+            # Not a recap email recipient
+            first_email = auto_subscribe = False
+            user = User.objects.get(email=email_address)
+            docket_alert = DocketAlert.objects.get(docket=d, user=user)
+
+        subject_context["first_email"] = first_email
+        subject_context["auto_subscribe"] = auto_subscribe
+        email_context["docket_alert"] = docket_alert
+        email_context["first_email"] = first_email
+        email_context["auto_subscribe"] = auto_subscribe
+        subject = subject_template.render(subject_context).strip()  # Remove
+        # newlines that editors can insist on adding.
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=txt_template.render(email_context),
+            from_email=settings.DEFAULT_ALERTS_EMAIL,
+            to=[email_address],
+            headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+        )
+        html = html_template.render(email_context)
+        msg.attach_alternative(html, "text/html")
+        messages.append(msg)
 
     return messages
 
@@ -116,31 +125,27 @@ def make_alert_messages(
 def send_docket_alert(
     d_pk: int,
     since: datetime,
-    first_time_recipients: list[int] = [],
+    recap_email_recipients: list[str] = [],
 ) -> None:
     """Send an alert for a given docket
 
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
-    :param first_time_recipients: The recipient user_pks if needed to send the
-    first case-user notification email.
+    :param recap_email_recipients: The recap.email addresses if needed to send
+    the first case-user notification email.
     :return: None
     """
 
     email_addresses = (
-        (
-            User.objects.filter(
-                docket_alerts__docket_id=d_pk,
-                docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
-            )
-            | User.objects.filter(pk__in=first_time_recipients)
+        User.objects.filter(
+            docket_alerts__docket_id=d_pk,
+            docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
         )
         .distinct()
         .values_list("email", flat=True)
-        .order_by("email")
     )
 
-    if not email_addresses:
+    if not email_addresses and not recap_email_recipients:
         # Nobody subscribed to the docket.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -154,7 +159,7 @@ def send_docket_alert(
 
     # Notify every user that's subscribed to this alert.
     messages = make_alert_messages(
-        d, new_des, email_addresses, first_time_recipients
+        d, new_des, email_addresses, recap_email_recipients
     )
     connection = get_connection()
     connection.send_messages(messages)

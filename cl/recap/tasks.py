@@ -1519,18 +1519,14 @@ def send_docket_to_webhook(
             webhook.save()
 
 
-def first_time_users(
-    docket_pk: int,
+def get_recap_email_recipients(
     email_recipients: list[dict[str, str | list[str]]],
-) -> list[int]:
-    """Get the recap.email recipients and determine if it's the first time that
-     a recap.email notification comes in for a case-user.
+) -> list[str]:
+    """Get the recap.email recipients from the email_recipients list.
 
     :param email_recipients: List of dicts that contains the notification
     email recipients in the format: "name": name, "email_addresses": [""]
-    :param docket_pk: The PK of the docket related to the notification
-    :return: List of recap.email user_pks if it's the first time the
-     recap.email notification comes in for this case-user
+    :return: List of recap.email addresses
     """
     # Extract all email addresses from email_recipients
     email_addresses = [
@@ -1544,19 +1540,7 @@ def first_time_users(
         for recap_email in email_addresses
         if "@recap.email" in recap_email
     ]
-
-    recap_users = User.objects.filter(
-        profile__recap_email__in=recap_email_recipients
-    )
-    first_time_recipients = []
-    for user in recap_users:
-        docket_alert = DocketAlert.objects.filter(
-            docket_id=docket_pk, user_id=user.pk
-        )
-        if not docket_alert.exists():
-            first_time_recipients.append(user.pk)
-
-    return first_time_recipients
+    return recap_email_recipients
 
 
 @app.task(
@@ -1650,12 +1634,12 @@ def process_recap_email(
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
-            first_time_recipients = first_time_users(
-                docket.pk, data["email_recipients"]
+            recap_email_recipients = get_recap_email_recipients(
+                data["email_recipients"]
             )
             chain(
                 send_docket_alert.si(
-                    docket.pk, start_time, first_time_recipients
+                    docket.pk, start_time, recap_email_recipients
                 ),
                 send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
             ).apply_async()
