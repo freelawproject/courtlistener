@@ -1,9 +1,12 @@
 import logging
+import pickle
 import re
+import socket
 from collections import OrderedDict
-from datetime import date
-from typing import Optional
+from datetime import date, datetime, timezone
+from typing import Mapping, Optional, TypedDict
 
+import requests
 import usaddress
 from dateutil import parser
 from django.core.exceptions import ValidationError
@@ -19,6 +22,7 @@ from juriscraper.pacer import (
 )
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
+from cl.lib.redis_utils import make_redis_interface
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
@@ -530,3 +534,120 @@ def normalize_attorney_contact(c, fallback_name=""):
     address_info = normalize_address_info(dict(address_info))
     address_info["lookup_key"] = make_address_lookup_key(address_info)
     return address_info, atty_info
+
+
+class ConnectionType(TypedDict):
+    connection_ok: bool
+    status_code: int | None
+    date_time: datetime
+
+
+def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
+    """Check PACER connection status for the given court.
+
+    :param court_id: The court ID to check.
+    :returns: A dict with the court connection status.
+    """
+
+    url = f"https://ecf.{court_id}.uscourts.gov/"
+
+    connection_ok = False
+    status_code = None
+    try:
+        r = requests.get(url, timeout=5)
+        status_code = r.status_code
+        r.raise_for_status()
+        connection_ok = True
+    except requests.exceptions.RequestException as e:
+        connection_ok = False
+
+    blocked_dict: ConnectionType = {
+        "connection_ok": connection_ok,
+        "status_code": status_code,
+        "date_time": datetime.now(timezone.utc),
+    }
+    return blocked_dict
+
+
+def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
+    """Get the court status from Redis or cache it if it's not there.
+
+    :param court_id: The court ID to check.
+    :param server_ip: The server IP address.
+    :return: True if connection was successful, False otherwise.
+    """
+
+    court_status_key = f"status:pacer:court.{court_id}:ip.{server_ip}"
+    r = make_redis_interface("CACHE", decode_responses=False)
+    pickle_status = r.get(court_status_key)
+    if pickle_status:
+        court_status = pickle.loads(pickle_status)
+        return court_status
+
+    # Unable to find court_status in cache, getting it from request.
+    connection_info = check_pacer_court_connectivity(court_id)
+    current_status = connection_info["connection_ok"]
+
+    # Stores court connection status with court ID and server IP as key.
+    # 30 seconds expiration time.
+    status_expiration = 30
+    r.set(court_status_key, pickle.dumps(current_status), ex=status_expiration)
+    if connection_info["connection_ok"]:
+        return True
+
+    # If court connection failed, log the error and return False.
+    log_pacer_court_connection(connection_info, court_id, server_ip)
+    return False
+
+
+def log_pacer_court_connection(
+    connection_info: ConnectionType,
+    court_id: str,
+    server_ip: str,
+) -> None:
+    """Log the problem with the court in Redis.
+
+    :param connection_info: A dict as returned by
+    check_pacer_court_connectivity method.
+    :param court_id: The court ID.
+    :param server_ip: The server IP address.
+    :return: None
+    """
+    r = make_redis_interface("STATS")
+    pipe = r.pipeline()
+    d = connection_info["date_time"].date().isoformat()
+    t = connection_info["date_time"].time().isoformat()
+    ip_key = f"pacer_log:c:{court_id}:server_ip:{server_ip}:d:{d}.ip_error"
+
+    status_code = connection_info["status_code"]
+    if status_code is None:
+        status_code = 0
+    if connection_info["connection_ok"] is True:
+        connection_ok = "True"
+    else:
+        connection_ok = "False"
+
+    log_info: Mapping[str | bytes, str | int] = {
+        "connection_ok": connection_ok,
+        "status_code": status_code,
+        "time": t,
+    }
+    pipe.hset(ip_key, mapping=log_info)
+    pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
+    pipe.execute()
+
+
+def is_pacer_court_accessible(court_id: str) -> bool:
+    """Check the connectivity for the given court.
+
+    :param court_id: The court ID to check.
+    :return: True if connection was successful, False otherwise.
+    """
+
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    # Get the IP address of the current node.
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+
+    court_status = get_or_cache_pacer_court_status(pacer_court_id, ip_addr)
+    return court_status
