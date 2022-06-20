@@ -1,7 +1,9 @@
+import json
 import logging
 from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
+from json import JSONDecodeError
 
 from django.conf import settings
 from django.contrib import messages
@@ -47,7 +49,7 @@ from cl.users.forms import (
     WebhookForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import subscribe_to_mailchimp, update_mailchimp
+from cl.users.tasks import update_moosend_subscription
 from cl.users.utils import convert_to_stub_account, emails, message_dict
 from cl.visualizations.models import SCOTUSMap
 
@@ -246,9 +248,9 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
 
-            # Unsubscribe the old address in mailchimp (we'll
+            # Unsubscribe the old address in moosend (we'll
             # resubscribe it when they confirm it later).
-            update_mailchimp.delay(old_email, "unsubscribed")
+            update_moosend_subscription.delay(old_email, "unsubscribe")
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
@@ -279,10 +281,10 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             if new_wants_newsletter is True and not changed_email:
                 # They just subscribed. If they didn't *also* update their
                 # email address, subscribe them.
-                subscribe_to_mailchimp.delay(new_email)
+                update_moosend_subscription.delay(new_email, "subscribe")
             elif new_wants_newsletter is False:
                 # They just unsubscribed
-                update_mailchimp.delay(new_email, "unsubscribed")
+                update_moosend_subscription.delay(new_email, "unsubscribe")
 
         # New email address and changes above are saved here.
         profile_form.save()
@@ -318,7 +320,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         request.user.monthly_donations.all().update(enabled=False)
         request.user.scotus_maps.all().update(deleted=True)
         user = convert_to_stub_account(request.user)
-        update_mailchimp.delay(request.user.email, "unsubscribed")
+        update_moosend_subscription.delay(request.user.email, "unsubscribe")
         update_session_auth_hash(request, user)
         logout(request)
         return HttpResponseRedirect(reverse("delete_profile_done"))
@@ -480,7 +482,7 @@ def confirm_email(request, activation_key):
 
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid. If they are subscribed to the newsletter, ensures
-    that mailchimp is updated.
+    that moosend is updated.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -516,7 +518,7 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         if up.wants_newsletter:
-            subscribe_to_mailchimp.delay(up.user.email)
+            update_moosend_subscription.delay(up.user.email, "subscribe")
         up.email_confirmed = True
         up.save()
 
@@ -613,26 +615,40 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 @csrf_exempt  # nosemgrep
-def mailchimp_webhook(request: HttpRequest) -> HttpResponse:
-    """Respond to changes to our mailing list"""
-    logger.info("Got mailchimp webhook with %s method.", request.method)
-    if request.method == "POST":
-        webhook_type = request.POST.get("type")
-        logger.info("Handling mailchimp '%s' request.", webhook_type)
-        wants_newsletter = None
-        if webhook_type == "subscribe":
-            wants_newsletter = True
-        elif webhook_type == "unsubscribe":
-            wants_newsletter = False
-        if wants_newsletter is not None:
-            # Only update this value if we get a valid webhook_type
-            email = request.POST.get("data[email]")
-            profiles = UserProfile.objects.filter(user__email=email)
-            logger.info(
-                "Updating %s profiles for email %s", profiles.count(), email
-            )
-            profiles.update(wants_newsletter=wants_newsletter)
+def moosend_webhook(request: HttpRequest) -> HttpResponse:
+    logger.info("Got moosend webhook with %s method.", request.method)
 
-    # Mailchimp does a GET when you create the webhook,
+    if request.method == "POST":
+        # The body is returned as a byte string
+        body = request.body.decode("utf-8")
+        try:
+            json_body = json.loads(body)
+            webhook_event = json_body.get("Event")
+            if webhook_event:
+                webhook_event_name = webhook_event.get("EventName")
+                webhook_contact_context = webhook_event.get("ContactContext")
+                wants_newsletter = None
+                email = None
+                if webhook_contact_context:
+                    email = webhook_contact_context.get("EmailAddress")
+                if webhook_event_name == "SUBSCRIBED":
+                    wants_newsletter = True
+                elif webhook_event_name == "UNSUBSCRIBED":
+                    wants_newsletter = False
+                if wants_newsletter is not None and email is not None:
+                    profiles = UserProfile.objects.filter(user__email=email)
+                    logger.info(
+                        "Updating %s profiles for email %s",
+                        profiles.count(),
+                        email,
+                    )
+                    profiles.update(wants_newsletter=wants_newsletter)
+        except JSONDecodeError:
+            # This case shouldn't happen but I'd rather be careful
+            logger.error(
+                f"Moosend webhook got unexpected response: {request.body}"
+            )
+
+    # Moosend does a GET when you create/edit the automation workflow,
     # so we need to return a 200 even for GETs.
     return HttpResponse("<h1>200: OK</h1>")

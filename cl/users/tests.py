@@ -1,7 +1,7 @@
 import json
+import logging
 from datetime import timedelta
 from pathlib import Path
-from time import time
 from unittest import mock
 
 from django.conf import settings
@@ -37,6 +37,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+from cl.users.tasks import update_moosend_subscription
 
 
 class UserTest(LiveServerTestCase):
@@ -2664,3 +2665,83 @@ class EmailBrokenTest(TestCase):
         r = self.client.get(path)
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
+
+
+class MockResponse:
+    """
+    A class to Mock API response
+    """
+
+    def __init__(self, json_data, status_code):
+        self.json_data = json_data
+        self.status_code = status_code
+
+    def json(self):
+        return self.json_data
+
+
+class MoosendTest(TestCase):
+    email = "testing@courtlistener.com"  # Test email address
+
+    def mock_subscribe_valid(*args, **kwargs):
+        data = {
+            "Code": 0,
+            "Error": None,
+            "Context": {
+                "ID": "38fb8eb6-cca5-43d5-b61b-2c36334ad7d0",
+                "Name": None,
+                "Mobile": None,
+                "Email": "testing@courtlistener.com",
+                "CreatedOn": "/Date(1655320447877)/",
+                "UpdatedOn": None,
+                "UnsubscribedOn": None,
+                "UnsubscribedFromID": None,
+                "SubscribeType": 1,
+                "SubscribeMethod": 2,
+                "CustomFields": [],
+                "RemovedOn": None,
+                "Tags": [],
+            },
+        }
+
+        return MockResponse(data, 200)
+
+    def mock_unsubscribe_valid(*args, **kwargs):
+        data = {"Code": 0, "Error": None, "Context": None}
+        return MockResponse(data, 200)
+
+    @mock.patch(
+        "cl.users.tasks.requests.post", side_effect=mock_subscribe_valid
+    )
+    def test_subscribe(self, mocked_post) -> None:
+        """This test checks that moosend mailing list subscription is successful"""
+        logger = logging.getLogger("cl.users.tasks")
+        action = "subscribe"
+        with mock.patch.object(logger, "info") as mock_info:
+            update_moosend_subscription.delay(self.email, action)
+            # It's implemented like this because logging library is optimized to use %s
+            # formatting style, avoids call  __str__() method automatically, also logs
+            # from update_moosend_subscription are in %s style
+            mock_info.assert_called_once_with(
+                "Successfully completed '%s' action on '%s' in moosend.",
+                action,
+                self.email,
+            )
+
+    @mock.patch(
+        "cl.users.tasks.requests.post", side_effect=mock_unsubscribe_valid
+    )
+    def test_unsubscribe(self, mocked_post) -> None:
+        """This test checks that moosend mailing list unsubscription is successful"""
+        logger = logging.getLogger("cl.users.tasks")
+        action = "unsubscribe"
+        with mock.patch.object(logger, "info") as mock_info:
+            update_moosend_subscription.delay(self.email, action)
+            # It's implemented like this because logging library is optimized to use %s
+            # formatting style, avoids call __str__() method automatically, also logs
+            # from update_moosend_subscription are in %s style
+            mock_info.assert_called_once_with(
+                "Successfully completed '%s' action on '%s' in moosend.",
+                action,
+                self.email,
+            )
