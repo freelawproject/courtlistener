@@ -355,6 +355,16 @@ def make_choices_group_lookup(c):
     return d
 
 
+def invert_choices_group_lookup(c):
+    """Invert a choices variable in a model to get the key from the value.
+    (key:, 'value') -> {'value': key}
+    """
+    d = {}
+    for choice, value in c:
+        d[value] = choice
+    return d
+
+
 def flatten_choices(self):
     """Flattened version of choices tuple on a model or form field
 

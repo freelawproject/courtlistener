@@ -74,8 +74,8 @@ def update_document_from_text(opinion: Opinion) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
-    max_retries=2,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=3,
     retry_backoff=10,
 )
 def extract_doc_content(
@@ -161,8 +161,8 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
-    max_retries=2,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=3,
     retry_backoff=10,
 )
 def extract_recap_pdf(
@@ -226,8 +226,8 @@ def extract_recap_pdf(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
-    max_retries=2,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=3,
     retry_backoff=10,
 )
 def process_audio_file(self, pk) -> None:
@@ -283,7 +283,7 @@ def process_audio_file(self, pk) -> None:
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException, RedisConnectionError),
-    max_retries=2,
+    max_retries=3,
     interval_start=5,
     interval_step=5,
 )

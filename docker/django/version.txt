@@ -1,5 +1,15 @@
-2.0.18
+2.0.27
 
+2.0.27 - Add new github action
+2.0.26 - Update code
+2.0.25 - Rebuild
+2.0.24 - Email retries code
+2.0.23 - Bug fix (dup tag, oops)
+2.0.23 - Update code
+2.0.22 - Update code
+2.0.21 - Update code
+2.0.20 - Update code
+2.0.19 - Update code
 2.0.18 - Add cursor pagination to the admin
 2.0.17 - Update code & juriscraper
 2.0.16 - Update code

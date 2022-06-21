@@ -305,7 +305,7 @@ class ApiEventCreationTestCase(TestCase):
         )
 
         # Timings
-        self.assertAlmostEqual(int(self.r.get("api:v3.timing")), 10, delta=200)
+        self.assertAlmostEqual(int(self.r.get("api:v3.timing")), 10, delta=500)
 
 
 class DRFOrderingTests(TestCase):

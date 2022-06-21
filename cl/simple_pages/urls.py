@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 from cl.simple_pages.views import (
     advanced_search,
     alert_help,
+    broken_email_help,
     contact,
     contact_thanks,
     contribute,
@@ -43,6 +44,7 @@ urlpatterns = [
     path("help/tags/", tag_help, name="tag_help"),
     path("help/search-operators/", advanced_search, name="advanced_search"),
     path("help/recap/email/", recap_email_help, name="recap_email_help"),
+    path("help/broken-email/", broken_email_help, name="broken_email_help"),
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",

@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
@@ -20,6 +20,8 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
+from cl.lib.pacer import is_pacer_court_accessible
+from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
     Attorney,
@@ -1841,3 +1843,35 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 2)
         create_or_merge_from_idb_chunk([self.fcj_2.id])
         self.assertEqual(Docket.objects.count(), 3)
+
+
+class CheckCourtConnectivityTest(TestCase):
+    """Test the is_pacer_court_accessible method."""
+
+    def setUp(self) -> None:
+        self.r = make_redis_interface("CACHE")
+        self.r.flushdb()
+
+    @mock.patch(
+        "cl.lib.pacer.check_pacer_court_connectivity",
+        side_effect=lambda x: {
+            "connection_ok": True,
+            "status_code": 200,
+            "date_time": datetime.now(timezone.utc),
+        },
+    )
+    def test_is_pacer_court_accessible_pass(self, mock_check_court):
+        court_status = is_pacer_court_accessible("alnb")
+        self.assertEqual(court_status, True)
+
+    @mock.patch(
+        "cl.lib.pacer.check_pacer_court_connectivity",
+        side_effect=lambda x: {
+            "connection_ok": False,
+            "status_code": 403,
+            "date_time": datetime.now(timezone.utc),
+        },
+    )
+    def test_is_pacer_court_accessible_fails(self, mock_check_court):
+        court_status = is_pacer_court_accessible("alnb")
+        self.assertEqual(court_status, False)

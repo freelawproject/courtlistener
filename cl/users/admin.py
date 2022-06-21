@@ -7,10 +7,10 @@ from cl.donate.admin import DonationInline, MonthlyDonationInline
 from cl.favorites.admin import FavoriteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
 from cl.users.models import (
-    BackoffEvent,
     BarMembership,
     EmailFlag,
     EmailSent,
+    FailedEmail,
     UserProfile,
 )
 
@@ -64,24 +64,12 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
 @admin.register(EmailFlag)
 class EmailFlagAdmin(admin.ModelAdmin):
     search_fields = ("email_address",)
-    list_filter = ("object_type", "event_sub_type", "flag")
+    list_filter = ("flag_type", "notification_subtype")
     list_display = (
         "email_address",
         "id",
-        "object_type",
-        "event_sub_type",
-        "flag",
-        "date_created",
-    )
-
-
-@admin.register(BackoffEvent)
-class BackoffEventAdmin(admin.ModelAdmin):
-    search_fields = ("email_address",)
-    list_display = (
-        "email_address",
-        "id",
-        "retry_counter",
+        "flag_type",
+        "notification_subtype",
         "date_created",
     )
 
@@ -96,6 +84,18 @@ class EmailSentAdmin(admin.ModelAdmin):
         "date_created",
     )
     raw_id_fields = ("user",)
+
+
+@admin.register(FailedEmail)
+class FailedEmailAdmin(admin.ModelAdmin):
+    search_fields = ("recipient",)
+    list_display = (
+        "recipient",
+        "id",
+        "status",
+        "date_created",
+    )
+    raw_id_fields = ("stored_email",)
 
 
 # Replace the normal User admin with our better one.

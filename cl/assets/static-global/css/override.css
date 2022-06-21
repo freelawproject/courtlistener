@@ -34,6 +34,7 @@ header {
 .navbar-default .navbar-nav > li a {
   /* Layout fix. */
   border-bottom: 3px solid transparent;
+  color: #555555;
 }
 .subnav {
   min-height: 0;
@@ -187,6 +188,12 @@ a.button:active {
   }
   .dl-horizontal dd {
     margin-left: 15px;
+  }
+  .broken-email-banner{
+    padding-right: 0px;
+  }
+  .broken-email-banner .navbar-text{
+    float: left;
   }
 }
 @media (min-width: 768px) {
@@ -1114,3 +1121,17 @@ emphasis {
   text-indent: 10px;
 }
 /* END Tax specific css tweak*/
+
+/*Improve contrast on alert boxes*/
+.alert-dismissible .navbar-text.lead, .alert-danger, .alert-warning,
+.alert-danger .help-block {
+  color: #333333;
+}
+
+.alert-dismissible .btn-default {
+  border-color: #999999;
+}
+.h-captcha > div{
+  color: #333333!important;
+  font-family: Helvetica;
+}

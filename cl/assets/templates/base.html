@@ -132,6 +132,29 @@
     </div>
     {% endif %}
 
+    <!-- Broken Email Banner -->
+    {% if EMAIL_BAN_REASON %}
+      <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
+        <div class="container-fluid">
+          <div class="row">
+            <div class="col-lg-12">
+              <p class="navbar-text lead">
+                <i class="fa fa-warning"></i>
+                {% if EMAIL_BAN_PERMANENT %}
+                  We are currently unable to send emails to you. Please update your email address to continue receiving emails.
+                {% else %}
+                  We are having difficulty sending emails to you, but we're continuing to try. If this problem persists, our servers will automatically stop sending you messages.
+                {% endif %}
+                </br>
+                <a href="{% url 'broken_email_help' %}"
+                  class="btn btn-default v-offset-above-1 pull-right">Learn More</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     <!-- Static navbar -->
     <div class="navbar navbar-default" role="navigation">
       <div class="container-fluid">
@@ -286,8 +309,8 @@
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
       </div>
       <div class="col-sm-6 right">
-        <form action="https://law.us14.list-manage.com/subscribe/post?u=4ea266fe7d0d074abd3f6a2ae&amp;id=ba547fa86b&amp;ANNOU=TRUE"
-          method="post" target="_blank" class="form-inline">
+        <form action="https://freelawproject.m-pages.com/free-law-project-newsletter"
+          method="get" target="_blank" class="form-inline">
           <div class="form-group">
             <input name="EMAIL" class="form-control" id="mce-EMAIL"
                    type="email" placeholder="Email Address"

@@ -402,6 +402,20 @@ Screenshots will be saved into the `cl-django` container. To grab them, [you can
 
 [cp]: https://stackoverflow.com/a/22050116/64911
 
+### Celery debugging
+
+If you are working with [celery tasks](https://docs.celeryq.dev/en/stable/userguide/monitoring.html#celery-events-curses-monitor), it's helpful to use celery events which is a simple curses monitor displaying task and worker history, you can inspect the result and traceback of tasks, and it also supports some management commands like rate limiting and shutting down workers.
+
+1. First, you need to set `CELERY_TASK_ALWAYS_EAGER` to `False` under DEVELOPMENT Settings: `cl.settings.third_party.celery`, to allow running your task into the async worker:
+`CELERY_TASK_ALWAYS_EAGER = False`
+ Remember to set it `TRUE` once debugging is finished, otherwise, tests aren't going to pass.
+
+2. To use celery events you need to run a celery worker that sends events, adding the `-E` option:
+`docker exec -it cl-celery celery -A cl worker -c 1 -E`
+
+3. Then start `celery events` monitor:
+`docker exec -it cl-celery celery -A cl events`
+Now, when executing a task you'll be able to monitor it with celery events.
 
 ### How to update a docker image.
 
@@ -418,6 +432,7 @@ To do this:
 
 We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
 
+We also automatically build and push new docker images using github actions when merging new code into main (with version bumps).
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux

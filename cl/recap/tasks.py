@@ -44,7 +44,7 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.crypto import sha1
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
-from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
@@ -450,7 +450,14 @@ def process_recap_zip(self, pk: int) -> dict[str, list[int] | list[Task]]:
         }
 
 
-@app.task(bind=True, max_retries=5, ignore_result=True)
+@app.task(
+    bind=True,
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    max_retries=5,
+    interval_start=5 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
 def process_recap_docket(self, pk):
     """Process an uploaded docket from the RECAP API endpoint.
 
@@ -1098,8 +1105,8 @@ def update_docket_from_hidden_api(data):
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
-    max_retries=3,
+    autoretry_for=(RedisConnectionError, PacerLoginException),
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
@@ -1122,6 +1129,16 @@ def fetch_pacer_doc_by_rd(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(rd.docket_entry.docket.court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return
+        raise self.retry()
+
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     if rd.is_available:
@@ -1184,8 +1201,8 @@ def fetch_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
-    max_retries=3,
+    autoretry_for=(RedisConnectionError, PacerLoginException),
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
@@ -1331,7 +1348,7 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException, RedisConnectionError),
-    max_retries=3,
+    max_retries=5,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
@@ -1359,23 +1376,25 @@ def fetch_docket(self, fq_pk):
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
-        msg = "Network error getting pacer_case_id for fq: %s."
+        msg = f"Network error getting pacer_case_id for fq: {fq_pk}."
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except PacerLoginException as exc:
-        msg = "PacerLoginException while getting pacer_case_id for fq: %s."
+        msg = (
+            f"PacerLoginException while getting pacer_case_id for fq: {fq_pk}."
+        )
         if self.request.retries == self.max_retries:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
             return None
         mark_fq_status(
-            fq, f"{msg}Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
     except ParsingException:

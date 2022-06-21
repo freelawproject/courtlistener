@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Help with your email address – CourtListener.com{% endblock %}
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h1>Why can't CourtListener send me emails and how do I fix it?</h1>
+    <p class="lead">We send a lot of email, but sometimes our messages don't go through.
+    </p>
+    <p>When we detect that messages are not getting delivered to you, we send fewer messages until either a message arrives successfully or five days pass. If five days pass without a message getting delivered properly, we have to stop sending messages to you until your account is fixed. This ensures that we are not marked as a spammer.
+    </p>
+    <p>Once your account is fixed and a message is delivered successfully, any messages that bounced during the outage are resent. This way, you get the messages you should, even if your mailbox is full or your mail server goes offline for several days.</p>
+    <p>If your email is down for more than five days, we will not resend emails earlier than that time, sorry.</p>
+
+    <h2>How do I fix this?</h2>
+    <p class="alert alert-warning">{{ EMAIL_BAN_REASON }}</p>
+    <p>You can see more details about this error in your profile, under your email address.</p>
+    <p class="v-offset-above-3">
+      <a href="{% url 'view_settings' %}" class="btn btn-lg btn-primary float-right">Update Your Email</a>
+      <i class="fa fa-life-bouy gray"></i> <a href="{% url 'contact' %}" class=""> Contact Support</a></span>
+    </p>
+  </div>
+{% endblock %}

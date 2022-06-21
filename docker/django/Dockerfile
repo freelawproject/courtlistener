@@ -49,7 +49,7 @@ WORKDIR $PYSETUP_PATH
 COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root
 
-ONBUILD COPY . /opt/courtlistener
+COPY . /opt/courtlistener
 
 
 FROM build-base as build-prod
@@ -57,15 +57,15 @@ FROM build-base as build-prod
 WORKDIR $PYSETUP_PATH
 
 # copy project requirement files here to ensure they will be cached.
-ONBUILD ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock /opt/poetry.lock
-ONBUILD ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
+ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/poetry.lock /opt/poetry.lock
+ADD https://raw.githubusercontent.com/freelawproject/courtlistener/main/pyproject.toml /opt/pyproject.toml
 
 # install runtime deps - uses $POETRY_VIRTUALENVS_IN_PROJECT internally
 RUN poetry install --no-root
 
-ONBUILD ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
+ADD https://github.com/freelawproject/courtlistener/archive/main.tar.gz /opt/courtlistener.tar.gz
 WORKDIR /opt
-ONBUILD RUN tar xvfz courtlistener.tar.gz && \
+RUN tar xvfz courtlistener.tar.gz && \
     mv /opt/courtlistener-main /opt/courtlistener && \
     rm -r /opt/courtlistener.tar.gz
 

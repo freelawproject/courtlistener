@@ -7,6 +7,7 @@ CV_OLD = 1
 CV_2017 = 2
 CV_2020 = 8
 CV_2021 = 9
+CV_2022 = 10
 CR_OLD = 3
 CR_2017 = 4
 APP_OLD = 5
@@ -28,6 +29,11 @@ DATASET_SOURCES = (
         CV_2021,
         "Civil cases filed, terminated, and pending from SY 1988 to present "
         "(September 2021)",
+    ),
+    (
+        CV_2022,
+        "Civil cases filed, terminated, and pending from SY 1988 to present "
+        "(March 2022)",
     ),
     (
         CR_OLD,
@@ -63,163 +69,163 @@ DATASET_SOURCES = (
 IDB_FIELD_DATA = {
     # Shared
     "CIRCUIT": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "circuit",
         "type": Court,
     },
     "DISTRICT": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "district",
         "type": Court,
     },
     "OFFICE": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "office",
         "type": str,
     },
     "DOCKET": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "docket_number",
         "type": str,
     },
     "ORIGIN": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "origin",
         "type": int,
     },
     "FILEDATE": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "date_filed",
         "type": date,
     },
     "COUNTY": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "county_of_residence",
         "type": int,
     },
     "TERMDATE": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "date_terminated",
         "type": date,
     },
     "TAPEYEAR": {
-        "sources": [CV_2017, CV_2020, CV_2021, CR_2017],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022, CR_2017],
         "field": "year_of_tape",
         "type": int,
     },
     # Civil only
     "JURIS": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "jurisdiction",
         "type": int,
     },
     "NOS": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "nature_of_suit",
         "type": int,
     },
     "TITL": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "title",
         "type": str,
     },
     "SECTION": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "section",
         "type": str,
     },
     "SUBSECTION": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "subsection",
         "type": str,
     },
     "RESIDENC": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "diversity_of_residence",
         "type": int,
     },
     "CLASSACT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "class_action",
         "type": bool,
     },
     "DEMANDED": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "monetary_demand",
         "type": int,
     },
     "ARBIT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "arbitration_at_filing",
         "type": str,
     },
     "MDLDOCK": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "multidistrict_litigation_docket_number",
         "type": str,
     },
     "PLT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "plaintiff",
         "type": str,
     },
     "DEF": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "defendant",
         "type": str,
     },
     "TRANSOFF": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "transfer_office",
         "type": str,
     },
     "TRANSDAT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "date_transfer",
         "type": date,
     },
     "TRANSDOC": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "transfer_docket_number",
         "type": str,
     },
     "TRANSORG": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "transfer_origin",
         "type": str,
     },
     "TRCLACT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "termination_class_action_status",
         "type": int,
     },
     "PROCPROG": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "procedural_progress",
         "type": int,
     },
     "DISP": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "disposition",
         "type": int,
     },
     "NOJ": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "nature_of_judgement",
         "type": int,
     },
     "AMTREC": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "amount_received",
         "type": int,
     },
     "JUDGMENT": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "judgment",
         "type": int,
     },
     "PROSE": {
-        "sources": [CV_2017, CV_2020, CV_2021],
+        "sources": [CV_2017, CV_2020, CV_2021, CV_2022],
         "field": "pro_se",
         "type": int,
     },
@@ -335,6 +341,7 @@ EMPLOYEE_RETIREMENT_INCOME_SECURITY_ACT = 791
 SELECTIVE_SERVICE = 810
 COPYRIGHT = 820
 PATENT = 830
+PATENT_ANDA = 835
 TRADEMARK = 840
 SECURITIES_COMMODITIES_EXCHANGE = 850
 SOCIAL_SECURITY = 860
@@ -481,6 +488,7 @@ NOS_CODES = (
     (SELECTIVE_SERVICE, "810 Selective service"),
     (COPYRIGHT, "820 Copyright"),
     (PATENT, "830 Patent"),
+    (PATENT_ANDA, "835 Patent Abbreviated New Drug Application (ANDA)"),
     (TRADEMARK, "840 Trademark"),
     (SECURITIES_COMMODITIES_EXCHANGE, "850 Securities, Commodities, Exchange"),
     (SOCIAL_SECURITY, "860 Social security"),
