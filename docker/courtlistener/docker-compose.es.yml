@@ -10,6 +10,10 @@ services:
       - discovery.type=single-node
       - cluster.name=courtlistener-cluster
       - xpack.security.enabled=false
+      - "http.cors.allow-origin=*"
+      - "http.cors.enabled=true"
+      - "http.cors.allow-headers=X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization"
+      - "http.cors.allow-credentials=true"
     ports:
       - "9200:9200"
     networks:

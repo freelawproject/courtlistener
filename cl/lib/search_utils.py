@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlencode
 from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
+from django_elasticsearch_dsl import Document
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse
@@ -93,8 +94,8 @@ def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
 
 
 def make_get_string(
-    request: HttpRequest,
-    nuke_fields: Optional[List[str]] = None,
+        request: HttpRequest,
+        nuke_fields: Optional[List[str]] = None,
 ) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
@@ -135,8 +136,8 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
 
 
 def make_stats_variable(
-    search_form: SearchForm,
-    paged_results: SolrResponse,
+        search_form: SearchForm,
+        paged_results: SolrResponse,
 ) -> List[str]:
     """Create a useful facet variable for use in a template
 
@@ -180,8 +181,8 @@ def make_stats_variable(
 
 
 def merge_form_with_courts(
-    courts: Dict,
-    search_form: SearchForm,
+        courts: Dict,
+        search_form: SearchForm,
 ) -> Tuple[Dict[str, List], str, str]:
     """Merges the courts dict with the values from the search form.
 
@@ -298,10 +299,10 @@ def merge_form_with_courts(
 
 
 def make_fq(
-    cd: CleanData,
-    field: str,
-    key: str,
-    make_phrase: bool = False,
+        cd: CleanData,
+        field: str,
+        key: str,
+        make_phrase: bool = False,
 ) -> str:
     """Does some minimal processing of the query string to get it into a
     proper field query.
@@ -378,9 +379,9 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
 
 
 def make_date_query(
-    query_field: str,
-    before: datetime,
-    after: datetime,
+        query_field: str,
+        before: datetime,
+        after: datetime,
 ) -> str:
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
@@ -439,7 +440,7 @@ def make_boost_string(fields: Dict[str, float]) -> str:
 def add_boosts(main_params: SearchParam, cd: CleanData) -> None:
     """Add any boosts that make sense for the query."""
     if cd["type"] == SEARCH_TYPES.OPINION and main_params["sort"].startswith(
-        "score"
+            "score"
     ):
         main_params["boost"] = "pagerank"
 
@@ -497,9 +498,9 @@ def add_faceting(main_params: SearchParam, cd: CleanData, facet: bool) -> None:
 
 
 def add_highlighting(
-    main_params: SearchParam,
-    cd: CleanData,
-    highlight: Union[bool, str],
+        main_params: SearchParam,
+        cd: CleanData,
+        highlight: Union[bool, str],
 ) -> None:
     """Add any parameters relating to highlighting."""
 
@@ -746,8 +747,8 @@ def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
             main_params["fq"] = [group_fq]
 
     elif (
-        cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
-        and group is True
+            cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+            and group is True
     ):
         docket_query = re.search(r"docket_id:\d+", cd["q"])
         if docket_query:
@@ -864,11 +865,11 @@ def cleanup_main_query(query_string: str) -> str:
 
 
 def build_main_query(
-    cd: CleanData,
-    highlight: Union[bool, str] = "all",
-    order_by: str = "",
-    facet: bool = True,
-    group: bool = True,
+        cd: CleanData,
+        highlight: Union[bool, str] = "all",
+        order_by: str = "",
+        facet: bool = True,
+        group: bool = True,
 ) -> SearchParam:
     main_params = cast(
         SearchParam,
@@ -889,9 +890,9 @@ def build_main_query(
 
 
 def build_main_query_from_query_string(
-    query_string,
-    updates=None,
-    kwargs=None,
+        query_string,
+        updates=None,
+        kwargs=None,
 ) -> Optional[SearchParam]:
     """Build a main query dict from a query string
 
@@ -1001,8 +1002,8 @@ def build_court_count_query(group: bool = False) -> SearchParam:
 
 
 def add_depth_counts(
-    search_data: Dict[str, Any],
-    search_results: SolrResponse,
+        search_data: Dict[str, Any],
+        search_results: SolrResponse,
 ) -> Optional[OpinionCluster]:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each Solr
@@ -1034,7 +1035,7 @@ def add_depth_counts(
 
 
 def get_citing_clusters_with_cache(
-    cluster: OpinionCluster,
+        cluster: OpinionCluster,
 ) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
 
@@ -1071,8 +1072,8 @@ def get_citing_clusters_with_cache(
 
 
 def get_related_clusters_with_cache(
-    cluster: OpinionCluster,
-    request: HttpRequest,
+        cluster: OpinionCluster,
+        request: HttpRequest,
 ) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
     """Use Solr to get related opinions with Solr-MoreLikeThis query
 
@@ -1130,8 +1131,8 @@ def get_related_clusters_with_cache(
 
         mlt_query = (
             si.query(sub_opinion_query)
-            .mlt(**mlt_params)
-            .field_limit(fields=["id", "caseName", "absolute_url"])
+                .mlt(**mlt_params)
+                .field_limit(fields=["id", "caseName", "absolute_url"])
         )
 
         if settings.RELATED_FILTER_BY_STATUS:
@@ -1182,11 +1183,11 @@ def get_related_clusters_with_cache(
 
 
 def get_mlt_query(
-    si: ExtraSolrInterface,
-    cd: CleanData,
-    facet: bool,
-    seed_pks: List[str],
-    filter_query: str,
+        si: ExtraSolrInterface,
+        cd: CleanData,
+        facet: bool,
+        seed_pks: List[str],
+        filter_query: str,
 ) -> SolrResponse:
     """
     By default Solr MoreLikeThis queries do not support highlighting. Thus, we
@@ -1236,3 +1237,8 @@ def get_mlt_query(
     )
 
     return si.mlt_query(hl_fields).add_extra(**q)
+
+
+def get_es_query(doc: Document, cd: CleanData):
+    # TODO convert cleaned data to ES query
+    pass

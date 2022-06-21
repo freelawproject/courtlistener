@@ -7,6 +7,7 @@ urlpatterns = [
     # Search pages
     path("", show_results, name="show_results"),
     path("opinion/", advanced, name="advanced_o"),
+    path("parenthetical/", advanced, name="advanced_op"),
     path("audio/", advanced, name="advanced_oa"),
     path("person/", advanced, name="advanced_p"),
     path("recap/", advanced, name="advanced_r"),

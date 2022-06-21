@@ -1,6 +1,9 @@
+import datetime
 import io
+import operator
 import os
 from datetime import date
+from functools import reduce
 from pathlib import Path
 from unittest import mock
 
@@ -12,6 +15,7 @@ from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
+from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -87,11 +91,11 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             self.expected_num_results_opinion,
             msg="Did not get expected number of results.\n"
-            "\tGot:\t%s\n\tExpected:\t %s"
-            % (
-                actual_count,
-                self.expected_num_results_opinion,
-            ),
+                "\tGot:\t%s\n\tExpected:\t %s"
+                % (
+                    actual_count,
+                    self.expected_num_results_opinion,
+                ),
         )
 
         # Check a simple citation query
@@ -102,8 +106,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
         # Next, we delete everything from Solr
@@ -125,8 +129,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of counts in empty index.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
         # Add things back, but do it by ID
@@ -151,8 +155,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
 
@@ -232,19 +236,19 @@ class ModelTest(TestCase):
         expected_count = 1
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .exclude(
+                .exclude(
                 # Note this doesn't actually exclude anything,
                 # but it helps ensure chaining is working.
                 docket__case_name="Not the right case name",
             )
-            .count()
+                .count()
         )
         self.assertEqual(cluster_count, expected_count)
 
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .filter(docket__case_name="Blah")
-            .count()
+                .filter(docket__case_name="Blah")
+                .count()
         )
         self.assertEqual(cluster_count, expected_count)
 
@@ -288,12 +292,12 @@ class IndexingTest(EmptySolrTestCase):
         # Save a docket to the backend using coalescing
 
         test_dir = (
-            Path(settings.INSTALL_ROOT)
-            / "cl"
-            / "assets"
-            / "media"
-            / "test"
-            / "search"
+                Path(settings.INSTALL_ROOT)
+                / "cl"
+                / "assets"
+                / "media"
+                / "test"
+                / "search"
         )
         self.att_filename = "fake_document.html"
         fake_path = os.path.join(test_dir, self.att_filename)
@@ -586,7 +590,7 @@ class SearchTest(IndexedSolrTestCase):
             r.content.decode().index(most_cited_name)
             < r.content.decode().index(less_cited_name),
             msg="'%s' should come BEFORE '%s' when ordered by descending "
-            "citeCount." % (most_cited_name, less_cited_name),
+                "citeCount." % (most_cited_name, less_cited_name),
         )
 
         r = self.client.get("/", {"q": "*", "order_by": "citeCount asc"})
@@ -594,7 +598,7 @@ class SearchTest(IndexedSolrTestCase):
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
             msg="'%s' should come AFTER '%s' when ordered by ascending "
-            "citeCount." % (most_cited_name, less_cited_name),
+                "citeCount." % (most_cited_name, less_cited_name),
         )
 
     def test_random_ordering(self) -> None:
@@ -647,7 +651,7 @@ class SearchTest(IndexedSolrTestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+                "case name. Expected %s, but got %s." % (expected, actual),
         )
 
     def test_oa_jurisdiction_filtering(self) -> None:
@@ -661,7 +665,7 @@ class SearchTest(IndexedSolrTestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+                "jurisdiction. Expected %s, but got %s." % (actual, expected),
         )
 
     def test_oa_date_argued_filtering(self) -> None:
@@ -694,7 +698,7 @@ class SearchTest(IndexedSolrTestCase):
             'id="homepage"',
             response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
-            "load the homepage",
+                "load the homepage",
         )
 
     def test_fail_gracefully(self) -> None:
@@ -911,7 +915,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             result_count,
             num_expected,
             msg="Found %s items, but should have found %s if the items were "
-            "grouped properly." % (result_count, num_expected),
+                "grouped properly." % (result_count, num_expected),
         )
 
 
@@ -942,10 +946,10 @@ class JudgeSearchTest(IndexedSolrTestCase):
             got,
             expected_count,
             msg="Did not get the right number of search results with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+                "filter applied.\n"
+                "Expected: %s\n"
+                "     Got: %s\n\n"
+                "Params were: %s" % (field_name, expected_count, got, params),
         )
 
     def test_name_field(self) -> None:
@@ -1093,7 +1097,7 @@ class FeedTest(IndexedSolrTestCase):
                 actual_count,
                 expected_count,
                 msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
+                    "Instead found: %s" % (expected_count, test, actual_count),
             )
 
 
@@ -1123,7 +1127,7 @@ class JurisdictionFeedTest(TestCase):
         self.pdf_item.update(
             {
                 "local_path": "pdf/2013/06/12/"
-                + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
+                              + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
             }
         )
         self.null_item = self.good_item.copy()
@@ -1207,7 +1211,7 @@ class PagerankTest(TestCase):
             self.assertTrue(
                 abs(pr_results[key] - value) < 0.0001,
                 msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key]),
+                    "%s" % (key, pr_results[key], answers[key]),
             )
 
 
@@ -1689,13 +1693,12 @@ class ElasticSearchTest(TestCase):
         """
         Create and populate the Elasticsearch index and mapping
         """
-        args = [
-            "--rebuild",
-        ]
-        call_command("search_index", "--rebuild")
+
+        # -f rebuilds index without prompt for confirmation
+        call_command("search_index", "--rebuild", "-f")
 
     def setUp(self) -> None:
-        # Data from make_dev_data commmand
+        # Dev data from make_dev_data commmand
         self.docket = Docket.objects.create(
             case_name="Peck, Williams and Freeman v. Stephens",
             court_id="test",
@@ -1704,6 +1707,15 @@ class ElasticSearchTest(TestCase):
             docket_number_core="9835856",
             pacer_case_id="272262",
         )
+        self.docket2 = Docket.objects.create(
+            case_name="Riley v. Brewer-Hall",
+            court_id="test",
+            source=Docket.DEFAULT,
+            docket_number="6:56-cv-46383",
+            docket_number_core="5646383",
+            pacer_case_id="190961",
+        )
+
         self.oc = OpinionCluster.objects.create(
             case_name="Peck, Williams and Freeman v. Stephens",
             case_name_short="Stephens",
@@ -1713,8 +1725,21 @@ class ElasticSearchTest(TestCase):
             precedential_status="Published",
         )
 
+        self.oc2 = OpinionCluster.objects.create(
+            case_name="Riley v. Brewer-Hall",
+            case_name_short="Riley",
+            docket=self.docket2,
+            date_filed=date(1976, 8, 30),
+            source="H",
+            precedential_status="Published",
+        )
+
         self.person = Person.objects.create(
             name_first="Sharon Navarro", name_last="Carpenter", gender=FEMALE
+        )
+
+        self.person2 = Person.objects.create(
+            name_first="Heidi Wheeler", name_last="Zimmerman", gender=FEMALE
         )
 
         self.o = Opinion.objects.create(
@@ -1722,10 +1747,31 @@ class ElasticSearchTest(TestCase):
             author=self.person,
             type="Plurality Opinion",
             sha1="6872c55064015d816e51a653241f38d35e78a02a",
-            plain_text="Compare recently always material authority. Drug water population letter. Property probably "
-            "soon add product. Mind happy although interesting pretty pattern represent. Administration "
-            "either short special artist. Skin yet member fish describe which recognize. Assume rock "
-            "everything phone similar wear. Example speak free sort.",
+            plain_text="Compare recently always material authority. Drug water "
+                       "population letter. Property probably soon add product. Mind "
+                       "happy although interesting pretty pattern represent. "
+                       "Administration either short special artist. Skin yet member "
+                       "fish describe which recognize. Assume rock everything phone "
+                       "similar wear. Example speak free sort.",
+            per_curiam=False,
+            extracted_by_ocr=True,
+        )
+
+        self.o2 = Opinion.objects.create(
+            cluster=self.oc2,
+            author=self.person2,
+            type="Concurrence Opinion",
+            sha1="c65b4add5c2e7147503ebeb783c5fba55705e376",
+            plain_text="Trip modern talk experience fight final low. Director say "
+                       "green support bag international kind easy. Now name to."
+                       "Morning summer finish money school hundred. Sense heavy then "
+                       "early however. Poor charge energy before particularly. Safe "
+                       "agent vote base capital old something attack. Soldier "
+                       "beautiful thank billion believe realize. Plant support here "
+                       "operation stop fly. Middle through onto under up visit time. "
+                       "Class experience identify significant.",
+            per_curiam=True,
+            extracted_by_ocr=True,
         )
 
         self.p = Parenthetical.objects.create(
@@ -1736,17 +1782,36 @@ class ElasticSearchTest(TestCase):
             score=0.3236,
         )
 
+        self.p2 = Parenthetical.objects.create(
+            describing_opinion=self.o2,
+            described_opinion=self.o2,
+            group=None,
+            text="Together friend conference end different such.",
+            score=0.318,
+        )
+
         self.pg = ParentheticalGroup.objects.create(
             opinion=self.o, representative=self.p, score=0.3236, size=1
         )
 
+        self.pg2 = ParentheticalGroup.objects.create(
+            opinion=self.o2, representative=self.p2, score=0.318, size=1
+        )
+
+        # Set parenthetical group
         self.p.group = self.pg
         self.p.save()
+        self.p2.group = self.pg2
+        self.p2.save()
 
         self.rebuild_index()
 
-    def test_search_1(self) -> None:
+    # Notes:
+    # "term" Returns documents that contain an exact term in a provided field.
+    # "match" Returns documents that match a provided text, number, date or boolean
+    # value. The provided text is analyzed before matching.
 
+    def test_search_1(self) -> None:
         # {'query': {'bool': {'filter': [{'term': {'text': 'responsibility'}}]}}}
         s = ParentheticalDocument.search().filter(
             "term", text="responsibility"
@@ -1779,3 +1844,97 @@ class ElasticSearchTest(TestCase):
         print(s4.to_dict())
         print(s4.count())
         self.assertEqual(s4.count(), 0)
+
+    def test_filter_1(self) -> None:
+        """ Test with one filter """
+        s1 = ParentheticalDocument.search().filter(
+            "term", describing_opinion_per_curiam=True
+        )
+        print(s1.to_dict())
+        print(s1.count())
+        self.assertEqual(s1.count(), 1)
+
+    def test_filter_2(self) -> None:
+        """ Test two filters """
+        filters = []
+
+        filters.append(Q("match", describing_opinion_extracted_by_ocr=True))
+        filters.append(Q("match", describing_opinion_per_curiam=True))
+
+        # {'query': {'bool': {'filter': [{'bool': {'must': [{'match': {'describing_opinion_extracted_by_ocr': True}}, {'match': {'describing_opinion_per_curiam': True}}]}}]}}}
+        s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s1.to_dict())
+        print(s1.count())
+        self.assertEqual(s1.count(), 2)
+
+    def test_filter_search(self) -> None:
+        """ Test filtering and search the same time """
+        filters = []
+
+        filters.append(Q("match", plain_text="experience"))
+        filters.append(Q("match", describing_opinion_extracted_by_ocr=True))
+        filters.append(Q("match", describing_opinion_per_curiam=True))
+
+        s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s1.to_dict())
+        print(s1.count())
+        self.assertEqual(s1.count(), 2)
+
+    def test_filter_daterange(self) -> None:
+        """ Test filter by date range"""
+        filters = []
+        date_gte = "1976-08-30T00:00:00Z"
+        date_lte = "1978-03-10T00:00:00Z"
+
+        filters.append(Q("range",
+                         describing_opinion_cluster_docket_date_filed={"gte": date_gte,
+                                                                       "lte": date_lte}))
+        filters.append(Q("range",
+                         described_opinion_cluster_docket_date_filed={"gte": date_gte,
+                                                                      "lte": date_lte}))
+
+        # {'query': {'bool': {'filter': [{'bool': {'must': [{'range': {'describing_opinion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}, {'range': {'described_opinion_cluster_docket_date_filed':
+        #  {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}]}}]}}}
+        s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s1.to_dict())
+        print(s1.count())
+        self.assertEqual(s1.count(), 2)
+
+    def test_filter_search_2(self) -> None:
+        """ Test filtering date range and search the same time """
+        filters = []
+        date_gte = "1976-08-30T00:00:00Z"
+        date_lte = "1978-03-10T00:00:00Z"
+
+        filters.append(Q("match", text="friend"))
+        filters.append(Q("range",
+                         describing_opinion_cluster_docket_date_filed={"gte": date_gte,
+                                                                       "lte": date_lte}))
+        filters.append(Q("range",
+                         described_opinion_cluster_docket_date_filed={"gte": date_gte,
+                                                                      "lte": date_lte}))
+
+        # {'query': {'bool': {'filter': [{'bool': {'must': [{'match': {'text': 'friend'}}, {'range': {'describing_opinion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}, {'range': {'described_opin
+        # ion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}]}}]}}}
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 1)
+
+    def test_ordering(self) -> None:
+        """ Test filter and then ordering by descending
+        describing_opinion_cluster_docket_date_filed"""
+        filters = []
+        date_gte = "1976-08-30T00:00:00Z"
+        date_lte = "1978-03-10T00:00:00Z"
+
+        filters.append(Q("range",
+                         describing_opinion_cluster_docket_date_filed={"gte": date_gte,
+                                                                       "lte": date_lte}))
+
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters)).sort(
+            "-describing_opinion_cluster_docket_date_filed")
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.execute()[0].describing_opinion_cluster_docket_date_filed,
+                         datetime.datetime(1978, 3, 10, 0, 0))

@@ -94,7 +94,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
 
 
 def do_search(
-    get_params, rows=20, override_params=None, facet=True, cache_key=None
+        get_params, rows=20, override_params=None, facet=True, cache_key=None
 ):
     """Do all the difficult solr work.
 
@@ -282,12 +282,13 @@ def get_homepage_stats():
         "visualizations": SCOTUSMap.objects.filter(
             published=True, deleted=False
         )
-        .annotate(Count("clusters"))
-        .filter(
+                              .annotate(Count("clusters"))
+                              .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-        .order_by("-date_published", "-date_modified", "-date_created")[:1],
+                              .order_by("-date_published", "-date_modified",
+                                        "-date_created")[:1],
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
@@ -471,6 +472,13 @@ def advanced(request: HttpRequest) -> HttpResponse:
             cache_key="opinion-homepage-results",
         )
         render_dict.update(o_results)
+        render_dict["search_form"] = SearchForm({"type": obj_type})
+        return render(request, "advanced.html", render_dict)
+    elif request.path == reverse("advanced_op"):
+        obj_type = SEARCH_TYPES.OPINION_PARENTHETICAL
+
+        # TODO perform ES search
+
         render_dict["search_form"] = SearchForm({"type": obj_type})
         return render(request, "advanced.html", render_dict)
     else:

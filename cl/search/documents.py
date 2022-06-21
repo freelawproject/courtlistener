@@ -10,19 +10,29 @@ from django_elasticsearch_dsl.registries import registry
 
 @registry.register_document
 class ParentheticalDocument(Document):
-    # Index nested fields
-    # describing_opinion = fields.ObjectField(properties={
-    #     "author_str": fields.TextField()
-    # })
-    #
-    # group = fields.ObjectField(properties={
-    #     "size": fields.IntegerField()
-    # })
+    describing_opinion_id = fields.IntegerField(attr="describing_opinion_id")
+    describing_opinion_type = fields.TextField(attr="describing_opinion.type")
+    describing_opinion_autor_id = fields.IntegerField(
+        attr="describing_opinion.author_id")
+    describing_opinion_cluster_id = fields.IntegerField(
+        attr="describing_opinion.cluster_id")
+    describing_opinion_cluster_docket_id = fields.IntegerField(
+        attr="describing_opinion.cluster.docket_id")
+    describing_opinion_cluster_docket_date_filed = fields.DateField(
+        attr="describing_opinion.cluster.date_filed")
 
-    # Index only ids
-    describing_opinion = fields.IntegerField(attr="describing_opinion_id")
-    described_opinion = fields.IntegerField(attr="described_opinion_id")
-    group = fields.IntegerField(attr="group_id")
+    described_opinion_id = fields.IntegerField(attr="described_opinion_id")
+    described_opinion_type = fields.TextField(attr="described_opinion.type")
+    described_opinion_autor_id = fields.IntegerField(
+        attr="described_opinion.author_id")
+    described_opinion_cluster_id = fields.IntegerField(
+        attr="described_opinion.cluster_id")
+    described_opinion_cluster_docket_id = fields.IntegerField(
+        attr="described_opinion.cluster.docket_id")
+    described_opinion_cluster_docket_date_filed = fields.DateField(
+        attr="described_opinion.cluster.date_filed")
+
+    group_id = fields.IntegerField(attr="group_id")
 
     class Index:
         # Name of Elasticsearch index
@@ -32,21 +42,6 @@ class ParentheticalDocument(Document):
     class Django:
         model = Parenthetical
         fields = [
-            # "describing_opinion",
-            # "described_opinion",
             "text",
             "score",
         ]
-
-    #     # Ensure Parenthetical will be re-saved when Opinion or ParentheticalGroup is updated
-    #     related_models = [Opinion, ParentheticalGroup]
-    #
-    # def get_instances_from_related(self, related_instance):
-    #     """If related_models is set, define how to retrieve the Car instance(s) from the related model.
-    #     The related_models option should be used with caution because it can lead in the index
-    #     to the updating of a lot of items.
-    #     """
-    #     if isinstance(related_instance, Opinion):
-    #         return related_instance.opinion_set.all()
-    #     elif isinstance(related_instance, Ad):
-    #         return related_instance.car
