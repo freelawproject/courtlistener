@@ -68,33 +68,36 @@ def make_alert_messages(
     email_addresses_list = list(email_addresses) + recap_email_recipients
     for email_address in email_addresses_list:
         if email_address in recap_email_recipients:
+            # If the email_address is a @recap.email address we need to get the
+            # actual user's email address and check if exists a DocketAlert
+            # for this case-user
             user_profile = UserProfile.objects.get(recap_email=email_address)
-            # Override user's @recap.email with the actual user's email address
             email_address = user_profile.user.email
             docket_alert_exist = DocketAlert.objects.filter(
-                docket_id=d, user_id=user_profile.user.pk
+                docket=d, user=user_profile.user
             ).exists()
-            # If a docket alert exists for this @recap.email user, avoid
-            # sending the first email.
             if docket_alert_exist:
+                # If a docket alert exists for this @recap.email user, avoid
+                # sending the first email
                 continue
             first_email = True
             if user_profile.auto_subscribe:
                 # First time recipient, auto_subscribe True
                 auto_subscribe = True
                 docket_alert = DocketAlert.objects.create(
-                    docket=d, user_id=user_profile.user.pk
+                    docket=d, user=user_profile.user
                 )
             else:
                 # First time recipient, auto_subscribe False
                 auto_subscribe = False
                 docket_alert = DocketAlert.objects.create(
                     docket=d,
-                    user_id=user_profile.user.pk,
+                    user=user_profile.user,
                     alert_type=DocketAlert.UNSUBSCRIPTION,
                 )
         else:
-            # Not a recap email recipient
+            # Options for users that already have an active subscription for
+            # this case
             first_email = auto_subscribe = False
             user = User.objects.get(email=email_address)
             docket_alert = DocketAlert.objects.get(docket=d, user=user)

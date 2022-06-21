@@ -2289,6 +2289,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 3)
         message_sent = mail.outbox[2]
         self.assertIn("[Unsubscribed]", message_sent.subject)
+
+
 class CheckCourtConnectivityTest(TestCase):
     """Test the is_pacer_court_accessible method."""
 
