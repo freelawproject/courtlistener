@@ -1940,3 +1940,14 @@ class ElasticSearchTest(TestCase):
         print(s.count())
         self.assertEqual(s.execute()[0].describing_opinion_cluster_docket_date_filed,
                          datetime.datetime(1978, 3, 10, 0, 0))
+
+    def test_build(self) -> None:
+        filters = []
+        date_gte = "1976-08-30T00:00:00Z"
+        date_lte = "1978-03-10T00:00:00Z"
+        filters.append(Q("range", **{"described_opinion_cluster_docket_date_filed": {"gte": date_gte, "lte": date_lte}}))
+        filters.append(Q("range", **{"described_opinion_cluster_docket_date_filed": {"lte": date_lte}}))
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 10)

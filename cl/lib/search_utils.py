@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.cache import cache, caches
 from django.http import HttpRequest, QueryDict
 from django_elasticsearch_dsl import Document
+from elasticsearch_dsl import Q
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from scorched.response import SolrResponse
@@ -1237,6 +1238,31 @@ def get_mlt_query(
     )
 
     return si.mlt_query(hl_fields).add_extra(**q)
+
+
+def build_range_query(field: str, before: datetime, after: datetime) -> Union[Q, None]:
+    """Given the cleaned data from a form, return a Elastic Search range query or
+    None"""
+    params = {}
+    if any([before, after]):
+        if hasattr(after, "strftime"):
+            params["gte"] = f"{after.isoformat()}T00:00:00Z"
+        if hasattr(before, "strftime"):
+            params["lte"] = f"{before.isoformat()}T00:00:00Z"
+
+    print("params", params)
+    if params:
+        return Q("range", **{field: params})
+
+    return None
+
+
+def build_string_query(field: str, value: str, query: str = "match") -> Union[Q, None]:
+    """Given the cleaned data from a form, return a Elastic Search string query or
+    None"""
+    if value:
+        return Q(query, **{field: value})
+    return None
 
 
 def get_es_query(doc: Document, cd: CleanData):
