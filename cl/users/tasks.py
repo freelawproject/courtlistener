@@ -7,7 +7,8 @@ from celery import Task
 from django.conf import settings
 
 from cl.celery_init import app
-from cl.users.models import STATUS_TYPES, FailedEmail
+from cl.users.email_handlers import schedule_failed_email
+from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
 def send_failed_email(
     self: Task,
     failed_pk: int,
-) -> int:
+) -> None:
     """Task to retry failed email messages"""
 
     failed_email = FailedEmail.objects.get(pk=failed_pk)
@@ -98,3 +99,35 @@ def send_failed_email(
             raise self.retry(exc=exc)
         failed_email.status = STATUS_TYPES.SUCCESSFUL
         failed_email.save()
+
+
+@app.task
+def check_recipient_deliverability(
+    recipient: str,
+    backoff_prev_counter: int,
+) -> None:
+    """This task checks if the recipient's email address is deliverable, it
+    works by verifying if the backoff event retry counter was updated since the
+    task was scheduled if so it means that it came in a new bounce event for
+    the recipient, otherwise it means that the recipient is deliverable,
+    so the backoff event is deleted and the waiting failed emails are scheduled
+    to be sent.
+
+    :param recipient: The recipient email address
+    :param backoff_prev_counter: The previous backoff event retry counter
+    :return: None
+    """
+
+    backoff_event = EmailFlag.objects.filter(
+        email_address=recipient, flag_type=FLAG_TYPES.BACKOFF
+    )
+    if not backoff_event.exists():
+        schedule_failed_email(recipient)
+        return
+
+    if backoff_event.last().retry_counter == backoff_prev_counter:
+        # There wasn't a new bounce after the last retry, seems that the
+        # recipient accepted the email, so we can delete the backoff event and
+        # schedule the waiting failed emails to be sent.
+        backoff_event.delete()
+        schedule_failed_email(recipient)
