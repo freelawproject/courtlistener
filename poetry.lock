@@ -608,7 +608,7 @@ redis = "<4.0"
 
 [[package]]
 name = "django-ses"
-version = "3.0.1"
+version = "3.1.0"
 description = "A Django email backend for Amazon's Simple Email Service"
 category = "main"
 optional = false
@@ -1733,7 +1733,7 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.17"
+version = "3.2.19"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
@@ -2166,7 +2166,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "b93cfcf2c1aba1bee9b9706ad905bc0547a2b3a1c77a90be9fe0c73fb32bf665"
+content-hash = "984a68c95ab1a6cb4d93dc2813bb2dfac3520d70dd51a9493dbf03842f822e8d"
 
 [metadata.files]
 amqp = [
@@ -2496,8 +2496,8 @@ django-redis-cache = [
     {file = "django-redis-cache-3.0.0.tar.gz", hash = "sha256:9a2eebef421d996a82098a19d17ff6b321265cd73178fa398913019764e8394a"},
 ]
 django-ses = [
-    {file = "django-ses-3.0.1.tar.gz", hash = "sha256:f2d1aa805bfbbc4d5e73e4a0e7399287bac426b45689e3fd15810793986a89ed"},
-    {file = "django_ses-3.0.1-py3-none-any.whl", hash = "sha256:0c11df1fd51e631ce70ccc2faf676f2538f433516bd04e7eca20d815885a0bac"},
+    {file = "django-ses-3.1.0.tar.gz", hash = "sha256:e16103b9cebe9e573e09cc6db79f7e6b0a8a315b5dad32a627d95ad2e12c3810"},
+    {file = "django_ses-3.1.0-py3-none-any.whl", hash = "sha256:25a2c718305ad6437f45c6c3cc696ea1899f71c49ce4c0dd4cafd38ab2216667"},
 ]
 django-storages = [
     {file = "django-storages-1.11.1.tar.gz", hash = "sha256:c823dbf56c9e35b0999a13d7e05062b837bae36c518a40255d522fbe3750fbb4"},
@@ -3308,8 +3308,8 @@ regex = [
     {file = "regex-2022.1.18.tar.gz", hash = "sha256:97f32dc03a8054a4c4a5ab5d761ed4861e828b2c200febd4e46857069a483916"},
 ]
 reporters-db = [
-    {file = "reporters-db-3.2.17.tar.gz", hash = "sha256:f773d18ce43bc0ecfc97c1ce56fc3c921c3bf15dc0148bfba912900dda1cd01b"},
-    {file = "reporters_db-3.2.17-py2.py3-none-any.whl", hash = "sha256:d2c1fe05a25ffc549d30d07e00f3073c5b48dde06961b875aafd8502c024ec2f"},
+    {file = "reporters-db-3.2.19.tar.gz", hash = "sha256:864b5c0bdba7c4b4ba00626a761ea9ca2c89340a357b4768157943ed252dce18"},
+    {file = "reporters_db-3.2.19-py2.py3-none-any.whl", hash = "sha256:62b5e9783d2aa8748b514a4d3482958850ab8a2197950e1eb2e40beb0e3ea9d5"},
 ]
 requests = [
     {file = "requests-2.27.1-py2.py3-none-any.whl", hash = "sha256:f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d"},
