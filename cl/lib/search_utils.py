@@ -1,6 +1,6 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast, Type
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -887,6 +887,7 @@ def build_main_query(
     add_grouping(main_params, cd, group)
 
     print_params(main_params)
+    print('main_params', main_params)
     return main_params
 
 
@@ -1240,31 +1241,103 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def build_range_query(field: str, before: datetime, after: datetime) -> Union[Q, None]:
-    """Given the cleaned data from a form, return a Elastic Search range query or
-    None"""
+def build_range_query(field: str, less: int, greater: int,
+                      less_than_equal: bool = True,
+                      greater_than_equal: bool = True,
+                      relation: Optional[str] = None) -> List:
+    """Given field name and range limits, returns ElasticSearch range query
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
+    :param field: elasticsearch index fieldname
+    :param less: upper limit
+    :param greater: lower limit
+    :param less_than_equal: True to set less than or equal to
+    :param greater_than_equal: True to set greater than or equal to
+    :param relation: Indicates how the range query matches values for range fields
+    :return: Empty list or list with DSL Range query
+    """
+    params = {}
+    if any([less, greater]):
+        if less:
+            params["lte" if less_than_equal else "lt"] = less
+        if greater:
+            params["gte" if greater_than_equal else "gt"] = greater
+        if relation is not None:
+            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+            assert relation in allowed_relations, f"'{relation}' is not an allowed relation."
+            params["relation"] = relation
+
+    if params:
+        return [Q("range", **{field: params})]
+
+    return []
+
+
+def build_daterange_query(field: str, before: datetime, after: datetime,
+                          relation: Optional[str] = None) -> List:
+    """Given field name and date range limits returns ElasticSearch range query or None
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
+    :param field: elasticsearch index fieldname
+    :param before: datetime upper limit
+    :param after: datetime lower limit
+    :param relation: Indicates how the range query matches values for range fields
+    :return: Empty list or list with DSL Range query
+    """
     params = {}
     if any([before, after]):
         if hasattr(after, "strftime"):
-            params["gte"] = f"{after.isoformat()}T00:00:00Z"
+            params["gte"] = f"{after.date().isoformat()}T00:00:00Z"
         if hasattr(before, "strftime"):
-            params["lte"] = f"{before.isoformat()}T00:00:00Z"
+            params["lte"] = f"{before.date().isoformat()}T23:59:59Z"
+        if relation is not None:
+            allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
+            assert relation in allowed_relations, f"'{relation}' is not an allowed relation."
+            params["relation"] = relation
 
-    print("params", params)
     if params:
-        return Q("range", **{field: params})
+        return [Q("range", **{field: params})]
 
-    return None
+    return []
 
 
-def build_string_query(field: str, value: str, query: str = "match") -> Union[Q, None]:
-    """Given the cleaned data from a form, return a Elastic Search string query or
-    None"""
+def build_fulltext_query(field: str, value: str, query: str = "match") -> List:
+    """Given the cleaned data from a form, return a Elastic Search string query or []
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
+    """
+    queries = ["match", "match_phrase", "query_string"]
+    assert query in queries, f"'{query}' is not an allowed query."
     if value:
-        return Q(query, **{field: value})
-    return None
+        return [Q(query, **{field: value})]
+    return []
 
 
-def get_es_query(doc: Document, cd: CleanData):
-    # TODO convert cleaned data to ES query
-    pass
+def build_term_query(field: str, value: str) -> List:
+    """Given field name and value, return Elastic Search term query or [].
+    Use it only whe you want an exact match, avoid using this with text fields
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
+    @param field: elasticsearch index fieldname
+    @param value: term to find
+    @return: Empty list or list with DSL Match query
+    """
+    if value:
+        return [Q("term", **{field: value})]
+    return []
+
+
+def build_es_queries(cd: CleanData) -> List:
+    queries_list = []
+
+    # Build daterange query
+    q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
+                               cd.get("filed_before"), cd.get("filed_after"))
+    queries_list.extend(q1)
+    q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
+                               cd.get("filed_before"), cd.get("filed_after"))
+    queries_list.extend(q2)
+
+    # Build text query
+    q3 = build_fulltext_query("text", cd.get("q", "*"))
+    queries_list.extend(q3)
+
+    print('queries_list', queries_list)
+
+    return queries_list

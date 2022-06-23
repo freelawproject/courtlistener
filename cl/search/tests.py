@@ -24,7 +24,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
-from cl.lib.search_utils import cleanup_main_query
+from cl.lib.search_utils import cleanup_main_query, build_daterange_query, \
+    build_fulltext_query, build_es_queries
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -1701,9 +1702,24 @@ class ElasticSearchTest(TestCase):
 
     def setUp(self) -> None:
         # Dev data from make_dev_data commmand
+        self.c1 = Court.objects.create(id="tsoyd", position=811.2506,
+                                       short_name="District court of the Medical Worries",
+                                       full_name="Appeals court for the Eruptanyom",
+                                       jurisdiction="I")
+
+        self.c2 = Court.objects.create(id="djmfd", position=294.3326,
+                                       short_name="Superior court of the Dirty Dishes",
+                                       full_name="Superior court for the dragons",
+                                       jurisdiction="I")
+
+        self.c3 = Court.objects.create(id="dopad", position=610.7101,
+                                       short_name="Thirteenth circuit of the Medical Worries",
+                                       full_name="District court of the Zoo",
+                                       jurisdiction="FBP")
+
         self.docket = Docket.objects.create(
             case_name="Peck, Williams and Freeman v. Stephens",
-            court_id="test",
+            court_id="tsoyd",
             source=Docket.DEFAULT,
             docket_number="1:98-cr-35856",
             docket_number_core="9835856",
@@ -1711,11 +1727,20 @@ class ElasticSearchTest(TestCase):
         )
         self.docket2 = Docket.objects.create(
             case_name="Riley v. Brewer-Hall",
-            court_id="test",
+            court_id="djmfd",
             source=Docket.DEFAULT,
             docket_number="6:56-cv-46383",
             docket_number_core="5646383",
             pacer_case_id="190961",
+        )
+
+        self.docket3 = Docket.objects.create(
+            case_name="Smith v. Herrera",
+            court_id="dopad",
+            source=Docket.DEFAULT,
+            docket_number="7:46-bk-35707",
+            docket_number_core="4635707",
+            pacer_case_id="132140",
         )
 
         self.oc = OpinionCluster.objects.create(
@@ -1736,12 +1761,25 @@ class ElasticSearchTest(TestCase):
             precedential_status="Published",
         )
 
+        self.oc3 = OpinionCluster.objects.create(
+            case_name="Smith v. Herrera",
+            case_name_short="Herrera",
+            docket=self.docket3,
+            date_filed=date(1981, 7, 11),
+            source="LC",
+            precedential_status="Published",
+        )
+
         self.person = Person.objects.create(
             name_first="Sharon Navarro", name_last="Carpenter", gender=FEMALE
         )
 
         self.person2 = Person.objects.create(
             name_first="Heidi Wheeler", name_last="Zimmerman", gender=FEMALE
+        )
+
+        self.person3 = Person.objects.create(
+            name_first="Emma Cabrera", name_last="Schmidt", gender=FEMALE
         )
 
         self.o = Opinion.objects.create(
@@ -1776,6 +1814,21 @@ class ElasticSearchTest(TestCase):
             extracted_by_ocr=True,
         )
 
+        self.o3 = Opinion.objects.create(
+            cluster=self.oc3,
+            author=self.person3,
+            type="In Part Opinion",
+            sha1="a729cdae5a1d25890927d249d18edb917dcf7b95",
+            plain_text="Help place late theory recognize peace official. Debate until "
+                       "under street whole term. Beyond family because possible cover "
+                       "most. Those realize lose treatment. Often data pretty heart. "
+                       "Different goal he whose traditional like. Key throughout "
+                       "subject start race cell carry operation. Campaign imagine "
+                       "first agent head weight including. ",
+            per_curiam=False,
+            extracted_by_ocr=True,
+        )
+
         self.p = Parenthetical.objects.create(
             describing_opinion=self.o,
             described_opinion=self.o,
@@ -1792,6 +1845,14 @@ class ElasticSearchTest(TestCase):
             score=0.318,
         )
 
+        self.p3 = Parenthetical.objects.create(
+            describing_opinion=self.o3,
+            described_opinion=self.o3,
+            group=None,
+            text="Necessary drug realize matter provide.",
+            score=0.1578,
+        )
+
         self.pg = ParentheticalGroup.objects.create(
             opinion=self.o, representative=self.p, score=0.3236, size=1
         )
@@ -1800,11 +1861,17 @@ class ElasticSearchTest(TestCase):
             opinion=self.o2, representative=self.p2, score=0.318, size=1
         )
 
+        self.pg3 = ParentheticalGroup.objects.create(
+            opinion=self.o3, representative=self.p3, score=0.1578, size=1
+        )
+
         # Set parenthetical group
         self.p.group = self.pg
         self.p.save()
         self.p2.group = self.pg2
         self.p2.save()
+        self.p3.group = self.pg3
+        self.p3.save()
 
         self.rebuild_index()
 
@@ -1886,7 +1953,7 @@ class ElasticSearchTest(TestCase):
         """ Test filter by date range"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T00:00:00Z"
+        date_lte = "1978-03-10T23:59:59Z"
 
         filters.append(Q("range",
                          describing_opinion_cluster_docket_date_filed={"gte": date_gte,
@@ -1906,7 +1973,7 @@ class ElasticSearchTest(TestCase):
         """ Test filtering date range and search the same time """
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T00:00:00Z"
+        date_lte = "1978-03-10T23:59:59Z"
 
         filters.append(Q("match", text="friend"))
         filters.append(Q("range",
@@ -1928,7 +1995,7 @@ class ElasticSearchTest(TestCase):
         describing_opinion_cluster_docket_date_filed"""
         filters = []
         date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T00:00:00Z"
+        date_lte = "1978-03-10T23:59:59Z"
 
         filters.append(Q("range",
                          describing_opinion_cluster_docket_date_filed={"gte": date_gte,
@@ -1941,13 +2008,36 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(s.execute()[0].describing_opinion_cluster_docket_date_filed,
                          datetime.datetime(1978, 3, 10, 0, 0))
 
-    def test_build(self) -> None:
+    def test_build_daterange_query(self) -> None:
         filters = []
-        date_gte = "1976-08-30T00:00:00Z"
-        date_lte = "1978-03-10T00:00:00Z"
-        filters.append(Q("range", **{"described_opinion_cluster_docket_date_filed": {"gte": date_gte, "lte": date_lte}}))
-        filters.append(Q("range", **{"described_opinion_cluster_docket_date_filed": {"lte": date_lte}}))
+        date_gte = datetime.datetime(1976, 8, 30, 0, 0)
+        date_lte = datetime.datetime(1978, 3, 10, 0, 0)
+
+        q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
+                                   date_lte, date_gte)
+        filters.extend(q1)
+
         s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s.to_dict())
         print(s.count())
-        self.assertEqual(s.count(), 10)
+        self.assertEqual(s.count(), 2)
+
+    def test_build_fulltext_query(self) -> None:
+        filters = []
+        q1 = build_fulltext_query("text", "responsibility")
+        filters.extend(q1)
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 1)
+
+    def test_cd_query(self) -> None:
+        cd = {"filed_after": datetime.datetime(1976, 8, 30, 0, 0),
+              "filed_before": datetime.datetime(1978, 3, 10, 0, 0),
+              "q": "responsibility"}
+
+        filters = build_es_queries(cd)
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 1)

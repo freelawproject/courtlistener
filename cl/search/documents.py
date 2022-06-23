@@ -20,6 +20,8 @@ class ParentheticalDocument(Document):
         attr="describing_opinion.cluster.docket_id")
     describing_opinion_cluster_docket_date_filed = fields.DateField(
         attr="describing_opinion.cluster.date_filed")
+    describing_opinion_cluster_docket_court_id= fields.TextField(
+        attr="describing_opinion.cluster.docket.court.pk")
 
     described_opinion_id = fields.IntegerField(attr="described_opinion_id")
     described_opinion_type = fields.TextField(attr="described_opinion.type")
@@ -31,6 +33,8 @@ class ParentheticalDocument(Document):
         attr="described_opinion.cluster.docket_id")
     described_opinion_cluster_docket_date_filed = fields.DateField(
         attr="described_opinion.cluster.date_filed")
+    described_opinion_cluster_docket_court_id = fields.TextField(
+        attr="described_opinion.cluster.docket.court.pk")
 
     group_id = fields.IntegerField(attr="group_id")
 
