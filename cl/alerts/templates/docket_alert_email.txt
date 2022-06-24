@@ -20,7 +20,8 @@ Buy Docket on PACER: {{ docket.pacer_url }}
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}
 Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
 {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
-Download PDF from RECAP: {{ rd.filepath_local.url }}{% endif %}{% if rd.pacer_url %}
+Download PDF from RECAP: {{ rd.filepath_local.url }}{% else %}
+Download PDF from RECAP if it's available: https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True{% endif %}{% if rd.pacer_url %}
 Buy PDF from PACER: {{ rd.pacer_url }}{% endif %}{% endif %}
 {% endfor %}{% endfor %}
 

@@ -427,6 +427,18 @@ def view_recap_document(
             document_number=doc_num,
             attachment_number=att_num,
         ).order_by("pk")[0]
+
+        # Check if the user has requested automatic redirection to the document
+        rd_download_redirect = request.GET.get("redirect_to_download", False)
+        if rd_download_redirect:
+            # Check if the document is available from CourtListener and
+            # if it is, redirect to the local document
+            # if it isn't, redirect to PACER if pacer_url is available
+            if rd.is_available:
+                return HttpResponseRedirect(rd.filepath_local.url)
+            else:
+                if rd.pacer_url:
+                    return HttpResponseRedirect(rd.pacer_url)
     except IndexError:
         raise Http404("No RECAPDocument matches the given query.")
 
