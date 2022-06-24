@@ -7,6 +7,11 @@ register = template.Library()
 
 @register.filter
 def price(rd: RECAPDocument) -> str:
+    """Calculate the PACER price for the document.
+
+    :param rd: The RECAPDocument object.
+    :return: The document PACER price.
+    """
     if rd.is_free_on_pacer:
         return "0.00"
 
@@ -18,6 +23,11 @@ def price(rd: RECAPDocument) -> str:
 
 @register.filter
 def pacerdash_price(rd: RECAPDocument) -> str:
+    """Calculate the PACERDash price for the document.
+
+    :param rd: The RECAPDocument object.
+    :return: The document PacerDash price.
+    """
     if rd.is_free_on_pacer:
         return "0.00"
 

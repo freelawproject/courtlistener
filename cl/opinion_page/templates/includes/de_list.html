@@ -99,10 +99,10 @@
                                 {% endif %}
                                 target="_blank"
                                 rel="nofollow">
-                                  {% if rd|price != "0.00" %}Buy on PACER{% else %}From PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                                  {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
                               </a>
                           </li>
-                          {% if rd.pacerdash_url and rd|price != "0.00" %}
+                          {% if rd.pacerdash_url and not rd.is_free_on_pacer %}
                             <li>
                                 <a href="{{ rd.pacerdash_url }}"
                                 target="_blank"

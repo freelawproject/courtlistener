@@ -1187,15 +1187,19 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 )
 
     @property
-    def pacerdash_url(self) -> str:
-        """Construct the PacerDash URL, if we can. Else, return None."""
+    def pacerdash_url(self) -> str | None:
+        """Construct the PacerDash URL, if we can.
 
-        if self.pacer_doc_id:
-            return (
-                "https://www.pacerdash.com/court-listener-checkouts/"
-                f"{self.pacer_doc_id}"
-            )
-        return ""
+        :param self: The RECAPDocument object.
+        :return: The PacerDash URL or None if pacer_doc_id is not available.
+        """
+
+        if not self.pacer_doc_id:
+            return None
+        return (
+            "https://www.pacerdash.com/court-listener-checkouts/"
+            f"{self.pacer_doc_id}"
+        )
 
     @property
     def has_valid_pdf(self) -> bool:
