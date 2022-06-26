@@ -218,11 +218,15 @@ def merge_form_with_courts(
     requires manual adjustment here.
     """
     # Are any of the checkboxes checked?
+
+    # print("search_form fieldsx", search_form.fields)
+
     checked_statuses = [
         field.value()
         for field in search_form
         if field.html_name.startswith("court_")
     ]
+    # print("checked_statuses", checked_statuses)
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
     court_count = str(
@@ -1255,7 +1259,7 @@ def build_range_query(field: str, less: int, greater: int,
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
-    params = {}
+    params = {} # type: Dict[str, Any]
     if any([less, greater]):
         if less:
             params["lte" if less_than_equal else "lt"] = less
@@ -1285,9 +1289,9 @@ def build_daterange_query(field: str, before: datetime, after: datetime,
     params = {}
     if any([before, after]):
         if hasattr(after, "strftime"):
-            params["gte"] = f"{after.date().isoformat()}T00:00:00Z"
+            params["gte"] = f"{after.isoformat()}T00:00:00Z"
         if hasattr(before, "strftime"):
-            params["lte"] = f"{before.date().isoformat()}T23:59:59Z"
+            params["lte"] = f"{before.isoformat()}T23:59:59Z"
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
             assert relation in allowed_relations, f"'{relation}' is not an allowed relation."
@@ -1326,18 +1330,18 @@ def build_term_query(field: str, value: str) -> List:
 def build_es_queries(cd: CleanData) -> List:
     queries_list = []
 
+    # TODO verify that filed_before or filed_after exists
+
     # Build daterange query
     q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
-                               cd.get("filed_before"), cd.get("filed_after"))
+                               cd.get("filed_before", ""), cd.get("filed_after", ""))
     queries_list.extend(q1)
     q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
-                               cd.get("filed_before"), cd.get("filed_after"))
+                               cd.get("filed_before", ""), cd.get("filed_after", ""))
     queries_list.extend(q2)
 
     # Build text query
-    q3 = build_fulltext_query("text", cd.get("q", "*"))
+    q3 = build_fulltext_query("text", cd.get("q", ""))
     queries_list.extend(q3)
-
-    print('queries_list', queries_list)
 
     return queries_list

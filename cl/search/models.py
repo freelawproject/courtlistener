@@ -3018,15 +3018,17 @@ class Tag(AbstractDateTimeModel):
 #         unique_together = ("upper_court", "lower_court")
 class SEARCH_TYPES:
     OPINION = "o"
+    OPINION_PARENTHETICAL = "op"
     RECAP = "r"
     DOCKETS = "d"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     NAMES = (
         (OPINION, "Opinions"),
+        (OPINION_PARENTHETICAL, "Parenthetical"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
     )
-    ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+    ALL_TYPES = [OPINION, OPINION_PARENTHETICAL, RECAP, ORAL_ARGUMENT, PEOPLE]

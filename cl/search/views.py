@@ -1,6 +1,8 @@
 import logging
+import operator
 import traceback
 from datetime import date, datetime, timedelta
+from functools import reduce
 from urllib.parse import quote
 
 from cache_memoize import cache_memoize
@@ -11,7 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, Http404
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
@@ -35,10 +37,11 @@ from cl.lib.search_utils import (
     make_get_string,
     make_stats_variable,
     merge_form_with_courts,
-    regroup_snippets,
+    regroup_snippets, build_es_queries,
 )
 from cl.search.constants import RELATED_PATTERN
-from cl.search.forms import SearchForm, _clean_form
+from cl.search.documents import ParentheticalDocument
+from cl.search.forms import SearchForm, _clean_form, ParentheticalSearchForm, prep_cd
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
@@ -474,13 +477,6 @@ def advanced(request: HttpRequest) -> HttpResponse:
         render_dict.update(o_results)
         render_dict["search_form"] = SearchForm({"type": obj_type})
         return render(request, "advanced.html", render_dict)
-    elif request.path == reverse("advanced_op"):
-        obj_type = SEARCH_TYPES.OPINION_PARENTHETICAL
-
-        # TODO perform ES search
-
-        render_dict["search_form"] = SearchForm({"type": obj_type})
-        return render(request, "advanced.html", render_dict)
     else:
         courts = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
@@ -508,3 +504,117 @@ def advanced(request: HttpRequest) -> HttpResponse:
             }
         )
         return render(request, "advanced.html", render_dict)
+
+
+def es_search(request: HttpRequest, type: str = None) -> HttpResponse:
+    """Display elasticsearch search page
+    """
+    render_dict = {"private": False}
+
+    if not type:
+        return HttpResponseRedirect(reverse("show_results"))
+
+    if type in ["parenthetical"]:
+        courts = Court.objects.filter(in_use=True)
+        render_dict.update({"type": type})
+        if type == "parenthetical":
+            search_form = ParentheticalSearchForm()
+            template = "parenthetical.html"
+
+        courts, court_count_human, court_count = merge_form_with_courts(
+            courts, search_form
+        )
+        render_dict.update({"search_form": search_form, "courts": courts,
+                            "court_count_human": court_count_human,
+                            "court_count": court_count, })
+    else:
+        raise Http404("Search type not valid")
+    #
+    # return HttpResponse(f"<h1>200: OK: {type}</h1>")
+    return render(request, template, render_dict)
+
+
+def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
+    """Display elasticsearch search results
+    """
+    render_dict = {"private": False}
+    print('type', type)
+    if not type:
+        return HttpResponseRedirect(reverse("show_results"))
+
+    # TODO jurisdiction shows 0 instead of All
+    # TODO keep jurisdiction checkbox values after search
+    # TODO run es filtering and show results
+    # TODO handle ordering, maybe by es score?
+    error = False
+    cd = {}
+
+    if type in ["parenthetical"]:
+        courts = Court.objects.filter(in_use=True)
+        render_dict.update({"type": type})
+        if type == "parenthetical":
+            print("searching......")
+            # search_form = ParentheticalSearchForm(initial=request.GET.copy())
+            # cd = _clean_form(request.GET.copy(), cd, courts)
+
+            x = do_es_search(request.GET.copy(), type)
+
+            search_form = ParentheticalSearchForm(request.GET.copy(), type=type)
+
+        if search_form.is_valid():
+            cd = prep_cd(request.GET.copy(), search_form.cleaned_data, courts)
+            search_form = ParentheticalSearchForm(cd, type=type)
+        else:
+            error = True
+
+        filters = build_es_queries(cd)
+
+        # print("cd", cd)
+        # print("filters", filters)
+
+        courts, court_count_human, court_count = merge_form_with_courts(
+            courts, search_form
+        )
+        search_summary_str = search_form.as_text(court_count_human)
+        search_summary_dict = search_form.as_display_dict(court_count_human)
+        print("court_count_human", court_count_human)
+        print("court_count", court_count)
+        render_dict.update({"search_form": search_form, "courts": courts,
+                            "court_count_human": court_count_human,
+                            "court_count": court_count,
+                            "search_summary_str": search_summary_str,
+                            "search_summary_dict": search_summary_dict,
+                            "error": error})
+    else:
+        raise Http404("Search type not valid")
+
+    # print("render_dict", render_dict)
+    #
+    # return HttpResponse(f"<h1>200: OK: {type}</h1>")
+    # return render(request, "search.html", render_dict)
+    return render(request, "results.html", render_dict)
+
+
+def do_es_search(get_params, type):
+    search_form = None
+    hits = None
+
+    if type == "parenthetical":
+        search_form = ParentheticalSearchForm(get_params, type=type)
+        document_type = ParentheticalDocument
+
+    if search_form:
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            filters = build_es_queries(cd)
+            if filters:
+                hits = document_type.search().filter(
+                    reduce(operator.iand, filters)).execute()
+
+            else:
+                hits = ParentheticalDocument.search().query("match_all").execute()
+            print("----> HITS", hits)
+        else:
+            print("form errors: ", search_form.errors)
+
+    return hits

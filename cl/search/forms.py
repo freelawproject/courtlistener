@@ -446,7 +446,7 @@ class SearchForm(forms.Form):
     selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
         choices=[("", "---------")]
-        + list(PoliticalAffiliation.POLITICAL_PARTIES),
+                + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
         label="Political Affiliation",
         initial="None",
@@ -560,8 +560,8 @@ class SearchForm(forms.Form):
             raise ValidationError("Invalid value for type field")
 
         if (
-            self.cleaned_data["type"] == SEARCH_TYPES.OPINION
-            or not self.cleaned_data["type"]
+                self.cleaned_data["type"] == SEARCH_TYPES.OPINION
+                or not self.cleaned_data["type"]
         ):
             if not self.cleaned_data["order_by"]:
                 return self.fields["order_by"].initial
@@ -681,3 +681,255 @@ class SearchForm(forms.Form):
         for label, value in self.as_display_dict(court_count_human).items():
             crumbs.append(f"{label}: {value}")
         return " › ".join(crumbs)
+
+
+class ParentheticalSearchForm(forms.Form):
+    ORDER_BY_OPTIONS = []
+
+    q = forms.CharField(required=False, label="Query")
+
+    order_by = forms.ChoiceField(label="Search Results Order:", required=False,
+                                 initial="score desc", choices=ORDER_BY_OPTIONS,
+                                 widget=forms.Select(
+                                     attrs={"class": "external-input form-control"}))
+
+    filed_after = FloorDateField(
+        required=False,
+        label="Filed After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    filed_before = CeilingDateField(
+        required=False,
+        label="Filed Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    court = forms.CharField(required=False, widget=forms.HiddenInput())
+    court.as_str_types = []
+
+    docket_number = forms.CharField(
+        required=False,
+        label="Docket Number",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    opinion_id = forms.CharField(
+        required=False,
+        label="Opinion id",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    def get_date_field_names(self):
+        return {
+            f_name.split("_")[0]
+            for f_name, f in self.fields.items()
+            if isinstance(f, DateField)
+        }
+
+    def __init__(self, *args, **kwargs):
+        type = kwargs.pop("type", None)
+        super(ParentheticalSearchForm, self).__init__(*args, **kwargs)
+        """
+        Normally we wouldn't need to use __init__ in a form object like
+        this, however, since we are generating checkbox fields with dynamic
+        names coming from the database, we need to interact directly with the
+        fields dict.
+        """
+
+        # Clear options to avoid duplicates
+        self.ORDER_BY_OPTIONS.clear()
+
+        courts = Court.objects.filter(in_use=True)
+        # print("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
+        # print("data", self.data)
+
+        for court in courts:
+            self.fields[f"court_{court.pk}"] = forms.BooleanField(
+                label=court.short_name,
+                required=False,
+                initial=True,
+                widget=forms.CheckboxInput(attrs={"checked": "checked"}),
+            )
+
+        print("type", type)
+
+        # Add options based on type
+        if type == "parenthetical":
+            self.ORDER_BY_OPTIONS.append(("score desc", "Relevance"))
+            self.ORDER_BY_OPTIONS.append(("dateFiled desc", "Newest First"))
+            self.ORDER_BY_OPTIONS.append(("dateFiled asc", "Oldest First"))
+
+        self.fields["order_by"].choices = self.ORDER_BY_OPTIONS
+
+        # data_courts = self.data.get("court")
+        # print('data_courts', data_courts)
+        # if data_courts:
+        #     if " " in data_courts:
+        #         court_ids = data_courts.split(" ")
+        #     elif "," in data_courts:
+        #         court_ids = data_courts.split(",")
+        #     else:
+        #         court_ids = [data_courts]
+        #     for court_id in court_ids:
+        #         self.initial[f"{court_id}"] = False
+        #         self.fields[f"{court_id}"].initial = False
+
+    def clean(self):
+        """
+        Handles validation fixes that need to be performed across fields.
+        """
+        cleaned_data = self.cleaned_data
+        print('XXXXXXXXXX CALL CLEAN DATA XXXXXXXXXXX')
+
+        # # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
+        # for field_name in self.get_date_field_names():
+        #     before = cleaned_data.get(f"{field_name}_before")
+        #     after = cleaned_data.get(f"{field_name}_after")
+        #     if before and after and (before < after):
+        #         # The user is requesting dates like this: <--b  a-->. Switch
+        #         # the dates so their query is like this: a-->   <--b
+        #         cleaned_data[f"{field_name}_before"] = after
+        #         cleaned_data[f"{field_name}_after"] = before
+
+        # 2. Convert the value in the court field to the various court_* fields
+        court_str = cleaned_data.get("court")
+        print("court_str", court_str)
+        if court_str:
+            if " " in court_str:
+                court_ids = court_str.split(" ")
+            elif "," in court_str:
+                court_ids = court_str.split(",")
+            else:
+                court_ids = [court_str]
+            for court_id in court_ids:
+                cleaned_data[f"court_{court_id}"] = True
+
+        # 3. Make sure that the user has selected at least one facet for each
+        #    taxonomy. Note that this logic must be paralleled in
+        #    search_utils.make_facet_variable
+        court_bools = [
+            v for k, v in cleaned_data.items() if k.startswith("court_")
+        ]
+        if not any(court_bools):
+            # Set all facets to True
+            for key in cleaned_data.keys():
+                if key.startswith("court_"):
+                    cleaned_data[key] = True
+
+        stat_bools = [
+            v for k, v in cleaned_data.items() if k.startswith("stat_")
+        ]
+        if not any(stat_bools):
+            # Set everything to False...
+            for key in cleaned_data.keys():
+                if key.startswith("stat_"):
+                    cleaned_data[key] = False
+            # ...except precedential
+            cleaned_data["stat_Precedential"] = True
+
+        cleaned_data["_court_count"] = len(court_bools)
+        cleaned_data["_stat_count"] = len(stat_bools)
+
+        # 4. Strip any whitespace, otherwise it crashes Solr.
+        for k, v in cleaned_data.items():
+            if isinstance(v, str):
+                cleaned_data[k] = v.strip()
+
+        return cleaned_data
+
+    def as_display_dict(self, court_count_human):
+        """Generate a displayable dictionary of the search form
+
+        This can be useful for displaying on the front end, or converting into
+        a useful string. The dictionary looks like:
+
+            {
+              'Case name': 'Foo',
+              'Query': 'bar',
+            }
+
+        :param court_count_human: The number of courts being queried or "All",
+        if all courts are being queried.
+        :returns A dictionary of the data
+        """
+        # The search type is usually provided by cleaned data, but can be
+        # missing when the form is invalid (and lacks it). If so, just give up.
+        try:
+            search_type = self.data["type"]
+        except MultiValueDictKeyError:
+            return {}
+        display_dict = OrderedDict({"Courts": court_count_human})
+        for field_name, field in self.fields.items():
+            if not hasattr(field, "as_str_types"):
+                continue
+            if search_type in field.as_str_types:
+                value = self.cleaned_data.get(field_name)
+                if value:
+                    if isinstance(field, ChoiceField):
+                        choices = flatten_choices(self.fields[field_name])
+                        value = dict(choices)[value]
+                    display_dict[field.label] = value
+
+        return display_dict
+
+    def as_text(self, court_count_human):
+        """Create a human-readable string representation of the search form"""
+        crumbs = []
+        for label, value in self.as_display_dict(court_count_human).items():
+            crumbs.append(f"{label}: {value}")
+        return " › ".join(crumbs)
+
+
+def prep_cd(get_params, cd, courts):
+    """Returns cleaned up values as a Form object."""
+    # Send the user the cleaned up query
+    get_params["q"] = cd["q"]
+
+    # Clean up the date formats. This is probably no longer needed since we do
+    # date cleanup on the client side via our datepickers, but it's probably
+    # fine to leave it here until there's a reason to remove it. It could be
+    # helpful if somebody finds a way not to use the datepickers (js off, say)
+    for date_field in ParentheticalSearchForm().get_date_field_names():
+        for time in ("before", "after"):
+            field = f"{date_field}_{time}"
+            if get_params.get(field) and cd.get(field) is not None:
+                # Don't use strftime. It'll fail before 1900
+                before = cd[field]
+                get_params[field] = "%02d/%02d/%s" % (
+                    before.month,
+                    before.day,
+                    before.year,
+                )
+
+    get_params["order_by"] = cd["order_by"]
+    # get_params["type"] = cd["type"]
+
+    for court in courts:
+        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
+
+    # for status in DOCUMENT_STATUSES:
+    #     get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
+
+    return get_params

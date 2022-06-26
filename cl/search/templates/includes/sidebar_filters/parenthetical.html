@@ -1,0 +1,53 @@
+{% load humanize %}
+
+
+<div class="sidebar-section">
+	<h3><span>Refine Your Query</span></h3>
+	<form action="{% url "es_results" type %}" method="get" id="sidebar-search-form">
+
+		{% for hidden in search_form.hidden_fields %}
+			{{ hidden }}
+		{% endfor %}
+
+		<div id="extra-search-fields">
+			{#  Modal is at bottom of results, so it loads last. #}
+			<div class="cursor v-offset-below-2"
+				 data-toggle="modal"
+				 data-target="#court-picker">
+				<a href="#" class="btn btn-default btn-lg" type="button">
+					<span class="hidden-sm">Select </span>Jurisdictions
+					<span id="jurisdiction-count"
+						  class="badge">{{ court_count_human|default:"" }}</span>
+				</a>
+			</div>
+
+			<div class="form-group">
+				{% include "fields/form_group_field.html" with field=search_form.order_by %}
+			</div>
+
+			<div class="row">
+				<div class="col-md-6">
+					{% include "fields/form_group_field.html" with field=search_form.filed_after %}
+				</div>
+				<div class="col-md-6">
+					{% include "fields/form_group_field.html" with field=search_form.filed_before %}
+				</div>
+			</div>
+			<div class="form-group">
+				{% include "fields/form_group_field.html" with field=search_form.docket_number %}
+			</div>
+
+			<div class="form-group">
+				{% include "fields/form_group_field.html" with field=search_form.opinion_id %}
+			</div>
+
+			<p>
+				<button type="submit"
+						class="btn btn-primary btn-lg btn-block"
+						name="search"><i class="fa fa-search"></i>&nbsp;Search
+				</button>
+			</p>
+		</div>
+	</form>
+</div>
+

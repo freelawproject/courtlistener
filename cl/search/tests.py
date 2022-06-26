@@ -2041,3 +2041,20 @@ class ElasticSearchTest(TestCase):
         print(s.to_dict())
         print(s.count())
         self.assertEqual(s.count(), 1)
+
+    def test_cd_query_2(self) -> None:
+        cd = {"filed_after": "",
+              "filed_before": "",
+              "q": ""}
+
+        filters = build_es_queries(cd)
+
+        # TODO "docket_id:15462654" filter
+        # TODO "opinion_id:15135" filter
+
+        if not filters:
+            # Return all results
+            s = ParentheticalDocument.search().query("match_all")
+            print(s.to_dict())
+            print(s.count())
+            self.assertEqual(s.count(), 3)

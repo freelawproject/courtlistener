@@ -13,8 +13,6 @@
 {% block title %}
 	{% if search_form.type.value == SEARCH_TYPES.OPINION %}
 		Advanced Legal Opinion Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.OPINION_PARENTHETICAL %}
-		Advanced Legal Opinion Parenthetical Search – CourtListener.com
 	{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
 		Advanced RECAP Archive Search for PACER – CourtListener.com
 	{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
@@ -27,8 +25,6 @@
 {% block og_title %}
 	{% if search_form.type.value == SEARCH_TYPES.OPINION %}
 		Advanced Legal Opinion Search – CourtListener.com
-	{% elif search_form.type.value == SEARCH_TYPES.OPINION_PARENTHETICAL %}
-		Advanced Legal Opinion Parenthetical Search – CourtListener.com
 	{% elif search_form.type.value == SEARCH_TYPES.RECAP %}
 		Advanced RECAP Archive Search for PACER – CourtListener.com
 	{% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
@@ -54,8 +50,7 @@
 {% block sidebar %}{% endblock %}
 
 {% block navbar-o %}
-	{% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.OPINION_PARENTHETICAL %}
-		active{% else %}
+	{% if search_form.type.value == SEARCH_TYPES.OPINION %}active{% else %}
 		{{ block.super }}{% endif %}
 {% endblock %}
 {% block navbar-r %}
@@ -78,11 +73,6 @@
 		<div id="above-main-query">
 			{% if search_form.type.value == SEARCH_TYPES.OPINION %}
 				<h1 class="text-center">Advanced Opinion Search</h1>
-				<p class="text-center gray large">Search millions of opinions across
-					hundreds of jurisdictions. Updated constantly.
-				</p>
-			{% elif search_form.type.value == SEARCH_TYPES.OPINION_PARENTHETICAL %}
-				<h1 class="text-center">Advanced Opinion Parenthetical Search</h1>
 				<p class="text-center gray large">Search millions of opinions across
 					hundreds of jurisdictions. Updated constantly.
 				</p>
@@ -269,37 +259,6 @@
 					<a class="text-right" href="{% url 'advanced_search' %}">More
 						details&hellip;</a>
 				</div>
-			</div>
-
-
-		{% elif search_form.type.value == SEARCH_TYPES.OPINION_PARENTHETICAL %}
-
-			<div class="row">
-
-
-					<div class="col-sm-3">
-						<a href="#" class="btn btn-default btn-lg v-offset-above-1"
-						   type="button" data-toggle="modal"
-						   data-target="#court-picker">
-							<span class="hidden-sm">Select </span>Jurisdictions
-							<span id="jurisdiction-count"
-								  class="badge">{{ court_count_human|default:"" }}</span>
-						</a>
-					</div>
-
-					<div class="col-sm-3">
-						<div class="form-group">
-							{{ search_form.filed_after.label_tag }}
-							{{ search_form.filed_after }}
-						</div>
-					</div>
-					<div class="col-sm-3">
-						<div class="form-group">
-							{{ search_form.filed_before.label_tag }}
-							{{ search_form.filed_before }}
-						</div>
-					</div>
-
 			</div>
 
 		{% elif search_form.type.value == SEARCH_TYPES.RECAP %}

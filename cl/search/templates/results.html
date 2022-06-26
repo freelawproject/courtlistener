@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load text_filters %}
+{% load static %}
+
+{% block message %}{% endblock %}
+
+{% block title %}
+	{% if search_summary_str %}
+		Search Results for {{ search_summary_str }} &mdash;
+		{% if not error %}{{ results.paginator.count|intcomma }} Result
+			{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+	{% else %}
+		Free Legal Search Engine and Alert System &mdash; CourtListener.com
+	{% endif %}
+{% endblock %}
+{% block og_title %}
+	{% if search_summary_str %}
+		Search Results for {{ search_summary_str }} &mdash;
+		{% if not error %}{{ results.paginator.count|intcomma }} Result
+			{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+	{% else %}
+		Free Legal Search Engine and Alert System &mdash; CourtListener.com
+	{% endif %}
+{% endblock %}
+
+{% block head %}
+	{% if not error %}
+		{% if get_string %}
+			{% if search_form.type.value != SEARCH_TYPES.PEOPLE %}
+				<link rel="alternate"
+					  type="application/rss+xml"
+					  title="Atom Feed for These Search Results"
+					  href="/feed/search/?{{ get_string }}"/>
+			{% endif %}
+		{% endif %}
+	{% endif %}
+	<link rel="alternate"
+		  type="application/rss+xml"
+		  title="Atom Feed For All Opinions"
+		  href="/feed/court/all/">
+	<link rel="alternate"
+		  type="application/rss+xml"
+		  title="Podcast For All Oral Arguments"
+		  href="/podcast/court/all/">
+	{% if DEBUG %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.css" %}"/>
+	{% else %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+	{% endif %}
+{% endblock %}
+
+{% block footer-scripts %}
+	{% include "includes/date_picker.html" %}
+	{% if alert_form.errors or request.GET.show_alert_modal %}
+		<script type="text/javascript">
+            $(window).on('load', function () {
+                $("#modal-save-alert").modal('show');
+            });
+		</script>
+	{% endif %}
+	<script type="text/javascript">
+        $("#modal-save-alert").on('show.bs.modal', function (e) {
+            const modalBody = $('.modal-body.logged-in');
+            if (modalBody.length === 0) {
+                // Not logged in; abort. Don't do alert estimation ajax
+                return
+            }
+            const estimate = $(this).find('#alert-estimate');
+            const icon = estimate.find('i');
+            const msg = estimate.find('span');
+            const numDaysToEstimate = 100;
+            $.ajax({
+                url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
+                success: function (data) {
+                    // Check if this is impractically large. If so, block it
+                    const hitsPerDay = Math.floor(data.count / numDaysToEstimate);
+                    if (hitsPerDay > {{ MAX_ALERT_RESULTS_PER_DAY }}) {
+                        // Wipe the screen; show message to the user
+                        modalBody.empty();
+                        modalBody.append(
+                            $('<p/>').text("This query averages about " + hitsPerDay + " results per day. This is more than our system can support and may create a lot of messages in your inbox."),
+                            $('<p/>').text("Please narrow your query to have fewer results per day.")
+                        );
+                        modalBody.removeClass("hidden");
+                    } else {
+                        // Show the form; Update icon and text
+                        modalBody.removeClass("hidden");
+                        icon.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
+                        msg.text(" " + data.count + " hits in the last 100 days")
+                    }
+                },
+                error: function () {
+                    modalBody.removeClass("hidden");
+                    icon.removeClass("fa-spinner fa-pulse fa-clock-o").addClass("fa-warning");
+                    msg.text(" Unable to get estimate for this alert");
+                }
+            })
+        })
+	</script>
+{% endblock %}
+
+{% block navbar-o %}
+	{% if type == "parenthetical" %}active{% else %}
+		{{ block.super }}{% endif %}
+{% endblock %}
+
+{% block sidebar %}
+	<div class="col-sm-3 search-page" id="sidebar">
+		<div class="sidebar-section visible-xs">
+			<a class="btn btn-default" href="#search-results">Jump to
+				Results</a>
+		</div>
+
+		{% if type == "parenthetical" %}
+			{% include "includes/sidebar_filters/parenthetical.html" %}
+		{% endif %}
+
+		{% include "includes/donate_sidebar.html" with referrer="search-donate-now" %}
+	</div>
+{% endblock %}
+
+
+{% block content %}
+	{% with type=type %}
+		<div id="search-results" class="col-lg-7 col-sm-9 search-page">
+			{% include "includes/messages.html" %}
+			{% if type != SEARCH_TYPES.PEOPLE %}
+				{% if query_citation or alert_form.errors or request.GET.edit_alert %}
+					<div class="alert {% if query_citation %}alert-info{% elif alert_form.errors %}alert-danger{% elif request.GET.edit_alert %}alert-info{% endif %}"
+						 role="alert">
+						<div class="row">
+							{% if query_citation %}
+								<div class="col-xs-9">
+									<p><i class="fa fa-info-circle fa-lg"></i> It looks
+										like you're trying to search for <a
+												class="alert-link"
+												href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>,
+										from {{ query_citation.dateFiled.year }}.</p>
+
+								</div>
+								<div class="col-xs-3 text-right">
+									<a class="btn btn-primary btn-sm"
+									   href="{{ query_citation.absolute_url }}">Go<span
+											class="hidden-xs"> to This Case</span></a>
+								</div>
+							{% elif alert_form.errors %}
+								<div class="col-xs-9">
+									<p class="bottom"><i
+											class="fa fa-exclamation-circle"></i> There
+										was an error creating your alert.</p>
+								</div>
+								<div class="col-xs-3 text-right">
+									<a class="btn btn-danger btn-sm"
+									   data-toggle="modal"
+									   data-target="#modal-save-alert">Update Alert</a>
+								</div>
+							{% elif request.GET.edit_alert %}
+								<div class="col-sm-6">
+									<p class="bottom">You are editing your alert,
+										"<strong>{{ alert_form.name.value }}</strong>".
+									</p>
+								</div>
+								<div class="col-sm-6 text-right">
+									<a class="btn btn-default btn-sm"
+									   data-toggle="modal"
+									   data-target="#modal-save-alert">
+										Save Alert
+									</a>
+									<a class="btn btn-danger btn-sm"
+									   href="?{{ get_string_sans_alert }}">
+										Cancel
+									</a>
+								</div>
+							{% endif %}
+						</div>
+					</div>
+				{% endif %}
+			{% endif %}
+
+			<div class="row">
+				<div class="col-sm-12">
+					{% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+						{% include "includes/alert_modal.html" %}
+					{% endif %}
+					<form action="{% url "es_results" type %}"
+						  method="get"
+						  id="search-form"
+						  role="form">
+						<div id="search-container" class="v-offset-below-1">
+							<label class="sr-only" for="id_q">Search</label>
+							<div class="input-group input-group-lg">
+								<input class="form-control"
+									   value="{{ search_form.q.value|default:'' }}"
+									   name="q"
+									   id="id_q"
+									   autocomplete="off"
+									   type="text">
+								{% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+									{% if not error and get_string %}
+										<span class="input-group-addon input-group-addon-blended">
+                                  <i class="fa fa-bell-o fa-lg gray pointer"
+									 data-toggle="modal"
+									 data-target="#modal-save-alert"
+									 title="{% if request.GET.edit_alert %}Edit this alert{% else %}Create new alert{% endif %}"></i>
+                                </span>
+									{% endif %}
+								{% endif %}
+								<span class="input-group-btn">
+                                <button type="submit"
+										class="btn btn-primary"
+										name="search"
+										id="search-button"><i
+										class="fa fa-search"></i>&nbsp;Search
+                                </button>
+                            </span>
+							</div>
+							<span><a
+									href="{% url "advanced_search" %}">Query Help</a></span>
+						</div>
+					</form>
+				</div>
+			</div>
+
+			{% if results.paginator.count > 0 %}
+				<div class="row">
+					<div class="col-sm-12">
+
+						<h2 id="result-count" class="bottom">
+							{% if type == SEARCH_TYPES.OPINION %}
+								{{ results.paginator.count|intcomma }} Opinion
+								{{ results.paginator.count|pluralize }}
+								{% if cited_cluster %}
+									<span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span>
+									{{ cited_cluster.caption|safe|v_wrapper }}
+								{% endif %}
+								{% if related_cluster %}
+									<span class="gray alt">related to</span>
+									{{ related_cluster.caption|safe|v_wrapper }}
+								{% endif %}
+							{% elif type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
+								{% with matches=results.object_list.groups.docket_id.matches count=results.paginator.count %}
+									{{ count|intcomma }} Case{{ count|pluralize }}
+									<span class="gray">&mdash;</span>
+									{{ matches|intcomma }} Docket&nbsp;Entr
+									{{ matches|pluralize:"y,ies" }}
+								{% endwith %}
+							{% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
+								{{ results.paginator.count|intcomma }} Oral Argument
+								{{ results.paginator.count|pluralize }}
+							{% elif type == SEARCH_TYPES.PEOPLE %}
+								{{ results.paginator.count|intcomma }} Judge
+								{{ results.paginator.count|pluralize }}
+							{% endif %}
+							{% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
+								<a href="/feed/search/?{{ get_string }}">
+									<i class="gray fa fa-rss"
+									   title="Subscribe to a feed of these results"></i>
+								</a>
+							{% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
+								<a href="/podcast/search/?{{ get_string }}">
+									<i class="gray fa fa-podcast"
+									   title="Subscribe to a podcast of these results"></i>
+								</a>
+							{% endif %}
+						</h2>
+						<span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
+					</div>
+				</div>
+				{% include "includes/search_result.html" %}
+			{% else %}
+				{% include "includes/no_results.html" %}
+			{% endif %}
+
+			{% include "includes/pagination.html" %}
+			{% include "includes/random_tip.html" %}
+			{% include "includes/jurisdiction_picker_modal.html" %}
+		</div>
+	{% endwith %}
+{% endblock %}
