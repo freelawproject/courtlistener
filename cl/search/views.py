@@ -26,6 +26,7 @@ from cl.alerts.models import Alert
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.paginators import ESPaginator
 from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
@@ -538,14 +539,13 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
     """Display elasticsearch search results
     """
     render_dict = {"private": False}
+    search_results = {}
     print('type', type)
     if not type:
         return HttpResponseRedirect(reverse("show_results"))
 
-    # TODO jurisdiction shows 0 instead of All
-    # TODO keep jurisdiction checkbox values after search
     # TODO run es filtering and show results
-    # TODO handle ordering, maybe by es score?
+    # TODO handle ordering by relevance, maybe by es score?
     error = False
     cd = {}
 
@@ -557,7 +557,7 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
             # search_form = ParentheticalSearchForm(initial=request.GET.copy())
             # cd = _clean_form(request.GET.copy(), cd, courts)
 
-            x = do_es_search(request.GET.copy(), type)
+            search_results = do_es_search(request.GET.copy(), type)
 
             search_form = ParentheticalSearchForm(request.GET.copy(), type=type)
 
@@ -567,11 +567,6 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
         else:
             error = True
 
-        filters = build_es_queries(cd)
-
-        # print("cd", cd)
-        # print("filters", filters)
-
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
@@ -579,6 +574,7 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
         search_summary_dict = search_form.as_display_dict(court_count_human)
         print("court_count_human", court_count_human)
         print("court_count", court_count)
+        render_dict.update(search_results)
         render_dict.update({"search_form": search_form, "courts": courts,
                             "court_count_human": court_count_human,
                             "court_count": court_count,
@@ -588,16 +584,14 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
     else:
         raise Http404("Search type not valid")
 
-    # print("render_dict", render_dict)
-    #
-    # return HttpResponse(f"<h1>200: OK: {type}</h1>")
-    # return render(request, "search.html", render_dict)
     return render(request, "results.html", render_dict)
 
 
 def do_es_search(get_params, type):
     search_form = None
-    hits = None
+    hits = []
+
+    # TODO handle exceptions like TransportError, ConnectionError, RequestError, etc
 
     if type == "parenthetical":
         search_form = ParentheticalSearchForm(get_params, type=type)
@@ -608,13 +602,35 @@ def do_es_search(get_params, type):
             cd = search_form.cleaned_data
             filters = build_es_queries(cd)
             if filters:
+                print("filters", filters)
                 hits = document_type.search().filter(
                     reduce(operator.iand, filters)).execute()
-
             else:
-                hits = ParentheticalDocument.search().query("match_all").execute()
+                hits = document_type.search().query("match_all").execute()
             print("----> HITS", hits)
         else:
             print("form errors: ", search_form.errors)
 
-    return hits
+    paged_results = do_es_pagination(get_params, hits, rows_per_page=1)
+
+    print("paged_results", paged_results)
+
+    return {"results": paged_results, "search_form": search_form}
+
+
+def do_es_pagination(get_params, hits, rows_per_page=10):
+    try:
+        page = int(get_params.get("page", 1))
+    except ValueError:
+        page = 1
+    check_pagination_depth(page)
+
+    paginator = ESPaginator(hits, rows_per_page)
+    try:
+        results = paginator.page(page)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    return results

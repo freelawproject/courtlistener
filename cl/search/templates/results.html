@@ -266,10 +266,10 @@
 								</a>
 							{% endif %}
 						</h2>
-						<span class="small gray top">{{ results.object_list.QTime|intcomma }}ms</span>
+						<span class="small gray top">{{ results.object_list.took|intcomma }}ms</span>
 					</div>
 				</div>
-				{% include "includes/search_result.html" %}
+				{% include "includes/es_search_result.html" %}
 			{% else %}
 				{% include "includes/no_results.html" %}
 			{% endif %}

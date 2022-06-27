@@ -762,8 +762,6 @@ class ParentheticalSearchForm(forms.Form):
         self.ORDER_BY_OPTIONS.clear()
 
         courts = Court.objects.filter(in_use=True)
-        # print("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
-        # print("data", self.data)
 
         for court in courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
@@ -772,8 +770,6 @@ class ParentheticalSearchForm(forms.Form):
                 initial=True,
                 widget=forms.CheckboxInput(attrs={"checked": "checked"}),
             )
-
-        print("type", type)
 
         # Add options based on type
         if type == "parenthetical":
@@ -801,7 +797,6 @@ class ParentheticalSearchForm(forms.Form):
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
-        print('XXXXXXXXXX CALL CLEAN DATA XXXXXXXXXXX')
 
         # # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
         # for field_name in self.get_date_field_names():
@@ -815,7 +810,6 @@ class ParentheticalSearchForm(forms.Form):
 
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get("court")
-        print("court_str", court_str)
         if court_str:
             if " " in court_str:
                 court_ids = court_str.split(" ")

@@ -25,7 +25,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query, build_daterange_query, \
-    build_fulltext_query, build_es_queries
+    build_fulltext_query, build_es_queries, build_terms_query
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -2030,6 +2030,16 @@ class ElasticSearchTest(TestCase):
         print(s.to_dict())
         print(s.count())
         self.assertEqual(s.count(), 1)
+
+    def test_build_terms_query(self) -> None:
+        filters = []
+        q = build_terms_query("described_opinion_cluster_docket_court_id",
+                              ["tsoyd", "djmfd"])
+        filters.extend(q)
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 2)
 
     def test_cd_query(self) -> None:
         cd = {"filed_after": datetime.datetime(1976, 8, 30, 0, 0),

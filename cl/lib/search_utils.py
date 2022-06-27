@@ -1259,7 +1259,7 @@ def build_range_query(field: str, less: int, greater: int,
     :param relation: Indicates how the range query matches values for range fields
     :return: Empty list or list with DSL Range query
     """
-    params = {} # type: Dict[str, Any]
+    params = {}  # type: Dict[str, Any]
     if any([less, greater]):
         if less:
             params["lte" if less_than_equal else "lt"] = less
@@ -1316,7 +1316,8 @@ def build_fulltext_query(field: str, value: str, query: str = "match") -> List:
 
 def build_term_query(field: str, value: str) -> List:
     """Given field name and value, return Elastic Search term query or [].
-    Use it only whe you want an exact match, avoid using this with text fields
+    "term" Returns documents that contain an exact term in a provided field
+    NOTE: Use it only whe you want an exact match, avoid using this with text fields
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
     @param field: elasticsearch index fieldname
     @param value: term to find
@@ -1327,10 +1328,25 @@ def build_term_query(field: str, value: str) -> List:
     return []
 
 
+def build_terms_query(field: str, value: List) -> List:
+    """Given field name and list of values, return Elastic Search term query or [].
+    "terms" Returns documents that contain one or more exact terms in a provided field.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
+    @param field: elasticsearch index fieldname
+    @param value: term to find
+    @return: Empty list or list with DSL Match query
+    """
+
+    # Remove elements that evaluate to False, like ""
+    value = list(filter(None, value))
+
+    if value:
+        return [Q("terms", **{field: value})]
+    return []
+
+
 def build_es_queries(cd: CleanData) -> List:
     queries_list = []
-
-    # TODO verify that filed_before or filed_after exists
 
     # Build daterange query
     q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
@@ -1340,8 +1356,23 @@ def build_es_queries(cd: CleanData) -> List:
                                cd.get("filed_before", ""), cd.get("filed_after", ""))
     queries_list.extend(q2)
 
-    # Build text query
-    q3 = build_fulltext_query("text", cd.get("q", ""))
+    # Build court terms filter
+    q3 = build_terms_query("described_opinion_cluster_docket_court_id",
+                           cd.get("court", "").split(" "))
     queries_list.extend(q3)
+
+    # Build fulltext query
+    q4 = build_fulltext_query("text", cd.get("q", ""))
+    queries_list.extend(q4)
+
+    # Build other text queries
+    # TODO not showing results with docket number
+    q5 = build_term_query("describing_opinion_cluster_docket_number", cd.get("docket_number", ""))
+    queries_list.extend(q5)
+    q6 = build_term_query("described_opinion_cluster_docket_number",
+                              cd.get("docket_number", ""))
+    queries_list.extend(q6)
+
+    print("queries_list", queries_list)
 
     return queries_list

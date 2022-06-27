@@ -92,16 +92,22 @@
 			</div>
 
 			<div class="col-sm-3">
-				<div class="form-group">
-					{{ search_form.filed_after.label_tag }}
-					{{ search_form.filed_after }}
-				</div>
+				{% include "fields/form_group_field.html" with field=search_form.order_by %}
+			</div>
+
+			<div class="col-sm-3">
+				{% include "fields/form_group_field.html" with field=search_form.filed_after %}
 			</div>
 			<div class="col-sm-3">
-				<div class="form-group">
-					{{ search_form.filed_before.label_tag }}
-					{{ search_form.filed_before }}
-				</div>
+				{% include "fields/form_group_field.html" with field=search_form.filed_before %}
+			</div>
+
+			<div class="col-sm-3">
+				{% include "fields/form_group_field.html" with field=search_form.docket_number %}
+			</div>
+
+			<div class="col-sm-3">
+				{% include "fields/form_group_field.html" with field=search_form.opinion_id %}
 			</div>
 
 		</div>
