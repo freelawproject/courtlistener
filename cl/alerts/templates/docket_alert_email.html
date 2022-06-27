@@ -85,7 +85,7 @@
                   <a href="{{ rd.filepath_local.url }}">For free from RECAP
                   </a>
                 {% else %}
-                  <a href="https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True">From RECAP if it's available
+                  <a href="https://www.courtlistener.com{{ rd.get_absolute_url }}?redirect_to_download=True">From RECAP with PACER fallback
                   </a>
                 {% endif %}
                 {% if rd.pacer_url %}
