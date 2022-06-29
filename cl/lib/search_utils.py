@@ -1,6 +1,6 @@
 import re
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union, cast, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -95,8 +95,8 @@ def get_solr_interface(cd: CleanData) -> ExtraSolrInterface:
 
 
 def make_get_string(
-        request: HttpRequest,
-        nuke_fields: Optional[List[str]] = None,
+    request: HttpRequest,
+    nuke_fields: Optional[List[str]] = None,
 ) -> str:
     """Makes a get string from the request object. If necessary, it removes
     the pagination parameters.
@@ -137,8 +137,8 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
 
 
 def make_stats_variable(
-        search_form: SearchForm,
-        paged_results: SolrResponse,
+    search_form: SearchForm,
+    paged_results: SolrResponse,
 ) -> List[str]:
     """Create a useful facet variable for use in a template
 
@@ -182,8 +182,8 @@ def make_stats_variable(
 
 
 def merge_form_with_courts(
-        courts: Dict,
-        search_form: SearchForm,
+    courts: Dict,
+    search_form: SearchForm,
 ) -> Tuple[Dict[str, List], str, str]:
     """Merges the courts dict with the values from the search form.
 
@@ -304,10 +304,10 @@ def merge_form_with_courts(
 
 
 def make_fq(
-        cd: CleanData,
-        field: str,
-        key: str,
-        make_phrase: bool = False,
+    cd: CleanData,
+    field: str,
+    key: str,
+    make_phrase: bool = False,
 ) -> str:
     """Does some minimal processing of the query string to get it into a
     proper field query.
@@ -384,9 +384,9 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
 
 
 def make_date_query(
-        query_field: str,
-        before: datetime,
-        after: datetime,
+    query_field: str,
+    before: datetime,
+    after: datetime,
 ) -> str:
     """Given the cleaned data from a form, return a valid Solr fq string"""
     if any([before, after]):
@@ -445,7 +445,7 @@ def make_boost_string(fields: Dict[str, float]) -> str:
 def add_boosts(main_params: SearchParam, cd: CleanData) -> None:
     """Add any boosts that make sense for the query."""
     if cd["type"] == SEARCH_TYPES.OPINION and main_params["sort"].startswith(
-            "score"
+        "score"
     ):
         main_params["boost"] = "pagerank"
 
@@ -503,9 +503,9 @@ def add_faceting(main_params: SearchParam, cd: CleanData, facet: bool) -> None:
 
 
 def add_highlighting(
-        main_params: SearchParam,
-        cd: CleanData,
-        highlight: Union[bool, str],
+    main_params: SearchParam,
+    cd: CleanData,
+    highlight: Union[bool, str],
 ) -> None:
     """Add any parameters relating to highlighting."""
 
@@ -752,8 +752,8 @@ def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
             main_params["fq"] = [group_fq]
 
     elif (
-            cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
-            and group is True
+        cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        and group is True
     ):
         docket_query = re.search(r"docket_id:\d+", cd["q"])
         if docket_query:
@@ -870,11 +870,11 @@ def cleanup_main_query(query_string: str) -> str:
 
 
 def build_main_query(
-        cd: CleanData,
-        highlight: Union[bool, str] = "all",
-        order_by: str = "",
-        facet: bool = True,
-        group: bool = True,
+    cd: CleanData,
+    highlight: Union[bool, str] = "all",
+    order_by: str = "",
+    facet: bool = True,
+    group: bool = True,
 ) -> SearchParam:
     main_params = cast(
         SearchParam,
@@ -895,9 +895,9 @@ def build_main_query(
 
 
 def build_main_query_from_query_string(
-        query_string,
-        updates=None,
-        kwargs=None,
+    query_string,
+    updates=None,
+    kwargs=None,
 ) -> Optional[SearchParam]:
     """Build a main query dict from a query string
 
@@ -1007,8 +1007,8 @@ def build_court_count_query(group: bool = False) -> SearchParam:
 
 
 def add_depth_counts(
-        search_data: Dict[str, Any],
-        search_results: SolrResponse,
+    search_data: Dict[str, Any],
+    search_results: SolrResponse,
 ) -> Optional[OpinionCluster]:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
     calculate and append the citation depth information between each Solr
@@ -1040,7 +1040,7 @@ def add_depth_counts(
 
 
 def get_citing_clusters_with_cache(
-        cluster: OpinionCluster,
+    cluster: OpinionCluster,
 ) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
 
@@ -1077,8 +1077,8 @@ def get_citing_clusters_with_cache(
 
 
 def get_related_clusters_with_cache(
-        cluster: OpinionCluster,
-        request: HttpRequest,
+    cluster: OpinionCluster,
+    request: HttpRequest,
 ) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
     """Use Solr to get related opinions with Solr-MoreLikeThis query
 
@@ -1136,8 +1136,8 @@ def get_related_clusters_with_cache(
 
         mlt_query = (
             si.query(sub_opinion_query)
-                .mlt(**mlt_params)
-                .field_limit(fields=["id", "caseName", "absolute_url"])
+            .mlt(**mlt_params)
+            .field_limit(fields=["id", "caseName", "absolute_url"])
         )
 
         if settings.RELATED_FILTER_BY_STATUS:
@@ -1188,11 +1188,11 @@ def get_related_clusters_with_cache(
 
 
 def get_mlt_query(
-        si: ExtraSolrInterface,
-        cd: CleanData,
-        facet: bool,
-        seed_pks: List[str],
-        filter_query: str,
+    si: ExtraSolrInterface,
+    cd: CleanData,
+    facet: bool,
+    seed_pks: List[str],
+    filter_query: str,
 ) -> SolrResponse:
     """
     By default Solr MoreLikeThis queries do not support highlighting. Thus, we
@@ -1244,10 +1244,14 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def build_range_query(field: str, less: int, greater: int,
-                      less_than_equal: bool = True,
-                      greater_than_equal: bool = True,
-                      relation: Optional[str] = None) -> List:
+def build_range_query(
+    field: str,
+    less: int,
+    greater: int,
+    less_than_equal: bool = True,
+    greater_than_equal: bool = True,
+    relation: Optional[str] = None,
+) -> List:
     """Given field name and range limits, returns ElasticSearch range query
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
     :param field: elasticsearch index fieldname
@@ -1266,7 +1270,9 @@ def build_range_query(field: str, less: int, greater: int,
             params["gte" if greater_than_equal else "gt"] = greater
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert relation in allowed_relations, f"'{relation}' is not an allowed relation."
+            assert (
+                relation in allowed_relations
+            ), f"'{relation}' is not an allowed relation."
             params["relation"] = relation
 
     if params:
@@ -1275,8 +1281,9 @@ def build_range_query(field: str, less: int, greater: int,
     return []
 
 
-def build_daterange_query(field: str, before: date, after: date,
-                          relation: Optional[str] = None) -> List:
+def build_daterange_query(
+    field: str, before: date, after: date, relation: Optional[str] = None
+) -> List:
     """Given field name and date range limits returns ElasticSearch range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
     :param field: elasticsearch index fieldname
@@ -1293,7 +1300,9 @@ def build_daterange_query(field: str, before: date, after: date,
             params["lte"] = f"{before.isoformat()}T23:59:59Z"
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
-            assert relation in allowed_relations, f"'{relation}' is not an allowed relation."
+            assert (
+                relation in allowed_relations
+            ), f"'{relation}' is not an allowed relation."
             params["relation"] = relation
 
     if params:
@@ -1352,19 +1361,27 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: dict or None
     """
     desc_order = ["score desc", "dateFiled desc"]
-    map_desc_order = [("score desc", "_score"),
-                      ("dateFiled desc", "described_opinion_cluster_docket_date_filed")]
+    map_desc_order = [
+        ("score desc", "_score"),
+        ("dateFiled desc", "described_opinion_cluster_docket_date_filed"),
+    ]
     asc_order = ["dateFiled asc"]
-    map_asc_order = [("dateFiled asc", "described_opinion_cluster_docket_date_filed")]
+    map_asc_order = [
+        ("dateFiled asc", "described_opinion_cluster_docket_date_filed")
+    ]
     order_by = cd.get("order_by")
     if order_by:
         if order_by in desc_order:
-            fieldname_map = list(filter(lambda x: x[0] == order_by, map_desc_order))
+            fieldname_map = list(
+                filter(lambda x: x[0] == order_by, map_desc_order)
+            )
             if fieldname_map:
                 # print("fieldname_map1", fieldname_map)
                 return {fieldname_map[0][1]: "desc"}
         if order_by in asc_order:
-            fieldname_map = list(filter(lambda x: x[0] == order_by, map_asc_order))
+            fieldname_map = list(
+                filter(lambda x: x[0] == order_by, map_asc_order)
+            )
             if fieldname_map:
                 # print("fieldname_map", fieldname_map)
                 return {fieldname_map[0][1]: "asc"}
@@ -1375,16 +1392,21 @@ def build_es_queries(cd: CleanData) -> List:
     queries_list = []
 
     # Build daterange query
-    q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
-                               cd.get("filed_before", ""), cd.get("filed_after", ""))
+    q1 = build_daterange_query(
+        "described_opinion_cluster_docket_date_filed",
+        cd.get("filed_before", ""),
+        cd.get("filed_after", ""),
+    )
     queries_list.extend(q1)
     # q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
     #                            cd.get("filed_before", ""), cd.get("filed_after", ""))
     # queries_list.extend(q2)
 
     # Build court terms filter
-    q3 = build_terms_query("described_opinion_cluster_docket_court_id",
-                           cd.get("court", "").split(" "))
+    q3 = build_terms_query(
+        "described_opinion_cluster_docket_court_id",
+        cd.get("court", "").split(" "),
+    )
     queries_list.extend(q3)
 
     # Build fulltext query
@@ -1395,8 +1417,9 @@ def build_es_queries(cd: CleanData) -> List:
     # q5 = build_term_query("describing_opinion_cluster_docket_number",
     #                       cd.get("docket_number", ""))
     # queries_list.extend(q5)
-    q6 = build_term_query("described_opinion_cluster_docket_number",
-                          cd.get("docket_number", ""))
+    q6 = build_term_query(
+        "described_opinion_cluster_docket_number", cd.get("docket_number", "")
+    )
     queries_list.extend(q6)
 
     # print("queries_list", queries_list)

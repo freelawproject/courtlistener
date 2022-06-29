@@ -10,12 +10,15 @@ class ESPaginator(Paginator):
 
     def __init__(self, *args, **kwargs):
         super(ESPaginator, self).__init__(*args, **kwargs)
-        self._count = self.object_list.hits.total.value if hasattr(self.object_list,
-                                                                   "hits") else 0
+        self._count = (
+            self.object_list.hits.total.value
+            if hasattr(self.object_list, "hits")
+            else 0
+        )
 
     @cached_property
     def execution_time(self):
-        """Return query execution time
-        """
-        return self.object_list.took if hasattr(self.object_list,
-                                                "took") else 0
+        """Return query execution time"""
+        return (
+            self.object_list.took if hasattr(self.object_list, "took") else 0
+        )

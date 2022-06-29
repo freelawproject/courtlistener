@@ -13,12 +13,12 @@ from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
-from django.http import HttpRequest, HttpResponse, Http404
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
 from django.views.decorators.cache import never_cache
-from elasticsearch.exceptions import TransportError, RequestError
+from elasticsearch.exceptions import RequestError, TransportError
 from requests import RequestException
 from scorched.exc import SolrError
 
@@ -32,19 +32,25 @@ from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
+    build_es_queries,
     build_main_query,
+    build_sort_results,
     get_mlt_query,
     get_query_citation,
     get_solr_interface,
     make_get_string,
     make_stats_variable,
     merge_form_with_courts,
-    regroup_snippets, build_es_queries, build_sort_results,
+    regroup_snippets,
 )
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import ParentheticalDocument
-from cl.search.forms import SearchForm, _clean_form, ParentheticalSearchForm, \
-    _clean_es_form
+from cl.search.forms import (
+    ParentheticalSearchForm,
+    SearchForm,
+    _clean_es_form,
+    _clean_form,
+)
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
@@ -100,7 +106,7 @@ def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
 
 
 def do_search(
-        get_params, rows=20, override_params=None, facet=True, cache_key=None
+    get_params, rows=20, override_params=None, facet=True, cache_key=None
 ):
     """Do all the difficult solr work.
 
@@ -288,13 +294,12 @@ def get_homepage_stats():
         "visualizations": SCOTUSMap.objects.filter(
             published=True, deleted=False
         )
-                              .annotate(Count("clusters"))
-                              .filter(
+        .annotate(Count("clusters"))
+        .filter(
             # Ensures that we only show good stuff on homepage
             clusters__count__gt=10,
         )
-                              .order_by("-date_published", "-date_modified",
-                                        "-date_created")[:1],
+        .order_by("-date_published", "-date_modified", "-date_created")[:1],
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
@@ -510,7 +515,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
 
 
 def es_search(request: HttpRequest, search_type: str = None) -> HttpResponse:
-    """ Display elasticsearch search page based on type passed as url param
+    """Display elasticsearch search page based on type passed as url param
     :param request: HttpRequest object
     :param search_type: search type name
     :return: HttpResponse
@@ -531,16 +536,23 @@ def es_search(request: HttpRequest, search_type: str = None) -> HttpResponse:
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
-        render_dict.update({"search_form": search_form, "courts": courts,
-                            "court_count_human": court_count_human,
-                            "court_count": court_count, })
+        render_dict.update(
+            {
+                "search_form": search_form,
+                "courts": courts,
+                "court_count_human": court_count_human,
+                "court_count": court_count,
+            }
+        )
     else:
         raise Http404(f"Search type: {search_type} not valid")
 
     return render(request, template, render_dict)
 
 
-def es_search_results(request: HttpRequest, search_type: str = None) -> HttpResponse:
+def es_search_results(
+    request: HttpRequest, search_type: str = None
+) -> HttpResponse:
     """Display elasticsearch search results
     :param request: HttpRequest object
     :param search_type: indicates search type by name
@@ -565,7 +577,7 @@ def es_search_results(request: HttpRequest, search_type: str = None) -> HttpResp
 
 
 def do_es_search(get_params, search_type):
-    """ Run Elasticsearch searching and filtering and prepare data to display
+    """Run Elasticsearch searching and filtering and prepare data to display
     :param get_params: The request.GET params sent by user.
     :param search_type: indicates search type by name
     :return: dict
@@ -581,7 +593,9 @@ def do_es_search(get_params, search_type):
     if search_type in ["parenthetical"]:
         courts = Court.objects.filter(in_use=True)
         if search_type == "parenthetical":
-            search_form = ParentheticalSearchForm(get_params, search_type=search_type)
+            search_form = ParentheticalSearchForm(
+                get_params, search_type=search_type
+            )
             document_type = ParentheticalDocument
 
     hits_query = None
@@ -593,7 +607,8 @@ def do_es_search(get_params, search_type):
             filters = build_es_queries(cd)
             if filters:
                 hits_query = document_type.search().filter(
-                    reduce(operator.iand, filters))
+                    reduce(operator.iand, filters)
+                )
             else:
                 hits_query = document_type.search().query("match_all")
         else:
@@ -604,7 +619,9 @@ def do_es_search(get_params, search_type):
             # Order by relevance default
             hits_query = hits_query.sort(build_sort_results(cd))
             hits = hits_query.execute()
-            paged_results = do_es_pagination(get_params, hits, rows_per_page=10)
+            paged_results = do_es_pagination(
+                get_params, hits, rows_per_page=10
+            )
         except (TransportError, ConnectionError, RequestError) as e:
             error = True
             logger.warning(
@@ -614,9 +631,13 @@ def do_es_search(get_params, search_type):
             if settings.DEBUG is True:
                 traceback.print_exc()
 
-    search_form = _clean_es_form(get_params, search_form.cleaned_data, courts,
-                                 search_type,
-                                 search_form.__class__)
+    search_form = _clean_es_form(
+        get_params,
+        search_form.cleaned_data,
+        courts,
+        search_type,
+        search_form.__class__,
+    )
 
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
@@ -624,11 +645,16 @@ def do_es_search(get_params, search_type):
     search_summary_str = search_form.as_text(court_count_human)
     search_summary_dict = search_form.as_display_dict(court_count_human)
 
-    return {"results": paged_results, "search_form": search_form,
-            "search_summary_str": search_summary_str,
-            "search_summary_dict": search_summary_dict, "error": error,
-            "courts": courts, "court_count_human": court_count_human,
-            "court_count": court_count, }
+    return {
+        "results": paged_results,
+        "search_form": search_form,
+        "search_summary_str": search_summary_str,
+        "search_summary_dict": search_summary_dict,
+        "error": error,
+        "courts": courts,
+        "court_count_human": court_count_human,
+        "court_count": court_count,
+    }
 
 
 def do_es_pagination(get_params, hits, rows_per_page=10):

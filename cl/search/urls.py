@@ -1,7 +1,12 @@
 from django.urls import path, re_path
 
 from cl.search.feeds import AllJurisdictionsFeed, JurisdictionFeed, SearchFeed
-from cl.search.views import advanced, show_results, es_search_results, es_search
+from cl.search.views import (
+    advanced,
+    es_search,
+    es_search_results,
+    show_results,
+)
 
 urlpatterns = [
     # Search pages
