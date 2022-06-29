@@ -749,7 +749,7 @@ class ParentheticalSearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
-        type = kwargs.pop("type", None)
+        search_type = kwargs.pop("search_type", None)
         super(ParentheticalSearchForm, self).__init__(*args, **kwargs)
         """
         Normally we wouldn't need to use __init__ in a form object like
@@ -771,8 +771,8 @@ class ParentheticalSearchForm(forms.Form):
                 widget=forms.CheckboxInput(attrs={"checked": "checked"}),
             )
 
-        # Add options based on type
-        if type == "parenthetical":
+        # Add options based on search type
+        if search_type == "parenthetical":
             self.ORDER_BY_OPTIONS.append(("score desc", "Relevance"))
             self.ORDER_BY_OPTIONS.append(("dateFiled desc", "Newest First"))
             self.ORDER_BY_OPTIONS.append(("dateFiled asc", "Oldest First"))
@@ -870,21 +870,18 @@ class ParentheticalSearchForm(forms.Form):
         """
         # The search type is usually provided by cleaned data, but can be
         # missing when the form is invalid (and lacks it). If so, just give up.
-        try:
-            search_type = self.data["type"]
-        except MultiValueDictKeyError:
-            return {}
+
         display_dict = OrderedDict({"Courts": court_count_human})
         for field_name, field in self.fields.items():
             if not hasattr(field, "as_str_types"):
                 continue
-            if search_type in field.as_str_types:
-                value = self.cleaned_data.get(field_name)
-                if value:
-                    if isinstance(field, ChoiceField):
-                        choices = flatten_choices(self.fields[field_name])
-                        value = dict(choices)[value]
-                    display_dict[field.label] = value
+            # if search_type in field.as_str_types:
+            value = self.cleaned_data.get(field_name)
+            if value:
+                if isinstance(field, ChoiceField):
+                    choices = flatten_choices(self.fields[field_name])
+                    value = dict(choices)[value]
+                display_dict[field.label] = value
 
         return display_dict
 
@@ -892,7 +889,8 @@ class ParentheticalSearchForm(forms.Form):
         """Create a human-readable string representation of the search form"""
         crumbs = []
         for label, value in self.as_display_dict(court_count_human).items():
-            crumbs.append(f"{label}: {value}")
+            if label:
+                crumbs.append(f"{label}: {value}")
         return " › ".join(crumbs)
 
 

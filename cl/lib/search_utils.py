@@ -1348,6 +1348,8 @@ def build_terms_query(field: str, value: List) -> List:
 def build_es_queries(cd: CleanData) -> List:
     queries_list = []
 
+    print("->>>>>>> CD", cd)
+
     # Build daterange query
     q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
                                cd.get("filed_before", ""), cd.get("filed_after", ""))
@@ -1367,10 +1369,11 @@ def build_es_queries(cd: CleanData) -> List:
 
     # Build other text queries
     # TODO not showing results with docket number
-    q5 = build_term_query("describing_opinion_cluster_docket_number", cd.get("docket_number", ""))
+    q5 = build_term_query("describing_opinion_cluster_docket_number",
+                          cd.get("docket_number", ""))
     queries_list.extend(q5)
     q6 = build_term_query("described_opinion_cluster_docket_number",
-                              cd.get("docket_number", ""))
+                          cd.get("docket_number", ""))
     queries_list.extend(q6)
 
     print("queries_list", queries_list)

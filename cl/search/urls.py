@@ -14,8 +14,9 @@ urlpatterns = [
     # Elastic search pages
     # TODO optional param
     path("search/", es_search, name="es_search"),
-    path("search/<str:type>/", es_search, name="es_search"),
-    path("results/<str:type>/", es_search_results, name="es_results"),
+    path("search/<str:search_type>/", es_search, name="es_search"),
+    path("results/", es_search_results, name="es_results"),
+    path("results/<str:search_type>/", es_search_results, name="es_results"),
     # Feeds & Podcasts
     re_path(r"^feed/(search)/$", SearchFeed(), name="search_feed"),
     # lacks URL capturing b/c it will use GET queries.

@@ -2059,12 +2059,21 @@ class ElasticSearchTest(TestCase):
 
         filters = build_es_queries(cd)
 
-        # TODO "docket_id:15462654" filter
-        # TODO "opinion_id:15135" filter
-
         if not filters:
             # Return all results
             s = ParentheticalDocument.search().query("match_all")
             print(s.to_dict())
             print(s.count())
             self.assertEqual(s.count(), 3)
+
+    def test_docker_number_filter(self) -> None:
+        filters = []
+
+        filters.append(Q("term", describing_opinion_cluster_docket_number="1:98-cr-35856"))
+
+        print("filters", filters)
+
+        s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.count(), 2)

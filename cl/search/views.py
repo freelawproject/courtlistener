@@ -18,6 +18,7 @@ from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
 from django.views.decorators.cache import never_cache
+from elasticsearch.exceptions import TransportError, RequestError
 from requests import RequestException
 from scorched.exc import SolrError
 
@@ -507,18 +508,22 @@ def advanced(request: HttpRequest) -> HttpResponse:
         return render(request, "advanced.html", render_dict)
 
 
-def es_search(request: HttpRequest, type: str = None) -> HttpResponse:
-    """Display elasticsearch search page
+def es_search(request: HttpRequest, search_type: str = None) -> HttpResponse:
+    """ Display elasticsearch search page based on type passed as url param
+    :param request: HttpRequest object
+    :param search_type: search type name
+    :return: HttpResponse
     """
     render_dict = {"private": False}
+    template = None
 
-    if not type:
+    if not search_type:
         return HttpResponseRedirect(reverse("show_results"))
 
-    if type in ["parenthetical"]:
+    if search_type in ["parenthetical"]:
         courts = Court.objects.filter(in_use=True)
-        render_dict.update({"type": type})
-        if type == "parenthetical":
+        render_dict.update({"search_type": search_type})
+        if search_type == "parenthetical":
             search_form = ParentheticalSearchForm()
             template = "parenthetical.html"
 
@@ -529,51 +534,56 @@ def es_search(request: HttpRequest, type: str = None) -> HttpResponse:
                             "court_count_human": court_count_human,
                             "court_count": court_count, })
     else:
-        raise Http404("Search type not valid")
-    #
-    # return HttpResponse(f"<h1>200: OK: {type}</h1>")
+        raise Http404(f"Search type: {search_type} not valid")
+
     return render(request, template, render_dict)
 
 
-def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
+def es_search_results(request: HttpRequest, search_type: str = None) -> HttpResponse:
     """Display elasticsearch search results
+    :param request: HttpRequest object
+    :param search_type: search type name
+    :return: HttpResponse
     """
     render_dict = {"private": False}
+    search_form = None
     search_results = {}
-    print('type', type)
-    if not type:
+    if not search_type:
         return HttpResponseRedirect(reverse("show_results"))
 
-    # TODO run es filtering and show results
+    get_string = make_get_string(request)
+    render_dict.update({"get_string": get_string})
+
     # TODO handle ordering by relevance, maybe by es score?
     error = False
-    cd = {}
 
-    if type in ["parenthetical"]:
+    if search_type in ["parenthetical"]:
         courts = Court.objects.filter(in_use=True)
-        render_dict.update({"type": type})
-        if type == "parenthetical":
-            print("searching......")
-            # search_form = ParentheticalSearchForm(initial=request.GET.copy())
-            # cd = _clean_form(request.GET.copy(), cd, courts)
+        render_dict.update({"search_type": search_type})
+        if search_type == "parenthetical":
+            # Perform search
+            search_results = do_es_search(request.GET.copy(), search_type)
 
-            search_results = do_es_search(request.GET.copy(), type)
-
-            search_form = ParentheticalSearchForm(request.GET.copy(), type=type)
+            search_form = ParentheticalSearchForm(request.GET.copy(),
+                                                  search_type=search_type)
 
         if search_form.is_valid():
             cd = prep_cd(request.GET.copy(), search_form.cleaned_data, courts)
-            search_form = ParentheticalSearchForm(cd, type=type)
+            search_form = ParentheticalSearchForm(cd, search_type=search_type)
+
         else:
             error = True
+
+        if search_form:
+            # Call is_valid() to get cleaned_data
+            search_form.is_valid()
 
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
         search_summary_str = search_form.as_text(court_count_human)
         search_summary_dict = search_form.as_display_dict(court_count_human)
-        print("court_count_human", court_count_human)
-        print("court_count", court_count)
+
         render_dict.update(search_results)
         render_dict.update({"search_form": search_form, "courts": courts,
                             "court_count_human": court_count_human,
@@ -582,47 +592,87 @@ def es_search_results(request: HttpRequest, type: str = None) -> HttpResponse:
                             "search_summary_dict": search_summary_dict,
                             "error": error})
     else:
-        raise Http404("Search type not valid")
+        raise Http404(f"Search type: {search_type} not valid")
 
-    return render(request, "results.html", render_dict)
+    return render(request, "elasticsearch/results.html", render_dict)
 
 
-def do_es_search(get_params, type):
+def do_es_search(get_params, search_type):
+    """
+
+    :param get_params:
+    :param search_type:
+    :return:
+    """
     search_form = None
+    document_type = None
     hits = []
 
     # TODO handle exceptions like TransportError, ConnectionError, RequestError, etc
+    if search_type in ["parenthetical"]:
+        courts = Court.objects.filter(in_use=True)
+        if search_type == "parenthetical":
+            search_form = ParentheticalSearchForm(get_params, search_type=search_type)
+            document_type = ParentheticalDocument
 
-    if type == "parenthetical":
-        search_form = ParentheticalSearchForm(get_params, type=type)
-        document_type = ParentheticalDocument
+    hits_query = None
 
     if search_form:
         if search_form.is_valid():
             cd = search_form.cleaned_data
+            # Create necessary filters to execute ES query
             filters = build_es_queries(cd)
             if filters:
                 print("filters", filters)
-                hits = document_type.search().filter(
-                    reduce(operator.iand, filters)).execute()
+                hits_query = document_type.search().filter(
+                    reduce(operator.iand, filters))
             else:
-                hits = document_type.search().query("match_all").execute()
+                hits_query = document_type.search().query("match_all")
             print("----> HITS", hits)
         else:
             print("form errors: ", search_form.errors)
 
-    paged_results = do_es_pagination(get_params, hits, rows_per_page=1)
+    if hits_query:
+        try:
+            hits = hits_query.execute()
+        except (TransportError, ConnectionError, RequestError) as e:
+            # TODO handle this here
+            error = True
+            logger.warning(
+                f"Error loading search page with request: {get_params}"
+            )
+            logger.warning(f"Error was: {e}")
+            if settings.DEBUG is True:
+                traceback.print_exc()
 
-    print("paged_results", paged_results)
+    paged_results = do_es_pagination(get_params, hits, rows_per_page=10)
 
-    return {"results": paged_results, "search_form": search_form}
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts, search_form
+    )
+    search_summary_str = search_form.as_text(court_count_human)
+    search_summary_dict = search_form.as_display_dict(court_count_human)
+
+    return {"results": paged_results, "search_form": search_form,
+            "search_summary_str": search_summary_str,
+            "search_summary_dict": search_summary_dict}
 
 
 def do_es_pagination(get_params, hits, rows_per_page=10):
+    """Paginate elasticsearch results
+    :param get_params: url get params
+    :param hits: elasticsearch results
+    :param rows_per_page: number of records per page
+    :return: paginated results
+    """
+
+    print("hits type", type(hits))
     try:
         page = int(get_params.get("page", 1))
     except ValueError:
         page = 1
+
+    # Check pagination depth
     check_pagination_depth(page)
 
     paginator = ESPaginator(hits, rows_per_page)

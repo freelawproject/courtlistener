@@ -1,0 +1,16 @@
+{% load extras %}
+{% load text_filters %}
+{% load mathfilters %}
+{% load humanize %}
+
+{% for result in results.object_list %}
+	<article>
+		<h3 class="bottom serif">
+			{{ result.text|safe }}
+		</h3>
+		<a href="{{ result.describing_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+				class="fa fa-search visitable">&nbsp;View describing opinion</i></a>
+		<a href="{{ result.described_opinion_url }}?{{ request.META.QUERY_STRING }}"><i
+				class="fa fa-search visitable">&nbsp;View described opinion</i></a>
+	</article>
+{% endfor %}

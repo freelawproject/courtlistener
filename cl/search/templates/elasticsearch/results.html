@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load text_filters %}
+{% load static %}
+
+{% block message %}{% endblock %}
+
+{% block title %}
+	{% if search_summary_str %}
+		Search Results for {{ search_summary_str }} &mdash;
+		{% if not error %}{{ results.paginator.count|intcomma }} Result
+			{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+	{% else %}
+		Free Legal Search Engine and Alert System &mdash; CourtListener.com
+	{% endif %}
+{% endblock %}
+{% block og_title %}
+	{% if search_summary_str %}
+		Search Results for {{ search_summary_str }} &mdash;
+		{% if not error %}{{ results.paginator.count|intcomma }} Result
+			{{ results.paginator.count|pluralize }} &mdash; {% endif %}CourtListener.com
+	{% else %}
+		Free Legal Search Engine and Alert System &mdash; CourtListener.com
+	{% endif %}
+{% endblock %}
+
+{% block head %}
+	{% if not error %}
+		{% if get_string %}
+			<link rel="alternate"
+				  type="application/rss+xml"
+				  title="Atom Feed for These Search Results"
+				  href="/feed/search/?{{ get_string }}"/>
+		{% endif %}
+	{% endif %}
+	<link rel="alternate"
+		  type="application/rss+xml"
+		  title="Atom Feed For All Opinions"
+		  href="/feed/court/all/">
+	<link rel="alternate"
+		  type="application/rss+xml"
+		  title="Podcast For All Oral Arguments"
+		  href="/podcast/court/all/">
+	{% if DEBUG %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.css" %}"/>
+	{% else %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+	{% endif %}
+{% endblock %}
+
+{% block footer-scripts %}
+	{% include "includes/date_picker.html" %}
+	{% if alert_form.errors or request.GET.show_alert_modal %}
+		<script type="text/javascript">
+            $(window).on('load', function () {
+                $("#modal-save-alert").modal('show');
+            });
+		</script>
+	{% endif %}
+	<script type="text/javascript">
+        $("#modal-save-alert").on('show.bs.modal', function (e) {
+            const modalBody = $('.modal-body.logged-in');
+            if (modalBody.length === 0) {
+                // Not logged in; abort. Don't do alert estimation ajax
+                return
+            }
+            const estimate = $(this).find('#alert-estimate');
+            const icon = estimate.find('i');
+            const msg = estimate.find('span');
+            const numDaysToEstimate = 100;
+            $.ajax({
+                url: "{% url "alert_frequency" version=3 day_count=100 %}" + window.location.search,
+                success: function (data) {
+                    // Check if this is impractically large. If so, block it
+                    const hitsPerDay = Math.floor(data.count / numDaysToEstimate);
+                    if (hitsPerDay > {{ MAX_ALERT_RESULTS_PER_DAY }}) {
+                        // Wipe the screen; show message to the user
+                        modalBody.empty();
+                        modalBody.append(
+                            $('<p/>').text("This query averages about " + hitsPerDay + " results per day. This is more than our system can support and may create a lot of messages in your inbox."),
+                            $('<p/>').text("Please narrow your query to have fewer results per day.")
+                        );
+                        modalBody.removeClass("hidden");
+                    } else {
+                        // Show the form; Update icon and text
+                        modalBody.removeClass("hidden");
+                        icon.removeClass('fa-spinner fa-pulse fa-warning').addClass('fa-clock-o');
+                        msg.text(" " + data.count + " hits in the last 100 days")
+                    }
+                },
+                error: function () {
+                    modalBody.removeClass("hidden");
+                    icon.removeClass("fa-spinner fa-pulse fa-clock-o").addClass("fa-warning");
+                    msg.text(" Unable to get estimate for this alert");
+                }
+            })
+        })
+	</script>
+{% endblock %}
+
+{% block navbar-o %}
+	{% if search_type == "parenthetical" %}active{% else %}
+		{{ block.super }}{% endif %}
+{% endblock %}
+
+{% block sidebar %}
+	<div class="col-sm-3 search-page" id="sidebar">
+		<div class="sidebar-section visible-xs">
+			<a class="btn btn-default" href="#search-results">Jump to
+				Results</a>
+		</div>
+
+		{% if search_type == "parenthetical" %}
+			{% include "elasticsearch/sidebar_filters/parenthetical.html" %}
+		{% endif %}
+
+		{% include "includes/donate_sidebar.html" with referrer="search-donate-now" %}
+	</div>
+{% endblock %}
+
+
+{% block content %}
+
+	<div id="search-results" class="col-lg-7 col-sm-9 search-page">
+		{% include "includes/messages.html" %}
+
+		<div class="row">
+			<div class="col-sm-12">
+
+				<form action="{% url "es_results" search_type %}"
+					  method="get"
+					  id="search-form"
+					  role="form">
+					<div id="search-container" class="v-offset-below-1">
+						<label class="sr-only" for="id_q">Search</label>
+						<div class="input-group input-group-lg">
+							<input class="form-control"
+								   value="{{ search_form.q.value|default:'' }}"
+								   name="q"
+								   id="id_q"
+								   autocomplete="off"
+								   type="text">
+
+							<span class="input-group-btn">
+                                <button type="submit"
+										class="btn btn-primary"
+										name="search"
+										id="search-button"><i
+										class="fa fa-search"></i>&nbsp;Search
+                                </button>
+                            </span>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		{% if results.paginator.count > 0 %}
+			<div class="row">
+				<div class="col-sm-12">
+
+					<h2 id="result-count" class="bottom">
+						{% if search_type == "parenthetical" %}
+							{{ results.paginator.count|intcomma }}
+							Parenthetical{{ results.paginator.count|pluralize }}
+						{% endif %}
+
+					</h2>
+					<span class="small gray top">{{ results.paginator.execution_time|intcomma }}ms</span>
+				</div>
+			</div>
+			{% include "elasticsearch/search_result.html" %}
+		{% else %}
+			{% include "elasticsearch/no_results.html" %}
+		{% endif %}
+
+		{% include "includes/pagination.html" %}
+		{% include "includes/random_tip.html" %}
+		{% include "includes/jurisdiction_picker_modal.html" %}
+	</div>
+
+{% endblock %}

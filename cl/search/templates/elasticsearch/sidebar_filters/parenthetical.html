@@ -3,7 +3,7 @@
 
 <div class="sidebar-section">
 	<h3><span>Refine Your Query</span></h3>
-	<form action="{% url "es_results" type %}" method="get" id="sidebar-search-form">
+	<form action="{% url "es_results" search_type %}" method="get" id="sidebar-search-form">
 
 		{% for hidden in search_form.hidden_fields %}
 			{{ hidden }}
@@ -42,7 +42,7 @@
 			</div>
 
 			<div class="form-group text-right">
-				<a href="{% url "es_results" type %}"><i class="fa fa-times"></i>&nbsp;Clear
+				<a href="{% url "es_results" search_type %}"><i class="fa fa-times"></i>&nbsp;Clear
 					filters</a>
 			</div>
 
