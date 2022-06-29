@@ -1,5 +1,6 @@
-2.0.33
+2.0.34
 
+2.0.34 - Another attempt to fix ratelimiting
 2.0.33 - Restore WSGI files
 2.0.32 - Update code & juriscraper
 2.0.31 - Update code
