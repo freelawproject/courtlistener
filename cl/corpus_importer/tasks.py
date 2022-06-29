@@ -63,6 +63,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
+    is_pacer_court_accessible,
     lookup_and_save,
     map_cl_to_pacer_id,
     map_pacer_to_cl_id,
@@ -568,6 +569,17 @@ def get_and_process_free_pdf(
         return None
     result = data["result"]
     rd = RECAPDocument.objects.get(pk=data["rd_pk"])
+
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(rd.docket_entry.docket.court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
+            logger.warning(msg)
+            self.request.chain = None
+            return None
+        raise self.retry()
+
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
