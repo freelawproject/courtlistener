@@ -25,7 +25,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.lib.search_utils import cleanup_main_query, build_daterange_query, \
-    build_fulltext_query, build_es_queries, build_terms_query
+    build_fulltext_query, build_es_queries, build_terms_query, build_sort_results
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     EmptySolrTestCase,
@@ -1881,7 +1881,7 @@ class ElasticSearchTest(TestCase):
     # value. The provided text is analyzed before matching.
 
     def test_search_1(self) -> None:
-        # {'query': {'bool': {'filter': [{'term': {'text': 'responsibility'}}]}}}
+        """ Basic test to search indexed ES data"""
         s = ParentheticalDocument.search().filter(
             "term", text="responsibility"
         )
@@ -1889,7 +1889,6 @@ class ElasticSearchTest(TestCase):
         print(s.count())
         self.assertEqual(s.count(), 1)
 
-        # {'query': {'match': {'text': 'responsibility'}}}
         s2 = ParentheticalDocument.search().query(
             "match", text="responsibility"
         )
@@ -1897,15 +1896,13 @@ class ElasticSearchTest(TestCase):
         print(s2.count())
         self.assertEqual(s2.count(), 1)
 
-        # {'query': {'bool': {'filter': [{'bool': {'must_not': [{'term': {'text': 'responsibility'}}]}}]}}}
         s3 = ParentheticalDocument.search().exclude(
             "term", text="responsibility"
         )
         print(s3.to_dict())
         print(s3.count())
-        self.assertEqual(s3.count(), 0)
+        self.assertEqual(s3.count(), 2)
 
-        # {'query': {'bool': {'filter': [{'term': {'text': 'responsibility'}}, {'term': {'group': 2}}]}}}
         s4 = ParentheticalDocument.search().filter(
             "term", text="responsibility"
         )
@@ -1921,7 +1918,7 @@ class ElasticSearchTest(TestCase):
         )
         print(s1.to_dict())
         print(s1.count())
-        self.assertEqual(s1.count(), 1)
+        self.assertEqual(s1.count(), 0)
 
     def test_filter_2(self) -> None:
         """ Test two filters """
@@ -1930,11 +1927,10 @@ class ElasticSearchTest(TestCase):
         filters.append(Q("match", describing_opinion_extracted_by_ocr=True))
         filters.append(Q("match", describing_opinion_per_curiam=True))
 
-        # {'query': {'bool': {'filter': [{'bool': {'must': [{'match': {'describing_opinion_extracted_by_ocr': True}}, {'match': {'describing_opinion_per_curiam': True}}]}}]}}}
         s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s1.to_dict())
         print(s1.count())
-        self.assertEqual(s1.count(), 2)
+        self.assertEqual(s1.count(), 0)
 
     def test_filter_search(self) -> None:
         """ Test filtering and search the same time """
@@ -1947,7 +1943,7 @@ class ElasticSearchTest(TestCase):
         s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s1.to_dict())
         print(s1.count())
-        self.assertEqual(s1.count(), 2)
+        self.assertEqual(s1.count(), 0)
 
     def test_filter_daterange(self) -> None:
         """ Test filter by date range"""
@@ -1962,8 +1958,6 @@ class ElasticSearchTest(TestCase):
                          described_opinion_cluster_docket_date_filed={"gte": date_gte,
                                                                       "lte": date_lte}))
 
-        # {'query': {'bool': {'filter': [{'bool': {'must': [{'range': {'describing_opinion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}, {'range': {'described_opinion_cluster_docket_date_filed':
-        #  {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}]}}]}}}
         s1 = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s1.to_dict())
         print(s1.count())
@@ -1983,8 +1977,6 @@ class ElasticSearchTest(TestCase):
                          described_opinion_cluster_docket_date_filed={"gte": date_gte,
                                                                       "lte": date_lte}))
 
-        # {'query': {'bool': {'filter': [{'bool': {'must': [{'match': {'text': 'friend'}}, {'range': {'describing_opinion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}, {'range': {'described_opin
-        # ion_cluster_docket_date_filed': {'gte': '1976-08-30T00:00:00Z', 'lte': '1978-03-10T00:00:00Z'}}}]}}]}}}
         s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s.to_dict())
         print(s.count())
@@ -2009,9 +2001,10 @@ class ElasticSearchTest(TestCase):
                          datetime.datetime(1978, 3, 10, 0, 0))
 
     def test_build_daterange_query(self) -> None:
+        """Test build es daterange query"""
         filters = []
-        date_gte = datetime.datetime(1976, 8, 30, 0, 0)
-        date_lte = datetime.datetime(1978, 3, 10, 0, 0)
+        date_gte = datetime.datetime(1976, 8, 30, 0, 0).date()
+        date_lte = datetime.datetime(1978, 3, 10, 0, 0).date()
 
         q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
                                    date_lte, date_gte)
@@ -2023,6 +2016,7 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(s.count(), 2)
 
     def test_build_fulltext_query(self) -> None:
+        """Test build es fulltext query"""
         filters = []
         q1 = build_fulltext_query("text", "responsibility")
         filters.extend(q1)
@@ -2032,6 +2026,7 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(s.count(), 1)
 
     def test_build_terms_query(self) -> None:
+        """Test build es terms query"""
         filters = []
         q = build_terms_query("described_opinion_cluster_docket_court_id",
                               ["tsoyd", "djmfd"])
@@ -2042,8 +2037,9 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(s.count(), 2)
 
     def test_cd_query(self) -> None:
-        cd = {"filed_after": datetime.datetime(1976, 8, 30, 0, 0),
-              "filed_before": datetime.datetime(1978, 3, 10, 0, 0),
+        """Test build es query with cleaned data"""
+        cd = {"filed_after": datetime.datetime(1976, 8, 30, 0, 0).date(),
+              "filed_before": datetime.datetime(1978, 3, 10, 0, 0).date(),
               "q": "responsibility"}
 
         filters = build_es_queries(cd)
@@ -2053,6 +2049,7 @@ class ElasticSearchTest(TestCase):
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
+        """Test build es query with cleaned data"""
         cd = {"filed_after": "",
               "filed_before": "",
               "q": ""}
@@ -2067,13 +2064,25 @@ class ElasticSearchTest(TestCase):
             self.assertEqual(s.count(), 3)
 
     def test_docker_number_filter(self) -> None:
+        """Test filter by docker_number"""
         filters = []
 
-        filters.append(Q("term", describing_opinion_cluster_docket_number="1:98-cr-35856"))
-
-        print("filters", filters)
+        filters.append(
+            Q("term", described_opinion_cluster_docket_number="1:98-cr-35856"))
 
         s = ParentheticalDocument.search().filter(reduce(operator.iand, filters))
         print(s.to_dict())
         print(s.count())
-        self.assertEqual(s.count(), 2)
+        self.assertEqual(s.count(), 1)
+
+    def test_build_sort(self) -> None:
+        """Test we can build sort dict and sort ES query"""
+        cd = {"order_by": "dateFiled desc"}
+
+        ordering = build_sort_results(cd)
+
+        s = ParentheticalDocument.search().query("match_all").sort(ordering)
+        print(s.to_dict())
+        print(s.count())
+        self.assertEqual(s.execute()[0].described_opinion_cluster_docket_date_filed,
+                         datetime.datetime(1981, 7, 11, 0, 0))

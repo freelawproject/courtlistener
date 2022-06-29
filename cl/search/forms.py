@@ -689,7 +689,7 @@ class ParentheticalSearchForm(forms.Form):
     q = forms.CharField(required=False, label="Query")
 
     order_by = forms.ChoiceField(label="Search Results Order:", required=False,
-                                 initial="score desc", choices=ORDER_BY_OPTIONS,
+                                 initial="-score", choices=ORDER_BY_OPTIONS,
                                  widget=forms.Select(
                                      attrs={"class": "external-input form-control"}))
 
@@ -730,16 +730,16 @@ class ParentheticalSearchForm(forms.Form):
         ),
     )
 
-    opinion_id = forms.CharField(
-        required=False,
-        label="Opinion id",
-        widget=forms.TextInput(
-            attrs={
-                "class": "external-input form-control",
-                "autocomplete": "off",
-            }
-        ),
-    )
+    # opinion_id = forms.CharField(
+    #     required=False,
+    #     label="Opinion id",
+    #     widget=forms.TextInput(
+    #         attrs={
+    #             "class": "external-input form-control",
+    #             "autocomplete": "off",
+    #         }
+    #     ),
+    # )
 
     def get_date_field_names(self):
         return {
@@ -779,34 +779,21 @@ class ParentheticalSearchForm(forms.Form):
 
         self.fields["order_by"].choices = self.ORDER_BY_OPTIONS
 
-        # data_courts = self.data.get("court")
-        # print('data_courts', data_courts)
-        # if data_courts:
-        #     if " " in data_courts:
-        #         court_ids = data_courts.split(" ")
-        #     elif "," in data_courts:
-        #         court_ids = data_courts.split(",")
-        #     else:
-        #         court_ids = [data_courts]
-        #     for court_id in court_ids:
-        #         self.initial[f"{court_id}"] = False
-        #         self.fields[f"{court_id}"].initial = False
-
     def clean(self):
         """
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
 
-        # # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
-        # for field_name in self.get_date_field_names():
-        #     before = cleaned_data.get(f"{field_name}_before")
-        #     after = cleaned_data.get(f"{field_name}_after")
-        #     if before and after and (before < after):
-        #         # The user is requesting dates like this: <--b  a-->. Switch
-        #         # the dates so their query is like this: a-->   <--b
-        #         cleaned_data[f"{field_name}_before"] = after
-        #         cleaned_data[f"{field_name}_after"] = before
+        # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
+        for field_name in self.get_date_field_names():
+            before = cleaned_data.get(f"{field_name}_before")
+            after = cleaned_data.get(f"{field_name}_after")
+            if before and after and (before < after):
+                # The user is requesting dates like this: <--b  a-->. Switch
+                # the dates so their query is like this: a-->   <--b
+                cleaned_data[f"{field_name}_before"] = after
+                cleaned_data[f"{field_name}_after"] = before
 
         # 2. Convert the value in the court field to the various court_* fields
         court_str = cleaned_data.get("court")
@@ -894,6 +881,37 @@ class ParentheticalSearchForm(forms.Form):
         return " › ".join(crumbs)
 
 
+def _clean_es_form(get_params, cd, courts, search_type, formclass):
+    """Returns cleaned up values as a Form object."""
+    # Send the user the cleaned up query
+    get_params["q"] = cd["q"]
+
+    # Clean up the date formats. This is probably no longer needed since we do
+    # date cleanup on the client side via our datepickers, but it's probably
+    # fine to leave it here until there's a reason to remove it. It could be
+    # helpful if somebody finds a way not to use the datepickers (js off, say)
+    for date_field in ParentheticalSearchForm().get_date_field_names():
+        for time in ("before", "after"):
+            field = f"{date_field}_{time}"
+            if get_params.get(field) and cd.get(field) is not None:
+                # Don't use strftime. It'll fail before 1900
+                before = cd[field]
+                get_params[field] = "%02d/%02d/%s" % (
+                    before.month,
+                    before.day,
+                    before.year,
+                )
+
+    get_params["order_by"] = cd["order_by"]
+
+    for court in courts:
+        get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
+
+    form = formclass(get_params, search_type=search_type)
+    form.is_valid()
+    return form
+
+
 def prep_cd(get_params, cd, courts):
     """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
@@ -916,12 +934,8 @@ def prep_cd(get_params, cd, courts):
                 )
 
     get_params["order_by"] = cd["order_by"]
-    # get_params["type"] = cd["type"]
 
     for court in courts:
         get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
-
-    # for status in DOCUMENT_STATUSES:
-    #     get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
 
     return get_params

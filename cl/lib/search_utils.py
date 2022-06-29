@@ -891,7 +891,6 @@ def build_main_query(
     add_grouping(main_params, cd, group)
 
     print_params(main_params)
-    print('main_params', main_params)
     return main_params
 
 
@@ -1276,7 +1275,7 @@ def build_range_query(field: str, less: int, greater: int,
     return []
 
 
-def build_daterange_query(field: str, before: datetime, after: datetime,
+def build_daterange_query(field: str, before: date, after: date,
                           relation: Optional[str] = None) -> List:
     """Given field name and date range limits returns ElasticSearch range query or None
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html#ranges-on-dates
@@ -1345,18 +1344,43 @@ def build_terms_query(field: str, value: List) -> List:
     return []
 
 
+def build_sort_results(cd: CleanData) -> Dict:
+    """
+    Given cleaned data, find order_by value and return dict to use with ElasticSearch
+    sort
+    :param cd: CleanedData
+    :return: dict or None
+    """
+    desc_order = ["score desc", "dateFiled desc"]
+    map_desc_order = [("score desc", "_score"),
+                      ("dateFiled desc", "described_opinion_cluster_docket_date_filed")]
+    asc_order = ["dateFiled asc"]
+    map_asc_order = [("dateFiled asc", "described_opinion_cluster_docket_date_filed")]
+    order_by = cd.get("order_by")
+    if order_by:
+        if order_by in desc_order:
+            fieldname_map = list(filter(lambda x: x[0] == order_by, map_desc_order))
+            if fieldname_map:
+                # print("fieldname_map1", fieldname_map)
+                return {fieldname_map[0][1]: "desc"}
+        if order_by in asc_order:
+            fieldname_map = list(filter(lambda x: x[0] == order_by, map_asc_order))
+            if fieldname_map:
+                # print("fieldname_map", fieldname_map)
+                return {fieldname_map[0][1]: "asc"}
+    return {"score": "desc"}
+
+
 def build_es_queries(cd: CleanData) -> List:
     queries_list = []
-
-    print("->>>>>>> CD", cd)
 
     # Build daterange query
     q1 = build_daterange_query("described_opinion_cluster_docket_date_filed",
                                cd.get("filed_before", ""), cd.get("filed_after", ""))
     queries_list.extend(q1)
-    q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
-                               cd.get("filed_before", ""), cd.get("filed_after", ""))
-    queries_list.extend(q2)
+    # q2 = build_daterange_query("describing_opinion_cluster_docket_date_filed",
+    #                            cd.get("filed_before", ""), cd.get("filed_after", ""))
+    # queries_list.extend(q2)
 
     # Build court terms filter
     q3 = build_terms_query("described_opinion_cluster_docket_court_id",
@@ -1368,14 +1392,13 @@ def build_es_queries(cd: CleanData) -> List:
     queries_list.extend(q4)
 
     # Build other text queries
-    # TODO not showing results with docket number
-    q5 = build_term_query("describing_opinion_cluster_docket_number",
-                          cd.get("docket_number", ""))
-    queries_list.extend(q5)
+    # q5 = build_term_query("describing_opinion_cluster_docket_number",
+    #                       cd.get("docket_number", ""))
+    # queries_list.extend(q5)
     q6 = build_term_query("described_opinion_cluster_docket_number",
                           cd.get("docket_number", ""))
     queries_list.extend(q6)
 
-    print("queries_list", queries_list)
+    # print("queries_list", queries_list)
 
     return queries_list
