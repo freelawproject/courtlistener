@@ -1136,7 +1136,7 @@ def fetch_pacer_doc_by_rd(
             msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             self.request.chain = None
-            return
+            return None
         raise self.retry()
 
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
@@ -1219,9 +1219,19 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     :return: None
     """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    rd = fq.recap_document
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(rd.docket_entry.docket.court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        raise self.retry()
+
     mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    rd = fq.recap_document
     if not rd.pacer_doc_id:
         msg = (
             "Unable to get attachment page: Unknown pacer_doc_id for "
@@ -1363,6 +1373,17 @@ def fetch_docket(self, fq_pk):
     :return: None
     """
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
+    court_id = fq.court_id or getattr(fq.docket, "court_id", None)
+    # Check court connectivity, if fails retry the task, hopefully, it'll be
+    # retried in a different not blocked node
+    if not is_pacer_court_accessible(court_id):
+        if self.request.retries == self.max_retries:
+            msg = f"Blocked by court: {court_id}"
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        raise self.retry()
+
     mark_pq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     cookies = get_pacer_cookie_from_cache(fq.user_id)
@@ -1370,7 +1391,6 @@ def fetch_docket(self, fq_pk):
         msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
 
-    court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     s = PacerSession(cookies=cookies)
 
     try:

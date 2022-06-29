@@ -1,5 +1,6 @@
-2.0.31
+2.0.32
 
+2.0.32 - Update code & juriscraper
 2.0.31 - Update code
 2.0.30 - Update code
 2.0.29 - Update code

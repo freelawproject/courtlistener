@@ -100,10 +100,10 @@ django-override-storage = "^0.3.2"
 django-ses = {extras = ["events"], version = "^3.0.1"}
 django-environ = "^0.8.1"
 judge-pics = "^2.0.1"
-juriscraper = "^2.4.11"
 types-simplejson = "^3.17.6"
 django-admin-cursor-paginator = "^0.1.2"
 django-ipware = "^4.0.2"
+juriscraper = "^2.5.7"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
