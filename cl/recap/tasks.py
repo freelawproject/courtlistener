@@ -190,7 +190,7 @@ def mark_pq_status(pq, msg, status, message_property_name="error_message"):
 @app.task(
     bind=True,
     autoretry_for=(requests.ConnectionError,),
-    max_retries=2,
+    max_retries=5,
     interval_start=5 * 60,
     interval_step=10 * 60,
 )
@@ -1568,6 +1568,7 @@ def get_recap_email_recipients(
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
+        requests.ConnectionError,
         PacerLoginException,
         RedisConnectionError,
     ),
