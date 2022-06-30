@@ -30,6 +30,7 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 
+from cl.alerts.models import DocketAlert
 from cl.api.models import Webhook
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
@@ -64,7 +65,9 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
         a.type = QueryDict(a.query).get("type", SEARCH_TYPES.OPINION)
-    docket_alerts = request.user.docket_alerts.all().order_by("date_created")
+    docket_alerts = request.user.docket_alerts.filter(
+        alert_type=DocketAlert.SUBSCRIPTION
+    ).order_by("date_created")
     return render(
         request,
         "profile/alerts.html",

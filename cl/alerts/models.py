@@ -59,6 +59,13 @@ class Alert(AbstractDateTimeModel):
 
 
 class DocketAlert(models.Model):
+    UNSUBSCRIPTION = 0
+    SUBSCRIPTION = 1
+    TYPES = (
+        (UNSUBSCRIPTION, "Unsubscription"),
+        (SUBSCRIPTION, "Subscription"),
+    )
+
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -85,6 +92,12 @@ class DocketAlert(models.Model):
         "purposes.",
         max_length=40,
     )
+    alert_type = models.SmallIntegerField(
+        help_text="The subscription type assigned, "
+        "Unsubscription or Subscription.",
+        default=SUBSCRIPTION,
+        choices=TYPES,
+    )
 
     class Meta:
         unique_together = ("docket", "user")
@@ -97,48 +110,6 @@ class DocketAlert(models.Model):
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
         super(DocketAlert, self).save(*args, **kwargs)
-
-
-class DocketSubscription(AbstractDateTimeModel):
-    """A table of subscriptions so users can get emails when recap.email gets
-    emails.
-    """
-
-    date_last_hit = models.DateTimeField(
-        help_text="The last date on which an email was received for the case.",
-        blank=True,
-        null=True,
-    )
-    docket = models.ForeignKey(
-        Docket,
-        help_text="The docket that we are subscribed to.",
-        related_name="subscriptions",
-        on_delete=models.CASCADE,
-    )
-    user = models.ForeignKey(
-        User,
-        help_text="The user that is subscribed to the docket.",
-        related_name="subscriptions",
-        on_delete=models.CASCADE,
-    )
-    secret_key = models.CharField(
-        help_text="A key to be used in links to access the alert without "
-        "having to log in. Can be used for a variety of "
-        "purposes.",
-        max_length=40,
-    )
-
-    class Meta:
-        unique_together = ("docket", "user")
-
-    def __str__(self) -> str:
-        return f"{self.pk}: {self.docket_id}"
-
-    def save(self, *args, **kwargs):
-        """Ensure we get a token when we save the first time."""
-        if self.pk is None:
-            self.secret_key = get_random_string(length=40)
-        super(DocketSubscription, self).save(*args, **kwargs)
 
 
 class RealTimeQueue(models.Model):

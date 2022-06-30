@@ -7,7 +7,9 @@ from cl.alerts.views import (
     edit_alert_redirect,
     enable_alert,
     new_docket_alert,
+    subscribe_docket_alert,
     toggle_docket_alert,
+    unsubscribe_docket_alert,
 )
 
 urlpatterns = [
@@ -32,4 +34,14 @@ urlpatterns = [
         name="toggle_docket_alert",
     ),
     path("alert/docket/new/", new_docket_alert, name="new_docket_alert"),
+    re_path(
+        "alert/docket/subscribe/([a-zA-Z0-9]{40})/",
+        subscribe_docket_alert,
+        name="subscribe_docket_alert",
+    ),
+    re_path(
+        "alert/docket/unsubscribe/([a-zA-Z0-9]{40})/",
+        unsubscribe_docket_alert,
+        name="unsubscribe_docket_alert",
+    ),
 ]

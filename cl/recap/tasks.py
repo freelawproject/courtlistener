@@ -30,6 +30,7 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
+from cl.alerts.models import DocketAlert
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.celery_init import app
@@ -1178,7 +1179,6 @@ def fetch_pacer_doc_by_rd(
         return
 
     court_id = rd.docket_entry.docket.court_id
-
     success, msg = update_rd_metadata(
         self,
         rd_pk,
@@ -1489,13 +1489,10 @@ def mark_fq_status(fq, msg, status):
     fq.save()
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(requests.RequestException,),
-    max_retries=5,
-    interval_start=5 * 60,
-)
-def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
+@app.task(bind=True, max_retries=5, interval_start=5 * 60)
+def send_docket_to_webhook(
+    self: Task, d_pk: int, since: datetime, epq_pk: int
+) -> None:
     """POSTS the PacerFetchQueue to the recipients webhook(s)
 
     :param d_pk: The Docket primary key
@@ -1542,6 +1539,30 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
             webhook.save()
 
 
+def get_recap_email_recipients(
+    email_recipients: list[dict[str, str | list[str]]],
+) -> list[str]:
+    """Get the recap.email recipients from the email_recipients list.
+
+    :param email_recipients: List of dicts that contains the notification
+    email recipients in the format: "name": name, "email_addresses": [""]
+    :return: List of recap.email addresses
+    """
+    # Extract all email addresses from email_recipients
+    email_addresses = [
+        email
+        for email_address in email_recipients
+        for email in email_address["email_addresses"]
+    ]
+    # Select only @recap.email addresses
+    recap_email_recipients = [
+        recap_email
+        for recap_email in email_addresses
+        if "@recap.email" in recap_email
+    ]
+    return recap_email_recipients
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1556,6 +1577,15 @@ def send_docket_to_webhook(d_pk: int, since: datetime, epq_pk: int) -> None:
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
 ) -> Optional[Dict[str, Union[int, bool]]]:
+    """Processes a recap.email when it comes in, fetches the free document and
+    triggers docket alerts and webhooks.
+
+    :param self: The task
+    :param epq_pk: The EmailProcessingQueue object pk
+    :param user_pk: The API user that sent this notification
+    :return: An optional dict to pass to the next task with the docket_pk and a
+     bool True if there was content updated, otherwise False
+    """
 
     start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
@@ -1624,11 +1654,15 @@ def process_recap_email(
     if content_updated:
         newly_enqueued = enqueue_docket_alert(docket.pk)
         if newly_enqueued:
+            recap_email_recipients = get_recap_email_recipients(
+                data["email_recipients"]
+            )
             chain(
-                send_docket_alert.si(docket.pk, start_time),
+                send_docket_alert.si(
+                    docket.pk, start_time, recap_email_recipients
+                ),
                 send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
             ).apply_async()
-
     return {
         "docket_pk": docket.pk,
         "content_updated": bool(rds_created or content_updated),

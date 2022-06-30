@@ -1,11 +1,14 @@
+from celery.canvas import chain
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, HttpResponseNotAllowed
+from django.core.mail import EmailMultiAlternatives
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
 from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.lib.types import AuthenticatedHttpRequest
@@ -98,14 +101,20 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             msg = "Unable to alter alert. Please provide ID attribute"
             return HttpResponse(msg)
         existing_alert = DocketAlert.objects.filter(
-            user=request.user, docket_id=docket_pk
+            user=request.user,
+            docket_id=docket_pk,
         )
         if existing_alert.exists():
-            existing_alert.delete()
-            msg = "Alert disabled successfully"
+            if existing_alert[0].alert_type == DocketAlert.SUBSCRIPTION:
+                existing_alert.update(alert_type=DocketAlert.UNSUBSCRIPTION)
+                msg = "Alert disabled successfully"
+            else:
+                existing_alert.update(alert_type=DocketAlert.SUBSCRIPTION)
+                msg = "Alerts are now enabled for this docket"
         else:
             DocketAlert.objects.create(docket_id=docket_pk, user=request.user)
             msg = "Alerts are now enabled for this docket"
+
         return HttpResponse(msg)
     else:
         return HttpResponseNotAllowed(
@@ -161,3 +170,39 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
             "private": True,
         },
     )
+
+
+@ratelimit_deny_list
+def subscribe_docket_alert(
+    request: HttpRequest, secret_key: str
+) -> HttpResponse:
+    """Subscribe a user to a docket alert based on the alert secret_key."""
+    docket_alert = flip_docket_alert(secret_key, DocketAlert.SUBSCRIPTION)
+    return render(
+        request,
+        "docket_alert.html",
+        {"docket_alert": docket_alert, "private": True, "enabled": True},
+    )
+
+
+@ratelimit_deny_list
+def unsubscribe_docket_alert(
+    request: HttpRequest, secret_key: str
+) -> HttpResponse:
+    """Unsubscribe a user from a docket alert based on the alert secret_key."""
+    docket_alert = flip_docket_alert(secret_key, DocketAlert.UNSUBSCRIPTION)
+    # Send Unsubscription confirmation email to the user
+    send_unsubscription_confirmation.delay(docket_alert.pk)
+    return render(
+        request,
+        "docket_alert.html",
+        {"docket_alert": docket_alert, "private": True, "enabled": False},
+    )
+
+
+def flip_docket_alert(secret_key: str, alert_type: int) -> DocketAlert:
+    """Flip the alert_type for a docket alert."""
+    docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
+    docket_alert.alert_type = alert_type
+    docket_alert.save()
+    return docket_alert

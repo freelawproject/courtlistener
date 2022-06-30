@@ -128,6 +128,13 @@ class UserProfile(models.Model):
         help_text="Generated recap email address for the user.",
         blank=True,
     )
+    auto_subscribe = models.BooleanField(
+        help_text="If enabled, for every new case that comes in from the "
+        "user's recap.email address, a new docket subscription for the case "
+        "will be created; if disabled we'll ask users if they want to "
+        "subscribe to the case.",
+        default=False,
+    )
 
     @property
     def total_donated_last_year(self) -> Decimal:

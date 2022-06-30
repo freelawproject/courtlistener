@@ -63,7 +63,7 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         return self.request.data.get("mail", {}).get("message_id")
 
     def get_destination_emails_from_request_data(self):
-        return self.request.data.get("mail", {}).get("destination")
+        return self.request.data.get("receipt", {}).get("recipients")
 
     def perform_create(self, serializer):
         recap_email_user = User.objects.get(username="recap-email")
