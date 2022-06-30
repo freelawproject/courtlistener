@@ -112,7 +112,7 @@ CMD python /opt/courtlistener/manage.py migrate && \
 FROM python-base as web-prod
 
 CMD gunicorn cl_wsgi:application \
-    --chdir /opt/courtlistener/docker/nginx/wsgi-configs/ \
+    --chdir /opt/courtlistener/docker/django/wsgi-configs/ \
     --user www-data \
     --group www-data \
     # Set high number of workers. Docs recommend 2-4× core count`
