@@ -14,11 +14,22 @@ from requests import Response, Session
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
 
 
+@retry(
+    (
+        requests.ConnectionError,
+        requests.ReadTimeout,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
 def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
     """Test for meta data redirections
 
@@ -63,6 +74,16 @@ def follow_redirections(r: Response, s: Session) -> Response:
     return r
 
 
+@retry(
+    (
+        requests.ConnectionError,
+        requests.ReadTimeout,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
 def get_extension(content: bytes) -> str:
     """A handful of workarounds for getting extensions we can trust."""
     return microservice(

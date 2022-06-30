@@ -39,7 +39,7 @@ MICROSERVICE_URLS = {
     },
     "buffer-extension": {
         "url": f"{DOCTOR_HOST}/utils/file/extension/",
-        "timeout": 60,
+        "timeout": 5,
     },
     # Converter Endpoints
     "generate-thumbnail": {
