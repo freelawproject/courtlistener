@@ -4,7 +4,7 @@
 
 {% block title %}Donations – CourtListener.com{% endblock %}
 
-{% block nav-donations %}active{% endblock %}
+{% block nav-account %}active{% endblock %}
 {% block footer-scripts %}
   <script type="text/javascript"
           src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
@@ -13,6 +13,9 @@
 {% endblock %}
 
 {% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/account-tabs.html" %}
+
   <div class="col-xs-12">
     {% if user.donations.all and user.profile.email_confirmed %}
       <h2>Processed Donations <small>Includes one-time and monthly contributions</small></h2>

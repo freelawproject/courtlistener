@@ -29,6 +29,7 @@ from django.views.decorators.debug import (
     sensitive_post_parameters,
     sensitive_variables,
 )
+from django.views.decorators.http import require_http_methods
 
 from cl.alerts.models import DocketAlert
 from cl.api.models import Webhook
@@ -71,6 +72,20 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
         a.type = QueryDict(a.query).get("type", SEARCH_TYPES.OPINION)
+    return render(
+        request,
+        "profile/alerts.html",
+        {
+            "search_alerts": search_alerts,
+            "page": "search_alerts",
+            "private": True,
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     ).order_by("date_created")
@@ -78,8 +93,8 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
         request,
         "profile/alerts.html",
         {
-            "search_alerts": search_alerts,
             "docket_alerts": docket_alerts,
+            "page": "docket_alerts",
             "private": True,
         },
     )
@@ -156,7 +171,11 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(request, "profile/donations.html", {"private": True})
+    return render(
+        request,
+        "profile/donations.html",
+        {"page": "donations", "private": True},
+    )
 
 
 @login_required
@@ -178,7 +197,7 @@ def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "private": True},
+        {"results": paged_vizes, "page": "active", "private": True},
     )
 
 
@@ -207,27 +226,37 @@ def view_deleted_visualizations(
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "private": True},
+        {"results": paged_vizes, "page": "trash", "private": True},
     )
 
 
 @login_required
 @never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        instance = Webhook()
-        form = WebhookForm(request.POST, instance=instance)
-        if form.is_valid():
-            instance.user = request.user
-            form.save()
-            return HttpResponseRedirect(reverse("view_api"))
-    else:
-        form = WebhookForm()
-
     return render(
         request,
         "profile/api.html",
-        {"webhook_form": form, "private": True},
+        {"private": True, "page": "info"},
+    )
+
+
+@login_required
+@never_cache
+def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "profile/api.html",
+        {"private": True, "page": "token"},
+    )
+
+
+@login_required
+@never_cache
+def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "profile/api.html",
+        {"private": True, "page": "usage"},
     )
 
 
@@ -307,6 +336,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "profile_form": profile_form,
             "user_form": user_form,
+            "page": "settings",
             "private": True,
         },
     )
@@ -625,7 +655,9 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     else:
         form = CustomPasswordChangeForm(user=request.user)
     return render(
-        request, "profile/password_form.html", {"form": form, "private": False}
+        request,
+        "profile/password_form.html",
+        {"form": form, "page": "password", "private": False},
     )
 
 
@@ -667,3 +699,54 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
     # Moosend does a GET when you create/edit the automation workflow,
     # so we need to return a 200 even for GETs.
     return HttpResponse("<h1>200: OK</h1>")
+
+
+@login_required
+@never_cache
+def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        instance = Webhook()
+        form = WebhookForm(request.POST, instance=instance)
+        if form.is_valid():
+            instance.user = request.user
+            form.save()
+            return HttpResponseRedirect(reverse("view_api"))
+    else:
+        form = WebhookForm()
+
+    return render(
+        request,
+        "profile/webhooks.html",
+        {"webhook_form": form, "private": True, "page": "webhooks"},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_recap_email_auto_subscription(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
+    """Toggle the user's setting to auto-subscribe to recap.email cases"""
+
+    if request.user.is_anonymous:
+        return HttpResponse("Please log in to continue.")
+
+    user = request.user
+    if user.profile.auto_subscribe:
+        UserProfile.objects.filter(user=user).update(auto_subscribe=False)
+        msg = "Auto-subscribe to @recap.email cases is now disabled"
+    else:
+        UserProfile.objects.filter(user=user).update(auto_subscribe=True)
+        msg = "Auto-subscribe to @recap.email cases is now enabled"
+    return HttpResponse(msg)
+
+
+@login_required
+@never_cache
+def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
+    auto_subscribe = request.user.profile.auto_subscribe
+    return render(
+        request,
+        "profile/recap_email.html",
+        {"private": True, "page": "recap", "auto_subscribe": auto_subscribe},
+    )

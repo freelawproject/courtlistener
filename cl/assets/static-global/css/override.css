@@ -1146,3 +1146,15 @@ emphasis {
   font-size: 11px;
 }
 /* END  Buy on Pacerdash custom styles */
+
+/* Responsive profile tabs styles */
+.mobile-tabs{
+  display: inline-flex;
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.mobile-tabs::-webkit-scrollbar {
+  display: none;
+}
+/* END Responsive profile tabs styles */

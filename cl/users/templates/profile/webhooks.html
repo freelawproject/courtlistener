@@ -1,0 +1,68 @@
+{% extends "profile/nav.html" %}
+{% load waffle_tags %}
+
+{% block title %} Developer Tools &ndash; CourtListener.com{% endblock %}
+
+{% block nav-api %}active{% endblock %}
+
+{% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/developer-tabs.html" %}
+
+  {% flag "user-webhooks" %}
+    <div class="hidden-xs col-sm-1 col-md-3"></div>
+    <div class="col-xs-12 col-sm-10 col-md-6 text-center">
+      <h3 class="v-offset-above-2">Your Webhooks</h3>
+      <p>Webhooks let you send a signal to your server whenever certain events happen on our website. To create a webhook, use the form below.</p>
+      <p class="v-offset-below-2"><a href="{% url "api_index" %}"#webhooks class="btn btn-default btn-lg">Read the Webhook Documentation</a></p>
+
+      <div class="row text-right">
+        <div class="col-xs-12">
+          <form action="" method="post">{% csrf_token %}
+            <div class="form-group">
+              <div class="row">
+                <label class="col-xs-4">Webhook Event Type</label>
+                <div class="col-xs-8">
+                  {{ webhook_form.event_type }}
+                  {% if webhook_form.event_type.errors %}
+                    <p class="help-block">
+                      {% for error in webhook_form.event_type.errors %}
+                        {{ error|escape }}
+                      {% endfor %}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="row">
+                <label class="col-xs-4">URL</label>
+                <div class="col-xs-8">
+                  {{ webhook_form.url }}
+                  {% if webhook_form.url.errors %}
+                    <p class="help-block">
+                      {% for error in webhook_form.url.errors %}
+                        {{ error|escape }}
+                      {% endfor %}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="row">
+                <label class="col-xs-4">&nbsp;</label>
+                <div class="col-xs-8">
+                  <button class="btn btn-primary btn-block" type="submit">
+                    Create Webhook
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endflag %}
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+{% endblock %}

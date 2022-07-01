@@ -1,0 +1,61 @@
+{% extends "profile/nav.html" %}
+{% load static %}
+
+{% block title %}@recap.email – CourtListener.com{% endblock %}
+
+{% block nav-account %}active{% endblock %}
+{% block footer-scripts %}
+  <script type="text/javascript"
+          src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  <script src="{% static "js/htmx.min.js" %}"></script>
+  <script defer
+          type="text/javascript" src="{% static "js/toggle_auto_subscribe.js" %}"></script>
+  <link href="{% static "css/bootstrap4-toggle.min.css" %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/account-tabs.html" %}
+
+  <div class="col-sm-2"></div>
+  <div class="col-xs-12 col-sm-8">
+    <p class="lead"><strong>@recap.email</strong> is a system we use to gather content from PACER and add it to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notification emails from PACER, it only takes a minute to set up this system and begin contributing content to the public commons.
+    </p>
+
+    <h2>How it works</h2>
+    <p>Three easy steps:</p>
+    <ol>
+      <li>
+        <p>Every party in a case gets notification emails that contain one-time "magic links." These links give free access to new filings in the case.</p>
+      </li>
+      <li>
+        <p>We give you an email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed.</p>
+        <p class="alert-warning alert">
+          {% if request.user.is_authenticated %}
+            Your @recap.email email address is <b>{{ request.user.profile.recap_email }}</b>
+          {% else %}
+            Log in and refresh this page to see your personal @recap.email address here.
+          {% endif %}
+        <p>
+      </li>
+      <li>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll add the items to RECAP, and we'll send you a notification so you're up to date.</li>
+    </ol>
+    <p>That's it!</p>
+    <hr>
+    <div class="recap-email-toggle text-center" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      <label for="auto-subscribe"><bold>Auto-subscribe to my recap.email cases: </bold></label>
+      <div id="switch-button" class="toggle btn {% if auto_subscribe %}btn-primary {% else %} btn-light off {% endif %}"
+           hx-post="{% url "toggle_recap_email_auto_subscription" %}"
+           hx-swap="none"
+           data-toggle="toggle" role="button" style="width: 55px; height: 20px;">
+        <div class="toggle-group">
+          <label for="auto-subscribe" class="btn btn-primary toggle-on" style="line-height: 7.5px;">On</label>
+          <label for="auto-subscribe" class="btn btn-light toggle-off" style="line-height: 7.5px;">Off</label>
+          <span class="toggle-handle btn btn-light"></span>
+        </div>
+      </div>
+    </div>
+    <hr>
+  </div>
+  <div class="col-sm-2"></div>
+{% endblock %}
