@@ -7,7 +7,6 @@ from cl.search.models import Docket, Opinion, OpinionCluster, Parenthetical
 from cl.tests.cases import TestCase
 
 
-
 class TestFactoryCreation(TestCase):
     """
     Tests to make sure that we can use our factories to generate data.
