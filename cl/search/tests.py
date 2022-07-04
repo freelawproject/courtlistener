@@ -5,7 +5,7 @@ import os
 from datetime import date
 from functools import reduce
 from pathlib import Path
-from unittest import mock
+from unittest import mock, skipUnless
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
@@ -15,8 +15,9 @@ from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
+from django.test.utils import captured_stderr
 from django.urls import reverse
-from elasticsearch_dsl import Q
+from elasticsearch_dsl import Q, connections
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
@@ -99,11 +100,11 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             self.expected_num_results_opinion,
             msg="Did not get expected number of results.\n"
-            "\tGot:\t%s\n\tExpected:\t %s"
-            % (
-                actual_count,
-                self.expected_num_results_opinion,
-            ),
+                "\tGot:\t%s\n\tExpected:\t %s"
+                % (
+                    actual_count,
+                    self.expected_num_results_opinion,
+                ),
         )
 
         # Check a simple citation query
@@ -114,8 +115,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
         # Next, we delete everything from Solr
@@ -137,8 +138,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of counts in empty index.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
         # Add things back, but do it by ID
@@ -163,8 +164,8 @@ class UpdateIndexCommandTest(SolrTestCase):
             actual_count,
             expected_citation_count,
             msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
+                "\tGot:\t %s\n\tExpected:\t%s"
+                % (actual_count, expected_citation_count),
         )
 
 
@@ -244,19 +245,19 @@ class ModelTest(TestCase):
         expected_count = 1
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .exclude(
+                .exclude(
                 # Note this doesn't actually exclude anything,
                 # but it helps ensure chaining is working.
                 docket__case_name="Not the right case name",
             )
-            .count()
+                .count()
         )
         self.assertEqual(cluster_count, expected_count)
 
         cluster_count = (
             OpinionCluster.objects.filter(citation="22 U.S. 44")
-            .filter(docket__case_name="Blah")
-            .count()
+                .filter(docket__case_name="Blah")
+                .count()
         )
         self.assertEqual(cluster_count, expected_count)
 
@@ -300,12 +301,12 @@ class IndexingTest(EmptySolrTestCase):
         # Save a docket to the backend using coalescing
 
         test_dir = (
-            Path(settings.INSTALL_ROOT)
-            / "cl"
-            / "assets"
-            / "media"
-            / "test"
-            / "search"
+                Path(settings.INSTALL_ROOT)
+                / "cl"
+                / "assets"
+                / "media"
+                / "test"
+                / "search"
         )
         self.att_filename = "fake_document.html"
         fake_path = os.path.join(test_dir, self.att_filename)
@@ -598,7 +599,7 @@ class SearchTest(IndexedSolrTestCase):
             r.content.decode().index(most_cited_name)
             < r.content.decode().index(less_cited_name),
             msg="'%s' should come BEFORE '%s' when ordered by descending "
-            "citeCount." % (most_cited_name, less_cited_name),
+                "citeCount." % (most_cited_name, less_cited_name),
         )
 
         r = self.client.get("/", {"q": "*", "order_by": "citeCount asc"})
@@ -606,7 +607,7 @@ class SearchTest(IndexedSolrTestCase):
             r.content.decode().index(most_cited_name)
             > r.content.decode().index(less_cited_name),
             msg="'%s' should come AFTER '%s' when ordered by ascending "
-            "citeCount." % (most_cited_name, less_cited_name),
+                "citeCount." % (most_cited_name, less_cited_name),
         )
 
     def test_random_ordering(self) -> None:
@@ -659,7 +660,7 @@ class SearchTest(IndexedSolrTestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "case name. Expected %s, but got %s." % (expected, actual),
+                "case name. Expected %s, but got %s." % (expected, actual),
         )
 
     def test_oa_jurisdiction_filtering(self) -> None:
@@ -673,7 +674,7 @@ class SearchTest(IndexedSolrTestCase):
             actual,
             expected,
             msg="Did not get expected number of results when filtering by "
-            "jurisdiction. Expected %s, but got %s." % (actual, expected),
+                "jurisdiction. Expected %s, but got %s." % (actual, expected),
         )
 
     def test_oa_date_argued_filtering(self) -> None:
@@ -706,7 +707,7 @@ class SearchTest(IndexedSolrTestCase):
             'id="homepage"',
             response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
-            "load the homepage",
+                "load the homepage",
         )
 
     def test_fail_gracefully(self) -> None:
@@ -923,7 +924,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             result_count,
             num_expected,
             msg="Found %s items, but should have found %s if the items were "
-            "grouped properly." % (result_count, num_expected),
+                "grouped properly." % (result_count, num_expected),
         )
 
 
@@ -954,10 +955,10 @@ class JudgeSearchTest(IndexedSolrTestCase):
             got,
             expected_count,
             msg="Did not get the right number of search results with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
+                "filter applied.\n"
+                "Expected: %s\n"
+                "     Got: %s\n\n"
+                "Params were: %s" % (field_name, expected_count, got, params),
         )
 
     def test_name_field(self) -> None:
@@ -1105,7 +1106,7 @@ class FeedTest(IndexedSolrTestCase):
                 actual_count,
                 expected_count,
                 msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
+                    "Instead found: %s" % (expected_count, test, actual_count),
             )
 
 
@@ -1135,7 +1136,7 @@ class JurisdictionFeedTest(TestCase):
         self.pdf_item.update(
             {
                 "local_path": "pdf/2013/06/12/"
-                + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
+                              + "in_re_motion_for_consent_to_disclosure_of_court_records.pdf"
             }
         )
         self.null_item = self.good_item.copy()
@@ -1220,7 +1221,7 @@ class PagerankTest(TestCase):
             self.assertTrue(
                 abs(pr_results[key] - value) < 0.0001,
                 msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key]),
+                    "%s" % (key, pr_results[key], answers[key]),
             )
 
 
@@ -1695,8 +1696,24 @@ class CaptionTest(TestCase):
         self.assertEqual(cs, cs_sorted)
 
 
+def is_es_online(connection_alias='default'):
+    """Validate that ES instance is online
+    :param connection_alias: Name of connection to use
+    :return: True or False
+    """
+    with captured_stderr():
+        es = connections.get_connection(connection_alias)
+        return es.ping()
+
+
+@skipUnless(is_es_online(), 'Elasticsearch is offline')
 class ElasticSearchTest(TestCase):
     fixtures = ["test_court.json"]
+
+    # Mock ElasticSearch search and responses are difficult due to its implementation,
+    # that's why we skip testing if Elasticsearch instance is offline, this can be
+    # fixed by implementing the service in Github actions or using external library to
+    # Mock elasticsearch like: ElasticMock
 
     def rebuild_index(self):
         """
@@ -1803,11 +1820,11 @@ class ElasticSearchTest(TestCase):
             type="Plurality Opinion",
             sha1="6872c55064015d816e51a653241f38d35e78a02a",
             plain_text="Compare recently always material authority. Drug water "
-            "population letter. Property probably soon add product. Mind "
-            "happy although interesting pretty pattern represent. "
-            "Administration either short special artist. Skin yet member "
-            "fish describe which recognize. Assume rock everything phone "
-            "similar wear. Example speak free sort.",
+                       "population letter. Property probably soon add product. Mind "
+                       "happy although interesting pretty pattern represent. "
+                       "Administration either short special artist. Skin yet member "
+                       "fish describe which recognize. Assume rock everything phone "
+                       "similar wear. Example speak free sort.",
             per_curiam=False,
             extracted_by_ocr=True,
         )
@@ -1818,13 +1835,13 @@ class ElasticSearchTest(TestCase):
             type="Concurrence Opinion",
             sha1="c65b4add5c2e7147503ebeb783c5fba55705e376",
             plain_text="Trip modern talk experience fight final low. Director say "
-            "green support bag international kind easy. Now name to."
-            "Morning summer finish money school hundred. Sense heavy then "
-            "early however. Poor charge energy before particularly. Safe "
-            "agent vote base capital old something attack. Soldier "
-            "beautiful thank billion believe realize. Plant support here "
-            "operation stop fly. Middle through onto under up visit time. "
-            "Class experience identify significant.",
+                       "green support bag international kind easy. Now name to."
+                       "Morning summer finish money school hundred. Sense heavy then "
+                       "early however. Poor charge energy before particularly. Safe "
+                       "agent vote base capital old something attack. Soldier "
+                       "beautiful thank billion believe realize. Plant support here "
+                       "operation stop fly. Middle through onto under up visit time. "
+                       "Class experience identify significant.",
             per_curiam=True,
             extracted_by_ocr=True,
         )
@@ -1835,11 +1852,11 @@ class ElasticSearchTest(TestCase):
             type="In Part Opinion",
             sha1="a729cdae5a1d25890927d249d18edb917dcf7b95",
             plain_text="Help place late theory recognize peace official. Debate until "
-            "under street whole term. Beyond family because possible cover "
-            "most. Those realize lose treatment. Often data pretty heart. "
-            "Different goal he whose traditional like. Key throughout "
-            "subject start race cell carry operation. Campaign imagine "
-            "first agent head weight including. ",
+                       "under street whole term. Beyond family because possible cover "
+                       "most. Those realize lose treatment. Often data pretty heart. "
+                       "Different goal he whose traditional like. Key throughout "
+                       "subject start race cell carry operation. Campaign imagine "
+                       "first agent head weight including. ",
             per_curiam=False,
             extracted_by_ocr=True,
         )
@@ -1895,60 +1912,6 @@ class ElasticSearchTest(TestCase):
     # "match" Returns documents that match a provided text, number, date or boolean
     # value. The provided text is analyzed before matching.
 
-    def test_search_1(self) -> None:
-        """Basic test to search indexed ES data"""
-        s = ParentheticalDocument.search().filter(
-            "term", text="responsibility"
-        )
-        print(s.to_dict())
-        print(s.count())
-        self.assertEqual(s.count(), 1)
-
-        s2 = ParentheticalDocument.search().query(
-            "match", text="responsibility"
-        )
-        print(s2.to_dict())
-        print(s2.count())
-        self.assertEqual(s2.count(), 1)
-
-        s3 = ParentheticalDocument.search().exclude(
-            "term", text="responsibility"
-        )
-        print(s3.to_dict())
-        print(s3.count())
-        self.assertEqual(s3.count(), 2)
-
-        s4 = ParentheticalDocument.search().filter(
-            "term", text="responsibility"
-        )
-        s4 = s4.filter("term", group=2)
-        print(s4.to_dict())
-        print(s4.count())
-        self.assertEqual(s4.count(), 0)
-
-    def test_filter_1(self) -> None:
-        """Test with one filter"""
-        s1 = ParentheticalDocument.search().filter(
-            "term", describing_opinion_per_curiam=True
-        )
-        print(s1.to_dict())
-        print(s1.count())
-        self.assertEqual(s1.count(), 0)
-
-    def test_filter_2(self) -> None:
-        """Test two filters"""
-        filters = []
-
-        filters.append(Q("match", describing_opinion_extracted_by_ocr=True))
-        filters.append(Q("match", describing_opinion_per_curiam=True))
-
-        s1 = ParentheticalDocument.search().filter(
-            reduce(operator.iand, filters)
-        )
-        print(s1.to_dict())
-        print(s1.count())
-        self.assertEqual(s1.count(), 0)
-
     def test_filter_search(self) -> None:
         """Test filtering and search the same time"""
         filters = []
@@ -1992,8 +1955,6 @@ class ElasticSearchTest(TestCase):
         s1 = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s1.to_dict())
-        print(s1.count())
         self.assertEqual(s1.count(), 2)
 
     def test_filter_search_2(self) -> None:
@@ -2025,8 +1986,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 1)
 
     def test_ordering(self) -> None:
@@ -2048,11 +2007,9 @@ class ElasticSearchTest(TestCase):
 
         s = (
             ParentheticalDocument.search()
-            .filter(reduce(operator.iand, filters))
-            .sort("-describing_opinion_cluster_docket_date_filed")
+                .filter(reduce(operator.iand, filters))
+                .sort("-describing_opinion_cluster_docket_date_filed")
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(
             s.execute()[0].describing_opinion_cluster_docket_date_filed,
             datetime.datetime(1978, 3, 10, 0, 0),
@@ -2072,8 +2029,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 2)
 
     def test_build_fulltext_query(self) -> None:
@@ -2084,8 +2039,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 1)
 
     def test_build_terms_query(self) -> None:
@@ -2098,8 +2051,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 2)
 
     def test_cd_query(self) -> None:
@@ -2114,8 +2065,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
@@ -2127,8 +2076,6 @@ class ElasticSearchTest(TestCase):
         if not filters:
             # Return all results
             s = ParentheticalDocument.search().query("match_all")
-            print(s.to_dict())
-            print(s.count())
             self.assertEqual(s.count(), 3)
 
     def test_docker_number_filter(self) -> None:
@@ -2142,8 +2089,6 @@ class ElasticSearchTest(TestCase):
         s = ParentheticalDocument.search().filter(
             reduce(operator.iand, filters)
         )
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(s.count(), 1)
 
     def test_build_sort(self) -> None:
@@ -2153,8 +2098,6 @@ class ElasticSearchTest(TestCase):
         ordering = build_sort_results(cd)
 
         s = ParentheticalDocument.search().query("match_all").sort(ordering)
-        print(s.to_dict())
-        print(s.count())
         self.assertEqual(
             s.execute()[0].described_opinion_cluster_docket_date_filed,
             datetime.datetime(1981, 7, 11, 0, 0),
