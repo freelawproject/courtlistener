@@ -446,7 +446,7 @@ class SearchForm(forms.Form):
     selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
     political_affiliation = forms.ChoiceField(
         choices=[("", "---------")]
-        + list(PoliticalAffiliation.POLITICAL_PARTIES),
+                + list(PoliticalAffiliation.POLITICAL_PARTIES),
         required=False,
         label="Political Affiliation",
         initial="None",
@@ -560,8 +560,8 @@ class SearchForm(forms.Form):
             raise ValidationError("Invalid value for type field")
 
         if (
-            self.cleaned_data["type"] == SEARCH_TYPES.OPINION
-            or not self.cleaned_data["type"]
+                self.cleaned_data["type"] == SEARCH_TYPES.OPINION
+                or not self.cleaned_data["type"]
         ):
             if not self.cleaned_data["order_by"]:
                 return self.fields["order_by"].initial
@@ -733,16 +733,16 @@ class ParentheticalSearchForm(forms.Form):
         ),
     )
 
-    # opinion_id = forms.CharField(
-    #     required=False,
-    #     label="Opinion id",
-    #     widget=forms.TextInput(
-    #         attrs={
-    #             "class": "external-input form-control",
-    #             "autocomplete": "off",
-    #         }
-    #     ),
-    # )
+    opinion_id = forms.CharField(
+        required=False,
+        label="Opinion id",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            }
+        ),
+    )
 
     def get_date_field_names(self):
         return {
