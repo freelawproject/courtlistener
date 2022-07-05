@@ -16,7 +16,7 @@
       will be deleted and resurrecting your account will not be
       possible.
   </p>
-  {% if request.user.alerts.count or request.user.favorites.count or non_deleted_map_count %}
+  {% if request.user.alerts.count or request.user.favorites.count or non_deleted_map_count or request.user.user_tags.count%}
   <p>The following will be deleted:</p>
   <ul>
     {% if request.user.alerts.count > 0 %}
@@ -29,7 +29,7 @@
       <li>All of your <a href="{% url "view_visualizations" %}">network visualizations</a> ({{ non_deleted_map_count }}).</li>
     {% endif %}
     {% if request.user.user_tags.count > 0 %}
-      <li>All of your <a href="{% url "tag_list" %}">tags</a> ({{ request.user.user_tags.count }}).</li>
+      <li>All of your <a href="{% url "tag_list" username=user.username %}">tags</a> ({{ request.user.user_tags.count }}).</li>
     {% endif %}
   </ul>
   {% endif %}
