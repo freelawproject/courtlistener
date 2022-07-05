@@ -676,6 +676,57 @@ class SNSWebhookTest(TestCase):
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
+    def test_restart_backoff_event_after_threshold_bounce(self) -> None:
+        """This test checks if we properly delete or update a backoff event
+        when a new bounce notification comes in. If the bounce event comes in
+        before BACKOFF_THRESHOLD hours since the last retry, the backoff event
+        is updated. Otherwise, the backoff event is restarted.
+        """
+
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_backoff_event = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Update next_retry_date to simulate the last retry was
+        # backoff_threshold hours ago, update retry_counter to 4
+        backoff_threshold = settings.BACKOFF_THRESHOLD + 1
+        email_backoff_event.update(
+            next_retry_date=now() - timedelta(hours=backoff_threshold),
+            retry_counter=4,
+        )
+
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event_after = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Store parameters after second backoff event update
+        retry_counter_after = email_backoff_event_after[0].retry_counter
+        next_retry_date_after = email_backoff_event_after[0].next_retry_date
+
+        # Backoff event is restarted
+        # 2 Hours expected for the next backoff retry
+        expected_waiting_period = 2
+
+        # Obtain waiting period in hours after backoff notification
+        waiting_period = next_retry_date_after - now()
+        actual_waiting_period = round(waiting_period.total_seconds() / 3600)
+
+        # Check retry counter is updated
+        self.assertEqual(retry_counter_after, 0)
+        # Check expected waiting period equals to computed waiting period
+        self.assertEqual(expected_waiting_period, actual_waiting_period)
+
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_hard_bounce_unexpected(self, mock_logging) -> None:
         """This test checks if a warning is logged and email address is banned
@@ -801,9 +852,8 @@ class SNSWebhookTest(TestCase):
 
     @mock.patch("cl.users.tasks.schedule_failed_email")
     def test_check_recipient_deliverability(self, mock_schedule) -> None:
-        """This test checks if the backoff event it's deleted and
-        schedule_failed_email function is called if recipient's deliverability
-        is proven.
+        """This test checks if schedule_failed_email function is called
+        if recipient's deliverability is proven.
         """
         # Trigger soft bounce event to create backoff event
         self.send_signal(
@@ -822,10 +872,6 @@ class SNSWebhookTest(TestCase):
             "bounce@simulator.amazonses.com",
             email_backoff_event[0].retry_counter,
         )
-
-        email_backoff_exists = email_backoff_event.exists()
-        # Check if backoff event was deleted
-        self.assertEqual(email_backoff_exists, False)
 
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
@@ -2173,8 +2219,8 @@ class RetryFailedEmailTest(TestCase):
     def test_enqueue_email_after_check_deliverability(
         self, mock_send_email, mock_check
     ) -> None:
-        """This test checks if after a delivery notification, WAITING failed
-        messages are properly scheduled to retry them.
+        """This test checks if after a successful deliverability recipient's
+        check WAITING failed messages are properly scheduled to be retried.
         """
 
         # Create a backoff event for bounce@simulator.amazonses.com
@@ -2315,8 +2361,8 @@ class RetryFailedEmailTest(TestCase):
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 2)
 
-        # Trigger a check delibiberability confirmation that ENQUEUED_DELIVERY
-        # failed messages are not deleted.
+        # Trigger a deliverability recipient's check to confirm that
+        # ENQUEUED_DELIVERY failed messages are not deleted.
         email_backoff_event = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
@@ -2340,7 +2386,7 @@ class RetryFailedEmailTest(TestCase):
         FailedEmail.objects.all().update(
             next_retry_date=now() - timedelta(minutes=35)
         )
-        # Trigger a new delivery notification
+        # Trigger a new deliverability recipient's check
         check_recipient_deliverability(
             "bounce@simulator.amazonses.com", stored_counter
         )
@@ -2419,6 +2465,9 @@ class RetryFailedEmailTest(TestCase):
 
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 3)
+
+        # Update backoff event to simulate it has already expired
+        backoff.update(next_retry_date=now() - timedelta(hours=2))
         now_time = now()
 
         # Check recipient's deliverability
@@ -2433,8 +2482,9 @@ class RetryFailedEmailTest(TestCase):
         ).order_by("next_retry_date")
         self.assertEqual(failed_email.count(), 3)
 
-        # Failed messages after a delivery notification should be scheduled to
-        # send one message per minute, one after the other.
+        # Failed messages after a successful deliverability recipient's check
+        # should be scheduled to send one message per minute.
+        # One after the other.
         expected_datetime_1 = now_time + timedelta(milliseconds=60_000)
         expected_datetime_2 = now_time + timedelta(milliseconds=120_000)
         expected_datetime_3 = now_time + timedelta(milliseconds=180_000)
@@ -2680,9 +2730,9 @@ class EmailBrokenTest(TestCase):
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-    def test_broken_email_banner_delivery(self) -> None:
-        """This test checks if a delivery notification properly deactivate a
-        Transient broken email banner.
+    def test_broken_email_banner_delivery_check(self) -> None:
+        """This test checks if a successful deliverability recipient's check
+        correctly deactivates a Transient broken email banner.
         """
 
         path = reverse("show_results")
@@ -2712,12 +2762,13 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), False)
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
+        # Update next_retry_date two hours behind to simulate backoff event is
+        # expired
+        backoff_event.update(next_retry_date=now() - timedelta(hours=2))
         # Check recipient's deliverability
         check_recipient_deliverability(
             "bounce@simulator.amazonses.com", backoff_event[0].retry_counter
         )
-        # If recipient's deliverability is proven, backoff event is deleted
-        self.assertEqual(backoff_event.count(), 0)
 
         r = self.client.get(path)
         # The broken email banner is gone

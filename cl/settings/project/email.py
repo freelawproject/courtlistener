@@ -23,6 +23,9 @@ EMAIL_BCC_COPY_RATE = 0.1
 
 BCC_EMAIL_ADDRESS = "bcc@free.law"
 
+# Hours after a bounce notification is considered a new failure event
+BACKOFF_THRESHOLD = 12
+
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_ALERTS_EMAIL = "CourtListener Alerts <alerts@courtlistener.com>"

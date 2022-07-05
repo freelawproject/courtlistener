@@ -106,12 +106,11 @@ def check_recipient_deliverability(
     recipient: str,
     backoff_prev_counter: int,
 ) -> None:
-    """This task checks if the recipient's email address is deliverable, it
+    """This task checks if the recipient's email address is deliverable. It
     works by verifying if the backoff event retry counter was updated since the
     task was scheduled if so it means that it came in a new bounce event for
-    the recipient, otherwise it means that the recipient is deliverable,
-    so the backoff event is deleted and the waiting failed emails are scheduled
-    to be sent.
+    the recipient. Otherwise, it means that the recipient is deliverable.
+    Then waiting failed emails are scheduled to be sent.
 
     :param recipient: The recipient email address
     :param backoff_prev_counter: The previous backoff event retry counter
@@ -127,7 +126,6 @@ def check_recipient_deliverability(
 
     if backoff_event.last().retry_counter == backoff_prev_counter:
         # There wasn't a new bounce after the last retry, seems that the
-        # recipient accepted the email, so we can delete the backoff event and
-        # schedule the waiting failed emails to be sent.
-        backoff_event.delete()
+        # recipient accepted the email, so we can schedule the waiting failed
+        # emails to be sent.
         schedule_failed_email(recipient)

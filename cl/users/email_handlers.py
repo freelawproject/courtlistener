@@ -133,8 +133,27 @@ def handle_soft_bounce(
                 retry_counter = backoff_event.retry_counter
                 next_retry_date = backoff_event.next_retry_date
 
+                backoff_threshold = next_retry_date + timedelta(
+                    hours=settings.BACKOFF_THRESHOLD
+                )
+                # Check if the bounce event comes in
+                # BACKOFF_THRESHOLD hours after the last retry_date.
+                # If so, is considered a new failure. Restart the
+                # backoff event.
+                if now() >= backoff_threshold:
+                    new_next_retry_date = now() + timedelta(
+                        hours=INITIAL_HOURS
+                    )
+                    EmailFlag.objects.filter(
+                        email_address=email,
+                        flag_type=FLAG_TYPES.BACKOFF,
+                    ).update(
+                        retry_counter=0,
+                        next_retry_date=new_next_retry_date,
+                    )
+
                 # Check if waiting period expired
-                if now() >= next_retry_date:
+                elif now() >= next_retry_date:
                     if retry_counter >= MAX_RETRY_COUNTER:
                         # Check if backoff event has reached
                         # max number of retries, if so ban email address
@@ -380,13 +399,15 @@ def get_next_retry_date(recipient: str) -> datetime:
         email_address=recipient,
         flag_type=FLAG_TYPES.BACKOFF,
     ).last()
-    if backoff_event:
+    if not backoff_event:
+        return now()
+
+    if backoff_event.under_waiting_period:
         # Return backoff event next_retry_date and add an extra minute
         return backoff_event.next_retry_date + timedelta(minutes=1)
 
-    # In case we don't have an active backoff event it means that it was
-    # deleted due to an incoming delivery notification, in this case, we could
-    # retry messages as soon as possible.
+    # In case we don't have an active backoff event it means that it has
+    # expired. In this case we can retry messages as soon as possible.
     return now()
 
 
@@ -404,11 +425,11 @@ def is_message_stored(message_id: str) -> tuple[bool, int | None]:
 
 
 def schedule_failed_email(recipient_email: str) -> None:
-    """Schedule recipient's waiting failed emails after receiving a delivery
-    notification because it means the recipient's inbox is working again.
+    """Schedule recipient's waiting failed emails after verifying the recipient
+      is deliverable. It means the recipient's inbox is working again.
 
-    :param recipient_email: The recipient's email address to whom the delivery
-    notification belongs
+    :param recipient_email: The recipient's email address to schedule failed
+    emails.
     :return: None
     """
 
@@ -486,15 +507,16 @@ def enqueue_email(recipients: list[str], message_id: str) -> None:
             )
             if active_backoff.exists():
                 # Schedule the task to verify if there is a new bounce event
-                # one hour after the enqueued retry email is sent
+                # one hour after the enqueued retry email is sent.
                 check_recipient_deliverability.si(
                     recipient, active_backoff.last().retry_counter
                 ).apply_async(eta=scheduled_datetime + timedelta(hours=1))
         else:
             # If the recipient has already one ENQUEUED FailedEmail the
-            # following messages will be enqueued with WAITING status.
-            # These  objects are going to be scheduled when receiving a
-            # delivery notification.
+            # following messages will be enqueued with WAITING status. These
+            # objects are going to be scheduled once
+            # check_recipient_deliverability task confirms the recipient is
+            # deliverable.
             FailedEmail.objects.create(
                 recipient=recipient,
                 status=STATUS_TYPES.WAITING,

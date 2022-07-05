@@ -1,9 +1,5 @@
 from django.dispatch import receiver
-from django_ses.signals import (
-    bounce_received,
-    complaint_received,
-    delivery_received,
-)
+from django_ses.signals import bounce_received, complaint_received
 
 from cl.users.email_handlers import (
     handle_complaint,
