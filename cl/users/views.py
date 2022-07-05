@@ -51,7 +51,12 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription
-from cl.users.utils import convert_to_stub_account, emails, message_dict
+from cl.users.utils import (
+    convert_to_stub_account,
+    delete_user_assets,
+    emails,
+    message_dict,
+)
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
@@ -316,12 +321,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             email["from_email"],
             email["to"],
         )
-        request.user.alerts.all().delete()
-        request.user.docket_alerts.all().delete()
-        request.user.favorites.all().delete()
-        request.user.user_tags.all().delete()
-        request.user.monthly_donations.all().update(enabled=False)
-        request.user.scotus_maps.all().update(deleted=True)
+        delete_user_assets(request.user)
         user = convert_to_stub_account(request.user)
         update_moosend_subscription.delay(request.user.email, "unsubscribe")
         update_session_auth_hash(request, user)
