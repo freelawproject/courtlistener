@@ -416,6 +416,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     user = stub_account
                     user.set_password(cd["password1"])
                     user.username = cd["username"]
+                    user.is_active = True
                     up = stub_account.profile
                     up.stub_account = False
 

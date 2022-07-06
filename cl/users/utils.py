@@ -73,6 +73,7 @@ def convert_to_stub_account(user: User) -> User:
     profile.employer = None
     profile.state = None
     profile.stub_account = True
+    profile.email_confirmed = False
     profile.wants_newsletter = False
     profile.zip_code = None
     profile.save()
