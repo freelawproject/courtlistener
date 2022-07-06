@@ -61,6 +61,7 @@ def convert_to_stub_account(user: User) -> User:
     """
     user.first_name = "Deleted"
     user.last_name = ""
+    user.is_active = False
     user.username = md5(user.email)
     user.set_unusable_password()
     user.save()
@@ -79,6 +80,16 @@ def convert_to_stub_account(user: User) -> User:
     profile.barmembership.all().delete()
 
     return user
+
+
+def delete_user_assets(user: User) -> None:
+    """Delete any associated data from a user account and profile"""
+    user.alerts.all().delete()
+    user.docket_alerts.all().delete()
+    user.favorites.all().delete()
+    user.user_tags.all().delete()
+    user.monthly_donations.all().update(enabled=False)
+    user.scotus_maps.all().update(deleted=True)
 
 
 emails: Dict[str, EmailType] = {
