@@ -40,9 +40,18 @@
   <p class="v-offset-below-3">If you have any last minute questions or comments, we hope you'll <a href="{% url "contact" %}" target="_blank">share them with us</a> before you delete your account.
   </p>
 
-  <a href="{% url "view_settings" %}" class="btn btn-success btn-lg">Cancel and Go
-      Back</a>&nbsp;&nbsp;
-  <form action="" method="post" class="float-right">{% csrf_token %}
+  <form action="" method="post">{% csrf_token %}
+    <div class="form-group">
+      {{ delete_form.password.label_tag }}
+      {{ delete_form.password }}
+      {% if delete_form.password.errors %}
+        <p class="help-block">
+          {% for error in delete_form.password.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </div>
     <button type="submit" class="btn btn-danger btn-lg">Delete My Account Now</button>
   </form>
 </div>

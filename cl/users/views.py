@@ -41,6 +41,7 @@ from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
+    AccountDeleteForm,
     CustomPasswordChangeForm,
     EmailConfirmationForm,
     OptInConsentForm,
@@ -313,28 +314,38 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        email: EmailType = emails["account_deleted"]
-        send_mail(
-            email["subject"],
-            email["body"] % request.user,
-            email["from_email"],
-            email["to"],
-        )
-        delete_user_assets(request.user)
-        user = convert_to_stub_account(request.user)
-        update_moosend_subscription.delay(request.user.email, "unsubscribe")
-        update_session_auth_hash(request, user)
-        logout(request)
-        return HttpResponseRedirect(reverse("delete_profile_done"))
-
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
     ).count()
+    if request.method == "POST":
+        delete_form = AccountDeleteForm(request, request.POST)
+        if delete_form.is_valid():
+            email: EmailType = emails["account_deleted"]
+            send_mail(
+                email["subject"],
+                email["body"] % request.user,
+                email["from_email"],
+                email["to"],
+            )
+            delete_user_assets(request.user)
+            user = convert_to_stub_account(request.user)
+            update_moosend_subscription.delay(
+                request.user.email, "unsubscribe"
+            )
+            update_session_auth_hash(request, user)
+            logout(request)
+            return HttpResponseRedirect(reverse("delete_profile_done"))
+
+    else:
+        delete_form = AccountDeleteForm(request=request)
     return render(
         request,
         "profile/delete.html",
-        {"non_deleted_map_count": non_deleted_map_count, "private": True},
+        {
+            "non_deleted_map_count": non_deleted_map_count,
+            "delete_form": delete_form,
+            "private": True,
+        },
     )
 
 
