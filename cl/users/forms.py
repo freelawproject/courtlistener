@@ -186,9 +186,10 @@ class EmailConfirmationForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
-                "class": "form-control auto-focus input-lg",
+                "class": "form-control input-lg",
                 "placeholder": "Your Email Address",
                 "autocomplete": "email",
+                "autofocus": "on",
             }
         ),
         required=True,
@@ -310,8 +311,9 @@ class CustomSetPasswordForm(SetPasswordForm):
 
         self.fields["new_password1"].widget.attrs.update(
             {
-                "class": "auto-focus form-control",
+                "class": "form-control",
                 "autocomplete": "new-password",
+                "autofocus": "on",
             }
         )
         self.fields["new_password2"].widget.attrs.update(
