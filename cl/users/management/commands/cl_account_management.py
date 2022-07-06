@@ -8,7 +8,7 @@ from cl.lib.command_utils import VerboseCommand
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
-from cl.users.utils import delete_user_assets, emails
+from cl.users.utils import emails
 
 
 class Command(VerboseCommand):
@@ -77,7 +77,6 @@ class Command(VerboseCommand):
             if self.options["simulate"]:
                 return
 
-            delete_user_assets(up.user)
             up.user.delete()
             up.delete()
             if self.options["verbose"]:
