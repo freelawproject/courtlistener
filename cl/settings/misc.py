@@ -12,7 +12,6 @@ DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 PLAUSIBLE_API_URL = "https://plausible.io/api/v1/stats/breakdown"
 PLAUSIBLE_API_TOKEN = env("PLAUSIBLE_API_TOKEN", default="")
 
-
 ###################
 #     Private     #
 ###################
@@ -44,6 +43,8 @@ GOOGLE_AUTH = {
     "PROJECT": "courtlistener-development",
 }
 
+# Case.law
+CASELAW_API_KEY = env("CASELAW_API_KEY", default="")
 
 ##############
 # Super Misc #
