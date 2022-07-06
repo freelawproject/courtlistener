@@ -12,17 +12,17 @@
   <div class="hidden-xs col-sm-1 col-md-3"></div>
   <div class="col-xs-12 col-sm-10 col-md-6 text-center">
 
-    {% if page == "info" %}
+    {% if page == "api_info" %}
       <h1>{% flag "user-webhooks" %}Developer Tools{% else %}CourtListener API{% endflag %}</h1>
       <h3 class="caps gray">REST APIs and Bulk Data for Developers</h3>
       <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database. By allowing programmers and researchers to access this data, we hope to fulfill our mission of stimulating legal innovation.
       </p>
       <p class="v-offset-above-2"><a href="{% url "api_index" %}" class="btn btn-primary btn-lg">Read the API Documentation</a></p>
-    {% elif page == "token" %}
+    {% elif page == "api_token" %}
       <h3 class="v-offset-above-2">Your API Token</h3>
       <p>To get started, you need an API token. Keep this private. Yours is:</p>
       <h4><code>{{ user.auth_token }}</code></h4>
-    {% elif page == "usage" %}
+    {% elif page == "api_usage" %}
       <h3 class="v-offset-above-2" id="usage">Your API Recent Usage</h3>
       {% with counts=user.profile.recent_api_usage %}
         {% if not counts %}

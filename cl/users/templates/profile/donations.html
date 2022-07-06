@@ -6,8 +6,11 @@
 
 {% block nav-account %}active{% endblock %}
 {% block footer-scripts %}
-  <script type="text/javascript"
-          src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
           src="{% static "js/toggle_settings.js" %}"></script>
 {% endblock %}

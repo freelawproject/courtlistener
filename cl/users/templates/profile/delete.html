@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends "profile/nav.html" %}
 
 {% block title %}Delete Account – CourtListener.com{% endblock %}
 
+{% block nav-account %}active{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
+  {% include "includes/account-tabs.html" %}
 <div class="col-sm-3">&nbsp;</div>
 <div class="col-sm-6">
   <h1>You Are About to Delete Your Account</h1>

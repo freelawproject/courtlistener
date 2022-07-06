@@ -82,7 +82,7 @@ urlpatterns = [
     path("profile/settings/", views.view_settings, name="view_settings"),
     path("profile/", RedirectView.as_view(pattern_name="view_settings")),
     path("profile/favorites/", views.view_favorites, name="profile_favorites"),
-    path("profile/alerts/", views.view_alerts, name="profile_alerts"),
+    path("profile/alerts/", views.view_search_alerts, name="profile_alerts"),
     path(
         "profile/docket-alerts/",
         views.view_docket_alerts,
@@ -113,7 +113,7 @@ urlpatterns = [
         name="password_change",
     ),
     path(
-        "profile/recap/",
+        "profile/recap-dot-email/",
         views.view_recap_email,
         name="view_recap_email",
     ),

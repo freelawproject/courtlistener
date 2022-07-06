@@ -48,7 +48,7 @@
   <div class="col-xs-12 v-offset-above-2">
     {% if user.favorites.exists %}
       {# Set up the pills #}
-      <ul class="nav nav-pills mobile-tabs">
+      <ul class="nav nav-pills">
       {% for type, typed_favorite_forms in favorite_forms.items %}
         <li class="{% if forloop.first %}active{% endif %} medium">
           <a href="#{{ type|slugify }}" data-toggle="tab">{{ type }} <span class="badge">{{ typed_favorite_forms|length }}</span></a>

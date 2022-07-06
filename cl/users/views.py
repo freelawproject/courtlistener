@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 @login_required
 @never_cache
-def view_alerts(request: HttpRequest) -> HttpResponse:
+def view_search_alerts(request: HttpRequest) -> HttpResponse:
     search_alerts = request.user.alerts.all()
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
@@ -174,7 +174,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/donations.html",
-        {"page": "donations", "private": True},
+        {"page": "profile_donations", "private": True},
     )
 
 
@@ -197,7 +197,11 @@ def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "page": "active", "private": True},
+        {
+            "results": paged_vizes,
+            "page": "visualizations_active",
+            "private": True,
+        },
     )
 
 
@@ -226,7 +230,11 @@ def view_deleted_visualizations(
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "page": "trash", "private": True},
+        {
+            "results": paged_vizes,
+            "page": "visualizations_trash",
+            "private": True,
+        },
     )
 
 
@@ -236,7 +244,7 @@ def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/api.html",
-        {"private": True, "page": "info"},
+        {"private": True, "page": "api_info"},
     )
 
 
@@ -246,7 +254,7 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/api.html",
-        {"private": True, "page": "token"},
+        {"private": True, "page": "api_token"},
     )
 
 
@@ -256,7 +264,7 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/api.html",
-        {"private": True, "page": "usage"},
+        {"private": True, "page": "api_usage"},
     )
 
 
@@ -336,7 +344,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "profile_form": profile_form,
             "user_form": user_form,
-            "page": "settings",
+            "page": "profile_settings",
             "private": True,
         },
     )
@@ -657,7 +665,7 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/password_form.html",
-        {"form": form, "page": "password", "private": False},
+        {"form": form, "page": "profile_password", "private": False},
     )
 
 
@@ -710,14 +718,14 @@ def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
         if form.is_valid():
             instance.user = request.user
             form.save()
-            return HttpResponseRedirect(reverse("view_api"))
+            return HttpResponseRedirect(reverse("view_webhooks"))
     else:
         form = WebhookForm()
 
     return render(
         request,
         "profile/webhooks.html",
-        {"webhook_form": form, "private": True, "page": "webhooks"},
+        {"webhook_form": form, "private": True, "page": "api_webhooks"},
     )
 
 
@@ -732,7 +740,7 @@ def toggle_recap_email_auto_subscription(
         return HttpResponse("Please log in to continue.")
 
     user = request.user
-    if user.profile.auto_subscribe:
+    if request.POST["current_toggle_status"] == "True":
         UserProfile.objects.filter(user=user).update(auto_subscribe=False)
         msg = "Auto-subscribe to @recap.email cases is now disabled"
     else:
@@ -748,5 +756,9 @@ def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/recap_email.html",
-        {"private": True, "page": "recap", "auto_subscribe": auto_subscribe},
+        {
+            "private": True,
+            "page": "profile_recap",
+            "auto_subscribe": auto_subscribe,
+        },
     )

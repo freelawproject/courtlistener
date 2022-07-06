@@ -6,8 +6,11 @@
 
 {% block nav-alerts %}active{% endblock %}
 {% block footer-scripts %}
-  <script type="text/javascript"
-          src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
+  {% endif %}
   <script defer type="text/javascript"
           src="{% static "js/toggle_settings.js" %}"></script>
 {% endblock %}
@@ -15,18 +18,7 @@
 
 {% block content %}
   {# Navigation Tabs #}
-  <div class="col-xs-12 v-offset-above-2 v-offset-below-2">
-    <ul class="nav nav-pills mobile-tabs">
-      <li class="{% if page == "search_alerts" %} active {% endif %} medium">
-        <a href="{% url "profile_alerts" %}">
-          <i class="fa fa-search"></i> Search Alerts</a>
-      </li>
-      <li class="{% if page == "docket_alerts" %} active {% endif %} medium">
-        <a href="{% url "profile_docket_alerts" %}">
-          <i class="fa fa-file-text-o"></i> Docket Alerts</a>
-      </li>
-    </ul>
-  </div>
+  {% include "includes/alerts-tabs.html" %}
 
 {% if not search_alerts and not docket_alerts %}
   {# No alerts yet. Tell the user about them. #}

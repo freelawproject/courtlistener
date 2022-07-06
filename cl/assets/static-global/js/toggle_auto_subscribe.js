@@ -2,6 +2,14 @@ function toggleSwitchButton(value){
   value.classList.toggle('btn-primary');
   value.classList.toggle('btn-light');
   value.classList.toggle('off');
+
+  let current_toggle_status = document.getElementsByName("current_toggle_status")[0].value;
+  if (current_toggle_status == "True") {
+    document.getElementsByName("current_toggle_status")[0].value = "False";
+  }
+  else{
+    document.getElementsByName("current_toggle_status")[0].value = "True";
+  }
 }
 
 document.body.addEventListener('htmx:afterRequest', function (event) {

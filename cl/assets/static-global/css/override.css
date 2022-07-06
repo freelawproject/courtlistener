@@ -1147,14 +1147,25 @@ emphasis {
 }
 /* END  Buy on Pacerdash custom styles */
 
-/* Responsive profile tabs styles */
-.mobile-tabs{
+/* Profile tabs styles */
+.centered-tabs{
   display: inline-flex;
   width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
+  justify-content: center;
 }
-.mobile-tabs::-webkit-scrollbar {
-  display: none;
+
+@media (max-width: 767px) {
+  .centered-tabs{
+    display: block;
+    justify-content: left;
+  }
 }
-/* END Responsive profile tabs styles */
+
+.recap-email-toggle .toggle{
+  width: 6rem;
+}
+.recap-email-toggle label{
+  line-height: 10px;
+}
+
+/* END Profile tabs styles */

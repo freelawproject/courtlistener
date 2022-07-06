@@ -11,28 +11,7 @@
   <div class="hidden-xs col-sm-2 col-md-3"></div>
   <div class="col-xs-12 col-sm-8 col-md-6">
     <h1>Help with @recap.email</h1>
-    <p class="lead"><strong>@recap.email</strong> is a system we use to gather content from PACER and add it to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notification emails from PACER, it only takes a minute to set up this system and begin contributing content to the public commons.
-    </p>
-
-    <h2>How it works</h2>
-    <p>Three easy steps:</p>
-    <ol>
-      <li>
-        <p>Every party in a case gets notification emails that contain one-time "magic links." These links give free access to new filings in the case.</p>
-      </li>
-      <li>
-        <p>We give you an email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed.</p>
-        <p class="alert-warning alert">
-          {% if request.user.is_authenticated %}
-            Your @recap.email email address is <b>{{ request.user.profile.recap_email }}</b>
-          {% else %}
-            Log in and refresh this page to see your personal @recap.email address here.
-          {% endif %}
-        <p>
-      </li>
-      <li>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll add the items to RECAP, and we'll send you a notification so you're up to date.</li>
-    </ol>
-    <p>That's it!</p>
+    {% include "includes/recap_email_intro.html" %}
 
     <h2>Why is this useful to me?</h2>
     <p>If you begin using @recap.email, you get some nice benefits immediately:</p>
