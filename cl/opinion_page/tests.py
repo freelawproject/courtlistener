@@ -125,6 +125,20 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
+    def test_invalid_page_number_1918(self) -> None:
+        """Do we fail gracefully with invalid page numbers?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "f2d",
+                    "volume": "1",
+                    "page": "asdf",  # <-- Nasty, nasty hobbits
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
     def test_long_numbers(self) -> None:
         """Do really long WL citations work?"""
         r = self.client.get(

@@ -227,7 +227,11 @@ class ProfileTest(TestCase):
         self.assertTrue(
             self.client.login(username="pandora", password="password")
         )
-        response = self.client.post(reverse("delete_account"), follow=True)
+        response = self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
         self.assertRedirects(
             response,
             reverse("delete_profile_done"),

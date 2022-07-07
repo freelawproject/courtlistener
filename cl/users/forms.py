@@ -1,5 +1,6 @@
 from disposable_email_domains import blocklist
 from django import forms
+from django.contrib.auth import authenticate
 from django.contrib.auth.forms import (
     PasswordChangeForm,
     PasswordResetForm,
@@ -7,13 +8,14 @@ from django.contrib.auth.forms import (
     UserCreationForm,
 )
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.forms import ModelForm
 from django.urls import reverse
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
-from cl.api.models import Webhook, WebhookEventType
+from cl.api.models import Webhook
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -184,9 +186,10 @@ class EmailConfirmationForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
-                "class": "form-control auto-focus input-lg",
+                "class": "form-control input-lg",
                 "placeholder": "Your Email Address",
                 "autocomplete": "email",
+                "autofocus": "on",
             }
         ),
         required=True,
@@ -200,6 +203,40 @@ class OptInConsentForm(forms.Form):
         },
         required=True,
     )
+
+
+class AccountDeleteForm(forms.Form):
+    password = forms.CharField(
+        label="Confirm your password to continue...",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control input-lg",
+                "placeholder": "Your password...",
+                "autocomplete": "off",
+                "autofocus": "on",
+            },
+        ),
+    )
+
+    def __init__(self, request=None, *args, **kwargs):
+        """Set the request attribute for use by the clean method."""
+        self.request = request
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self) -> dict[str, str]:
+        password = self.cleaned_data["password"]
+
+        if password:
+            user = authenticate(
+                self.request, username=self.request.user, password=password
+            )
+            if user is None:
+                raise ValidationError(
+                    "Your password was invalid. Please try again."
+                )
+
+        return self.cleaned_data
 
 
 class CustomPasswordChangeForm(PasswordChangeForm):
@@ -274,8 +311,9 @@ class CustomSetPasswordForm(SetPasswordForm):
 
         self.fields["new_password1"].widget.attrs.update(
             {
-                "class": "auto-focus form-control",
+                "class": "form-control",
                 "autocomplete": "new-password",
+                "autofocus": "on",
             }
         )
         self.fields["new_password2"].widget.attrs.update(
