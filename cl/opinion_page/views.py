@@ -1,9 +1,8 @@
 from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
-import waffle
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
@@ -29,10 +28,7 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
-from cl.citations.parenthetical_utils import (
-    create_parenthetical_groups,
-    get_or_create_parenthetical_groups,
-)
+from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
@@ -413,9 +409,9 @@ def make_thumb_if_needed(
 @ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
-    docket_id: Optional[int] = None,
-    doc_num: Optional[int] = None,
-    att_num: Optional[int] = None,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
     slug: str = "",
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
@@ -620,7 +616,7 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
 
 
 def reporter_or_volume_handler(
-    request: HttpRequest, reporter: str, volume: Optional[str] = None
+    request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
     """Show all the volumes for a given reporter abbreviation or all the cases
     for a reporter-volume dyad.
@@ -840,9 +836,9 @@ def citation_handler(
 
 def citation_redirector(
     request: HttpRequest,
-    reporter: Optional[str] = None,
-    volume: Optional[str] = None,
-    page: Optional[str] = None,
+    reporter: str | None = None,
+    volume: str | None = None,
+    page: str | None = None,
 ) -> HttpResponse:
     """Take a citation URL and use it to redirect the user to the canonical
     page for that citation.
