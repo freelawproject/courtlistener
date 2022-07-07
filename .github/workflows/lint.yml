@@ -82,7 +82,8 @@ jobs:
           cl/tests/utils.py \
           cl/users/management/commands/cl_account_management.py \
           cl/users/forms.py \
-          cl/users/email_handlers.py
+          cl/users/email_handlers.py \
+          cl/users/tasks.py
 
       - name: Flynt f-string Formatter
         run: >

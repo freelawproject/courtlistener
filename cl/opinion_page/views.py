@@ -779,7 +779,7 @@ def citation_handler(
     else:
         cluster_count = clusters.count()
 
-    if cluster_count == 0:
+    if cluster_count == 0 and page.isdigit():
         # Do a second pass for the closest opinion and check if we have
         # a page cite that matches -- if it does give the requested opinion
         possible_match = (
