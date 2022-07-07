@@ -41,6 +41,7 @@ from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
+    AccountDeleteForm,
     CustomPasswordChangeForm,
     EmailConfirmationForm,
     OptInConsentForm,
@@ -51,7 +52,12 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription
-from cl.users.utils import convert_to_stub_account, emails, message_dict
+from cl.users.utils import (
+    convert_to_stub_account,
+    delete_user_assets,
+    emails,
+    message_dict,
+)
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
@@ -308,33 +314,38 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        email: EmailType = emails["account_deleted"]
-        send_mail(
-            email["subject"],
-            email["body"] % request.user,
-            email["from_email"],
-            email["to"],
-        )
-        request.user.alerts.all().delete()
-        request.user.docket_alerts.all().delete()
-        request.user.favorites.all().delete()
-        request.user.user_tags.all().delete()
-        request.user.monthly_donations.all().update(enabled=False)
-        request.user.scotus_maps.all().update(deleted=True)
-        user = convert_to_stub_account(request.user)
-        update_moosend_subscription.delay(request.user.email, "unsubscribe")
-        update_session_auth_hash(request, user)
-        logout(request)
-        return HttpResponseRedirect(reverse("delete_profile_done"))
-
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
     ).count()
+    if request.method == "POST":
+        delete_form = AccountDeleteForm(request, request.POST)
+        if delete_form.is_valid():
+            email: EmailType = emails["account_deleted"]
+            send_mail(
+                email["subject"],
+                email["body"] % request.user,
+                email["from_email"],
+                email["to"],
+            )
+            delete_user_assets(request.user)
+            user = convert_to_stub_account(request.user)
+            update_moosend_subscription.delay(
+                request.user.email, "unsubscribe"
+            )
+            update_session_auth_hash(request, user)
+            logout(request)
+            return HttpResponseRedirect(reverse("delete_profile_done"))
+
+    else:
+        delete_form = AccountDeleteForm(request=request)
     return render(
         request,
         "profile/delete.html",
-        {"non_deleted_map_count": non_deleted_map_count, "private": True},
+        {
+            "non_deleted_map_count": non_deleted_map_count,
+            "delete_form": delete_form,
+            "private": True,
+        },
     )
 
 
@@ -405,6 +416,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     user = stub_account
                     user.set_password(cd["password1"])
                     user.username = cd["username"]
+                    user.is_active = True
                     up = stub_account.profile
                     up.stub_account = False
 
