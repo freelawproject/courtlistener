@@ -834,6 +834,18 @@ def citation_handler(
     return HttpResponse(status=500)
 
 
+def make_citation_url_dict(
+    reporter: str, volume: str | None, page: str | None
+) -> dict[str, str]:
+    """Make a dict of the volume/reporter/page, but only if truthy."""
+    d = {"reporter": reporter}
+    if volume:
+        d["volume"] = volume
+    if page:
+        d["page"] = page
+    return d
+
+
 def citation_redirector(
     request: HttpRequest,
     reporter: str | None = None,
@@ -882,13 +894,15 @@ def citation_redirector(
         if reporter != reporter_slug:
             # Reporter provided in non-slugified form. Redirect to slugified
             # version.
-            cd = {"reporter": reporter_slug}
-            if volume:
-                cd["volume"] = volume
-            if page:
-                cd["page"] = page
             return HttpResponseRedirect(
-                reverse("citation_redirector", kwargs=cd)
+                reverse(
+                    "citation_redirector",
+                    kwargs=make_citation_url_dict(
+                        reporter_slug,
+                        volume,
+                        page,
+                    ),
+                ),
             )
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
