@@ -15,7 +15,6 @@ from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.template.defaultfilters import slugify
 from django.urls import reverse
-from django.utils.safestring import SafeText
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -846,6 +845,78 @@ def make_citation_url_dict(
     return d
 
 
+def attempt_reporter_variation(
+    request: HttpRequest,
+    reporter: str,
+    volume: str | None,
+    page: str | None,
+) -> HttpResponse:
+    """Try to disambiguate an unknown reporter using the variations dict.
+
+    The variations dict looks like this:
+
+        {
+         "A. 2d": ["A.2d"],
+         ...
+         "P.R.": ["Pen. & W.", "P.R.R.", "P."],
+        }
+
+    This means that there can be more than one canonical reporter for a given
+    variation. When that happens, we give up. When there's exactly one, we
+    redirect to the canonical variation. When there's zero, we give up.
+
+    :param request: The HTTP request
+    :param reporter: The reporter string we're trying to look up, e.g., "f-3d"
+    :param volume: The volume requested, if provided
+    :param page: The page requested, if provided
+    """
+    # Make a slugified variations dict
+    slugified_variations = {}
+    for variant, canonicals in VARIATIONS_ONLY.items():
+        slugged_canonicals = []
+        for canonical in canonicals:
+            slugged_canonicals.append(slugify(canonical))
+        slugified_variations[slugify(variant)] = slugged_canonicals
+
+    # Look up the user's request in the variations dict
+    possible_canonicals = slugified_variations.get(reporter, [])
+    if len(possible_canonicals) == 0:
+        # Couldn't find it as a variation. Give up.
+        return throw_404(
+            request,
+            {"no_reporters": True, "reporter": reporter, "private": True},
+        )
+
+    elif len(possible_canonicals) == 1:
+        # Unambiguous reporter variation. Great. Redirect to the canonical
+        # reporter
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    possible_canonicals[0], volume, page
+                ),
+            ),
+        )
+
+    elif len(possible_canonicals) > 1:
+        # The reporter variation is ambiguous b/c it can refer to more than
+        # one reporter. Abort with a 300 status.
+        return HttpResponse(
+            content=loader.render_to_string(
+                "citation_redirect_info_page.html",
+                {
+                    "too_many_reporter_variations": True,
+                    "reporter": reporter,
+                    "possible_canonicals": possible_canonicals,
+                    "private": True,
+                },
+                request=request,
+            ),
+            status=HTTP_300_MULTIPLE_CHOICES,
+        )
+
+
 def citation_redirector(
     request: HttpRequest,
     reporter: str | None = None,
@@ -906,13 +977,11 @@ def citation_redirector(
             )
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slug_edition = {slugify(item): item for item in EDITIONS.keys()}
-    proper_reporter = slug_edition.get(SafeText(reporter), None)
+    slugified_editions = {slugify(item): item for item in EDITIONS.keys()}
+    proper_reporter = slugified_editions.get(reporter, None)
     if not proper_reporter:
-        return throw_404(
-            request,
-            {"no_reporters": True, "reporter": reporter, "private": False},
-        )
+        return attempt_reporter_variation(request, reporter, volume, page)
+
     # We have a reporter (show volumes in it), a volume (show cases in
     # it), or a citation (show matching citation(s))
     if proper_reporter and volume and page:

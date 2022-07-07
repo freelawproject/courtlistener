@@ -195,6 +195,51 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
+    def test_reporter_variation_just_reporter(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/")
+
+    def test_reporter_variation_just_reporter_and_volume(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/56/")
+
+    def test_reporter_variation_full_citation(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                    "page": "9",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/56/9/")
+
 
 class ViewRecapDocketTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
