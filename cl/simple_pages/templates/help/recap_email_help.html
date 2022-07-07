@@ -11,7 +11,33 @@
   <div class="hidden-xs col-sm-2 col-md-3"></div>
   <div class="col-xs-12 col-sm-8 col-md-6">
     <h1>Help with @recap.email</h1>
-    {% include "includes/recap_email_intro.html" %}
+    <p class="lead"><strong>@recap.email</strong> is a system that gathers content from PACER and adds it to the <a href="{% url 'advanced_r' %}">RECAP Archive</a>. If you receive notification emails from PACER, it only takes a minute to set up this system and contribute content to the public commons.
+    </p>
+
+    <h2>How it works</h2>
+    <p>Three easy steps:</p>
+    <ol>
+      <li>
+        <p>Every party in a case gets notification emails that contain one-time "magic links." These links give free access to new filings in the case.</p>
+      </li>
+      <li>
+        <p>We give you an email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed.</p>
+        <p class="alert-warning alert">
+          {% if request.user.is_authenticated %}
+            Your @recap.email email address is <b>{{ request.user.profile.recap_email }}</b>
+          {% else %}
+            Log in and refresh this page to see your personal @recap.email address here.
+          {% endif %}
+        <p>
+      </li>
+      <li>
+        <p>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll automatically add the items to RECAP.
+        </p>
+        <p>If you have <a href="{% url "view_recap_email" %}">auto-subscribe turned on in your profile</a> (the default), we will automatically start sending you email notifications for the case. If auto-subscribe is off, we will send you one email for each case you're associated with in PACER, when we get the first notification for that case from PACER. In the email we send, you can click a link to subscribe to it on CourtListener so you get all of its notifications, or if you do nothing, you won't get more emails for that case.
+        </p>
+      </li>
+    </ol>
+    <p>That's it!</p>
 
     <h2>Why is this useful to me?</h2>
     <p>If you begin using @recap.email, you get some nice benefits immediately:</p>
