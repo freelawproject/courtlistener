@@ -876,7 +876,7 @@ def attempt_reporter_variation(
         slugged_canonicals = []
         for canonical in canonicals:
             slugged_canonicals.append(slugify(canonical))
-        slugified_variations[slugify(variant)] = slugged_canonicals
+        slugified_variations[str(slugify(variant))] = slugged_canonicals
 
     # Look up the user's request in the variations dict
     possible_canonicals = slugified_variations.get(reporter, [])
@@ -915,11 +915,13 @@ def attempt_reporter_variation(
             ),
             status=HTTP_300_MULTIPLE_CHOICES,
         )
+    else:
+        return HttpResponse(status=500)
 
 
 def citation_redirector(
     request: HttpRequest,
-    reporter: str | None = None,
+    reporter: str,
     volume: str | None = None,
     page: str | None = None,
 ) -> HttpResponse:
@@ -929,6 +931,40 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+    reporter_slug = slugify(reporter)
+    if reporter != reporter_slug:
+        # Reporter provided in non-slugified form. Redirect to slugified
+        # version.
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    reporter_slug,
+                    volume,
+                    page,
+                ),
+            ),
+        )
+
+    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
+    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
+    proper_reporter = slugified_editions.get(reporter, None)
+    if not proper_reporter:
+        return attempt_reporter_variation(request, reporter, volume, page)
+
+    # We have a reporter (show volumes in it), a volume (show cases in
+    # it), or a citation (show matching citation(s))
+    if proper_reporter and volume and page:
+        return citation_handler(request, proper_reporter, volume, page)
+    elif proper_reporter and volume and page is None:
+        return reporter_or_volume_handler(request, proper_reporter, volume)
+    elif proper_reporter and volume is None and page is None:
+        return reporter_or_volume_handler(request, proper_reporter)
+    return HttpResponse(status=500)
+
+
+def citation_homepage(request: HttpRequest) -> HttpResponse:
+    """Show the citation homepage"""
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
@@ -945,52 +981,18 @@ def citation_redirector(
                 {"show_homepage": True, "form": form, "private": False},
             )
 
-    if all(_ is None for _ in (reporter, volume, page)):
-        # No parameters. Show the citation lookup homepage.
-        form = CitationRedirectorForm()
-        reporter_dict = make_reporter_dict()
-        return render(
-            request,
-            "citation_redirect_info_page.html",
-            {
-                "show_homepage": True,
-                "reporter_dict": reporter_dict,
-                "form": form,
-                "private": False,
-            },
-        )
-
-    if reporter:
-        reporter_slug = slugify(reporter)
-        if reporter != reporter_slug:
-            # Reporter provided in non-slugified form. Redirect to slugified
-            # version.
-            return HttpResponseRedirect(
-                reverse(
-                    "citation_redirector",
-                    kwargs=make_citation_url_dict(
-                        reporter_slug,
-                        volume,
-                        page,
-                    ),
-                ),
-            )
-
-    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slugified_editions = {slugify(item): item for item in EDITIONS.keys()}
-    proper_reporter = slugified_editions.get(reporter, None)
-    if not proper_reporter:
-        return attempt_reporter_variation(request, reporter, volume, page)
-
-    # We have a reporter (show volumes in it), a volume (show cases in
-    # it), or a citation (show matching citation(s))
-    if proper_reporter and volume and page:
-        return citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
-        return reporter_or_volume_handler(request, proper_reporter, volume)
-    elif proper_reporter and volume is None and page is None:
-        return reporter_or_volume_handler(request, proper_reporter)
-    return HttpResponse(status=500)
+    form = CitationRedirectorForm()
+    reporter_dict = make_reporter_dict()
+    return render(
+        request,
+        "citation_redirect_info_page.html",
+        {
+            "show_homepage": True,
+            "reporter_dict": reporter_dict,
+            "form": form,
+            "private": False,
+        },
+    )
 
 
 @ensure_csrf_cookie

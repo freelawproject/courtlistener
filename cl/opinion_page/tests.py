@@ -81,11 +81,12 @@ class CitationRedirectorTest(TestCase):
             msg=f"Didn't get a {status} status code. Got {r.status_code} instead.",
         )
 
-    def test_with_and_without_a_citation(self) -> None:
-        """Make sure that the url paths are working properly."""
-        r = self.client.get(reverse("citation_redirector"))
+    def test_citation_homepage(self) -> None:
+        r = self.client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTP_200_OK)
 
+    def test_with_a_citation(self) -> None:
+        """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
