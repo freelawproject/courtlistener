@@ -99,7 +99,9 @@ def make_alert_messages(
             # Options for users that already have an active subscription for
             # this case
             first_email = auto_subscribe = False
-            user = User.objects.get(email=email_address)
+            user = User.objects.filter(
+                email=email_address, docket_alerts__docket=d
+            ).first()
             docket_alert = DocketAlert.objects.get(docket=d, user=user)
 
         subject_context["first_email"] = first_email
