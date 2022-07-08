@@ -7,6 +7,7 @@ import requests
 from django.conf import settings
 
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.settings import CASELAW_API_KEY
 
 
 class OptionsType(TypedDict):
@@ -22,12 +23,12 @@ class OptionsType(TypedDict):
 
 
 def get_data(url, params=None):
-    header = {}
+    header = {"Authorization": f"Token {CASELAW_API_KEY}"}
     logger.info(f"Processing endpoint: {url}")
     try:
         request = requests.get(url, headers=header, params=params, timeout=10)
 
-        # print(request.url)
+        print(request.url)
 
         if request.status_code == 401:
             logger.error("Invalid token header or No credentials provided")
@@ -81,6 +82,8 @@ def get_from_caselaw(options: OptionsType):
     page_size = 1000
 
     # TODO test how many cases can we collect, there's api calls limit for registered user?
+
+    # TODO handle error_auth_required or error_limit_exceeded when want to get casebody
 
     if not type:
         logger.error("You didn't provide the type. Exiting.")
@@ -235,14 +238,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--last-updated",
             help="Filter cases by last update. Format: YYYY-MM-DDTHH:MM:SS or "
-            "YYYY-MM-DD or YYYY-MM or YYYY",
+                 "YYYY-MM-DD or YYYY-MM or YYYY",
             required=False,
         )
 
         parser.add_argument(
             "--last-updated-filter",
             help="Indicate filter by last update is gt, gte, lt, lte. Default: None ("
-            "exact match).",
+                 "exact match).",
             required=False,
         )
 
