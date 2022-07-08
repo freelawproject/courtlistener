@@ -54,7 +54,6 @@ class ProfileForm(ModelForm):
             "is_tester",
             "barmembership",
             "plaintext_preferred",
-            "auto_subscribe",
         )
         widgets = {
             "employer": forms.TextInput(

@@ -82,7 +82,12 @@ urlpatterns = [
     path("profile/settings/", views.view_settings, name="view_settings"),
     path("profile/", RedirectView.as_view(pattern_name="view_settings")),
     path("profile/favorites/", views.view_favorites, name="profile_favorites"),
-    path("profile/alerts/", views.view_alerts, name="profile_alerts"),
+    path("profile/alerts/", views.view_search_alerts, name="profile_alerts"),
+    path(
+        "profile/docket-alerts/",
+        views.view_docket_alerts,
+        name="profile_docket_alerts",
+    ),
     path(
         "profile/visualizations/",
         views.view_visualizations,
@@ -94,10 +99,23 @@ urlpatterns = [
         name="view_deleted_visualizations",
     ),
     path("profile/api/", views.view_api, name="view_api"),
+    path("profile/api-token/", views.view_api_token, name="view_api_token"),
+    path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
+    path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
+    path(
+        "profile/auto_subscribe/toggle/",
+        views.toggle_recap_email_auto_subscription,
+        name="toggle_recap_email_auto_subscription",
+    ),
     path(
         "profile/password/change/",
         views.password_change,
         name="password_change",
+    ),
+    path(
+        "profile/recap-dot-email/",
+        views.view_recap_email,
+        name="view_recap_email",
     ),
     path("profile/delete/", views.delete_account, name="delete_account"),
     path(

@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends "profile/nav.html" %}
 
 {% block title %}Delete Account – CourtListener.com{% endblock %}
 
+{% block nav-account %}active{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block content %}
+  {% include "includes/account-tabs.html" %}
 <div class="col-sm-3">&nbsp;</div>
 <div class="col-sm-6">
   <h1>You Are About to Delete Your Account</h1>
@@ -23,7 +25,7 @@
       <li>All of <a href="{% url "profile_alerts" %}">your search alerts</a> ({{ request.user.alerts.count }}).</li>
     {% endif %}
     {% if request.user.docket_alerts.count %}
-      <li>All of <a href="{% url "profile_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.count }}).</li>
+      <li>All of <a href="{% url "profile_docket_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.count }}).</li>
     {% endif %}
     {% if request.user.user_tags.count > 0 %}
       <li>All of your <a href="{% url "tag_list" username=user.username %}">tags</a> ({{ request.user.user_tags.count }}).</li>
