@@ -16,10 +16,11 @@ from django.db.models import Count
 from django.http import (
     HttpRequest,
     HttpResponse,
+    HttpResponseForbidden,
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.template.defaultfilters import urlencode
 from django.urls import reverse
 from django.utils.timezone import now
@@ -32,7 +33,7 @@ from django.views.decorators.debug import (
 from django.views.decorators.http import require_http_methods
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook
+from cl.api.models import Webhook, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -712,20 +713,69 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        instance = Webhook()
-        form = WebhookForm(request.POST, instance=instance)
-        if form.is_valid():
-            instance.user = request.user
-            form.save()
-            return HttpResponseRedirect(reverse("view_webhooks"))
-    else:
-        form = WebhookForm()
-
+    """Render the webhooks page"""
     return render(
         request,
         "profile/webhooks.html",
-        {"webhook_form": form, "private": True, "page": "api_webhooks"},
+        {
+            "private": True,
+            "page": "api_webhooks",
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_webhooks_list(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """List webhooks for the current user"""
+    webhooks = request.user.webhooks.all().order_by("date_created")
+    return render(
+        request,
+        "includes/webhooks-list.html",
+        {"webhooks": webhooks},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_webhook(request: AuthenticatedHttpRequest, pk: int) -> HttpResponse:
+    """Handle the deletion of a webhook"""
+    webhook = get_object_or_404(Webhook, pk=pk, user=request.user)
+    webhook.delete()
+    return HttpResponse(headers={"HX-Trigger": "webhooksListChanged"})
+
+
+@login_required
+@require_http_methods(["POST", "GET"])
+def webhook_form(request: HttpRequest) -> HttpResponse:
+    """Handle the creation or editing of a webhook"""
+    pk = ""
+    if "pk" in request.GET:
+        pk = request.GET["pk"]
+    if "pk" in request.POST:
+        pk = request.POST["pk"]
+
+    if pk:
+        webhook = get_object_or_404(Webhook, pk=pk, user=request.user)
+        update = True
+    else:
+        webhook = Webhook()
+        update = False
+
+    if request.method == "POST":
+        form = WebhookForm(
+            update, request.user, request.POST, instance=webhook
+        )
+        if form.is_valid():
+            webhook.user = request.user
+            form.save()
+            return HttpResponse(headers={"HX-Trigger": "webhooksListChanged"})
+    else:
+        form = WebhookForm(update, request.user, instance=webhook)
+    return render(
+        request,
+        "includes/webhooks-form.html",
+        {"webhook_form": form, "webhook_id": pk},
     )
 
 

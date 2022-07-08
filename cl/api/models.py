@@ -17,8 +17,9 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
 
 
 class WebhookEventType(models.IntegerChoices):
-    RECAP_EMAIL = 1, "RECAP email received"
-    ALERT = 2, "Alert triggered"
+    DOCKET_ALERT = 1, "Docket Alert"
+    SEARCH_ALERT = 2, "Search Alert"
+    RECAP_FETCH = 3, "Recap Fetch"
 
 
 HttpStatusCodes = models.IntegerChoices(  # type: ignore

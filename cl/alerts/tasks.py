@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union, cast
 
+import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -9,7 +10,9 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import DocketAlert
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.celery_init import app
+from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
@@ -33,7 +36,7 @@ def make_alert_messages(
     new_des: QuerySet,
     email_addresses: "ValuesQuerySet[User, Optional[str]]",  # type: ignore
     recap_email_recipients: list[str] = [],
-) -> List[EmailMultiAlternatives]:
+) -> tuple[list[EmailMultiAlternatives], list[str]]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
@@ -46,6 +49,7 @@ def make_alert_messages(
 
     case_name = trunc(best_case_name(d), 100, ellipsis="...")
     messages = []
+    da_webhook_recipients = []
     txt_template = loader.get_template("docket_alert_email.txt")
     html_template = loader.get_template("docket_alert_email.html")
     subject_template = loader.get_template("docket_alert_subject.txt")
@@ -93,6 +97,7 @@ def make_alert_messages(
                 docket_alert = DocketAlert.objects.create(
                     docket=d, user=user_profile.user
                 )
+                da_webhook_recipients.append(email_address)
             else:
                 # First time recipient, auto_subscribe False
                 auto_subscribe = False
@@ -109,6 +114,7 @@ def make_alert_messages(
                 email=email_address, docket_alerts__docket=d
             ).first()
             docket_alert = DocketAlert.objects.get(docket=d, user=user)
+            da_webhook_recipients.append(email_address)
 
         subject_context["first_email"] = first_email
         subject_context["auto_subscribe"] = auto_subscribe
@@ -128,7 +134,60 @@ def make_alert_messages(
         msg.attach_alternative(html, "text/html")
         messages.append(msg)
 
-    return messages
+    return messages, da_webhook_recipients
+
+
+@app.task()
+def send_docket_to_webhook(
+    d_pk: int,
+    since: datetime,
+    da_webhook_recipients: list[str],
+) -> None:
+    """POSTS the DocketAlert to the recipients webhook(s)
+
+    :param d_pk: The Docket primary key
+    :param since: Start time for querying the docket entries
+    :da_webhook_recipients: The list of email recipients to send the webhook to
+    :return: None
+    """
+
+    docket_entries = DocketEntry.objects.filter(
+        date_created__gte=since, docket_id=d_pk
+    )
+    if docket_entries.count() == 0:
+        # No new docket entries.
+        return
+
+    webhooks = Webhook.objects.filter(
+        event_type=WebhookEventType.DOCKET_ALERT,
+        user__email__in=da_webhook_recipients,
+        enabled=True,
+    )
+
+    serialized_docket_entries = []
+    for de in docket_entries:
+        serialized_docket_entries.append(DocketEntrySerializer(de).data)
+
+    for webhook in webhooks:
+        post_content = {
+            "webhook": {
+                "event_type": webhook.event_type,
+                "version": webhook.version,
+                "date_created": webhook.date_created.isoformat(),
+            },
+            "results": serialized_docket_entries,
+        }
+        response = requests.post(webhook.url, json=post_content, timeout=2)
+        WebhookEvent.objects.create(
+            webhook=webhook,
+            status_code=response.status_code,
+            content=post_content,
+            response=response.text,
+        )
+
+        if not response.ok:
+            webhook.failure_count = webhook.failure_count + 1
+            webhook.save()
 
 
 # Ignore the result or else we'll use a lot of memory.
@@ -169,7 +228,7 @@ def send_docket_alert(
         return
 
     # Notify every user that's subscribed to this alert.
-    messages = make_alert_messages(
+    messages, da_webhook_recipients = make_alert_messages(
         d, new_des, email_addresses, recap_email_recipients
     )
     connection = get_connection()
@@ -178,6 +237,9 @@ def send_docket_alert(
     # Work completed. Tally, log, and clean up
     tally_stat("alerts.docket.alerts.sent", inc=len(email_addresses))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
+
+    # Send the docket to webhook
+    send_docket_to_webhook.si(d_pk, since, da_webhook_recipients).apply_async()
     delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 

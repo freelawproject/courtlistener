@@ -32,9 +32,7 @@ from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.models import DocketAlert
 from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     get_attachment_page_by_rd,
@@ -1489,56 +1487,6 @@ def mark_fq_status(fq, msg, status):
     fq.save()
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60)
-def send_docket_to_webhook(
-    self: Task, d_pk: int, since: datetime, epq_pk: int
-) -> None:
-    """POSTS the PacerFetchQueue to the recipients webhook(s)
-
-    :param d_pk: The Docket primary key
-    :param since: Start time for querying the docket entries
-    :param epq_pk: The EmailProcessingQueue primary key
-    :return: None
-    """
-    docket_entries = DocketEntry.objects.filter(
-        date_created__gte=since, docket_id=d_pk
-    )
-    if docket_entries.count() == 0:
-        # No new docket entries.
-        return
-
-    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
-    webhooks = Webhook.objects.filter(
-        event_type=WebhookEventType.RECAP_EMAIL,
-        user__profile__recap_email__in=epq.destination_emails,
-        enabled=True,
-    )
-
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
-
-    for webhook in webhooks:
-        post_content = {
-            "webhook": {
-                "event_type": webhook.event_type,
-                "version": webhook.version,
-                "date_created": webhook.date_created,
-            },
-            "results": serialized_docket_entries,
-        }
-        response = requests.post(webhook.url, data=post_content, timeout=2)
-        WebhookEvent.objects.create(
-            webhook=webhook,
-            status_code=response.status_code,
-            content=post_content,
-            response=response.text,
-        )
-        if not response.ok:
-            webhook.failure_count = webhook.failure_count + 1
-            webhook.save()
-
-
 def get_recap_email_recipients(
     email_recipients: list[dict[str, str | list[str]]],
 ) -> list[str]:
@@ -1658,11 +1606,8 @@ def process_recap_email(
             recap_email_recipients = get_recap_email_recipients(
                 data["email_recipients"]
             )
-            chain(
-                send_docket_alert.si(
-                    docket.pk, start_time, recap_email_recipients
-                ),
-                send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
+            send_docket_alert.si(
+                docket.pk, start_time, recap_email_recipients
             ).apply_async()
     return {
         "docket_pk": docket.pk,

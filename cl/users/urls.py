@@ -103,6 +103,21 @@ urlpatterns = [
     path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
     path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
     path(
+        "profile/webhook-form/",
+        views.webhook_form,
+        name="webhook_form",
+    ),
+    path(
+        "profile/webhooks-list/",
+        views.view_webhooks_list,
+        name="view_webhooks_list",
+    ),
+    path(
+        "profile/webhook-delete/<int:pk>/",
+        views.delete_webhook,
+        name="delete_webhook",
+    ),
+    path(
         "profile/auto_subscribe/toggle/",
         views.toggle_recap_email_auto_subscription,
         name="toggle_recap_email_auto_subscription",

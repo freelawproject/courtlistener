@@ -1167,5 +1167,17 @@ emphasis {
 .recap-email-toggle label{
   line-height: 10px;
 }
-
 /* END Profile tabs styles */
+
+/* Webhooks styles */
+.webhooks .panel-body{
+    padding: 0px;
+}
+.webhooks .panel-heading{
+  background-color: white;
+}
+.empty-webhooks{
+    padding: 1rem;
+}
+/* END Webhooks styles */
+
