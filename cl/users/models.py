@@ -133,7 +133,7 @@ class UserProfile(models.Model):
         "user's recap.email address, a new docket subscription for the case "
         "will be created; if disabled we'll ask users if they want to "
         "subscribe to the case.",
-        default=False,
+        default=True,
     )
 
     @property
