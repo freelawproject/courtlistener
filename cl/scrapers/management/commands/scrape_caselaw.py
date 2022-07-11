@@ -9,6 +9,8 @@ from django.conf import settings
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.settings import CASELAW_API_KEY
 
+reporters_slugs = dict()
+
 
 class OptionsType(TypedDict):
     type: str
@@ -20,6 +22,7 @@ class OptionsType(TypedDict):
     ordering: str
     body_format: str
     full_case: bool
+    reporter_id: int
 
 
 def get_data(url, params=None):
@@ -28,7 +31,7 @@ def get_data(url, params=None):
     try:
         request = requests.get(url, headers=header, params=params, timeout=10)
 
-        print(request.url)
+        # print(request.url)
 
         if request.status_code == 401:
             logger.error("Invalid token header or No credentials provided")
@@ -48,6 +51,29 @@ def get_data(url, params=None):
     except requests.exceptions.ReadTimeout:
         logger.error("Case.law server timeout, url: ", url)
         return None
+
+
+def get_reporter_slug(reporter_endpoint):
+    """
+    Get reporter slug from reporter endpoint
+    :param reporter_endpoint: Reporter instance endpoint
+    @return: reporter slug or None
+    """
+    global reporters_slugs
+    if reporters_slugs.get(reporter_endpoint):
+        # Check if slug is already stored in global variable to avoid
+        # unnecessary requests
+        return reporters_slugs.get(reporter_endpoint)
+    data = get_data(reporter_endpoint)
+    if data:
+        frontend_url = data.get("frontend_url")
+        if frontend_url:
+            url = [y for y in frontend_url.split("/") if y]
+            if url:
+                # Store and return reporter slug from url
+                reporters_slugs[reporter_endpoint] = url[-1]
+                return url[-1]
+    return None
 
 
 def get_from_caselaw(options: OptionsType):
@@ -74,6 +100,7 @@ def get_from_caselaw(options: OptionsType):
     ordering = options["ordering"]
     body_format = options["body_format"]
     full_case = options["full_case"]
+    reporter_id = None
     allowed_types = ["jurisdictions", "courts", "reporters", "cases"]
     base_url = "https://api.case.law"
     version = "v1"
@@ -82,7 +109,6 @@ def get_from_caselaw(options: OptionsType):
     page_size = 1000
 
     # TODO test how many cases can we collect, there's api calls limit for registered user?
-
     # TODO handle error_auth_required or error_limit_exceeded when want to get casebody
 
     if not type:
@@ -147,6 +173,8 @@ def get_from_caselaw(options: OptionsType):
             params["body_format"] = body_format
         if last_updated and last_updated_filter:
             params[f"last_updated__{last_updated_filter}"] = last_updated
+        if reporter_id:
+            params["reporter"] = reporter_id
 
     # Directory to store data based on type
     directory = Path(settings.MEDIA_ROOT, "case.law", type)
@@ -181,14 +209,24 @@ def get_from_caselaw(options: OptionsType):
                         if result.get("reporter")
                         else None
                     )
+                    reporter_url = (
+                        result.get("reporter").get("url")
+                        if result.get("reporter")
+                        else None
+                    )
+
+                    reporter_slug = get_reporter_slug(reporter_url)
+
+                    if not reporter_slug:
+                        # No slug from url, use reporter id
+                        reporter_slug = reporter_id
+
                     filename = f"{first_page}.{id}.json"
                     # Specific directory tree for cases
                     directory = Path(
                         settings.MEDIA_ROOT,
-                        "case.law",
-                        type,
-                        f"reporter_{reporter_id}",
-                        f"volume_{volume_number}",
+                        "harvard_corpus",
+                        f"law.free.cap.{reporter_slug}.{volume_number}",
                     )
 
                 file_path = Path(directory, filename)
@@ -238,14 +276,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--last-updated",
             help="Filter cases by last update. Format: YYYY-MM-DDTHH:MM:SS or "
-            "YYYY-MM-DD or YYYY-MM or YYYY",
+                 "YYYY-MM-DD or YYYY-MM or YYYY",
             required=False,
         )
 
         parser.add_argument(
             "--last-updated-filter",
             help="Indicate filter by last update is gt, gte, lt, lte. Default: None ("
-            "exact match).",
+                 "exact match).",
             required=False,
         )
 
@@ -264,6 +302,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--full-case",
             help="Load the case body if true. Default: True.",
+            default=False,
+            required=False,
+        )
+
+        parser.add_argument(
+            "--reporter-id",
+            help="Filter cases by reporter id. Ids from "
+                 "https://api.case.law/v1/reporters/",
             default=False,
             required=False,
         )
