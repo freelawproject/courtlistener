@@ -1146,3 +1146,26 @@ emphasis {
   font-size: 11px;
 }
 /* END  Buy on Pacerdash custom styles */
+
+/* Profile tabs styles */
+.centered-tabs{
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .centered-tabs{
+    display: block;
+    justify-content: left;
+  }
+}
+
+.recap-email-toggle .toggle{
+  width: 6rem;
+}
+.recap-email-toggle label{
+  line-height: 10px;
+}
+
+/* END Profile tabs styles */

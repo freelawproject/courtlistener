@@ -37,7 +37,10 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
-from cl.users.tasks import update_moosend_subscription
+from cl.users.tasks import (
+    check_recipient_deliverability,
+    update_moosend_subscription,
+)
 
 
 class UserTest(LiveServerTestCase):
@@ -378,18 +381,18 @@ class SNSWebhookTest(TestCase):
                 test_dir / "hard_bounce.json", encoding="utf-8"
             ) as hard_bounce,
             open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
             open(
                 test_dir / "suppressed_bounce.json", encoding="utf-8"
             ) as suppressed_bounce,
+            open(test_dir / "no_bounce.json", encoding="utf-8") as no_bounce,
         ):
             cls.soft_bounce_asset = json.load(general_soft_bounce)
             cls.soft_bounce_msg_large_asset = json.load(msg_large_bounce)
             cls.soft_bounce_cnt_rejected_asset = json.load(cnt_rejected_bounce)
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
-            cls.delivery_asset = json.load(delivery)
             cls.suppressed_asset = json.load(suppressed_bounce)
+            cls.no_failed_bounce_asset = json.load(no_bounce)
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -425,9 +428,9 @@ class SNSWebhookTest(TestCase):
         mock_hard_bounce.assert_called()
 
     @mock.patch("cl.users.signals.handle_soft_bounce")
-    def test_soft_bounce_signal(self, mock_soft_bounce) -> None:
+    def test_soft_bounce_signal_failed(self, mock_soft_bounce) -> None:
         """This test checks if handle_soft_bounce function is called
-        when a soft bounce event is received
+        when a failed soft bounce event is received
         """
         # Trigger a soft bounce event
         self.send_signal(
@@ -435,6 +438,18 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_soft_bounce is called
         mock_soft_bounce.assert_called()
+
+    @mock.patch("cl.users.signals.handle_soft_bounce")
+    def test_soft_bounce_signal_not_failed(self, mock_soft_bounce) -> None:
+        """This test checks if handle_soft_bounce function is not called
+        when a not failed soft bounce event is received
+        """
+        # Trigger a soft bounce event for a no failed action
+        self.send_signal(
+            self.no_failed_bounce_asset, "bounce", signals.bounce_received
+        )
+        # Check if handle_soft_bounce is not called
+        mock_soft_bounce.assert_not_called()
 
     @mock.patch("cl.users.signals.handle_complaint")
     def test_complaint_signal(self, mock_complaint) -> None:
@@ -447,19 +462,6 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_complaint is called
         mock_complaint.assert_called()
-
-    @mock.patch("cl.users.signals.handle_delivery")
-    def test_delivery_signal(self, mock_delivery) -> None:
-        """This test checks if handle_delivery function is called
-        when a delivery event is received
-        """
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
-        )
-
-        # Check if handle_delivery is called
-        mock_delivery.assert_called()
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
@@ -651,7 +653,7 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        # Store parameter after backoff event update
+        # Store parameter before backoff event is update
         retry_counter_before = email_backoff_event[0].retry_counter
         # Trigger second backoff notification event
         self.send_signal(
@@ -661,7 +663,8 @@ class SNSWebhookTest(TestCase):
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
-        # Store parametes after second backoff event update
+
+        # Store parameters after second backoff event update
         retry_counter_after = email_backoff_event_after[0].retry_counter
         next_retry_date_after = email_backoff_event_after[0].next_retry_date
 
@@ -674,6 +677,57 @@ class SNSWebhookTest(TestCase):
 
         # Check retry counter is updated
         self.assertNotEqual(retry_counter_before, retry_counter_after)
+        # Check expected waiting period equals to computed waiting period
+        self.assertEqual(expected_waiting_period, actual_waiting_period)
+
+    def test_restart_backoff_event_after_threshold_bounce(self) -> None:
+        """This test checks if we properly delete or update a backoff event
+        when a new bounce notification comes in. If the bounce event comes in
+        before BACKOFF_THRESHOLD hours since the last retry, the backoff event
+        is updated. Otherwise, the backoff event is restarted.
+        """
+
+        # Trigger first backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        email_backoff_event = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Update next_retry_date to simulate the last retry was
+        # backoff_threshold hours ago, update retry_counter to 4
+        backoff_threshold = settings.BACKOFF_THRESHOLD + 1
+        email_backoff_event.update(
+            next_retry_date=now() - timedelta(hours=backoff_threshold),
+            retry_counter=4,
+        )
+
+        # Trigger second backoff notification event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+        email_backoff_event_after = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
+        )
+
+        # Store parameters after second backoff event update
+        retry_counter_after = email_backoff_event_after[0].retry_counter
+        next_retry_date_after = email_backoff_event_after[0].next_retry_date
+
+        # Backoff event is restarted
+        # 2 Hours expected for the next backoff retry
+        expected_waiting_period = 2
+
+        # Obtain waiting period in hours after backoff notification
+        waiting_period = next_retry_date_after - now()
+        actual_waiting_period = round(waiting_period.total_seconds() / 3600)
+
+        # Check retry counter is updated
+        self.assertEqual(retry_counter_after, 0)
         # Check expected waiting period equals to computed waiting period
         self.assertEqual(expected_waiting_period, actual_waiting_period)
 
@@ -800,11 +854,10 @@ class SNSWebhookTest(TestCase):
             email_ban[0].notification_subtype, EMAIL_NOTIFICATIONS.COMPLAINT
         )
 
-    @mock.patch("cl.users.email_handlers.schedule_failed_email")
-    def test_handle_delivery(self, mock_schedule) -> None:
-        """This test checks if a delivery notification is received
-        and exists a previous backoff event it's deleted and
-        schedule_failed_email function is called
+    @mock.patch("cl.users.tasks.schedule_failed_email")
+    def test_check_recipient_deliverability(self, mock_schedule) -> None:
+        """This test checks if schedule_failed_email function is called
+        if recipient's deliverability is proven.
         """
         # Trigger soft bounce event to create backoff event
         self.send_signal(
@@ -818,22 +871,55 @@ class SNSWebhookTest(TestCase):
         # Check if backoff event was created
         self.assertEqual(email_backoff_exists, True)
 
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com",
+            email_backoff_event[0].retry_counter,
         )
 
+        # Check if schedule_failed_email is called
+        mock_schedule.assert_called()
+
+    @mock.patch("cl.users.tasks.schedule_failed_email")
+    def test_check_recipient_deliverability_fails(self, mock_schedule) -> None:
+        """This test checks if the backoff event it's not deleted and
+        schedule_failed_email function is not called if recipient's
+        deliverability is not proven.
+        """
+        # Trigger soft bounce event to create backoff event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
         email_backoff_event = EmailFlag.objects.filter(
             email_address="bounce@simulator.amazonses.com",
             flag_type=FLAG_TYPES.BACKOFF,
         )
         email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was created
+        self.assertEqual(email_backoff_exists, True)
+        prev_retry_counter = email_backoff_event[0].retry_counter
 
-        # Check if backoff event was deleted
-        self.assertEqual(email_backoff_exists, False)
+        # Update Backoff event to simulate a new bounce event
+        email_backoff_event.update(
+            next_retry_date=now() - timedelta(hours=3), retry_counter=4
+        )
 
-        # Check if schedule_failed_email is called
-        mock_schedule.assert_called()
+        # Trigger soft bounce event to update the backoff event
+        self.send_signal(
+            self.soft_bounce_asset, "bounce", signals.bounce_received
+        )
+
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com", prev_retry_counter
+        )
+
+        email_backoff_exists = email_backoff_event.exists()
+        # Check if backoff event was not deleted
+        self.assertEqual(email_backoff_exists, True)
+
+        # Check if schedule_failed_email is not called
+        mock_schedule.assert_not_called()
 
     def test_update_ban_object(self) -> None:
         """This test checks if an email ban object is updated when receiving
@@ -1862,11 +1948,9 @@ class RetryFailedEmailTest(TestCase):
             open(
                 test_dir / "soft_bounce_msg_id.json", encoding="utf-8"
             ) as soft_bounce_with_id,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
         ):
             cls.soft_bounce_asset = json.load(soft_bounce)
             cls.soft_bounce_with_id_asset = json.load(soft_bounce_with_id)
-            cls.delivery_asset = json.load(delivery)
 
     def send_signal(self, test_asset, event_name, signal) -> None:
         """Function to dispatch signal that mocks a SNS notification event
@@ -2001,7 +2085,10 @@ class RetryFailedEmailTest(TestCase):
         "cl.users.email_handlers.send_failed_email",
         side_effect=lambda x: None,
     )
-    def test_enqueue_email_backoff_event(self, mock_send_email) -> None:
+    @mock.patch("cl.users.email_handlers.check_recipient_deliverability")
+    def test_enqueue_email_backoff_event(
+        self, mock_send_email, mock_check
+    ) -> None:
         """This test checks if an email is properly enqueued when the
         recipient's email address is under a backoff event waiting period and
         we send more messages to the user.
@@ -2132,9 +2219,12 @@ class RetryFailedEmailTest(TestCase):
         "cl.users.email_handlers.send_failed_email",
         side_effect=lambda x: None,
     )
-    def test_enqueue_email_after_delivery(self, mock_send_email) -> None:
-        """This test checks if after a delivery notification, WAITING failed
-        messages are properly scheduled to retry them.
+    @mock.patch("cl.users.email_handlers.check_recipient_deliverability")
+    def test_enqueue_email_after_check_deliverability(
+        self, mock_send_email, mock_check
+    ) -> None:
+        """This test checks if after a successful deliverability recipient's
+        check WAITING failed messages are properly scheduled to be retried.
         """
 
         # Create a backoff event for bounce@simulator.amazonses.com
@@ -2187,13 +2277,19 @@ class RetryFailedEmailTest(TestCase):
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 2)
 
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        email_backoff_event = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
         )
 
-        # After the delivery notification the failed messages under WAITING status
-        # were scheduled, now under ENQUEUED_DELIVERY status
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com",
+            email_backoff_event[0].retry_counter,
+        )
+
+        # After the deliverability check failed messages under WAITING status
+        # are scheduled, now under ENQUEUED_DELIVERY status
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
         self.assertEqual(failed_email.count(), 1)
 
@@ -2206,7 +2302,10 @@ class RetryFailedEmailTest(TestCase):
         "cl.users.email_handlers.send_failed_email",
         side_effect=lambda x: None,
     )
-    def test_delete_failed_task_objects(self, mock_send_email) -> None:
+    @mock.patch("cl.users.email_handlers.check_recipient_deliverability")
+    def test_delete_failed_task_objects(
+        self, mock_send_email, mock_check
+    ) -> None:
         """This test checks if delete_failed_tasks_objects function works
         properly. We shouldn't eliminate objects whose next_retry_date is ahead
         but the ones that are behind (those whose tasks have failed)
@@ -2266,14 +2365,18 @@ class RetryFailedEmailTest(TestCase):
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 2)
 
-        # Trigger two delivery notifications to confirm that ENQUEUED_DELIVERY
-        # failed messages are not deleted.
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        # Trigger a deliverability recipient's check to confirm that
+        # ENQUEUED_DELIVERY failed messages are not deleted.
+        email_backoff_event = EmailFlag.objects.filter(
+            email_address="bounce@simulator.amazonses.com",
+            flag_type=FLAG_TYPES.BACKOFF,
         )
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        stored_counter = email_backoff_event[0].retry_counter
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com", stored_counter
         )
+
         # We should have 3 FailedEmail objects now.
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.ENQUEUED)
         self.assertEqual(failed_email.count(), 1)
@@ -2287,9 +2390,9 @@ class RetryFailedEmailTest(TestCase):
         FailedEmail.objects.all().update(
             next_retry_date=now() - timedelta(minutes=35)
         )
-        # Trigger a new delivery notification
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        # Trigger a new deliverability recipient's check
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com", stored_counter
         )
         # Failed objects are eliminated.
         failed_email = FailedEmail.objects.all()
@@ -2299,7 +2402,8 @@ class RetryFailedEmailTest(TestCase):
         "cl.users.email_handlers.send_failed_email",
         side_effect=lambda x: None,
     )
-    def test_retry_datetime(self, mock_send_email) -> None:
+    @mock.patch("cl.users.email_handlers.check_recipient_deliverability")
+    def test_retry_datetime(self, mock_send_email, mock_check) -> None:
         """This test checks that retry times are properly computed."""
 
         # Send a message
@@ -2365,10 +2469,14 @@ class RetryFailedEmailTest(TestCase):
 
         failed_email = FailedEmail.objects.filter(status=STATUS_TYPES.WAITING)
         self.assertEqual(failed_email.count(), 3)
+
+        # Update backoff event to simulate it has already expired
+        backoff.update(next_retry_date=now() - timedelta(hours=2))
         now_time = now()
-        # Trigger a delivery notification.
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com", backoff[0].retry_counter
         )
 
         # WAITING FailedEmail objects were scheduled with
@@ -2378,8 +2486,9 @@ class RetryFailedEmailTest(TestCase):
         ).order_by("next_retry_date")
         self.assertEqual(failed_email.count(), 3)
 
-        # Failed messages after a delivery notification should be scheduled to
-        # send one message per minute, one after the other.
+        # Failed messages after a successful deliverability recipient's check
+        # should be scheduled to send one message per minute.
+        # One after the other.
         expected_datetime_1 = now_time + timedelta(milliseconds=60_000)
         expected_datetime_2 = now_time + timedelta(milliseconds=120_000)
         expected_datetime_3 = now_time + timedelta(milliseconds=180_000)
@@ -2407,7 +2516,6 @@ class EmailBrokenTest(TestCase):
                 test_dir / "hard_bounce.json", encoding="utf-8"
             ) as hard_bounce,
             open(test_dir / "complaint.json", encoding="utf-8") as complaint,
-            open(test_dir / "delivery.json", encoding="utf-8") as delivery,
             open(
                 test_dir / "mail_box_full_soft_bounce.json", encoding="utf-8"
             ) as mail_box_full_soft_bounce,
@@ -2420,7 +2528,6 @@ class EmailBrokenTest(TestCase):
         ):
             cls.hard_bounce_asset = json.load(hard_bounce)
             cls.complaint_asset = json.load(complaint)
-            cls.delivery_asset = json.load(delivery)
             cls.no_email_hard_bounce_asset = json.load(no_email_hard_bounce)
             cls.mail_box_full_soft_bounce_asset = json.load(
                 mail_box_full_soft_bounce
@@ -2627,9 +2734,9 @@ class EmailBrokenTest(TestCase):
         # The broken email banner is gone
         self.assertEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-    def test_broken_email_banner_delivery(self) -> None:
-        """This test checks if a delivery notification properly deactivate a
-        Transient broken email banner.
+    def test_broken_email_banner_delivery_check(self) -> None:
+        """This test checks if a successful deliverability recipient's check
+        correctly deactivates a Transient broken email banner.
         """
 
         path = reverse("show_results")
@@ -2659,12 +2766,13 @@ class EmailBrokenTest(TestCase):
         self.assertEqual(r.context.get("EMAIL_BAN_PERMANENT"), False)
         self.assertNotEqual(r.context.get("EMAIL_BAN_REASON"), None)
 
-        # Trigger a delivery event
-        self.send_signal(
-            self.delivery_asset, "delivery", signals.delivery_received
+        # Update next_retry_date two hours behind to simulate backoff event is
+        # expired
+        backoff_event.update(next_retry_date=now() - timedelta(hours=2))
+        # Check recipient's deliverability
+        check_recipient_deliverability(
+            "bounce@simulator.amazonses.com", backoff_event[0].retry_counter
         )
-        # Delivery event eliminates the backoff event
-        self.assertEqual(backoff_event.count(), 0)
 
         r = self.client.get(path)
         # The broken email banner is gone

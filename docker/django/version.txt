@@ -1,5 +1,8 @@
-2.0.34
+2.0.37
 
+2.0.37 - Update atomicwrites since 1.4.0 disappeared
+2.0.36 - Fix bug in alerts
+2.0.35 - Update account tabs and dependencies; fix email banning, and a bunch more
 2.0.34 - Another attempt to fix ratelimiting
 2.0.33 - Restore WSGI files
 2.0.32 - Update code & juriscraper
