@@ -23,6 +23,9 @@ class Command(VerboseCommand):
 
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
+            # Donation objects get left behind when users are deleted. Don't
+            # charge those donations anymore.
+            donor__isnull=False,
             monthly_donation_day=now().date().day,
             # This is a safety to account for timezones. We want to be very
             # careful that we don't double-bill people right when they sign up,
