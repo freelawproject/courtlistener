@@ -1,5 +1,6 @@
-2.0.38
+2.0.39
 
+2.0.39 - Land fuzzy citation matching and auto-subscribe on as default
 2.0.38 - Update code
 2.0.37 - Update atomicwrites since 1.4.0 disappeared
 2.0.36 - Fix bug in alerts
