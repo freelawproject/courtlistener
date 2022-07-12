@@ -1,9 +1,8 @@
 from collections import OrderedDict, defaultdict
 from itertools import groupby
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Tuple, Union
 from urllib.parse import urlencode
 
-import waffle
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
@@ -16,7 +15,6 @@ from django.shortcuts import get_object_or_404, render
 from django.template import loader
 from django.template.defaultfilters import slugify
 from django.urls import reverse
-from django.utils.safestring import SafeText
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -29,10 +27,7 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.alerts.models import DocketAlert
-from cl.citations.parenthetical_utils import (
-    create_parenthetical_groups,
-    get_or_create_parenthetical_groups,
-)
+from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import FavoriteForm
 from cl.favorites.models import Favorite
@@ -413,9 +408,9 @@ def make_thumb_if_needed(
 @ratelimit_deny_list
 def view_recap_document(
     request: HttpRequest,
-    docket_id: Optional[int] = None,
-    doc_num: Optional[int] = None,
-    att_num: Optional[int] = None,
+    docket_id: int | None = None,
+    doc_num: int | None = None,
+    att_num: int | None = None,
     slug: str = "",
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
@@ -620,7 +615,7 @@ def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
 
 
 def reporter_or_volume_handler(
-    request: HttpRequest, reporter: str, volume: Optional[str] = None
+    request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
     """Show all the volumes for a given reporter abbreviation or all the cases
     for a reporter-volume dyad.
@@ -838,11 +833,97 @@ def citation_handler(
     return HttpResponse(status=500)
 
 
+def make_citation_url_dict(
+    reporter: str, volume: str | None, page: str | None
+) -> dict[str, str]:
+    """Make a dict of the volume/reporter/page, but only if truthy."""
+    d = {"reporter": reporter}
+    if volume:
+        d["volume"] = volume
+    if page:
+        d["page"] = page
+    return d
+
+
+def attempt_reporter_variation(
+    request: HttpRequest,
+    reporter: str,
+    volume: str | None,
+    page: str | None,
+) -> HttpResponse:
+    """Try to disambiguate an unknown reporter using the variations dict.
+
+    The variations dict looks like this:
+
+        {
+         "A. 2d": ["A.2d"],
+         ...
+         "P.R.": ["Pen. & W.", "P.R.R.", "P."],
+        }
+
+    This means that there can be more than one canonical reporter for a given
+    variation. When that happens, we give up. When there's exactly one, we
+    redirect to the canonical variation. When there's zero, we give up.
+
+    :param request: The HTTP request
+    :param reporter: The reporter string we're trying to look up, e.g., "f-3d"
+    :param volume: The volume requested, if provided
+    :param page: The page requested, if provided
+    """
+    # Make a slugified variations dict
+    slugified_variations = {}
+    for variant, canonicals in VARIATIONS_ONLY.items():
+        slugged_canonicals = []
+        for canonical in canonicals:
+            slugged_canonicals.append(slugify(canonical))
+        slugified_variations[str(slugify(variant))] = slugged_canonicals
+
+    # Look up the user's request in the variations dict
+    possible_canonicals = slugified_variations.get(reporter, [])
+    if len(possible_canonicals) == 0:
+        # Couldn't find it as a variation. Give up.
+        return throw_404(
+            request,
+            {"no_reporters": True, "reporter": reporter, "private": True},
+        )
+
+    elif len(possible_canonicals) == 1:
+        # Unambiguous reporter variation. Great. Redirect to the canonical
+        # reporter
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    possible_canonicals[0], volume, page
+                ),
+            ),
+        )
+
+    elif len(possible_canonicals) > 1:
+        # The reporter variation is ambiguous b/c it can refer to more than
+        # one reporter. Abort with a 300 status.
+        return HttpResponse(
+            content=loader.render_to_string(
+                "citation_redirect_info_page.html",
+                {
+                    "too_many_reporter_variations": True,
+                    "reporter": reporter,
+                    "possible_canonicals": possible_canonicals,
+                    "private": True,
+                },
+                request=request,
+            ),
+            status=HTTP_300_MULTIPLE_CHOICES,
+        )
+    else:
+        return HttpResponse(status=500)
+
+
 def citation_redirector(
     request: HttpRequest,
-    reporter: Optional[str] = None,
-    volume: Optional[str] = None,
-    page: Optional[str] = None,
+    reporter: str,
+    volume: str | None = None,
+    page: str | None = None,
 ) -> HttpResponse:
     """Take a citation URL and use it to redirect the user to the canonical
     page for that citation.
@@ -850,6 +931,40 @@ def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
+    reporter_slug = slugify(reporter)
+    if reporter != reporter_slug:
+        # Reporter provided in non-slugified form. Redirect to slugified
+        # version.
+        return HttpResponseRedirect(
+            reverse(
+                "citation_redirector",
+                kwargs=make_citation_url_dict(
+                    reporter_slug,
+                    volume,
+                    page,
+                ),
+            ),
+        )
+
+    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
+    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
+    proper_reporter = slugified_editions.get(reporter, None)
+    if not proper_reporter:
+        return attempt_reporter_variation(request, reporter, volume, page)
+
+    # We have a reporter (show volumes in it), a volume (show cases in
+    # it), or a citation (show matching citation(s))
+    if proper_reporter and volume and page:
+        return citation_handler(request, proper_reporter, volume, page)
+    elif proper_reporter and volume and page is None:
+        return reporter_or_volume_handler(request, proper_reporter, volume)
+    elif proper_reporter and volume is None and page is None:
+        return reporter_or_volume_handler(request, proper_reporter)
+    return HttpResponse(status=500)
+
+
+def citation_homepage(request: HttpRequest) -> HttpResponse:
+    """Show the citation homepage"""
     if request.method == "POST":
         form = CitationRedirectorForm(request.POST)
         if form.is_valid():
@@ -866,52 +981,18 @@ def citation_redirector(
                 {"show_homepage": True, "form": form, "private": False},
             )
 
-    if all(_ is None for _ in (reporter, volume, page)):
-        # No parameters. Show the citation lookup homepage.
-        form = CitationRedirectorForm()
-        reporter_dict = make_reporter_dict()
-        return render(
-            request,
-            "citation_redirect_info_page.html",
-            {
-                "show_homepage": True,
-                "reporter_dict": reporter_dict,
-                "form": form,
-                "private": False,
-            },
-        )
-
-    if reporter:
-        reporter_slug = slugify(reporter)
-        if reporter != reporter_slug:
-            # Reporter provided in non-slugified form. Redirect to slugified
-            # version.
-            cd = {"reporter": reporter_slug}
-            if volume:
-                cd["volume"] = volume
-            if page:
-                cd["page"] = page
-            return HttpResponseRedirect(
-                reverse("citation_redirector", kwargs=cd)
-            )
-
-    # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slug_edition = {slugify(item): item for item in EDITIONS.keys()}
-    proper_reporter = slug_edition.get(SafeText(reporter), None)
-    if not proper_reporter:
-        return throw_404(
-            request,
-            {"no_reporters": True, "reporter": reporter, "private": False},
-        )
-    # We have a reporter (show volumes in it), a volume (show cases in
-    # it), or a citation (show matching citation(s))
-    if proper_reporter and volume and page:
-        return citation_handler(request, proper_reporter, volume, page)
-    elif proper_reporter and volume and page is None:
-        return reporter_or_volume_handler(request, proper_reporter, volume)
-    elif proper_reporter and volume is None and page is None:
-        return reporter_or_volume_handler(request, proper_reporter)
-    return HttpResponse(status=500)
+    form = CitationRedirectorForm()
+    reporter_dict = make_reporter_dict()
+    return render(
+        request,
+        "citation_redirect_info_page.html",
+        {
+            "show_homepage": True,
+            "reporter_dict": reporter_dict,
+            "form": form,
+            "private": False,
+        },
+    )
 
 
 @ensure_csrf_cookie
