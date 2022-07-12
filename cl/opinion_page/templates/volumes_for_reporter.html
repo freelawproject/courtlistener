@@ -29,7 +29,7 @@
       <p>Sorry about this. Please try again or try looking up a different reporter abbreviation.
       </p>
       <p class="v-offset-above-2">
-        <a href="{% url "citation_redirector" %}"
+        <a href="{% url "citation_homepage" %}"
            class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
     </div>
   {% elif no_volumes or no_cases %}
@@ -40,7 +40,7 @@
       </p>
       <p>Sorry about this.</p>
       <p class="v-offset-above-2">
-        <a href="{% url "citation_redirector" %}"
+        <a href="{% url "citation_homepage" %}"
            class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
     </div>
   {% elif volumes %}
