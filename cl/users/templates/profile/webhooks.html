@@ -8,33 +8,26 @@
 {% block footer-scripts %}
   {% if DEBUG %}
     <script src="{% static "js/htmx.js" %}"></script>
-    <link href="{% static "css/bootstrap4-toggle.css" %}" rel="stylesheet">
   {% else %}
     <script src="{% static "js/htmx.min.js" %}"></script>
-    <link href="{% static "css/bootstrap4-toggle.min.css" %}" rel="stylesheet">
   {% endif %}
   <script>
     // htmx event handlers
     htmx.on("htmx:afterSwap", (e) => {
       //Load the form over the modal
-      let webhook_submit = document.getElementById("webhook-submit");
       let webhook_form = document.getElementById("webhooks-body");
       if (e.detail.target.id == "webhooks-body") {
-        //Change submit button text according to the action performed
-        if (e.detail.requestConfig.parameters.hasOwnProperty('update')) {
-          webhook_submit.innerHTML = "Update Webhook";
-        }
-        // If user has reached the max number of webhooks, show a message.
+        // If the user already have a webhook configured for each type of event, show a message.
         let event_type_options = document.getElementById("id_event_type").options.length;
         if(event_type_options == 0){
-          webhook_form.innerHTML = "<b class='text-center'>You've reached the maximum number of webhooks. Please delete one before adding another.</b>";
+          webhook_form.innerHTML = "<b class='text-center'>You already have a webhook configured for each type of event. Please delete one before making another.</b>";
         }
         //Toggle form modal
         $('#webhook-modal').modal('toggle');
       }
     })
     htmx.on("htmx:beforeSwap", (e) => {
-      //After submitting the POST request, toggle the modal back to hidden
+      //After submitting the POST request, toggle the modal back to hidden.
       if (e.detail.target.id == "webhook-form" && !e.detail.xhr.response) {
         $('#webhook-modal').modal('toggle');
         e.detail.shouldSwap = false;
@@ -59,9 +52,9 @@
                </div>
                <div class="col-xs-6 col-sm-6 col-md-4 text-right">
                  <button id="add-webhook" class="btn btn-primary btn-xs"
-                         hx-get="{% url 'webhook_form' %}"
+                         hx-get="{% url 'webhooks-render-form' version="v3" format="html" %}"
                          hx-target="#webhooks-body">
-                   <i class="fa fa-plus"></i>&nbsp;Add Webhook</button>
+                   <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
                </div>
              </div>
             </div>
@@ -78,7 +71,7 @@
                   </thead>
                   <tbody
                     hx-trigger="load, webhooksListChanged from:body"
-                    hx-get="{% url 'view_webhooks_list' %}"
+                    hx-get="{% url 'webhooks-list' version='v3' format="html" %}"
                     hx-target="this">
                   </tbody>
                 </table>
@@ -88,7 +81,7 @@
         </div>
       </div>
       {% include "includes/webhooks-modal.html" %}
-      <p>Webhooks let you send a signal to your server whenever certain events happen on our website. To create a webhook, use the form below.</p>
+      <p>Webhooks enable bi-directional APIs by sending data to your server whenever events happen on ours. Use webhooks to get the fastest updates &mdash; without polling.</p>
       <p class="v-offset-below-2"><a href="{% url "api_index" %}#webhooks" class="btn btn-default btn-lg">Read the Webhook Documentation</a></p>
     </div>
   {% endflag %}

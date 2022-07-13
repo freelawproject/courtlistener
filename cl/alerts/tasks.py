@@ -239,7 +239,7 @@ def send_docket_alert(
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send the docket to webhook
-    send_docket_to_webhook.si(d_pk, since, da_webhook_recipients).apply_async()
+    send_docket_to_webhook.si(d_pk, since, da_webhook_recipients).delay()
     delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 

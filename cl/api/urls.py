@@ -11,6 +11,7 @@ from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
 from cl.search import api_views as search_views
+from cl.users import api_views
 from cl.visualizations import api_views as viz_views
 
 router = DefaultRouter()
@@ -130,6 +131,8 @@ router.register(
 
 # Search Alerts
 router.register(r"alerts", alert_views.SearchAlertViewSet, basename="alert")
+# Webhooks
+router.register(r"webhooks", api_views.WebhooksViewSet, basename="webhooks")
 
 API_TITLE = "CourtListener Legal Data API"
 schema_view = get_schema_view(

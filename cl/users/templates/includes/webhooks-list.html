@@ -17,13 +17,12 @@
     </td>
     <td>{{ webhook.url }}</td>
     <td class="right" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-      <button hx-post="{% url "delete_webhook" webhook.pk %}"
+      <button hx-delete="{% url "webhooks-detail" pk=webhook.id version='v3' format='json' %}"
               hx-confirm="Are you sure you want to delete this Webhook?"
               class="btn btn-danger btn-xs">
         <i class="fa fa-trash-o"></i>&nbsp;Delete</button>
       <button class="btn btn-primary btn-xs"
-              hx-get="{% url "webhook_form" %}"
-              hx-vals='{"pk": {{ webhook.pk }}, "update": "True"}'
+              hx-get="{% url "webhooks-detail" pk=webhook.id version='v3' format='html' %}"
               hx-target="#webhooks-body">
         <i class="fa fa-pencil"></i>&nbsp;Edit</button>
     </td>
@@ -33,8 +32,8 @@
   <td class="text-center empty-webhooks" colspan="5">
     <p>Create a new webhook:</p>
     <button id="add-webhook" class="btn btn-primary btn-xs"
-            hx-get="{% url 'webhook_form' %}"
+            hx-get="{% url 'webhooks-render-form' version="v3" format="html" %}"
             hx-target="#webhooks-body">
-      <i class="fa fa-plus"></i>&nbsp;Add Webhook</button>
+      <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
   </td>
 {% endif %}

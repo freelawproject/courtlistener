@@ -1608,7 +1608,7 @@ def process_recap_email(
             )
             send_docket_alert.si(
                 docket.pk, start_time, recap_email_recipients
-            ).apply_async()
+            ).delay()
     return {
         "docket_pk": docket.pk,
         "content_updated": bool(rds_created or content_updated),
