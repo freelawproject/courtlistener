@@ -69,6 +69,7 @@ from cl.lib.pacer import (
     map_pacer_to_cl_id,
 )
 from cl.lib.pacer_session import (
+    delete_pacer_cookies_from_cache,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -538,7 +539,6 @@ def process_free_opinion_result(
     bind=True,
     autoretry_for=(
         ConnectionError,
-        PacerLoginException,
         ReadTimeout,
         RedisConnectionError,
     ),
@@ -596,6 +596,13 @@ def get_and_process_free_pdf(
             self.request.chain = None
             return None
         logger.info(f"{msg} Retrying.")
+        # Delete the cookies from cache and get fresh new ones before retrying
+        delete_pacer_cookies_from_cache("pacer_scraper")
+        get_or_cache_pacer_cookies(
+            "pacer_scraper",
+            username=settings.PACER_USERNAME,
+            password=settings.PACER_PASSWORD,
+        )
         raise self.retry(exc=exc)
     except (ReadTimeoutError, requests.RequestException) as exc:
         msg = "Request exception getting free PDF"
