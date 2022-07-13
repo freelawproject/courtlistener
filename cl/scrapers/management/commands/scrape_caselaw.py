@@ -23,6 +23,7 @@ class OptionsType(TypedDict):
     body_format: str
     full_case: bool
     reporter_id: int
+    source: str
 
 
 def get_data(url, params=None):
@@ -90,6 +91,9 @@ def get_from_caselaw(options: OptionsType):
     Get all the courts
     manage.py scrape_caselaw --type courts
 
+    Get all fastcase cases
+    manage.py scrape_caselaw --type cases --source Fastcase --full-case True --body-format xml
+
     """
     type = options["type"]
     cursor = options["cursor"]
@@ -100,7 +104,8 @@ def get_from_caselaw(options: OptionsType):
     ordering = options["ordering"]
     body_format = options["body_format"]
     full_case = options["full_case"]
-    reporter_id = None
+    reporter_id = options["reporter_id"]
+    source = options["source"]
     allowed_types = ["jurisdictions", "courts", "reporters", "cases"]
     base_url = "https://api.case.law"
     version = "v1"
@@ -152,6 +157,12 @@ def get_from_caselaw(options: OptionsType):
         )
         return
 
+    if source and source not in ["Harvard", "Fastcase"]:
+        logger.error(
+            "Invalid source. Valid sources: Harvard or Fastcase. Exiting. "
+        )
+        return
+
     if type == "jurisdictions":
         endpoint = f"{base_url}/{version}/jurisdictions/"
     elif type == "courts":
@@ -175,6 +186,8 @@ def get_from_caselaw(options: OptionsType):
             params[f"last_updated__{last_updated_filter}"] = last_updated
         if reporter_id:
             params["reporter"] = reporter_id
+        if source:
+            params["source"] = source
 
     # Directory to store data based on type
     directory = Path(settings.MEDIA_ROOT, "case.law", type)
@@ -184,8 +197,9 @@ def get_from_caselaw(options: OptionsType):
         params["cursor"] = cursor
 
     while endpoint:
-        # We only need to pass the params on first request
         data = get_data(endpoint, params=params)
+        # We only need to pass the params on first request
+        params = {}
 
         if data:
             results_count = data.get("count", None)
@@ -276,14 +290,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--last-updated",
             help="Filter cases by last update. Format: YYYY-MM-DDTHH:MM:SS or "
-            "YYYY-MM-DD or YYYY-MM or YYYY",
+                 "YYYY-MM-DD or YYYY-MM or YYYY",
             required=False,
         )
 
         parser.add_argument(
             "--last-updated-filter",
             help="Indicate filter by last update is gt, gte, lt, lte. Default: None ("
-            "exact match).",
+                 "exact match).",
             required=False,
         )
 
@@ -295,13 +309,13 @@ class Command(VerboseCommand):
 
         parser.add_argument(
             "--body-format",
-            help="Case body format: html or xml. Default: xml.",
+            help="Case body format: html or xml.",
             required=False,
         )
 
         parser.add_argument(
             "--full-case",
-            help="Load the case body if true. Default: True.",
+            help="Load the case body if true. Default: False.",
             default=False,
             required=False,
         )
@@ -309,7 +323,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--reporter-id",
             help="Filter cases by reporter id. Ids from "
-            "https://api.case.law/v1/reporters/",
+                 "https://api.case.law/v1/reporters/",
+            default=False,
+            required=False,
+        )
+
+        parser.add_argument(
+            "--source",
+            help="Filter by source. Harvard or Fastcase.",
             default=False,
             required=False,
         )
