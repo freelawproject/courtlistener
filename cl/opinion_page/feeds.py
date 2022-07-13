@@ -73,7 +73,7 @@ class DocketFeed(Feed):
                 "docket__case_name_full",
                 "docket__case_name_short",
                 "docket__docket_number",
-            )
+            )[:30]
         )
 
     def item_title(self, item: DocketEntry) -> SafeText:
