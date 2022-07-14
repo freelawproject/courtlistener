@@ -39,10 +39,10 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
     - name: Create Kubeconfig with AWS CLI
       run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-    - name: Get unapplied migration exit code
+    - name: Get collect static assets and check unapplied migration exit code
       id: checkMigration
       run: |
-        kubectl run ${{ github.sha }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ github.sha }}-web-prod --overrides='
+        kubectl run ${{ github.sha }} -it -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ github.sha }}-web-prod --overrides='
         {
           "spec": {
             "containers": [
@@ -102,3 +102,4 @@ jobs:
 # TODOS
 # - Add requirement for PRs on main branch in Github.
 # - Make sure that --check doesn't run migrations
+# - Github short codes
