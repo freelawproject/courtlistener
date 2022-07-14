@@ -24,13 +24,16 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push
         run: |
-          make push --file docker/django/Makefile -e VERSION=${{ github.sha }}
+          make push --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Set shortcode
+      id: vars
+      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -39,20 +42,22 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
     - name: Create Kubeconfig with AWS CLI
       run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-    - name: Get collect static assets and check unapplied migration exit code
+    - name: Collect static assets and check unapplied migration exit code
       id: checkMigration
+      # Do big complicated thing to get secrets into the image.
+      # See: https://stackoverflow.com/a/52488906/64911
       run: |
-        kubectl run ${{ github.sha }} -it -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ github.sha }}-web-prod --overrides='
+        kubectl run ${{ steps.vars.outputs.sha_short }} -it -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --overrides='
         {
           "spec": {
             "containers": [
               {
-                "name": "${{ github.sha }}",
-                "image": "freelawproject/courtlistener:${{ github.sha }}-web-prod",
+                "name": "${{ steps.vars.outputs.sha_short }}",
+                "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod",
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "./manage.py collectstatic --noinput && ./manage.py migrate --check"
+                    "./manage.py migrate --check && ./manage.py collectstatic --noinput"
                 ],
                 "envFrom": [
                   {
@@ -65,41 +70,35 @@ jobs:
             ]
           }
         }
-        '  && echo "::set-output name=exitCode::$(kubectl get  -n ${{ env.EKS_NAMESPACE }} pod/${{ github.sha }} -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}')" && kubectl delete pod -n ${{ env.EKS_NAMESPACE }} ${{ github.sha }}
+        '  && echo "::set-output name=exitCode::$(kubectl get  -n ${{ env.EKS_NAMESPACE }} pod/${{ steps.vars.outputs.sha_short }} -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}')" && kubectl delete pod -n ${{ env.EKS_NAMESPACE }} ${{ steps.vars.outputs.sha_short }}
 
-    - name: Check migration exit code
+    - name: Check migration exit code from previous step
       run: |
         if [[ ${{ steps.checkMigration.outputs.exitCode }} -ne 0 ]]; then
           echo "Found unapplied migrations. Migrate manually, and re-run deployment."
           exit 1
         fi
 
-    # Rollout new versions one by one...
+    # Rollout new versions one by one (watch "deployments" in k9s)
     - name: Rollout cl-python
-      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ github.sha }}-web-prod
+      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod
     - name: Watch cl-python rollout status
       run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
 
     - name: Rollout cl-celery-prefork
-      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ github.sha }}-celery
+      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-celery
     - name: Watch cl-celery-prefork rollout status
       run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
 
     - name: Rollout cl-celery-prefork-bulk
-      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ github.sha }}-celery
+      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-celery
     - name: Watch cl-celery-prefork-bulk rollout status
       run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
+    # Watch "cronjobs" in k9s
     - name: Update cronjobs
       run: |
         CRONJOB_NAMES=$(kubectl get cronjobs -n court-listener -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
         for name in $CRONJOB_NAMES; do
-           kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ github.sha }}-web-prod;
+           kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod;
         done;
-
-
-
-# TODOS
-# - Add requirement for PRs on main branch in Github.
-# - Make sure that --check doesn't run migrations
-# - Github short codes
