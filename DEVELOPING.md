@@ -421,18 +421,18 @@ Now, when executing a task you'll be able to monitor it with celery events.
 
 Once an amazing new feature has been added to CL or to an import dependency (ie Juriscraper) one might need to update the docker image.
 
-To do this:
+Use CI/CD to do this automatically (see below), or if you're impatient:
 
-1) Update the version numbers and version logs in `docker/django/version.txt`.
-2) Push to `main`
-3) Build and push new images with `make push --file docker/django/Makefile`
+1) Push to `main`
+
+2) Build and push new images with `make push --file docker/django/Makefile`
 
 
 ### CI/CD
 
 We use Github Actions to run the full test and linting suite on every push. If the tests fail or your code is not formatted properly according to our linters, your code probably won't get merged.
 
-We also automatically build and push new docker images using github actions when merging new code into main (with version bumps).
+When code is merged into `main`, we also automatically build and push new docker images, then deploy that code to our kubernetes cluster. If the code has a database migration, it is not deployed without manual review and a re-run of the deploy step after the migration is applied by hand.
 
 
 [wiki]: https://github.com/freelawproject/courtlistener/wiki/Installing-CourtListener-on-Ubuntu-Linux
