@@ -1556,7 +1556,7 @@ def get_recap_email_recipients(
     ]
     # Select only @recap.email addresses
     recap_email_recipients = [
-        recap_email
+        recap_email.lower()
         for recap_email in email_addresses
         if "@recap.email" in recap_email
     ]
