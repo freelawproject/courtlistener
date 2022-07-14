@@ -4,7 +4,6 @@
 REPO ?= freelawproject/courtlistener
 
 # The various tags available
-VERSION = $(shell head -1 docker/django/version.txt)
 DOCKER_TAG_DEV = $(VERSION)-web-dev
 DOCKER_TAG_PROD = $(VERSION)-web-prod
 WEB_PROD ?= latest-web-prod
