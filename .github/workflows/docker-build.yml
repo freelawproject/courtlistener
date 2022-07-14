@@ -1,4 +1,4 @@
-name: Automate docker build and push
+name: Automate build and deploy
 on:
   pull_request:
     branches: [ "main" ]
@@ -57,7 +57,7 @@ jobs:
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "./manage.py migrate --check && ./manage.py collectstatic --noinput"
+                    "./manage.py collectstatic --noinput && ./manage.py migrate --check "
                 ],
                 "envFrom": [
                   {
