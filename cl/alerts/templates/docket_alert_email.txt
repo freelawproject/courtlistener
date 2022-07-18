@@ -14,8 +14,8 @@ You've been subscribed to this case because your account has auto-subscribe turn
 {{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
 {{ docket.court }}
 ~~~
-View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
-Buy Docket on PACER: {{ docket.pacer_url }}
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% if docket.pacer_url %}
+Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
 
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}
 Date Filed: {{ de.date_filed|date:"M j, Y"|default:'Unknown' }}
