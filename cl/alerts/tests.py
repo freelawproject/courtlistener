@@ -19,7 +19,7 @@ from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
 from cl.alerts.models import Alert, DocketAlert
-from cl.alerts.tasks import send_docket_alert
+from cl.alerts.tasks import send_alert_and_webhook
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
@@ -146,14 +146,14 @@ class DocketAlertTest(TestCase):
 
     def test_triggering_docket_alert(self) -> None:
         """Does the alert trigger when it should?"""
-        send_docket_alert(self.docket.pk, self.before)
+        send_alert_and_webhook(self.docket.pk, self.before)
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
         """Do we avoid sending alerts for timers after the de was created?"""
-        send_docket_alert(self.docket.pk, self.after)
+        send_alert_and_webhook(self.docket.pk, self.after)
 
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
@@ -164,7 +164,7 @@ class DocketAlertTest(TestCase):
     )
     def test_triggering_docket_webhook(self, mock_post) -> None:
         """Does the docket alert trigger the DocketAlert Webhook?"""
-        send_docket_alert(self.docket.pk, self.before)
+        send_alert_and_webhook(self.docket.pk, self.before)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
 
         # Does the webhook was triggered?

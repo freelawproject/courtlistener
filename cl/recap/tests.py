@@ -1997,10 +1997,14 @@ class RecapEmailDocketAlerts(TestCase):
 
         # A DocketAlert email for testing_2@recap.email should go out
         recap_document = RECAPDocument.objects.all()
-        message_sent = mail.outbox[0]
         self.assertEqual(recap_document.count(), 1)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+        message_sent_2 = mail.outbox[1]
+        self.assertEqual(message_sent_2.to, [self.recipient_user_2.user.email])
+
+        # A @recap.email user not found notification should go out
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.subject, "@recap.email user not found")
+        self.assertEqual(len(mail.outbox), 2)
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
@@ -2020,11 +2024,11 @@ class RecapEmailDocketAlerts(TestCase):
 
         # 2 more emails should go out, one for testing_2@recap.email and one
         # for testing_1@recap.email
-        message_sent = mail.outbox[1]
-        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
         message_sent = mail.outbox[2]
+        self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+        message_sent = mail.outbox[3]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
-        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(len(mail.outbox), 4)
 
     def test_new_recap_email_case_no_auto_subscription(
         self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
@@ -2080,10 +2084,14 @@ class RecapEmailDocketAlerts(TestCase):
 
         # A DocketAlert email for testing_2@recap.email should go out
         self.assertEqual(DocketAlert.objects.all().count(), 1)
-        self.assertEqual(len(mail.outbox), 1)
-        message_sent = mail.outbox[0]
+        message_sent = mail.outbox[1]
         self.assertIn("1 New Docket Entry for", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+
+        # A @recap.email user not found notification should go out
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.subject, "@recap.email user not found")
+        self.assertEqual(len(mail.outbox), 2)
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option disabled
@@ -2107,11 +2115,11 @@ class RecapEmailDocketAlerts(TestCase):
 
         # 2 more emails should go out, a first user-case email for
         # testing_1@recap.email and one alert for testing_2@recap.email
-        self.assertEqual(len(mail.outbox), 3)
-        message_sent = mail.outbox[1]
+        self.assertEqual(len(mail.outbox), 4)
+        message_sent = mail.outbox[2]
         self.assertNotIn("[Sign-Up Needed]", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
-        message_sent = mail.outbox[2]
+        message_sent = mail.outbox[3]
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 

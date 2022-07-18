@@ -31,7 +31,7 @@ from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.models import DocketAlert
-from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
+from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
@@ -549,7 +549,7 @@ def process_recap_docket(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -804,7 +804,7 @@ def process_recap_docket_history_report(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -901,7 +901,7 @@ def process_recap_appellate_docket(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -1606,9 +1606,9 @@ def process_recap_email(
             recap_email_recipients = get_recap_email_recipients(
                 data["email_recipients"]
             )
-            send_docket_alert.si(
+            send_alert_and_webhook.delay(
                 docket.pk, start_time, recap_email_recipients
-            ).delay()
+            )
     return {
         "docket_pk": docket.pk,
         "content_updated": bool(rds_created or content_updated),
