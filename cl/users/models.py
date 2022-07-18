@@ -350,6 +350,8 @@ class EmailSent(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["message_id"]),
         ]
+        verbose_name = "Sent Email"
+        verbose_name_plural = "Emails Sent"
 
     def convert_to_email_multipart(
         self,

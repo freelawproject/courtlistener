@@ -72,6 +72,10 @@ class EmailFlagAdmin(admin.ModelAdmin):
         "notification_subtype",
         "date_created",
     )
+    readonly_fields = (
+        "date_modified",
+        "date_created",
+    )
 
 
 @admin.register(EmailSent)
@@ -81,6 +85,10 @@ class EmailSentAdmin(admin.ModelAdmin):
         "to",
         "id",
         "subject",
+        "date_created",
+    )
+    readonly_fields = (
+        "date_modified",
         "date_created",
     )
     raw_id_fields = ("user",)
@@ -93,6 +101,10 @@ class FailedEmailAdmin(admin.ModelAdmin):
         "recipient",
         "id",
         "status",
+        "date_created",
+    )
+    readonly_fields = (
+        "date_modified",
         "date_created",
     )
     raw_id_fields = ("stored_email",)
