@@ -320,6 +320,12 @@ class CitationObjectTest(IndexedSolrTestCase):
             date_filed=date(2000, 1, 1),  # F.3d must be after 1993
             court_id="ca1",
         )
+        cls.citation2a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
+            volume="9",
+            reporter="F",
+            page="1",
+            cluster=OpinionCluster.objects.get(pk=cls.citation2.cluster_id),
+        )
         cls.citation3 = CitationWithParentsFactory.create(
             volume="1",
             reporter="U.S.",
@@ -576,7 +582,7 @@ class CitationObjectTest(IndexedSolrTestCase):
 
     def test_citation_matching_issue621(self) -> None:
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
-        # The fixture contains a reference to 9 F. 1, so we expect no results.
+        # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
         citation = get_citations(citation_str)[0]
         results = resolve_fullcase_citation(citation)
