@@ -133,7 +133,7 @@ class UserProfile(models.Model):
         "user's recap.email address, a new docket subscription for the case "
         "will be created; if disabled we'll ask users if they want to "
         "subscribe to the case.",
-        default=False,
+        default=True,
     )
 
     @property
@@ -350,6 +350,8 @@ class EmailSent(AbstractDateTimeModel):
         indexes = [
             models.Index(fields=["message_id"]),
         ]
+        verbose_name = "Sent Email"
+        verbose_name_plural = "Emails Sent"
 
     def convert_to_email_multipart(
         self,

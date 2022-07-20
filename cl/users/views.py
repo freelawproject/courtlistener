@@ -29,6 +29,7 @@ from django.views.decorators.debug import (
     sensitive_post_parameters,
     sensitive_variables,
 )
+from django.views.decorators.http import require_http_methods
 
 from cl.alerts.models import DocketAlert
 from cl.api.models import Webhook
@@ -41,6 +42,7 @@ from cl.lib.url_utils import get_redirect_or_login_url
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
+    AccountDeleteForm,
     CustomPasswordChangeForm,
     EmailConfirmationForm,
     OptInConsentForm,
@@ -51,7 +53,12 @@ from cl.users.forms import (
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription
-from cl.users.utils import convert_to_stub_account, emails, message_dict
+from cl.users.utils import (
+    convert_to_stub_account,
+    delete_user_assets,
+    emails,
+    message_dict,
+)
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
@@ -59,12 +66,26 @@ logger = logging.getLogger(__name__)
 
 @login_required
 @never_cache
-def view_alerts(request: HttpRequest) -> HttpResponse:
+def view_search_alerts(request: HttpRequest) -> HttpResponse:
     search_alerts = request.user.alerts.all()
     for a in search_alerts:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
         a.type = QueryDict(a.query).get("type", SEARCH_TYPES.OPINION)
+    return render(
+        request,
+        "profile/alerts.html",
+        {
+            "search_alerts": search_alerts,
+            "page": "search_alerts",
+            "private": True,
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     ).order_by("date_created")
@@ -72,8 +93,8 @@ def view_alerts(request: HttpRequest) -> HttpResponse:
         request,
         "profile/alerts.html",
         {
-            "search_alerts": search_alerts,
             "docket_alerts": docket_alerts,
+            "page": "docket_alerts",
             "private": True,
         },
     )
@@ -150,7 +171,11 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(request, "profile/donations.html", {"private": True})
+    return render(
+        request,
+        "profile/donations.html",
+        {"page": "profile_donations", "private": True},
+    )
 
 
 @login_required
@@ -172,7 +197,11 @@ def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return render(
         request,
         "profile/visualizations.html",
-        {"results": paged_vizes, "private": True},
+        {
+            "results": paged_vizes,
+            "page": "visualizations_active",
+            "private": True,
+        },
     )
 
 
@@ -201,27 +230,41 @@ def view_deleted_visualizations(
     return render(
         request,
         "profile/visualizations_deleted.html",
-        {"results": paged_vizes, "private": True},
+        {
+            "results": paged_vizes,
+            "page": "visualizations_trash",
+            "private": True,
+        },
     )
 
 
 @login_required
 @never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        instance = Webhook()
-        form = WebhookForm(request.POST, instance=instance)
-        if form.is_valid():
-            instance.user = request.user
-            form.save()
-            return HttpResponseRedirect(reverse("view_api"))
-    else:
-        form = WebhookForm()
-
     return render(
         request,
         "profile/api.html",
-        {"webhook_form": form, "private": True},
+        {"private": True, "page": "api_info"},
+    )
+
+
+@login_required
+@never_cache
+def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "profile/api.html",
+        {"private": True, "page": "api_token"},
+    )
+
+
+@login_required
+@never_cache
+def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "profile/api.html",
+        {"private": True, "page": "api_usage"},
     )
 
 
@@ -301,6 +344,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "profile_form": profile_form,
             "user_form": user_form,
+            "page": "profile_settings",
             "private": True,
         },
     )
@@ -308,33 +352,38 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        email: EmailType = emails["account_deleted"]
-        send_mail(
-            email["subject"],
-            email["body"] % request.user,
-            email["from_email"],
-            email["to"],
-        )
-        request.user.alerts.all().delete()
-        request.user.docket_alerts.all().delete()
-        request.user.favorites.all().delete()
-        request.user.user_tags.all().delete()
-        request.user.monthly_donations.all().update(enabled=False)
-        request.user.scotus_maps.all().update(deleted=True)
-        user = convert_to_stub_account(request.user)
-        update_moosend_subscription.delay(request.user.email, "unsubscribe")
-        update_session_auth_hash(request, user)
-        logout(request)
-        return HttpResponseRedirect(reverse("delete_profile_done"))
-
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
     ).count()
+    if request.method == "POST":
+        delete_form = AccountDeleteForm(request, request.POST)
+        if delete_form.is_valid():
+            email: EmailType = emails["account_deleted"]
+            send_mail(
+                email["subject"],
+                email["body"] % request.user,
+                email["from_email"],
+                email["to"],
+            )
+            delete_user_assets(request.user)
+            user = convert_to_stub_account(request.user)
+            update_moosend_subscription.delay(
+                request.user.email, "unsubscribe"
+            )
+            update_session_auth_hash(request, user)
+            logout(request)
+            return HttpResponseRedirect(reverse("delete_profile_done"))
+
+    else:
+        delete_form = AccountDeleteForm(request=request)
     return render(
         request,
         "profile/delete.html",
-        {"non_deleted_map_count": non_deleted_map_count, "private": True},
+        {
+            "non_deleted_map_count": non_deleted_map_count,
+            "delete_form": delete_form,
+            "private": True,
+        },
     )
 
 
@@ -405,6 +454,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     user = stub_account
                     user.set_password(cd["password1"])
                     user.username = cd["username"]
+                    user.is_active = True
                     up = stub_account.profile
                     up.stub_account = False
 
@@ -613,7 +663,9 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
     else:
         form = CustomPasswordChangeForm(user=request.user)
     return render(
-        request, "profile/password_form.html", {"form": form, "private": False}
+        request,
+        "profile/password_form.html",
+        {"form": form, "page": "profile_password", "private": False},
     )
 
 
@@ -655,3 +707,58 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
     # Moosend does a GET when you create/edit the automation workflow,
     # so we need to return a 200 even for GETs.
     return HttpResponse("<h1>200: OK</h1>")
+
+
+@login_required
+@never_cache
+def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        instance = Webhook()
+        form = WebhookForm(request.POST, instance=instance)
+        if form.is_valid():
+            instance.user = request.user
+            form.save()
+            return HttpResponseRedirect(reverse("view_webhooks"))
+    else:
+        form = WebhookForm()
+
+    return render(
+        request,
+        "profile/webhooks.html",
+        {"webhook_form": form, "private": True, "page": "api_webhooks"},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_recap_email_auto_subscription(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
+    """Toggle the user's setting to auto-subscribe to recap.email cases"""
+
+    if request.user.is_anonymous:
+        return HttpResponse("Please log in to continue.")
+
+    user = request.user
+    if request.POST["current_toggle_status"] == "True":
+        UserProfile.objects.filter(user=user).update(auto_subscribe=False)
+        msg = "Auto-subscribe to @recap.email cases is now disabled"
+    else:
+        UserProfile.objects.filter(user=user).update(auto_subscribe=True)
+        msg = "Auto-subscribe to @recap.email cases is now enabled"
+    return HttpResponse(msg)
+
+
+@login_required
+@never_cache
+def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
+    auto_subscribe = request.user.profile.auto_subscribe
+    return render(
+        request,
+        "profile/recap_email.html",
+        {
+            "private": True,
+            "page": "profile_recap",
+            "auto_subscribe": auto_subscribe,
+        },
+    )

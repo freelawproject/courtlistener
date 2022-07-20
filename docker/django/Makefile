@@ -1,10 +1,15 @@
-# Run with make push --file docker/django/Makefile
+# Run with make push --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 # Note that makefiles differentiate between tabs and spaces in a weird way!
+
+# Ensure VERSION is set.
+ifndef VERSION
+$(error VERSION variable is not set. Use -e VERSION=XYZ to proceed.)
+endif
+
 
 REPO ?= freelawproject/courtlistener
 
 # The various tags available
-VERSION = $(shell head -1 docker/django/version.txt)
 DOCKER_TAG_DEV = $(VERSION)-web-dev
 DOCKER_TAG_PROD = $(VERSION)-web-prod
 WEB_PROD ?= latest-web-prod

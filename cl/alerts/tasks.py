@@ -70,8 +70,14 @@ def make_alert_messages(
         if email_address in recap_email_recipients:
             # If the email_address is a @recap.email address we need to get the
             # actual user's email address and check if exists a DocketAlert
-            # for this case-user
-            user_profile = UserProfile.objects.get(recap_email=email_address)
+            # for this case-user. Ignore it if user doesn't exist in our DB.
+            try:
+                user_profile = UserProfile.objects.get(
+                    recap_email=email_address
+                )
+            except UserProfile.DoesNotExist:
+                # TODO send an email to admins informing the issue
+                continue
             email_address = user_profile.user.email
             docket_alert_exist = DocketAlert.objects.filter(
                 docket=d, user=user_profile.user
@@ -99,7 +105,9 @@ def make_alert_messages(
             # Options for users that already have an active subscription for
             # this case
             first_email = auto_subscribe = False
-            user = User.objects.get(email=email_address)
+            user = User.objects.filter(
+                email=email_address, docket_alerts__docket=d
+            ).first()
             docket_alert = DocketAlert.objects.get(docket=d, user=user)
 
         subject_context["first_email"] = first_email

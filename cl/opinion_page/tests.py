@@ -81,11 +81,12 @@ class CitationRedirectorTest(TestCase):
             msg=f"Didn't get a {status} status code. Got {r.status_code} instead.",
         )
 
-    def test_with_and_without_a_citation(self) -> None:
-        """Make sure that the url paths are working properly."""
-        r = self.client.get(reverse("citation_redirector"))
+    def test_citation_homepage(self) -> None:
+        r = self.client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTP_200_OK)
 
+    def test_with_a_citation(self) -> None:
+        """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
@@ -120,6 +121,20 @@ class CitationRedirectorTest(TestCase):
                     "reporter": "bad-reporter",
                     "volume": "1",
                     "page": "1",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+
+    def test_invalid_page_number_1918(self) -> None:
+        """Do we fail gracefully with invalid page numbers?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "f2d",
+                    "volume": "1",
+                    "page": "asdf",  # <-- Nasty, nasty hobbits
                 },
             ),
         )
@@ -179,6 +194,51 @@ class CitationRedirectorTest(TestCase):
                 kwargs={"reporter": "F.2d", "volume": "56", "page": "9"},
             )
         )
+        self.assertEqual(r.url, "/c/f2d/56/9/")
+
+    def test_reporter_variation_just_reporter(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/")
+
+    def test_reporter_variation_just_reporter_and_volume(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.url, "/c/f2d/56/")
+
+    def test_reporter_variation_full_citation(self) -> None:
+        """Do we redirect properly when we get reporter variations?"""
+        r = self.client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    # Introduce a space (slugified to a dash) into the reporter
+                    "reporter": "f-2d",
+                    "volume": "56",
+                    "page": "9",
+                },
+            )
+        )
+        self.assertEqual(r.status_code, HTTP_302_FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
 
