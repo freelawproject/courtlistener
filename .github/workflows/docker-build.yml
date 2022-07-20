@@ -74,6 +74,7 @@ jobs:
         echo "::set-output name=exitCode::$?"
 
     - name: Check migration exit code from previous step
+      if: always()
       run: |
         if [[ ${{ steps.checkMigration.outputs.exitCode }} -ne 0 ]]; then
           echo "Found unapplied migrations. Migrate manually using deploy-${{ steps.vars.outputs.sha_short }}, and re-run this deployment."
