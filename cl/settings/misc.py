@@ -43,9 +43,6 @@ GOOGLE_AUTH = {
     "PROJECT": "courtlistener-development",
 }
 
-# Case.law
-CASELAW_API_KEY = env("CASELAW_API_KEY", default="")
-
 ##############
 # Super Misc #
 ##############

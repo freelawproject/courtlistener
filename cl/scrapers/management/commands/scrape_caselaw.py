@@ -1,20 +1,19 @@
 import json
 import os
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, Union
 
 import requests
 from django.conf import settings
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.settings import CASELAW_API_KEY
 
 reporters_slugs = dict()
 
 
-class OptionsType(TypedDict):
-    type: str
-    cursor: str
+class CaseLawOptionsType(TypedDict):
+    """Define caselaw scraper command option types"""
+
     court: str
     jurisdiction: str
     last_updated: str
@@ -26,22 +25,25 @@ class OptionsType(TypedDict):
     source: str
 
 
-def get_data(url, params=None):
-    header = {"Authorization": f"Token {CASELAW_API_KEY}"}
+def get_data(url: str, params=None) -> Union[dict, None]:
+    """Request GET method endpoint
+    :param url: endpoint url
+    :param params: additional params to pass to the request
+    :return: json response or None
+    """
+    header = {}
     logger.info(f"Processing endpoint: {url}")
     try:
         request = requests.get(url, headers=header, params=params, timeout=10)
 
-        # print(request.url)
-
         if request.status_code == 401:
-            logger.error("Invalid token header or No credentials provided")
+            logger.warning("Invalid token header or No credentials provided")
             return None
         if request.status_code == 404:
-            logger.error("Endpoint doesn't exist")
+            logger.warning("Endpoint doesn't exist")
             return None
         if request.status_code == 500:
-            logger.error("Case.law server error")
+            logger.warning("Case.law server error")
             return None
 
         return request.json()
@@ -50,15 +52,14 @@ def get_data(url, params=None):
         return None
 
     except requests.exceptions.ReadTimeout:
-        logger.error("Case.law server timeout, url: ", url)
+        logger.warning("Case.law server timeout, url: ", url)
         return None
 
 
-def get_reporter_slug(reporter_endpoint):
-    """
-    Get reporter slug from reporter endpoint
+def get_reporter_slug(reporter_endpoint: str) -> Union[str, None]:
+    """Get reporter slug from reporter endpoint
     :param reporter_endpoint: Reporter instance endpoint
-    @return: reporter slug or None
+    :return: reporter slug or None
     """
     global reporters_slugs
     if reporters_slugs.get(reporter_endpoint):
@@ -77,26 +78,21 @@ def get_reporter_slug(reporter_endpoint):
     return None
 
 
-def get_from_caselaw(options: OptionsType):
+def get_from_caselaw(options: CaseLawOptionsType):
     """Read options, fetch endpoint and store results
-
     :param options: dict with options passed to management command
+
     Usage examples:
 
     Get the cases from 'md' court with last updated date greater than or equal to year
     2022, with full case text in xml
-    manage.py scrape_caselaw --type cases --full-case True --body-format xml --court md
+    manage.py scrape_caselaw --full-case True --body-format xml --court md
     --last- updated 2022 --last-updated-filter gte
 
-    Get all the courts
-    manage.py scrape_caselaw --type courts
-
     Get all fastcase cases
-    manage.py scrape_caselaw --type cases --source Fastcase --full-case True --body-format xml
+    manage.py scrape_caselaw --source Fastcase --full-case True --body-format xml
 
     """
-    type = options["type"]
-    cursor = options["cursor"]
     court = options["court"]
     jurisdiction = options["jurisdiction"]
     last_updated = options["last_updated"]
@@ -106,142 +102,118 @@ def get_from_caselaw(options: OptionsType):
     full_case = options["full_case"]
     reporter_id = options["reporter_id"]
     source = options["source"]
-    allowed_types = ["jurisdictions", "courts", "reporters", "cases"]
+
     base_url = "https://api.case.law"
     version = "v1"
     params = {}
-    endpoint = None
     page_size = 1000
-
-    # TODO test how many cases can we collect, there's api calls limit for registered user?
-    # TODO handle error_auth_required or error_limit_exceeded when want to get casebody
-
-    if not type:
-        logger.error("You didn't provide the type. Exiting.")
-        return
-
-    if type not in allowed_types:
-        logger.error("You didn't provide the type. Exiting.")
-        return
 
     if last_updated and last_updated_filter:
         if last_updated_filter not in ["gt", "gte", "lt", "lte"]:
-            logger.error(
+            logger.warning(
                 f"{last_updated_filter} not in options gt, gte, lt, lte."
             )
             return
 
     if not last_updated and last_updated_filter:
-        logger.error(
+        logger.warning(
             "You can't set last-update-filter without passing last-update argument."
         )
         return
 
     if last_updated and not last_updated_filter:
-        logger.error(
+        logger.warning(
             "You can't filter by last-update without passing last-update-filter "
             "argument."
         )
         return
 
     if full_case and not body_format:
-        logger.error(
+        logger.warning(
             "You need to set body-format argument to get full case text. Exiting."
         )
         return
 
     if not full_case and body_format:
-        logger.error(
+        logger.warning(
             "You can't set body-format argument without setting the full-case "
             "argument to True. Exiting. "
         )
         return
 
     if source and source not in ["Harvard", "Fastcase"]:
-        logger.error(
+        logger.warning(
             "Invalid source. Valid sources: Harvard or Fastcase. Exiting. "
         )
         return
 
-    if type == "jurisdictions":
-        endpoint = f"{base_url}/{version}/jurisdictions/"
-    elif type == "courts":
-        endpoint = f"{base_url}/{version}/courts/"
-    elif type == "reporters":
-        endpoint = f"{base_url}/{version}/reporters/"
-    elif type == "cases":
-        endpoint = f"{base_url}/{version}/cases/"
-        params["page_size"] = page_size
-        if ordering:
-            params["ordering"] = ordering
-        if court:
-            params["court"] = court
-        if jurisdiction:
-            params["jurisdiction"] = jurisdiction
-        if full_case:
-            params["full_case"] = "true" if full_case else "false"
-        if body_format:
-            params["body_format"] = body_format
-        if last_updated and last_updated_filter:
-            params[f"last_updated__{last_updated_filter}"] = last_updated
-        if reporter_id:
-            params["reporter"] = reporter_id
-        if source:
-            params["source"] = source
+    # Cases endpoint
+    endpoint = f"{base_url}/{version}/cases/"
 
-    # Directory to store data based on type
-    directory = Path(settings.MEDIA_ROOT, "case.law", type)
-
-    if cursor:
-        # Start from specific cursor
-        params["cursor"] = cursor
+    # Add params to dict
+    params["page_size"] = page_size
+    if ordering:
+        params["ordering"] = ordering
+    if court:
+        params["court"] = court
+    if jurisdiction:
+        params["jurisdiction"] = jurisdiction
+    if full_case:
+        params["full_case"] = "true" if full_case else "false"
+    if body_format:
+        params["body_format"] = body_format
+    if last_updated and last_updated_filter:
+        params[f"last_updated__{last_updated_filter}"] = last_updated
+    if reporter_id:
+        params["reporter"] = reporter_id
+    if source:
+        params["source"] = source
 
     while endpoint:
         data = get_data(endpoint, params=params)
+        last_endpoint_call = endpoint
         # We only need to pass the params on first request
         params = {}
 
         if data:
-            results_count = data.get("count", None)
-            old_endpoint = endpoint
             endpoint = data.get("next", None)
             results = data.get("results", [])
 
             for result in results:
                 # We go through each result
                 id = result.get("id")
-                filename = f"{id}.json"
-                if type == "cases":
-                    volume_number = (
-                        result.get("volume").get("volume_number")
-                        if result.get("volume")
-                        else None
-                    )
-                    first_page = result.get("first_page")
-                    reporter_id = (
-                        result.get("reporter").get("id")
-                        if result.get("reporter")
-                        else None
-                    )
-                    reporter_url = (
-                        result.get("reporter").get("url")
-                        if result.get("reporter")
-                        else None
-                    )
 
-                    reporter_slug = get_reporter_slug(reporter_url)
+                volume_number = (
+                    result.get("volume").get("volume_number")
+                    if result.get("volume")
+                    else None
+                )
+                first_page = result.get("first_page")
+                reporter_id = (
+                    result.get("reporter").get("id")
+                    if result.get("reporter")
+                    else None
+                )
+                reporter_url = (
+                    result.get("reporter").get("url")
+                    if result.get("reporter")
+                    else None
+                )
 
-                    if not reporter_slug:
-                        # No slug from url, use reporter id
-                        reporter_slug = reporter_id
+                reporter_slug = get_reporter_slug(reporter_url)
 
-                    filename = f"{first_page}.{id}.json"
-                    # Specific directory tree for cases
-                    directory = Path(
-                        settings.MEDIA_ROOT,
-                        "harvard_corpus",
-                        f"law.free.cap.{reporter_slug}.{volume_number}",
-                    )
+                if not reporter_slug:
+                    # No slug from url, use reporter id, this will be used to
+                    # set reporter and volume output directory
+                    reporter_slug = reporter_id
+
+                filename = f"{first_page}.{id}.json"
+                # Specific directory tree for cases
+                directory = Path(
+                    settings.MEDIA_ROOT,
+                    "harvard_corpus",
+                    f"law.free.cap.{reporter_slug}.{volume_number}",
+                )
 
                 file_path = Path(directory, filename)
 
@@ -251,11 +223,22 @@ def get_from_caselaw(options: OptionsType):
 
                 Path(directory).mkdir(parents=True, exist_ok=True)
 
-                with open(file_path, "w") as outfile:
-                    json.dump(result, outfile, indent=2)
+                try:
+                    # x mode to avoid overwriting files
+                    with open(file_path, "x") as outfile:
+                        json.dump(result, outfile, indent=2)
+                except FileExistsError:
+                    # The file already exists, but somehow an attempt was made to save
+                    # it again.
+                    logger.info("Already captured: %s", file_path)
+                    continue
 
         else:
             # Something happened, we should probably stop and check what's going on.
+            # Probably a server error from case.law
+            logger.warning(
+                f"Problem during request, url: {last_endpoint_call}"
+            )
             return
 
 
@@ -263,18 +246,6 @@ class Command(VerboseCommand):
     help = "Download and save Case.law corpus to disk."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--type",
-            help="Type to fetch.",
-            required=True,
-        )
-
-        parser.add_argument(
-            "--cursor",
-            help="Cursor pagination parameter",
-            required=False,
-        )
-
         parser.add_argument(
             "--court",
             help="Filter cases by court slug",
@@ -290,14 +261,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--last-updated",
             help="Filter cases by last update. Format: YYYY-MM-DDTHH:MM:SS or "
-            "YYYY-MM-DD or YYYY-MM or YYYY",
+                 "YYYY-MM-DD or YYYY-MM or YYYY",
             required=False,
         )
 
         parser.add_argument(
             "--last-updated-filter",
             help="Indicate filter by last update is gt, gte, lt, lte. Default: None ("
-            "exact match).",
+                 "exact match).",
             required=False,
         )
 
@@ -323,7 +294,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--reporter-id",
             help="Filter cases by reporter id. Ids from "
-            "https://api.case.law/v1/reporters/",
+                 "https://api.case.law/v1/reporters/",
             default=False,
             required=False,
         )
