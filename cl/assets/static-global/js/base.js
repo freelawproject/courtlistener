@@ -195,7 +195,7 @@ $(document).ready(function () {
     if($(this).attr("class") === "collapse") {
       $(`[href="#${$targetId}"]`).html("[+]")
     }
-    
+
   })
 
   ///////////////
