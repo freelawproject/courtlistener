@@ -176,6 +176,28 @@ $(document).ready(function () {
     }
   });
 
+  ///////////////////////////
+  // TOC Collapse Controls //
+  ///////////////////////////
+
+  $('.collapse').on('shown.bs.collapse', function () {
+    // do something…
+    $targetId = $(this).attr('id')
+    if($(this).attr("class") === "collapse in") {
+      $(`[href="#${$targetId}"]`).html("[–]")
+    }
+
+  })
+
+  $('.collapse').on('hidden.bs.collapse', function () {
+    // do something…
+    $targetId = $(this).attr('id')
+    if($(this).attr("class") === "collapse") {
+      $(`[href="#${$targetId}"]`).html("[+]")
+    }
+    
+  })
+
   ///////////////
   // Show More //
   ///////////////
