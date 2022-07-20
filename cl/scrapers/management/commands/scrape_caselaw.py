@@ -261,14 +261,14 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--last-updated",
             help="Filter cases by last update. Format: YYYY-MM-DDTHH:MM:SS or "
-                 "YYYY-MM-DD or YYYY-MM or YYYY",
+            "YYYY-MM-DD or YYYY-MM or YYYY",
             required=False,
         )
 
         parser.add_argument(
             "--last-updated-filter",
             help="Indicate filter by last update is gt, gte, lt, lte. Default: None ("
-                 "exact match).",
+            "exact match).",
             required=False,
         )
 
@@ -294,7 +294,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--reporter-id",
             help="Filter cases by reporter id. Ids from "
-                 "https://api.case.law/v1/reporters/",
+            "https://api.case.law/v1/reporters/",
             default=False,
             required=False,
         )
