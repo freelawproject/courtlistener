@@ -5,6 +5,12 @@ from django.core import mail
 from django.test import Client
 from django.urls import reverse
 from django.utils.timezone import now
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+    HTTP_404_NOT_FOUND,
+)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -15,7 +21,9 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_docket_alert
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import TestCase
+from cl.tests.cases import APITestCase, TestCase
+from cl.tests.utils import make_client
+from cl.users.factories import UserFactory
 
 
 class AlertTest(TestCase):
@@ -231,3 +239,142 @@ class AlertSeleniumTest(BaseSeleniumTest):
         # And gets redirected to the SERP where they see a notice about their
         # alert being edited.
         self.assert_text_in_node("editing your alert", "body")
+
+
+class AlertAPITests(APITestCase):
+    """Check that API CRUD operations are working well for search alerts."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+    def setUp(self) -> None:
+        self.alert_path = reverse("alert-list", kwargs={"version": "v3"})
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        Alert.objects.all().delete()
+
+    def make_an_alert(
+        self,
+        client,
+        alert_name="testing_name",
+        alert_query="q=testing_query&",
+        alert_rate="dly",
+    ):
+        data = {
+            "name": alert_name,
+            "query": alert_query,
+            "rate": alert_rate,
+        }
+        return client.post(self.alert_path, data, format="json")
+
+    def test_make_an_alert(self) -> None:
+        """Can we make an alert?"""
+
+        # Make a simple search alert
+        search_alert = Alert.objects.all()
+        response = self.make_an_alert(self.client)
+        self.assertEqual(search_alert.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+    def test_list_users_alerts(self) -> None:
+        """Can we list user's own alerts?"""
+
+        # Make two alerts for user_1
+        self.make_an_alert(self.client, alert_name="alert_1")
+        self.make_an_alert(self.client, alert_name="alert_2")
+
+        # Make one alert for user_2
+        self.make_an_alert(self.client_2, alert_name="alert_3")
+
+        # Get the alerts for user_1, should be 2
+        response = self.client.get(self.alert_path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        # Get the alerts for user_2, should be 1
+        response_2 = self.client_2.get(self.alert_path)
+        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.json()["count"], 1)
+
+    def test_delete_alert(self) -> None:
+        """Can we delete an alert?
+        Avoid users from deleting other users' alerts.
+        """
+
+        # Make two alerts for user_1
+        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
+        alert_2 = self.make_an_alert(self.client, alert_name="alert_2")
+
+        search_alert = Alert.objects.all()
+        self.assertEqual(search_alert.count(), 2)
+
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Delete the alert for user_1
+        response = self.client.delete(alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(search_alert.count(), 1)
+
+        alert_2_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_2.json()["id"], "version": "v3"},
+        )
+
+        # user_2 tries to delete a user_1 alert, it should fail
+        response = self.client_2.delete(alert_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(search_alert.count(), 1)
+
+    def test_alert_detail(self) -> None:
+        """Can we get the details of an alert?
+        Avoid users from getting other users' alerts.
+        """
+
+        # Make one alerts for user_1
+        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
+        search_alert = Alert.objects.all()
+        self.assertEqual(search_alert.count(), 1)
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Get the alert detail for user_1
+        response = self.client.get(alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 alert, it should fail
+        response = self.client_2.get(alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_alert_update(self) -> None:
+        """Can we update an alert?"""
+
+        # Make one alerts for user_1
+        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
+        search_alert = Alert.objects.all()
+        self.assertEqual(search_alert.count(), 1)
+        alert_1_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Update the alert
+        data_updated = {
+            "name": "alert_1_updated",
+            "query": alert_1.json()["query"],
+            "rate": alert_1.json()["rate"],
+        }
+        response = self.client.put(alert_1_path_detail, data_updated)
+
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["name"], "alert_1_updated")
+        self.assertEqual(response.json()["id"], alert_1.json()["id"])
