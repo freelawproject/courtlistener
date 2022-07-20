@@ -40,9 +40,7 @@ push: image
 	@if [ $(UNAME) = "x86_64" ]; then \
 	    echo "Architecture is OK. Pushing.";\
 	    docker push $(REPO):$(DOCKER_TAG_PROD);\
-	    docker push $(REPO):$(DOCKER_TAG_DEV);\
 	    docker push $(REPO):$(WEB_PROD);\
-	    docker push $(REPO):$(WEB_DEV);\
 	    docker push $(REPO):$(CELERY_TAG);\
 	    docker push $(REPO):$(CELERY_LATEST);\
 	    docker push $(REPO):$(RSS_TAG);\
