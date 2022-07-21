@@ -176,6 +176,33 @@ $(document).ready(function () {
     }
   });
 
+  ///////////////////////////
+  // TOC Collapse Controls //
+  ///////////////////////////
+
+  // when element moves from hidden to shown
+  $('.collapse').on('shown.bs.collapse', function () {
+    // the element's id is the parent element's href target
+    $targetId = $(this).attr('id')
+
+    // "collapse in" check ensures only direct parent affected
+    // the directly related parent element is edited
+    if($(this).attr("class") === "collapse in") {
+      $(`[href="#${$targetId}"]`).html("[–]")
+    }
+  })
+
+  // when element moves from shown to hidden
+  $('.collapse').on('hidden.bs.collapse', function () {
+    // the element's id is the parent element's href target
+    $targetId = $(this).attr('id')
+
+    // "collapse" check ensures only direct parent affected
+    if($(this).attr("class") === "collapse") {
+      $(`[href="#${$targetId}"]`).html("[+]")
+    }
+  })
+
   ///////////////
   // Show More //
   ///////////////
