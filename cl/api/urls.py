@@ -3,6 +3,7 @@ from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 
+from cl.alerts import api_views as alert_views
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.disclosures import api_views as disclosure_views
@@ -126,6 +127,9 @@ router.register(
     disclosure_views.SpouseIncomeViewSet,
     basename="spouseincome",
 )
+
+# Search Alerts
+router.register(r"alerts", alert_views.SearchAlertViewSet, basename="alert")
 
 API_TITLE = "CourtListener Legal Data API"
 schema_view = get_schema_view(
