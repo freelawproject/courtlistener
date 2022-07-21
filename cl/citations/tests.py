@@ -15,6 +15,7 @@ from eyecite.test_factories import (
     nonopinion_citation,
     supra_citation,
 )
+from factory import RelatedFactory
 from lxml import etree
 
 from cl.citations.annotate_citations import (
@@ -46,7 +47,13 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
 )
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.search.factories import CitationWithParentsFactory
+from cl.search.factories import (
+    CitationWithParentsFactory,
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionWithChildrenFactory,
+)
 from cl.search.models import (
     Citation,
     Opinion,
@@ -304,21 +311,34 @@ class CitationObjectTest(IndexedSolrTestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
+        # Courts
+        court_scotus = CourtFactory(id="scotus")
+        court_ca1 = CourtFactory(id="ca1")
+
+        # Citation 1
         cls.citation1 = CitationWithParentsFactory.create(
             volume="1",
             reporter="U.S.",
             page="1",
-            case_name="Foo v. Bar",
-            date_filed=date(2000, 1, 1),  # Year must equal text in citation4
-            court_id="scotus",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(
+                    2000, 1, 1
+                ),  # Year must equal text in citation4
+            ),
         )
+
+        # Citation 2
         cls.citation2 = CitationWithParentsFactory.create(
             volume="2",
             reporter="F.3d",
             page="2",
-            case_name="Qwerty v. Uiop",
-            date_filed=date(2000, 1, 1),  # F.3d must be after 1993
-            court_id="ca1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_ca1),
+                case_name="Qwerty v. Uiop",
+                date_filed=date(2000, 1, 1),  # F.3d must be after 1993
+            ),
         )
         cls.citation2a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
             volume="9",
@@ -326,29 +346,49 @@ class CitationObjectTest(IndexedSolrTestCase):
             page="1",
             cluster=OpinionCluster.objects.get(pk=cls.citation2.cluster_id),
         )
+
+        # Citation 3
         cls.citation3 = CitationWithParentsFactory.create(
             volume="1",
             reporter="U.S.",
             page="50",
-            case_name="Lorem v. Ipsum",
-            court_id="scotus",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Lorem v. Ipsum",
+            ),
         )
+
+        # Citation 4
         cls.citation4 = CitationWithParentsFactory.create(
             volume="1",
             reporter="U.S.",
             page="999",
-            case_name="Abcdef v. Ipsum",
-            plain_text="Blah blah Foo v. Bar, 1 U.S. 1, 4, 2 S.Ct. 2, 5 (2000) (holding something happened that was at least five words)",
-            court_id="scotus",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Abcdef v. Ipsum",
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar, 1 U.S. 1, 4, 2 S.Ct. 2, 5 (2000) (holding something happened that was at least five words)",
+                ),
+            ),
         )
+
+        # Citation 5
         cls.citation5 = CitationWithParentsFactory.create(
             volume="123",
             reporter="U.S.",
             page="123",
-            case_name="Bush v. Gore",
-            plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
-            date_filed=date.today(),  # Must be later than any cited opinion
-            court_id="scotus",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
         )
         super().setUpTestData()
 
@@ -735,24 +775,41 @@ class CitationCommandTest(IndexedSolrTestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.citation1 = CitationWithParentsFactory.create(  # Cited opinion
+        # Court
+        court_scotus = CourtFactory(id="scotus")
+
+        # Citation 1 - cited opinion
+        cls.citation1 = CitationWithParentsFactory.create(
             volume="1",
             reporter="Yeates",
             page="1",
         )
-        cls.citation2 = CitationWithParentsFactory.create(  # Citing opinion
+
+        # Citation 2 - citing opinion
+        cls.citation2 = CitationWithParentsFactory.create(
             volume="56",
             reporter="F.2d",
             page="9",
-            date_filed=date.today(),  # Must be later than any cited opinion
-            plain_text="Blah blah 1 Yeates 1",
+            cluster=OpinionClusterFactoryWithChildrenAndParents(
+                docket=DocketFactory(court=court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Blah blah 1 Yeates 1",
+                ),
+            ),
         )
+
+        # Citation 3
         cls.citation3 = CitationWithParentsFactory.create(
             volume="56",
             reporter="F.2d",
             page="11",
         )
 
+        # Opinions IDs
         cls.opinion_id2 = Opinion.objects.get(
             cluster__pk=cls.citation2.cluster_id
         ).pk

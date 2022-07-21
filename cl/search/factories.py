@@ -91,22 +91,8 @@ class CitationFactory(DjangoModelFactory):
 
 
 class CitationWithParentsFactory(CitationFactory):
-    class Params:
-        case_name = Faker("case_name")
-        date_filed = Faker(
-            "date_between", start_date=date(1876, 1, 1), end_date=date.today()
-        )
-        plain_text = Faker("text", max_nb_chars=2000)
-        court_id = FuzzyText(
-            length=4, chars=string.ascii_lowercase, suffix="d"
-        )
-
     cluster = SubFactory(
-        "cl.search.factories.OpinionClusterFactoryForCitation",
-        case_name=SelfAttribute("..case_name"),
-        date_filed=SelfAttribute("..date_filed"),
-        plain_text=SelfAttribute("..plain_text"),
-        court_id=SelfAttribute("..court_id"),
+        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
     )
 
 
@@ -139,11 +125,6 @@ class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
 
 
 class DocketParentMixin(DjangoModelFactory):
-    class Params:
-        court_id = FuzzyText(
-            length=4, chars=string.ascii_lowercase, suffix="d"
-        )
-
     docket = SubFactory(
         "cl.search.factories.DocketFactory",
         # Set the case names on the docket to the ones on this object
@@ -169,21 +150,15 @@ class DocketParentMixin(DjangoModelFactory):
                 str(Faker("case_name", full=True)),
             )
         ),
-        court_id=SelfAttribute("..court_id"),
     )
 
 
-class OpinionClusterFactoryForCitation(
+class OpinionClusterFactoryWithChildrenAndParents(
     OpinionClusterFactory, DocketParentMixin
 ):
-    class Params:
-        plain_text = Faker("text", max_nb_chars=2000)
-
-    # For OpinionClusterFactory
     sub_opinions = RelatedFactory(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
-        plain_text=SelfAttribute("..plain_text"),
     )
     precedential_status = ("Published", "Precedential")  # Always precedential
 
@@ -217,17 +192,12 @@ class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    class Params:
-        court_id = FuzzyText(
-            length=4, chars=string.ascii_lowercase, suffix="d"
-        )
-
     idb_data = RelatedFactory(
         "cl.recap.factories.FjcIntegratedDatabaseFactory",
         factory_related_name="docket",
     )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
-    court = SubFactory(CourtFactory, id=SelfAttribute("..court_id"))
+    court = SubFactory(CourtFactory)
     appeal_from = SubFactory(CourtFactory)
     case_name_short = LazyAttribute(
         lambda self: cnt.make_case_name_short(self.case_name)
