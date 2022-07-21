@@ -79,7 +79,7 @@ jobs:
       if: failure()
       run: |
         echo "Found unapplied migrations. Migrate manually using deploy-${{ steps.vars.outputs.sha_short }}, and re-run this deployment."
-        ehco "When done deploying manually, you should delete pod deploy-${{ steps.vars.outputs.sha_short }}."
+        echo "When done deploying manually, you should delete pod deploy-${{ steps.vars.outputs.sha_short }}."
         kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
           {
             "spec": {
