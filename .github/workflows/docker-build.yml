@@ -22,9 +22,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-#      - name: Build and Push
-#        run: |
-#          make push --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
+      - name: Build and Push
+        run: |
+          make push --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
 
   deploy:
     needs: build
@@ -33,8 +33,7 @@ jobs:
     - uses: actions/checkout@v3
     - name: Set shortcode
       id: vars
-#      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-      run: echo "::set-output name=sha_short::41e722c"
+      run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -58,7 +57,7 @@ jobs:
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "./manage.py migrate --check"
+                    "./manage.py collectstatic --noinput && ./manage.py migrate --check"
                 ],
                 "envFrom": [
                   {
@@ -74,12 +73,12 @@ jobs:
         '
 
     # If the previous step had an error, start a pod to do maintenance, and
-    # quit.
+    # quit with an error message.
     - name: Check migration exit code from previous step
       if: failure()
       run: |
-        echo "Found unapplied migrations. Migrate manually using deploy-${{ steps.vars.outputs.sha_short }}, and re-run this deployment."
-        echo "When done deploying manually, you should delete pod deploy-${{ steps.vars.outputs.sha_short }}."
+        echo "Found unapplied migrations. A pod named deploy-${{ steps.vars.outputs.sha_short }} has been created for you."
+        echo "Shell into that pod, do a manual migration, delete the pod, and re-run this Github Action job."
         kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
           {
             "spec": {
