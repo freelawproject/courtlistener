@@ -76,37 +76,35 @@ jobs:
     # If the previous step had an error, start a pod to do maintenance, and
     # quit.
     - name: Check migration exit code from previous step
-      if: always()
+      if: failure()
       run: |
-        if [[ "${{ job.status }}" -ne "success" ]]; then
-          echo "Found unapplied migrations. Migrate manually using deploy-${{ steps.vars.outputs.sha_short }}, and re-run this deployment."
-          ehco "When done deploying manually, you should delete pod deploy-${{ steps.vars.outputs.sha_short }}."
-          kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
-            {
-              "spec": {
-                "containers": [
-                  {
-                    "name": "deploy-${{ steps.vars.outputs.sha_short }}",
-                    "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod",
-                    "command": [
-                        "/bin/sh",
-                        "-c",
-                        "trap : TERM INT; sleep infinity & wait"
-                    ],
-                    "envFrom": [
-                      {
-                        "secretRef": {
-                          "name": "cl-env"
-                        }
+        echo "Found unapplied migrations. Migrate manually using deploy-${{ steps.vars.outputs.sha_short }}, and re-run this deployment."
+        ehco "When done deploying manually, you should delete pod deploy-${{ steps.vars.outputs.sha_short }}."
+        kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
+          {
+            "spec": {
+              "containers": [
+                {
+                  "name": "deploy-${{ steps.vars.outputs.sha_short }}",
+                  "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod",
+                  "command": [
+                      "/bin/sh",
+                      "-c",
+                      "trap : TERM INT; sleep infinity & wait"
+                  ],
+                  "envFrom": [
+                    {
+                      "secretRef": {
+                        "name": "cl-env"
                       }
-                    ]
-                  }
-                ]
-              }
+                    }
+                  ]
+                }
+              ]
             }
-            '
-         exit 1
-        fi
+          }
+          '
+        exit 1
 
     # Rollout new versions one by one (watch "deployments" in k9s)
     - name: Rollout cl-python
