@@ -58,7 +58,6 @@ jobs:
                 "command": [
                     "/bin/sh",
                     "-c",
-                    #"./manage.py collectstatic --noinput && ./manage.py migrate --check"
                     "./manage.py migrate --check"
                 ],
                 "envFrom": [
