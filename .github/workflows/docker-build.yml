@@ -71,6 +71,7 @@ jobs:
           }
         }
         '
+        echo "Finished testing migrations and deploying static assets."
         echo "::set-output name=exitCode::$?"
 
     - name: Check migration exit code from previous step
