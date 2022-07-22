@@ -47,7 +47,7 @@ jobs:
       # Do big complicated thing to get secrets into the image.
       # See: https://stackoverflow.com/a/52488906/64911
       run: |
-        kubectl run ${{ steps.vars.outputs.sha_short }} -it -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --overrides='
+        kubectl run ${{ steps.vars.outputs.sha_short }} -it --rm -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
         {
           "spec": {
             "containers": [
@@ -57,7 +57,7 @@ jobs:
                 "command": [
                     "/bin/sh",
                     "-c",
-                    "./manage.py collectstatic --noinput && ./manage.py migrate --check "
+                    "./manage.py collectstatic --noinput && ./manage.py migrate --check"
                 ],
                 "envFrom": [
                   {
@@ -70,14 +70,40 @@ jobs:
             ]
           }
         }
-        '  && echo "::set-output name=exitCode::$(kubectl get  -n ${{ env.EKS_NAMESPACE }} pod/${{ steps.vars.outputs.sha_short }} -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}')" && kubectl delete pod -n ${{ env.EKS_NAMESPACE }} ${{ steps.vars.outputs.sha_short }}
+        '
 
+    # If the previous step had an error, start a pod to do maintenance, and
+    # quit with an error message.
     - name: Check migration exit code from previous step
+      if: failure()
       run: |
-        if [[ ${{ steps.checkMigration.outputs.exitCode }} -ne 0 ]]; then
-          echo "Found unapplied migrations. Migrate manually, and re-run deployment."
-          exit 1
-        fi
+        echo "Found unapplied migrations. A pod named deploy-${{ steps.vars.outputs.sha_short }} has been created for you."
+        echo "Shell into that pod, do a manual migration, delete the pod, and re-run this Github Action job."
+        kubectl run deploy-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod --restart Never --overrides='
+          {
+            "spec": {
+              "containers": [
+                {
+                  "name": "deploy-${{ steps.vars.outputs.sha_short }}",
+                  "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-web-prod",
+                  "command": [
+                      "/bin/sh",
+                      "-c",
+                      "trap : TERM INT; sleep infinity & wait"
+                  ],
+                  "envFrom": [
+                    {
+                      "secretRef": {
+                        "name": "cl-env"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          '
+        exit 1
 
     # Rollout new versions one by one (watch "deployments" in k9s)
     - name: Rollout cl-python
