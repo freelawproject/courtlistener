@@ -80,7 +80,7 @@ class OpinionWithChildrenFactory(OpinionFactory):
     )
 
 
-class CitationFactory(DjangoModelFactory):
+class CitationWithParentsFactory(DjangoModelFactory):
     class Meta:
         model = Citation
 
@@ -88,9 +88,6 @@ class CitationFactory(DjangoModelFactory):
     reporter = "U.S."
     page = Faker("random_int", min=1, max=100)
     type = 1
-
-
-class CitationWithParentsFactory(CitationFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
     )
