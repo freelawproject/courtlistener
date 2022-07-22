@@ -1169,3 +1169,18 @@ emphasis {
 }
 
 /* END Profile tabs styles */
+
+/* h-captcha submit button styles */
+ button.h-captcha{
+   color: #ffffff;
+   background-color: #428bca;
+   padding: 10px 16px;
+   font-size: 15px;
+   line-height: 1.33;
+   border-radius: 6px;
+   border: 1px solid transparent;
+ }
+ button.h-captcha:hover{
+   background-color: #3071a9;
+ }
+/* END  h-captcha submit button styles */

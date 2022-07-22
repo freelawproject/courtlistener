@@ -1,12 +1,12 @@
-from celery.canvas import chain
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.mail import EmailMultiAlternatives
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.urls import reverse
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
+from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
@@ -177,12 +177,10 @@ def subscribe_docket_alert(
     request: HttpRequest, secret_key: str
 ) -> HttpResponse:
     """Subscribe a user to a docket alert based on the alert secret_key."""
-    docket_alert = flip_docket_alert(secret_key, DocketAlert.SUBSCRIPTION)
-    return render(
-        request,
-        "docket_alert.html",
-        {"docket_alert": docket_alert, "private": True, "enabled": True},
+    response = docket_alert_toggle_confirmation(
+        request, secret_key, DocketAlert.SUBSCRIPTION
     )
+    return response
 
 
 @ratelimit_deny_list
@@ -190,14 +188,11 @@ def unsubscribe_docket_alert(
     request: HttpRequest, secret_key: str
 ) -> HttpResponse:
     """Unsubscribe a user from a docket alert based on the alert secret_key."""
-    docket_alert = flip_docket_alert(secret_key, DocketAlert.UNSUBSCRIPTION)
-    # Send Unsubscription confirmation email to the user
-    send_unsubscription_confirmation.delay(docket_alert.pk)
-    return render(
-        request,
-        "docket_alert.html",
-        {"docket_alert": docket_alert, "private": True, "enabled": False},
+
+    response = docket_alert_toggle_confirmation(
+        request, secret_key, DocketAlert.UNSUBSCRIPTION
     )
+    return response
 
 
 def flip_docket_alert(secret_key: str, alert_type: int) -> DocketAlert:
@@ -205,4 +200,73 @@ def flip_docket_alert(secret_key: str, alert_type: int) -> DocketAlert:
     docket_alert = get_object_or_404(DocketAlert, secret_key=secret_key)
     docket_alert.alert_type = alert_type
     docket_alert.save()
+    if alert_type == DocketAlert.UNSUBSCRIPTION:
+        # Send Unsubscription confirmation email to the user
+        send_unsubscription_confirmation.delay(docket_alert.pk)
     return docket_alert
+
+
+def docket_alert_toggle_confirmation(
+    request: HttpRequest, secret_key: str, alert_type: int
+) -> HttpResponse:
+    """Show a confirmation or success page for toggling docket alerts."""
+
+    enabled = False
+    if alert_type == DocketAlert.SUBSCRIPTION:
+        enabled = True
+    docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    # Handle confirmation form POST requests
+    if request.method == "POST":
+        form = DocketAlertConfirmForm(request.POST)
+        if form.is_valid():
+            flip_docket_alert(secret_key, alert_type)
+            return render(
+                request,
+                "docket_alert.html",
+                {
+                    "docket_alert": docket_alert,
+                    "private": True,
+                    "enabled": enabled,
+                },
+            )
+        # If the form is invalid, show the form errors.
+        return render(
+            request,
+            "docket_alert_confirmation.html",
+            {
+                "docket_alert": docket_alert,
+                "form": form,
+                "private": True,
+                "enabled": enabled,
+                "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+            },
+        )
+
+    if request.user.is_authenticated:
+        # If the user is logged in, flip the docket alert. No confirmation page
+        # required
+        flip_docket_alert(secret_key, alert_type)
+        return render(
+            request,
+            "docket_alert.html",
+            {
+                "docket_alert": docket_alert,
+                "private": True,
+                "enabled": enabled,
+            },
+        )
+
+    # Unauthenticated users need to confirm their action, render the
+    # confirmation page
+    form = DocketAlertConfirmForm()
+    return render(
+        request,
+        "docket_alert_confirmation.html",
+        {
+            "docket_alert": docket_alert,
+            "form": form,
+            "private": True,
+            "enabled": enabled,
+            "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+        },
+    )

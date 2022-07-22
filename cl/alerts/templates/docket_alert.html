@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load text_filters %}
 
 {% block title %}Your Docket Alert is now {% if enabled %} Enabled {% else %} Disabled {% endif %} – CourtListener.com{% endblock %}
 
@@ -12,14 +11,7 @@
       <h1>You Have {% if enabled %} Enabled {% else %} Disabled {% endif %} This Docket Alert</h1>
       <h3>You're now {% if enabled %} subscribed {% else %} unsubscribed {% endif %}</h3>
       <h3 class="gray alt">&mdash; {% if enabled %} to {% else %} from {% endif %} &mdash;</h3>
-      <h2 class="v-offset-below-3">
-        <a href="{{ docket_alert.docket.get_absolute_url }}"
-           class="no-underline black-link">{{ docket_alert.docket|best_case_name|safe|v_wrapper }}
-           {% if docket_alert.docket.docket_number %}
-             ({{ docket_alert.docket.docket_number }})
-           {% endif %}
-        </a>
-      </h2>
+      {% include "includes/docket_alert_case_name.html" %}
       <div class="row">
         <div class="col-xs-6">
           <a href="{{ docket_alert.docket.get_absolute_url }}"
