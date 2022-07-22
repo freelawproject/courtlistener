@@ -1,4 +1,5 @@
 import string
+from datetime import date
 
 from factory import (
     Faker,
@@ -15,6 +16,7 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     DOCUMENT_STATUSES,
     SOURCES,
+    Citation,
     Court,
     Docket,
     DocketEntry,
@@ -32,6 +34,7 @@ cnt = CaseNameTweaker()
 class CourtFactory(DjangoModelFactory):
     class Meta:
         model = Court
+        django_get_or_create = ("id",)
 
     id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
     position = Faker("pyfloat", positive=True, right_digits=4, left_digits=3)
@@ -74,6 +77,19 @@ class OpinionWithChildrenFactory(OpinionFactory):
     parentheticals = RelatedFactory(
         ParentheticalFactory,
         factory_related_name="described_opinion",
+    )
+
+
+class CitationWithParentsFactory(DjangoModelFactory):
+    class Meta:
+        model = Citation
+
+    volume = Faker("random_int", min=1, max=100)
+    reporter = "U.S."
+    page = Faker("random_int", min=1, max=100)
+    type = 1
+    cluster = SubFactory(
+        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
     )
 
 
@@ -132,6 +148,16 @@ class DocketParentMixin(DjangoModelFactory):
             )
         ),
     )
+
+
+class OpinionClusterFactoryWithChildrenAndParents(
+    OpinionClusterFactory, DocketParentMixin
+):
+    sub_opinions = RelatedFactory(
+        OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+    )
+    precedential_status = ("Published", "Precedential")  # Always precedential
 
 
 class OpinionClusterWithParentsFactory(
