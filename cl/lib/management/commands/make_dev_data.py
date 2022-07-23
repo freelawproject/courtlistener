@@ -4,6 +4,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
@@ -29,6 +30,8 @@ FACTORIES = {
     # Users
     300: UserFactory,
     301: SuperUserFactory,
+    # Citations
+    400: CitationWithParentsFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 
@@ -72,6 +75,8 @@ class Command(VerboseCommand):
             logger.info(f"Making {count} users and super users")
             UserFactory.create_batch(count)
             SuperUserFactory.create_batch(count)
+            logger.info(f"Making {count} citations and their parent objects")
+            CitationWithParentsFactory.create_batch(count)
         else:
             # The user requested something specific. Build that thing and all
             # the parents above it.
