@@ -19,4 +19,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and Push
         run: |
-          make multiarch_push_development --file docker/django/Makefile
+          make multiarch_push_development --file docker/django/Makefile  -e VERSION=$(git rev-parse --short HEAD)
