@@ -46,7 +46,7 @@ services:
   # Task Server
   cl-celery:
     container_name: cl-celery
-    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery}
+    image: ${CELERY_DOCKER_IMAGE:-freelawproject/courtlistener:latest-celery-dev}
     depends_on:
       - cl-postgresql
       - cl-redis

@@ -16,6 +16,7 @@ WEB_PROD ?= latest-web-prod
 WEB_DEV ?= latest-web-dev
 CELERY_TAG = $(VERSION)-celery
 CELERY_LATEST ?= latest-celery
+CELERY_DEV ?= latest-celery-dev
 RSS_TAG ?= $(VERSION)-scrape-rss
 RSS_LATEST ?= latest-scrape-rss
 
@@ -26,8 +27,8 @@ UNAME := $(shell uname -m)
 all: image
 
 development:
-	docker build --target web-dev -t $(REPO):$(DOCKER_TAG_DEV) -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
-	docker build --target celery -t $(REPO):$(CELERY_TAG) -t $(REPO):$(CELERY_LATEST) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
+	docker build --target web-dev -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
+	docker build --target celery -t $(REPO):$(CELERY_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
 
 image:
 	docker build --target web-prod -t $(REPO):$(DOCKER_TAG_PROD) -t $(REPO):$(WEB_PROD) --file docker/django/Dockerfile .
@@ -39,9 +40,7 @@ push: image
 	@if [ $(UNAME) = "x86_64" ]; then \
 	    echo "Architecture is OK. Pushing.";\
 	    docker push $(REPO):$(DOCKER_TAG_PROD);\
-	    docker push $(REPO):$(DOCKER_TAG_DEV);\
 	    docker push $(REPO):$(WEB_PROD);\
-	    docker push $(REPO):$(WEB_DEV);\
 	    docker push $(REPO):$(CELERY_TAG);\
 	    docker push $(REPO):$(CELERY_LATEST);\
 	    docker push $(REPO):$(RSS_TAG);\
@@ -72,3 +71,10 @@ x86_push:
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(WEB_PROD) -t $(REPO):$(DOCKER_TAG_PROD) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(CELERY_LATEST) -t $(REPO):$(CELERY_TAG) --file docker/django/Dockerfile .
 	docker buildx build --push --platform linux/amd64 -t $(REPO):$(RSS_TAG)  -t $(REPO):$(RSS_LATEST) --file docker/django/Dockerfile .
+
+multiarch_push_development:
+	export DOCKER_CLI_EXPERIMENTAL=enabled
+	docker buildx rm
+	docker buildx create --use --name flp-builder
+	docker buildx build --target web-dev --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
+	docker buildx build --target celery --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
