@@ -328,6 +328,12 @@ class CitationObjectTest(IndexedSolrTestCase):
                 ),  # Year must equal text in citation4
             ),
         )
+        cls.citation1a = CitationWithParentsFactory.create(  # Extra citation for same OpinionCluster as above
+            volume="2",
+            reporter="S.Ct.",
+            page="2",
+            cluster=OpinionCluster.objects.get(pk=cls.citation1.cluster_id),
+        )
 
         # Citation 2
         cls.citation2 = CitationWithParentsFactory.create(
@@ -366,6 +372,12 @@ class CitationObjectTest(IndexedSolrTestCase):
             cluster=OpinionClusterFactoryWithChildrenAndParents(
                 docket=DocketFactory(court=court_scotus),
                 case_name="Abcdef v. Ipsum",
+                date_filed=OpinionCluster.objects.get(
+                    pk=cls.citation1.cluster_id
+                ).date_filed
+                + timedelta(
+                    days=1
+                ),  # Must be after citation1 date for test_no_duplicate_parentheticals_from_parallel_cites test
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
