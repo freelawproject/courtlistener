@@ -15,6 +15,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     compare_documents,
     parse_harvard_opinions,
     validate_dt,
+    winnow_case_name,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -681,3 +682,240 @@ class HarvardTests(TestCase):
 
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
+
+    def test_winnow_case_name(self) -> None:
+        """Test function winnow_case_name() to reduce case names to a set of words
+        Some names were wiped out when the name only contains abbreviations/acronyms
+        """
+
+        # (case name full, case name)
+        data_case_1 = (
+            "In the matter of S.J.S., a minor child. D.L.M. and D.E.M. "
+            "Petitioners/Respondents v. T.J.S.",
+            "D.L.M. v. T.J.S.",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_1[0]),
+            {
+                "respondents",
+                "minor",
+                "petitioners",
+                "sjs",
+                "tjs",
+                "dlm",
+                "dem",
+                "child",
+            },
+        )
+        self.assertEqual(
+            winnow_case_name(f"{data_case_1[0]} {data_case_1[1]}"),
+            {
+                "respondents",
+                "minor",
+                "petitioners",
+                "sjs",
+                "tjs",
+                "dlm",
+                "dem",
+                "child",
+            },
+        )
+
+        data_case_2 = (
+            "Appeal of HAMILTON & CHAMBERS CO., INC.",
+            "Appeal of Hamilton & Chambers Co.",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_2[0]),
+            {"hamilton", "co", "chambers", "appeal"},
+        )
+        self.assertEqual(
+            winnow_case_name(f"{data_case_2[0]} {data_case_2[1]}"),
+            {"hamilton", "co", "chambers", "appeal"},
+        )
+
+        data_case_3 = (
+            "Appeal of GEORGE C. PETERSON CO.",
+            "Appeal of George C. Peterson Co.",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_3[0]),
+            {"co", "peterson", "appeal", "george"},
+        )
+        self.assertEqual(
+            winnow_case_name(f"{data_case_3[0]} {data_case_3[1]}"),
+            {"co", "peterson", "appeal", "george"},
+        )
+
+        data_case_4 = (
+            "DALLAS SALES COMPANY, INC. v. CARLISLE SILVER COMPANY, INC., "
+            "d/b/a Carlisle Jewelry Company, H. William Pollack, III, Carolyn Pollack "
+            "and J.C. Penney Company, Inc.",
+            "Dallas Sales Co. v. Carlisle Silver Co.",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_4[0]),
+            {
+                "jewelry",
+                "dallas",
+                "pollack",
+                "jc",
+                "carlisle",
+                "sales",
+                "carolyn",
+                "company",
+                "silver",
+                "penney",
+                "william",
+                "iii",
+            },
+        )
+        self.assertEqual(
+            winnow_case_name(f"{data_case_4[0]} {data_case_4[1]}"),
+            {
+                "jewelry",
+                "dallas",
+                "pollack",
+                "jc",
+                "carlisle",
+                "sales",
+                "carolyn",
+                "co",
+                "company",
+                "silver",
+                "penney",
+                "william",
+                "iii",
+            },
+        )
+
+        data_case_5 = (
+            "Bertrand A. EICHELBERGER v. STATE of Missouri",
+            "Eichelberger v. State",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_5[0]),
+            {"missouri", "bertrand", "eichelberger"},
+        )
+
+        self.assertEqual(
+            winnow_case_name(f"{data_case_5[0]} {data_case_5[1]}"),
+            {"missouri", "bertrand", "eichelberger"},
+        )
+
+        data_case_6 = (
+            "Tina WESTER v. MISSOURI DEPARTMENT OF LABOR AND INDUSTRIAL RELATIONS, "
+            "Defendant-Respondent",
+            "Wester v. Missouri Department of Labor & Industrial Relations",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_6[0]),
+            {
+                "tina",
+                "wester",
+                "missouri",
+                "department",
+                "labor",
+                "industrial",
+                "relations",
+                "defendant",
+                "respondent",
+            },
+        )
+
+        self.assertEqual(
+            winnow_case_name(f"{data_case_6[0]} {data_case_6[1]}"),
+            {
+                "tina",
+                "wester",
+                "missouri",
+                "department",
+                "labor",
+                "industrial",
+                "relations",
+                "defendant",
+                "respondent",
+            },
+        )
+
+        data_case_7 = (
+            "In the Interest of C.R.B. and R.L.B Juvenile Officer v. C.B. (Natural "
+            "Father), G.B.Z. (Mother)",
+            "In the Interest of C.R.B. v. C.B.",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_7[0]),
+            {
+                "interest",
+                "crb",
+                "rlb",
+                "juvenile",
+                "officer",
+                "cb",
+                "natural",
+                "father",
+                "gbz",
+                "mother",
+            },
+        )
+
+        self.assertEqual(
+            winnow_case_name(f"{data_case_7[0]} {data_case_7[1]}"),
+            {
+                "interest",
+                "crb",
+                "rlb",
+                "juvenile",
+                "officer",
+                "cb",
+                "natural",
+                "father",
+                "gbz",
+                "mother",
+            },
+        )
+
+        data_case_8 = (
+            "IN RE: OLD CARCO LLC (f/k/a Chrysler LLC), Debtors, Frankie Overton v. "
+            "FCA US LLC.",
+            "Overton v. FCA U.S. LLC. (In re Old Carco LLC)",
+        )
+
+        self.assertEqual(
+            winnow_case_name(data_case_8[0]),
+            {
+                "us",
+                "re",
+                "old",
+                "carco",
+                "llc",
+                "chrysler",
+                "debtors",
+                "frankie",
+                "overton",
+                "fca",
+            },
+        )
+
+        self.assertEqual(
+            winnow_case_name(f"{data_case_8[0]} {data_case_8[1]}"),
+            {
+                "us",
+                "re",
+                "old",
+                "carco",
+                "llc",
+                "chrysler",
+                "debtors",
+                "frankie",
+                "overton",
+                "fca",
+            },
+        )

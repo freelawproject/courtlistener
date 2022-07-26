@@ -58,8 +58,8 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
             # We discovered that dates like 1913-02-29 killed this method.
             # In this instance, revert back one day and continue
             if (
-                str(msg) == "day is out of range for month"
-                and "02-29" in date_str
+                    str(msg) == "day is out of range for month"
+                    and "02-29" in date_str
             ):
                 date_str = date_str.replace("29", "28")
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -68,9 +68,9 @@ def validate_dt(date_str: str) -> Tuple[Optional[date], bool]:
 
 
 def _make_glob_from_args(
-    reporter: Optional[str],
-    volumes: Optional[range],
-    page: Optional[str],
+        reporter: Optional[str],
+        volumes: Optional[range],
+        page: Optional[str],
 ) -> List[str]:
     """Make list of glob paths
 
@@ -113,9 +113,9 @@ def _make_glob_from_args(
 
 
 def filepath_list(
-    reporter: str,
-    volumes: Optional[range],
-    page: Optional[str],
+        reporter: str,
+        volumes: Optional[range],
+        page: Optional[str],
 ) -> List[str]:
     """Given a reporter and volume, return a sorted list of files to process
 
@@ -395,17 +395,17 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
 
 def add_new_case(
-    data: Dict[str, Any],
-    case_body: str,
-    case_name: str,
-    case_name_full: str,
-    case_name_short: str,
-    date_filed: Optional[date],
-    is_approximate: bool,
-    citation: Citation,
-    court_id: Optional[str],
-    file_path: str,
-    make_searchable: bool,
+        data: Dict[str, Any],
+        case_body: str,
+        case_name: str,
+        case_name_full: str,
+        case_name_short: str,
+        date_filed: Optional[date],
+        is_approximate: bool,
+        citation: Citation,
+        court_id: Optional[str],
+        file_path: str,
+        make_searchable: bool,
 ) -> None:
     """Add new case to Courtlistener.com
 
@@ -473,8 +473,8 @@ def add_new_case(
         except OperationalError as e:
             if "exceeds maximum" in str(e):
                 docket.docket_number = (
-                    "%s, See Corrections for full Docket Number"
-                    % trunc(docket_string, length=5000, ellipsis="...")
+                        "%s, See Corrections for full Docket Number"
+                        % trunc(docket_string, length=5000, ellipsis="...")
                 )
                 docket.save()
                 long_data["correction"] = "%s <br> %s" % (
@@ -573,7 +573,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
 
 
 def add_opinions(
-    soup: BeautifulSoup, cluster_id: int, citation: Citation
+        soup: BeautifulSoup, cluster_id: int, citation: Citation
 ) -> List[int]:
     """Add opinions to Cluster
 
@@ -679,7 +679,7 @@ def clean_body_content(case_body: str, harvard: bool = False) -> str:
 
 
 def length_too_different(
-    case: OpinionCluster, harvard_characters: str, cl_characters: str
+        case: OpinionCluster, harvard_characters: str, cl_characters: str
 ) -> bool:
     """Check if length is too different between texts
 
@@ -700,10 +700,10 @@ def length_too_different(
 
 
 def content_too_different(
-    case: OpinionCluster,
-    harvard_characters: str,
-    cl_characters: str,
-    docket: str,
+        case: OpinionCluster,
+        harvard_characters: str,
+        cl_characters: str,
+        docket: str,
 ) -> bool:
     """Is the content too different
 
@@ -752,7 +752,7 @@ def content_too_different(
 
 
 def case_names_dont_overlap(
-    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+        case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
     """Case names not overlap
 
@@ -774,7 +774,7 @@ def case_names_dont_overlap(
 
 
 def cosine_similarity_too_different(
-    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+        case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
     """Cosine similarity comparison between case names
 
@@ -815,20 +815,20 @@ def has_too_similar_citation(case: OpinionCluster, citation: Citation) -> bool:
             cluster_id=case.id,
             reporter=citation.corrected_reporter(),
         )
-        .exclude(
+            .exclude(
             page=citation.groups["page"], volume=citation.groups["volume"]
         )
-        .exists()
+            .exists()
     )
 
 
 def match_based_text(
-    harvard_characters: str,
-    docket_number: str,
-    case_name_full: str,
-    possible_cases: QuerySet,
-    case_name_abbreviation: str,
-    citation: Citation,
+        harvard_characters: str,
+        docket_number: str,
+        case_name_full: str,
+        possible_cases: QuerySet,
+        case_name_abbreviation: str,
+        citation: Citation,
 ) -> Optional[OpinionCluster]:
     """Compare CL text to Harvard content to establish duplicates
 
@@ -852,11 +852,11 @@ def match_based_text(
         case_and_texts_and_docket = case_and_texts + [docket_number]
         case_and_titles = [case, case_name_full, case_name_abbreviation]
         if (
-            length_too_different(*case_and_texts)
-            or has_too_similar_citation(case, citation)
-            or case_names_dont_overlap(*case_and_titles)
-            or cosine_similarity_too_different(*case_and_titles)
-            or content_too_different(*case_and_texts_and_docket)
+                length_too_different(*case_and_texts)
+                or has_too_similar_citation(case, citation)
+                or case_names_dont_overlap(*case_and_titles)
+                or cosine_similarity_too_different(*case_and_titles)
+                or content_too_different(*case_and_texts_and_docket)
         ):
             continue
         return case
@@ -864,12 +864,12 @@ def match_based_text(
 
 
 def find_previously_imported_cases(
-    data: Dict[str, Any],
-    court_id: Optional[str],
-    date_filed: date,
-    harvard_characters: str,
-    case_name_full: str,
-    citation: Citation,
+        data: Dict[str, Any],
+        court_id: Optional[str],
+        date_filed: date,
+        harvard_characters: str,
+        case_name_full: str,
+        citation: Citation,
 ) -> Optional[OpinionCluster]:
     """Check if opinion is in Courtlistener
     :param data: The harvard data
@@ -907,8 +907,8 @@ def find_previously_imported_cases(
             date_filed=date_filed,
             docket__court_id=court_id,
         )
-        .exclude(citations__reporter=citation.corrected_reporter())
-        .order_by("id")
+            .exclude(citations__reporter=citation.corrected_reporter())
+            .order_by("id")
     )
     docket_number = data["docket_number"]
     match = match_based_text(
@@ -926,9 +926,9 @@ def find_previously_imported_cases(
                 date_filed__range=[date_filed - month, date_filed + month],
                 docket__court_id=court_id,
             )
-            .exclude(citations__reporter=citation.corrected_reporter())
-            .exclude(date_filed=date_filed)
-            .order_by("id")
+                .exclude(citations__reporter=citation.corrected_reporter())
+                .exclude(date_filed=date_filed)
+                .order_by("id")
         )
         match = match_based_text(
             harvard_characters,
@@ -967,8 +967,14 @@ def winnow_case_name(case_name: str) -> Set:
         "rel",
     }
 
-    # Remove all non alphanumeric characters
+    # Fix case name to be cleaner
     case_name = harmonize(case_name)
+
+    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    case_name = re.sub(r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
+                       lambda m: m.group().replace('.', ''), case_name)
+
+    # Remove all non alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
 
     # Remove one letter words, initials etc.
@@ -1064,9 +1070,9 @@ def filter_subsets(lists: List[List[int]]) -> Iterator[List[int]]:
 
     for match in lists:
         if not any(
-            is_subset(match, other_matches)
-            for other_matches in lists
-            if match is not other_matches
+                is_subset(match, other_matches)
+                for other_matches in lists
+                if match is not other_matches
         ):
             yield match
 
@@ -1094,7 +1100,7 @@ class Command(VerboseCommand):
             required=False,
             type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
-            "'1:' will start at 1 and to 2000; '5' will do volume 5",
+                 "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
@@ -1119,7 +1125,7 @@ class Command(VerboseCommand):
             "--location",
             type=str,
             help="The location of the court (if applicable) ex. Florida"
-            "for courts-db differentiation.",
+                 "for courts-db differentiation.",
             required=False,
             default=None,
         )
@@ -1127,7 +1133,7 @@ class Command(VerboseCommand):
             "--make-searchable",
             action="store_true",
             help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
+                 "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
             "--no-debug",
