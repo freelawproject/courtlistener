@@ -4,8 +4,9 @@
 import json
 import os
 import re
+import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 import internetarchive as ia
 import requests
@@ -82,8 +83,7 @@ def download_file(ia_key: str, file_name) -> None:
 
     logger.info("Capturing: %s", url)
     Path(directory).mkdir(parents=True, exist_ok=True)
-
-    data = requests.get(url, timeout=10).json()
+    data = requests.get(url, timeout=30).json()
     with open(file_path, "w") as outfile:
         json.dump(data, outfile, indent=2)
 
@@ -125,8 +125,22 @@ def get_from_ia(options: OptionsType) -> None:
         files = [file.__dict__ for file in files]
         files = human_sort(files, "name")
 
+        # Download files, but enable a backoff event in the event of a timeout
         for file in files:
-            download_file(ia_key, file["name"])
+            count = 0
+            while count < 5:
+                try:
+                    download_file(ia_key, file["name"])
+                    break
+                except TimeoutError:
+                    count += 1
+                    logger.info(
+                        f"Timeout error occurred. Pausing. {10 * count} seconds."
+                    )
+                    time.sleep(10 * count)
+            if count == 5:
+                logger.warn("Stopping IA scraper.")
+                raise Exception("Too many timeouts occurred.")
 
 
 class Command(VerboseCommand):
