@@ -172,70 +172,54 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
-@ratelimit_deny_list
-def toggle_docket_alert_confirmation(
-    request: HttpRequest, route_prefix: str | None, secret_key: str
-) -> HttpResponse:
-    """Subscribe a user to a docket alert based on the alert secret_key.
-
-    :param request: The HttpRequest from the client
-    :param route_prefix: The route prefix, un: unsubscribe, None: subscribe
-    :param secret_key: The secret key for the docket alert
-    :return: The HttpResponse to send to the client
-    """
-
-    alert_type = DocketAlert.SUBSCRIPTION
-    if route_prefix == "un":
-        # Called from unsubscribe route
-        alert_type = DocketAlert.UNSUBSCRIPTION
-    response = docket_alert_toggle_confirmation(
-        request, secret_key, alert_type
-    )
-    return response
-
-
-def flip_docket_alert(docket_alert: DocketAlert, alert_type: int) -> None:
+def set_docket_alert_state(
+    docket_alert: DocketAlert, target_state: int
+) -> None:
     """Flip the alert_type for a docket alert.
 
     :param docket_alert: The docket alert to flip.
-    :param alert_type: The new alert_type to set.
+    :param target_state: The new alert_type to set.
     """
-
     # Only flip the alert_type if it's not already the same
-    if docket_alert.alert_type != alert_type:
-        docket_alert.alert_type = alert_type
-        docket_alert.save()
-        if alert_type == DocketAlert.UNSUBSCRIPTION:
-            # Send Unsubscription confirmation email to the user
-            send_unsubscription_confirmation.delay(docket_alert.pk)
+    if docket_alert.alert_type == target_state:
+        return
+
+    docket_alert.alert_type = target_state
+    docket_alert.save()
+    if target_state == DocketAlert.UNSUBSCRIPTION:
+        # Send Unsubscription confirmation email to the user
+        send_unsubscription_confirmation.delay(docket_alert.pk)
 
 
-def docket_alert_toggle_confirmation(
-    request: HttpRequest, secret_key: str, alert_type: int
+@ratelimit_deny_list
+def toggle_docket_alert_confirmation(
+    request: HttpRequest,
+    route_prefix: str,
+    secret_key: str,
 ) -> HttpResponse:
     """Show a confirmation or success page for toggling docket alerts.
 
     :param request: The HttpRequest from the client
+    :param route_prefix: The route prefix, unsubscribe or subscribe
     :param secret_key: The secret key for the docket alert
-    :param alert_type: The type of alert to toggle
     :return: The HttpResponse to send to the client
     """
-    enabled = False
-    if alert_type == DocketAlert.SUBSCRIPTION:
-        enabled = True
+    target_state = DocketAlert.UNSUBSCRIPTION
+    if route_prefix == "subscribe":
+        target_state = DocketAlert.SUBSCRIPTION
     docket_alert = DocketAlert.objects.get(secret_key=secret_key)
     # Handle confirmation form POST requests
     if request.method == "POST":
         form = DocketAlertConfirmForm(request.POST)
         if form.is_valid():
-            flip_docket_alert(docket_alert, alert_type)
+            set_docket_alert_state(docket_alert, target_state)
             return render(
                 request,
                 "docket_alert.html",
                 {
                     "docket_alert": docket_alert,
                     "private": True,
-                    "enabled": enabled,
+                    "target_state": target_state,
                 },
             )
         # If the form is invalid, show the form errors.
@@ -246,7 +230,7 @@ def docket_alert_toggle_confirmation(
                 "docket_alert": docket_alert,
                 "form": form,
                 "private": True,
-                "enabled": enabled,
+                "target_state": target_state,
                 "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
             },
         )
@@ -254,14 +238,14 @@ def docket_alert_toggle_confirmation(
     if request.user.is_authenticated:
         # If the user is logged in, flip the docket alert. No confirmation page
         # required
-        flip_docket_alert(docket_alert, alert_type)
+        set_docket_alert_state(docket_alert, target_state)
         return render(
             request,
             "docket_alert.html",
             {
                 "docket_alert": docket_alert,
                 "private": True,
-                "enabled": enabled,
+                "target_state": target_state,
             },
         )
 
@@ -275,7 +259,7 @@ def docket_alert_toggle_confirmation(
             "docket_alert": docket_alert,
             "form": form,
             "private": True,
-            "enabled": enabled,
+            "target_state": target_state,
             "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
         },
     )
