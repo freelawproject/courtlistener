@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %} Confirm your Docket Alert {% if enabled %} subscription {% else %} unsubscription {% endif %} – CourtListener.com{% endblock %}
+{% block title %} Confirm your Docket Alert {% if target_state == docket_alert.SUBSCRIPTION %} subscription {% else %} unsubscription {% endif %} – CourtListener.com{% endblock %}
 
 {% block footer-scripts %}
   <script type="text/javascript">
