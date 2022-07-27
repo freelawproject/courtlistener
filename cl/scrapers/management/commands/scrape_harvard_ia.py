@@ -12,6 +12,8 @@ import internetarchive as ia
 import requests
 from django.conf import settings
 from internetarchive import ArchiveSession
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from cl.lib.argparse_types import _argparse_volumes
 from cl.lib.command_utils import VerboseCommand, logger
@@ -83,7 +85,18 @@ def download_file(ia_key: str, file_name) -> None:
 
     logger.info("Capturing: %s", url)
     Path(directory).mkdir(parents=True, exist_ok=True)
-    data = requests.get(url, timeout=30).json()
+    # Create session to retry timeouts with backoff events
+    session = requests.Session()
+    session.mount(
+        "https://",
+        HTTPAdapter(
+            max_retries=Retry(
+                total=5,
+                backoff_factor=10,
+            )
+        ),
+    )
+    data = session.get(url, timeout=15).json()
     with open(file_path, "w") as outfile:
         json.dump(data, outfile, indent=2)
 
@@ -125,22 +138,8 @@ def get_from_ia(options: OptionsType) -> None:
         files = [file.__dict__ for file in files]
         files = human_sort(files, "name")
 
-        # Download files, but enable a backoff event in the event of a timeout
         for file in files:
-            count = 0
-            while count < 5:
-                try:
-                    download_file(ia_key, file["name"])
-                    break
-                except TimeoutError:
-                    count += 1
-                    logger.info(
-                        f"Timeout error occurred. Pausing. {10 * count} seconds."
-                    )
-                    time.sleep(10 * count)
-            if count == 5:
-                logger.warn("Stopping IA scraper.")
-                raise Exception("Too many timeouts occurred.")
+            download_file(ia_key, file["name"])
 
 
 class Command(VerboseCommand):
