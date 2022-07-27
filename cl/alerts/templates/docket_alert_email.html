@@ -35,7 +35,7 @@
       {% if first_email and not auto_subscribe %}
         Your account on CourtListener just received its first email from PACER related to the case below.
         Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
-        <a href="https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' docket_alert.secret_key %}">
+        <a href="https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscribe" docket_alert.secret_key %}">
           Subscribe to this case to get ongoing updates
         </a>.
       {% elif first_email and auto_subscribe %}
@@ -98,7 +98,7 @@
     {% if not first_email or first_email and auto_subscribe %}
       <p style="font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 1em 0 1.5em; padding: 0;">
         This alert was sent because you subscribed to this docket with your account on CourtListener.com. To disable this alert
-        <a href="https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'un' docket_alert.secret_key %}">
+        <a href="https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert.secret_key %}">
           unsubscribe here.
         </a>
       </p>

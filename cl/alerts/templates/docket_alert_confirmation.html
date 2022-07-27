@@ -16,8 +16,8 @@
   <div class="col-sm-2"></div>
   <div class="col-sm-8">
     <div class="text-center">
-      <h1> Please confirm your {% if enabled %} subscription {% else %} unsubscription {% endif %}</h1>
-      <h3 class="gray alt">&mdash; {% if enabled %} to {% else %} from {% endif %} &mdash;</h3>
+      <h1> Please confirm your {% if target_state == docket_alert.SUBSCRIPTION %} subscription {% else %} unsubscription {% endif %}</h1>
+      <h3 class="gray alt">&mdash; {% if target_state == docket_alert.SUBSCRIPTION %} to {% else %} from {% endif %} &mdash;</h3>
       {% include "includes/docket_alert_case_name.html" %}
       <form id="confirmation" action="" method="post">{% csrf_token %}
         <div class="form-group">
@@ -30,12 +30,11 @@
             </p>
           {% endif %}
         </div>
-        <button class="h-captcha"
+        <button class="h-captcha btn btn-primary btn-lg"
                 data-sitekey="{{ h_captcha_site_key }}"
                 data-callback="onSubmit"
                 type="submit"
-                class="btn btn-primary btn-lg pull-right"
-                >{% if enabled %} Subscribe {% else %} Unsubscribe {% endif %}</button>
+                >{% if target_state == docket_alert.SUBSCRIPTION %} Subscribe {% else %} Unsubscribe {% endif %}</button>
       </form>
     </div>
     {% include "includes/docket_alert_donation.html" %}

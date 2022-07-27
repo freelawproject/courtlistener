@@ -2149,7 +2149,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=[docket_alert[0].secret_key],
+                args=["subscribe", docket_alert[0].secret_key],
             )
         )
         docket_alert_subscription = DocketAlert.objects.filter(
@@ -2197,7 +2197,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["un", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert[0].secret_key],
             )
         )
 
@@ -2262,7 +2262,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=[docket_alert[0].secret_key],
+                args=["subscribe", docket_alert[0].secret_key],
             )
         )
         self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
@@ -2295,7 +2295,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["un", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert[0].secret_key],
             )
         )
 
@@ -2336,13 +2336,13 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["un", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert[0].secret_key],
             )
         )
         self.client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["un", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert[0].secret_key],
             ),
             {},
         )
@@ -2355,13 +2355,13 @@ class RecapEmailDocketAlerts(TestCase):
         self.client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=[docket_alert[0].secret_key],
+                args=["subscribe", docket_alert[0].secret_key],
             )
         )
         self.client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=[docket_alert[0].secret_key],
+                args=["subscribe", docket_alert[0].secret_key],
             ),
             {},
         )
