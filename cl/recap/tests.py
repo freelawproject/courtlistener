@@ -2148,7 +2148,8 @@ class RecapEmailDocketAlerts(TestCase):
         # Subscribe to the case from first user-case email subscription link
         self.client.get(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=[docket_alert[0].secret_key],
             )
         )
         docket_alert_subscription = DocketAlert.objects.filter(
@@ -2195,7 +2196,8 @@ class RecapEmailDocketAlerts(TestCase):
         # Unsubscribe from email link
         self.client.get(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["un", docket_alert[0].secret_key],
             )
         )
 
@@ -2259,7 +2261,8 @@ class RecapEmailDocketAlerts(TestCase):
         # Subscribe to the case from first user-case email subscription link
         self.client.get(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=[docket_alert[0].secret_key],
             )
         )
         self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
@@ -2291,7 +2294,8 @@ class RecapEmailDocketAlerts(TestCase):
         # Unsubscribe from email link
         self.client.get(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["un", docket_alert[0].secret_key],
             )
         )
 
@@ -2331,12 +2335,14 @@ class RecapEmailDocketAlerts(TestCase):
         # Unauthenticated user tries to unsubscribe via GET and POST
         self.client.get(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["un", docket_alert[0].secret_key],
             )
         )
         self.client.post(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["un", docket_alert[0].secret_key],
             ),
             {},
         )
@@ -2348,12 +2354,14 @@ class RecapEmailDocketAlerts(TestCase):
         # Unauthenticated user tries to subscribe via GET and POST
         self.client.get(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=[docket_alert[0].secret_key],
             )
         )
         self.client.post(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=[docket_alert[0].secret_key],
             ),
             {},
         )
