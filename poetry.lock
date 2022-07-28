@@ -1143,7 +1143,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.9"
+version = "2.5.10"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -2166,7 +2166,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "933b8f19e7fc2fe54965c760d880f507ba9a3f152261d98a48406220277c8ac9"
+content-hash = "8dc0f7c01ed154a99df2d0ef8ecd04dde93a515d4474c50314944f1d5c4bf4cf"
 
 [metadata.files]
 amqp = []
