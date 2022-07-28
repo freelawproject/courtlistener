@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Your Docket Alert is now {% if enabled %} Enabled {% else %} Disabled {% endif %} – CourtListener.com{% endblock %}
+{% block title %}Your Docket Alert is now {% if target_state == docket_alert.SUBSCRIPTION %} Enabled {% else %} Disabled {% endif %} – CourtListener.com{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -8,9 +8,9 @@
   <div class="col-sm-2"></div>
   <div class="col-sm-8">
     <div class="text-center">
-      <h1>You Have {% if enabled %} Enabled {% else %} Disabled {% endif %} This Docket Alert</h1>
-      <h3>You're now {% if enabled %} subscribed {% else %} unsubscribed {% endif %}</h3>
-      <h3 class="gray alt">&mdash; {% if enabled %} to {% else %} from {% endif %} &mdash;</h3>
+      <h1>You Have {% if target_state == docket_alert.SUBSCRIPTION %} Enabled {% else %} Disabled {% endif %} This Docket Alert</h1>
+      <h3>You're now {% if target_state == docket_alert.SUBSCRIPTION %} subscribed {% else %} unsubscribed {% endif %}</h3>
+      <h3 class="gray alt">&mdash; {% if target_state == docket_alert.SUBSCRIPTION %} to {% else %} from {% endif %} &mdash;</h3>
       {% include "includes/docket_alert_case_name.html" %}
       <div class="row">
         <div class="col-xs-6">
