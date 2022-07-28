@@ -1,7 +1,9 @@
+from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.forms.widgets import HiddenInput, Select, TextInput
+from hcaptcha.fields import hCaptchaField
 
 from cl.alerts.models import Alert
 
@@ -40,3 +42,7 @@ class CreateAlertForm(ModelForm):
             "name": TextInput(attrs={"class": "form-control"}),
             "rate": Select(attrs={"class": "form-control"}),
         }
+
+
+class DocketAlertConfirmForm(forms.Form):
+    hcaptcha = hCaptchaField(size="invisible")

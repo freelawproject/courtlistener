@@ -1,5 +1,4 @@
 import string
-from datetime import date
 
 from factory import (
     Faker,
