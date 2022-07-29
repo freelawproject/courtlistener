@@ -18,14 +18,14 @@
       will be deleted and resurrecting your account will not be
       possible.
   </p>
-  {% if request.user.alerts.count or request.user.favorites.count or non_deleted_map_count or request.user.user_tags.count or request.user.docket_alerts.count %}
+  {% if request.user.alerts.count or request.user.favorites.count or non_deleted_map_count or request.user.user_tags.count or request.user.docket_alerts.subscriptions.count %}
   <p>The following will be deleted:</p>
   <ul>
     {% if request.user.alerts.count > 0 %}
       <li>All of <a href="{% url "profile_alerts" %}">your search alerts</a> ({{ request.user.alerts.count }}).</li>
     {% endif %}
-    {% if request.user.docket_alerts.count %}
-      <li>All of <a href="{% url "profile_docket_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.count }}).</li>
+    {% if request.user.docket_alerts.subscriptions.count %}
+      <li>All of <a href="{% url "profile_docket_alerts" %}">your docket alerts</a> ({{ request.user.docket_alerts.subscriptions.count }}).</li>
     {% endif %}
     {% if request.user.user_tags.count > 0 %}
       <li>All of your <a href="{% url "tag_list" username=user.username %}">tags</a> ({{ request.user.user_tags.count }}).</li>
