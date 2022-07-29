@@ -1702,3 +1702,35 @@ class AttorneyOrganization(AbstractDateTimeModel):
             self.state,
             self.zip_code,
         )
+
+
+class Committee(models.Model):
+    """
+    Details about committee receiving campaign contribution.
+    """
+
+    committee_uniq_id = models.CharField(
+        help_text="Unique ID for committee",
+        max_length=9,
+        db_index=True,
+    )
+    committee_name = models.CharField(
+        help_text="Committee name",
+        max_length=200,
+        blank=True,
+    )
+    committee_party = models.CharField(
+        help_text="Political party affiliation",
+        max_length=3,
+        blank=True,
+    )
+    candidate_id = models.CharField(
+        help_text="Unique ID for candidate supported by committee",
+        max_length=9,
+        blank=True,
+    )
+    connected_org_name = models.CharField(
+        help_text="Connected organization name",
+        max_length=200,
+        blank=True,
+    )
