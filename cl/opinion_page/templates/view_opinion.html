@@ -461,7 +461,7 @@
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
-                                  <div class="serif-text">{{ sub_opinion.xml_harvard|safe }}</div>
+                                  <div class="serif-text">{{ sub_opinion.xml_harvard|harvard_images|safe }}</div>
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
                                 {% elif sub_opinion.html %}

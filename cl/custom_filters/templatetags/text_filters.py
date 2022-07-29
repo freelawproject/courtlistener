@@ -218,3 +218,20 @@ def read_more(s, show_words, autoescape=True):
     words.insert(show_words, insertion)
     words.append("</span>")
     return mark_safe(" ".join(words))
+
+
+@register.filter(needs_autoescape=False)
+@stringfilter
+def harvard_images(text) -> str:
+    """Update css for harvard data images
+
+    Stop harvard images from extending beyond the bounds of the opinion
+
+    :param text: Harvard opinion
+    :param autoescape: Text autoescape
+    :return: The updated opinion
+    """
+    images = re.findall(r'(<img .*width=")(\d+)"', text)
+    for image in images:
+        text = text.replace("".join(image), f"{image[0]}100%")
+    return text
