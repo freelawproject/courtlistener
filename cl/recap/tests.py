@@ -6,6 +6,7 @@ from unittest import mock
 from unittest.mock import ANY
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
@@ -1923,6 +1924,7 @@ class RecapEmailDocketAlerts(TestCase):
 
         recipient_user = self.user_profile
         recipient_user.user.email = "testing_1@mail.com"
+        recipient_user.user.password = make_password("password")
         recipient_user.user.save()
         recipient_user.recap_email = "testing_1@recap.email"
         recipient_user.auto_subscribe = True
@@ -1931,6 +1933,7 @@ class RecapEmailDocketAlerts(TestCase):
 
         recipient_user_2 = self.user_profile_2
         recipient_user_2.user.email = "testing_2@mail.com"
+        recipient_user_2.user.password = make_password("password")
         recipient_user_2.user.save()
         recipient_user_2.recap_email = "testing_2@recap.email"
         recipient_user_2.auto_subscribe = True
@@ -2138,10 +2141,15 @@ class RecapEmailDocketAlerts(TestCase):
         )
         self.assertEqual(docket_alert.count(), 1)
 
+        # Authenticate user to avoid the subscription confirmation form
+        self.client.login(
+            username=self.recipient_user.user.username, password="password"
+        )
         # Subscribe to the case from first user-case email subscription link
         self.client.get(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["subscribe", docket_alert[0].secret_key],
             )
         )
         docket_alert_subscription = DocketAlert.objects.filter(
@@ -2181,10 +2189,15 @@ class RecapEmailDocketAlerts(TestCase):
         message_sent = mail.outbox[0]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # Authenticate user to avoid the unsubscription confirmation form
+        self.client.login(
+            username=self.recipient_user.user.username, password="password"
+        )
         # Unsubscribe from email link
         self.client.get(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["unsubscribe", docket_alert[0].secret_key],
             )
         )
 
@@ -2241,10 +2254,15 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # Authenticate user to avoid the confirmation form
+        self.client.login(
+            username=self.recipient_user.user.username, password="password"
+        )
         # Subscribe to the case from first user-case email subscription link
         self.client.get(
             reverse(
-                "subscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["subscribe", docket_alert[0].secret_key],
             )
         )
         self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
@@ -2276,7 +2294,8 @@ class RecapEmailDocketAlerts(TestCase):
         # Unsubscribe from email link
         self.client.get(
             reverse(
-                "unsubscribe_docket_alert", args=[docket_alert[0].secret_key]
+                "toggle_docket_alert_confirmation",
+                args=["unsubscribe", docket_alert[0].secret_key],
             )
         )
 
@@ -2289,6 +2308,67 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 3)
         message_sent = mail.outbox[2]
         self.assertIn("[Unsubscribed]", message_sent.subject)
+
+    def test_docket_alert_toggle_confirmation_fails(
+        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+    ):
+        """This test verifies if the unsubscription/subscription fails if a bot
+        tries to unsubscribe/subscribe from/to a docket alert.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data, format="json")
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        recap_document = RECAPDocument.objects.all()
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+
+        # Unauthenticated user tries to unsubscribe via GET and POST
+        self.client.get(
+            reverse(
+                "toggle_docket_alert_confirmation",
+                args=["unsubscribe", docket_alert[0].secret_key],
+            )
+        )
+        self.client.post(
+            reverse(
+                "toggle_docket_alert_confirmation",
+                args=["unsubscribe", docket_alert[0].secret_key],
+            ),
+            {},
+        )
+        # The DocketAlert should remain in Subscription type.
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+
+        # Update the DocketAlert to Unsubscription type
+        docket_alert.update(alert_type=DocketAlert.UNSUBSCRIPTION)
+        # Unauthenticated user tries to subscribe via GET and POST
+        self.client.get(
+            reverse(
+                "toggle_docket_alert_confirmation",
+                args=["subscribe", docket_alert[0].secret_key],
+            )
+        )
+        self.client.post(
+            reverse(
+                "toggle_docket_alert_confirmation",
+                args=["subscribe", docket_alert[0].secret_key],
+            ),
+            {},
+        )
+        # The DocketAlert should remain in unsubscription type.
+        self.assertEqual(
+            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+        )
 
 
 class CheckCourtConnectivityTest(TestCase):
