@@ -104,6 +104,19 @@ PGPASSWORD=$DB_PASSWORD psql \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.csv.bz2 --acl public-read
 
+echo "Streaming search_parenthetical to S3"
+PGPASSWORD=$DB_PASSWORD psql \
+	--command \
+	  'set statement_timeout to 0;
+	   COPY search_parenthetical (
+	       id, text, score, described_opinion_id, describing_opinion_id, group_id
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
+	--host $DB_HOST \
+	--username $DB_USER \
+	--dbname courtlistener | \
+	bzip2 | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/parentheticals-`date -I`.csv.bz2 --acl public-read
+
 echo "Streaming audio_audio to S3"
 PGPASSWORD=$DB_PASSWORD psql \
 	--command \
