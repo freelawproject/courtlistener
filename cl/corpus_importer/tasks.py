@@ -69,9 +69,9 @@ from cl.lib.pacer import (
     map_pacer_to_cl_id,
 )
 from cl.lib.pacer_session import (
-    delete_pacer_cookies_from_cache,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
+    refresh_pacer_cookies,
 )
 from cl.lib.recap_utils import (
     get_bucket_name,
@@ -589,16 +589,34 @@ def get_and_process_free_pdf(
         r, r_msg = download_pacer_pdf_by_rd(
             rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
         )
-    except PacerLoginException as exc:
-        msg = "PacerLoginException while getting free docs."
-        if self.request.retries == self.max_retries:
-            logger.warning(msg)
+    except HTTPError as exc:
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            msg = (
+                f"Ran into HTTPError while getting PDF: "
+                f"{exc.response.status_code}."
+            )
+            if self.request.retries == self.max_retries:
+                logger.error(msg)
+                self.request.chain = None
+                return None
+            logger.info(f"{msg} Retrying.")
+            raise self.retry(exc)
+        else:
+            msg = (
+                f"Ran into unknown HTTPError while getting PDF: "
+                f"{exc.response.status_code}. Aborting."
+            )
+            logger.error(msg)
             self.request.chain = None
             return None
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")
-        # Delete the cookies from cache and get fresh new ones before retrying
-        delete_pacer_cookies_from_cache("pacer_scraper")
-        get_or_cache_pacer_cookies(
+        # Refresh cookies before retrying
+        refresh_pacer_cookies(
             "pacer_scraper",
             username=settings.PACER_USERNAME,
             password=settings.PACER_PASSWORD,
@@ -1520,16 +1538,7 @@ def make_attachment_pq_object(
     return pq.pk
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(PacerLoginException,),
-    max_retries=15,
-    interval_start=5,
-    interval_step=5,
-    ignore_result=True,
-)
 def download_pacer_pdf_by_rd(
-    self: Task,
     rd_pk: int,
     pacer_case_id: str,
     pacer_doc_id: int,
@@ -1539,7 +1548,6 @@ def download_pacer_pdf_by_rd(
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
-    :param self: The celery task
     :param rd_pk: The PK of the RECAPDocument to download
     :param pacer_case_id: The internal PACER case ID number
     :param pacer_doc_id: The internal PACER document ID to download
@@ -1556,40 +1564,9 @@ def download_pacer_pdf_by_rd(
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
-    try:
-        r, r_msg = report.download_pdf(
-            pacer_case_id, pacer_doc_id, magic_number
-        )
-    except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
-        ]:
-            msg = (
-                f"Ran into HTTPError while getting PDF: "
-                f"{exc.response.status_code}."
-            )
-            if self.request.retries == self.max_retries:
-                logger.error(msg)
-                self.request.chain = None
-                return None, msg
-            logger.info(f"{msg} Retrying.")
-            raise self.retry(exc)
-        else:
-            msg = (
-                f"Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None, msg
-    except requests.RequestException as exc:
-        msg = f"Unable to get PDF for {pacer_doc_id} in {pacer_case_id}"
-        logger.warning(msg)
-        if self.request.retries == self.max_retries:
-            self.request.chain = None
-            return None, msg
-        raise self.retry(exc=exc)
+
+    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
+
     return r, r_msg
 
 
@@ -1679,7 +1656,7 @@ def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(PacerLoginException, RequestException),
+    autoretry_for=(PacerLoginException, RequestException, HTTPError),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1733,7 +1710,7 @@ def get_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ReadTimeout),
+    autoretry_for=(ConnectionError, ReadTimeout, HTTPError, RequestException),
     max_retries=15,
     interval_start=5,
     interval_step=5,

@@ -56,10 +56,13 @@ def get_or_cache_pacer_cookies(
     """
     r = make_redis_interface("CACHE", decode_responses=False)
     cookies = get_pacer_cookie_from_cache(user_pk, r=r)
-    if cookies:
+    ttl_seconds = r.ttl(session_key % user_pk)
+    if cookies and ttl_seconds >= 300:
+        # cookies were found in cache and ttl >= 5 minutes, return them
         return cookies
 
-    # Unable to find cookies in cache. Login and cache new values.
+    # Unable to find cookies in cache, or they close to expire.
+    # Login and cache new values.
     cookies = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
     r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
@@ -81,13 +84,25 @@ def get_pacer_cookie_from_cache(user_pk: Union[str, int], r: Redis = None):
         return pickle.loads(pickled_cookie)
 
 
-def delete_pacer_cookies_from_cache(user_pk: Union[str, int], r: Redis = None):
-    """Delete the cookie for a user from the cache.
+def refresh_pacer_cookies(
+    user_pk: Union[str, int],
+    username: str,
+    password: str,
+    client_code: str = None,
+) -> RequestsCookieJar:
+    """Refresh PACER cookies for a user.
 
-    :param user_pk: The ID of the user, can be a string or an ID
-    :param r: A redis interface. If not provided, a fresh one is used. This is
-    a performance enhancement.
+    :param user_pk: The PK of the user attempting to store their credentials.
+    Needed to create the key in Redis.
+    :param username: The PACER username of the user
+    :param password: The PACER password of the user
+    :param client_code: The PACER client code of the user
+    :return: Cookies for the PACER user
     """
-    if not r:
-        r = make_redis_interface("CACHE", decode_responses=False)
-    r.delete(session_key % user_pk)
+
+    r = make_redis_interface("CACHE", decode_responses=False)
+    cookies = log_into_pacer(username, password, client_code)
+    cookie_expiration = 60 * 60
+
+    r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
+    return cookies
