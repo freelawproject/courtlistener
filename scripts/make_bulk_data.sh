@@ -1,12 +1,20 @@
 #!/bin/bash
 set -e
 
+echo "Installing utilities"
+
 # Set up Sentry
 curl -sL https://sentry.io/get-cli/ | bash
 eval "$(sentry-cli bash-hook)"
 
-# Set up AWS tools
-apt install awscli
+# Set up AWS tools and gnupg (needed for apt-key add, below)
+apt install -y awscli gnupg
+
+# Install latest version of pg_dump (else we get an error about version mismatch
+echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
+apt-get update
+apt-get install postgresql-client-14
 
 # Stream to S3
 
@@ -208,17 +216,18 @@ PGPASSWORD=$DB_PASSWORD psql \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-political-affiliations-`date -I`.bin.bz2 --acl public-read
 
-echo "Streaming search_parenthetical to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_parenthetical (
-	       id, text, score, described_opinion_id, describing_opinion_id, group_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/parentheticals-`date -I`.bin.bz2 --acl public-read
+echo "Exporting schema to S3"
+PGPASSWORD=$DB_PASSWORD pg_dump \
+    --host $DB_HOST \
+    --username $DB_USER \
+    --create \
+    --schema-only \
+    --table 'search_*' \
+    --table 'people_db_*' \
+    --table 'audio_*' \
+    --no-privileges \
+    --no-publications \
+    --no-subscriptions courtlistener | \
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/schema-`date -I`.sql --acl public-read
 
 echo "Done."
