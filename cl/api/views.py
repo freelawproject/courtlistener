@@ -87,18 +87,10 @@ def replication_docs(request: HttpRequest) -> HttpResponse:
 
 def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
-    courts = make_court_variable()
-    court_count = len(courts)
-    # Temporary message during shift to AWS is completed.
-    messages.add_message(
-        request,
-        messages.ERROR,
-        f"Bulk data is temporarily unavailable while we transition to new server infrastructure. We apologize for the inconvenience. To learn more, follow the github issue <a href='https://github.com/freelawproject/courtlistener/issues/1983'>here</a>.",
-    )
     return render(
         request,
         "bulk-data.html",
-        {"court_count": court_count, "courts": courts, "private": False},
+        {"private": False},
     )
 
 
