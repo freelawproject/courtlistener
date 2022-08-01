@@ -27,12 +27,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       in_use, has_opinion_scraper, has_oral_argument_scraper, position,
 	       citation_string, short_name, full_name, url, start_date, end_date,
 	       jurisdiction
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/courts-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/courts-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming search_docket to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -49,12 +49,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       filepath_local, filepath_ia, filepath_ia_json, date_blocked, blocked,
 	       appeal_from_id, assigned_to_id, court_id, idb_data_id,
 	       originating_court_information_id, referred_to_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/dockets-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/dockets-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming search_opinioncluster to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -68,12 +68,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
 	       history, other_dates, cross_reference, correction, citation_count,
 	       precedential_status, date_blocked, blcoked, docket_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinion-clusters-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinion-clusters-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming search_opinion to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -84,12 +84,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       type, sha1, page_count, download_url, local_path, plain_text, html,
 	       html_lawbox, html_columbia, html_anon_2020, xml_harvard,
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinions-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinions-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming search_opinionscited to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -97,12 +97,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY search_opinionscited (
 	       id, depth, cited_opinion_id, citing_opinion_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST -\
 	-username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming audio_audio to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -113,12 +113,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       case_name, case_name_full, judges, sha1, download_url, local_path_mp3,
 	       local_path_original_file, filepath_ia, duration, date_blocked,
 	       blocked, docket_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/audio-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/oral-arguments-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_person to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -130,12 +130,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       date_dod, date_granularity_dod, dob_city, dob_state, dob_country,
 	       dod_city, dod_state, dod_country, gender, religion, ftm_total_received,
 	       ftn_eid, has_photo, is_alias_of_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-people-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-people-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_school to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -143,12 +143,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY people_db_school (
 	       id, date_created, date_modified, name, ein, is_alias_of_id,
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-schools-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-schools-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_position to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -165,12 +165,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       votes_yes_percent, votes_no_percent, how_selected, has_inferred_values,
 	       appointer_id, court_id, person_id, predecessor_id, school_id,
 	       supervisor_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-positions-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-positions-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_retentionevent to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -180,12 +180,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       id, date_created, date_modified, retention_type, date_retention,
 	       votes_yes, votes_no, vote_yes_percent, votes_no_percent, unopposed, won
 	       position_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-retention-events-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-retention-events-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_education to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -194,12 +194,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY people_db_education (
 	       id, date_created, date_modified, degree_level, degree_detail,
 	       degree_year, person_id, school_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-educations-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-educations-`date -I`.csv.bz2 --acl public-read
 
 echo "Streaming people_db_politicalaffiliation to S3"
 PGPASSWORD=$DB_PASSWORD psql \
@@ -209,12 +209,12 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       id, date_created, date_modified, political_party, source,
 	       date_start, date_granularity_start, date_end,
 	       date_granularity_end, person_id
-	   ) TO STDOUT WITH (FORMAT binary, ENCODING utf8)' \
+	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-political-affiliations-`date -I`.bin.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-political-affiliations-`date -I`.csv.bz2 --acl public-read
 
 echo "Exporting schema to S3"
 PGPASSWORD=$DB_PASSWORD pg_dump \
