@@ -23,7 +23,7 @@ from cl.search.constants import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
     OpinionCluster,
@@ -1083,7 +1083,7 @@ def get_related_clusters_with_cache(
     """
 
     # By default all statuses are included
-    available_statuses = dict(DOCUMENT_STATUSES).values()
+    available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
     url_search_params = {f"stat_{v}": "on" for v in available_statuses}
 
     # Opinions that belong to the targeted cluster
