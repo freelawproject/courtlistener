@@ -32,6 +32,28 @@ class OpinionSitemap(sitemaps.Sitemap):
     def lastmod(self, obj: OpinionCluster) -> datetime:
         return obj.date_modified
 
+
+class BlockedOpinionSitemap(sitemaps.Sitemap):
+    """Mirrors the OpinionSitemap, but only for recently blocked cases.
+
+    This ensures that they get crawled by search engines and removed from
+    results.
+    """
+
+    changefreq = "daily"
+    priority = 0.6
+    limit = 50_000
+
+    def items(self) -> QuerySet:
+        return (
+            OpinionCluster.objects.filter(
+                blocked=True,
+                date_blocked__gt=datetime.today() - timedelta(days=30),
+            )
+            .only("date_modified", "pk", "slug")
+            .order_by("pk")
+        )
+
     def lastmod(self, obj: OpinionCluster) -> datetime:
         return obj.date_modified
 
@@ -72,3 +94,23 @@ class DocketSitemap(sitemaps.Sitemap):
         elif view_count > 1_000:
             priority = 0.65
         return priority
+
+
+class BlockedDocketSitemap(sitemaps.Sitemap):
+    changefreq = "daily"
+    limit = 50_000
+    priority = 0.6
+
+    def items(self) -> QuerySet:
+        return (
+            Docket.objects.filter(
+                source__in=Docket.RECAP_SOURCES,
+                blocked=True,
+                date_blocked__gt=datetime.today() - timedelta(days=30),
+            )
+            .order_by("pk")
+            .only("view_count", "date_modified", "pk", "slug")
+        )
+
+    def lastmod(self, obj: Docket) -> datetime:
+        return obj.date_modified
