@@ -603,7 +603,7 @@ def get_and_process_free_pdf(
                 self.request.chain = None
                 return None
             logger.info(f"{msg} Retrying.")
-            raise self.retry(exc)
+            raise self.retry(exc=exc)
         else:
             msg = (
                 f"Ran into unknown HTTPError while getting PDF: "
