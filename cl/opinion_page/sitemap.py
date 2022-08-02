@@ -41,8 +41,16 @@ class DocketSitemap(sitemaps.Sitemap):
     limit = 50_000
 
     def items(self) -> QuerySet:
+        # Give items ten days to get some views.
+        new_or_popular = Q(view_count__gt=10) | Q(
+            date_filed__gt=datetime.today() - timedelta(days=30)
+        )
         return (
-            Docket.objects.filter(source__in=Docket.RECAP_SOURCES)
+            Docket.objects.filter(
+                new_or_popular,
+                source__in=Docket.RECAP_SOURCES,
+                blocked=False,
+            )
             .order_by("pk")
             .only("view_count", "date_modified", "pk", "slug")
         )
