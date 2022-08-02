@@ -1,44 +1,25 @@
 import json
-import shutil
 from datetime import date, timedelta
 from typing import Any, Dict
-from unittest import mock
 
-from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
-from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, RequestFactory, override_settings
+from django.test import Client, RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import ResolverMatch, reverse
-from django.utils.timezone import now
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
 from cl.api.pagination import ShallowOnlyPageNumberPagination
-from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
-from cl.audio.models import Audio
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.scrapers.management.commands.cl_scrape_oral_arguments import (
-    Command as OralArgumentCommand,
-)
-from cl.scrapers.test_assets import test_oral_arg_scraper
-from cl.search.factories import CourtFactory
-from cl.search.models import (
-    Court,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    OpinionsCited,
-)
+from cl.search.models import Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.users.factories import UserFactory
@@ -951,102 +932,3 @@ class DRFRecapPermissionTest(TestCase):
             r = self.client.get(path)
             self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
             print("✓")
-
-
-class BulkJsonHistoryTest(SimpleTestCase):
-    def setUp(self) -> None:
-        self.history = BulkJsonHistory("test", settings.BULK_DATA_DIR)
-
-    def tearDown(self) -> None:
-        self.history.delete_from_disk()
-
-    def test_load_the_file(self) -> None:
-        data = self.history.load_json_file()
-        self.assertEqual({}, data)
-
-    def test_load_date_when_none(self) -> None:
-        d = self.history.get_last_good_date()
-        self.assertIsNone(d)
-
-    def test_set_date_then_load_it(self) -> None:
-        self.history.add_current_attempt_and_save()
-        self.history.mark_success_and_save()
-        d = self.history.get_last_good_date()
-        self.assertAlmostEqual(
-            # The date serialized is within ten seconds of now.
-            d,
-            now(),
-            delta=timedelta(seconds=10),
-        )
-
-    def test_add_current_attempt(self) -> None:
-        self.history.add_current_attempt_and_save()
-        d = self.history.get_last_attempt()
-        self.assertAlmostEqual(d, now(), delta=timedelta(seconds=10))
-
-
-class BulkDataTest(TestCase):
-    tmp_data_dir = "/tmp/bulk-dir/"
-
-    def setUp(self) -> None:
-        docket = Docket(
-            case_name="foo",
-            court=Court.objects.get(pk="test"),
-            source=Docket.DEFAULT,
-        )
-        docket.save()
-        # Must be more than a year old for all tests to be runnable.
-        last_month = now().date() - timedelta(days=400)
-        self.doc_cluster = OpinionCluster(
-            case_name="foo", docket=docket, date_filed=last_month
-        )
-        self.doc_cluster.save(index=False)
-        opinion = Opinion(cluster=self.doc_cluster, type="Lead Opinion")
-        opinion.save(index=False)
-
-        opinion2 = Opinion(cluster=self.doc_cluster, type="Concurrence")
-        opinion2.save(index=False)
-
-        OpinionsCited.objects.create(
-            citing_opinion=opinion2, cited_opinion=opinion
-        )
-
-        # Scrape the audio "site" and add its contents
-        site = test_oral_arg_scraper.Site().parse()
-        with mock.patch(
-            "cl.lib.storage.get_name_by_incrementing",
-            side_effect=clobbering_get_name,
-        ):
-            OralArgumentCommand().scrape_court(site, full_crawl=True)
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.court = CourtFactory.create()
-
-    def tearDown(self) -> None:
-        OpinionCluster.objects.all().delete()
-        Docket.objects.all().delete()
-        Audio.objects.all().delete()
-        try:
-            shutil.rmtree(self.tmp_data_dir)
-        except OSError:
-            pass
-
-    @override_settings(BULK_DATA_DIR=tmp_data_dir)
-    def test_make_all_bulk_files(self) -> None:
-        """Can we successfully generate all bulk files?"""
-        call_command("cl_make_bulk_data")
-
-    def test_database_has_objects_for_bulk_export(self) -> None:
-        # This is a very weird test. It's essentially just testing the
-        # setUp function, which...OK?
-        self.assertTrue(Opinion.objects.count() > 0, "No opinions exist")
-        self.assertTrue(
-            OpinionsCited.objects.count() > 0, "No citations exist"
-        )
-        self.assertTrue(Audio.objects.count() > 0, "No audio exist")
-        self.assertTrue(Docket.objects.count() > 0, "No docket exist")
-        self.assertTrue(Court.objects.count() > 0, "No courts exist")
-        self.assertEqual(
-            Court.objects.get(pk=self.court.id).full_name, self.court.full_name
-        )
