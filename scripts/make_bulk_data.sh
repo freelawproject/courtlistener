@@ -41,12 +41,13 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY search_docket (
 	       id, date_created, date_modified, source, appeal_from_str,
 	       assigned_to_str, referred_to_str, panel_str, date_cert_granted,
-	       date_cert_denied, date_argued, date_reargued, date_reargument_denied,
-	       date_filed, date_terminated, date_last_filing, case_name_short,
-	       case_name, case_name_full, slug, docket_number, docket_number_core,
-	       pacer_case_id, cause, nature_of_suit, jury_demand, jurisdiction_type,
+	       date_cert_denied, date_argued, date_reargued,
+	       date_reargument_denied, date_filed, date_terminated,
+	       date_last_filing, case_name_short, case_name, case_name_full, slug,
+	       docket_number, docket_number_core, pacer_case_id, cause,
+	       nature_of_suit, jury_demand, jurisdiction_type,
 	       appellate_fee_status, appellate_case_type_information, mdl_status,
-	       filepath_local, filepath_ia, filepath_ia_json, date_blocked, blocked,
+	       filepath_ia, filepath_ia_json, date_blocked, blocked,
 	       appeal_from_id, assigned_to_id, court_id, idb_data_id,
 	       originating_court_information_id, referred_to_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
@@ -67,7 +68,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       scdb_votes_minority, source, procedural_history, attorneys,
 	       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
 	       history, other_dates, cross_reference, correction, citation_count,
-	       precedential_status, date_blocked, blcoked, docket_id
+	       precedential_status, date_blocked, blocked, docket_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
@@ -142,7 +143,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       name_middle, name_last, name_suffix, date_dob, date_granularity_dob,
 	       date_dod, date_granularity_dod, dob_city, dob_state, dob_country,
 	       dod_city, dod_state, dod_country, gender, religion, ftm_total_received,
-	       ftn_eid, has_photo, is_alias_of_id
+	       ftm_eid, has_photo, is_alias_of_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
@@ -191,7 +192,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY people_db_retentionevent (
 	       id, date_created, date_modified, retention_type, date_retention,
-	       votes_yes, votes_no, vote_yes_percent, votes_no_percent, unopposed, won
+	       votes_yes, votes_no, votes_yes_percent, votes_no_percent, unopposed, won
 	       position_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
