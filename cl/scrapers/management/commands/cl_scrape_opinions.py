@@ -112,8 +112,7 @@ def make_objects(
 
     url = item["download_urls"]
     if court.id == "tax":
-        url = url.split("&")[0]
-        pass
+        url = ""
 
     opinion = Opinion(
         type=Opinion.COMBINED,

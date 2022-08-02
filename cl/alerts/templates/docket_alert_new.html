@@ -16,7 +16,7 @@
   {% endif %}
   <script type="text/javascript">
     // Set this variable for the docket alerts script to find
-    var userAlertAcount = {{ user.docket_alerts.count|default:"0" }};
+    var userAlertAcount = {{ user.docket_alerts.subscriptions.count|default:"0" }};
   </script>
   <script defer type="text/javascript"
           src="{% static "js/docket_alerts.js" %}"></script>
