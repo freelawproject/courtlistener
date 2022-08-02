@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib import sitemaps
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 
-from cl.search.models import Docket, OpinionCluster
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, OpinionCluster
 
 
 class OpinionSitemap(sitemaps.Sitemap):
@@ -12,9 +12,25 @@ class OpinionSitemap(sitemaps.Sitemap):
     limit = 50_000
 
     def items(self) -> QuerySet:
-        return OpinionCluster.objects.only(
-            "date_modified", "pk", "slug"
-        ).order_by("pk")
+        # Unblocked precedential cases that are published in the last 75 years
+        # and that have at least one citation, or that were published in the
+        # last ten years and not yet cited.
+        new_or_popular = Q(citation_count__gte=1) | Q(
+            date_filed__gt=datetime.today() - timedelta(days=365 * 10)
+        )
+        return (
+            OpinionCluster.objects.filter(
+                new_or_popular,
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                blocked=False,
+                date_filed__gt=datetime.today() - timedelta(days=365 * 75),
+            )
+            .only("date_modified", "pk", "slug")
+            .order_by("pk")
+        )
+
+    def lastmod(self, obj: OpinionCluster) -> datetime:
+        return obj.date_modified
 
     def lastmod(self, obj: OpinionCluster) -> datetime:
         return obj.date_modified
