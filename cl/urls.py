@@ -2,14 +2,19 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps import views as sitemaps_views
-from django.urls import include, path, re_path, register_converter
+from django.urls import include, path, register_converter
 from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
 
 from cl.audio.sitemap import AudioSitemap
 from cl.disclosures.sitemap import DisclosureSitemap
 from cl.lib.converters import BlankSlugConverter
-from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
+from cl.opinion_page.sitemap import (
+    BlockedDocketSitemap,
+    BlockedOpinionSitemap,
+    DocketSitemap,
+    OpinionSitemap,
+)
 from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.sitemap import SimpleSitemap
@@ -26,6 +31,8 @@ sitemaps = {
     "disclosures": DisclosureSitemap,
     "visualizations": VizSitemap,
     "simple": SimpleSitemap,
+    "blocked-dockets": BlockedDocketSitemap,
+    "blocked-opinions": BlockedOpinionSitemap,
 }
 
 urlpatterns = [
