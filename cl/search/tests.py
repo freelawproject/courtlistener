@@ -33,7 +33,7 @@ from cl.search.factories import CourtFactory
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Court,
@@ -814,7 +814,9 @@ class RelatedSearchTest(IndexedSolrTestCase):
         }
 
         # disable all status filters (otherwise results do not match detail page)
-        params.update({f"stat_{v}": "on" for s, v in DOCUMENT_STATUSES})
+        params.update(
+            {f"stat_{v}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
+        )
 
         r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
