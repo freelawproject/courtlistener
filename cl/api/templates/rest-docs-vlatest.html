@@ -979,6 +979,11 @@ PACER_TO_CL_IDS = {
       <li><strong><code>query</code></strong> &mdash; The URL parameters you would get when creating the alert on the front end.</li>
       <li><strong><code>rate</code></strong> &mdash; How frequently you want your alert query to be checked and alert emails to be sent.</li>
     </ul>
+    <p>Here's an example of making an alert realtime (<code>rt</code>) instead of weekly (<code>wly</code>).</p>
+    <pre class="scrollable">curl -X PATCH \
+  --data rate=rt \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-detail" version="v3" pk=9999 %}"</pre>
     <p>As always, for more details place an <code>OPTIONS</code> request to the endpoint.</p>
 
     <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
