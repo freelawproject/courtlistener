@@ -88,11 +88,26 @@ class PodcastTest(IndexedSolrTestCase):
 
 
 class AudioSitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        AudioWithParentsFactory.create(
+            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
+            duration=1,
+            blocked=True,
+        )
+        AudioWithParentsFactory.create(
+            local_path_mp3__data=ONE_SECOND_MP3_BYTES,
+            local_path_original_file__data=ONE_SECOND_MP3_BYTES,
+            duration=1,
+            blocked=False,
+        )
+
     def setUp(self) -> None:
-        self.item_qs = Audio.objects.all()
+        self.expected_item_count = 1
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.ORAL_ARGUMENT}
         )
 
     def test_does_the_sitemap_have_content(self) -> None:
-        super(AudioSitemapTest, self).assert_sitemap_has_content()
+        super().assert_sitemap_has_content()

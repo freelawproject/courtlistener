@@ -32,6 +32,7 @@ class SimpleSitemap(sitemaps.Sitemap):
                 "citation_homepage", priority=0.6, changefreq="never"
             ),
             make_url_dict("coverage", priority=0.4),
+            make_url_dict("coverage_fds", priority=0.4),
             make_url_dict("feeds_info", priority=0.4, changefreq="never"),
             make_url_dict("podcasts", priority=0.6, changefreq="never"),
             make_url_dict("contribute", priority=0.6, changefreq="never"),
@@ -43,6 +44,9 @@ class SimpleSitemap(sitemaps.Sitemap):
             make_url_dict("donation_help", priority=0.4, changefreq="monthly"),
             make_url_dict("delete_help", priority=0.3, changefreq="monthly"),
             make_url_dict("advanced_search", priority=0.5),
+            make_url_dict(
+                "recap_email_help", priority=0.5, changefreq="monthly"
+            ),
             # Search
             make_url_dict("advanced_o", priority=0.7, changefreq="weekly"),
             make_url_dict("advanced_r", priority=0.7, changefreq="weekly"),
