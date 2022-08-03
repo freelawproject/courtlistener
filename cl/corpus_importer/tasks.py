@@ -71,7 +71,6 @@ from cl.lib.pacer import (
 from cl.lib.pacer_session import (
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
-    refresh_pacer_cookies,
 )
 from cl.lib.recap_utils import (
     get_bucket_name,
@@ -616,10 +615,11 @@ def get_and_process_free_pdf(
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")
         # Refresh cookies before retrying
-        refresh_pacer_cookies(
+        get_or_cache_pacer_cookies(
             "pacer_scraper",
             username=settings.PACER_USERNAME,
             password=settings.PACER_PASSWORD,
+            refresh=True,
         )
         raise self.retry(exc=exc)
     except (ReadTimeoutError, requests.RequestException) as exc:

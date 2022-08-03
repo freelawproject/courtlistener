@@ -36,6 +36,7 @@ def get_or_cache_pacer_cookies(
     username: str,
     password: str,
     client_code: str = None,
+    refresh: bool = False,
 ) -> RequestsCookieJar:
     """Get PACER cookies for a user or create and cache fresh ones
 
@@ -52,16 +53,17 @@ def get_or_cache_pacer_cookies(
     :param username: The PACER username of the user
     :param password: The PACER password of the user
     :param client_code: The PACER client code of the user
+    :param refresh: If True, refresh the cookies even if they're already cached
     :return: Cookies for the PACER user
     """
     r = make_redis_interface("CACHE", decode_responses=False)
     cookies = get_pacer_cookie_from_cache(user_pk, r=r)
     ttl_seconds = r.ttl(session_key % user_pk)
-    if cookies and ttl_seconds >= 300:
+    if cookies and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
         return cookies
 
-    # Unable to find cookies in cache, or they close to expire.
+    # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.
     cookies = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
@@ -82,27 +84,3 @@ def get_pacer_cookie_from_cache(user_pk: Union[str, int], r: Redis = None):
     pickled_cookie = r.get(session_key % user_pk)
     if pickled_cookie:
         return pickle.loads(pickled_cookie)
-
-
-def refresh_pacer_cookies(
-    user_pk: Union[str, int],
-    username: str,
-    password: str,
-    client_code: str = None,
-) -> RequestsCookieJar:
-    """Refresh PACER cookies for a user.
-
-    :param user_pk: The PK of the user attempting to store their credentials.
-    Needed to create the key in Redis.
-    :param username: The PACER username of the user
-    :param password: The PACER password of the user
-    :param client_code: The PACER client code of the user
-    :return: Cookies for the PACER user
-    """
-
-    r = make_redis_interface("CACHE", decode_responses=False)
-    cookies = log_into_pacer(username, password, client_code)
-    cookie_expiration = 60 * 60
-
-    r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
-    return cookies
