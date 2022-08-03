@@ -156,7 +156,7 @@ PGPASSWORD=$DB_PASSWORD psql \
 	--command \
 	  'set statement_timeout to 0;
 	   COPY people_db_school (
-	       id, date_created, date_modified, name, ein, is_alias_of_id,
+	       id, date_created, date_modified, name, ein, is_alias_of_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
@@ -192,8 +192,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	  'set statement_timeout to 0;
 	   COPY people_db_retentionevent (
 	       id, date_created, date_modified, retention_type, date_retention,
-	       votes_yes, votes_no, votes_yes_percent, votes_no_percent, unopposed, won
-	       position_id
+	       votes_yes, votes_no, votes_yes_percent, votes_no_percent, unopposed,
+	       won, position_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
 	--host $DB_HOST \
 	--username $DB_USER \
