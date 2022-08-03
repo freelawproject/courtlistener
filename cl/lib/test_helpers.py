@@ -2,7 +2,6 @@ from typing import Sized, cast
 
 import scorched
 from django.conf import settings
-from django.db.models import QuerySet
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
@@ -109,7 +108,7 @@ class IndexedSolrTestCase(SolrTestCase):
 class SitemapTest(TestCase):
 
     sitemap_url: str
-    item_qs: QuerySet
+    expected_item_count: int
 
     def assert_sitemap_has_content(self) -> None:
         """Does content get into the sitemap?"""
@@ -129,11 +128,15 @@ class SitemapTest(TestCase):
                 ),
             )
         )
-        expected_item_count = self.item_qs.count()
+        self.assertGreater(
+            self.expected_item_count,
+            0,
+            msg="Didn't get any content in test case.",
+        )
         self.assertEqual(
             node_count,
-            expected_item_count,
+            self.expected_item_count,
             msg="Did not get the right number of items in the sitemap.\n"
-            "\tCounted:\t%s\n"
-            "\tExpected:\t%s" % (node_count, expected_item_count),
+            f"\tCounted:\t{node_count}\n"
+            f"\tExpected:\t{self.expected_item_count}",
         )
