@@ -6,7 +6,7 @@ from django.urls import include, path, register_converter
 from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
 
-from cl.audio.sitemap import AudioSitemap
+from cl.audio.sitemap import AudioSitemap, BlockedAudioSitemap
 from cl.disclosures.sitemap import DisclosureSitemap
 from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import (
@@ -31,6 +31,7 @@ sitemaps = {
     "disclosures": DisclosureSitemap,
     "visualizations": VizSitemap,
     "simple": SimpleSitemap,
+    "blocked-audio": BlockedAudioSitemap,
     "blocked-dockets": BlockedDocketSitemap,
     "blocked-opinions": BlockedOpinionSitemap,
 }
