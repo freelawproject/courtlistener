@@ -2,7 +2,6 @@ from typing import Sized, cast
 
 import scorched
 from django.conf import settings
-from django.db.models import QuerySet
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
