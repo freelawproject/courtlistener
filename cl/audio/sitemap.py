@@ -24,14 +24,10 @@ class BlockedAudioSitemap(sitemaps.Sitemap):
     priority = 0.6
 
     def items(self) -> QuerySet:
-        return (
-            Audio.objects.filter(
-                blocked=True,
-                date_blocked__gt=datetime.today() - timedelta(days=30),
-            )
-            .order_by("pk")
-            .only("date_modified", "pk", "slug")
-        )
+        return Audio.objects.filter(
+            blocked=True,
+            date_blocked__gt=datetime.today() - timedelta(days=30),
+        ).order_by("pk")
 
     def lastmod(self, obj: Audio) -> datetime:
         return obj.date_modified
