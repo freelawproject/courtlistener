@@ -52,7 +52,7 @@
                </div>
                <div class="col-xs-6 col-sm-6 col-md-4 text-right">
                  <button id="add-webhook" class="btn btn-primary btn-xs"
-                         hx-get="{% url 'webhooks-render-form' version="v3" format="html" %}"
+                         hx-get="{% url 'webhooks-render-form' format="html" %}"
                          hx-target="#webhooks-body">
                    <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
                </div>
@@ -71,7 +71,7 @@
                   </thead>
                   <tbody
                     hx-trigger="load, webhooksListChanged from:body"
-                    hx-get="{% url 'webhooks-list' version='v3' format="html" %}"
+                    hx-get="{% url 'webhooks-list' format="html" %}"
                     hx-target="this">
                   </tbody>
                 </table>

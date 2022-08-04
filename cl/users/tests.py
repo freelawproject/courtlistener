@@ -2875,7 +2875,7 @@ class WebhooksHTMXTests(APITestCase):
         cls.user_2 = UserFactory()
 
     def setUp(self) -> None:
-        self.webhook_path = reverse("webhooks-list", kwargs={"version": "v3"})
+        self.webhook_path = reverse("webhooks-list")
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
 
@@ -2913,7 +2913,7 @@ class WebhooksHTMXTests(APITestCase):
 
         webhook_path_list = reverse(
             "webhooks-list",
-            kwargs={"version": "v3", "format": "html"},
+            kwargs={"format": "html"},
         )
         # Get the webhooks for user_1
         response = self.client.get(webhook_path_list)
@@ -2937,7 +2937,7 @@ class WebhooksHTMXTests(APITestCase):
 
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "version": "v3", "format": "json"},
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
         )
 
         # Delete the webhook for user_1
@@ -2947,7 +2947,7 @@ class WebhooksHTMXTests(APITestCase):
 
         webhook_2_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "version": "v3", "format": "json"},
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
         )
 
         # user_2 tries to delete a user_1 webhook, it should fail
@@ -2956,7 +2956,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(webhooks.count(), 1)
 
     def test_webhook_detail(self) -> None:
-        """Can we get the details of an webhook?
+        """Can we get the details of a webhook?
         Avoid users from getting other users' webhooks.
         """
 
@@ -2966,7 +2966,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(webhooks.count(), 1)
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "version": "v3", "format": "html"},
+            kwargs={"pk": webhooks[0].pk, "format": "html"},
         )
 
         # Get the webhook detail for user_1
@@ -2986,7 +2986,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(webhooks.count(), 1)
         webhook_1_path_detail = reverse(
             "webhooks-detail",
-            kwargs={"pk": webhooks[0].pk, "version": "v3", "format": "json"},
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
         )
 
         # Update the webhook

@@ -16,11 +16,10 @@ from django.db.models import Count
 from django.http import (
     HttpRequest,
     HttpResponse,
-    HttpResponseForbidden,
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import render
 from django.template.defaultfilters import urlencode
 from django.urls import reverse
 from django.utils.timezone import now
@@ -33,7 +32,6 @@ from django.views.decorators.debug import (
 from django.views.decorators.http import require_http_methods
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -50,7 +48,6 @@ from cl.users.forms import (
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
-    WebhookForm,
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription

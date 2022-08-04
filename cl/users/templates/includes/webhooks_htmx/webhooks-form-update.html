@@ -1,4 +1,4 @@
-<form id="webhook-form" hx-put="{% url 'webhooks-detail' pk=webhook_id format="json" version='v3' %}"
+<form id="webhook-form" hx-put="{% url 'webhooks-detail' pk=webhook_id format="json" %}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% include "includes/webhooks_htmx/webhooks-form-common.html" %}
   <div class="modal-footer">

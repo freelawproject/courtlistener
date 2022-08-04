@@ -81,7 +81,6 @@ def get_docket_alert_recipients(
         except UserProfile.DoesNotExist:
             recap_email_user_does_not_exist_list.append(email_address)
             continue
-        email_address = user_profile.user.email
         docket_alert_exist = DocketAlert.objects.filter(
             docket_id=d_pk, user=user_profile.user
         ).exists()
@@ -99,7 +98,7 @@ def get_docket_alert_recipients(
             docket_id=d_pk, user=user_profile.user, alert_type=alert_type
         )
         dar = DocketAlertRecipient(
-            email_address=email_address,
+            email_address=user_profile.user.email,
             secret_key=docket_alert.secret_key,
             auto_subscribe=user_profile.auto_subscribe,
             first_email=True,
@@ -195,8 +194,7 @@ def send_alert_and_webhook(
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
 
-    docket_alert_messages = make_alert_messages(d, new_des, da_recipients)
-    messages = docket_alert_messages
+    messages = make_alert_messages(d, new_des, da_recipients)
     connection = get_connection()
     connection.send_messages(messages)
 
@@ -294,8 +292,8 @@ def send_docket_alert_webhooks(
         return
 
     webhook_recipients = User.objects.filter(
-            docket_alerts__docket_id=d_pk,
-            docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
+        docket_alerts__docket_id=d_pk,
+        docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
     ).distinct()
 
     webhooks = Webhook.objects.filter(
