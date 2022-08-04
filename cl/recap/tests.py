@@ -24,6 +24,8 @@ from rest_framework.status import (
 from rest_framework.test import APIClient
 
 from cl.alerts.models import DocketAlert
+from cl.api.factories import WebhookFactory
+from cl.api.models import WebhookEvent, WebhookEventType
 from cl.lib.pacer import is_pacer_court_accessible
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -1859,6 +1861,14 @@ def mock_bucket_open(message_id, r):
     return recap_mail_example
 
 
+class MockResponse:
+    """Mock a Request Response"""
+
+    def __init__(self, text, status_code):
+        self.text = text
+        self.status_code = status_code
+
+
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -1879,6 +1889,12 @@ class RecapEmailDocketAlerts(TestCase):
         cls.user_profile = UserProfileFactory()
         cls.user_profile_2 = UserProfileFactory()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.webhook = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
             open(
@@ -1940,8 +1956,16 @@ class RecapEmailDocketAlerts(TestCase):
         recipient_user_2.save()
         self.recipient_user_2 = recipient_user_2
 
+    @mock.patch(
+        "cl.alerts.tasks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+    )
     def test_new_recap_email_case_auto_subscription(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_post,
     ):
         """This test verifies that if a new recap.email notification comes in
         (first time) and the user has the auto-subscribe option enabled, a new
@@ -1975,6 +1999,17 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Webhook should be triggered
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        content = webhook_triggered.first().content
+        # Compare the content of the webhook to the recap document
+        pacer_doc_id = content["results"][0]["recap_documents"][0][
+            "pacer_doc_id"
+        ]
+        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     def test_new_recap_email_case_auto_subscription_prev_user(
         self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
@@ -2030,8 +2065,16 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
         self.assertEqual(len(mail.outbox), 4)
 
+    @mock.patch(
+        "cl.alerts.tasks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+    )
     def test_new_recap_email_case_no_auto_subscription(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_post,
     ):
         """This test verifies that if a new recap.email notification comes in
         and the user has auto-subscribe option disabled an Unsubscription
@@ -2067,6 +2110,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         self.assertIn("[Sign-Up Needed]:", message.subject)
+
+        # No webhook should be triggered
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 0)
 
     def test_new_recap_email_case_no_auto_subscription_prev_user(
         self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies

@@ -1,6 +1,6 @@
 <form id="webhook-form" hx-put="{% url 'webhooks-detail' pk=webhook_id format="json" version='v3' %}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-  {% include "includes/webhooks-form-common.html" %}
+  {% include "includes/webhooks_htmx/webhooks-form-common.html" %}
   <div class="modal-footer">
     <p>
       <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>

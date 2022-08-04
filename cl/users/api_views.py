@@ -32,7 +32,8 @@ class WebhooksViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         webhooks = self.get_queryset()
         return Response(
-            {"webhooks": webhooks}, template_name="includes/webhooks-list.html"
+            {"webhooks": webhooks},
+            template_name="includes/webhooks_htmx/webhooks-list.html",
         )
 
     def destroy(self, request, *args, **kwargs):
@@ -49,7 +50,7 @@ class WebhooksViewSet(ModelViewSet):
         form = WebhookForm(update, request.user, instance=instance)
         return Response(
             {"webhook_form": form, "webhook_id": instance.pk},
-            template_name="includes/webhooks-form-update.html",
+            template_name="includes/webhooks_htmx/webhooks-form-update.html",
         )
 
     def create(self, request, *args, **kwargs):
@@ -68,7 +69,7 @@ class WebhooksViewSet(ModelViewSet):
         else:
             return render(
                 request,
-                "includes/webhooks-form-create.html",
+                "includes/webhooks_htmx/webhooks-form-create.html",
                 {"webhook_form": form},
             )
 
@@ -88,7 +89,7 @@ class WebhooksViewSet(ModelViewSet):
         else:
             return render(
                 request,
-                "includes/webhooks-form-update.html",
+                "includes/webhooks_htmx/webhooks-form-update.html",
                 {"webhook_form": form, "webhook_id": instance.pk},
             )
 
@@ -99,5 +100,5 @@ class WebhooksViewSet(ModelViewSet):
         form = WebhookForm(update, request.user, instance=webhook)
         return Response(
             {"webhook_form": form},
-            template_name="includes/webhooks-form-create.html",
+            template_name="includes/webhooks_htmx/webhooks-form-create.html",
         )

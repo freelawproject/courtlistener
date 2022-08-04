@@ -1,12 +1,15 @@
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Tuple, Union, cast
 
 import requests
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db.models import QuerySet
 from django.template import loader
 from django.utils.timezone import now
+from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.models import DocketAlert
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
@@ -30,42 +33,51 @@ def enqueue_docket_alert(d_pk: int) -> bool:
     return create_redis_semaphore("ALERTS", key, ttl=60 * 10)
 
 
+@dataclass
+class DocketAlertRecipient:
+    email_address: str
+    secret_key: str
+    auto_subscribe: bool
+    first_email: bool
+
+
 def get_docket_alert_recipients(
     d_pk: int,
-    recap_email_recipients: list[str] = [],
-) -> tuple[
-    list[tuple[str, str]],
-    list[tuple[str, str]],
-    list[tuple[str, str]],
-    list[str],
-]:
+    recap_email_recipients: list[str],
+) -> tuple[list[DocketAlertRecipient], list[str]]:
     """Get the notification's recipients for a docket alert.
+
     :param d_pk: Docket primary key
     :param recap_email_recipients: List of @recap.email addresses to send the
     notification to.
-    :return: A Tuple of lists of tuples (email_address, secret_key) and a list
-    of @recap.email addresses that don't belong to any user if any.
+    :return: A list of DocketAlertRecipients objects and a list of @recap.email
+     addresses that don't belong to any user if any.
     """
 
-    # Lists of tuples (email_address, docket_alert.secret_key)
-    docket_alert_recipients_list = []
-    recap_email_first_time_auto_subscribe_list = []
-    recap_email_first_time_no_auto_subscribe_list = []
+    # List of DocketAlertRecipient objects
+    da_recipients_list = []
     # List of @recap.email addresses that don't belong to any user
     recap_email_user_does_not_exist_list = []
 
     # First, get current docket alert recipients to avoid duplicate alerts
-    docket_alerts_current_subscribers = DocketAlert.objects.filter(
-        docket_id=d_pk, alert_type=DocketAlert.SUBSCRIPTION
-    )
+    docket_alerts_current_subscribers = DocketAlert.objects.select_related(
+        "user"
+    ).filter(docket_id=d_pk, alert_type=DocketAlert.SUBSCRIPTION)
     for da in docket_alerts_current_subscribers:
-        recipient_tuple = (da.user.email, da.secret_key)
-        docket_alert_recipients_list.append(recipient_tuple)
+        dar = DocketAlertRecipient(
+            email_address=da.user.email,
+            secret_key=da.secret_key,
+            auto_subscribe=False,
+            first_email=False,
+        )
+        da_recipients_list.append(dar)
 
     # Get recap email recipients and create new docket alerts objects
     for email_address in recap_email_recipients:
         try:
-            user_profile = UserProfile.objects.get(recap_email=email_address)
+            user_profile = UserProfile.objects.select_related("user").get(
+                recap_email=email_address
+            )
         except UserProfile.DoesNotExist:
             recap_email_user_does_not_exist_list.append(email_address)
             continue
@@ -77,47 +89,35 @@ def get_docket_alert_recipients(
             # If a docket alert exists for this @recap.email user, avoid
             # sending the first email
             continue
-        if user_profile.auto_subscribe:
-            # First time recipient, auto_subscribe True
-            docket_alert = DocketAlert.objects.create(
-                docket_id=d_pk, user=user_profile.user
-            )
-            recipient_tuple = (email_address, docket_alert.secret_key)
-            recap_email_first_time_auto_subscribe_list.append(recipient_tuple)
-        else:
-            # First time recipient, auto_subscribe False
-            docket_alert = DocketAlert.objects.create(
-                docket_id=d_pk,
-                user=user_profile.user,
-                alert_type=DocketAlert.UNSUBSCRIPTION,
-            )
-            recipient_tuple = (email_address, docket_alert.secret_key)
-            recap_email_first_time_no_auto_subscribe_list.append(
-                recipient_tuple
-            )
-    return (
-        docket_alert_recipients_list,
-        recap_email_first_time_auto_subscribe_list,
-        recap_email_first_time_no_auto_subscribe_list,
-        recap_email_user_does_not_exist_list,
-    )
+
+        alert_type = (
+            DocketAlert.SUBSCRIPTION
+            if user_profile.auto_subscribe
+            else DocketAlert.UNSUBSCRIPTION
+        )
+        docket_alert = DocketAlert.objects.create(
+            docket_id=d_pk, user=user_profile.user, alert_type=alert_type
+        )
+        dar = DocketAlertRecipient(
+            email_address=email_address,
+            secret_key=docket_alert.secret_key,
+            auto_subscribe=user_profile.auto_subscribe,
+            first_email=True,
+        )
+        da_recipients_list.append(dar)
+    return da_recipients_list, recap_email_user_does_not_exist_list
 
 
 def make_alert_messages(
     d: Docket,
     new_des: QuerySet,
-    recipients: list[tuple[str, str]],
-    first_email: bool,
-    auto_subscribe: bool,
+    da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
 
     :param d: The docket to work on
     :param new_des: The new docket entries
-    :param recipients: A list of user email and secret_key tuples to send to
-    :param first_email: Whether this is the first email for this docket
-    :param auto_subscribe: Whether this is the first time the user has received
-    a notification for this docket
+    :param da_recipients: A list of DocketAlertRecipients objects
     :return: A list of email messages to send
     """
 
@@ -129,27 +129,26 @@ def make_alert_messages(
         "docket": d,
         "count": new_des.count(),
         "case_name": case_name,
-        "first_email": first_email,
-        "auto_subscribe": auto_subscribe,
     }
     email_context = {
         "new_des": new_des,
         "docket": d,
         "docket_alert_secret_key": None,
-        "first_email": first_email,
-        "auto_subscribe": auto_subscribe,
     }
-
     messages = []
-    for recipient_tuple in recipients:
-        email_context["docket_alert_secret_key"] = recipient_tuple[1]
+    for recipient in da_recipients:
+        email_context["docket_alert_secret_key"] = recipient.secret_key
+        email_context["first_email"] = recipient.first_email
+        subject_context["first_email"] = recipient.first_email
+        email_context["auto_subscribe"] = recipient.auto_subscribe
+        subject_context["auto_subscribe"] = recipient.auto_subscribe
         subject = subject_template.render(subject_context).strip()  # Remove
         # newlines that editors can insist on adding.
         msg = EmailMultiAlternatives(
             subject=subject,
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
-            to=[recipient_tuple[0]],
+            to=[recipient.email_address],
             headers={f"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
         )
         html = html_template.render(email_context)
@@ -163,7 +162,7 @@ def make_alert_messages(
 def send_alert_and_webhook(
     d_pk: int,
     since: datetime,
-    recap_email_recipients: list[str] = [],
+    recap_email_recipients: list[str] = None,
 ) -> None:
     """Send an alert and webhook for a given docket
 
@@ -174,21 +173,17 @@ def send_alert_and_webhook(
     :return: None
     """
 
-    (
-        docket_alert_recipients,
-        recap_email_auto_subscribe_recipients,
-        recap_email_no_auto_recipients,
-        recap_email_user_does_not_exist_list,
-    ) = get_docket_alert_recipients(d_pk, recap_email_recipients)
+    if recap_email_recipients is None:
+        recap_email_recipients = []
 
-    if recap_email_user_does_not_exist_list:
-        send_recap_email_user_not_found(recap_email_user_does_not_exist_list)
+    da_recipients, re_user_does_not_exist_list = get_docket_alert_recipients(
+        d_pk, recap_email_recipients
+    )
 
-    if (
-        not docket_alert_recipients
-        and not recap_email_auto_subscribe_recipients
-        and not recap_email_no_auto_recipients
-    ):
+    if re_user_does_not_exist_list:
+        send_recap_email_user_not_found(re_user_does_not_exist_list)
+
+    if not da_recipients:
         # Nobody subscribed to the docket.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -200,33 +195,8 @@ def send_alert_and_webhook(
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
 
-    docket_alert_messages = make_alert_messages(
-        d,
-        new_des,
-        docket_alert_recipients,
-        first_email=False,
-        auto_subscribe=False,
-    )
-    re_first_time_auto_subscribe_messages = make_alert_messages(
-        d,
-        new_des,
-        recap_email_auto_subscribe_recipients,
-        first_email=True,
-        auto_subscribe=True,
-    )
-    re_first_time_no_auto_subscribe_messages = make_alert_messages(
-        d,
-        new_des,
-        recap_email_no_auto_recipients,
-        first_email=True,
-        auto_subscribe=False,
-    )
-
-    messages = (
-        docket_alert_messages
-        + re_first_time_auto_subscribe_messages
-        + re_first_time_no_auto_subscribe_messages
-    )
+    docket_alert_messages = make_alert_messages(d, new_des, da_recipients)
+    messages = docket_alert_messages
     connection = get_connection()
     connection.send_messages(messages)
 
@@ -234,15 +204,8 @@ def send_alert_and_webhook(
     tally_stat("alerts.docket.alerts.sent", inc=len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Webhooks recipients are handled separately, send it to current docket
-    # alerts recipients + first time recap.email recipients with auto_subscribe
-    # set to true.
-    webhook_recipients = (
-        docket_alert_recipients + recap_email_auto_subscribe_recipients
-    )
     # Send the docket to webhook
-    webhook_email_recipients = [email[0] for email in webhook_recipients]
-    send_docket_to_webhook.delay(d_pk, since, webhook_email_recipients)
+    send_docket_alert_webhooks.delay(d_pk, since)
     delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 
@@ -312,16 +275,14 @@ def send_unsubscription_confirmation(
 
 
 @app.task()
-def send_docket_to_webhook(
+def send_docket_alert_webhooks(
     d_pk: int,
     since: datetime,
-    webhook_recipients: list[str],
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s)
 
     :param d_pk: The Docket primary key
     :param since: Start time for querying the docket entries
-    :webhook_recipients: The list of email recipients to send the webhook to
     :return: None
     """
 
@@ -332,9 +293,14 @@ def send_docket_to_webhook(
         # No new docket entries.
         return
 
+    webhook_recipients = User.objects.filter(
+            docket_alerts__docket_id=d_pk,
+            docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
+    ).distinct()
+
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
-        user__email__in=webhook_recipients,
+        user__in=webhook_recipients,
         enabled=True,
     )
 
@@ -348,17 +314,25 @@ def send_docket_to_webhook(
                 "event_type": webhook.event_type,
                 "version": webhook.version,
                 "date_created": webhook.date_created.isoformat(),
+                "deprecation_date": None,
             },
             "results": serialized_docket_entries,
         }
-        response = requests.post(webhook.url, json=post_content, timeout=2)
+        renderer = JSONRenderer()
+        json_str = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        ).decode()
+        headers = {"Content-type": "application/json"}
+        response = requests.post(
+            webhook.url, data=json_str, timeout=2, headers=headers
+        )
         WebhookEvent.objects.create(
             webhook=webhook,
             status_code=response.status_code,
             content=post_content,
             response=response.text,
         )
-
         if not response.ok:
             webhook.failure_count = webhook.failure_count + 1
             webhook.save()
