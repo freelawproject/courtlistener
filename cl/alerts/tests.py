@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core import mail
@@ -18,8 +19,10 @@ from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
 from cl.alerts.models import Alert, DocketAlert
-from cl.alerts.tasks import send_docket_alert
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.alerts.tasks import send_alert_and_webhook
+from cl.api.factories import WebhookFactory
+from cl.api.models import WebhookEvent, WebhookEventType
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
@@ -87,10 +90,29 @@ class AlertTest(TestCase):
         self.assertEqual(self.alert.rate, new_rate)
 
 
+class MockResponse:
+    """Mock a Request Response"""
+
+    def __init__(self, text, status_code):
+        self.text = text
+        self.status_code = status_code
+
+
 class DocketAlertTest(TestCase):
     """Do docket alerts work properly?"""
 
-    fixtures = ["test_court.json", "authtest_data.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+        cls.court = Court.objects.get(id="scotus")
+
+        # Create a DOCKET_ALERT webhook
+        cls.webhook = WebhookFactory(
+            user=cls.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
 
     def setUp(self) -> None:
         self.before = now()
@@ -104,7 +126,7 @@ class DocketAlertTest(TestCase):
         )
 
         # Add an alert for it
-        DocketAlert.objects.create(docket=self.docket, user_id=1001)
+        DocketAlert.objects.create(docket=self.docket, user=self.user)
 
         # Add a new docket entry to it
         de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
@@ -124,17 +146,35 @@ class DocketAlertTest(TestCase):
 
     def test_triggering_docket_alert(self) -> None:
         """Does the alert trigger when it should?"""
-        send_docket_alert(self.docket.pk, self.before)
+        send_alert_and_webhook(self.docket.pk, self.before)
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
         """Do we avoid sending alerts for timers after the de was created?"""
-        send_docket_alert(self.docket.pk, self.after)
+        send_alert_and_webhook(self.docket.pk, self.after)
 
         # Do zero emails go out? None should.
         self.assertEqual(len(mail.outbox), 0)
+
+    @mock.patch(
+        "cl.alerts.tasks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+    )
+    def test_triggering_docket_webhook(self, mock_post) -> None:
+        """Does the docket alert trigger the DocketAlert Webhook?"""
+        send_alert_and_webhook(self.docket.pk, self.before)
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        content = webhook_triggered.first().content
+        # Compare the content of the webhook to the recap document
+        pacer_doc_id = content["results"][0]["recap_documents"][0][
+            "pacer_doc_id"
+        ]
+        self.assertEqual("232322332", pacer_doc_id)
 
 
 class DisableDocketAlertTest(TestCase):

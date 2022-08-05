@@ -15,7 +15,7 @@ from django.urls import reverse
 from localflavor.us.forms import USStateField, USZipCodeField
 from localflavor.us.us_states import STATE_CHOICES
 
-from cl.api.models import Webhook
+from cl.api.models import Webhook, WebhookEventType
 from cl.lib.types import EmailType
 from cl.users.models import UserProfile
 from cl.users.utils import emails
@@ -321,11 +321,37 @@ class CustomSetPasswordForm(SetPasswordForm):
 
 
 class WebhookForm(ModelForm):
+    def __init__(self, update=None, request_user=None, *args, **kwargs):
+        super(WebhookForm, self).__init__(*args, **kwargs)
+
+        # Determine the webhook type options to show accordingly.
+        if update:
+            # If we're updating an existing webhook, we only want to show the
+            # webhook type that matches the current webhook.
+            instance_type = [
+                i
+                for i in WebhookEventType.choices
+                if i[0] == self.instance.event_type
+            ]
+            self.fields["event_type"].choices = instance_type
+            self.fields["event_type"].widget.attrs["readonly"] = True
+        else:
+            # If we're creating a new webhook, show the webhook type options
+            # that are available for the user. One webhook for each event type
+            # is allowed.
+            webhooks = request_user.webhooks.all()
+            used_types = [w.event_type for w in webhooks]
+            available_choices = [
+                i for i in WebhookEventType.choices if i[0] not in used_types
+            ]
+            self.fields["event_type"].choices = available_choices
+
     class Meta:
         model = Webhook
         fields = (
-            "event_type",
             "url",
+            "event_type",
+            "enabled",
         )
         widgets = {
             "event_type": forms.Select(
@@ -333,5 +359,8 @@ class WebhookForm(ModelForm):
             ),
             "url": forms.TextInput(
                 attrs={"class": "form-control"},
+            ),
+            "enabled": forms.CheckboxInput(
+                attrs={"class": "webhook-checkbox"},
             ),
         }

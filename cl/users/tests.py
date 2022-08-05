@@ -15,12 +15,19 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import HTTP_200_OK
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+    HTTP_404_NOT_FOUND,
+)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.api.models import Webhook, WebhookEventType
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import LiveServerTestCase, TestCase
+from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.utils import make_client
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -2857,3 +2864,139 @@ class MoosendTest(TestCase):
                 action,
                 self.email,
             )
+
+
+class WebhooksHTMXTests(APITestCase):
+    """Check that API CRUD operations are working well for search webhooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+    def setUp(self) -> None:
+        self.webhook_path = reverse("webhooks-list")
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        Webhook.objects.all().delete()
+
+    def make_a_webhook(
+        self,
+        client,
+        url="https://example.com",
+        event_type=WebhookEventType.DOCKET_ALERT,
+        enabled=True,
+    ):
+        data = {
+            "url": url,
+            "event_type": event_type,
+            "enabled": enabled,
+        }
+        return client.post(self.webhook_path, data)
+
+    def test_make_an_webhook(self) -> None:
+        """Can we make a webhook?"""
+
+        # Make a webhook
+        webhooks = Webhook.objects.all()
+        response = self.make_a_webhook(self.client)
+        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+    def test_list_users_webhooks(self) -> None:
+        """Can we list user's own webhooks?"""
+
+        # Make a webhook for user_1
+        self.make_a_webhook(self.client)
+
+        webhook_path_list = reverse(
+            "webhooks-list",
+            kwargs={"format": "html"},
+        )
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+    def test_delete_webhook(self) -> None:
+        """Can we delete a webhook?
+        Avoid users from deleting other users' webhooks.
+        """
+
+        # Make two webhooks for user_1
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.DOCKET_ALERT
+        )
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.SEARCH_ALERT
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 2)
+
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Delete the webhook for user_1
+        response = self.client.delete(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(webhooks.count(), 1)
+
+        webhook_2_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # user_2 tries to delete a user_1 webhook, it should fail
+        response = self.client_2.delete(webhook_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(webhooks.count(), 1)
+
+    def test_webhook_detail(self) -> None:
+        """Can we get the details of a webhook?
+        Avoid users from getting other users' webhooks.
+        """
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "html"},
+        )
+
+        # Get the webhook detail for user_1
+        response = self.client.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 webhook, it should fail
+        response = self.client_2.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_webhook_update(self) -> None:
+        """Can we update a webhook?"""
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Update the webhook
+        data_updated = {
+            "url": "https://example.com/updated",
+            "event_type": webhooks[0].event_type,
+            "enabled": webhooks[0].enabled,
+        }
+        response = self.client.put(webhook_1_path_detail, data_updated)
+
+        # Check that the webhook was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(webhooks[0].url, "https://example.com/updated")

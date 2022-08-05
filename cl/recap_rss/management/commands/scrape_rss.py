@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from celery.canvas import chain
 from django.utils.timezone import make_aware, now
 
-from cl.alerts.tasks import send_docket_alerts
+from cl.alerts.tasks import send_alerts_and_webhooks
 from cl.lib.command_utils import VerboseCommand
 from cl.recap_rss.models import RssFeedStatus
 from cl.recap_rss.tasks import (
@@ -149,7 +149,7 @@ class Command(VerboseCommand):
                         court.pk, new_status.pk, feed_status.date_last_build
                     ),
                     merge_rss_feed_contents.s(court.pk),
-                    send_docket_alerts.s(),
+                    send_alerts_and_webhooks.s(),
                     # Update recap *documents*, not *dockets*. Updating dockets
                     # requires much more work, and we don't expect to get much
                     # docket information from the RSS feeds. RSS feeds also

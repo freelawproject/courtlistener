@@ -51,7 +51,7 @@ from rest_framework.status import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
-from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
+from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
@@ -525,7 +525,7 @@ def process_free_opinion_result(
     if rd_created:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
 
     return {
         "result": result,

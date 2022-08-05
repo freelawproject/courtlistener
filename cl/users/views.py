@@ -32,7 +32,6 @@ from django.views.decorators.debug import (
 from django.views.decorators.http import require_http_methods
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -49,7 +48,6 @@ from cl.users.forms import (
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
-    WebhookForm,
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription
@@ -712,20 +710,14 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        instance = Webhook()
-        form = WebhookForm(request.POST, instance=instance)
-        if form.is_valid():
-            instance.user = request.user
-            form.save()
-            return HttpResponseRedirect(reverse("view_webhooks"))
-    else:
-        form = WebhookForm()
-
+    """Render the webhooks page"""
     return render(
         request,
         "profile/webhooks.html",
-        {"webhook_form": form, "private": True, "page": "api_webhooks"},
+        {
+            "private": True,
+            "page": "api_webhooks",
+        },
     )
 
 
