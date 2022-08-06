@@ -121,6 +121,11 @@ jobs:
     - name: Watch cl-celery-prefork-bulk rollout status
       run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
+    - name: Rollout cl-scrape-rss
+      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-scrape-rss
+    - name: Watch cl-scrape-rss rollout status
+      run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
+
     # Watch "cronjobs" in k9s
     - name: Update cronjobs
       run: |
