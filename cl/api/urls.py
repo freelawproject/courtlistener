@@ -132,14 +132,9 @@ router.register(
 router.register(r"alerts", alert_views.SearchAlertViewSet, basename="alert")
 
 API_TITLE = "CourtListener Legal Data API"
-schema_view = get_schema_view(
-    title=API_TITLE,
-    url="https://www.courtlistener.com/api/rest/v3/",
-    renderer_classes=[JSONOpenAPIRenderer],
-)
 
 
-urlpatterns = [
+urlpatterns_base = [
     path(
         "api-auth/",
         include("rest_framework.urls", namespace="rest_framework"),
@@ -151,7 +146,6 @@ urlpatterns = [
         views.deprecated_api,
         name="deprecated_core_api_schema",
     ),
-    path("api/swagger/", schema_view, name="swagger_schema"),
     # Documentation
     path("api/", views.api_index, name="api_index"),
     path("api/jurisdictions/", views.court_index, name="court_index"),
@@ -180,4 +174,15 @@ urlpatterns = [
         views.deprecated_api,
         name="deprecated_api",
     ),
+]
+
+schema_view = get_schema_view(
+    title=API_TITLE,
+    url="https://www.courtlistener.com/api/rest/v3/",
+    renderer_classes=[JSONOpenAPIRenderer],
+    patterns=urlpatterns_base,
+)
+
+urlpatterns = urlpatterns_base + [
+    path("api/swagger/", schema_view, name="swagger_schema"),
 ]
