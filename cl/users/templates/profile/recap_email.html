@@ -31,9 +31,12 @@
 
     <h2 class="v-offset-above-3">Your recap.email address</h2>
     <p>To use the system, simply add this email address as a secondary recipient in your CM/ECF account:</p>
+
+    {% spaceless %}
     <p class="alert-warning alert">
       <b>{{ request.user.profile.recap_email }}</b>
-    <p>
+    </p>
+    {%  endspaceless %}
     <p><a href="{% url "recap_email_help" %}#how-do-i-set-it-up" class="btn btn-lg btn-primary">Explain how</a></p>
 
     <h2 class="v-offset-above-3">Auto-Subscribe to your cases</h2>
