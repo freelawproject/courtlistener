@@ -1,16 +1,19 @@
 
-{% load text_filters %}{% load humanize %}**************************
-CourtListener Docket Alert
-**************************
+{% load text_filters %}{% load humanize %}
 {% if first_email and not auto_subscribe %}
 Your account on CourtListener just received its first email from PACER related to the case below.
 Your account has auto-subscribe turned off, so this is the only alert you will get for this case.
 Subscribe to this case to get ongoing updates:
+
 https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscribe" docket_alert_secret_key %}
 {% elif first_email and auto_subscribe %}
 Your account on CourtListener just received its first email from PACER related to the case below.
 You've been subscribed to this case because your account has auto-subscribe turned on.
 {% endif %}
+**************************
+CourtListener Docket Alert
+**************************
+
 {{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
 {{ docket.court }}
 ~~~
