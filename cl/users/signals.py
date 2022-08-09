@@ -1,6 +1,13 @@
-from django.dispatch import receiver
-from django_ses.signals import bounce_received, complaint_received
+from datetime import timedelta
 
+from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils.timezone import now
+from django_ses.signals import bounce_received, complaint_received
+from rest_framework.authtoken.models import Token
+
+from cl.lib.crypto import sha1_activation_key
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
@@ -82,6 +89,21 @@ def complaint_handler(
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
         Token.objects.create(user=instance)
+
+
+@receiver(
+    post_save,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="create_superuser_profile_object",
+)
+def superuser_creation(sender, instance, created, **kwargs):
+    # Create a profile whenever createsuperuser is run
+    if instance.is_superuser:
+        UserProfile.objects.create(
+            user=instance,
+            activation_key=sha1_activation_key(instance.username),
+            key_expires=now() + timedelta(days=5),
+        )
 
 
 @receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
