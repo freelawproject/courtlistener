@@ -74,7 +74,10 @@ x86_push:
 
 multiarch_push_development:
 	export DOCKER_CLI_EXPERIMENTAL=enabled
-	docker buildx rm
-	docker buildx create --use --name flp-builder
+	# Fix for #2116 as per https://github.com/docker/buildx/issues/495#issuecomment-761562905
+	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	docker buildx create --name flp-builder --driver docker-container --use
+	# Wait for the builder to boot
+	docker buildx inspect --bootstrap
 	docker buildx build --target web-dev --push --platform linux/amd64,linux/arm64 -t $(REPO):$(WEB_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
 	docker buildx build --target celery --push --platform linux/amd64,linux/arm64 -t $(REPO):$(CELERY_DEV) --build-arg BUILD_ENV=dev --file docker/django/Dockerfile .
