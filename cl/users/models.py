@@ -10,8 +10,6 @@ from django.core.exceptions import FieldError
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.db import models
 from django.db.models import Q, Sum, UniqueConstraint
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.utils.timezone import now
 from localflavor.us.models import USStateField
 
@@ -462,10 +460,3 @@ def generate_recap_email(user_profile: UserProfile, append: int = None) -> str:
     elif len(user_profiles_with_match) > 0:
         return generate_recap_email(user_profile, (append or 0) + 1)
     return recap_email
-
-
-@receiver(post_save, sender=UserProfile)
-def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
-    if created:
-        instance.recap_email = generate_recap_email(instance)
-        instance.save()

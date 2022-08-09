@@ -6,6 +6,7 @@ from cl.users.email_handlers import (
     handle_hard_bounce,
     handle_soft_bounce,
 )
+from cl.users.models import UserProfile, generate_recap_email
 
 
 def get_message_id(mail_obj: dict) -> str:
@@ -71,3 +72,20 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
+
+
+@receiver(
+    post_save,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="create_auth_token",
+)
+def create_auth_token(sender, instance=None, created=False, **kwargs):
+    if created:
+        Token.objects.create(user=instance)
+
+
+@receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
+def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+    if created:
+        instance.recap_email = generate_recap_email(instance)
+        instance.save()
