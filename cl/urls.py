@@ -38,7 +38,14 @@ sitemaps = {
 
 urlpatterns = [
     # Admin docs and site
+    path(
+        # Redirect admin login to our ratelimited version to reduce surface
+        # area and enforce ratelimiting.
+        "admin/login/",
+        RedirectView.as_view(url="/sign-in/", permanent=False),
+    ),
     path("admin/", admin.site.urls),
+    # App includes
     path("", include("cl.audio.urls")),
     path("", include("cl.corpus_importer.urls")),
     path("", include("cl.opinion_page.urls")),
