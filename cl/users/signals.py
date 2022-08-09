@@ -31,7 +31,7 @@ def get_message_id(mail_obj: dict) -> str:
     return ""
 
 
-@receiver(bounce_received)
+@receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """Receiver function to handle bounce notifications sent by Amazon SES via
     handle_event_webhook
@@ -65,7 +65,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 )
 
 
-@receiver(complaint_received)
+@receiver(complaint_received, dispatch_uid="complaint_handler")
 def complaint_handler(
     sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
 ):
