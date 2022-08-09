@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v2-beta
 
       - uses: actions/setup-python@v2
-        id: cp310
+        id: cp3106
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.10"
@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: .venv
-          key: venv-${{ runner.os }}-cache-${{ steps.cp310.outputs.version }}-${{ hashFiles('**/poetry.lock')}}-v20210414
+          key: venv-${{ runner.os }}-cache-${{ steps.cp3106.outputs.version }}-${{ hashFiles('**/poetry.lock')}}-v20210414
 
       - name: Install dependencies
         run: poetry install
