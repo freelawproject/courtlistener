@@ -2,6 +2,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from factory import Faker, LazyFunction, RelatedFactory, SubFactory
 from factory.django import DjangoModelFactory
+from pytz import utc
 
 from cl.users.models import EmailSent, UserProfile
 
@@ -39,4 +40,21 @@ class UserProfileFactory(DjangoModelFactory):
     class Meta:
         model = UserProfile
 
+    email_confirmed = True
+    key_expires = Faker(
+        "date_time_this_year",
+        before_now=False,
+        after_now=True,
+        tzinfo=utc,
+    )
+    activation_key = Faker(
+        "password",
+        length=40,
+        special_chars=False,
+        upper_case=False,
+        lower_case=False,
+    )
+
+
+class UserProfileWithParentsFactory(UserProfileFactory):
     user = SubFactory(UserFactory)
