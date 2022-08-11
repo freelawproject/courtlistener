@@ -98,7 +98,7 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
 )
 def superuser_creation(sender, instance, created, **kwargs):
     # Create a profile whenever createsuperuser is run
-    if instance.is_superuser:
+    if created and instance.is_superuser:
         UserProfile.objects.create(
             user=instance,
             activation_key=sha1_activation_key(instance.username),
