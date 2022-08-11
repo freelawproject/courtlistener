@@ -26,7 +26,7 @@ class SimpleUserDataMixin:
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUpTestData()
+        super().setUpTestData()  # type: ignore
 
 
 @override_settings(
