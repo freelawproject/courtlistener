@@ -1,6 +1,6 @@
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
-from factory import Faker, LazyFunction, SubFactory
+from factory import Faker, LazyFunction, RelatedFactory, SubFactory
 from factory.django import DjangoModelFactory
 
 from cl.users.models import EmailSent, UserProfile
@@ -20,10 +20,14 @@ class UserFactory(DjangoModelFactory):
     password = LazyFunction(lambda: make_password("password"))
     is_staff = False
     is_superuser = False
+    is_active = True
 
 
-class SuperUserFactory(UserFactory):
-    is_superuser = True
+class UserWithChildProfileFactory(UserFactory):
+    profile = RelatedFactory(
+        "cl.users.factories.UserProfileFactory",
+        factory_related_name="user",
+    )
 
 
 class EmailSentFactory(DjangoModelFactory):
@@ -36,4 +40,3 @@ class UserProfileFactory(DjangoModelFactory):
         model = UserProfile
 
     user = SubFactory(UserFactory)
-    email_confirmed = True
