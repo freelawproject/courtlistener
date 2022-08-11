@@ -253,9 +253,6 @@ def get_homepage_stats():
         "queries_in_last_ten": Stat.objects.filter(
             name="search.results", date_logged__gte=ten_days_ago
         ).aggregate(Sum("count"))["count__sum"],
-        "bulk_in_last_ten": Stat.objects.filter(
-            name__contains="bulk_data", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
         "opinions_in_last_ten": Opinion.objects.filter(
             date_created__gte=ten_days_ago
         ).count(),

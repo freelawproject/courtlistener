@@ -232,16 +232,6 @@
           </div>
         </div>
 
-        {% if bulk_in_last_ten > 0 %}
-          <div class="row">
-            <div class="col-xs-3 text-center">
-              <span class="homepage-stat bold">{{ bulk_in_last_ten|intcomma }}</span>
-            </div>
-            <div class="col-xs-9"><p>Times the <a href="{% url "bulk_data_index" %}">bulk data</a> has been downloaded in the last ten days.</p>
-            </div>
-          </div>
-        {% endif %}
-
         {% if user.is_superuser %}
           <div class="row">
             <div class="col-xs-3 text-center">
