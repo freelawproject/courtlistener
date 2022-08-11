@@ -17,6 +17,16 @@ class SerializeSolrTestMixin(SerializeMixin):
     lockfile = __file__
 
 
+class SimpleUserDataMixin:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        super().setUpTestData()
+
+
 @override_settings(
     SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
     SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
