@@ -255,11 +255,6 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-        request.resolver_match = ResolverMatch(
-            view,
-            {"version": "v3"},
-            self.endpoint_name,
-        )
 
         view(request)
 
