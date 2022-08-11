@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest import mock
 
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.test import Client
@@ -15,6 +16,7 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.alerts.factories import DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
@@ -22,15 +24,16 @@ from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_alert_and_webhook
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
-from cl.users.factories import UserFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class AlertTest(TestCase):
-    fixtures = ["test_court.json", "authtest_data.json"]
+class AlertTest(SimpleUserDataMixin, TestCase):
+    fixtures = ["test_court.json"]
 
     def setUp(self) -> None:
         # Set up some handy variables
@@ -102,7 +105,7 @@ class DocketAlertTest(TestCase):
     """Do docket alerts work properly?"""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.user = UserFactory()
         cls.court = Court.objects.get(id="scotus")
 
@@ -180,40 +183,24 @@ class DocketAlertTest(TestCase):
 class DisableDocketAlertTest(TestCase):
     """Do old docket alerts get disabled or alerted properly?"""
 
-    fixtures = ["test_court.json", "authtest_data.json"]
+    fixtures = ["test_court.json"]
 
-    def setUp(self) -> None:
-        self.now = now()
-
-        # Create a terminated docket
-        self.docket = Docket.objects.create(
-            source=Docket.RECAP,
-            court_id="scotus",
-            date_terminated="2020-01-01",
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
         )
-
-        # Add an alert for it
-        self.user = User.objects.get(pk=1001)
-        self.alert = DocketAlert.objects.create(
-            docket=self.docket, user=self.user
-        )
-
-    def tearDown(self) -> None:
-        Docket.objects.all().delete()
-        DocketAlert.objects.all().delete()
 
     def backdate_alert(self) -> None:
-        self.alert.date_created = self.now - timedelta(days=365)
+        self.alert.date_created = now() - timedelta(days=365)
         self.alert.save()
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
-        self.docket.date_terminated = now() - timedelta(days=365)
-        self.docket.save()
+        self.alert.docket.date_terminated = now() - timedelta(days=365)
+        self.alert.docket.save()
 
-        report = build_user_report(self.user)
+        report = build_user_report(self.alert.user)
         # This alert was recent (the test created it a few seconds ago),
         # so no actions should be taken
         self.assertEqual(
@@ -228,14 +215,14 @@ class DisableDocketAlertTest(TestCase):
         for i in range(90, 97):
             new_date_terminated = now() - timedelta(days=i)
             print(f"Trying a date_terminated of {new_date_terminated}")
-            self.docket.date_terminated = new_date_terminated
-            self.docket.save()
-            report = build_user_report(self.user, delete=True)
-            self.assertEqual(report.ninety_ago, [self.docket])
+            self.alert.docket.date_terminated = new_date_terminated
+            self.alert.docket.save()
+            report = build_user_report(self.alert.user, delete=True)
+            self.assertEqual(report.ninety_ago, [self.alert.docket])
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
-    fixtures = ["test_court.json", "authtest_data.json"]
+    fixtures = ["test_court.json"]
 
     def setUp(self) -> None:
         # Set up some handy variables
@@ -245,6 +232,10 @@ class AlertSeleniumTest(BaseSeleniumTest):
             "name": "dummy alert",
             "rate": "dly",
         }
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
         super(AlertSeleniumTest, self).setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -285,7 +276,7 @@ class AlertAPITests(APITestCase):
     """Check that API CRUD operations are working well for search alerts."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         cls.user_1 = UserFactory()
         cls.user_2 = UserFactory()
 

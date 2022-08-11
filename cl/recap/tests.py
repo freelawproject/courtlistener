@@ -14,7 +14,6 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
-from requests import HTTPError
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -83,7 +82,10 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileFactory
+from cl.users.factories import (
+    UserProfileWithParentsFactory,
+    UserWithChildProfileFactory,
+)
 
 
 @mock.patch("cl.recap.views.process_recap_upload")
@@ -328,17 +330,18 @@ class RecapDocketFetchApiTest(TestCase):
 
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
 class RecapFetchApiSerializationTestCase(SimpleTestCase):
-    def setUp(self) -> None:
-        self.user = User.objects.get(username="recap")
-        self.fetch_attributes = {
-            "user": self.user,
+    @classmethod
+    def setUp(cls) -> None:
+        cls.user = UserWithChildProfileFactory.create()
+        cls.fetch_attributes = {
+            "user": cls.user,
             "docket_id": 1,
             "request_type": REQUEST_TYPE.DOCKET,
             "pacer_username": "johncofey",
             "pacer_password": "mrjangles",
         }
-        self.request = RequestFactory().request()
-        self.request.user = self.user
+        cls.request = RequestFactory().request()
+        cls.request.user = cls.user
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -1886,8 +1889,8 @@ class RecapEmailDocketAlerts(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.user_profile = UserProfileFactory()
-        cls.user_profile_2 = UserProfileFactory()
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.webhook = WebhookFactory(
             user=cls.user_profile.user,

@@ -1,5 +1,6 @@
 import time
 
+from django.contrib.auth.hashers import make_password
 from django.test import Client
 from django.urls import reverse
 from rest_framework.status import (
@@ -10,17 +11,19 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.favorites.factories import FavoriteFactory
 from cl.favorites.models import DocketTag, Favorite, UserTag
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import make_client
+from cl.users.factories import UserProfileWithParentsFactory
 
 
-class FavoriteTest(TestCase):
+class FavoriteTest(SimpleUserDataMixin, TestCase):
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "test_objects_search.json",
         "judge_judy.json",
         "test_objects_audio.json",
@@ -76,14 +79,16 @@ class UserFavoritesTest(BaseSeleniumTest):
 
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "judge_judy.json",
         "test_objects_search.json",
-        "favorites.json",
     ]
 
     def setUp(self) -> None:
         get_homepage_stats.invalidate()
+        self.f = FavoriteFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
         super(UserFavoritesTest, self).setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
@@ -286,9 +291,7 @@ class UserFavoritesTest(BaseSeleniumTest):
         # Select the opinions pill
         opinions_pill = self.browser.find_element(By.LINK_TEXT, "Opinions 1")
         opinions_pill.click()
-        self.assert_text_in_node(
-            "Totes my Notes 2", "body"
-        )  # in favorites.json
+        self.assert_text_in_node(self.f.notes, "body")
         edit_link = self.browser.find_element(By.LINK_TEXT, "Edit / Delete")
         edit_link.click()
 
@@ -301,11 +304,8 @@ class UserFavoritesTest(BaseSeleniumTest):
         name = self.find_element_by_id(modal, "save-favorite-name-field")
         notes = self.find_element_by_id(modal, "save-favorite-notes-field")
         # -- via favorites.json[pk=1]
-        self.assertEqual(
-            name.get_property("value"),
-            'Formerly known as "case name cluster 3"',
-        )
-        self.assertEqual(notes.get_property("value"), "Totes my Notes 2")
+        self.assertEqual(name.get_property("value"), self.f.name)
+        self.assertEqual(notes.get_property("value"), self.f.notes)
 
         name.clear()
         name.send_keys("Renamed Favorite")
@@ -338,17 +338,27 @@ class APITests(APITestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
     fixtures = [
-        "authtest_data.json",
         "judge_judy.json",
         "test_objects_search.json",
     ]
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.pandora = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        cls.unconfirmed = UserProfileWithParentsFactory.create(
+            user__username="unconfirmed_email",
+            user__password=make_password("password"),
+            email_confirmed=False,
+        )
+
     def setUp(self) -> None:
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
-        self.client_id = 1001
-        self.client = make_client(self.client_id)
-        self.client2 = make_client(1002)
+        self.client = make_client(self.pandora.user.pk)
+        self.client2 = make_client(self.unconfirmed.user.pk)
 
     def tearDown(cls):
         UserTag.objects.all().delete()
@@ -446,7 +456,9 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 2)
 
         # And if they want to, they can just show their own
-        response = self.client.get(self.tag_path, {"user": self.client_id})
+        response = self.client.get(
+            self.tag_path, {"user": self.pandora.user.pk}
+        )
         self.assertEqual(response.json()["count"], 1)
 
     def test_use_a_tag_thats_not_yours(self) -> None:
