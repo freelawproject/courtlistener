@@ -14,7 +14,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
 )
-from cl.users.factories import SuperUserFactory, UserFactory
+from cl.users.factories import UserFactory
 
 FACTORIES = {
     # Search app
@@ -30,7 +30,6 @@ FACTORIES = {
     201: PersonWithChildrenFactory,
     # Users
     300: UserFactory,
-    301: SuperUserFactory,
     # Citations
     400: CitationWithParentsFactory,
     # Alerts
