@@ -608,6 +608,7 @@ def add_docket_entries(d, docket_entries, tags=None):
     docket_entries = [de for de in docket_entries if de.get("date_filed")]
 
     rds_created = []
+    des_returned = []
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries)
     known_filing_dates = [d.date_last_filing]
@@ -633,6 +634,7 @@ def add_docket_entries(d, docket_entries, tags=None):
         )
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
         de.save()
+        des_returned.append(de)
         if tags:
             for tag in tags:
                 tag.tag_object(de)
@@ -701,7 +703,7 @@ def add_docket_entries(d, docket_entries, tags=None):
             date_last_filing=max(known_filing_dates)
         )
 
-    return rds_created, content_updated
+    return rds_created, content_updated, des_returned
 
 
 def check_json_for_terminated_entities(parties) -> bool:
@@ -1213,7 +1215,7 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    rds_created, content_updated = add_docket_entries(
+    rds_created, content_updated, des_returned = add_docket_entries(
         d, docket_data["docket_entries"], tags=tags
     )
     add_parties_and_attorneys(d, docket_data["parties"])
