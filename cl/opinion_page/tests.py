@@ -5,7 +5,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import Client
@@ -20,7 +20,7 @@ from rest_framework.status import (
 )
 
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import SitemapTest
+from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
@@ -297,12 +297,11 @@ class OgRedirectLookupViewTest(TestCase):
         mock.assert_called_once()
 
 
-class NewDocketAlertTest(TestCase):
+class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
     fixtures = [
         "test_objects_search.json",
         "judge_judy.json",
         "test_court.json",
-        "authtest_data.json",
     ]
 
     def setUp(self) -> None:

@@ -1,6 +1,7 @@
 import datetime
 from typing import Tuple, TypedDict, cast
 
+from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
 from django.db.models import F
 from django.test import override_settings
@@ -27,6 +28,7 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import DocketFactory
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class TestPacerUtils(TestCase):
@@ -261,7 +263,16 @@ class TestMimeLookup(SimpleTestCase):
 class TestMaintenanceMiddleware(TestCase):
     """Test the maintenance middleware"""
 
-    fixtures = ["authtest_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Do this in two steps to avoid triggering profile creation signal
+        admin = UserProfileWithParentsFactory.create(
+            user__username="admin",
+            user__password=make_password("password"),
+        )
+        admin.user.is_superuser = True
+        admin.user.is_staff = True
+        admin.user.save()
 
     def test_middleware_works_when_enabled(self) -> None:
         """Does the middleware block users when enabled?"""

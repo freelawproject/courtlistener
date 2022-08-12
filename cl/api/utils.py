@@ -1,9 +1,6 @@
-import json
 import logging
-import os
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime
-from pathlib import Path
 from typing import Dict, List, Set, Union
 
 from dateutil import parser
@@ -182,6 +179,13 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
+def get_logging_prefix() -> str:
+    """Simple tool for getting the prefix for logging API requests. Useful for
+    mocking the logger.
+    """
+    return "api:v3"
+
+
 class LoggingMixin(object):
     """Log requests to Redis
 
@@ -242,36 +246,37 @@ class LoggingMixin(object):
 
         r = make_redis_interface("STATS")
         pipe = r.pipeline()
+        api_prefix = get_logging_prefix()
 
         # Global and daily tallies for all URLs.
-        pipe.incr("api:v3.count")
-        pipe.incr(f"api:v3.d:{d}.count")
-        pipe.incr("api:v3.timing", response_ms)
-        pipe.incr(f"api:v3.d:{d}.timing", response_ms)
+        pipe.incr(f"{api_prefix}.count")
+        pipe.incr(f"{api_prefix}.d:{d}.count")
+        pipe.incr(f"{api_prefix}.timing", response_ms)
+        pipe.incr(f"{api_prefix}.d:{d}.timing", response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
         user_pk = user.pk or "AnonymousUser"
-        pipe.zincrby("api:v3.user.counts", 1, user_pk)
-        pipe.zincrby(f"api:v3.user.d:{d}.counts", 1, user_pk)
+        pipe.zincrby(f"{api_prefix}.user.counts", 1, user_pk)
+        pipe.zincrby(f"{api_prefix}.user.d:{d}.counts", 1, user_pk)
 
         # Use a hash to store a per-day map between IP addresses and user pks
         # Get a user pk with: `hget api:v3.d:2022-05-18.ip_map 172.19.0.1`
         if client_ip is not None:
-            ip_key = f"api:v3.d:{d}.ip_map"
+            ip_key = f"{api_prefix}.d:{d}.ip_map"
             pipe.hset(ip_key, client_ip, user_pk)
             pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
-        pipe.zincrby("api:v3.endpoint.counts", 1, endpoint)
-        pipe.zincrby(f"api:v3.endpoint.d:{d}.counts", 1, endpoint)
+        pipe.zincrby(f"{api_prefix}.endpoint.counts", 1, endpoint)
+        pipe.zincrby(f"{api_prefix}.endpoint.d:{d}.counts", 1, endpoint)
 
         # We create a per-day key in redis for timings. Inside the key we have
         # members for every endpoint, with score of the total time. So to get
         # the average for an endpoint you need to get the number of requests
         # and the total time for the endpoint and divide.
-        timing_key = f"api:v3.endpoint.d:{d}.timings"
+        timing_key = f"{api_prefix}.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
         results = pipe.execute()

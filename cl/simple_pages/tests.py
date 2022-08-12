@@ -6,13 +6,13 @@ from django.urls import reverse
 from lxml.html import fromstring
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.cases import TestCase
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
-class ContactTest(TestCase):
-    fixtures = ["authtest_data.json"]
+class ContactTest(SimpleUserDataMixin, TestCase):
     test_msg = {
         "name": "pandora",
         "phone_number": "asdf",
@@ -117,9 +117,7 @@ class ContactTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
 
-class SimplePagesTest(TestCase):
-    fixtures = ["authtest_data.json"]
-
+class SimplePagesTest(SimpleUserDataMixin, TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
         print("Checking for HTML title tag....", end="")

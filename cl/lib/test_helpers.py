@@ -2,6 +2,7 @@ from typing import Sized, cast
 
 import scorched
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from lxml import etree
@@ -11,10 +12,21 @@ from cl.people_db.models import Person
 from cl.search.models import Court, Opinion
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import TestCase
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class SerializeSolrTestMixin(SerializeMixin):
     lockfile = __file__
+
+
+class SimpleUserDataMixin:
+    @classmethod
+    def setUpTestData(cls) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        super().setUpTestData()  # type: ignore
 
 
 @override_settings(
@@ -64,7 +76,7 @@ class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
             si.conn.http_connection.close()
 
 
-class SolrTestCase(EmptySolrTestCase):
+class SolrTestCase(SimpleUserDataMixin, EmptySolrTestCase):
     """A standard Solr test case with content included in the database,  but not
     yet indexed into the database.
     """
@@ -74,7 +86,6 @@ class SolrTestCase(EmptySolrTestCase):
         "judge_judy.json",
         "test_objects_search.json",
         "test_objects_audio.json",
-        "authtest_data.json",
     ]
 
     def setUp(self) -> None:
