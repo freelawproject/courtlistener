@@ -103,6 +103,7 @@ def superuser_creation(sender, instance, created, **kwargs):
             user=instance,
             activation_key=sha1_activation_key(instance.username),
             key_expires=now() + timedelta(days=5),
+            email_confirmed=True,
         )
 
 
