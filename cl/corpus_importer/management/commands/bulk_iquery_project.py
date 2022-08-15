@@ -124,8 +124,8 @@ class CycleChecker:
     """
 
     def __init__(self) -> None:
-        self.court_counts = defaultdict(int)
-        self.current_iteration = 1
+        self.court_counts: defaultdict = defaultdict(int)
+        self.current_iteration: int = 1
 
     def check_if_cycled(self, court_id: str) -> bool:
         """Check if the cycle repeated
