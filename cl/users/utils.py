@@ -157,7 +157,7 @@ emails: Dict[str, EmailType] = {
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
         " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
-        " - Check our blog for the latest news and updates: https://free.law/\n\n"
+        " - Check our blog for the latest news and updates: https://free.law/blog/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
         "The Free Law Project Team\n\n"
         "-------------------\n"

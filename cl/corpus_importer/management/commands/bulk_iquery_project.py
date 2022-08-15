@@ -124,8 +124,8 @@ class CycleChecker:
     """
 
     def __init__(self) -> None:
-        self.court_counts = defaultdict(int)
-        self.current_iteration = 1
+        self.court_counts: defaultdict = defaultdict(int)
+        self.current_iteration: int = 1
 
     def check_if_cycled(self, court_id: str) -> bool:
         """Check if the cycle repeated
@@ -174,16 +174,15 @@ def update_open_cases(options) -> None:
     iterations_completed = 0
     for d in ds:
         if iterations_completed < options["skip_rows"]:
+            iterations_completed += 1
             continue
-        if options["iterations"] != 0:
-            if iterations_completed >= options["iterations"]:
-                break
 
         # Dispatch a crawl against all court websites simultaneously, every
         # iteration_delay seconds.
         if cc.check_if_cycled(d.court_id):
             print(
-                f"Finished iteration {iterations_completed} on docket with id {d.pk}. Sleeping {options['iterations_delay']} seconds."
+                f"Finished iteration {iterations_completed} on docket with id "
+                f"{d.pk}. Sleeping {options['iteration_delay']} seconds."
             )
             time.sleep(options["iteration_delay"])
 
@@ -191,6 +190,7 @@ def update_open_cases(options) -> None:
 
         iterations_completed += 1
         if iterations_completed == options["iterations"]:
+            print("Finished iterating. Quitting.")
             break
 
 
