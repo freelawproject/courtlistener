@@ -3,7 +3,7 @@ import random
 from django import template
 from django.core.exceptions import ValidationError
 from django.utils.formats import date_format
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 
 register = template.Library()
 
@@ -43,6 +43,12 @@ def get_full_host(context, username=None, password=None):
             domain_and_port=domain_and_port,
         )
     )
+
+
+@register.simple_tag(takes_context=True)
+def get_canonical_element(context: dict) -> SafeString:
+    href = f"{get_full_host(context)}{context['request'].path}"
+    return mark_safe(f'<link rel="canonical" href="{href}" />')
 
 
 @register.simple_tag(takes_context=False)
