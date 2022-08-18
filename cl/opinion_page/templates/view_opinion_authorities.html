@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
+{% load text_filters %}
 
 {# Shown on authorities pages. #}
-
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Table of Authorities for {{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Table of Authorities for {{ title }} –
     CourtListener.com{% endblock %}

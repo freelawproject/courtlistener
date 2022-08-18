@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
+{% load text_filters %}
 
-
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Summaries of {{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}Summaries of {{ title }} – CourtListener.com{% endblock %}
 {% block description %}Summaries of {{ title }}{% endblock %}

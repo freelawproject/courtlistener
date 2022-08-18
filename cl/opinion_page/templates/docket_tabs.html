@@ -1,9 +1,12 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
-{% load tz %}
 {% load static %}
+{% load text_filters %}
+{% load tz %}
 
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block content %}{% endblock %}
 

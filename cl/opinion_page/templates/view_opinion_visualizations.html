@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
+{% load text_filters %}
 
 {# Shown on visualizations pages. #}
-
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}List of Visualizations for {{ title }} –
     CourtListener.com{% endblock %}
 {% block og_title %}List of Visualizations for {{ title }} –
