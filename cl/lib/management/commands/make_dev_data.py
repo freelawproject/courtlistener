@@ -1,6 +1,7 @@
 from django.core.management.base import CommandParser
 
 from cl.alerts.factories import DocketAlertWithParentsFactory
+from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
@@ -34,6 +35,8 @@ FACTORIES = {
     400: CitationWithParentsFactory,
     # Alerts
     500: DocketAlertWithParentsFactory,
+    # Audio
+    600: AudioWithParentsFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 
