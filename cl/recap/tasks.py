@@ -52,6 +52,7 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.storage import RecapEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
+    add_att_report_for_recap_email,
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
     add_docket_entries,
@@ -76,7 +77,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
 logger = logging.getLogger(__name__)
@@ -1517,6 +1518,7 @@ def get_recap_email_recipients(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
         requests.ConnectionError,
+        requests.ReadTimeout,
         PacerLoginException,
         RedisConnectionError,
     ),
@@ -1583,13 +1585,22 @@ def process_recap_email(
         docket, data["docket_entries"]
     )
 
+    rds_affected = []
+    if data["contains_attachments"] is True:
+        rds_affected = add_att_report_for_recap_email(
+            docket_entry["document_url"],
+            epq.court,
+            docket_entry["pacer_case_id"],
+        )
+
     # Ensures we have PACER cookies ready to go.
     get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
     magic_number = docket_entry["pacer_magic_num"]
-    for rd in rds_created:
+    rds_affected = rds_affected + rds_created
+    for rd in rds_affected:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )

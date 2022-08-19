@@ -1855,11 +1855,18 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
-def mock_bucket_open(message_id, r):
+def mock_bucket_open(message_id, r, read_file=False):
     """This function mocks bucket.open() method in order to call a
     recap.email notification fixture.
     """
     test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+
+    if read_file:
+        with open(test_dir / message_id, encoding="utf-8") as file:
+            text = file.read()
+            file.close()
+            return text
+
     recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
     return recap_mail_example
 
@@ -1884,6 +1891,10 @@ class MockResponse:
     "cl.recap.tasks.get_or_cache_pacer_cookies",
     side_effect=lambda x, y, z: None,
 )
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
 class RecapEmailDocketAlerts(TestCase):
     """Test recap email docket alerts"""
 
@@ -1892,6 +1903,7 @@ class RecapEmailDocketAlerts(TestCase):
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_2 = UserProfileWithParentsFactory()
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FB")
         cls.webhook = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.DOCKET_ALERT,
@@ -1912,10 +1924,15 @@ class RecapEmailDocketAlerts(TestCase):
                 test_dir / "recap_mail_custom_receipt_3.json",
                 encoding="utf-8",
             ) as file_3,
+            open(
+                test_dir / "recap_mail_custom_receipt_4.json",
+                encoding="utf-8",
+            ) as file_4,
         ):
             recap_mail_receipt = json.load(file)
             recap_mail_receipt_2 = json.load(file_2)
             recap_mail_receipt_3 = json.load(file_3)
+            recap_mail_receipt_4 = json.load(file_4)
 
         cls.data = {
             "court": cls.court.id,
@@ -1932,6 +1949,11 @@ class RecapEmailDocketAlerts(TestCase):
             "court": cls.court.id,
             "mail": recap_mail_receipt_3["mail"],
             "receipt": recap_mail_receipt_3["receipt"],
+        }
+        cls.data_4 = {
+            "court": cls.court_nyed.id,
+            "mail": recap_mail_receipt_4["mail"],
+            "receipt": recap_mail_receipt_4["receipt"],
         }
 
     def setUp(self) -> None:
@@ -1969,6 +1991,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_post,
+        mock_pacer_court_accessible,
     ):
         """This test verifies that if a new recap.email notification comes in
         (first time) and the user has the auto-subscribe option enabled, a new
@@ -2015,7 +2038,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     def test_new_recap_email_case_auto_subscription_prev_user(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test verifies that if two users with the auto-subscribe option
         enabled are properly subscribed for a case when two recap.email
@@ -2078,6 +2105,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_post,
+        mock_pacer_court_accessible,
     ):
         """This test verifies that if a new recap.email notification comes in
         and the user has auto-subscribe option disabled an Unsubscription
@@ -2120,7 +2148,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(webhook_triggered.count(), 0)
 
     def test_new_recap_email_case_no_auto_subscription_prev_user(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test checks if a new recap.email (first time) notification
         comes in and user has auto-subscribe option disabled, an unsubscription
@@ -2175,7 +2207,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
     def test_new_recap_email_subscribe_by_email_link(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test verifies if a recap.email user with the auto-subscribe
         option disabled can successfully subscribe to a case from the
@@ -2221,7 +2257,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(docket_alert_subscription.count(), 1)
 
     def test_new_recap_email_unsubscribe_by_email_link(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test verifies if a recap.email user can successfully
         unsubscribe to a case from the unsubscription link.
@@ -2279,7 +2319,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 2)
 
     def test_new_recap_email_alerts_integration(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test verifies if a user can successfully unsubscribe to a case
         from the email unsubscription link, the user won't longer receive more
@@ -2369,7 +2413,11 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Unsubscribed]", message_sent.subject)
 
     def test_docket_alert_toggle_confirmation_fails(
-        self, mock_bucket_open, mock_download_pacer_pdf_by_rd, mock_cookies
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_pacer_court_accessible,
     ):
         """This test verifies if the unsubscription/subscription fails if a bot
         tries to unsubscribe/subscribe from/to a docket alert.
@@ -2428,6 +2476,93 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(
             docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
         )
+
+    @mock.patch(
+        "cl.alerts.tasks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+    )
+    @mock.patch(
+        "cl.recap.mergers.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(
+            mock_bucket_open("nyed_123019137279.html", "r", True), 200
+        ),
+    )
+    def test_new_recap_email_with_attachments(
+        self,
+        mock_bucket_open,
+        mock_download_pacer_pdf_by_rd,
+        mock_cookies,
+        mock_post,
+        mock_att_response,
+        mock_pacer_court_accessible,
+    ):
+        """This test verifies that if a recap.email notification with
+        attachments comes in we can get the main document and all its
+        attachments. The docket alert and webhook should be sent with all the
+        recap documents.
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        # auto-subscription option enabled
+        self.client.post(self.path, self.data_4, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 10)
+
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # Webhook should be triggered
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        content = webhook_triggered.first().content
+        # Compare the content of the webhook to the recap document
+        pacer_doc_id = content["results"][0]["recap_documents"][0][
+            "pacer_doc_id"
+        ]
+        recap_documents_webhook = content["results"][0]["recap_documents"]
+        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        # We should send 10 recap documents in this webhook example
+        self.assertEqual(len(recap_documents_webhook), 10)
+        # Compare content for the main document and the first attachment
+        # Main document
+        self.assertEqual(recap_documents_webhook[0]["description"], "")
+        self.assertEqual(
+            recap_documents_webhook[0]["pacer_doc_id"], "123019137279"
+        )
+        self.assertEqual(recap_documents_webhook[0]["document_number"], "16")
+        self.assertEqual(recap_documents_webhook[0]["attachment_number"], None)
+
+        # First attachment
+        self.assertEqual(
+            recap_documents_webhook[1]["description"],
+            "Proposed Order Proposed Case Management Plan (as discussed in the letter)",
+        )
+        self.assertEqual(
+            recap_documents_webhook[1]["pacer_doc_id"], "123019137280"
+        )
+        self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
+        self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
 
 
 class CheckCourtConnectivityTest(TestCase):
