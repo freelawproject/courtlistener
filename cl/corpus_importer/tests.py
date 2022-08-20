@@ -13,11 +13,12 @@ from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
+    case_names_dont_overlap,
     clean_body_content,
     compare_documents,
     parse_harvard_opinions,
     validate_dt,
-    winnow_case_name, case_names_dont_overlap,
+    winnow_case_name,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -260,7 +261,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -313,7 +314,7 @@ class PacerDocketParserTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.fp = (
-                MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
+            MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
         )
         docket_number = "3:11-cv-00064"
         cls.court = CourtFactory.create()
@@ -441,12 +442,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -457,7 +458,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -487,8 +488,17 @@ class HarvardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        for court in ["mass", "tax", "cadc", "kan", "bta", "njsuperctappdiv",
-                      "moctapp", "texapp", "colo"]:
+        for court in [
+            "mass",
+            "tax",
+            "cadc",
+            "kan",
+            "bta",
+            "njsuperctappdiv",
+            "moctapp",
+            "texapp",
+            "colo",
+        ]:
             CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
@@ -699,56 +709,110 @@ class HarvardTests(TestCase):
 
         # Test the stored object against the same json used to load the case,
         # there should be an overlap of case names because they are the same
-        case_1 = Citation.objects.get(volume=444, reporter="N.J. Super.",
-                                      page=423).cluster
+        case_1 = Citation.objects.get(
+            volume=444, reporter="N.J. Super.", page=423
+        ).cluster
         case_1_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_1.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_1, case_1_data.get("name"),
-                                                 case_1_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_1.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_1,
+                case_1_data.get("name"),
+                case_1_data.get("name_abbreviation"),
+            ),
+            False,
+        )
 
-        case_2 = Citation.objects.get(volume=134, reporter="S.W.3d",
-                                      page=673).cluster
+        case_2 = Citation.objects.get(
+            volume=134, reporter="S.W.3d", page=673
+        ).cluster
         case_2_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_2.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_2, case_2_data.get("name"),
-                                                 case_2_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_2.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_2,
+                case_2_data.get("name"),
+                case_2_data.get("name_abbreviation"),
+            ),
+            False,
+        )
 
-        case_3 = Citation.objects.get(volume=1, reporter="B.T.A.",
-                                      page=694).cluster
+        case_3 = Citation.objects.get(
+            volume=1, reporter="B.T.A.", page=694
+        ).cluster
         case_3_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_3.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_3, case_3_data.get("name"),
-                                                 case_3_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_3.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_3,
+                case_3_data.get("name"),
+                case_3_data.get("name_abbreviation"),
+            ),
+            False,
+        )
 
-        case_4 = Citation.objects.get(volume=134, reporter="S.W.3d",
-                                      page=928).cluster
+        case_4 = Citation.objects.get(
+            volume=134, reporter="S.W.3d", page=928
+        ).cluster
         case_4_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_4.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_4, case_4_data.get("name"),
-                                                 case_4_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_4.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_4,
+                case_4_data.get("name"),
+                case_4_data.get("name_abbreviation"),
+            ),
+            False,
+        )
 
-        case_5 = Citation.objects.get(volume=134, reporter="S.W.3d",
-                                      page=757).cluster
+        case_5 = Citation.objects.get(
+            volume=134, reporter="S.W.3d", page=757
+        ).cluster
         case_5_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_5.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_5, case_5_data.get("name"),
-                                                 case_5_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_5.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_5,
+                case_5_data.get("name"),
+                case_5_data.get("name_abbreviation"),
+            ),
+            False,
+        )
 
-        case_6 = Citation.objects.get(volume=200, reporter="Colo.",
-                                      page=11).cluster
+        case_6 = Citation.objects.get(
+            volume=200, reporter="Colo.", page=11
+        ).cluster
         case_6_data = json.load(
-            open(os.path.join(self.test_dir, "cases", "case_6.json"),
-                 encoding="utf-8", ))
-        self.assertEqual(case_names_dont_overlap(case_6, case_6_data.get("name"),
-                                                 case_6_data.get("name_abbreviation")),
-                         False)
+            open(
+                os.path.join(self.test_dir, "cases", "case_6.json"),
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(
+            case_names_dont_overlap(
+                case_6,
+                case_6_data.get("name"),
+                case_6_data.get("name_abbreviation"),
+            ),
+            False,
+        )
