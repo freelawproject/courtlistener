@@ -2,9 +2,11 @@ import json
 import os
 from datetime import date, datetime
 from glob import iglob
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_opinions import (
@@ -15,7 +17,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     compare_documents,
     parse_harvard_opinions,
     validate_dt,
-    winnow_case_name,
+    winnow_case_name, case_names_dont_overlap,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -258,7 +260,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                    "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -311,7 +313,7 @@ class PacerDocketParserTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.fp = (
-            MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
+                MEDIA_ROOT / "test" / "xml" / "gov.uscourts.akd.41664.docket.xml"
         )
         docket_number = "3:11-cv-00064"
         cls.court = CourtFactory.create()
@@ -439,12 +441,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+                "Got %s, expected %s: \n%s"
+                % (
+                    actual_num_attorneys,
+                    expected_num_attorneys,
+                    first_party_attorneys,
+                ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -455,7 +457,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -485,7 +487,8 @@ class HarvardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        for court in ["mass", "tax", "cadc", "kan", "bta"]:
+        for court in ["mass", "tax", "cadc", "kan", "bta", "njsuperctappdiv",
+                      "moctapp", "texapp", "colo"]:
             CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
@@ -683,239 +686,69 @@ class HarvardTests(TestCase):
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
 
-    def test_winnow_case_name(self) -> None:
-        """Test function winnow_case_name() to reduce case names to a set of words
-        Some names were wiped out when the name only contains abbreviations/acronyms
-        """
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "cases", "case_*"))],
+    )
+    def test_casename_abbreviations(self, mock) -> None:
+        # Get path to json case files
+        files = list(iglob(os.path.join(self.test_dir, "cases", "case_*")))
 
-        # (case name full, case name)
-        data_case_1 = (
-            "In the matter of S.J.S., a minor child. D.L.M. and D.E.M. "
-            "Petitioners/Respondents v. T.J.S.",
-            "D.L.M. v. T.J.S.",
-        )
+        # Load cases fromjson files, use files count to match
+        self.assertSuccessfulParse(len(files))
 
-        self.assertEqual(
-            winnow_case_name(data_case_1[0]),
-            {
-                "respondents",
-                "minor",
-                "petitioners",
-                "sjs",
-                "tjs",
-                "dlm",
-                "dem",
-                "child",
-            },
-        )
-        self.assertEqual(
-            winnow_case_name(f"{data_case_1[0]} {data_case_1[1]}"),
-            {
-                "respondents",
-                "minor",
-                "petitioners",
-                "sjs",
-                "tjs",
-                "dlm",
-                "dem",
-                "child",
-            },
-        )
+        # Test the stored object against the same json used to load the case,
+        # there should be an overlap of case names because they are the same
+        case_1 = Citation.objects.get(volume=444, reporter="N.J. Super.",
+                                      page=423).cluster
+        case_1_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_1.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_1, case_1_data.get("name"),
+                                                 case_1_data.get("name_abbreviation")),
+                         False)
 
-        data_case_2 = (
-            "Appeal of HAMILTON & CHAMBERS CO., INC.",
-            "Appeal of Hamilton & Chambers Co.",
-        )
+        case_2 = Citation.objects.get(volume=134, reporter="S.W.3d",
+                                      page=673).cluster
+        case_2_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_2.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_2, case_2_data.get("name"),
+                                                 case_2_data.get("name_abbreviation")),
+                         False)
 
-        self.assertEqual(
-            winnow_case_name(data_case_2[0]),
-            {"hamilton", "co", "chambers", "appeal"},
-        )
-        self.assertEqual(
-            winnow_case_name(f"{data_case_2[0]} {data_case_2[1]}"),
-            {"hamilton", "co", "chambers", "appeal"},
-        )
+        case_3 = Citation.objects.get(volume=1, reporter="B.T.A.",
+                                      page=694).cluster
+        case_3_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_3.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_3, case_3_data.get("name"),
+                                                 case_3_data.get("name_abbreviation")),
+                         False)
 
-        data_case_3 = (
-            "Appeal of GEORGE C. PETERSON CO.",
-            "Appeal of George C. Peterson Co.",
-        )
+        case_4 = Citation.objects.get(volume=134, reporter="S.W.3d",
+                                      page=928).cluster
+        case_4_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_4.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_4, case_4_data.get("name"),
+                                                 case_4_data.get("name_abbreviation")),
+                         False)
 
-        self.assertEqual(
-            winnow_case_name(data_case_3[0]),
-            {"co", "peterson", "appeal", "george"},
-        )
-        self.assertEqual(
-            winnow_case_name(f"{data_case_3[0]} {data_case_3[1]}"),
-            {"co", "peterson", "appeal", "george"},
-        )
+        case_5 = Citation.objects.get(volume=134, reporter="S.W.3d",
+                                      page=757).cluster
+        case_5_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_5.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_5, case_5_data.get("name"),
+                                                 case_5_data.get("name_abbreviation")),
+                         False)
 
-        data_case_4 = (
-            "DALLAS SALES COMPANY, INC. v. CARLISLE SILVER COMPANY, INC., "
-            "d/b/a Carlisle Jewelry Company, H. William Pollack, III, Carolyn Pollack "
-            "and J.C. Penney Company, Inc.",
-            "Dallas Sales Co. v. Carlisle Silver Co.",
-        )
-
-        self.assertEqual(
-            winnow_case_name(data_case_4[0]),
-            {
-                "jewelry",
-                "dallas",
-                "pollack",
-                "jc",
-                "carlisle",
-                "sales",
-                "carolyn",
-                "company",
-                "silver",
-                "penney",
-                "william",
-                "iii",
-            },
-        )
-        self.assertEqual(
-            winnow_case_name(f"{data_case_4[0]} {data_case_4[1]}"),
-            {
-                "jewelry",
-                "dallas",
-                "pollack",
-                "jc",
-                "carlisle",
-                "sales",
-                "carolyn",
-                "co",
-                "company",
-                "silver",
-                "penney",
-                "william",
-                "iii",
-            },
-        )
-
-        data_case_5 = (
-            "Bertrand A. EICHELBERGER v. STATE of Missouri",
-            "Eichelberger v. State",
-        )
-
-        self.assertEqual(
-            winnow_case_name(data_case_5[0]),
-            {"missouri", "bertrand", "eichelberger"},
-        )
-
-        self.assertEqual(
-            winnow_case_name(f"{data_case_5[0]} {data_case_5[1]}"),
-            {"missouri", "bertrand", "eichelberger"},
-        )
-
-        data_case_6 = (
-            "Tina WESTER v. MISSOURI DEPARTMENT OF LABOR AND INDUSTRIAL RELATIONS, "
-            "Defendant-Respondent",
-            "Wester v. Missouri Department of Labor & Industrial Relations",
-        )
-
-        self.assertEqual(
-            winnow_case_name(data_case_6[0]),
-            {
-                "tina",
-                "wester",
-                "missouri",
-                "department",
-                "labor",
-                "industrial",
-                "relations",
-                "defendant",
-                "respondent",
-            },
-        )
-
-        self.assertEqual(
-            winnow_case_name(f"{data_case_6[0]} {data_case_6[1]}"),
-            {
-                "tina",
-                "wester",
-                "missouri",
-                "department",
-                "labor",
-                "industrial",
-                "relations",
-                "defendant",
-                "respondent",
-            },
-        )
-
-        data_case_7 = (
-            "In the Interest of C.R.B. and R.L.B Juvenile Officer v. C.B. (Natural "
-            "Father), G.B.Z. (Mother)",
-            "In the Interest of C.R.B. v. C.B.",
-        )
-
-        self.assertEqual(
-            winnow_case_name(data_case_7[0]),
-            {
-                "interest",
-                "crb",
-                "rlb",
-                "juvenile",
-                "officer",
-                "cb",
-                "natural",
-                "father",
-                "gbz",
-                "mother",
-            },
-        )
-
-        self.assertEqual(
-            winnow_case_name(f"{data_case_7[0]} {data_case_7[1]}"),
-            {
-                "interest",
-                "crb",
-                "rlb",
-                "juvenile",
-                "officer",
-                "cb",
-                "natural",
-                "father",
-                "gbz",
-                "mother",
-            },
-        )
-
-        data_case_8 = (
-            "IN RE: OLD CARCO LLC (f/k/a Chrysler LLC), Debtors, Frankie Overton v. "
-            "FCA US LLC.",
-            "Overton v. FCA U.S. LLC. (In re Old Carco LLC)",
-        )
-
-        self.assertEqual(
-            winnow_case_name(data_case_8[0]),
-            {
-                "us",
-                "re",
-                "old",
-                "carco",
-                "llc",
-                "chrysler",
-                "debtors",
-                "frankie",
-                "overton",
-                "fca",
-            },
-        )
-
-        self.assertEqual(
-            winnow_case_name(f"{data_case_8[0]} {data_case_8[1]}"),
-            {
-                "us",
-                "re",
-                "old",
-                "carco",
-                "llc",
-                "chrysler",
-                "debtors",
-                "frankie",
-                "overton",
-                "fca",
-            },
-        )
+        case_6 = Citation.objects.get(volume=200, reporter="Colo.",
+                                      page=11).cluster
+        case_6_data = json.load(
+            open(os.path.join(self.test_dir, "cases", "case_6.json"),
+                 encoding="utf-8", ))
+        self.assertEqual(case_names_dont_overlap(case_6, case_6_data.get("name"),
+                                                 case_6_data.get("name_abbreviation")),
+                         False)

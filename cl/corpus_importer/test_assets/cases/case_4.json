@@ -1,0 +1,491 @@
+{
+  "id": 9250317,
+  "url": "https://api.case.law/v1/cases/9250317/",
+  "name": "DALLAS SALES COMPANY, INC., Appellant, v. CARLISLE SILVER COMPANY, INC., d/b/a Carlisle Jewelry Company, H. William Pollack, III, Carolyn Pollack and J.C. Penney Company, Inc., Appellees",
+  "name_abbreviation": "Dallas Sales Co. v. Carlisle Silver Co.",
+  "decision_date": "2004-05-26",
+  "docket_number": "No. 10-00-00077-CV",
+  "first_page": "928",
+  "last_page": "933",
+  "citations": [
+    {
+      "type": "official",
+      "cite": "134 S.W.3d 928"
+    }
+  ],
+  "volume": {
+    "url": "https://api.case.law/v1/volumes/32044073045999/",
+    "volume_number": "134",
+    "barcode": "32044073045999"
+  },
+  "reporter": {
+    "url": "https://api.case.law/v1/reporters/612/",
+    "full_name": "South Western Reporter Third Series",
+    "id": 612
+  },
+  "court": {
+    "url": "https://api.case.law/v1/courts/tex-app-1/",
+    "name_abbreviation": "Tex. App.",
+    "slug": "tex-app-1",
+    "id": 8992,
+    "name": "Texas Courts of Appeals"
+  },
+  "jurisdiction": {
+    "id": 32,
+    "name_long": "Texas",
+    "url": "https://api.case.law/v1/jurisdictions/tex/",
+    "slug": "tex",
+    "whitelisted": false,
+    "name": "Tex."
+  },
+  "cites_to": [
+    {
+      "cite": "74 A.2d 597",
+      "category": "reporters:state_regional",
+      "reporter": "A.2d",
+      "year": 1950,
+      "opinion_id": 0
+    },
+    {
+      "cite": "5 N.J. 268",
+      "category": "reporters:state",
+      "reporter": "N.J.",
+      "case_ids": [
+        114822
+      ],
+      "year": 1950,
+      "opinion_id": 0
+    },
+    {
+      "cite": "69 A.2d 596",
+      "category": "reporters:state_regional",
+      "reporter": "A.2d",
+      "year": 1949,
+      "pin_cites": [
+        {
+          "page": "603",
+          "parenthetical": "\"A party will not be permitted to play fast and loose with the courts\""
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "6 N.J.Super. 456",
+      "category": "reporters:state",
+      "reporter": "N.J. Super.",
+      "case_ids": [
+        361417
+      ],
+      "year": 1949,
+      "pin_cites": [
+        {
+          "page": "469",
+          "parenthetical": "\"A party will not be permitted to play fast and loose with the courts\""
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "203 F.2d 510",
+      "category": "reporters:federal",
+      "reporter": "F.2d",
+      "case_ids": [
+        1271649
+      ],
+      "pin_cites": [
+        {
+          "page": "513"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "124 B.R. 712",
+      "category": "reporters:specialty",
+      "reporter": "B.R.",
+      "case_ids": [
+        6497372
+      ],
+      "pin_cites": [
+        {
+          "page": "720"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "915 S.W.2d 471",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10008856
+      ],
+      "pin_cites": [
+        {
+          "page": "473"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "62 S.W.3d 237",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9455143
+      ],
+      "pin_cites": [
+        {
+          "page": "241"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "853 S.W.2d 667",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10009375
+      ],
+      "pin_cites": [
+        {
+          "page": "672"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "954 S.W.2d 885",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        11903425
+      ],
+      "pin_cites": [
+        {
+          "page": "889-90"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "47 S.W.3d 122",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11085677
+      ],
+      "pin_cites": [
+        {
+          "page": "124"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "95 S.W.3d 683",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9333825
+      ],
+      "pin_cites": [
+        {
+          "page": "691"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "924 S.W.2d 375",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10014404
+      ],
+      "weight": 2,
+      "pin_cites": [
+        {
+          "page": "377"
+        },
+        {
+          "page": "377"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "94 S.W.3d 550",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9329509
+      ],
+      "pin_cites": [
+        {
+          "page": "553"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "26 S.W.3d 66",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11186033
+      ],
+      "weight": 4,
+      "pin_cites": [
+        {
+          "page": "73"
+        },
+        {
+          "page": "73"
+        },
+        {
+          "page": "74"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "73 S.W.3d 211",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9436678
+      ],
+      "weight": 2,
+      "pin_cites": [
+        {
+          "page": "215"
+        },
+        {
+          "page": "215"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "688 S.W.2d 100",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9959735
+      ],
+      "pin_cites": [
+        {
+          "page": "103"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "90 S.W.3d 268",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9317982
+      ],
+      "pin_cites": [
+        {
+          "page": "287"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "64 S.W.3d 564",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9398795
+      ],
+      "pin_cites": [
+        {
+          "page": "579-80"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "978 S.W.2d 203",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        11668471
+      ],
+      "weight": 2,
+      "pin_cites": [
+        {
+          "page": "208"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "16 S.W.3d 829",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11527896
+      ],
+      "pin_cites": [
+        {
+          "page": "841"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "39 S.W.3d 658",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11120712
+      ],
+      "pin_cites": [
+        {
+          "page": "665"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "18 S.W.3d 701",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11508435
+      ],
+      "weight": 4,
+      "pin_cites": [
+        {
+          "page": "703-04"
+        },
+        {
+          "page": "704",
+          "parenthetical": "fact issue remained on question of whether debtors' failure to list personal injury claim in bankruptcy schedule was inadvertent due to debtors' stated belief that such a claim was not considered a \"contingent and unliquidated claim\" for bankruptcy purposes"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "959 S.W.2d 646",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        11875972
+      ],
+      "weight": 4,
+      "pin_cites": [
+        {
+          "page": "649"
+        },
+        {
+          "page": "649"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "41 Baylor L.Rev. 447",
+      "category": "journals:journal",
+      "reporter": "Baylor L. Rev.",
+      "pin_cites": [
+        {
+          "page": "459",
+          "parenthetical": "\"The purpose of judicial estoppel or estop-pel by oath is to uphold the sanctity of the oath and to prevent abuse of the judicial process.\""
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "179 F.3d 197",
+      "category": "reporters:federal",
+      "reporter": "F.3d",
+      "case_ids": [
+        844432,
+        11662465
+      ],
+      "weight": 8,
+      "pin_cites": [
+        {
+          "page": "205"
+        },
+        {
+          "page": "206-07"
+        },
+        {
+          "page": "209-10"
+        },
+        {
+          "page": "210"
+        },
+        {
+          "page": "210"
+        },
+        {
+          "page": "210"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "79 S.W.3d 633",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9407226
+      ],
+      "weight": 5,
+      "pin_cites": [
+        {
+          "page": "636"
+        },
+        {
+          "page": "636"
+        },
+        {
+          "page": "637"
+        },
+        {
+          "page": "636-37"
+        },
+        {
+          "page": "636"
+        }
+      ],
+      "opinion_id": 0
+    }
+  ],
+  "frontend_url": "https://cite.case.law/sw3d/134/928/",
+  "frontend_pdf_url": "https://cite.case.law/pdf/9250317/Dallas%20Sales%20Co.%20v.%20Carlisle%20Silver%20Co.,%20134%20S.W.3d%20928%20(2004).pdf",
+  "preview": [],
+  "analysis": {
+    "cardinality": 641,
+    "char_count": 10719,
+    "ocr_confidence": 0.697,
+    "pagerank": {
+      "raw": 1.3580373348052624e-07,
+      "percentile": 0.634804320466033
+    },
+    "sha256": "14f39e7c355ab9e1f9094ef24fb7a6377fc2a6aefeea06b9a9d06520248386e8",
+    "simhash": "1:1f48fa0461d9118b",
+    "word_count": 1708,
+    "random_id": 1539076360.0,
+    "random_bucket": 28936
+  },
+  "last_updated": "2021-09-21T20:02:18.861595+00:00",
+  "provenance": {
+    "date_added": "2019-08-29",
+    "source": "Harvard",
+    "batch": "2018"
+  },
+  "casebody": {
+    "status": "ok",
+    "data": "<?xml version='1.0' encoding='utf-8'?>\n<casebody xmlns=\"http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1\" firstpage=\"928\" lastpage=\"933\">\n  <parties id=\"b938-9\">DALLAS SALES COMPANY, INC., Appellant, v. CARLISLE SILVER COMPANY, INC., d/b/a Carlisle Jewelry Company, H. William Pollack, III, Carolyn Pollack and J.C. Penney Company, Inc., Appellees.</parties>\n  <docketnumber id=\"Aqqq\">No. 10-00-00077-CV.</docketnumber>\n  <court id=\"A5z\">Court of Appeals of Texas, Waco.</court>\n  <decisiondate id=\"AKfg\">May 26, 2004.</decisiondate>\n  <attorneys id=\"b939-21\">\n    <page-number label=\"929\" citation-index=\"1\">*929</page-number>W.D. Masterson, John H. Crouch, Theodore C. Anderson, D. Elizabeth Masterson <page-number label=\"930\" citation-index=\"1\">*930</page-number>Mattei, Kilgore <em>&amp; </em>Kilgore, P.L.L.C., Dallas, for appellant.</attorneys>\n  <attorneys id=\"b940-4\">Robert T. Mowrey, Thomas A. Connop, J. Clinton Schumacher, Locke, Liddell <em>&amp; </em>Sapp, L.L.P., Dallas, for appellees.</attorneys>\n  <attorneys id=\"b940-5\">Thomas A. Connop and J. Clinton Schu-macher, for Carolyn Pollack.</attorneys>\n  <judges id=\"b940-6\">Before Chief Justice GRAY, Justice VANCE, and Justice REYNA.</judges>\n  <opinion type=\"majority\">\n    <p id=\"b940-7\">OPINION</p>\n    <author id=\"b940-8\">FELIPE REYNA, Justice.</author>\n    <p id=\"b940-9\">In this appeal we decide whether Dallas Sales Company is judicially estopped from pursuing the claims it has raised in the underlying lawsuit against Appellees because of its failure to list those claims in the debtor’s schedules it filed in a prior bankruptcy proceeding.</p>\n    <p id=\"b940-10\">JUDICIAL ESTOPPEL</p>\n    <p id=\"b940-11\">Dallas Sales Co. alleges in its first point that Appellees failed to conclusively establish that it is judicially estopped from pursuing its claims.</p>\n    <p id=\"b940-12\">PERTINENT AUTHORITIES</p>\n    <p id=\"b940-13\">“Judicial estoppel protects the integrity of judicial proceedings by precluding a party from asserting a position in a legal proceeding which is inconsistent with a position previously taken by the party.” <em>Natl. Loan Investors, L.P. v. Taylor, </em><extracted-citation url=\"https://cite.case.law/sw3d/79/633/#p636\" index=\"0\" case-ids=\"9407226\">79 S.W.3d 633</extracted-citation>, 636 (Tex.App.-Waco 2002, pet. denied); <em>accord In re Coastal Plains, Inc., </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"1\" case-ids=\"844432,11662465\">179 F.3d 197</extracted-citation>, 205 &amp; n. 1 (5th Cir.1999); Roger M. Baron &amp; Melissa M. Martin, <em>The Application of Judicial Estoppel in Texas, </em><extracted-citation url=\"https://cite.case.law/citations/?q=41%20Baylor%20L.%20Rev.%20447\" index=\"2\">41 Baylor L.Rev. 447</extracted-citation>, 459 (“The purpose of judicial estoppel or estop-pel by oath is to uphold the sanctity of the oath and to prevent abuse of the judicial process.”). This common law doctrine “prevents a party from ‘playing fast and loose’ with the courts to suit its own purposes.” <em>Natl. Loan Investors, </em><extracted-citation url=\"https://cite.case.law/sw3d/79/633/#p636\" index=\"3\" case-ids=\"9407226\">79 S.W.3d at 636</extracted-citation> (quoting <em>Andrews v. Diamond, Rash, Leslie &amp; Smith, </em><extracted-citation url=\"https://cite.case.law/sw2d/959/646/#p649\" index=\"4\" case-ids=\"11875972\">959 S.W.2d 646</extracted-citation>, 649 (Tex.App.-El Paso 1997, writ denied)); <em>accord Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"5\" case-ids=\"844432,11662465\">179 F.3d at 205</extracted-citation>.<footnotemark>1</footnotemark>\n    </p>\n    <p id=\"b940-16\">Under Texas law, the elements for judicial estoppel are: (1) the opponent made a sworn, inconsistent statement in a prior judicial proceeding; (2) the opponent gained some advantage by the prior statement; (3) the statement was not made inadvertently or because of mistake, iraud or duress; and (4) the statement was deliberate, clear and unequivocal. <em>Natl. Loan Investors, </em><extracted-citation url=\"https://cite.case.law/sw3d/79/633/#p636\" index=\"6\" case-ids=\"9407226\">79 S.W.3d at 637</extracted-citation>; <em>Thompson v. Contl. Airlines, </em><extracted-citation url=\"https://cite.case.law/sw3d/18/701/\" index=\"7\" case-ids=\"11508435\">18 S.W.3d 701</extracted-citation>, 704 n. 2 (Tex.App.-San Antonio 2000, no pet.); <em>Andrews, </em><extracted-citation url=\"https://cite.case.law/sw2d/959/646/#p649\" index=\"8\" case-ids=\"11875972\">959 S.W.2d at </extracted-citation>650 n. 2.</p>\n    <p id=\"b940-17\">Under federal law, a party which has assumed one position in its pleadings may be estopped from asserting a contrary position in a subsequent proceeding if: (1) “the position of the party to be estopped is clearly inconsistent with its previous one;” (2) that party convinced the court in the previous proceeding to accept its position; and (3) that party asserted the prior position intentionally rather than inadvertently. <em>See Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"9\" case-ids=\"844432,11662465\">179 F.3d at 206-07</extracted-citation>; <em>Thompson, </em><extracted-citation url=\"https://cite.case.law/sw3d/18/701/\" index=\"10\" case-ids=\"11508435\">18 S.W.3d at 703-04</extracted-citation>.</p>\n    <p id=\"b941-4\">\n      <page-number label=\"931\" citation-index=\"1\">*931</page-number>In <em>National Loan Investors, </em>this Court applied state law in determining that the debtors in that ease were judicially es-topped from claiming the property at issue as their homestead in a foreclosure proceeding because they had not identified the property as homestead in the schedules they filed in a prior bankruptcy proceeding. <extracted-citation url=\"https://cite.case.law/sw3d/79/633/#p636\" index=\"11\" case-ids=\"9407226\">79 S.W.3d at 636-37</extracted-citation>.</p>\n    <p id=\"b941-5\">However, Appellees contend that federal law should apply here because the prior proceeding was in bankruptcy court. A majority of Texas courts seems to agree with Appellees on this issue. <em>See Zipp Indus., Inc. v. Ranger Ins. Co., </em><extracted-citation url=\"https://cite.case.law/sw3d/39/658/#p665\" index=\"12\" case-ids=\"11120712\">39 S.W.3d 658</extracted-citation>, 665 (Tex.App.-Amarillo 2001, no pet.); <em>Stephenson v. LeBoeuf, </em><extracted-citation url=\"https://cite.case.law/sw3d/16/829/#p841\" index=\"13\" case-ids=\"11527896\">16 S.W.3d 829</extracted-citation>, 841 (Tex.App.-Houston [14th Dist.] 2000, pet. denied); <em>Thompson, </em><extracted-citation url=\"https://cite.case.law/sw3d/18/701/\" index=\"14\" case-ids=\"11508435\">18 S.W.3d at </extracted-citation>703 n. 1; <em>Stewart v. Hardie, </em><extracted-citation url=\"https://cite.case.law/sw2d/978/203/\" index=\"15\" case-ids=\"11668471\">978 S.W.2d 203</extracted-citation>, 208 n. 1 (Tex.App.-Fort Worth 1998, pet. denied); <em>Andrews, </em><extracted-citation url=\"https://cite.case.law/sw2d/959/646/#p649\" index=\"16\" case-ids=\"11875972\">959 S.W.2d at </extracted-citation>649 n. 1; <em>but cf. In re Est. of Loveless, </em><extracted-citation url=\"https://cite.case.law/sw3d/64/564/#p579\" index=\"17\" case-ids=\"9398795\">64 S.W.3d 564</extracted-citation>, 579-80 (Tex.App.-Texarkana 2001, no pet.) (questioning whether Fifth Circuit cases should be followed given lack of consensus among federal circuits regarding judicial estoppel).</p>\n    <p id=\"b941-6\">For two related reasons, we agree with Appellees. First, the primary purpose of judicial estoppel is to preserve the integrity of the prior judicial proceeding. <em>See Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"18\" case-ids=\"844432,11662465\">179 F.3d at </extracted-citation>205 &amp; n. 2; <em>Natl. Loan Investors, </em><extracted-citation url=\"https://cite.case.law/sw3d/79/633/#p636\" index=\"19\" case-ids=\"9407226\">79 S.W.3d at 636</extracted-citation>; Baron &amp; Martin, 41 Baylor L.Rev. at 459. Thus, it makes sense to apply the law applicable to the prior proceeding.</p>\n    <p id=\"b941-7\">Second, under the similar doctrine of res judicata, the Supreme Court has long held that federal law governs when determining whether a state court claim is barred by a prior federal judgment. <em>John G. &amp; Marie Stella Kenedy Meml. Found. v. Dewhurst, </em><extracted-citation url=\"https://cite.case.law/sw3d/90/268/#p287\" index=\"20\" case-ids=\"9317982\">90 S.W.3d 268</extracted-citation>, 287 (Tex.2002); <em>Jeanes v. Henderson, </em><extracted-citation url=\"https://cite.case.law/sw2d/688/100/#p103\" index=\"21\" case-ids=\"9959735\">688 S.W.2d 100</extracted-citation>, 103 (Tex.1985) (citing <em>Restatement (Second) of Judgments </em>§ 87 (1982)). This approach operates to preserve the “principle of finality [of judgments].” <em>Restatement (Second) of Judgments </em>§ 87 cmt. a. Thus, the Supreme Court’s approach in res judicata eases serves to preserve the integrity of prior federal proceedings.</p>\n    <p id=\"b941-11\">Accordingly, we agree with other Texas courts that the federal law of judicial es-toppel applies in a case in which the prior proceeding was in federal bankruptcy court. We overrule <em>National Loan Investors </em>to the extent it is inconsistent with this approach.<footnotemark>2</footnotemark>\n    </p>\n    <p id=\"b941-12\">STANDARD OF REVIEW</p>\n    <p id=\"b941-13\">To prevail on a summary judgment motion, the movant must demonstrate that there are no genuine issues of material fact and that it is entitled to judgment as a matter of law. <em>Sw. Elec. Power Co. v. Grant, </em><extracted-citation url=\"https://cite.case.law/sw3d/73/211/#p215\" index=\"22\" case-ids=\"9436678\">73 S.W.3d 211</extracted-citation>, 215 (Tex.2002); <em>Fletcher v. Edwards, </em><extracted-citation url=\"https://cite.case.law/sw3d/26/66/#p73\" index=\"23\" case-ids=\"11186033\">26 S.W.3d 66</extracted-citation>, 73 (Tex.App.-Waco 2000, pet. denied). We take all evidence favoring the nonmovant as true. <em>Sw. Elec. Power Co., </em><extracted-citation url=\"https://cite.case.law/sw3d/73/211/#p215\" index=\"24\" case-ids=\"9436678\">73 S.W.3d at 215</extracted-citation>; <em>Fletcher, </em><extracted-citation url=\"https://cite.case.law/sw3d/26/66/#p73\" index=\"25\" case-ids=\"11186033\">26 S.W.3d at 73</extracted-citation>. We indulge every reasonable inference from the evidence in favor of the nonmovant and resolve any doubts in its favor. <em><extracted-citation url=\"https://cite.case.law/sw3d/26/66/#p73\" index=\"26\" case-ids=\"11186033\">Id.</extracted-citation></em>\n    </p>\n    <p id=\"b941-14\">Judicial estoppel is an affirmative defense. <em>See Anadarko Petroleum Corp. v. Thompson, </em><extracted-citation url=\"https://cite.case.law/sw3d/94/550/#p553\" index=\"27\" case-ids=\"9329509\">94 S.W.3d 550</extracted-citation>, 553 (Tex.2002). A defendant must conclusively establish each element of an affirmative defense. <em>Walker v. Harris, </em><extracted-citation url=\"https://cite.case.law/sw2d/924/375/#p377\" index=\"28\" case-ids=\"10014404\">924 S.W.2d 375</extracted-citation>, 377 (Tex.1996); <em>Perry v. Greanias, </em><extracted-citation url=\"https://cite.case.law/sw3d/95/683/#p691\" index=\"29\" case-ids=\"9333825\">95 S.W.3d 683</extracted-citation>, 691 (Tex.App.-Houston [1st <page-number label=\"932\" citation-index=\"1\">*932</page-number>Dist.] 2002, pet. denied); <em>Sonnichsen v. Baylor U., </em><extracted-citation url=\"https://cite.case.law/sw3d/47/122/#p124\" index=\"30\" case-ids=\"11085677\">47 S.W.3d 122</extracted-citation>, 124 (Tex.App.-Waco 2001, no pet.). Once a defendant has presented sufficient evidence to establish a right to summary judgment on an affirmative defense, the burden of production shifts to the nonmovant to present evidence which raises a genuine issue of material fact as to at least one element of the affirmative defense. <em>See Santanna Nat. Gas Corp. v. Hamon Operating Co., </em><extracted-citation url=\"https://cite.case.law/sw2d/954/885/#p889\" index=\"31\" case-ids=\"11903425\">954 S.W.2d 885</extracted-citation>, 889-90 (Tex.App.-Austin 1997, writ denied); <em>Carter v. Charles, </em><extracted-citation url=\"https://cite.case.law/sw2d/853/667/#p672\" index=\"32\" case-ids=\"10009375\">853 S.W.2d 667</extracted-citation>, 672 (Tex.App.-Houston [14th Dist.] 1993, no writ); <em>accord Walker, </em><extracted-citation url=\"https://cite.case.law/sw2d/924/375/#p377\" index=\"33\" case-ids=\"10014404\">924 S.W.2d at 377</extracted-citation>; <em>Lake Charles Harbor &amp; Terminal Dist. v. Bd. of Trustees of Galveston Wharves, </em><extracted-citation url=\"https://cite.case.law/sw3d/62/237/#p241\" index=\"34\" case-ids=\"9455143\">62 S.W.3d 237</extracted-citation>, 241 (Tex.App.-Houston [14th Dist.] 2001, pet. denied).</p>\n    <p id=\"b942-4\">Application</p>\n    <p id=\"b942-5\">Dallas Sales Co. does not dispute that it listed none of the claims asserted in this lawsuit as assets in its bankruptcy schedules. Its pursuit of these claims in this post-bankruptcy litigation is clearly inconsistent with the position it took in bankruptcy court. <em>See Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"35\" case-ids=\"844432,11662465\">179 F.3d at 209-10</extracted-citation>; <em>Stewart, </em><extracted-citation url=\"https://cite.case.law/sw2d/978/203/\" index=\"36\" case-ids=\"11668471\">978 S.W.2d at 208</extracted-citation>. The fact that Dallas Sales Co. asserted these claims in the adversary proceeding is irrelevant. <em>See Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"37\" case-ids=\"844432,11662465\">179 F.3d at 210</extracted-citation>.</p>\n    <p id=\"b942-6\">Dallas Sales Co. does not dispute that the bankruptcy court accepted its position by authorizing the bankruptcy trustee to abandon the assets of Dallas Sales Co.’s bankruptcy estate because those assets were of “no or little value to the estate.” <em>Cf. Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"38\" case-ids=\"844432,11662465\">179 F.3d at 210</extracted-citation>.</p>\n    <p id=\"b942-7\">Dallas Sales Co. does contend, however, that its failure to disclose these claims in its bankruptcy schedules was inadvertent. To support this argument, Dallas Sales Co. cites the affidavit of its bankruptcy counsel who states that the claims were “inadvertently omitted” because “the principal concern [at the time of the bankruptcy filing] was to obtain post-petition financing.” Notwithstanding this tactical explanation however, it is undisputed that Dallas Sales Co. had knowledge of these claims at a time when it could have amended its schedules to include them because the claims formed the basis of the adversary proceeding it pursued in bankruptcy court. It is also undisputed that Dallas Sales Co. never amended its schedules.</p>\n    <p id=\"b942-9\">According to the Fifth Circuit, “the debtor’s failure to satisfy its statutory disclosure duty is ‘inadvertent’ only when, in general, the debtor either lacks knowledge of the undisclosed claims <em>or </em>has no motive for their concealment.” <em>Coastal Plains, </em><extracted-citation url=\"https://cite.case.law/f3d/179/197/\" index=\"39\" case-ids=\"844432,11662465\">179 F.3d at 210</extracted-citation>. Counsel’s explanation does not meet this test. Even taking Dallas Sales Co.’s factual allegations as true, Appellees conclusively established that Dallas Sales Co. had knowledge of the undisclosed claims, that it did not list them in its original bankruptcy schedules, and that it did not amend its schedules to include the claims. <em>Cf. Thompson, </em><extracted-citation url=\"https://cite.case.law/sw3d/18/701/\" index=\"40\" case-ids=\"11508435\">18 S.W.3d at 704</extracted-citation> (fact issue remained on question of whether debtors’ failure to list personal injury claim in bankruptcy schedule was inadvertent due to debtors’ stated belief that such a claim was not considered a “contingent and unliquidated claim” for bankruptcy purposes).</p>\n    <p id=\"b942-10\">Accordingly, we overrule Dallas Sales Co.’s first point.</p>\n    <p id=\"b942-11\">CONCLUSION</p>\n    <p id=\"b942-12\">Because Appellees conclusively established that Dallas Sales Co. is judicially estopped from asserting the claims presented in this lawsuit, we need not address the remainder of the grounds presented in the summary judgment motion or the points challenging them. <em>See Star-Tele</em>\n      <page-number label=\"933\" citation-index=\"1\">*933</page-number>\n      <em>gram, Inc. v. Doe, </em><extracted-citation url=\"https://cite.case.law/sw2d/915/471/#p473\" index=\"41\" case-ids=\"10008856\">915 S.W.2d 471</extracted-citation>, 473 (Tex.1995); <em>Fletcher, </em><extracted-citation url=\"https://cite.case.law/sw3d/26/66/#p73\" index=\"42\" case-ids=\"11186033\">26 S.W.3d at 74</extracted-citation>.</p>\n    <p id=\"b943-5\">We affirm the judgment.</p>\n    <footnote label=\"1\">\n      <p id=\"b940-14\">. The El Paso Court derived the \"playing fast and loose” quote from a federal bankruptcy case. <em>Andrews v. Diamond, Rash, Leslie &amp; Smith, </em><extracted-citation url=\"https://cite.case.law/sw2d/959/646/#p649\" index=\"43\" case-ids=\"11875972\">959 S.W.2d 646</extracted-citation>, 649 (Tex.App.-El Paso 1997, writ denied) (quoting <em>In re Phillips, </em><extracted-citation url=\"https://cite.case.law/br/124/712/#p720\" index=\"44\" case-ids=\"6497372\">124 B.R. 712</extracted-citation>, 720 (Bkrtcy W.D.Tex.1991)). Although this phrase appears in numerous federal authorities, it apparently finds its origin in a 1949 decision of the Superior Court of New Jersey. <em>See Scarano v. C. Ry., </em><extracted-citation url=\"https://cite.case.law/f2d/203/510/#p513\" index=\"45\" case-ids=\"1271649\">203 F.2d 510</extracted-citation>, 513 (3d Cir.1953) (quoting <em>Stretch v. Watson, </em><extracted-citation url=\"https://cite.case.law/nj-super/6/456/#p469\" index=\"46\" case-ids=\"361417\">6 N.J.Super. 456</extracted-citation>, 469, <extracted-citation url=\"https://cite.case.law/citations/?q=69%20A.2d%20596\" index=\"47\">69 A.2d 596</extracted-citation>, 603 (1949) (\"A party will not be permitted to play fast and loose with the courts”), <em>rev’d in part on other grounds, </em><extracted-citation url=\"https://cite.case.law/nj/5/268/\" index=\"48\" case-ids=\"114822\">5 N.J. 268</extracted-citation>, <extracted-citation url=\"https://cite.case.law/citations/?q=74%20A.2d%20597\" index=\"49\">74 A.2d 597</extracted-citation> (1950)).</p>\n    </footnote>\n    <footnote label=\"2\">\n      <p id=\"b941-8\">. It does not appear that the result would have been any different in <em>National Loan Investors </em>had we applied federal law.</p>\n    </footnote>\n  </opinion>\n</casebody>\n"
+  }
+}

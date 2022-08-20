@@ -1,0 +1,225 @@
+{
+  "id": 9249213,
+  "url": "https://api.case.law/v1/cases/9249213/",
+  "name": "Tina WESTER, Plaintiff-Appellant, v. MISSOURI DEPARTMENT OF LABOR AND INDUSTRIAL RELATIONS, Defendant-Respondent",
+  "name_abbreviation": "Wester v. Missouri Department of Labor & Industrial Relations",
+  "decision_date": "2004-05-21",
+  "docket_number": "No. 25741",
+  "first_page": "757",
+  "last_page": "761",
+  "citations": [
+    {
+      "type": "official",
+      "cite": "134 S.W.3d 757"
+    }
+  ],
+  "volume": {
+    "url": "https://api.case.law/v1/volumes/32044073045999/",
+    "volume_number": "134",
+    "barcode": "32044073045999"
+  },
+  "reporter": {
+    "url": "https://api.case.law/v1/reporters/612/",
+    "full_name": "South Western Reporter Third Series",
+    "id": 612
+  },
+  "court": {
+    "url": "https://api.case.law/v1/courts/mo-ct-app-3/",
+    "name_abbreviation": "Mo. Ct. App.",
+    "slug": "mo-ct-app-3",
+    "id": 9982,
+    "name": "Missouri Court of Appeals"
+  },
+  "jurisdiction": {
+    "id": 37,
+    "name_long": "Missouri",
+    "url": "https://api.case.law/v1/jurisdictions/mo/",
+    "slug": "mo",
+    "whitelisted": false,
+    "name": "Mo."
+  },
+  "cites_to": [
+    {
+      "cite": "524 S.W.2d 34",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10119046
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "652 S.W.2d 728",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9951320
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "674 S.W.2d 69",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9926344,
+        9926438
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "509 S.W.2d 217",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10119985
+      ],
+      "pin_cites": [
+        {
+          "page": "220"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "703 S.W.2d 528",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9977544
+      ],
+      "pin_cites": [
+        {
+          "page": "530"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "291 S.W.2d 166",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10164329,
+        1903757
+      ],
+      "year": 1956,
+      "pin_cites": [
+        {
+          "page": "177"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "365 Mo. 996",
+      "category": "reporters:state",
+      "reporter": "Mo.",
+      "case_ids": [
+        1903757
+      ],
+      "year": 1956,
+      "opinion_id": 0
+    },
+    {
+      "cite": "651 S.W.2d 145",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9929481
+      ],
+      "year": 1983,
+      "pin_cites": [
+        {
+          "page": "151",
+          "parenthetical": "citing Producers Produce Co. v. Indus. Comm'n of Missouri, 365 Mo. 996, 291 S.W.2d 166, 177 (1956)"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "489 S.W.2d 475",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10122982
+      ],
+      "pin_cites": [
+        {
+          "page": "481"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "998 S.W.2d 870",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        11546319
+      ],
+      "pin_cites": [
+        {
+          "page": "873"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "15 S.W.3d 792",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        11530955
+      ],
+      "weight": 2,
+      "pin_cites": [
+        {
+          "page": "795"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "106 S.W.3d 536",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.3d",
+      "case_ids": [
+        9113920
+      ],
+      "pin_cites": [
+        {
+          "page": "539"
+        }
+      ],
+      "opinion_id": 0
+    }
+  ],
+  "frontend_url": "https://cite.case.law/sw3d/134/757/",
+  "frontend_pdf_url": "https://cite.case.law/pdf/9249213/Wester%20v.%20Missouri%20Department%20of%20Labor%20&%20Industrial%20Relations,%20134%20S.W.3d%20757%20(2004).pdf",
+  "preview": [],
+  "analysis": {
+    "cardinality": 599,
+    "char_count": 11184,
+    "ocr_confidence": 0.711,
+    "pagerank": {
+      "raw": 1.8176320193101872e-07,
+      "percentile": 0.7187104165303175
+    },
+    "sha256": "64770be2e0f6fb88b6a1fab5a2b8f82c0fbb857d89eb272995c85ff9dec5630b",
+    "simhash": "1:00668def3128548f",
+    "word_count": 1788,
+    "random_id": 2744622615.0,
+    "random_bucket": 40471
+  },
+  "last_updated": "2021-09-21T20:02:18.861595+00:00",
+  "provenance": {
+    "date_added": "2019-08-29",
+    "source": "Harvard",
+    "batch": "2018"
+  },
+  "casebody": {
+    "status": "ok",
+    "data": "<?xml version='1.0' encoding='utf-8'?>\n<casebody xmlns=\"http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1\" firstpage=\"757\" lastpage=\"761\">\n  <parties id=\"b767-5\">Tina WESTER, Plaintiff-Appellant, v. MISSOURI DEPARTMENT OF LABOR AND INDUSTRIAL RELATIONS, Defendant-Respondent.</parties>\n  <docketnumber id=\"AFZ\">No. 25741.</docketnumber>\n  <court id=\"Ap2\">Missouri Court of Appeals, Southern District, Division Two.</court>\n  <decisiondate id=\"Auya\">May 21, 2004.</decisiondate>\n  <attorneys id=\"b768-9\">\n    <page-number label=\"758\" citation-index=\"1\">*758</page-number>Jack Kentner and Kevin M. Sloan, Lake Ozark, MO, for appellant.</attorneys>\n  <attorneys id=\"b768-10\">Marilyn Green and Cynthia Quetsch, Jefferson City, MO, for respondent.</attorneys>\n  <opinion type=\"majority\">\n    <author id=\"b768-11\">NANCY STEFFEN RAHMEYER, Chief Judge.</author>\n    <p id=\"b768-12\">Tina Wester (“Claimant”), having exhausted all administrative procedures and remedies, appeals the denial of her application for unemployment benefits.<footnotemark>1</footnotemark> The Labor and Industrial Relations Commission (“the Commission”) found that pursuant to Section 288.040 Claimant was not able and available for work because she was a part-time student and had restricted her work availability to periods when she was not attending class.<footnotemark>2</footnotemark> We affirm.</p>\n    <p id=\"b768-15\">The standard of review when reviewing a Commission decision on unemployment benefits is governed by Section 288.210. This court may reverse, modify, set aside, or remand a decision by the Commission only on the following grounds:</p>\n    <blockquote id=\"b768-16\">(1) That the commission acted without or in excess of its powers;</blockquote>\n    <blockquote id=\"b768-17\">(2) That the decision was procured by fraud;</blockquote>\n    <blockquote id=\"b768-18\">(3) That the facts found by the commission do not support the award; or</blockquote>\n    <blockquote id=\"b768-19\">(4) That there was no sufficient competent evidence in the record to warrant the making of the award.</blockquote>\n    <p id=\"b768-20\">Section 288.210; <em>Dixon v. Div. of Employment Sec., </em><extracted-citation url=\"https://cite.case.law/sw3d/106/536/#p539\" index=\"0\" case-ids=\"9113920\">106 S.W.3d 536</extracted-citation>, 539 (Mo.App. W.D.2003). The factual findings of the <page-number label=\"759\" citation-index=\"1\">*759</page-number>Commission, if supported by competent and substantial evidence and in the absence of fraud, shall be conclusive and our review shall be limited to questions of law. <em>Kennett Bd. of Pub. Works v. Shipman, </em><extracted-citation url=\"https://cite.case.law/sw3d/15/792/#p795\" index=\"1\" case-ids=\"11530955\">15 S.W.3d 792</extracted-citation>, 795 (Mo.App. S.D.2000). The evidence is reviewed in a light most favorable to the findings and decision of the Commission and opposing and unfavorable evidence is disregarded. <em><extracted-citation url=\"https://cite.case.law/sw3d/15/792/#p795\" index=\"2\" case-ids=\"11530955\">Id.</extracted-citation> </em>Section 288.020.2 directs that Missouri employment security law “shall be liberally construed to accomplish its purpose to promote employment security ... by providing for the payment of compensation to individuals in respect to their unemployment.” Therefore, disqualifying provisions in employment security law are strictly construed against the disallowance of benefits. <em>City of Kansas City v. Arthur, </em><extracted-citation url=\"https://cite.case.law/sw2d/998/870/#p873\" index=\"3\" case-ids=\"11546319\">998 S.W.2d 870</extracted-citation>, 873 (Mo.App. W.D.1999).</p>\n    <p id=\"b769-4\">Claimant pursued an Associate’s Degree in early childhood education at Ozark Technical Community College (“OTC”) on a part-time basis during the period of unemployment at issue in this case.<footnotemark>3</footnotemark> Claimant made three or four job contacts a week, but when making those job contacts restricted her requested working days to those that did not coincide with the eight hours per week she was in class at OTC. Upon examination by the appeals referee, Claimant stated that she could take a normal 8:00 a.m. to 5:00 p.m. job “if they’re willing to work with me,” but she could not alter her class schedule. She further stated that “I suppose I could miss the class and ... get the work done.”</p>\n    <p id=\"b769-6\">Claimant’s denial of benefits was predicated solely on findings that she was not “available for work” as required by Section 288.040.1(2). In part, the Commission found:</p>\n    <blockquote id=\"b769-7\">Since the claimant is not a full-time student, no presumption arises that she is per se “not available.” However, during two normal workdays each week the claimant is in class both in the morning and the afternoon for several hours. This would severely restrict her availability for most full-time work.</blockquote>\n    <blockquote id=\"b769-8\">Additionally, the claimant has been restricting her search for work to days and hours that do not conflict with her schedule. Since the claimant graduates in three weeks, it must reasonably be assumed that finishing her education is her primary goal. Based upon the record as a whole, it is demonstrated that the claimant has been restricting her availability for work and therefore is ineligible for benefits for the period January 29, 2003 through April 26, 2003.</blockquote>\n    <p id=\"b769-9\">An unemployed claimant is eligible for benefits if she is able to work and is “available” for work. Section 288.040. To be deemed available for work the claimant must have been “actively and earnestly” looking for work. Section 288.040. The expression “available for work” is not defined in Section 288.040.1(2) and it is not necessary nor desirable to attempt an inflexible definition because its meaning will vary depending upon the peculiar facts in each case. <em>Western Elec. Co. v. Indus. Comm’n, </em><extracted-citation url=\"https://cite.case.law/sw2d/489/475/#p481\" index=\"4\" case-ids=\"10122982\">489 S.W.2d 475</extracted-citation>, 481 (Mo.App.1972).<footnotemark>4</footnotemark> Availability for work differs from <page-number label=\"760\" citation-index=\"1\">*760</page-number>case-to-case; however, a claimant must clearly possess a genuine attachment to the labor market and be able, willing, and ready to accept suitable work. <em>Missouri Div. of Emp. Sec. v. Labor &amp; Indus. Rel. Comm’n, </em><extracted-citation url=\"https://cite.case.law/sw2d/651/145/#p151\" index=\"5\" case-ids=\"9929481\">651 S.W.2d 145</extracted-citation>, 151 (Mo. banc 1983)(citing <em>Producers Produce Co. v. Indus. Comm’n of Missouri, </em><extracted-citation url=\"https://cite.case.law/mo/365/996/\" index=\"6\" case-ids=\"1903757\">365 Mo. 996</extracted-citation>, <extracted-citation url=\"https://cite.case.law/sw2d/291/166/\" index=\"7\" case-ids=\"10164329,1903757\">291 S.W.2d 166</extracted-citation>, 177 (1956)).</p>\n    <p id=\"b770-4\">No doubt exists as to Claimant’s readiness and willingness to work during the hours designated by her; however, the issue before the Commission was whether the availability of Claimant was so reduced that she in fact was no longer available for work. A claimant may render herself unavailable for work, and thus ineligible for unemployment benefits, by imposition of unreasonable restrictions on her accessibility. <em>Scott County Reorganized Sch. Dist. R-6 v. Labor and Indus. Relations Comm’n of Missouri, </em><extracted-citation url=\"https://cite.case.law/sw2d/703/528/#p530\" index=\"8\" case-ids=\"9977544\">703 S.W.2d 528</extracted-citation>, 530 (Mo.App. S.D.1985). “A willingness to merely be employed conditionally does not meet the test of availability and the determination of availability for work is largely a question of fact for the commission.” <em>Golden, </em>524 S.W.2d at 38. As stated in <em>Golden:</em>\n    </p>\n    <blockquote id=\"b770-5\">Ineligible student-claimants are those who limit their availability for work to particular times, days or periods that do not interfere with their primary and principal objective of obtaining a formal education. The reason such students are considered ineligible is that by making themselves available for work only conditionally and on a limited basis at times that do not conflict with their classes and learning purposes, they have divorced themselves actually and currently from the general labor market. While the determination of student-claimants to secure an education is commendable, the standards of the employment security act must be applied consistent with its purpose of removing the economic disabilities and distress resulting from involuntary unemployment.</blockquote>\n    <p id=\"b770-8\">\n      <em>Id. </em>at 37.</p>\n    <p id=\"b770-9\">Here, the Commission’s decision was based on Claimant’s failure to prove that her primary purpose was employment and not education. While we commend Claimant for her continued efforts to further her education, and note that she did work and attend classes simultaneously prior to her separation from employment, the burden of proof was upon Claimant to prove she was available for work at the time she requested unemployment benefits. The Commission found she was not available and that finishing her education was Claimant’s primary goal. That finding is supported by Claimant’s statements in that even though Claimant insisted repeatedly that the hours were very flexible in her desired field of children’s day care, “[t]he record stands mute as to the extent and existence vel non of any market for labor at the times claimant was willing to accept employment.” <em>See Golden, </em>524 S.W.2d at 38. Claimant argues that in the past she was able to work forty hours a week and carry a similar class schedule and that she had not been told by any <page-number label=\"761\" citation-index=\"1\">*761</page-number>prospective employer that her working and attending classes would be a problem. We agree with the Commission that the issue before this Court is not whether Claimant was available for work at some time in the past. There was sufficient, competent evidence in the record to support the Commission’s decision that Claimant was not available for work at the time she applied for unemployment benefits.</p>\n    <p id=\"b771-5\">Although Claimant’s testimony was un-contradicted, the administrative agency here, as trier of fact, had the right to believe or disbelieve none, all, or part of any witness’ testimony and draw inferences from facts dissimilar to those which a court on judicial review may have drawn. <em>See Tri-State Motor Transit Co. v. Indus. Comm’n of Missouri, </em><extracted-citation url=\"https://cite.case.law/sw2d/509/217/#p220\" index=\"9\" case-ids=\"10119985\">509 S.W.2d 217</extracted-citation>, 220 (Mo.App.1974). Under our standard of review, we cannot say that the Commission’s finding was not supported by sufficient competent evidence or authorized by law.</p>\n    <p id=\"b771-6\">The decision of the Labor and Industrial Relations Commission is affirmed.</p>\n    <judges id=\"b771-7\">PARRISH, J., and BATES, J., concur.</judges>\n    <footnote label=\"1\">\n      <p id=\"b768-13\">. Claimant filed her initial claim for benefits on January 31, 2003. On February 18, 2003, a deputy with the Missouri Division of Employment Security determined that Claimant was ineligible for work under Section 288.040 because her \"school attendance” restricted her availability for work. Claimant filed her Notice of Appeal with the Appeals Tribunal on February 21, 2003. Following a telephone hearing on April 29, 2003, Appeals Referee Honorable Joe Villines, Jr. affirmed the deputy's determination and found Claimant \"was not available for work and therefore is ineligible for benefits.” Claimant then filed an Application for Review with the Labor and Industrial Relations Commission on May 27, 2003. On June 25, 2003, the Labor and Industrial Relations Commission affirmed the decision of the Appeals Tribunal. Claimant then secured her appeal with this Court pursuant to Section 288.210.</p>\n    </footnote>\n    <footnote label=\"2\">\n      <p id=\"b768-22\">. Section 288.040 states in pertinent part:</p>\n      <blockquote id=\"b768-23\">1. A claimant who is unemployed and has been determined to be an insured worker shall be eligible for benefits for any week only if the deputy finds that:</blockquote>\n      <blockquote id=\"pAX-\">\n        <img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAE4AAAAcAQAAAADnl7RMAAAAQUlEQVR4nGP8zwAFf5kY4GAwMycwTGA4wfCEgYGJoYHhB8MfhgdoChoYOBhYGBQYGBj+3/9//v///////2GkpjcBRj0UnJ3WJlsAAAAASUVORK5CYII=\" class=\"blockquote\" width=\"78\" height=\"28\"/>\n      </blockquote>\n      <blockquote id=\"b768-24\">(2) The claimant is able to work and is available for work. No person shall be deemed available for work unless such person has been and is actively and earnestly seeking work. All statutory references are to RSMo 2000, unless otherwise specified.</blockquote>\n      <p id=\"b768-25\">All statutory references are to RSMo 2000, unless otherwise stated.</p>\n    </footnote>\n    <footnote label=\"3\">\n      <p id=\"b769-5\">. On Tuesdays, Claimant attended class from 8:00 a.m. until 9:15 a.m. and then again from 2:30 p.m. until 5:00 p.m. On Thursdays, Claimant had class from 8:00 a.m. until 11:30 a.m. and then again from 2:30 p.m. until 3:45 p.m.</p>\n    </footnote>\n    <footnote label=\"4\">\n      <p id=\"b769-10\">. Additional cases dealing with the issue of \"availability\" include: Gee v. <em>Labor &amp; Indus. Rel. Comm'n of Missouri, </em><extracted-citation url=\"https://cite.case.law/sw2d/674/69/\" index=\"10\" case-ids=\"9926344,9926438\">674 S.W.2d 69</extracted-citation> (Mo.App.W.D.1984) (Claimant, who attended school from 7:00 a.m. to 12:00 noon, five days a week and was looking for a \"full-time nights only” job, was properly denied benefits be<page-number label=\"760\" citation-index=\"1\">*760</page-number>cause he placed an undue restriction on his availability for work and had \"separated himself from the general labor market because of his school attendance.”); <em>Ferry v. Labor &amp; Indus. Rel. Comm’n of Missouri, </em><extracted-citation url=\"https://cite.case.law/sw2d/652/728/\" index=\"11\" case-ids=\"9951320\">652 S.W.2d 728</extracted-citation> (Mo.App. W.D.1983) (Claimant was ineligible for benefits by unreasonably restricting his availability for work where he limited the time and salary conditions under which he was willing to work to evening hours only.); and <em>Golden v. Indus. Comm’n Div. of Employment Sec., </em><extracted-citation url=\"https://cite.case.law/sw2d/524/34/\" index=\"12\" case-ids=\"10119046\">524 S.W.2d 34</extracted-citation> (Mo.App.1975) (Claimant college student rendered himself \"unavailable” for work, and thus ineligible for unemployment benefits, by imposing conditions on the hours and days he was available for work so that they would not interfere with his class attendance.).</p>\n    </footnote>\n  </opinion>\n</casebody>\n"
+  }
+}

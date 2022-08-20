@@ -1,0 +1,148 @@
+{
+  "id": 9248666,
+  "url": "https://api.case.law/v1/cases/9248666/",
+  "name": "In the matter of S.J.S., a minor child. D.L.M. and D.E.M., Petitioners/Respondents, v. T.J.S., Respondent/Appellant",
+  "name_abbreviation": "D.L.M. v. T.J.S.",
+  "decision_date": "2004-03-23",
+  "docket_number": "No. ED 83155",
+  "first_page": "673",
+  "last_page": "678",
+  "citations": [
+    {
+      "type": "official",
+      "cite": "134 S.W.3d 673"
+    }
+  ],
+  "volume": {
+    "url": "https://api.case.law/v1/volumes/32044073045999/",
+    "volume_number": "134",
+    "barcode": "32044073045999"
+  },
+  "reporter": {
+    "url": "https://api.case.law/v1/reporters/612/",
+    "full_name": "South Western Reporter Third Series",
+    "id": 612
+  },
+  "court": {
+    "url": "https://api.case.law/v1/courts/mo-ct-app-3/",
+    "name_abbreviation": "Mo. Ct. App.",
+    "slug": "mo-ct-app-3",
+    "id": 9982,
+    "name": "Missouri Court of Appeals"
+  },
+  "jurisdiction": {
+    "id": 37,
+    "name_long": "Missouri",
+    "url": "https://api.case.law/v1/jurisdictions/mo/",
+    "slug": "mo",
+    "whitelisted": false,
+    "name": "Mo."
+  },
+  "cites_to": [
+    {
+      "cite": "931 S.W.2d 218",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10006627
+      ],
+      "weight": 6,
+      "year": 1996,
+      "pin_cites": [
+        {
+          "page": "222"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "240 Mo.App. 1097",
+      "category": "reporters:state",
+      "reporter": "Mo. App.",
+      "case_ids": [
+        1852360
+      ],
+      "weight": 2,
+      "year": 1949,
+      "pin_cites": [
+        {
+          "page": "380-381"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "359 S.W.2d 360",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10159600
+      ],
+      "weight": 3,
+      "pin_cites": [
+        {
+          "page": "367"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "409 S.W.2d 149",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        10122795
+      ],
+      "weight": 2,
+      "pin_cites": [
+        {
+          "page": "153"
+        }
+      ],
+      "opinion_id": 0
+    },
+    {
+      "cite": "850 S.W.2d 64",
+      "category": "reporters:state_regional",
+      "reporter": "S.W.2d",
+      "case_ids": [
+        9993774
+      ],
+      "weight": 2,
+      "year": 1993,
+      "pin_cites": [
+        {
+          "page": "68"
+        }
+      ],
+      "opinion_id": 0
+    }
+  ],
+  "frontend_url": "https://cite.case.law/sw3d/134/673/9248666/",
+  "frontend_pdf_url": "https://cite.case.law/pdf/9248666/D.L.M.%20v.%20T.J.S.,%20134%20S.W.3d%20673%20(2004).pdf",
+  "preview": [],
+  "analysis": {
+    "cardinality": 520,
+    "char_count": 10643,
+    "ocr_confidence": 0.682,
+    "pagerank": {
+      "raw": 4.037307804377483e-08,
+      "percentile": 0.2153638064149812
+    },
+    "sha256": "d414aded59e69aa0bfc371c2e57e586b5969a79b947e6475881c0b43e967eebe",
+    "simhash": "1:990df6ed5497d8d3",
+    "word_count": 1768,
+    "random_id": 3420570750.0,
+    "random_bucket": 50302
+  },
+  "last_updated": "2021-09-21T20:02:18.861595+00:00",
+  "provenance": {
+    "date_added": "2019-08-29",
+    "source": "Harvard",
+    "batch": "2018"
+  },
+  "casebody": {
+    "status": "ok",
+    "data": "<casebody xmlns=\"http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1\" firstpage=\"673\" lastpage=\"678\">\n  <parties id=\"b683-25\">In the matter of S.J.S., a minor child. D.L.M. and D.E.M., Petitioners/Respondents, v. T.J.S., Respondent/Appellant.</parties>\n  <docketnumber id=\"A3gI\">No. ED 83155.</docketnumber>\n  <court id=\"AOy\">Missouri Court of Appeals, Eastern District, Division Three.</court>\n  <decisiondate id=\"A3y\">March 23, 2004.</decisiondate>\n  <otherdate id=\"ARNB\">Motion for Rehearing and/or Transfer to Supreme Court Denied May 13, 2004.</otherdate>\n  <otherdate id=\"AWa6\">Application for Transfer Denied June 22, 2004.</otherdate>\n  <attorneys id=\"b685-16\">\n    <page-number label=\"675\" citation-index=\"1\">*675</page-number>Clinton B. Roberts, Sonya D. Day, Farmington, MO, for appellant.</attorneys>\n  <attorneys id=\"b685-17\">James Michael Willis, Farmington, MO, Gardian Ad Litem.</attorneys>\n  <attorneys id=\"b685-18\">William Gerald Reeves, Farmington, MO, for respondents.</attorneys>\n  <opinion type=\"majority\">\n    <author id=\"b685-19\">WILLIAM H. CRANDALL, JR., Judge.</author>\n    <p id=\"b685-21\">Father, T.J.S., appeals from the judgment of the trial court, granting the petition for the adoption of S.J.S. filed by the SJ.S.’s stepfather, D.E.M., and S.J.S.’s mother, D.L.M. We affirm.</p>\n    <p id=\"b685-22\">Father was married to mother in 1992 and a son, S.J.S, was born of the marriage <page-number label=\"676\" citation-index=\"1\">*676</page-number>in 1993. In 1995, father and mother’s marriage was dissolved and mother was awarded primary physical and legal custody of S.J.S. The decree of dissolution awarded father visitation every other weekend, every other holiday and birthday, and one week in the summer. Father was to pay child support of $125.00 per week and to provide medical insurance coverage for S.J.S.</p>\n    <p id=\"b686-4\">In 1997, mother married D.E.M. In September 1999, D.E.M. and mother filed a petition for adoption of S.J.S. They alleged that stepfather had maintained lawful custody of S.J.S. at all times after December 1997 and for a period of at least nine months, and that father had abandoned and neglected S.J.S. during that time period.</p>\n    <p id=\"b686-5\">Father admitted that from October 1996 on, he had no contact with S.J.S. and did not pay child support, although he was financially able to do so. He did, however, provide medical insurance coverage for S.J.S. At the time of the hearing, father owed back child support of over $88,800.00.</p>\n    <p id=\"b686-6\">The court entered judgment permitting the adoption of S.J.S. by stepfather. Father appeals.</p>\n    <p id=\"b686-7\">In his first point, father asserts that the trial court lacked jurisdiction to hear the case for the reason that stepfather did not meet the jurisdictional requirement of having lawful and actual custody of S.J.S. under section 453.080 RSMo 2000 prior to filing the petition for adoption. Section 453.080 provides in pertinent part:</p>\n    <blockquote id=\"b686-8\">1. The court shall conduct a hearing to determine whether the adoption shall be finalized. During such hearing, the court shall ascertain whether:</blockquote>\n    <blockquote id=\"b686-9\">(1) The person sought to be adopted, if a child, has been in the lawful and actual custody of the petitioner for a period of at least six months prior to entry of the adoption decree. “Lawful and actual custody” shall include a transfer of custody pursuant to the laws of this state, another state, a territory of the United States, or another country....</blockquote>\n    <blockquote id=\"b686-11\">Father argues that when section 453.080 was amended in 1997, it reduced the time of lawful and actual custody from nine months to six months and added as a prerequisite for adoption a court-ordered transfer of custody to the petitioner pursuant to section 453.110 RSMo 2000. Section 453.110 provides in relevant part:</blockquote>\n    <blockquote id=\"b686-12\">1. No person, agency, organization or institution shall surrender custody of a minor child, or transfer the custody of such a child to another, and no person, agency, organization or institution shall take possession or charge of a minor child so transferred, without first having filed a petition before the circuit court sitting as a juvenile court of the county where the child may be, praying that such surrender or transfer may be made, and having obtained such an order from such court approving or ordering transfer of custody....</blockquote>\n    <p id=\"b686-13\">We disagree with father’s assertion that section 453.110.1 requires a court-approved transfer of S.J.S. to stepfather as a precondition for his filing an adoption petition. In enacting section 453.110.1, the purpose of the legislature was to prohibit the indiscriminate transfer of children, the concept that a parent could pass them on like chattel. <em>In re Baby Girl </em>—, <extracted-citation url=\"https://cite.case.law/sw2d/850/64/#p68\" index=\"0\" case-ids=\"9993774\">850 S.W.2d 64</extracted-citation>, 68 (Mo. banc 1993). Section 453.110.1 required that the custody of a child could not be transferred at the whim of the individual in charge of the child, but rather the transfer of custody must have the sanction of a court given by order <page-number label=\"677\" citation-index=\"1\">*677</page-number>approving such a transfer. <em><extracted-citation url=\"https://cite.case.law/sw2d/850/64/#p68\" index=\"1\" case-ids=\"9993774\">Id.</extracted-citation> </em>The concerns of a parent indiscriminately transferring custody, however, are not paramount in a situation where a stepparent, who is living with the child and the child’s parent, is seeking to adopt the child. Thus, the policy considerations which prompt the application of section 453.110.1 do not arise in the situation where a stepparent is seeking adoption.</p>\n    <p id=\"b687-5\">In addition, the express language of section 453.080 does not mandate that stepfather’s lawful and actual custody of S.J.S. can only be attained by a court-ordered transfer of custody. Section 453.080 states that lawful and actual custody <em>“shall include </em>a transfer of custody pursuant to the laws of this state.” (Emphasis added). Generally, the word “include” is not a word of limitation, but rather of enlargement. <em>St. Louis County v. State Highway Comm’n, </em><extracted-citation url=\"https://cite.case.law/sw2d/409/149/#p153\" index=\"2\" case-ids=\"10122795\">409 S.W.2d 149</extracted-citation>, 153 (Mo.1966). When used in conjunction with a number of specified objects, it implies that there may be others that are not mentioned. <em><extracted-citation url=\"https://cite.case.law/sw2d/409/149/#p153\" index=\"3\" case-ids=\"10122795\">Id.</extracted-citation> </em>Thus, the legislature did not intend that a court order transferring legal custody to a stepparent would be the exclusive means by which a party can exercise lawful and actual custody of a child. If the legislature had so intended, it would have expressly stated so in the statute.</p>\n    <p id=\"b687-6\">Given that the 1997 amendment to section 453.080 did not impose on stepparents the requirement that they have a court-ordered transfer of custody as a precondition for filing a petition for adoption, the law in Missouri regarding stepparent adoption remains unchanged. In <em>In re Adoption of P.J.K., </em><extracted-citation url=\"https://cite.case.law/sw2d/359/360/\" index=\"4\" case-ids=\"10159600\">359 S.W.2d 360</extracted-citation> (Mo. App.1962), the appellate court addressed the identical issue of whether a court order transferring custody of a child to a stepfather was needed to meet the “lawful and actual custody” of the child for the requisite statutory period. In rejecting the necessity of a court order of transfer, the court stated that section 453.080 did not require that an order of transfer of custody to the petitioner for adoption be made as a prerequisite to lawful adoption. <em><extracted-citation url=\"https://cite.case.law/sw2d/359/360/\" index=\"5\" case-ids=\"10159600\">Id. </extracted-citation></em><extracted-citation url=\"https://cite.case.law/sw2d/359/360/\" index=\"5\" case-ids=\"10159600\">at 367</extracted-citation>. The question of custody for the court is not whether there was a court order transferring custody of the child, but only whether custody of the child was lawful and actual in the petitioner during the minimum statutory period. <em><extracted-citation url=\"https://cite.case.law/sw2d/359/360/\" index=\"6\" case-ids=\"10159600\">Id.</extracted-citation></em>\n    </p>\n    <p id=\"b687-8\">Further, in <em>In re Adoption of Siler, </em><extracted-citation url=\"https://cite.case.law/mo-app/240/1097/\" index=\"7\" case-ids=\"1852360\">240 Mo.App. 1097</extracted-citation>, <extracted-citation url=\"https://cite.case.law/mo-app/240/1097/\" index=\"8\" case-ids=\"1852360\">225 S.W.2d 379</extracted-citation>, 380-381 (1949), the appellate court recognized that a person cannot surrender or transfer custody of a minor child to another and that the other person cannot take custody of the child so surrendered or transferred without first filing a petition with juvenile court and obtaining an order from the court granting such permission. But, the court went on to state that in light of the unique position of a stepparent, the statute did not require a court-ordered transfer for the stepparent to obtain lawful and actual custody:</p>\n    <blockquote id=\"b687-9\">We cannot conceive that [the statute] was intended by the legislature to make such custody as that of [stepfather] unlawful. In the first place, ... the natural mother did not surrender or transfer the custody of her child. She has had the actual and continual custody of it from its birth. It is true that she took it into the home of her husband and that he provided for both her and the child, but the custody that he acquired by virtue of that act on the part of its natural mother could not conceivably be unlawful.</blockquote>\n    <p id=\"b687-10\">\n      <em>Id. </em>at 381.</p>\n    <p id=\"b687-11\">Here, S.J.S. was in the lawful and actual custody of stepfather for more than six months, the statutory period under section 453.080. The court had jurisdiction to hear the matter. Father’s first point is denied.</p>\n    <p id=\"b688-16\">\n      <page-number label=\"678\" citation-index=\"1\">*678</page-number>In his second point, father asserts that the trial court erred in finding that he willfully and continuously neglected to provide S.J.S. with the necessary care and protection under section 453.040(7) RSMo 2000. He specifically challenges the trial court’s finding that his provision of medical insurance coverage was “de minimus and unsubstantial” and was disregarded as “token.” Section 453.040(7) provides that the consent to the adoption of a child is not required of the parent who “for a period of at least six months immediately prior to the filing of the petition for adoption, willfully, substantially and continuously neglected to provide him with necessary care and protection.”</p>\n    <p id=\"b688-17\">Neglect focuses on physical deprivation or harm. <em>In re Marriage of A.S.A., </em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"9\" case-ids=\"10006627\">931 S.W.2d 218</extracted-citation>, 222 (Mo.App. S.D. 1996). The essence of neglect has been characterized as the failure to perform the duty with which the parent is charged by the law and by conscience. <em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"10\" case-ids=\"10006627\">Id.</extracted-citation> </em>In stepparent adoptions, neglect frequently is shown by a failure to provide support, without just cause or excuse, whether ordered by judicial decree or not. <em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"11\" case-ids=\"10006627\">Id.</extracted-citation> A </em>non-custodial parent’s failure to contribute to the financial support of his or her child, combined with other evidence of lack of contact, is sufficient to sustain a finding of willful neglect in failing to provide proper care and maintenance. <em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"12\" case-ids=\"10006627\">Id.</extracted-citation> </em>Neglect, which must be willful under section 453.040(7), is thus a question of intent, which is frequently a fact inferred from relevant conduct, particularly within the statutory period, but also before and after this period. <em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"13\" case-ids=\"10006627\">Id.</extracted-citation> </em>Intent must be shown by clear, cogent, and convincing evidence. <em><extracted-citation url=\"https://cite.case.law/sw2d/931/218/#p222\" index=\"14\" case-ids=\"10006627\">Id.</extracted-citation></em>\n    </p>\n    <p id=\"b688-18\">Here, father admitted that he was ordered to pay child support in the decree of dissolution and that he had not done so since August 1996. He also admitted that he had the financial means to pay. Although he claimed that mothers refusal-to permit him to see S.J.S. was the reason he didn’t pay child support, the evidence established that father did not attempt to exercise his visitation. He did not try to contact S.J.S. or to make arrangements to see him. He ignored birthdays and holidays with him. Except for providing medical insurance coverage, father did not provide for him financially in any way. In light of father’s lack of commitment to having a personal relationship with S.J.S., his providing medical insurance for the child was superficial and minimal at best. The trial court did not err in finding that it was de minimus and merely a token effort on father’s part.</p>\n    <p id=\"b688-4\">The trial court did not err in finding that father willfully and continuously neglected S.J.S. Father’s second point is denied.</p>\n    <p id=\"b688-5\">The judgment of the trial court is affirmed.</p>\n    <judges id=\"b688-6\">CLIFFORD H. AHRENS, P. J., and LAWRENCE E. MOONEY, J., concur.</judges>\n  </opinion>\n</casebody>\n"
+  }
+}
