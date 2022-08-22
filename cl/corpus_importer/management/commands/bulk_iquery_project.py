@@ -150,7 +150,7 @@ def update_open_cases(options) -> None:
     # schedule. It should help us avoid getting banned. Hopefully!
     q = options["queue"]
     courts = Court.federal_courts.district_pacer_courts().exclude(
-        pk__in=["uscfc", "arb", "cit"]
+        pk__in=["uscfc", "arb", "cit", "jpml"]
     )
     ds = (
         Docket.objects.filter(
@@ -158,6 +158,9 @@ def update_open_cases(options) -> None:
             date_terminated=None,
             court__in=courts,
             pacer_case_id__isnull=False,
+        )
+        .exclude(
+            date_modified__gt="2022-08-13T17:30:00-0800",
         )
         .annotate(
             row_number=Window(
