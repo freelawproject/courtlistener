@@ -19,6 +19,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
+    AttachmentPage,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
@@ -36,6 +37,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     get_attachment_page_by_rd,
+    make_attachment_pq_object,
     update_rd_metadata,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
@@ -52,7 +54,6 @@ from cl.lib.recap_utils import get_document_filename
 from cl.lib.storage import RecapEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
-    add_att_report_for_recap_email,
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
     add_docket_entries,
@@ -565,13 +566,16 @@ def process_recap_attachment(
     self: Task,
     pk: int,
     tag_names: Optional[List[str]] = None,
-) -> Optional[Tuple[int, str]]:
+    return_rds_affected: bool = False,
+) -> Optional[Tuple[int, str] | list[RECAPDocument]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param self: The Celery teask
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
+    :param return_rds_affected: Whether to return a list of attachments
+    documents that were added or not.
     :return: Tuple indicating the status of the processing and a related
     message
     """
@@ -619,16 +623,23 @@ def process_recap_attachment(
             "Too many documents found when attempting to associate "
             "attachment data"
         )
+        if return_rds_affected:
+            return []
         return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
+            if return_rds_affected:
+                return []
             return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
     add_tags_to_objs(tag_names, rds_affected)
+
+    if return_rds_affected:
+        return rds_affected
     return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
 
 
@@ -1512,6 +1523,28 @@ def get_recap_email_recipients(
     return recap_email_recipients
 
 
+def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
+    """Get the attachment page report for recap.email documents without being
+    logged into PACER.
+
+    :param att_page_url: The free look link url to the attachment page
+    :param court: The court object we're working with
+    :return: The HTML page text or None if it's not a valid attachment page
+    """
+
+    logger.info(
+        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
+    )
+    req_timeout = (60, 300)
+    att_response = requests.get(att_page_url, timeout=req_timeout)
+    att_data = get_data_from_att_report(att_response.text, court.pk)
+    if att_data == {}:
+        msg = "Not a valid attachment page upload for recap.email"
+        logger.warning(msg)
+        return None
+    return att_response.text
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1585,22 +1618,35 @@ def process_recap_email(
         docket, data["docket_entries"]
     )
 
-    rds_affected = []
-    if data["contains_attachments"] is True:
-        rds_affected = add_att_report_for_recap_email(
-            docket_entry["document_url"],
-            epq.court,
-            docket_entry["pacer_case_id"],
-        )
-
     # Ensures we have PACER cookies ready to go.
-    get_or_cache_pacer_cookies(
+    cookies = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
     magic_number = docket_entry["pacer_magic_num"]
-    rds_affected = rds_affected + rds_created
-    for rd in rds_affected:
+    rds_attachments = []
+    if data["contains_attachments"] is True:
+        # Get attachments and merge them.
+        for rd in rds_created:
+            # Try to get the attachment page without being logged into PACER
+            att_report_text = get_attachment_page_by_url(
+                docket_entry["document_url"], epq.court
+            )
+            if att_report_text:
+                att_report = AttachmentPage(epq.court_id)
+            else:
+                # Get the attachment page being logged into PACER
+                att_report = get_attachment_page_by_rd(rd.pk, cookies)
+            pq_pk = make_attachment_pq_object(
+                att_report, rd.pk, user_pk, att_report_text
+            )
+            rds_affected = process_recap_attachment(
+                pq_pk, return_rds_affected=True
+            )
+            rds_attachments += rds_affected
+
+    rds_to_download = rds_attachments + rds_created
+    for rd in rds_to_download:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )

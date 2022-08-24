@@ -1863,9 +1863,7 @@ def mock_bucket_open(message_id, r, read_file=False):
 
     if read_file:
         with open(test_dir / message_id, encoding="utf-8") as file:
-            text = file.read()
-            file.close()
-            return text
+            return file.read()
 
     recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
     return recap_mail_example
@@ -2482,7 +2480,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     @mock.patch(
-        "cl.recap.mergers.requests.get",
+        "cl.recap.tasks.requests.get",
         side_effect=lambda *args, **kwargs: MockResponse(
             mock_bucket_open("nyed_123019137279.html", "r", True), 200
         ),
@@ -2492,9 +2490,9 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_download_pacer_pdf_by_rd,
         mock_cookies,
+        mock_pacer_court_accessible,
         mock_post,
         mock_att_response,
-        mock_pacer_court_accessible,
     ):
         """This test verifies that if a recap.email notification with
         attachments comes in we can get the main document and all its

@@ -5,7 +5,6 @@ from copy import deepcopy
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import requests
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
@@ -1141,13 +1140,8 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
             add_claim_history_entry(new_history, db_claim)
 
 
-def get_data_from_att_report(
-    text: str, court_id: str, notification_att_page: bool = False
-) -> Dict[str, str]:
-    att_page = AttachmentPage(
-        map_cl_to_pacer_id(court_id),
-        notification_att_page=notification_att_page,
-    )
+def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
+    att_page = AttachmentPage(map_cl_to_pacer_id(court_id))
     att_page._parse_text(text)
     att_data = att_page.data
     return att_data
@@ -1405,56 +1399,3 @@ def process_orphan_documents(
             # exceptions that were previously raised for the
             # processing queue items a second time.
             pass
-
-
-def add_att_report_for_recap_email(
-    att_page_url: str, court: Court, pacer_case_id: str
-) -> list[RECAPDocument]:
-    """Get and merge the attachment report for recap.email documents
-
-    :param att_page_url: The url to the attachment page
-    :param court: The court object we're working with
-    :param pacer_case_id: A PACER case ID
-    :return: A list of RECAPDocument objects that were affected.
-    """
-
-    logger.info(
-        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
-    )
-    req_timeout = (60, 300)
-    att_response = requests.get(att_page_url, timeout=req_timeout)
-    text = att_response.text
-    att_data = get_data_from_att_report(
-        text, court.pk, notification_att_page=True
-    )
-
-    if att_data == {}:
-        msg = "Not a valid attachment page upload for recap.email"
-        logger.warning(msg)
-        return []
-    try:
-        rds_affected, de = merge_attachment_page_data(
-            court,
-            pacer_case_id,
-            att_data["pacer_doc_id"],
-            att_data["document_number"],
-            text,
-            att_data["attachments"],
-        )
-    except RECAPDocument.MultipleObjectsReturned:
-        msg = (
-            "Too many documents found when attempting to associate "
-            "attachment data for recap.email"
-        )
-        logger.warning(msg)
-        return []
-
-    except RECAPDocument.DoesNotExist as exc:
-        msg = (
-            "Could not find docket to associate with attachment metadata "
-            "for recap.email"
-        )
-        logger.warning(msg)
-        return []
-
-    return rds_affected

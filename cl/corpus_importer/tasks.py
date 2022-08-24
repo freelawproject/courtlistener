@@ -1508,6 +1508,7 @@ def make_attachment_pq_object(
     attachment_report: AttachmentPage,
     rd_pk: int,
     user_pk: int,
+    att_report_text: str = None,
 ) -> int:
     """Create an item in the processing queue for an attachment page.
 
@@ -1521,6 +1522,8 @@ def make_attachment_pq_object(
     with
     :param user_pk: The user to associate with the ProcessingQueue object when
     it's created.
+    :param att_report_text: The attachment page report text if we got it from a
+    notification free look link.
     :return: The pk of the ProcessingQueue object that's created.
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1531,8 +1534,10 @@ def make_attachment_pq_object(
         upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
     )
+    if att_report_text is None:
+        att_report_text = attachment_report.response.text
     pq.filepath_local.save(
-        "attachment_page.html", ContentFile(attachment_report.response.text)
+        "attachment_page.html", ContentFile(att_report_text)
     )
 
     return pq.pk
