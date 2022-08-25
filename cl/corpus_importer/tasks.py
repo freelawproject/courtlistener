@@ -1537,7 +1537,7 @@ def make_attachment_pq_object(
     if att_report_text is None:
         att_report_text = attachment_report.response.text
     pq.filepath_local.save(
-        "attachment_page.html", ContentFile(att_report_text)
+        "attachment_page.html", ContentFile(att_report_text.encode())
     )
 
     return pq.pk

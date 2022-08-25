@@ -601,6 +601,9 @@ def process_recap_attachment(
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
         self.request.chain = None
+        if return_rds_affected:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return []
         return mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
 
     if pq.pacer_case_id in ["undefined", "null"]:
@@ -624,12 +627,14 @@ def process_recap_attachment(
             "attachment data"
         )
         if return_rds_affected:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             return []
         return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
             if return_rds_affected:
+                mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
                 return []
             return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         else:
@@ -639,6 +644,7 @@ def process_recap_attachment(
     add_tags_to_objs(tag_names, rds_affected)
 
     if return_rds_affected:
+        mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
         return rds_affected
     return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
 
