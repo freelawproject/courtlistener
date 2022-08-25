@@ -573,8 +573,6 @@ def process_recap_attachment(
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
-    :param return_rds_affected: Whether to return a list of attachments
-    documents that were added or not.
     :return: Tuple indicating the status of the processing and a related
     message
     """
