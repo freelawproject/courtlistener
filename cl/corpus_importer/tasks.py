@@ -1508,7 +1508,7 @@ def make_attachment_pq_object(
     attachment_report: AttachmentPage,
     rd_pk: int,
     user_pk: int,
-    att_report_text: str = None,
+    att_report_text: str | None = None,
 ) -> int:
     """Create an item in the processing queue for an attachment page.
 

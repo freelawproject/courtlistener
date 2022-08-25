@@ -566,8 +566,7 @@ def process_recap_attachment(
     self: Task,
     pk: int,
     tag_names: Optional[List[str]] = None,
-    return_rds_affected: bool = False,
-) -> Optional[Tuple[int, str] | list[RECAPDocument]]:
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param self: The Celery teask
@@ -588,8 +587,8 @@ def process_recap_attachment(
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return None
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
@@ -601,10 +600,10 @@ def process_recap_attachment(
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
         self.request.chain = None
-        if return_rds_affected:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return []
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        pq_status, msg = mark_pq_status(
+            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
+        )
+        return pq_status, msg, []
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
@@ -626,27 +625,20 @@ def process_recap_attachment(
             "Too many documents found when attempting to associate "
             "attachment data"
         )
-        if return_rds_affected:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return []
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return pq_status, msg, []
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
-            if return_rds_affected:
-                mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-                return []
-            return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
     add_tags_to_objs(tag_names, rds_affected)
-
-    if return_rds_affected:
-        mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
-        return rds_affected
-    return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    return pq_status, msg, rds_affected
 
 
 @app.task(
@@ -1646,9 +1638,7 @@ def process_recap_email(
             pq_pk = make_attachment_pq_object(
                 att_report, rd.pk, user_pk, att_report_text
             )
-            rds_affected = process_recap_attachment(
-                pq_pk, return_rds_affected=True
-            )
+            pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
             rds_attachments += rds_affected
 
     rds_to_download = rds_attachments + rds_created
