@@ -19,6 +19,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
+    AttachmentPage,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
@@ -36,6 +37,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     get_attachment_page_by_rd,
+    make_attachment_pq_object,
     update_rd_metadata,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
@@ -76,7 +78,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
 logger = logging.getLogger(__name__)
@@ -564,7 +566,7 @@ def process_recap_attachment(
     self: Task,
     pk: int,
     tag_names: Optional[List[str]] = None,
-) -> Optional[Tuple[int, str]]:
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param self: The Celery teask
@@ -583,8 +585,8 @@ def process_recap_attachment(
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return None
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
@@ -596,7 +598,10 @@ def process_recap_attachment(
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
         self.request.chain = None
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        pq_status, msg = mark_pq_status(
+            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
+        )
+        return pq_status, msg, []
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
@@ -618,17 +623,20 @@ def process_recap_attachment(
             "Too many documents found when attempting to associate "
             "attachment data"
         )
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return pq_status, msg, []
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
-            return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
     add_tags_to_objs(tag_names, rds_affected)
-    return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    return pq_status, msg, rds_affected
 
 
 @app.task(
@@ -1511,12 +1519,35 @@ def get_recap_email_recipients(
     return recap_email_recipients
 
 
+def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
+    """Get the attachment page report for recap.email documents without being
+    logged into PACER.
+
+    :param att_page_url: The free look link url to the attachment page
+    :param court: The court object we're working with
+    :return: The HTML page text or None if it's not a valid attachment page
+    """
+
+    logger.info(
+        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
+    )
+    req_timeout = (60, 300)
+    att_response = requests.get(att_page_url, timeout=req_timeout)
+    att_data = get_data_from_att_report(att_response.text, court.pk)
+    if att_data == {}:
+        msg = "Not a valid attachment page upload for recap.email"
+        logger.warning(msg)
+        return None
+    return att_response.text
+
+
 @app.task(
     bind=True,
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
         requests.ConnectionError,
+        requests.ReadTimeout,
         PacerLoginException,
         RedisConnectionError,
     ),
@@ -1584,12 +1615,32 @@ def process_recap_email(
     )
 
     # Ensures we have PACER cookies ready to go.
-    get_or_cache_pacer_cookies(
+    cookies = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
     magic_number = docket_entry["pacer_magic_num"]
-    for rd in rds_created:
+    rds_attachments = []
+    if data["contains_attachments"] is True:
+        # Get attachments and merge them.
+        for rd in rds_created:
+            # Try to get the attachment page without being logged into PACER
+            att_report_text = get_attachment_page_by_url(
+                docket_entry["document_url"], epq.court
+            )
+            if att_report_text:
+                att_report = AttachmentPage(epq.court_id)
+            else:
+                # Get the attachment page being logged into PACER
+                att_report = get_attachment_page_by_rd(rd.pk, cookies)
+            pq_pk = make_attachment_pq_object(
+                att_report, rd.pk, user_pk, att_report_text
+            )
+            pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
+            rds_attachments += rds_affected
+
+    rds_to_download = rds_attachments + rds_created
+    for rd in rds_to_download:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )
