@@ -2904,7 +2904,7 @@ class WebhooksHTMXTests(APITestCase):
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
-        self.assertIn("New webhook created or updated", message_sent.subject)
+        self.assertIn("A webhook was created", message_sent.subject)
 
     def test_list_users_webhooks(self) -> None:
         """Can we list user's own webhooks?"""
@@ -2989,7 +2989,7 @@ class WebhooksHTMXTests(APITestCase):
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
-        self.assertIn("New webhook created or updated", message_sent.subject)
+        self.assertIn("A webhook was created", message_sent.subject)
 
         webhook_1_path_detail = reverse(
             "webhooks-detail",
@@ -3011,4 +3011,4 @@ class WebhooksHTMXTests(APITestCase):
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 2)
         message_sent = mail.outbox[1]
-        self.assertIn("New webhook created or updated", message_sent.subject)
+        self.assertIn("A webhook was updated", message_sent.subject)
