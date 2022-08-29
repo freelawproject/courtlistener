@@ -10,6 +10,7 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.api_permissions import IsOwner
 from cl.api.models import Webhook
 from cl.users.forms import WebhookForm
+from cl.users.tasks import notify_new_or_updated_webhook
 
 
 class WebhooksViewSet(ModelViewSet):
@@ -62,6 +63,8 @@ class WebhooksViewSet(ModelViewSet):
         if form.is_valid():
             webhook.user = request.user
             form.save()
+            # Send webhook created notification to admins
+            notify_new_or_updated_webhook.delay(webhook.pk)
             return Response(
                 status=HTTP_201_CREATED,
                 headers={"HX-Trigger": "webhooksListChanged"},
@@ -82,6 +85,8 @@ class WebhooksViewSet(ModelViewSet):
         if form.is_valid():
             instance.user = request.user
             form.save()
+            # Send webhook updated notification to admins
+            notify_new_or_updated_webhook.delay(instance.pk)
             return Response(
                 status=HTTP_200_OK,
                 headers={"HX-Trigger": "webhooksListChanged"},

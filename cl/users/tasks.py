@@ -5,7 +5,10 @@ import requests
 from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
+from django.core.mail import send_mail
+from django.template import loader
 
+from cl.api.models import Webhook
 from cl.celery_init import app
 from cl.users.email_handlers import schedule_failed_email
 from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
@@ -129,3 +132,23 @@ def check_recipient_deliverability(
         # recipient accepted the email, so we can schedule the waiting failed
         # emails to be sent.
         schedule_failed_email(recipient)
+
+
+@app.task(ignore_result=True)
+def notify_new_or_updated_webhook(
+    webhook_pk: int,
+) -> None:
+    """Send a notification to the admins if a webhook was created or updated.
+
+    :param webhook_pk: The webhook PK that was created or updated.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    template = loader.get_template("emails/new_or_updated_webhook.txt")
+    send_mail(
+        subject="New webhook created or updated",
+        message=template.render({"webhook": webhook}),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[a[1] for a in settings.MANAGERS],
+    )

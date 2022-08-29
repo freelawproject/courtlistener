@@ -1,0 +1,7 @@
+Hello Admins!
+
+The following webhook was created or updated in Courtlistener:
+
+Webhook ID: {{ webhook.pk }}
+Webhook URL: {{ webhook.url }}
+Webhook status: {{ webhook.enabled }}
