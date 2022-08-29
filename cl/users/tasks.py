@@ -5,7 +5,10 @@ import requests
 from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.template import loader
 
+from cl.api.models import Webhook
 from cl.celery_init import app
 from cl.users.email_handlers import schedule_failed_email
 from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
@@ -73,6 +76,37 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
             email,
             error,
         )
+
+
+@app.task(ignore_result=True)
+def notify_new_or_updated_webhook(
+    webhook_pk: int,
+    created: bool,
+) -> None:
+    """Send a notification to the admins if a webhook was created or updated.
+
+    :param webhook_pk: The webhook PK that was created or updated.
+    :created: Whether the webhook was just created or not.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+
+    action = "created" if created else "updated"
+    subject = f"A webhook was {action}"
+    txt_template = loader.get_template("emails/new_or_updated_webhook.txt")
+    html_template = loader.get_template("emails/new_or_updated_webhook.html")
+    context = {"webhook": webhook, "action": action}
+    txt = txt_template.render(context)
+    html = html_template.render(context)
+    msg = EmailMultiAlternatives(
+        subject,
+        txt,
+        settings.DEFAULT_FROM_EMAIL,
+        [a[1] for a in settings.MANAGERS],
+    )
+    msg.attach_alternative(html, "text/html")
+    msg.send()
 
 
 @app.task(bind=True, max_retries=3, interval_start=5 * 60)

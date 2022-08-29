@@ -7,6 +7,7 @@ from django.utils.timezone import now
 from django_ses.signals import bounce_received, complaint_received
 from rest_framework.authtoken.models import Token
 
+from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
 from cl.users.email_handlers import (
     handle_complaint,
@@ -14,6 +15,7 @@ from cl.users.email_handlers import (
     handle_soft_bounce,
 )
 from cl.users.models import UserProfile, generate_recap_email
+from cl.users.tasks import notify_new_or_updated_webhook
 
 
 def get_message_id(mail_obj: dict) -> str:
@@ -112,3 +114,13 @@ def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
     if created:
         instance.recap_email = generate_recap_email(instance)
         instance.save()
+
+
+@receiver(post_save, sender=Webhook, dispatch_uid="webhook_created_or_updated")
+def webhook_created_or_updated(
+    sender, instance=None, created=False, **kwargs
+) -> None:
+    if created:
+        notify_new_or_updated_webhook.delay(instance.pk, created=True)
+    else:
+        notify_new_or_updated_webhook.delay(instance.pk, created=False)
