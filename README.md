@@ -39,7 +39,7 @@ All materials in this repository are copyright Free Law Project under the Affero
 
 ## Contact
 
-To contract Free Law Project, see here:
+To contact Free Law Project, see here:
 
 https://free.law/contact/
 
