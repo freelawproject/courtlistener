@@ -553,6 +553,7 @@ def process_recap_docket(self, pk):
         if newly_enqueued:
             send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
+
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
