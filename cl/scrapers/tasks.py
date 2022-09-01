@@ -189,7 +189,6 @@ def extract_recap_pdf(
             item=rd,
         )
         if not response.ok:
-            print("Error from microservice")
             continue
 
         content = response.json()["content"]

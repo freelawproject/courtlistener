@@ -14,6 +14,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
 from juriscraper.pacer import PacerRssFeed
+from requests import HTTPError
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -22,6 +23,7 @@ from rest_framework.status import (
 )
 from rest_framework.test import APIClient
 
+from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
@@ -288,6 +290,20 @@ class RecapDocketFetchApiTest(TestCase):
 
     COURT = "scotus"
 
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court_id=cls.COURT,
+            pacer_case_id="104490",
+            docket_number=fakes.DOCKET_NUMBER,
+            case_name=fakes.CASE_NAME,
+        )
+        cls.docket_alert = DocketAlertFactory(
+            docket=cls.docket, user=cls.user_profile.user
+        )
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
@@ -326,6 +342,26 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    @mock.patch(
+        "cl.recap.tasks.is_pacer_court_accessible",
+        side_effect=lambda a: True,
+    )
+    def test_fetch_docket_send_alert(self, mock_court_accessible) -> None:
+        """
+        Does a docket alert is triggered when fetching a docket from PACER?
+        """
+        fq = PacerFetchQueue.objects.create(
+            user=self.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.COURT,
+            docket_number=fakes.DOCKET_NUMBER,
+        )
+        result = do_pacer_fetch(fq)
+        # Wait for the chain to complete
+        result.get()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(fakes.CASE_NAME, mail.outbox[0].subject)
 
 
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
@@ -566,6 +602,23 @@ class ProcessingQueueApiFilterTest(TestCase):
         self.assertEqual(j["count"], total_pdfs)
 
 
+def mock_bucket_open(message_id, r, read_file=False):
+    """This function mocks bucket.open() method in order to call a
+    recap.email notification fixture.
+    """
+    test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+
+    if read_file and r == "r":
+        with open(test_dir / message_id, encoding="utf-8") as file:
+            return file.read()
+    if read_file and r == "rb":
+        with open(test_dir / message_id, "rb") as file:
+            return file.read()
+
+    recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
+    return recap_mail_example
+
+
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
@@ -620,7 +673,17 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
             ["The JSON value at key 'receipt' should include 'recipients'."],
         )
 
-    def test_email_processing_queue_create(self):
+    @mock.patch(
+        "cl.recap.tasks.RecapEmailSESStorage.open",
+        side_effect=mock_bucket_open,
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_or_cache_pacer_cookies",
+        side_effect=lambda x, y, z: None,
+    )
+    def test_email_processing_queue_create(
+        self, mock_bucket_open, mock_cookies
+    ):
         self.assertEqual(EmailProcessingQueue.objects.count(), 0)
         self.client.post(self.path, self.data, format="json")
         self.assertEqual(EmailProcessingQueue.objects.count(), 1)
@@ -1855,35 +1918,18 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
-def mock_bucket_open(message_id, r, read_file=False):
-    """This function mocks bucket.open() method in order to call a
-    recap.email notification fixture.
-    """
-    test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
-
-    if read_file:
-        with open(test_dir / message_id, encoding="utf-8") as file:
-            return file.read()
-
-    recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
-    return recap_mail_example
-
-
 class MockResponse:
     """Mock a Request Response"""
 
-    def __init__(self, text, status_code):
+    def __init__(self, text, status_code, content=None):
         self.text = text
         self.status_code = status_code
+        self.content = content
 
 
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
-)
-@mock.patch(
-    "cl.recap.tasks.download_pacer_pdf_by_rd",
-    side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
@@ -1980,16 +2026,20 @@ class RecapEmailDocketAlerts(TestCase):
         self.recipient_user_2 = recipient_user_2
 
     @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
+    @mock.patch(
         "cl.alerts.tasks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     def test_new_recap_email_case_auto_subscription(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_post,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies that if a new recap.email notification comes in
         (first time) and the user has the auto-subscribe option enabled, a new
@@ -2035,12 +2085,16 @@ class RecapEmailDocketAlerts(TestCase):
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_new_recap_email_case_auto_subscription_prev_user(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies that if two users with the auto-subscribe option
         enabled are properly subscribed for a case when two recap.email
@@ -2094,16 +2148,20 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 4)
 
     @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
+    @mock.patch(
         "cl.alerts.tasks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     def test_new_recap_email_case_no_auto_subscription(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_post,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies that if a new recap.email notification comes in
         and the user has auto-subscribe option disabled an Unsubscription
@@ -2145,12 +2203,16 @@ class RecapEmailDocketAlerts(TestCase):
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 0)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test checks if a new recap.email (first time) notification
         comes in and user has auto-subscribe option disabled, an unsubscription
@@ -2204,12 +2266,16 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_new_recap_email_subscribe_by_email_link(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a recap.email user with the auto-subscribe
         option disabled can successfully subscribe to a case from the
@@ -2254,12 +2320,16 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(docket_alert.count(), 0)
         self.assertEqual(docket_alert_subscription.count(), 1)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_new_recap_email_unsubscribe_by_email_link(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a recap.email user can successfully
         unsubscribe to a case from the unsubscription link.
@@ -2316,12 +2386,16 @@ class RecapEmailDocketAlerts(TestCase):
         # No new notification for the same case should go out
         self.assertEqual(len(mail.outbox), 2)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_new_recap_email_alerts_integration(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a user can successfully unsubscribe to a case
         from the email unsubscription link, the user won't longer receive more
@@ -2410,12 +2484,16 @@ class RecapEmailDocketAlerts(TestCase):
         message_sent = mail.outbox[2]
         self.assertIn("[Unsubscribed]", message_sent.subject)
 
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
     def test_docket_alert_toggle_confirmation_fails(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if the unsubscription/subscription fails if a bot
         tries to unsubscribe/subscribe from/to a docket alert.
@@ -2476,6 +2554,10 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
     @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+    )
+    @mock.patch(
         "cl.alerts.tasks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
@@ -2488,9 +2570,9 @@ class RecapEmailDocketAlerts(TestCase):
     def test_new_recap_email_with_attachments(
         self,
         mock_bucket_open,
-        mock_download_pacer_pdf_by_rd,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
         mock_post,
         mock_att_response,
     ):
@@ -2561,6 +2643,43 @@ class RecapEmailDocketAlerts(TestCase):
         )
         self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
         self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        side_effect=lambda z, x, c, v, b: (
+            MockResponse(
+                "OK",
+                200,
+                mock_bucket_open(
+                    "gov.uscourts.ca1.12-2209.00106475093.0.pdf", "rb", True
+                ),
+            ),
+            "OK",
+        ),
+    )
+    def test_extract_pdf_for_recap_email(
+        self,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookie,
+        mock_download_pdf,
+    ):
+        """This test checks if the content extraction of a PDF obtained from
+        recap.email is successfully performed..
+        """
+
+        # Trigger a new recap.email notification from testing_1@recap.email
+        self.client.post(self.path, self.data, format="json")
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(recap_document[0].is_available, True)
+        # Plain text is extracted properly.
+        self.assertNotEqual(recap_document[0].plain_text, "")
 
 
 class CheckCourtConnectivityTest(TestCase):

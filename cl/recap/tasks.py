@@ -1378,6 +1378,7 @@ def fetch_docket(self, fq_pk):
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :return: None
     """
+    start_time = now()
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -1467,6 +1468,12 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
+    content_updated = result["content_updated"]
+    d_pk = result["docket_pk"]
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d_pk)
+        if newly_enqueued:
+            send_alert_and_webhook(d_pk, start_time)
     msg = "Successfully got and merged docket. Adding to Solr as final step."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
     return result
@@ -1556,15 +1563,15 @@ def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
-) -> Optional[Dict[str, Union[int, bool]]]:
+) -> Optional[list[int]]:
     """Processes a recap.email when it comes in, fetches the free document and
     triggers docket alerts and webhooks.
 
     :param self: The task
     :param epq_pk: The EmailProcessingQueue object pk
     :param user_pk: The API user that sent this notification
-    :return: An optional dict to pass to the next task with the docket_pk and a
-     bool True if there was content updated, otherwise False
+    :return: An optional list to pass to the next task with recap documents pks
+     that were downloaded
     """
 
     start_time = now()
@@ -1660,13 +1667,10 @@ def process_recap_email(
             send_alert_and_webhook.delay(
                 docket.pk, start_time, recap_email_recipients
             )
-    return {
-        "docket_pk": docket.pk,
-        "content_updated": bool(rds_created or content_updated),
-    }
+    return [rd.pk for rd in rds_to_download]
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
-        process_recap_email.si(epq.pk, user.pk),
+        process_recap_email.s(epq.pk, user.pk), extract_recap_pdf.s()
     ).apply_async()
