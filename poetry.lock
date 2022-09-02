@@ -1178,14 +1178,14 @@ html5lib = "*"
 lxml = ">=4.9,<5.0"
 python-dateutil = "2.8.2"
 requests = ">=2.20.0"
-selenium = "4.0.0"
+selenium = "4.0.0.a7"
 tldextract = "*"
 
 [package.source]
 type = "git"
-url = "https://github.com/freelawproject/juriscraper.git"
+url = "https://github.com/albertisfu/juriscraper.git"
 reference = "update-selenium-version"
-resolved_reference = "c0e1659e947dc26c0329bbf1e461a90536f131c3"
+resolved_reference = "88ef41ba3a4caaf68630144bc96d63d8b90a3135"
 
 [[package]]
 name = "kdtree"
@@ -1867,16 +1867,16 @@ resolved_reference = "0632024e72e22a71e17cdb778805561f7cdd33d8"
 
 [[package]]
 name = "selenium"
-version = "4.0.0"
+version = "4.0.0.a7"
 description = ""
 category = "main"
 optional = false
-python-versions = "~=3.7"
+python-versions = "*"
 
 [package.dependencies]
-trio = ">=0.17,<1.0"
-trio-websocket = ">=0.9,<1.0"
-urllib3 = {version = ">=1.26,<2.0", extras = ["secure"]}
+trio = "*"
+trio-websocket = "*"
+urllib3 = {version = "*", extras = ["secure"]}
 
 [[package]]
 name = "sentry-sdk"
@@ -2267,7 +2267,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "a7bf3e29aa44e011d48aa2b264763693a6e012b0a711db15a07943c4949aeb57"
+content-hash = "0911fc3f5190ac06517568b9bd7a13f98bc332486f2a2a6a6154d50ec68143d6"
 
 [metadata.files]
 amqp = []
