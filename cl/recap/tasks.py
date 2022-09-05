@@ -1378,7 +1378,7 @@ def fetch_docket(self, fq_pk):
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :return: None
     """
-    start_time = now()
+
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -1399,7 +1399,6 @@ def fetch_docket(self, fq_pk):
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
 
     s = PacerSession(cookies=cookies)
-
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
@@ -1450,6 +1449,7 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
+    start_time = now()
     try:
         result = fetch_docket_by_pacer_case_id(s, court_id, pacer_case_id, fq)
     except (requests.RequestException, ReadTimeoutError) as exc:
@@ -1574,7 +1574,6 @@ def process_recap_email(
      that were downloaded
     """
 
-    start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
 
@@ -1617,6 +1616,7 @@ def process_recap_email(
         ContentFile(body.encode()),
     )
 
+    start_time = now()
     rds_created, content_updated = add_docket_entries(
         docket, data["docket_entries"]
     )
@@ -1672,5 +1672,5 @@ def process_recap_email(
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
-        process_recap_email.s(epq.pk, user.pk), extract_recap_pdf.s()
+        process_recap_email.si(epq.pk, user.pk), extract_recap_pdf.s()
     ).apply_async()
