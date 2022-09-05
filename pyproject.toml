@@ -73,7 +73,7 @@ pytz = "*"
 pyyaml = "^5.3.1"
 redis = "^3.5.3"
 requests = "^2.28.1"
-selenium = "4.0.0a6.post2"
+selenium = "4.4.0"
 simplejson = "*"
 stripe = "^4.1.0"
 timeout-decorator = "*"
@@ -103,7 +103,7 @@ types-simplejson = "^3.17.6"
 django-admin-cursor-paginator = "^0.1.2"
 django-ipware = "^4.0.2"
 sentry-sdk = "^1.9.0"
-juriscraper = "^2.5.13"
+juriscraper = {git = "https://github.com/freelawproject/juriscraper.git", branch="bump-selenium"}
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"

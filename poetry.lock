@@ -65,6 +65,14 @@ lazy-object-proxy = ">=1.4.0"
 wrapt = ">=1.11,<1.13"
 
 [[package]]
+name = "async-generator"
+version = "1.10"
+description = "Async generators and context managers for Python 3.5+"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
 name = "atomicwrites"
 version = "1.4.1"
 description = "Atomic file writes."
@@ -76,7 +84,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 name = "attrs"
 version = "20.3.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
@@ -899,7 +907,7 @@ speedup = ["python-levenshtein (>=0.12)"]
 
 [[package]]
 name = "geonamescache"
-version = "1.5.0"
+version = "1.3.0"
 description = "Geonames data for continents, cities and US states."
 category = "main"
 optional = false
@@ -918,6 +926,14 @@ eventlet = ["eventlet (>=0.24.1)"]
 gevent = ["gevent (>=1.4.0)"]
 setproctitle = ["setproctitle"]
 tornado = ["tornado (>=0.2)"]
+
+[[package]]
+name = "h11"
+version = "0.13.0"
+description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
+category = "main"
+optional = false
+python-versions = ">=3.6"
 
 [[package]]
 name = "html5lib"
@@ -1143,11 +1159,12 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.13"
+version = "2.5.11"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
+develop = false
 
 [package.dependencies]
 argparse = "*"
@@ -1156,13 +1173,19 @@ certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<5.1.0"
 cssselect = "*"
 feedparser = "6.0.8"
-geonamescache = "1.5.0"
+geonamescache = "1.3.0"
 html5lib = "*"
 lxml = ">=4.9,<5.0"
 python-dateutil = "2.8.2"
 requests = ">=2.20.0"
-selenium = "4.0.0-alpha-6"
+selenium = "4.4.0"
 tldextract = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/freelawproject/juriscraper.git"
+reference = "bump-selenium"
+resolved_reference = "1531d636a46b63c95bc9a7722953b2850cc0b257"
 
 [[package]]
 name = "kdtree"
@@ -1369,6 +1392,17 @@ python-versions = "*"
 
 [package.dependencies]
 coreapi = ">=2.2.0"
+
+[[package]]
+name = "outcome"
+version = "1.2.0"
+description = "Capture the outcome of Python function calls."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+attrs = ">=19.2.0"
 
 [[package]]
 name = "pandas"
@@ -1610,6 +1644,14 @@ optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
+name = "pysocks"
+version = "1.7.1"
+description = "A Python SOCKS client module. See https://github.com/Anorov/PySocks for more information."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[[package]]
 name = "pystemmer"
 version = "2.0.1"
 description = "Snowball stemming algorithms, for information retrieval"
@@ -1833,14 +1875,16 @@ resolved_reference = "0632024e72e22a71e17cdb778805561f7cdd33d8"
 
 [[package]]
 name = "selenium"
-version = "4.0.0a6"
-description = "Python bindings for Selenium"
+version = "4.4.0"
+description = ""
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = "~=3.7"
 
 [package.dependencies]
-urllib3 = {version = "*", extras = ["secure"]}
+trio = ">=0.17,<1.0"
+trio-websocket = ">=0.9,<1.0"
+urllib3 = {version = ">=1.26,<2.0", extras = ["secure", "socks"]}
 
 [[package]]
 name = "sentry-sdk"
@@ -1897,6 +1941,22 @@ description = "Python 2 and 3 compatibility utilities"
 category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
+name = "sniffio"
+version = "1.3.0"
+description = "Sniff out which async library your code is running under"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "soupsieve"
@@ -2007,6 +2067,36 @@ ipython-genutils = "*"
 test = ["pytest"]
 
 [[package]]
+name = "trio"
+version = "0.21.0"
+description = "A friendly Python library for async concurrency and I/O"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+async-generator = ">=1.9"
+attrs = ">=19.2.0"
+cffi = {version = ">=1.14", markers = "os_name == \"nt\" and implementation_name != \"pypy\""}
+idna = "*"
+outcome = "*"
+sniffio = "*"
+sortedcontainers = "*"
+
+[[package]]
+name = "trio-websocket"
+version = "0.9.2"
+description = "WebSocket library for Trio"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+async-generator = ">=1.10"
+trio = ">=0.11"
+wsproto = ">=0.14"
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.8.9"
 description = "Typing stubs for python-dateutil"
@@ -2102,6 +2192,7 @@ certifi = {version = "*", optional = true, markers = "extra == \"secure\""}
 cryptography = {version = ">=1.3.4", optional = true, markers = "extra == \"secure\""}
 idna = {version = ">=2.0.0", optional = true, markers = "extra == \"secure\""}
 pyOpenSSL = {version = ">=0.14", optional = true, markers = "extra == \"secure\""}
+PySocks = {version = ">=1.5.6,<1.5.7 || >1.5.7,<2.0", optional = true, markers = "extra == \"socks\""}
 
 [package.extras]
 brotli = ["brotlipy (>=0.6.0)"]
@@ -2171,10 +2262,21 @@ category = "dev"
 optional = false
 python-versions = "*"
 
+[[package]]
+name = "wsproto"
+version = "1.2.0"
+description = "WebSockets state-machine based protocol implementation"
+category = "main"
+optional = false
+python-versions = ">=3.7.0"
+
+[package.dependencies]
+h11 = ">=0.9.0,<1"
+
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "d09ca50e55ddc86569efdbab6f6b8ec08db0eb72b07be427da05adcd31829d54"
+content-hash = "960776569e22159eb5469a37c9630870c04045959eeffda173b250cf7d7f229c"
 
 [metadata.files]
 amqp = []
@@ -2184,6 +2286,7 @@ argparse = []
 asgiref = []
 astor = []
 astroid = []
+async-generator = []
 atomicwrites = []
 attrs = []
 backcall = []
@@ -2256,6 +2359,7 @@ future = []
 fuzzywuzzy = []
 geonamescache = []
 gunicorn = []
+h11 = []
 html5lib = []
 httplib2 = []
 identify = []
@@ -2293,6 +2397,7 @@ nodeenv = []
 nose = []
 numpy = []
 openapi-codec = []
+outcome = []
 pandas = []
 parso = []
 pathspec = []
@@ -2316,6 +2421,7 @@ pygments = []
 pylint = []
 pyopenssl = []
 pyparsing = []
+pysocks = []
 pystemmer = []
 pytest = []
 pytest-django = []
@@ -2340,6 +2446,8 @@ sentry-sdk = []
 sgmllib3k = []
 simplejson = []
 six = []
+sniffio = []
+sortedcontainers = []
 soupsieve = []
 sqlparse = []
 stripe = []
@@ -2351,6 +2459,8 @@ toml = []
 tomli = []
 tqdm = []
 traitlets = []
+trio = []
+trio-websocket = []
 types-python-dateutil = []
 types-pytz = []
 types-pyyaml = []
@@ -2368,3 +2478,4 @@ virtualenv = []
 wcwidth = []
 webencodings = []
 wrapt = []
+wsproto = []
