@@ -907,7 +907,7 @@ speedup = ["python-levenshtein (>=0.12)"]
 
 [[package]]
 name = "geonamescache"
-version = "1.3.0"
+version = "1.5.0"
 description = "Geonames data for continents, cities and US states."
 category = "main"
 optional = false
@@ -1159,7 +1159,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.11"
+version = "2.5.13"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1173,7 +1173,7 @@ certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<5.1.0"
 cssselect = "*"
 feedparser = "6.0.8"
-geonamescache = "1.3.0"
+geonamescache = "1.5.0"
 html5lib = "*"
 lxml = ">=4.9,<5.0"
 python-dateutil = "2.8.2"
@@ -1184,8 +1184,8 @@ tldextract = "*"
 [package.source]
 type = "git"
 url = "https://github.com/freelawproject/juriscraper.git"
-reference = "bump-selenium"
-resolved_reference = "1531d636a46b63c95bc9a7722953b2850cc0b257"
+reference = "another-selenium-bump"
+resolved_reference = "f94f03b182cafa06fe0e32b11cd174c4b9092be0"
 
 [[package]]
 name = "kdtree"
@@ -2276,7 +2276,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "960776569e22159eb5469a37c9630870c04045959eeffda173b250cf7d7f229c"
+content-hash = "f3af21422e4e52582240a665749210e3964adaedfe6abb974c853f6cebef09bb"
 
 [metadata.files]
 amqp = []
