@@ -1,7 +1,10 @@
+import time
+import uuid
 from typing import Union, cast
 
 from django.conf import settings
 from redis import Redis
+from redis.exceptions import WatchError
 
 
 def make_redis_interface(
@@ -76,3 +79,54 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     if isinstance(r, str):
         r = make_redis_interface(r)
     r.delete(key)
+
+
+def acquire_lock(
+    lock_name: str, ttl: int, acquire_timeout: int = 10
+) -> str | bool:
+    """Redis lock implementation with acquire time out and unique identifier in
+     order to avoid conflicts when releasing the lock
+
+    This implementation is based on:
+        https://redis.com/ebook/part-2-core-concepts/chapter-6-application-components-in-redis/6-2-distributed-locking/6-2-3-building-a-lock-in-redis/
+
+    With small changes like adding a TTL in order to avoid a deadlock in case
+    of a redis failure.
+
+    :param lock_name: The lock redis key
+    :param ttl: The redis TTL expiration
+    :param acquire_timeout: The timeout to until giving up to acquire the lock
+    """
+
+    redis_db = make_redis_interface("CACHE")
+    identifier = str(uuid.uuid4())
+    end = time.time() + acquire_timeout
+    while time.time() < end:
+        if redis_db.set(lock_name, identifier, nx=True, ex=ttl):
+            return identifier
+        time.sleep
+    return False
+
+
+def release_lock(lock_name: str, identifier: str) -> bool:
+    """Releasing the acquire_lock redis lock
+
+    :param lock_name: The lock redis key
+    :param identifier: The lock unique identifier
+    """
+
+    redis_db = make_redis_interface("CACHE")
+    pipe = redis_db.pipeline(True)
+    while True:
+        try:
+            pipe.watch(lock_name)
+            if pipe.get(lock_name) == identifier:
+                pipe.multi()
+                pipe.delete(lock_name)
+                pipe.execute()
+                return True
+            pipe.unwatch()
+            break
+        except WatchError:
+            pass
+    return False

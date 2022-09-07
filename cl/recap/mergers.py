@@ -25,11 +25,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
-from cl.lib.redis_utils import (
-    create_redis_semaphore,
-    delete_redis_semaphore,
-    make_redis_interface,
-)
+from cl.lib.redis_utils import acquire_lock, release_lock
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
 from cl.people_db.models import (
@@ -73,21 +69,6 @@ def make_docket_entries_key(docket_id: int) -> str:
     :return: The key.
     """
     return f"recap_docket_entries.enqueued:docket-{docket_id}"
-
-
-def enqueue_add_docket_entries(docket_id: int) -> bool:
-    """Small wrapper to create a redis semaphore to add docket entries.
-
-    :param docket_id: The docket we are adding entries.
-    :return: True if the redis semaphore was created, otherwise False.
-    """
-    redis_db = make_redis_interface("CACHE")
-    docket_entries_key = make_docket_entries_key(docket_id)
-    return create_redis_semaphore(
-        redis_db,
-        docket_entries_key,
-        ttl=60,
-    )
 
 
 def find_docket_object(
@@ -631,12 +612,16 @@ def add_docket_entries(d, docket_entries, tags=None):
     calculate_recap_sequence_numbers(docket_entries)
     known_filing_dates = [d.date_last_filing]
 
-    newly_docket_entries_enqueued = enqueue_add_docket_entries(d.pk)
+    # Acquire a lock to avoid a race condition adding docket entries.
+    newly_docket_entries_enqueued = acquire_lock(
+        make_docket_entries_key(d.pk), ttl=60
+    )
     if not newly_docket_entries_enqueued:
         logger.info(
             f"Add docket entries process for docket:{d.pk} is already running",
         )
         return rds_created, content_updated
+
     for docket_entry in docket_entries:
         response = get_or_make_docket_entry(d, docket_entry)
         if response is None:
@@ -720,7 +705,9 @@ def add_docket_entries(d, docket_entries, tags=None):
         if tags:
             for tag in tags:
                 tag.tag_object(rd)
-    delete_redis_semaphore("CACHE", make_docket_entries_key(d.pk))
+
+    # Release redis lock
+    release_lock(make_docket_entries_key(d.pk), newly_docket_entries_enqueued)
 
     known_filing_dates = set(filter(None, known_filing_dates))
     if known_filing_dates:
