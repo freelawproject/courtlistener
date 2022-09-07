@@ -1672,5 +1672,7 @@ def process_recap_email(
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
-        process_recap_email.si(epq.pk, user.pk), extract_recap_pdf.s()
+        process_recap_email.si(epq.pk, user.pk),
+        extract_recap_pdf.s(),
+        add_items_to_solr.s("search.RECAPDocument"),
     ).apply_async()
