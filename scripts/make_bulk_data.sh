@@ -99,8 +99,8 @@ PGPASSWORD=$DB_PASSWORD psql \
 	   COPY search_opinionscited (
 	       id, depth, cited_opinion_id, citing_opinion_id
 	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER)' \
-	--host $DB_HOST -\
-	-username $DB_USER \
+	--host $DB_HOST \
+	--username $DB_USER \
 	--dbname courtlistener | \
 	bzip2 | \
 	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.csv.bz2 --acl public-read
