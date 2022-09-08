@@ -21,7 +21,7 @@
         <p>Every party in a case gets notification emails that contain one-time "magic links." These links give free access to new filings in the case.</p>
       </li>
       <li>
-        <p>We give you an email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed.</p>
+        <p>We give you a personalized email address that you can configure in your PACER account as a secondary recipient for these notifications. Your primary address in PACER is never changed, you keep getting the alerts you do now, and our system does not "use up" your one-free look links.</p>
         {% if request.user.is_authenticated %}
           <p>Your @recap.email email address is:</p>
           {% spaceless %}
@@ -35,10 +35,7 @@
         {% endif %}
       </li>
       <li>
-        <p>After you add us as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll automatically add the items to RECAP.
-        </p>
-        <p>If you have <a href="{% url "view_recap_email" %}">auto-subscribe turned <strong>on</strong> in your profile</a> (the default), we will automatically start sending you email notifications for the case.</p>
-        <p>If auto-subscribe is <strong>off</strong>, you choose on a case-by-case basis which cases we email you about. Each time your @recap.email address gets a notification about a new case, we will send you <strong>one</strong> email to begin the process. In the email we send, you can click a link to subscribe to it on CourtListener so you get all of its notifications. Or, if you do nothing, you won't get more emails for that case.
+        <p>After you add your personal email address as a secondary recipient in PACER, we'll get a copy of your notification emails. When we do, we'll automatically add the items to RECAP.
         </p>
       </li>
     </ol>
