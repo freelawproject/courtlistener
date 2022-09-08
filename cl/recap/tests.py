@@ -2747,7 +2747,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 
         self.assertEqual(RECAPDocument.objects.count(), 3)
         rd_needs_extraction = [
-            x
+            x.pk
             for x in RECAPDocument.objects.all()
             if x.needs_extraction and needs_ocr(x.plain_text)
         ]
@@ -2756,7 +2756,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         extract_missed_recap_documents("celery")
 
         rd_needs_extraction_after = [
-            x
+            x.pk
             for x in RECAPDocument.objects.all()
             if x.needs_extraction and needs_ocr(x.plain_text)
         ]

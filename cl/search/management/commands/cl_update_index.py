@@ -4,6 +4,7 @@ from typing import Iterable
 
 from django.apps import apps
 from django.conf import settings
+from django.db.models import Q
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
@@ -64,8 +65,12 @@ def extract_missed_recap_documents(queue: str) -> None:
 
     rd_needs_extraction = [
         x.pk
-        for x in RECAPDocument.objects.all()
-        if x.needs_extraction and needs_ocr(x.plain_text)
+        for x in RECAPDocument.objects.filter(
+            (Q(ocr_status=None) | Q(ocr_status=RECAPDocument.OCR_NEEDED))
+            & Q(is_available=True)
+            & ~Q(filepath_local="")
+        )
+        if needs_ocr(x.plain_text)
     ]
     count = len(rd_needs_extraction)
 
