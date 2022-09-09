@@ -44,7 +44,7 @@ def extract_unextracted_rds_and_add_to_solr(queue: str) -> None:
             throttle.maybe_wait()
             chain(
                 extract_recap_pdf.si(chunk).set(queue=queue),
-                add_items_to_solr.s("search.RECAPDocument"),
+                add_items_to_solr.s("search.RECAPDocument").set(queue=queue),
             ).apply_async()
             chunk = []
             sys.stdout.write(
