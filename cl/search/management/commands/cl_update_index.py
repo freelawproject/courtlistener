@@ -4,17 +4,14 @@ from typing import Iterable
 
 from django.apps import apps
 from django.conf import settings
-from django.db.models import Q
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.recap_utils import needs_ocr
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timer import print_timing
 from cl.people_db.models import Person
-from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Docket
 from cl.search.tasks import add_items_to_solr, delete_items
 
 VALID_OBJ_TYPES = (
@@ -53,49 +50,6 @@ def proceed_with_deletion(out, count, noinput):
             proceed = False
 
     return proceed
-
-
-def extract_missed_recap_documents(queue: str) -> None:
-    """Performs content extraction for all recap documents that need to be
-    extracted.
-
-    :param queue: The celery queue to use
-    :return: None
-    """
-
-    rd_needs_extraction = [
-        x.pk
-        for x in RECAPDocument.objects.filter(
-            (Q(ocr_status=None) | Q(ocr_status=RECAPDocument.OCR_NEEDED))
-            & Q(is_available=True)
-            & ~Q(filepath_local="")
-        )
-        if needs_ocr(x.plain_text)
-    ]
-    count = len(rd_needs_extraction)
-
-    # The count to send in a single Celery task
-    chunk_size = 100
-    queue = queue
-    # Set low throttle. Higher values risk crashing Redis.
-    throttle = CeleryThrottle(queue_name=queue)
-    processed_count = 0
-    chunk = []
-    for item in rd_needs_extraction:
-        processed_count += 1
-        last_item = count == processed_count
-        chunk.append(item)
-        if processed_count % chunk_size == 0 or last_item:
-            throttle.maybe_wait()
-            extract_recap_pdf.apply_async(args=(chunk,), queue=queue)
-            chunk = []
-            sys.stdout.write(
-                "\rProcessed {}/{} ({:.0%})".format(
-                    processed_count, count, processed_count * 1.0 / count
-                )
-            )
-            sys.stdout.flush()
-    sys.stdout.write("\n")
 
 
 class Command(VerboseCommand):
@@ -214,23 +168,11 @@ class Command(VerboseCommand):
             "before starting the processing.",
         )
 
-        parser.add_argument(
-            "--extract_missed_rd",
-            action="store_true",
-            default=False,
-            help="Extract all recap documents that need to be extracted.",
-        )
-
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.verbosity = int(options.get("verbosity", 1))
         self.options = options
         self.noinput = options["noinput"]
-
-        if options.get("extract_missed_rd"):
-            self.extract_missed_rd()
-            return
-
         if not self.options["optimize_everything"]:
             self.solr_url = options["solr_url"]
             self.si = ExtraSolrInterface(self.solr_url, mode="rw")
@@ -458,14 +400,3 @@ class Command(VerboseCommand):
                 continue
             si.optimize()
         self.stdout.write("Done.\n")
-
-    @print_timing
-    def extract_missed_rd(self):
-        """
-        Extract all recap documents that need to be extracted.
-        """
-        queue = self.options["queue"]
-        self.stdout.write(
-            "Extracting all recap documents that need extraction.\n"
-        )
-        extract_missed_recap_documents(queue)

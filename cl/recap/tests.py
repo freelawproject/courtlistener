@@ -46,6 +46,9 @@ from cl.recap.factories import (
     ProcessingQueueFactory,
 )
 from cl.recap.management.commands.import_idb import Command
+from cl.recap.management.commands.reprocess_recap_dockets import (
+    extract_unextracted_rds_and_add_to_solr,
+)
 from cl.recap.mergers import (
     add_attorney,
     add_docket_entries,
@@ -76,9 +79,6 @@ from cl.recap.tasks import (
     process_recap_zip,
 )
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.management.commands.cl_update_index import (
-    extract_missed_recap_documents,
-)
 from cl.search.models import (
     Court,
     Docket,
@@ -2733,6 +2733,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
             is_available=True,
             plain_text="Appellate Case: 21-1298     Document: 42     Page: 1    Date Filed: 08/31/2022",
+            ocr_status=RECAPDocument.OCR_NEEDED,
         )
         cf = ContentFile(self.file_content)
         rd_2.filepath_local.save(self.filename, cf)
@@ -2753,7 +2754,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_missed_recap_documents("celery")
+        extract_unextracted_rds_and_add_to_solr("celery")
 
         rd_needs_extraction_after = [
             x.pk

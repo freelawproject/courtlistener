@@ -105,7 +105,7 @@ def needs_ocr(content):
     """
     for line in content.splitlines():
         line = line.strip()
-        if line.startswith(("Case", "Appellate", "Appeal", "USCA", "USCA11")):
+        if line.startswith(("Case", "Appellate", "Appeal", "USCA")):
             continue
         elif line:
             # We found a line with good content. No OCR needed.
