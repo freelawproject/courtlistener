@@ -28,6 +28,7 @@ from cl.alerts.models import DocketAlert
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.lib.pacer import is_pacer_court_accessible
+from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import make_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
@@ -45,6 +46,9 @@ from cl.recap.factories import (
     ProcessingQueueFactory,
 )
 from cl.recap.management.commands.import_idb import Command
+from cl.recap.management.commands.reprocess_recap_dockets import (
+    extract_unextracted_rds_and_add_to_solr,
+)
 from cl.recap.mergers import (
     add_attorney,
     add_docket_entries,
@@ -2678,8 +2682,86 @@ class RecapEmailDocketAlerts(TestCase):
 
         recap_document = RECAPDocument.objects.all()
         self.assertEqual(recap_document[0].is_available, True)
+
         # Plain text is extracted properly.
         self.assertNotEqual(recap_document[0].plain_text, "")
+
+        self.assertEqual(recap_document[0].needs_extraction, False)
+        self.assertEqual(
+            recap_document[0].ocr_status, RECAPDocument.OCR_UNNECESSARY
+        )
+
+
+class TestRecapDocumentsExtractContentCommand(TestCase):
+    """Test extraction for missed recap documents that need content
+    extraction.
+    """
+
+    def setUp(self) -> None:
+        self.user = User.objects.get(username="recap")
+        file_content = mock_bucket_open(
+            "gov.uscourts.ca1.12-2209.00106475093.0.pdf", "rb", True
+        )
+        self.filename = "file_2.pdf"
+        self.file_content = file_content
+
+    def test_extract_missed_recap_documents(self):
+        """Can we extract only recap documents that need content extraction?"""
+
+        d = Docket.objects.create(
+            source=0, court_id="scotus", pacer_case_id="asdf"
+        )
+        de = DocketEntry.objects.create(docket=d, entry_number=1)
+
+        # RD is_available and has a valid PDF, needs extraction.
+        rd = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_number="1",
+            pacer_doc_id="04505578698",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+        )
+        cf = ContentFile(self.file_content)
+        rd.filepath_local.save(self.filename, cf)
+
+        # RD is_available, has a valid PDF, only document header extracted,
+        # needs extraction using OCR.
+        rd_2 = RECAPDocument.objects.create(
+            docket_entry=de,
+            document_number="2",
+            pacer_doc_id="04505578698",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            plain_text="Appellate Case: 21-1298     Document: 42     Page: 1    Date Filed: 08/31/2022",
+            ocr_status=RECAPDocument.OCR_NEEDED,
+        )
+        cf = ContentFile(self.file_content)
+        rd_2.filepath_local.save(self.filename, cf)
+
+        # RD doesn't have a valid PDF. Don't need extraction.
+        RECAPDocument.objects.create(
+            docket_entry=de,
+            document_number="3",
+            pacer_doc_id="04505578699",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        self.assertEqual(RECAPDocument.objects.count(), 3)
+        rd_needs_extraction = [
+            x.pk
+            for x in RECAPDocument.objects.all()
+            if x.needs_extraction and needs_ocr(x.plain_text)
+        ]
+        self.assertEqual(len(rd_needs_extraction), 2)
+
+        extract_unextracted_rds_and_add_to_solr("celery")
+
+        rd_needs_extraction_after = [
+            x.pk
+            for x in RECAPDocument.objects.all()
+            if x.needs_extraction and needs_ocr(x.plain_text)
+        ]
+        self.assertEqual(len(rd_needs_extraction_after), 0)
 
 
 class CheckCourtConnectivityTest(TestCase):
