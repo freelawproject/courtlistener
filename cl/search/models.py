@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple, TypeVar
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models
 from django.db.models import Prefetch, Q, QuerySet
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
@@ -1016,23 +1016,6 @@ class DocketEntry(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"{self.pk} ---> {trunc(self.description, 50, ellipsis='...')}"
-
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            with transaction.atomic():
-                docket = Docket.objects.select_for_update().get(
-                    pk=self.docket.pk
-                )
-                if (
-                    self.entry_number is not None
-                    and DocketEntry.objects.filter(
-                        docket=docket, entry_number=self.entry_number
-                    ).exists()
-                ):
-                    raise ValidationError(
-                        message=f"A DocketEntry for docket: {self.docket.pk} and entry_number: {self.entry_number} already exists."
-                    )
-        super(DocketEntry, self).save(*args, **kwargs)
 
 
 class AbstractPacerDocument(models.Model):
