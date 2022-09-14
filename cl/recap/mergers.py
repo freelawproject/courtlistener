@@ -531,18 +531,28 @@ def get_or_make_docket_entry(d, docket_entry):
      - None is returned when things fail.
     """
     if docket_entry["document_number"]:
-        try:
-            de, de_created = DocketEntry.objects.get_or_create(
-                docket=d, entry_number=docket_entry["document_number"]
-            )
-        except DocketEntry.MultipleObjectsReturned:
-            logger.error(
-                "Multiple docket entries found for document "
-                "entry number '%s' while processing '%s'",
-                docket_entry["document_number"],
-                d,
-            )
-            return None
+        with transaction.atomic():
+            # In order to create a lock, we need to retrieve the docket using
+            # select_for_update
+            docket = Docket.objects.select_for_update().get(pk=d.pk)
+            try:
+                de = DocketEntry.objects.get(
+                    docket=docket, entry_number=docket_entry["document_number"]
+                )
+                de_created = False
+            except DocketEntry.DoesNotExist:
+                de = DocketEntry.objects.create(
+                    docket=docket, entry_number=docket_entry["document_number"]
+                )
+                de_created = True
+            except DocketEntry.MultipleObjectsReturned:
+                logger.error(
+                    "Multiple docket entries found for document "
+                    "entry number '%s' while processing '%s'",
+                    docket_entry["document_number"],
+                    d,
+                )
+                return None
     else:
         # Unnumbered entry. The only thing we can be sure we have is a
         # date. Try to find it by date and description (short or long)
