@@ -7,28 +7,30 @@
 User-agent: Googlebot
 Disallow: /robots.txt
 Disallow: /assets/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v1/
+Disallow: /api/rest/v2/
+Disallow: /api/rest/v3/
 
 User-agent: bingbot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 
 User-agent: Slurp
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 
 User-agent: DuckDuckBot
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 
 # Needed for open graph crawling
 User-agent: twitterbot
@@ -36,14 +38,14 @@ Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 
 User-agent: facebookexternalhit
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 
 # Yandex, Ask
 # These support meta robots, but not x-robots-tag
@@ -53,7 +55,7 @@ Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
@@ -64,7 +66,7 @@ Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
@@ -75,7 +77,7 @@ Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/
@@ -86,7 +88,7 @@ Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
 Disallow: /api/rest/v2/
-Disallow: /api/bulk-data/
+Disallow: /api/rest/v3/
 Disallow: /pdf/
 Disallow: /wpd/
 Disallow: /txt/

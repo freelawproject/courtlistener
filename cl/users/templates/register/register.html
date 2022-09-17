@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load honeypot %}
+{% load extras %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Register an Account – CourtListener.com{% endblock %}
 
 {% block footer-scripts %}{% endblock %}
