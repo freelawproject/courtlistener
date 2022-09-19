@@ -207,7 +207,20 @@ def toggle_docket_alert_confirmation(
     target_state = DocketAlert.UNSUBSCRIPTION
     if route_prefix == "subscribe":
         target_state = DocketAlert.SUBSCRIPTION
-    docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    try:
+        docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    except DocketAlert.DoesNotExist:
+        return render(
+            request,
+            "docket_alert.html",
+            {
+                "docket_alert_not_found": True,
+                "da_subscription_type": DocketAlert.SUBSCRIPTION,
+                "private": True,
+                "target_state": target_state,
+            },
+            status=HTTP_404_NOT_FOUND,
+        )
     # Handle confirmation form POST requests
     if request.method == "POST":
         form = DocketAlertConfirmForm(request.POST)

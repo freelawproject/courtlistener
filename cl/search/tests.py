@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -15,7 +16,6 @@ from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -29,11 +29,10 @@ from cl.lib.test_helpers import (
     SolrTestCase,
 )
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
-from cl.search.factories import CourtFactory
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Court,
@@ -49,6 +48,7 @@ from cl.search.views import do_search
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import TestCase
 from cl.tests.utils import get_with_wait
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class UpdateIndexCommandTest(SolrTestCase):
@@ -795,8 +795,14 @@ class SearchTest(IndexedSolrTestCase):
 )
 class RelatedSearchTest(IndexedSolrTestCase):
     def setUp(self) -> None:
-        # Add additional user fixtures
-        self.fixtures.append("authtest_data.json")
+        # Do this in two steps to avoid triggering profile creation signal
+        admin = UserProfileWithParentsFactory.create(
+            user__username="admin",
+            user__password=make_password("password"),
+        )
+        admin.user.is_superuser = True
+        admin.user.is_staff = True
+        admin.user.save()
 
         super(RelatedSearchTest, self).setUp()
 
@@ -814,7 +820,9 @@ class RelatedSearchTest(IndexedSolrTestCase):
         }
 
         # disable all status filters (otherwise results do not match detail page)
-        params.update({f"stat_{v}": "on" for s, v in DOCUMENT_STATUSES})
+        params.update(
+            {f"stat_{v}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
+        )
 
         r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTP_200_OK)
@@ -1221,12 +1229,18 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "judge_judy.json",
         "test_objects_search.json",
         "functest_opinions.json",
         "test_objects_audio.json",
     ]
+
+    def setUp(self) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        super().setUp()
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")

@@ -6,6 +6,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
 from django.core.mail import EmailMessage, EmailMultiAlternatives, send_mail
@@ -15,18 +16,30 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import HTTP_200_OK
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+    HTTP_404_NOT_FOUND,
+)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.api.models import Webhook, WebhookEventType
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import LiveServerTestCase, TestCase
+from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.utils import make_client
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
     normalize_addresses,
 )
-from cl.users.factories import EmailSentFactory, UserFactory
+from cl.users.factories import (
+    EmailSentFactory,
+    UserFactory,
+    UserProfileWithParentsFactory,
+)
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.models import (
     EMAIL_NOTIFICATIONS,
@@ -44,8 +57,6 @@ from cl.users.tasks import (
 
 
 class UserTest(LiveServerTestCase):
-    fixtures = ["authtest_data.json"]
-
     def test_simple_auth_urls_GET(self) -> None:
         """Can we at least GET all the basic auth URLs?"""
         reverse_names = [
@@ -136,12 +147,15 @@ class UserTest(LiveServerTestCase):
                         % next_param,
                     )
 
+
+class UserDataTest(LiveServerTestCase):
     def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
-        params = {
-            "username": "pandora",
-            "password": "password",
-        }
+        params = {"username": "pandora", "password": "password"}
+        UserProfileWithParentsFactory.create(
+            user__username=params["username"],
+            user__password=make_password(params["password"]),
+        )
         r = self.client.post(reverse("sign-in"), params, follow=True)
         self.assertRedirects(r, "/")
 
@@ -150,16 +164,9 @@ class UserTest(LiveServerTestCase):
         with a single account.
         """
         # Update the expiration since the fixture has one some time ago.
-        u = UserProfile.objects.get(pk=1002)
-        u.key_expires = now() + timedelta(days=2)
-        u.save()
+        up = UserProfileWithParentsFactory.create(email_confirmed=False)
 
-        r = self.client.get(
-            reverse(
-                "email_confirm",
-                args=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-            )
-        )
+        r = self.client.get(reverse("email_confirm", args=[up.activation_key]))
         self.assertEqual(
             200,
             r.status_code,
@@ -177,16 +184,14 @@ class UserTest(LiveServerTestCase):
     ) -> None:
         """Test the trickier case when an email is associated with many accounts"""
         # Update the accounts to have keys that are not expired.
-        (
-            UserProfile.objects.filter(pk__in=[1003, 1004, 1005]).update(
-                key_expires=now() + timedelta(days=2)
-            )
+        ups = UserProfileWithParentsFactory.create_batch(
+            3,
+            activation_key="a" * 40,  # Note length has to be correct
+            email_confirmed=False,
         )
+
         r = self.client.get(
-            reverse(
-                "email_confirm",
-                args=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"],
-            )
+            reverse("email_confirm", args=[ups[0].activation_key])
         )
         self.assertIn(
             "has been confirmed",
@@ -199,14 +204,12 @@ class UserTest(LiveServerTestCase):
             msg="Did not get 200 code when activating account. "
             "Instead got %s" % r.status_code,
         )
-        ups = UserProfile.objects.filter(pk__in=(3, 4, 5))
+        ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         for up in ups:
             self.assertTrue(up.email_confirmed)
 
 
-class ProfileTest(TestCase):
-    fixtures = ["authtest_data.json"]
-
+class ProfileTest(SimpleUserDataMixin, TestCase):
     def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
         # Get the page anonymously to populate the stats with anon data
@@ -237,27 +240,21 @@ class ProfileTest(TestCase):
             reverse("delete_profile_done"),
         )
 
-    def test_generate_recap_email_with_non_email_username(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="pandora@recap.email"
-        )
-        self.assertEqual(user_profile.user.pk, 1001)
+    def test_generate_recap_dot_email_addresses(self) -> None:
+        # Test simple username
+        u = User.objects.get(username="pandora")
+        self.assertEqual(u.profile.recap_email, "pandora@recap.email")
 
-    def test_generate_recap_email_with_email_username(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="pandora.gmail.com@recap.email"
-        )
-        self.assertEqual(user_profile.user.pk, 1006)
+        # Test with email address username
+        up = UserProfileWithParentsFactory(user__username="pandora@gmail.com")
+        self.assertEqual(up.recap_email, "pandora.gmail.com@recap.email")
 
-    def test_generate_recap_email_username_lowercase(self) -> None:
-        user_profile = UserProfile.objects.get(
-            recap_email="test.user@recap.email"
-        )
-        self.assertEqual(user_profile.user.pk, 1007)
+        # Test username lowercasing
+        up = UserProfileWithParentsFactory(user__username="Test.User")
+        self.assertEqual(up.recap_email, "test.user@recap.email")
 
 
-class DisposableEmailTest(TestCase):
-    fixtures = ["authtest_data.json"]
+class DisposableEmailTest(SimpleUserDataMixin, TestCase):
     """
     Tests for issue #724 to block people with bad disposable email addresses.
 
@@ -307,7 +304,12 @@ class DisposableEmailTest(TestCase):
 
 
 class LiveUserTest(BaseSeleniumTest):
-    fixtures = ["authtest_data.json"]
+    def setUp(self) -> None:
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+            user__email="pandora@courtlistener.com",
+        )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_reset_password_using_the_HTML(self) -> None:
@@ -333,14 +335,15 @@ class LiveUserTest(BaseSeleniumTest):
     def test_set_password_using_the_HTML(self) -> None:
         """Can we reset our password after generating a confirmation link?"""
         # Generate a token and use it to visit a generated reset URL
-        up = UserProfile.objects.get(pk=1001)
-        token = default_token_generator.make_token(up.user)
+        token = default_token_generator.make_token(self.up.user)
         url = "{host}{path}".format(
             host=self.live_server_url,
             path=reverse(
                 "confirm_password",
                 kwargs={
-                    "uidb64": urlsafe_base64_encode(str(up.user.pk).encode()),
+                    "uidb64": urlsafe_base64_encode(
+                        str(self.up.user.pk).encode()
+                    ),
                     "token": token,
                 },
             ),
@@ -365,7 +368,7 @@ class LiveUserTest(BaseSeleniumTest):
 
 class SNSWebhookTest(TestCase):
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "users" / "test_assets"
         with (
             open(
@@ -2857,3 +2860,155 @@ class MoosendTest(TestCase):
                 action,
                 self.email,
             )
+
+
+class WebhooksHTMXTests(APITestCase):
+    """Check that API CRUD operations are working well for search webhooks."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+    def setUp(self) -> None:
+        self.webhook_path = reverse("webhooks-list")
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        Webhook.objects.all().delete()
+
+    def make_a_webhook(
+        self,
+        client,
+        url="https://example.com",
+        event_type=WebhookEventType.DOCKET_ALERT,
+        enabled=True,
+    ):
+        data = {
+            "url": url,
+            "event_type": event_type,
+            "enabled": enabled,
+        }
+        return client.post(self.webhook_path, data)
+
+    def test_make_an_webhook(self) -> None:
+        """Can we make a webhook?"""
+
+        # Make a webhook
+        webhooks = Webhook.objects.all()
+        response = self.make_a_webhook(self.client)
+        self.assertEqual(webhooks.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("A webhook was created", message_sent.subject)
+
+    def test_list_users_webhooks(self) -> None:
+        """Can we list user's own webhooks?"""
+
+        # Make a webhook for user_1
+        self.make_a_webhook(self.client)
+
+        webhook_path_list = reverse(
+            "webhooks-list",
+            kwargs={"format": "html"},
+        )
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+    def test_delete_webhook(self) -> None:
+        """Can we delete a webhook?
+        Avoid users from deleting other users' webhooks.
+        """
+
+        # Make two webhooks for user_1
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.DOCKET_ALERT
+        )
+        self.make_a_webhook(
+            self.client, event_type=WebhookEventType.SEARCH_ALERT
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 2)
+
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Delete the webhook for user_1
+        response = self.client.delete(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(webhooks.count(), 1)
+
+        webhook_2_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # user_2 tries to delete a user_1 webhook, it should fail
+        response = self.client_2.delete(webhook_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(webhooks.count(), 1)
+
+    def test_webhook_detail(self) -> None:
+        """Can we get the details of a webhook?
+        Avoid users from getting other users' webhooks.
+        """
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "html"},
+        )
+
+        # Get the webhook detail for user_1
+        response = self.client.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 webhook, it should fail
+        response = self.client_2.get(webhook_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_webhook_update(self) -> None:
+        """Can we update a webhook?"""
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 1)
+        message_sent = mail.outbox[0]
+        self.assertIn("A webhook was created", message_sent.subject)
+
+        webhook_1_path_detail = reverse(
+            "webhooks-detail",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+
+        # Update the webhook
+        data_updated = {
+            "url": "https://example.com/updated",
+            "event_type": webhooks[0].event_type,
+            "enabled": webhooks[0].enabled,
+        }
+        response = self.client.put(webhook_1_path_detail, data_updated)
+
+        # Check that the webhook was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(webhooks[0].url, "https://example.com/updated")
+
+        # New or updated webhook notification for admins should go out
+        self.assertEqual(len(mail.outbox), 2)
+        message_sent = mail.outbox[1]
+        self.assertIn("A webhook was updated", message_sent.subject)

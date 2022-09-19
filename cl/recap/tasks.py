@@ -19,6 +19,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
+    AttachmentPage,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
@@ -31,13 +32,12 @@ from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.models import DocketAlert
-from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
-from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
     get_attachment_page_by_rd,
+    make_attachment_pq_object,
     update_rd_metadata,
 )
 from cl.corpus_importer.utils import mark_ia_upload_needed
@@ -78,7 +78,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, DocketEntry, RECAPDocument
+from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
 logger = logging.getLogger(__name__)
@@ -551,7 +551,7 @@ def process_recap_docket(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -566,7 +566,7 @@ def process_recap_attachment(
     self: Task,
     pk: int,
     tag_names: Optional[List[str]] = None,
-) -> Optional[Tuple[int, str]]:
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
     :param self: The Celery teask
@@ -585,8 +585,8 @@ def process_recap_attachment(
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         if (self.request.retries == self.max_retries) or pq.debug:
-            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-            return None
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
@@ -598,7 +598,10 @@ def process_recap_attachment(
         # Bad attachment page.
         msg = "Not a valid attachment page upload."
         self.request.chain = None
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        pq_status, msg = mark_pq_status(
+            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
+        )
+        return pq_status, msg, []
 
     if pq.pacer_case_id in ["undefined", "null"]:
         # Bad data from the client. Fix it with parsed data.
@@ -620,17 +623,20 @@ def process_recap_attachment(
             "Too many documents found when attempting to associate "
             "attachment data"
         )
-        return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return pq_status, msg, []
     except RECAPDocument.DoesNotExist as exc:
         msg = "Could not find docket to associate with attachment metadata"
         if (self.request.retries == self.max_retries) or pq.debug:
-            return mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
         else:
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
     add_tags_to_objs(tag_names, rds_affected)
-    return mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    return pq_status, msg, rds_affected
 
 
 @app.task(
@@ -806,7 +812,7 @@ def process_recap_docket_history_report(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -903,7 +909,7 @@ def process_recap_appellate_docket(self, pk):
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
@@ -1372,6 +1378,7 @@ def fetch_docket(self, fq_pk):
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :return: None
     """
+
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
     court_id = fq.court_id or getattr(fq.docket, "court_id", None)
     # Check court connectivity, if fails retry the task, hopefully, it'll be
@@ -1392,7 +1399,6 @@ def fetch_docket(self, fq_pk):
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
 
     s = PacerSession(cookies=cookies)
-
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
@@ -1443,6 +1449,7 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
+    start_time = now()
     try:
         result = fetch_docket_by_pacer_case_id(s, court_id, pacer_case_id, fq)
     except (requests.RequestException, ReadTimeoutError) as exc:
@@ -1461,6 +1468,12 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
+    content_updated = result["content_updated"]
+    d_pk = result["docket_pk"]
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d_pk)
+        if newly_enqueued:
+            send_alert_and_webhook(d_pk, start_time)
     msg = "Successfully got and merged docket. Adding to Solr as final step."
     mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
     return result
@@ -1489,56 +1502,6 @@ def mark_fq_status(fq, msg, status):
     fq.save()
 
 
-@app.task(bind=True, max_retries=5, interval_start=5 * 60)
-def send_docket_to_webhook(
-    self: Task, d_pk: int, since: datetime, epq_pk: int
-) -> None:
-    """POSTS the PacerFetchQueue to the recipients webhook(s)
-
-    :param d_pk: The Docket primary key
-    :param since: Start time for querying the docket entries
-    :param epq_pk: The EmailProcessingQueue primary key
-    :return: None
-    """
-    docket_entries = DocketEntry.objects.filter(
-        date_created__gte=since, docket_id=d_pk
-    )
-    if docket_entries.count() == 0:
-        # No new docket entries.
-        return
-
-    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
-    webhooks = Webhook.objects.filter(
-        event_type=WebhookEventType.RECAP_EMAIL,
-        user__profile__recap_email__in=epq.destination_emails,
-        enabled=True,
-    )
-
-    serialized_docket_entries = []
-    for de in docket_entries:
-        serialized_docket_entries.append(DocketEntrySerializer(de).data)
-
-    for webhook in webhooks:
-        post_content = {
-            "webhook": {
-                "event_type": webhook.event_type,
-                "version": webhook.version,
-                "date_created": webhook.date_created,
-            },
-            "results": serialized_docket_entries,
-        }
-        response = requests.post(webhook.url, data=post_content, timeout=2)
-        WebhookEvent.objects.create(
-            webhook=webhook,
-            status_code=response.status_code,
-            content=post_content,
-            response=response.text,
-        )
-        if not response.ok:
-            webhook.failure_count = webhook.failure_count + 1
-            webhook.save()
-
-
 def get_recap_email_recipients(
     email_recipients: list[dict[str, str | list[str]]],
 ) -> list[str]:
@@ -1563,12 +1526,35 @@ def get_recap_email_recipients(
     return recap_email_recipients
 
 
+def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
+    """Get the attachment page report for recap.email documents without being
+    logged into PACER.
+
+    :param att_page_url: The free look link url to the attachment page
+    :param court: The court object we're working with
+    :return: The HTML page text or None if it's not a valid attachment page
+    """
+
+    logger.info(
+        f"Querying the email notice attachment page endpoint at URL: {att_page_url}"
+    )
+    req_timeout = (60, 300)
+    att_response = requests.get(att_page_url, timeout=req_timeout)
+    att_data = get_data_from_att_report(att_response.text, court.pk)
+    if att_data == {}:
+        msg = "Not a valid attachment page upload for recap.email"
+        logger.warning(msg)
+        return None
+    return att_response.text
+
+
 @app.task(
     bind=True,
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
         requests.ConnectionError,
+        requests.ReadTimeout,
         PacerLoginException,
         RedisConnectionError,
     ),
@@ -1577,18 +1563,17 @@ def get_recap_email_recipients(
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
-) -> Optional[Dict[str, Union[int, bool]]]:
+) -> Optional[list[int]]:
     """Processes a recap.email when it comes in, fetches the free document and
     triggers docket alerts and webhooks.
 
     :param self: The task
     :param epq_pk: The EmailProcessingQueue object pk
     :param user_pk: The API user that sent this notification
-    :return: An optional dict to pass to the next task with the docket_pk and a
-     bool True if there was content updated, otherwise False
+    :return: An optional list to pass to the next task with recap documents pks
+     that were downloaded
     """
 
-    start_time = now()
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
 
@@ -1631,17 +1616,38 @@ def process_recap_email(
         ContentFile(body.encode()),
     )
 
+    start_time = now()
     rds_created, content_updated = add_docket_entries(
         docket, data["docket_entries"]
     )
 
     # Ensures we have PACER cookies ready to go.
-    get_or_cache_pacer_cookies(
+    cookies = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
     magic_number = docket_entry["pacer_magic_num"]
-    for rd in rds_created:
+    rds_attachments = []
+    if data["contains_attachments"] is True:
+        # Get attachments and merge them.
+        for rd in rds_created:
+            # Try to get the attachment page without being logged into PACER
+            att_report_text = get_attachment_page_by_url(
+                docket_entry["document_url"], epq.court
+            )
+            if att_report_text:
+                att_report = AttachmentPage(epq.court_id)
+            else:
+                # Get the attachment page being logged into PACER
+                att_report = get_attachment_page_by_rd(rd.pk, cookies)
+            pq_pk = make_attachment_pq_object(
+                att_report, rd.pk, user_pk, att_report_text
+            )
+            pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
+            rds_attachments += rds_affected
+
+    rds_to_download = rds_attachments + rds_created
+    for rd in rds_to_download:
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )
@@ -1658,19 +1664,15 @@ def process_recap_email(
             recap_email_recipients = get_recap_email_recipients(
                 data["email_recipients"]
             )
-            chain(
-                send_docket_alert.si(
-                    docket.pk, start_time, recap_email_recipients
-                ),
-                send_docket_to_webhook.si(docket.pk, start_time, epq.pk),
-            ).apply_async()
-    return {
-        "docket_pk": docket.pk,
-        "content_updated": bool(rds_created or content_updated),
-    }
+            send_alert_and_webhook.delay(
+                docket.pk, start_time, recap_email_recipients
+            )
+    return [rd.pk for rd in rds_to_download]
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
         process_recap_email.si(epq.pk, user.pk),
+        extract_recap_pdf.s(),
+        add_items_to_solr.s("search.RECAPDocument"),
     ).apply_async()

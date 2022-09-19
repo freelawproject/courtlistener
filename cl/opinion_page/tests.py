@@ -5,7 +5,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from django.conf import settings
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test.client import Client
@@ -20,13 +20,18 @@ from rest_framework.status import (
 )
 
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import SitemapTest
+from cl.lib.test_helpers import SimpleUserDataMixin, SitemapTest
 from cl.opinion_page.forms import TennWorkersForm
 from cl.opinion_page.views import make_docket_title
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import Person
-from cl.search.factories import CourtFactory
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterWithParentsFactory,
+)
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Docket,
@@ -292,12 +297,11 @@ class OgRedirectLookupViewTest(TestCase):
         mock.assert_called_once()
 
 
-class NewDocketAlertTest(TestCase):
+class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
     fixtures = [
         "test_objects_search.json",
         "judge_judy.json",
         "test_court.json",
-        "authtest_data.json",
     ]
 
     def setUp(self) -> None:
@@ -330,14 +334,100 @@ class NewDocketAlertTest(TestCase):
 
 
 class OpinionSitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c so new
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=0,
+            date_filed=datetime.date.today(),
+        )
+        # Included b/c cited
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today() - datetime.timedelta(365 * 15),
+        )
+        # Excluded because no cites
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=0,
+            date_filed=datetime.date.today() - datetime.timedelta(365 * 15),
+        )
+        # Excluded because blocked
+        OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=100,
+            blocked=True,
+        )
+
     def setUp(self) -> None:
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
-        self.item_qs = OpinionCluster.objects.all()
+        self.expected_item_count = 2
 
     def test_does_the_sitemap_have_content(self) -> None:
-        super(OpinionSitemapTest, self).assert_sitemap_has_content()
+        super().assert_sitemap_has_content()
+
+
+class DocketSitemapTest(SitemapTest):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c so new
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=0,
+            date_filed=datetime.date.today(),
+        )
+        # Included b/c many views
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=False,
+            view_count=50,
+            date_filed=datetime.date.today() - datetime.timedelta(days=60),
+        )
+        # Excluded b/c blocked
+        DocketFactory.create(
+            source=Docket.RECAP,
+            blocked=True,
+        )
+
+    def setUp(self) -> None:
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
+        )
+        self.expected_item_count = 2
+
+    def test_does_the_sitemap_have_content(self) -> None:
+        super().assert_sitemap_has_content()
+
+
+class BlockedSitemapTest(SitemapTest):
+    """Do we create sitemaps of recently blocked opinions?"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        # Included b/c recently blocked
+        OpinionClusterWithParentsFactory.create(
+            blocked=True,
+            date_blocked=datetime.date.today(),
+        )
+        # Excluded b/c blocked too long ago
+        OpinionClusterWithParentsFactory.create(
+            blocked=True,
+            date_blocked=datetime.date.today() - datetime.timedelta(days=60),
+        )
+
+    def setUp(self) -> None:
+        self.sitemap_url = reverse(
+            "sitemaps", kwargs={"section": "blocked-opinions"}
+        )
+        self.expected_item_count = 1
+
+    def test_does_the_sitemap_have_content(self) -> None:
+        super().assert_sitemap_has_content()
 
 
 @override_settings(

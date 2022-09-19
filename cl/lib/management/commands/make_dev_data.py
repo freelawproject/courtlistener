@@ -1,6 +1,7 @@
 from django.core.management.base import CommandParser
 
 from cl.alerts.factories import DocketAlertWithParentsFactory
+from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
@@ -14,7 +15,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
 )
-from cl.users.factories import SuperUserFactory, UserFactory
+from cl.users.factories import UserFactory
 
 FACTORIES = {
     # Search app
@@ -30,11 +31,12 @@ FACTORIES = {
     201: PersonWithChildrenFactory,
     # Users
     300: UserFactory,
-    301: SuperUserFactory,
     # Citations
     400: CitationWithParentsFactory,
     # Alerts
     500: DocketAlertWithParentsFactory,
+    # Audio
+    600: AudioWithParentsFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 

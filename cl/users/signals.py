@@ -1,11 +1,21 @@
-from django.dispatch import receiver
-from django_ses.signals import bounce_received, complaint_received
+from datetime import timedelta
 
+from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils.timezone import now
+from django_ses.signals import bounce_received, complaint_received
+from rest_framework.authtoken.models import Token
+
+from cl.api.models import Webhook
+from cl.lib.crypto import sha1_activation_key
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
     handle_soft_bounce,
 )
+from cl.users.models import UserProfile, generate_recap_email
+from cl.users.tasks import notify_new_or_updated_webhook
 
 
 def get_message_id(mail_obj: dict) -> str:
@@ -23,7 +33,7 @@ def get_message_id(mail_obj: dict) -> str:
     return ""
 
 
-@receiver(bounce_received)
+@receiver(bounce_received, dispatch_uid="bounce_handler")
 def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
     """Receiver function to handle bounce notifications sent by Amazon SES via
     handle_event_webhook
@@ -57,7 +67,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
                 )
 
 
-@receiver(complaint_received)
+@receiver(complaint_received, dispatch_uid="complaint_handler")
 def complaint_handler(
     sender, mail_obj, complaint_obj, raw_message, *args, **kwargs
 ):
@@ -71,3 +81,46 @@ def complaint_handler(
             email["emailAddress"] for email in complained_recipients
         ]
         handle_complaint(recipient_emails)
+
+
+@receiver(
+    post_save,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="create_auth_token",
+)
+def create_auth_token(sender, instance=None, created=False, **kwargs):
+    if created:
+        Token.objects.create(user=instance)
+
+
+@receiver(
+    post_save,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="create_superuser_profile_object",
+)
+def superuser_creation(sender, instance, created, **kwargs):
+    # Create a profile whenever createsuperuser is run
+    if created and instance.is_superuser:
+        UserProfile.objects.create(
+            user=instance,
+            activation_key=sha1_activation_key(instance.username),
+            key_expires=now() + timedelta(days=5),
+            email_confirmed=True,
+        )
+
+
+@receiver(post_save, sender=UserProfile, dispatch_uid="assign_recap_email")
+def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
+    if created:
+        instance.recap_email = generate_recap_email(instance)
+        instance.save()
+
+
+@receiver(post_save, sender=Webhook, dispatch_uid="webhook_created_or_updated")
+def webhook_created_or_updated(
+    sender, instance=None, created=False, **kwargs
+) -> None:
+    if created:
+        notify_new_or_updated_webhook.delay(instance.pk, created=True)
+    else:
+        notify_new_or_updated_webhook.delay(instance.pk, created=False)

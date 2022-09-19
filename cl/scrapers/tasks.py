@@ -172,6 +172,7 @@ def extract_recap_pdf(
     check_if_needed: bool = True,
 ) -> List[int]:
     """Extract the contents from a RECAP PDF if necessary."""
+
     if not is_iter(pks):
         pks = [pks]
 
@@ -189,12 +190,12 @@ def extract_recap_pdf(
             item=rd,
         )
         if not response.ok:
-            print("Error from microservice")
             continue
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if ocr_available and needs_ocr(content):
+        ocr_needed = needs_ocr(content)
+        if ocr_available and ocr_needed:
             response = microservice(
                 service="pdf-to-text",
                 item=rd,
@@ -209,7 +210,7 @@ def extract_recap_pdf(
             case True, True:
                 rd.ocr_status = RECAPDocument.OCR_COMPLETE
             case True, False:
-                if not ocr_available:
+                if not ocr_needed:
                     rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
             case False, True:
                 rd.ocr_status = RECAPDocument.OCR_FAILED

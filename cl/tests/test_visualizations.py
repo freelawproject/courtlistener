@@ -1,12 +1,12 @@
 """
 Functional tests for the Visualization feature of CourtListener
 """
-from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.users.models import UserProfile
+from cl.users.factories import UserProfileWithParentsFactory
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
@@ -18,12 +18,11 @@ class VisualizationCrudTests(BaseSeleniumTest):
     fixtures = ["scotus_map_data.json", "visualizations.json"]
 
     def setUp(self) -> None:
-        self.user = User.objects.create_user("user", "user@cl.com", "password")
-        self.user.save()
-        self.user = UserProfile.objects.create(
-            user=self.user, email_confirmed=True
+        UserProfileWithParentsFactory.create(
+            user__username="user",
+            user__password=make_password("password"),
         )
-        super(VisualizationCrudTests, self).setUp()
+        super().setUp()
 
     def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()

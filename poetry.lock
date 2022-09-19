@@ -65,6 +65,14 @@ lazy-object-proxy = ">=1.4.0"
 wrapt = ">=1.11,<1.13"
 
 [[package]]
+name = "async-generator"
+version = "1.10"
+description = "Async generators and context managers for Python 3.5+"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[[package]]
 name = "atomicwrites"
 version = "1.4.1"
 description = "Atomic file writes."
@@ -76,7 +84,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 name = "attrs"
 version = "20.3.0"
 description = "Classes Without Boilerplate"
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
@@ -432,7 +440,7 @@ python-versions = "*"
 
 [[package]]
 name = "django"
-version = "3.2.14"
+version = "3.2.15"
 description = "A high-level Python Web framework that encourages rapid development and clean, pragmatic design."
 category = "main"
 optional = false
@@ -600,7 +608,7 @@ redis = "<4.0"
 
 [[package]]
 name = "django-ses"
-version = "3.1.0"
+version = "3.1.2"
 description = "A Django email backend for Amazon's Simple Email Service"
 category = "main"
 optional = false
@@ -899,7 +907,7 @@ speedup = ["python-levenshtein (>=0.12)"]
 
 [[package]]
 name = "geonamescache"
-version = "1.3.0"
+version = "1.5.0"
 description = "Geonames data for continents, cities and US states."
 category = "main"
 optional = false
@@ -918,6 +926,14 @@ eventlet = ["eventlet (>=0.24.1)"]
 gevent = ["gevent (>=1.4.0)"]
 setproctitle = ["setproctitle"]
 tornado = ["tornado (>=0.2)"]
+
+[[package]]
+name = "h11"
+version = "0.13.0"
+description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
+category = "main"
+optional = false
+python-versions = ">=3.6"
 
 [[package]]
 name = "html5lib"
@@ -1143,7 +1159,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.10"
+version = "2.5.15"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -1156,12 +1172,12 @@ certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<5.1.0"
 cssselect = "*"
 feedparser = "6.0.8"
-geonamescache = "1.3.0"
+geonamescache = "1.5.0"
 html5lib = "*"
 lxml = ">=4.9,<5.0"
 python-dateutil = "2.8.2"
 requests = ">=2.20.0"
-selenium = "4.0.0-alpha-6"
+selenium = "4.0.0.a7"
 tldextract = "*"
 
 [[package]]
@@ -1371,6 +1387,17 @@ python-versions = "*"
 coreapi = ">=2.2.0"
 
 [[package]]
+name = "outcome"
+version = "1.2.0"
+description = "Capture the outcome of Python function calls."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+attrs = ">=19.2.0"
+
+[[package]]
 name = "pandas"
 version = "1.4.2"
 description = "Powerful data structures for data analysis, time series, and statistics"
@@ -1427,11 +1454,15 @@ python-versions = "*"
 
 [[package]]
 name = "pillow"
-version = "9.0.1"
+version = "9.2.0"
 description = "Python Imaging Library (Fork)"
 category = "main"
 optional = false
 python-versions = ">=3.7"
+
+[package.extras]
+docs = ["furo", "olefile", "sphinx (>=2.4)", "sphinx-copybutton", "sphinx-issues (>=3.0.1)", "sphinx-removed-in", "sphinxext-opengraph"]
+tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout"]
 
 [[package]]
 name = "platformdirs"
@@ -1733,14 +1764,14 @@ python-versions = "*"
 
 [[package]]
 name = "reporters-db"
-version = "3.2.21"
+version = "3.2.28"
 description = "Database of Court Reporters"
 category = "main"
 optional = false
 python-versions = "*"
 
 [package.dependencies]
-six = "*"
+six = ">=1.0.0"
 
 [[package]]
 name = "requests"
@@ -1819,7 +1850,7 @@ pytz = "*"
 requests = "*"
 
 [package.extras]
-test = ["nose", "coverage", "mock"]
+test = ["coverage", "mock", "nose"]
 
 [package.source]
 type = "git"
@@ -1829,18 +1860,20 @@ resolved_reference = "0632024e72e22a71e17cdb778805561f7cdd33d8"
 
 [[package]]
 name = "selenium"
-version = "4.0.0a6"
-description = "Python bindings for Selenium"
+version = "4.0.0.a7"
+description = ""
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = "*"
 
 [package.dependencies]
+trio = "*"
+trio-websocket = "*"
 urllib3 = {version = "*", extras = ["secure"]}
 
 [[package]]
 name = "sentry-sdk"
-version = "1.0.0"
+version = "1.9.0"
 description = "Python client for Sentry (https://sentry.io)"
 category = "main"
 optional = false
@@ -1858,12 +1891,16 @@ celery = ["celery (>=3)"]
 chalice = ["chalice (>=1.16.0)"]
 django = ["django (>=1.8)"]
 falcon = ["falcon (>=1.4)"]
+fastapi = ["fastapi (>=0.79.0)"]
 flask = ["flask (>=0.11)", "blinker (>=1.1)"]
+httpx = ["httpx (>=0.16.0)"]
 pure_eval = ["pure-eval", "executing", "asttokens"]
 pyspark = ["pyspark (>=2.4.4)"]
+quart = ["quart (>=0.16.1)", "blinker (>=1.1)"]
 rq = ["rq (>=0.6)"]
 sanic = ["sanic (>=0.8)"]
 sqlalchemy = ["sqlalchemy (>=1.2)"]
+starlette = ["starlette (>=0.19.1)"]
 tornado = ["tornado (>=5)"]
 
 [[package]]
@@ -1891,6 +1928,22 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
+name = "sniffio"
+version = "1.3.0"
+description = "Sniff out which async library your code is running under"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "soupsieve"
 version = "2.2.1"
 description = "A modern CSS selector implementation for Beautiful Soup."
@@ -1908,7 +1961,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "stripe"
-version = "2.56.0"
+version = "4.1.0"
 description = "Python bindings for the Stripe API"
 category = "main"
 optional = false
@@ -1997,6 +2050,36 @@ ipython-genutils = "*"
 
 [package.extras]
 test = ["pytest"]
+
+[[package]]
+name = "trio"
+version = "0.21.0"
+description = "A friendly Python library for async concurrency and I/O"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+async-generator = ">=1.9"
+attrs = ">=19.2.0"
+cffi = {version = ">=1.14", markers = "os_name == \"nt\" and implementation_name != \"pypy\""}
+idna = "*"
+outcome = "*"
+sniffio = "*"
+sortedcontainers = "*"
+
+[[package]]
+name = "trio-websocket"
+version = "0.9.2"
+description = "WebSocket library for Trio"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+async-generator = ">=1.10"
+trio = ">=0.11"
+wsproto = ">=0.14"
 
 [[package]]
 name = "types-python-dateutil"
@@ -2163,10 +2246,21 @@ category = "dev"
 optional = false
 python-versions = "*"
 
+[[package]]
+name = "wsproto"
+version = "1.2.0"
+description = "WebSockets state-machine based protocol implementation"
+category = "main"
+optional = false
+python-versions = ">=3.7.0"
+
+[package.dependencies]
+h11 = ">=0.9.0,<1"
+
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "8dc0f7c01ed154a99df2d0ef8ecd04dde93a515d4474c50314944f1d5c4bf4cf"
+content-hash = "9830b9b0fc5be80945e5123f3d7ed1d5a062c8c00cf5c214b8ff6655288f051c"
 
 [metadata.files]
 amqp = []
@@ -2176,6 +2270,7 @@ argparse = []
 asgiref = []
 astor = []
 astroid = []
+async-generator = []
 atomicwrites = []
 attrs = []
 backcall = []
@@ -2248,6 +2343,7 @@ future = []
 fuzzywuzzy = []
 geonamescache = []
 gunicorn = []
+h11 = []
 html5lib = []
 httplib2 = []
 identify = []
@@ -2285,6 +2381,7 @@ nodeenv = []
 nose = []
 numpy = []
 openapi-codec = []
+outcome = []
 pandas = []
 parso = []
 pathspec = []
@@ -2332,6 +2429,8 @@ sentry-sdk = []
 sgmllib3k = []
 simplejson = []
 six = []
+sniffio = []
+sortedcontainers = []
 soupsieve = []
 sqlparse = []
 stripe = []
@@ -2343,6 +2442,8 @@ toml = []
 tomli = []
 tqdm = []
 traitlets = []
+trio = []
+trio-websocket = []
 types-python-dateutil = []
 types-pytz = []
 types-pyyaml = []
@@ -2360,3 +2461,4 @@ virtualenv = []
 wcwidth = []
 webencodings = []
 wrapt = []
+wsproto = []

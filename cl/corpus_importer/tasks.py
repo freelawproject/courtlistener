@@ -51,7 +51,7 @@ from rest_framework.status import (
     HTTP_504_GATEWAY_TIMEOUT,
 )
 
-from cl.alerts.tasks import enqueue_docket_alert, send_docket_alert
+from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
@@ -525,7 +525,7 @@ def process_free_opinion_result(
     if rd_created:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
-            send_docket_alert(d.pk, start_time)
+            send_alert_and_webhook(d.pk, start_time)
 
     return {
         "result": result,
@@ -538,7 +538,6 @@ def process_free_opinion_result(
     bind=True,
     autoretry_for=(
         ConnectionError,
-        PacerLoginException,
         ReadTimeout,
         RedisConnectionError,
     ),
@@ -589,13 +588,39 @@ def get_and_process_free_pdf(
         r, r_msg = download_pacer_pdf_by_rd(
             rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
         )
-    except PacerLoginException as exc:
-        msg = "PacerLoginException while getting free docs."
-        if self.request.retries == self.max_retries:
-            logger.warning(msg)
+    except HTTPError as exc:
+        if exc.response.status_code in [
+            HTTP_500_INTERNAL_SERVER_ERROR,
+            HTTP_504_GATEWAY_TIMEOUT,
+        ]:
+            msg = (
+                f"Ran into HTTPError while getting PDF: "
+                f"{exc.response.status_code}."
+            )
+            if self.request.retries == self.max_retries:
+                logger.error(msg)
+                self.request.chain = None
+                return None
+            logger.info(f"{msg} Retrying.")
+            raise self.retry(exc=exc)
+        else:
+            msg = (
+                f"Ran into unknown HTTPError while getting PDF: "
+                f"{exc.response.status_code}. Aborting."
+            )
+            logger.error(msg)
             self.request.chain = None
             return None
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")
+        # Refresh cookies before retrying
+        get_or_cache_pacer_cookies(
+            "pacer_scraper",
+            username=settings.PACER_USERNAME,
+            password=settings.PACER_PASSWORD,
+            refresh=True,
+        )
         raise self.retry(exc=exc)
     except (ReadTimeoutError, requests.RequestException) as exc:
         msg = "Request exception getting free PDF"
@@ -1483,6 +1508,7 @@ def make_attachment_pq_object(
     attachment_report: AttachmentPage,
     rd_pk: int,
     user_pk: int,
+    att_report_text: str | None = None,
 ) -> int:
     """Create an item in the processing queue for an attachment page.
 
@@ -1496,6 +1522,8 @@ def make_attachment_pq_object(
     with
     :param user_pk: The user to associate with the ProcessingQueue object when
     it's created.
+    :param att_report_text: The attachment page report text if we got it from a
+    notification free look link.
     :return: The pk of the ProcessingQueue object that's created.
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1506,23 +1534,16 @@ def make_attachment_pq_object(
         upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
     )
+    if att_report_text is None:
+        att_report_text = attachment_report.response.text
     pq.filepath_local.save(
-        "attachment_page.html", ContentFile(attachment_report.response.text)
+        "attachment_page.html", ContentFile(att_report_text.encode())
     )
 
     return pq.pk
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(PacerLoginException,),
-    max_retries=15,
-    interval_start=5,
-    interval_step=5,
-    ignore_result=True,
-)
 def download_pacer_pdf_by_rd(
-    self: Task,
     rd_pk: int,
     pacer_case_id: str,
     pacer_doc_id: int,
@@ -1532,7 +1553,6 @@ def download_pacer_pdf_by_rd(
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
 
-    :param self: The celery task
     :param rd_pk: The PK of the RECAPDocument to download
     :param pacer_case_id: The internal PACER case ID number
     :param pacer_doc_id: The internal PACER document ID to download
@@ -1549,40 +1569,9 @@ def download_pacer_pdf_by_rd(
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
-    try:
-        r, r_msg = report.download_pdf(
-            pacer_case_id, pacer_doc_id, magic_number
-        )
-    except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
-        ]:
-            msg = (
-                f"Ran into HTTPError while getting PDF: "
-                f"{exc.response.status_code}."
-            )
-            if self.request.retries == self.max_retries:
-                logger.error(msg)
-                self.request.chain = None
-                return None, msg
-            logger.info(f"{msg} Retrying.")
-            raise self.retry(exc)
-        else:
-            msg = (
-                f"Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
-            )
-            logger.error(msg)
-            self.request.chain = None
-            return None, msg
-    except requests.RequestException as exc:
-        msg = f"Unable to get PDF for {pacer_doc_id} in {pacer_case_id}"
-        logger.warning(msg)
-        if self.request.retries == self.max_retries:
-            self.request.chain = None
-            return None, msg
-        raise self.retry(exc=exc)
+
+    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
+
     return r, r_msg
 
 
@@ -1672,7 +1661,7 @@ def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(PacerLoginException, RequestException),
+    autoretry_for=(PacerLoginException, RequestException, HTTPError),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -1726,7 +1715,7 @@ def get_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ReadTimeout),
+    autoretry_for=(ConnectionError, ReadTimeout, HTTPError, RequestException),
     max_retries=15,
     interval_start=5,
     interval_step=5,

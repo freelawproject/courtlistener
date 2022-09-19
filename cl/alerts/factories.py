@@ -11,7 +11,12 @@ class DocketAlertFactory(DjangoModelFactory):
         model = DocketAlert
 
     user = SubFactory(UserFactory)
-    secret_key = Faker("random_letters", length=40)
+    secret_key = Faker(
+        "password",
+        length=40,
+        special_chars=False,
+        upper_case=False,
+    )
 
 
 class DocketAlertWithParentsFactory(DocketAlertFactory, DocketParentMixin):

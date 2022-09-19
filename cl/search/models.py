@@ -31,15 +31,26 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
-DOCUMENT_STATUSES = (
-    ("Published", "Precedential"),
-    ("Unpublished", "Non-Precedential"),
-    ("Errata", "Errata"),
-    ("Separate", "Separate Opinion"),
-    ("In-chambers", "In-chambers"),
-    ("Relating-to", "Relating-to orders"),
-    ("Unknown", "Unknown Status"),
-)
+
+class PRECEDENTIAL_STATUS:
+    PUBLISHED = "Published"
+    UNPUBLISHED = "Unpublished"
+    ERRATA = "Errata"
+    SEPARATE = "Separate"
+    IN_CHAMBERS = "In-chambers"
+    RELATING_TO = "Relating-to"
+    UNKNOWN = "Unknown"
+
+    NAMES = (
+        (PUBLISHED, "Precedential"),
+        (UNPUBLISHED, "Non-Precedential"),
+        (ERRATA, "Errata"),
+        (SEPARATE, "Separate Opinion"),
+        (IN_CHAMBERS, "In-chambers"),
+        (RELATING_TO, "Relating-to orders"),
+        (UNKNOWN, "Unknown Status"),
+    )
+
 
 SOURCES = (
     ("C", "court website"),
@@ -2129,10 +2140,10 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     precedential_status = models.CharField(
         help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in DOCUMENT_STATUSES]),
+        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
         max_length=50,
         blank=True,
-        choices=DOCUMENT_STATUSES,
+        choices=PRECEDENTIAL_STATUS.NAMES,
         db_index=True,
     )
     date_blocked = models.DateField(

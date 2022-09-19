@@ -13,7 +13,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.people_db.factories import PersonFactory
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SOURCES,
     Citation,
     Court,
@@ -110,7 +110,9 @@ class OpinionClusterFactory(DjangoModelFactory):
     date_filed = Faker("date")
     slug = Faker("slug")
     source = FuzzyChoice(SOURCES, getter=lambda c: c[0])
-    precedential_status = FuzzyChoice(DOCUMENT_STATUSES, getter=lambda c: c[0])
+    precedential_status = FuzzyChoice(
+        PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
+    )
 
 
 class OpinionClusterFactoryWithChildren(OpinionClusterFactory):

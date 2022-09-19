@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
 {% load static %}
+{% load text_filters %}
 
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
 {% block description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
@@ -123,7 +126,7 @@
             </ul>
             <p>
               <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
-                 class="btn btn-default">
+                 class="btn btn-default" rel="nofollow">
                   View Citing Opinions
               </a>
             </p>
@@ -131,7 +134,7 @@
             <p>This case has not yet been cited in our system.</p>
           {% endif %}
           <div class="btn-group">
-            <a class="btn btn-primary"
+            <a class="btn btn-primary" rel="nofollow"
                href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"><i class="fa fa-bell-o"></i> Get Citation Alerts</a>
             <a class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <span class="caret"></span>

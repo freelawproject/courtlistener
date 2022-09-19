@@ -1,9 +1,6 @@
-import json
 import logging
-import os
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime
-from pathlib import Path
 from typing import Dict, List, Set, Union
 
 from dateutil import parser
@@ -182,6 +179,13 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
+def get_logging_prefix() -> str:
+    """Simple tool for getting the prefix for logging API requests. Useful for
+    mocking the logger.
+    """
+    return "api:v3"
+
+
 class LoggingMixin(object):
     """Log requests to Redis
 
@@ -242,36 +246,37 @@ class LoggingMixin(object):
 
         r = make_redis_interface("STATS")
         pipe = r.pipeline()
+        api_prefix = get_logging_prefix()
 
         # Global and daily tallies for all URLs.
-        pipe.incr("api:v3.count")
-        pipe.incr(f"api:v3.d:{d}.count")
-        pipe.incr("api:v3.timing", response_ms)
-        pipe.incr(f"api:v3.d:{d}.timing", response_ms)
+        pipe.incr(f"{api_prefix}.count")
+        pipe.incr(f"{api_prefix}.d:{d}.count")
+        pipe.incr(f"{api_prefix}.timing", response_ms)
+        pipe.incr(f"{api_prefix}.d:{d}.timing", response_ms)
 
         # Use a sorted set to store the user stats, with the score representing
         # the number of queries the user made total or on a given day.
         user_pk = user.pk or "AnonymousUser"
-        pipe.zincrby("api:v3.user.counts", 1, user_pk)
-        pipe.zincrby(f"api:v3.user.d:{d}.counts", 1, user_pk)
+        pipe.zincrby(f"{api_prefix}.user.counts", 1, user_pk)
+        pipe.zincrby(f"{api_prefix}.user.d:{d}.counts", 1, user_pk)
 
         # Use a hash to store a per-day map between IP addresses and user pks
         # Get a user pk with: `hget api:v3.d:2022-05-18.ip_map 172.19.0.1`
         if client_ip is not None:
-            ip_key = f"api:v3.d:{d}.ip_map"
+            ip_key = f"{api_prefix}.d:{d}.ip_map"
             pipe.hset(ip_key, client_ip, user_pk)
             pipe.expire(ip_key, 60 * 60 * 24 * 14)  # Two weeks
 
         # Use a sorted set to store all the endpoints with score representing
         # the number of queries the endpoint received total or on a given day.
-        pipe.zincrby("api:v3.endpoint.counts", 1, endpoint)
-        pipe.zincrby(f"api:v3.endpoint.d:{d}.counts", 1, endpoint)
+        pipe.zincrby(f"{api_prefix}.endpoint.counts", 1, endpoint)
+        pipe.zincrby(f"{api_prefix}.endpoint.d:{d}.counts", 1, endpoint)
 
         # We create a per-day key in redis for timings. Inside the key we have
         # members for every endpoint, with score of the total time. So to get
         # the average for an endpoint you need to get the number of requests
         # and the total time for the endpoint and divide.
-        timing_key = f"api:v3.endpoint.d:{d}.timings"
+        timing_key = f"{api_prefix}.endpoint.d:{d}.timings"
         pipe.zincrby(timing_key, response_ms, endpoint)
 
         results = pipe.execute()
@@ -377,87 +382,6 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
         "POST": ["%(app_label)s.has_recap_upload_access"],
         "GET": ["%(app_label)s.has_recap_upload_access"],
     }
-
-
-class BulkJsonHistory(object):
-    """Helpers for keeping track of data modified info on disk.
-
-    Format of JSON data is:
-
-    {
-      "last_good_date": ISO-Date,
-      "last_attempt: ISO-Date,
-      "duration": seconds,
-    }
-
-    """
-
-    def __init__(self, obj_type_str, bulk_dir):
-        self.obj_type_str = obj_type_str
-        self.path = os.path.join(bulk_dir, obj_type_str, "info.json")
-        self.json = self.load_json_file()
-        super(BulkJsonHistory, self).__init__()
-
-    def load_json_file(self) -> Dict[str, Union[str, float]]:
-        """Get the history file from disk and return it as data."""
-        try:
-            with open(self.path, "r") as f:
-                try:
-                    return json.load(f)
-                except ValueError:
-                    # When the file doesn't exist.
-                    return {}
-        except IOError as e:
-            # Happens when the directory isn't even there.
-            return {}
-
-    def save_to_disk(self):
-        filepath = self.path.rsplit("/", 1)[0]
-        Path(filepath).mkdir(parents=True, exist_ok=True)
-
-        with open(self.path, "w") as f:
-            json.dump(self.json, f, indent=2)
-
-    def delete_from_disk(self):
-        try:
-            os.remove(self.path)
-        except OSError as e:
-            if e.errno != 2:
-                # Problem other than No such file or directory.
-                raise
-
-    def get_last_good_date(self):
-        """Get the last good date from the file, or return None."""
-        d = self.json.get("last_good_date", None)
-        if d is None:
-            return d
-        else:
-            return parser.parse(d)
-
-    def get_last_attempt(self):
-        """Get the last attempt from the file, or return None."""
-        d = self.json.get("last_attempt", None)
-        if d is None:
-            return d
-        else:
-            return parser.parse(d)
-
-    def add_current_attempt_and_save(self):
-        """Add an attempt as the current attempt."""
-        self.json["last_attempt"] = now().isoformat()
-        self.save_to_disk()
-
-    def mark_success_and_save(self):
-        """Note a successful run."""
-        n = now()
-        self.json["last_good_date"] = n.isoformat()
-        try:
-            duration = n - parser.parse(self.json["last_attempt"])
-            self.json["duration"] = int(duration.total_seconds())
-        except KeyError:
-            # last_attempt wasn't set ahead of time.
-            self.json["duration"] = "Unknown"
-        self.save_to_disk()
 
 
 def make_date_str_list(

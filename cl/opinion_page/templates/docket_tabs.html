@@ -1,9 +1,12 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load extras %}
 {% load humanize %}
-{% load tz %}
 {% load static %}
+{% load text_filters %}
+{% load tz %}
 
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block sidebar %}{% endblock %}
 {% block content %}{% endblock %}
 
@@ -85,7 +88,7 @@
     {% if docket.pacer_docket_url or docket_entries %}
       <div class="v-offset-above-2">
         {% if docket_entries %}
-          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" rel="nofollow"
              class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
         {% endif %}
         <div class="btn-group"
@@ -108,7 +111,8 @@
               <a href="{% url "docket_feed" docket.pk %}"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
-              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
+              <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
+                rel="nofollow"><i class="fa fa-share-alt fa-fw gray"></i> Share Alert Link</a>
             </li>
             <li>
               <a href="{% url "alert_help" %}#recap-alerts"><i class="fa fa-question-circle-o fa-fw gray"></i> Learn More</a>

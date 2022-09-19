@@ -1,0 +1,39 @@
+{% if webhooks %}
+  {% for webhook in webhooks %}
+  <tr>
+    <td>
+      <p class="bottom">
+       {{ webhook.get_event_type_display }}
+      </p>
+    </td>
+    <td>
+      <p class="bottom">
+        {% if webhook.enabled is True %}
+          <span class="text-success">Active</span>
+        {% else %}
+          <span class="text-danger">Disabled</span>
+        {% endif %}
+      </p>
+    </td>
+    <td>{{ webhook.url }}</td>
+    <td class="right" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      <button hx-delete="{% url "webhooks-detail" pk=webhook.id format='json' %}"
+              hx-confirm="Are you sure you want to delete this Webhook?"
+              class="btn btn-danger btn-xs">
+        <i class="fa fa-trash-o"></i>&nbsp;Delete</button>
+      <button class="btn btn-primary btn-xs"
+              hx-get="{% url "webhooks-detail" pk=webhook.id format='html' %}"
+              hx-target="#webhooks-body">
+        <i class="fa fa-pencil"></i>&nbsp;Edit</button>
+    </td>
+  </tr>
+{% endfor %}
+{% else %}
+  <td class="text-center empty-webhooks" colspan="5">
+    <p>Create a new webhook:</p>
+    <button id="add-webhook" class="btn btn-primary btn-xs"
+            hx-get="{% url 'webhooks-render-form' format="html" %}"
+            hx-target="#webhooks-body">
+      <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
+  </td>
+{% endif %}

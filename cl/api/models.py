@@ -1,24 +1,15 @@
 from http import HTTPStatus
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from rest_framework.authtoken.models import Token
 
 from cl.lib.models import AbstractDateTimeModel
 
 
-@receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def create_auth_token(sender, instance=None, created=False, **kwargs):
-    if created:
-        Token.objects.create(user=instance)
-
-
 class WebhookEventType(models.IntegerChoices):
-    RECAP_EMAIL = 1, "RECAP email received"
-    ALERT = 2, "Alert triggered"
+    DOCKET_ALERT = 1, "Docket Alert"
+    SEARCH_ALERT = 2, "Search Alert"
+    RECAP_FETCH = 3, "Recap Fetch"
 
 
 HttpStatusCodes = models.IntegerChoices(  # type: ignore
