@@ -103,7 +103,7 @@ django-admin-cursor-paginator = "^0.1.2"
 django-ipware = "^4.0.2"
 sentry-sdk = "^1.9.0"
 selenium = "4.0.0.a7"
-juriscraper = "^2.5.15"
+juriscraper = "^2.5.16"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
