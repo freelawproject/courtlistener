@@ -348,7 +348,9 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_post_parameters("password")
 @login_required
+@ratelimiter_unsafe_10_per_m
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
