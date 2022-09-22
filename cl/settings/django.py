@@ -120,6 +120,7 @@ MIDDLEWARE = [
     "ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.MaintenanceModeMiddleware",
 ]
 
