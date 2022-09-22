@@ -11,9 +11,10 @@ from django.db.models import F, IntegerField, Prefetch
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import Http404, HttpResponse, HttpResponseNotAllowed
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404
 from django.template import loader
 from django.template.defaultfilters import slugify
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
@@ -92,7 +93,7 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         )["results"],
         "private": False,
     }
-    return render(request, "court.html", render_dict)
+    return TemplateResponse(request, "court.html", render_dict)
 
 
 @group_required("tenn_work_uploaders")
@@ -121,7 +122,7 @@ def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
             messages.info(
                 request, "Error submitting form, please review below."
             )
-    return render(
+    return TemplateResponse(
         request, "publish.html", {"form": form, "private": True, "pk": pk}
     )
 
@@ -271,7 +272,7 @@ def view_docket(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
             "get_string": make_get_string(request),
         }
     )
-    return render(request, "view_docket.html", context)
+    return TemplateResponse(request, "docket.html", context)
 
 
 @ratelimit_deny_list
@@ -327,7 +328,7 @@ def view_parties(
     context.update(
         {"parties": parties, "docket_entries": docket.docket_entries.exists()}
     )
-    return render(request, "docket_parties.html", context)
+    return TemplateResponse(request, "docket_parties.html", context)
 
 
 @ratelimit_deny_list
@@ -365,7 +366,7 @@ def docket_idb_data(
             "pro_se_csv": choices_to_csv(docket.idb_data, "pro_se"),
         }
     )
-    return render(request, "docket_idb_data.html", context)
+    return TemplateResponse(request, "docket_idb_data.html", context)
 
 
 def make_rd_title(rd: RECAPDocument) -> str:
@@ -452,7 +453,7 @@ def view_recap_document(
     else:
         favorite_form = FavoriteForm(instance=fave)
 
-    return render(
+    return TemplateResponse(
         request,
         "recap_document.html",
         {
@@ -519,9 +520,10 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     parenthetical_groups = get_or_create_parenthetical_groups(
         cluster,
     ).prefetch_related("representative",)[:3]
-    return render(
+
+    return TemplateResponse(
         request,
-        "view_opinion.html",
+        "opinion.html",
         {
             "title": title,
             "cluster": cluster,
@@ -560,9 +562,9 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
         )
     )
 
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_summaries.html",
+        "opinion_summaries.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -577,9 +579,9 @@ def view_summaries(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
 def view_authorities(request: HttpRequest, pk: int, slug: str) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
 
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_authorities.html",
+        "opinion_authorities.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -594,9 +596,9 @@ def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     cluster = get_object_or_404(OpinionCluster, pk=pk)
-    return render(
+    return TemplateResponse(
         request,
-        "view_opinion_visualizations.html",
+        "opinion_visualizations.html",
         {
             "title": get_case_title(cluster),
             "cluster": cluster,
@@ -606,7 +608,7 @@ def cluster_visualizations(
 
 
 def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         context,
@@ -661,7 +663,7 @@ def reporter_or_volume_handler(
                 },
             )
 
-        return render(
+        return TemplateResponse(
             request,
             "volumes_for_reporter.html",
             {
@@ -717,7 +719,7 @@ def reporter_or_volume_handler(
     except EmptyPage:
         cases = paginator.page(paginator.num_pages)
 
-    return render(
+    return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
@@ -800,7 +802,7 @@ def citation_handler(
     # Show the correct page....
     if cluster_count == 0:
         # No results for an otherwise valid citation.
-        return render(
+        return TemplateResponse(
             request,
             "citation_redirect_info_page.html",
             {
@@ -975,7 +977,7 @@ def citation_homepage(request: HttpRequest) -> HttpResponse:
             )
         else:
             # Error in form, somehow.
-            return render(
+            return TemplateResponse(
                 request,
                 "citation_redirect_info_page.html",
                 {"show_homepage": True, "form": form, "private": False},
@@ -983,7 +985,7 @@ def citation_homepage(request: HttpRequest) -> HttpResponse:
 
     form = CitationRedirectorForm()
     reporter_dict = make_reporter_dict()
-    return render(
+    return TemplateResponse(
         request,
         "citation_redirect_info_page.html",
         {

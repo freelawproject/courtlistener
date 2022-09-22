@@ -138,7 +138,8 @@
                 <ul>
                     {% for cluster in clusters %}
                         <li>
-                            <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
+                            <a href="{{ cluster.get_absolute_url }}"
+                               {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
                             <br>
                             {{ cluster.docket.court }} |
                             {{ cluster.date_filed }}

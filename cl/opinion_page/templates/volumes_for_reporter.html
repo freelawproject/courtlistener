@@ -89,7 +89,10 @@
     {% for case in cases %}
       <article class="{% cycle "odd" "even" %}">
       <h3 class="bottom serif">
-        <a href="{{ case.get_absolute_url }}" class="visitable">{{ case|best_case_name|safe|v_wrapper }}</a>
+        <a href="{{ case.get_absolute_url }}"
+           class="visitable"
+           {% if case.blocked %}rel="nofollow"{% endif %}
+        >{{ case|best_case_name|safe|v_wrapper }}</a>
       </h3>
       <div class="bottom">
         <div class="inline-block">

@@ -628,9 +628,9 @@ $(document).ready(function(){
           {% if o.citeCount > 0 %}
             <div class="bottom" class="inline nowrap">
             <span class="meta-data-value">
-              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})">
-                Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}
-              </a>
+              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})"
+                 rel="nofollow"
+              >Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}</a>
             </span>
             </div>
           {% endif %}
@@ -639,7 +639,10 @@ $(document).ready(function(){
         </div>
         {% endfor %}
         <p>
-            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on" class="btn btn-primary">Search for All Opinions Authored by {{ person.name_last }} in CourtListener</a>
+            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
+               rel="nofollow"
+               class="btn btn-primary"
+            >Search for All Opinions Authored by {{ person.name_last }} in CourtListener</a>
         </p>
       </div>
     </div>
@@ -686,7 +689,10 @@ $(document).ready(function(){
         </div>
         {% endfor %}
         <p>
-            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc" class="btn btn-primary">Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
+            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
+               rel="nofollow"
+               class="btn btn-primary"
+            >Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
         </p>
       </div>
     </div>
@@ -741,7 +747,9 @@ $(document).ready(function(){
         {% endfor %}
 
         <p>
-          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary">Search for All Oral Arguments Heard by {{ person.name_last }}</a>
+          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary"
+             rel="nofollow"
+          >Search for All Oral Arguments Heard by {{ person.name_last }}</a>
         </p>
       </div>
     </div>

@@ -344,9 +344,9 @@
     {% if result.citeCount > 0 %}
       <div class="bottom" class="inline-block">
         <span class="meta-data-value">
-          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})">
-              Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}
-          </a>
+          <a href="/?q=cites%3A({{ result.sibling_ids|join:" OR " }})"
+             rel="nofollow"
+          >Cited by {{ result.citeCount|intcomma }} opinion{{ result.citeCount|pluralize }}</a>
         </span>
       </div>
     {% endif %}
