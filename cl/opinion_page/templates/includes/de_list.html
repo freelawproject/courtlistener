@@ -32,14 +32,14 @@
                   <p>
                     {% if rd.document_type == rd.ATTACHMENT %}
                       {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}">Att<span
+                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Att<span
                                 class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
                       {% else %}
                         Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
                       {% endif %}
                     {% else %}
                       {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
+                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
                       {% else %}
                         Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
                       {% endif %}
@@ -62,6 +62,7 @@
                 <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
                   {% if rd.filepath_local %}
                     <a href="{{ rd.filepath_local.url }}"
+                       rel="nofollow"
                        role="button"
                        class="btn btn-primary btn-xs"
                             {% if rd.date_upload %}
@@ -79,7 +80,7 @@
                     </button>
                     <ul class="dropdown-menu">
                       <li>
-                        <a href="{{ rd.filepath_local.url }}">From
+                        <a href="{{ rd.filepath_local.url }}" rel="nofollow">From
                           CourtListener</a>
                       </li>
                       {% if rd.filepath_ia %}
@@ -95,7 +96,8 @@
                               <a href="{{ rd.pacer_url }}"
                                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                                   class="open_buy_pacer_modal"
-                                  data-toggle="modal" data-target="#modal-buy-pacer"
+                                  data-toggle="modal"
+                                  data-target="#modal-buy-pacer"
                                 {% endif %}
                                 target="_blank"
                                 rel="nofollow">
@@ -154,6 +156,7 @@
                     <a href="{{ rd.filepath_local.url }}"
                        role="button"
                        class="btn btn-primary btn-xs"
+                       rel="nofollow"
                        title="Download PDF"><i class="fa fa-download"></i>
                     </a>
                   {% else %}
@@ -167,7 +170,8 @@
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
                           {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
-                            data-toggle="modal" data-target="#modal-buy-pacer"
+                            data-toggle="modal"
+                            data-target="#modal-buy-pacer"
                             class="open_buy_pacer_modal btn btn-default btn-xs"
                           {% else%}
                             class="btn btn-default btn-xs"

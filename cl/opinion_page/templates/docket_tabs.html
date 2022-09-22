@@ -108,7 +108,7 @@
           </a>
           <ul class="dropdown-menu">
             <li>
-              <a href="{% url "docket_feed" docket.pk %}"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
+              <a href="{% url "docket_feed" docket.pk %}" rel="nofollow"><i class="fa fa-rss fa-fw gray"></i> Subscribe with RSS</a>
             </li>
             <li>
               <a href="{% url "new_docket_alert" %}?pacer_case_id={{ docket.pacer_case_id }}&court_id={{ docket.court_id }}"
