@@ -30,11 +30,11 @@ function toggleSettings(e) {
         button.removeClass('btn-danger').addClass('btn-success');
         alert_text.text(enable_message);
 
-        button.next()[0].className = 'btn btn-success dropdown-toggle';
+        button.next('.dropdown-toggle')[0].className = 'btn btn-success dropdown-toggle';
       } else {
         button_icon.removeClass().addClass('fa ' + button_disable_class);
         button.removeClass('btn-success').addClass('btn-danger');
-        button.next()[0].className = 'btn btn-danger dropdown-toggle';
+        button.next('.dropdown-toggle')[0].className = 'btn btn-danger dropdown-toggle';
         alert_text.text(disable_message);
       }
     },
