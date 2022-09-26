@@ -66,7 +66,7 @@
               </td>
               <td>
                 <p class="bottom">
-                  <a href="/?{{ alert.query }}">{{ alert.name }}</a>
+                  <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
                 </p>
               </td>
               <td>{{ alert.get_rate_display }}</td>
@@ -94,6 +94,7 @@
                   </p>
                 {% else %}
                   <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+                     rel="nofollow"
                      class="btn btn-primary btn-xs">
                     <i class="fa fa-pencil"></i>&nbsp;Edit</a>
                 {% endif %}

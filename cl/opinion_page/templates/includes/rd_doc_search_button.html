@@ -1,8 +1,10 @@
 {% if rd.is_available %}
 <div class="btn-group">
   <a href="/?type=r&amp;q=id%3A{{ rd.pk }}"
+     rel="nofollow"
      role="button"
-     class="btn btn-success"><i class="fa fa-search"></i>&nbsp;Search this PDF
+     class="btn btn-success"
+  ><i class="fa fa-search"></i>&nbsp;Search this PDF
   </a>
   <button type="button"
           class="btn btn-success dropdown-toggle"
@@ -14,7 +16,9 @@
   </button>
   <ul class="dropdown-menu">
     <li>
-      <a href="/?type=r&amp;q=docket_id%3A{{ rd.docket_entry.docket.pk }}">Search full Docket</a>
+      <a href="/?type=r&amp;q=docket_id%3A{{ rd.docket_entry.docket.pk }}"
+         rel="nofollow"
+      >Search full Docket</a>
     </li>
   </ul>
 </div>

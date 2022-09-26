@@ -107,6 +107,7 @@
             {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
             <p class="right">
                 <a href="/?order_by=dateFiled+desc"
+                   rel="nofollow"
                    class="btn btn-primary btn-lg v-offset-above-2">See Recent Opinions</a>
             </p>
         </div>
@@ -121,6 +122,7 @@
             {% include "includes/search_result.html" with results=results_oa type_override=SEARCH_TYPES.ORAL_ARGUMENT simple=True %}
             <p class="right">
                 <a href="/?order_by=dateArgued+desc&type=oa"
+                   rel="nofollow"
                    class="btn btn-primary btn-lg v-offset-above-2">See Recent Oral Arguments</a>
             </p>
         </div>
@@ -163,7 +165,8 @@
                   id="stat-num-precedential-opinions">{{ results.paginator.count|intcomma }}</span>
           </div>
           <div class="col-xs-9">
-            <p>Number of <a href="/?order_by=dateFiled+desc">precedential opinions</a> in CourtListener.</p>
+            <p>Number of <a href="/?order_by=dateFiled+desc"
+                            rel="nofollow">precedential opinions</a> in CourtListener.</p>
           </div>
         </div>
 
@@ -182,7 +185,7 @@
                   id="stat-num-days-of-oa">{{ days_of_oa|intcomma }}</span>
           </div>
           <div class="col-xs-9">
-            <p>Duration of all <a href="/?type=oa">oral arguments</a> in CourtListener, in days.</p>
+            <p>Duration of all <a href="/?type=oa" rel="nofollow">oral arguments</a> in CourtListener, in days.</p>
           </div>
         </div>
 

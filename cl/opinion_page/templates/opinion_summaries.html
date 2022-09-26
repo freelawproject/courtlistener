@@ -19,7 +19,8 @@
     <div class="sidebar-section">
       <h4 class="bottom">
         <i class="fa fa-arrow-circle-o-left gray"></i>
-        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back to Opinion</a>
+        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+           {% if cluster.blocked %}rel="nofollow"{% endif %}>Back to Opinion</a>
       </h4>
     </div>
   </div>
@@ -29,7 +30,8 @@
   <div class="col-sm-9">
     <h2>
       <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
-         class="black-link no-underline">{{ cluster.caption|safe|v_wrapper }}</a>
+         class="black-link no-underline"
+         {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
     </h2>
 
     <div id="all-summaries">

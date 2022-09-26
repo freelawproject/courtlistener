@@ -109,7 +109,8 @@
         <div id="cited-by" class="sidebar-section">
           <h3>
             <span>Cited By ({{ citing_cluster_count|intcomma }}) <a
-              href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})">
+              href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+              rel="nofollow">
                 <i class="gray fa fa-rss"
                    title="Subscribe to a feed of citations to this case."></i>
               </a>
@@ -126,17 +127,22 @@
             </ul>
             <p>
               <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
-                 class="btn btn-default" rel="nofollow">
-                  View Citing Opinions
-              </a>
+                 rel="nofollow"
+                 class="btn btn-default"
+              >View Citing Opinions</a>
             </p>
           {% else %}
             <p>This case has not yet been cited in our system.</p>
           {% endif %}
           <div class="btn-group">
-            <a class="btn btn-primary" rel="nofollow"
-               href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"><i class="fa fa-bell-o"></i> Get Citation Alerts</a>
-            <a class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <a href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+               rel="nofollow"
+               class="btn btn-primary"
+            ><i class="fa fa-bell-o"></i> Get Citation Alerts</a>
+            <a class="btn btn-primary dropdown-toggle"
+               data-toggle="dropdown"
+               aria-haspopup="true"
+               aria-expanded="false">
               <span class="caret"></span>
               <span class="sr-only">Toggle Dropdown</span>
             </a>
@@ -352,7 +358,8 @@
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             {% if sub_opinion.local_path %}
                                 <li>
-                                    <a href="{{ sub_opinion.local_path.url }}">
+                                    <a href="{{ sub_opinion.local_path.url }}"
+                                       rel="nofollow">
                                         {{ sub_opinion.get_type_display }} from
                                         our Backup
                                     </a>
@@ -436,7 +443,8 @@
                                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
                                   {% if sub_opinion.download_url %}
                                     You may prefer <a href="{{ sub_opinion.download_url }}"
-                                                      class="visitable">reading the original</a>.
+                                                      class="visitable"
+                                                      rel="nofollow">reading the original</a>.
                                   {% endif %}
                                 </p>
                             </div>
