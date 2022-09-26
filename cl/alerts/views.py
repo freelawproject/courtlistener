@@ -122,7 +122,6 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         )
 
 
-@login_required
 def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
