@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from judge_pics.search import ImageSizes, portrait
 
@@ -103,7 +104,7 @@ def view_person(request, pk, slug):
     }
     recap_cases_assigned = conn.query().add_extra(**q).execute()
     conn.conn.http_connection.close()
-    return render(
+    return TemplateResponse(
         request,
         "view_person.html",
         {

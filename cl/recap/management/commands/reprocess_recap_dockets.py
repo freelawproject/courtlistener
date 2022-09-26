@@ -26,7 +26,7 @@ def extract_unextracted_rds_and_add_to_solr(queue: str) -> None:
             (Q(ocr_status=None) | Q(ocr_status=RECAPDocument.OCR_NEEDED))
             & Q(is_available=True)
             & ~Q(filepath_local="")
-        )
+        ).only("pk")
     ]
     count = len(rd_needs_extraction)
 

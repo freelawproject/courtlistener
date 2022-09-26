@@ -10,8 +10,8 @@ from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.db.models import Count, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.shortcuts import render
 from django.template import loader
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 def about(request: HttpRequest) -> HttpResponse:
     """Loads the about page"""
-    return render(request, "about.html", {"private": False})
+    return TemplateResponse(request, "about.html", {"private": False})
 
 
 def faq(request: HttpRequest) -> HttpResponse:
@@ -75,7 +75,7 @@ def faq(request: HttpRequest) -> HttpResponse:
 
 
 def help_home(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/index.html", {"private": False})
+    return TemplateResponse(request, "help/index.html", {"private": False})
 
 
 def alert_help(request: HttpRequest) -> HttpResponse:
@@ -110,31 +110,43 @@ def alert_help(request: HttpRequest) -> HttpResponse:
         "private": False,
     }
     context.update(data)
-    return render(request, "help/alert_help.html", context)
+    return TemplateResponse(request, "help/alert_help.html", context)
 
 
 def donation_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/donation_help.html", {"private": False})
+    return TemplateResponse(
+        request, "help/donation_help.html", {"private": False}
+    )
 
 
 def delete_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/delete_account_help.html", {"private": False})
+    return TemplateResponse(
+        request, "help/delete_account_help.html", {"private": False}
+    )
 
 
 def markdown_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/markdown_help.html", {"private": False})
+    return TemplateResponse(
+        request, "help/markdown_help.html", {"private": False}
+    )
 
 
 def tag_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/tags_help.html", {"private": False})
+    return TemplateResponse(request, "help/tags_help.html", {"private": False})
 
 
 def recap_email_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/recap_email_help.html", {"private": False})
+    return TemplateResponse(
+        request, "help/recap_email_help.html", {"private": False}
+    )
 
 
 def broken_email_help(request: HttpRequest) -> HttpResponse:
-    return render(request, "help/broken_email_help.html", {"private": True})
+    return TemplateResponse(
+        request,
+        "help/broken_email_help.html",
+        {"private": True},
+    )
 
 
 def build_court_dicts(courts: QuerySet) -> List[Dict[str, str]]:
@@ -175,7 +187,7 @@ def coverage_fds(request: HttpRequest) -> HttpResponse:
         cache.set(coverage_key, coverage_data, one_week)
 
     coverage_data["private"] = False
-    return render(request, "coverage_fds.html", coverage_data)
+    return TemplateResponse(request, "coverage_fds.html", coverage_data)
 
 
 def coverage_graph(request: HttpRequest) -> HttpResponse:
@@ -232,11 +244,11 @@ def coverage_graph(request: HttpRequest) -> HttpResponse:
         one_day = 60 * 60 * 24
         cache.set(coverage_cache_key, coverage_data, one_day)
 
-    return render(request, "coverage.html", coverage_data)
+    return TemplateResponse(request, "coverage.html", coverage_data)
 
 
 def feeds(request: HttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "feeds.html",
         {
@@ -249,7 +261,7 @@ def feeds(request: HttpRequest) -> HttpResponse:
 
 
 def podcasts(request: HttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "podcasts.html",
         {
@@ -263,7 +275,7 @@ def podcasts(request: HttpRequest) -> HttpResponse:
 
 
 def contribute(request: HttpRequest) -> HttpResponse:
-    return render(request, "contribute.html", {"private": False})
+    return TemplateResponse(request, "contribute.html", {"private": False})
 
 
 @ratelimiter_unsafe_3_per_m
@@ -326,19 +338,21 @@ def contact(
             form = ContactForm(initial=initial)
 
     template_data.update({"form": form, "private": False})
-    return render(request, template_path, template_data)
+    return TemplateResponse(request, template_path, template_data)
 
 
 def contact_thanks(request: HttpRequest) -> HttpResponse:
-    return render(request, "contact_thanks.html", {"private": True})
+    return TemplateResponse(request, "contact_thanks.html", {"private": True})
 
 
 def advanced_search(request: HttpRequest) -> HttpResponse:
-    return render(request, "advanced_search.html", {"private": False})
+    return TemplateResponse(
+        request, "advanced_search.html", {"private": False}
+    )
 
 
 def old_terms(request: HttpRequest, v: str) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         f"terms/{v}.html",
         {
@@ -350,7 +364,7 @@ def old_terms(request: HttpRequest, v: str) -> HttpResponse:
 
 
 def latest_terms(request: HttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "terms/latest.html",
         {
@@ -374,7 +388,7 @@ def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 def ratelimited(request: HttpRequest, exception: Exception) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "429.html",
         {"private": True},

@@ -14,7 +14,11 @@
         <li role="separator" class="divider"></li>
       {% endif %}
       {% if entry_count %}
-        <li><a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"><i class="fa fa-search"></i>&nbsp;Search this Docket</a></li>
+        <li>
+          <a href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+             rel="nofollow"
+          ><i class="fa fa-search"></i>&nbsp;Search this Docket</a>
+        </li>
       {% endif %}
       {% if docket.pacer_docket_url %}
         {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
@@ -44,7 +48,9 @@
         {% if docket.assigned_to %}
           <a href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
         {% elif docket.assigned_to_str %}
-          <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;">{{ docket.assigned_to_str }}</a>
+          <a href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;"
+             rel="nofollow"
+          >{{ docket.assigned_to_str }}</a>
         {% endif %}
         presiding
       </span>
@@ -56,7 +62,9 @@
         {% if docket.referred_to %}
           <a href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
         {% elif docket.referred_to_str %}
-          <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;">{{ docket.referred_to_str }}</a>
+          <a href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;"
+             rel="nofollow"
+          >{{ docket.referred_to_str }}</a>
         {% endif %}
       </span>
     {% endif %}

@@ -110,7 +110,9 @@
           {% include "includes/search_result.html" with results=results_compcl type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompcl=on&order_by=dateFiled+desc"
-               class="btn btn-default btn-lg v-offset-above-2">See Recent Opinions</a>
+               class="btn btn-default btn-lg v-offset-above-2"
+               rel="nofollow"
+            >See Recent Opinions</a>
           </p>
         {% else %}
           <p>No cases yet.</p>
@@ -126,7 +128,9 @@
           {% include "includes/search_result.html" with results=results_compapp type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompapp=on&order_by=dateFiled+desc"
-               class="btn btn-default btn-lg v-offset-above-2">See Recent Opinions</a>
+               class="btn btn-default btn-lg v-offset-above-2"
+               rel="nofollow"
+            >See Recent Opinions</a>
           </p>
         {% else %}
           <p>No cases yet.</p>

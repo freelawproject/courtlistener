@@ -12,8 +12,9 @@
     <p>If you wish to edit it or re-enable this alert, click below.</p>
     <div class="v-offset-above-3 text-left">
       <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
-         class="btn btn-primary btn-lg">
-        <i class="fa fa-pencil"></i>&nbsp;Edit Alert</a>
+         class="btn btn-primary btn-lg"
+         rel="nofollow"
+      ><i class="fa fa-pencil"></i>&nbsp;Edit Alert</a>
       <a href="{% url "enable_alert" alert.secret_key %}?rate={{ prev_rate }}"
          class="float-right btn btn-lg btn-primary"><i class="fa fa-undo"></i>&nbsp;Re-enable Alert</a>
     </div>
