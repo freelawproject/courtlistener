@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% load text_filters %}
-{% load partition_util %}
+{% load extras partition_util text_filters %}
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 
 
 {% block sidebar %}{% endblock %}
