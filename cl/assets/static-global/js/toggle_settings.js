@@ -36,7 +36,9 @@ function toggleSettings(e) {
       } else {
         button_icon.removeClass().addClass('fa ' + button_disable_class);
         button.removeClass('btn-success').addClass('btn-danger');
-        button.next('.dropdown-toggle')[0].className = 'btn btn-danger dropdown-toggle';
+        if (button.next('.dropdown-toggle')[0]){
+          button.next('.dropdown-toggle')[0].className = 'btn btn-danger dropdown-toggle';
+        }
         alert_text.text(disable_message);
       }
     },
