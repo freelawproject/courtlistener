@@ -57,7 +57,7 @@ class RobotsHeaderMiddleware:
     """Adds x-robots-tag HTTP header to any request that has `private=True`
 
     There's some evidence and good logic to support the idea that using the
-    x-robots-tag HTTP header uses less of of a site's "crawl budget" than
+    x-robots-tag HTTP header uses less of a site's "crawl budget" than
     using the noindex HTML tag. Logically, this makes sense because crawlers
     can simply download the headers and stop, instead of downloading and
     parsing pages.
