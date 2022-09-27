@@ -79,7 +79,7 @@ class RobotsHeaderMiddleware:
         request: HttpRequest,
         response: TemplateResponse,
     ) -> TemplateResponse:
-        if not response.context_data:
+        if getattr(response, "context_data", None) is None:
             return response
 
         private = response.context_data.get("private", False)
