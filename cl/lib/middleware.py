@@ -82,7 +82,9 @@ class RobotsHeaderMiddleware:
         if getattr(response, "context_data", None) is None:
             return response
 
-        private = response.context_data.get("private", False)
+        private = False
+        if response.context_data:
+            private = response.context_data.get("private", False)
         if private:
             response.headers[
                 "X-Robots-Tag"
