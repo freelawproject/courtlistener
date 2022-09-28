@@ -25,6 +25,10 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
+      - name: Get full Python version
+        id: full-python-version
+        run: echo ::set-output name=version::$(python -c "import sys; print('-'.join(str(v) for v in sys.version_info))")
+
       - name: Load cached venv
         id: cached-poetry-dependencies
         uses: actions/cache@v2
