@@ -50,20 +50,21 @@ def microservice(
     # Sadly these are not uniform
     if item:
         if type(item) == RECAPDocument:
-            req.files = {
-                "file": (item.filepath_local.name, item.filepath_local.read())
-            }
+            with item.filepath_local.open(mode="rb") as local_path:
+                req.files = {
+                    "file": (item.filepath_local.name, local_path.read())
+                }
         elif type(item) == Opinion:
-            req.files = {
-                "file": (item.local_path.name, item.local_path.read())
-            }
+            with item.local_path.open(mode="rb") as local_path:
+                req.files = {"file": (item.local_path.name, local_path.read())}
         elif type(item) == Audio:
-            req.files = {
-                "file": (
-                    item.local_path_original_file.name,
-                    item.local_path_original_file.read(),
-                )
-            }
+            with item.local_path_original_file.open(mode="rb") as local_path:
+                req.files = {
+                    "file": (
+                        item.local_path_original_file.name,
+                        local_path.read(),
+                    )
+                }
     # Sometimes we will want to pass in a filename and the file bytes
     # to avoid writing them to disk. Filename can often be generic
     # and is used to identify the file extension for our microservices

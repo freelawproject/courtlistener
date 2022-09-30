@@ -202,7 +202,7 @@ def extract_recap_pdf(
                 params={"ocr_available": ocr_available},
             )
             if response.ok:
-                content = response.content
+                content = response.text
                 extracted_by_ocr = True
 
         has_content = bool(content)
