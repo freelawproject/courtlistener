@@ -23,7 +23,6 @@ from cl.recap.filters import (
     ProcessingQueueFilter,
 )
 from cl.recap.models import (
-    REQUEST_TYPE,
     EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
