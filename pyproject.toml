@@ -81,7 +81,7 @@ unidecode = "*"
 usaddress = "^0.5.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
-ipython = "^7.31.1"
+ipython = "^8.5.0"
 gunicorn = "^20.0.4"
 django-hCaptcha = "^0.1.0"
 reporters-db = "^3.2.28"
