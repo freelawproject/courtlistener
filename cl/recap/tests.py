@@ -822,7 +822,7 @@ class RecapPdfTaskTest(TestCase):
             sha1=sha1,
         )
 
-        file_content_ocr = mock_bucket_open("pdf_ocr_test.pdf", "rb", True)
+        file_content_ocr = mock_bucket_open("ocr_pdf_test.pdf", "rb", True)
         self.filename_ocr = "file_ocr.pdf"
         self.file_content_ocr = file_content_ocr
 
@@ -921,12 +921,10 @@ class RecapPdfTaskTest(TestCase):
         """Can we extract a recap document via OCR?"""
         cf = ContentFile(self.file_content_ocr)
         self.pq.filepath_local.save(self.filename_ocr, cf)
-        process_recap_pdf(self.pq.pk)
-        recap_document = RECAPDocument.objects.all()
-        self.assertNotEqual(recap_document[0].plain_text, "")
-        self.assertEqual(
-            recap_document[0].ocr_status, RECAPDocument.OCR_COMPLETE
-        )
+        rd = process_recap_pdf(self.pq.pk)
+        recap_document = RECAPDocument.objects.get(pk=rd.pk)
+        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
 class RecapZipTaskTest(TestCase):

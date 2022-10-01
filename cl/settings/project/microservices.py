@@ -12,10 +12,6 @@ MICROSERVICE_URLS = {
         "timeout": 5,
     },
     # Extractor Endpoints
-    "pdf-to-text": {
-        "url": f"{DOCTOR_HOST}/extract/pdf/text/",
-        "timeout": 60 * 5,
-    },
     "document-extract": {
         "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 15,
