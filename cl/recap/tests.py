@@ -822,6 +822,10 @@ class RecapPdfTaskTest(TestCase):
             sha1=sha1,
         )
 
+        file_content_ocr = mock_bucket_open("ocr_pdf_test.pdf", "rb", True)
+        self.filename_ocr = "file_ocr.pdf"
+        self.file_content_ocr = file_content_ocr
+
     def tearDown(self) -> None:
         self.pq.filepath_local.delete()
         self.pq.delete()
@@ -912,6 +916,15 @@ class RecapPdfTaskTest(TestCase):
         # working, the correct status is PROCESSING_STATUS.FAILED.
         self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         self.assertIn("Unable to find docket", self.pq.error_message)
+
+    def test_ocr_extraction_recap_document(self):
+        """Can we extract a recap document via OCR?"""
+        cf = ContentFile(self.file_content_ocr)
+        self.pq.filepath_local.save(self.filename_ocr, cf)
+        rd = process_recap_pdf(self.pq.pk)
+        recap_document = RECAPDocument.objects.get(pk=rd.pk)
+        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
 class RecapZipTaskTest(TestCase):

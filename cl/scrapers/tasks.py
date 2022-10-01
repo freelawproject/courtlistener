@@ -197,12 +197,12 @@ def extract_recap_pdf(
         ocr_needed = needs_ocr(content)
         if ocr_available and ocr_needed:
             response = microservice(
-                service="pdf-to-text",
+                service="document-extract",
                 item=rd,
                 params={"ocr_available": ocr_available},
             )
             if response.ok:
-                content = response.content
+                content = response.json()["content"]
                 extracted_by_ocr = True
 
         has_content = bool(content)

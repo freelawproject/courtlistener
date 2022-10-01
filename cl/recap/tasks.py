@@ -1,7 +1,6 @@
 import logging
-from datetime import datetime
 from io import BytesIO
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 from zipfile import ZipFile
 
 import requests
@@ -31,7 +30,6 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
-from cl.alerts.models import DocketAlert
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
