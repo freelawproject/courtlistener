@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -41,6 +41,9 @@ from cl.users.factories import (
     UserProfileWithParentsFactory,
 )
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
+from cl.users.management.commands.cl_welcome_new_users import (
+    get_welcome_recipients,
+)
 from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
@@ -207,6 +210,25 @@ class UserDataTest(LiveServerTestCase):
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         for up in ups:
             self.assertTrue(up.email_confirmed)
+
+    def test_get_welcome_email_recipients(self) -> None:
+        """This test verifies that we can get the welcome email recipients
+        properly, users that signed up in the last 24 hours.
+        """
+
+        # Create a new user.
+        UserProfileWithParentsFactory.create(email_confirmed=False)
+        time_now = datetime.now()
+        # Get last 24 hours signed-up users.
+        recipients = get_welcome_recipients(time_now)
+        # The newly created user should be returned.
+        self.assertEqual(len(recipients), 1)
+
+        # Simulate getting recipients for tomorrow.
+        tomorrow = time_now + timedelta(days=1)
+        recipients = get_welcome_recipients(tomorrow)
+        # No recipients should be returned.
+        self.assertEqual(len(recipients), 0)
 
 
 class ProfileTest(SimpleUserDataMixin, TestCase):
