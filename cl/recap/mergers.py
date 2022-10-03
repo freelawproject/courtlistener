@@ -601,8 +601,9 @@ def add_docket_entries(d, docket_entries, tags=None):
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
-    :returns tuple of a list of RECAPDocument objects created and whether the
-    any docket entry was created.
+    :returns tuple of a list of RECAPDocument objects created, whether
+    any docket entry was created and a list of created or existing
+    RECAPDocument objects.
     """
     # Remove items without a date filed value.
     docket_entries = [de for de in docket_entries if de.get("date_filed")]

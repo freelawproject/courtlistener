@@ -6,7 +6,6 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
-from django.db.models import QuerySet
 from django.template import loader
 from django.utils.timezone import now
 from rest_framework.renderers import JSONRenderer

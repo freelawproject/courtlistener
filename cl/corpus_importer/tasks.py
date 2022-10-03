@@ -1581,6 +1581,41 @@ def download_pacer_pdf_by_rd(
     return r, r_msg
 
 
+def download_free_appellate_pacer_pdf(
+    court_id: str,
+    pacer_doc_id: str,
+    pacer_case_id: str,
+    cookies: RequestsCookieJar,
+    magic_number: str,
+) -> tuple[Response | None, str]:
+    """Small wrapper to fetch a free appellate PACER PDF.
+
+    For appellate documents we need to download the PDF before creating the
+    RECAPDocument in order try getting the document number from the PDF file.
+
+    :param court_id: A CourtListener court ID to query the free document.
+    :param pacer_doc_id: The pacer_doc_id to query the free document.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :return: A two-tuple of requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
+    """
+
+    s = PacerSession(cookies=cookies)
+    report = FreeOpinionReport(court_id, s)
+    appellate = True
+    try:
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, appellate
+        )
+    except (requests.RequestException, HTTPError):
+        msg = "Failed to get PDF from network."
+        return None, msg
+    return r, r_msg
+
+
 def get_document_number_from_confirmation_page(
     court_id: str, pacer_doc_id: str
 ) -> str:
@@ -1603,17 +1638,34 @@ def get_document_number_from_confirmation_page(
 
 
 def get_document_number_appellate(
-    court_id: str, pacer_doc_id: str, response: Response | None
-) -> str:
-    """Wrapper to get the PACER document number either from the download
+    court_id: str,
+    pacer_doc_id: str,
+    pacer_case_id: str,
+    cookies: RequestsCookieJar,
+    magic_number: str,
+) -> tuple[str, Response | None, str | None]:
+    """A wrapper to get the PACER document number either from the download
     confirmation page or from the PDF document.
 
     :param court_id: A CourtListener court ID to query the confirmation page.
     :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
-    :param response: A requests.Response object containing the PDF data.
-    :return: The PACER document number is available or an empty string if not.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :return: A tuple containing the PACER document number is available or an
+    empty string if not, a requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
     """
 
+    # Try to download the free appellate PDF.
+    pdf_response, r_msg = download_free_appellate_pacer_pdf(
+        court_id,
+        pacer_doc_id,
+        pacer_case_id,
+        cookies,
+        magic_number,
+    )
     document_number = ""
     if court_id in ("ca8", "ca11", "cadc"):
         # For ca8, ca11 and cadc the PACER document number is not available
@@ -1622,12 +1674,13 @@ def get_document_number_appellate(
         document_number = get_document_number_from_confirmation_page(
             court_id, pacer_doc_id
         )
-    elif response:
+    elif pdf_response:
+        pdf_bytes = pdf_response.content
         # For other jurisdictions try first to get it from the PDF document.
         dn_response = microservice(
             service="document-number",
             file_type="pdf",
-            file=response.content,
+            file=pdf_bytes,
         )
         if dn_response.ok:
             document_number = dn_response.text
@@ -1639,12 +1692,19 @@ def get_document_number_appellate(
             court_id, pacer_doc_id
         )
 
-    # Document numbers for documents with attachments have the format
+    # Document numbers from documents with attachments have the format
     # 1-1, 1-2, 1-3 in those cases the document number is the left number.
     document_number_split = document_number.split("-")
     if not len(document_number_split) == 1:
         document_number = document_number_split[0]
-    return document_number
+
+    if len(document_number) > 9:
+        # If is a larger document number is likely a pacer_doc_id force
+        # the four-digit to 0
+        # 00218987740 -> 00208987740, 123119177518 -> 123019177518
+        document_number = f"{document_number[:3]}0{document_number[4:]}"
+
+    return document_number, pdf_response, r_msg
 
 
 def update_rd_metadata(
@@ -1657,7 +1717,6 @@ def update_rd_metadata(
     pacer_doc_id: str,
     document_number: str,
     attachment_number: int,
-    appellate: bool = False,
 ) -> Tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
@@ -1672,29 +1731,11 @@ def update_rd_metadata(
     :param document_number: The docket entry number for use in file names.
     :param attachment_number: The attachment number (if applicable) for use in
     file names.
-    :param appellate: Whether the document belongs to an appellate court
-    obtained from recap.email
     :return: A two-tuple of a boolean indicating success and a corresponding
     error/success message string.
     """
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
-
-    # Appellate documents obtained from recap.email don't contain a document
-    # number try to get it either from the PDF document or the download
-    # confirmation page.
-    if appellate:
-        document_number = get_document_number_appellate(
-            court_id, pacer_doc_id, response
-        )
-        rd.document_number = document_number
-        rd.save()
-
-        # Update the docket entry number with the document number.
-        if document_number:
-            de = rd.docket_entry
-            de.entry_number = document_number
-            de.save()
 
     if response is None:
         if r_msg:
