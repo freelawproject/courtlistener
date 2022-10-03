@@ -3,10 +3,28 @@ from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db.models import QuerySet
 from django.template import loader
-from django.utils.timezone import make_aware, utc
+from django.utils.timezone import make_aware
 
 from cl.lib.command_utils import VerboseCommand, logger
+
+
+def get_welcome_recipients(time_now: datetime) -> QuerySet:
+    """Get users that signed up in the last 24 hours
+    to send a welcome email.
+
+    :param time_now: The current time to compute the query datetime.
+    :return: Users that signed up in the last 24 hours.
+    """
+
+    # Not passing a timezone in make_aware will use the default timezone
+    # defined on settings.TIME_ZONE
+    yesterday = make_aware(time_now) - timedelta(days=1)
+    recipients = User.objects.filter(
+        date_joined__gt=yesterday, profile__stub_account=False
+    ).only("pk", "first_name", "email")
+    return recipients
 
 
 class Command(VerboseCommand):
@@ -31,10 +49,8 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         self.options = options
-        yesterday = make_aware(datetime.now(), utc) - timedelta(days=1)
-        recipients = User.objects.filter(
-            date_joined__gt=yesterday, profile__stub_account=False
-        )
+        time_now = datetime.now()
+        recipients = get_welcome_recipients(time_now)
         if recipients:
             if self.options["simulate"]:
                 sys.stdout.write(
