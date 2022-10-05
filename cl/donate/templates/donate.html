@@ -1,6 +1,7 @@
 {% extends "payment_base.html" %}
-{% load partition_util %}
+{% load extras partition_util %}
 
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Donate to Free Law Project – CourtListener.com{% endblock %}
 {% block description %}
   CourtListener is an initiative of Free Law Project, a Federal
