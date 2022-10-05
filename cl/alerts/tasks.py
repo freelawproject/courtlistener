@@ -43,15 +43,16 @@ class DocketAlertRecipient:
 def get_docket_alert_recipients(
     d_pk: int,
     recap_email_recipients: list[str],
-    for_recap_email_user: bool = False,
+    recap_email_user_only: bool = False,
 ) -> tuple[list[DocketAlertRecipient], list[str]]:
     """Get the notification's recipients for a docket alert.
 
     :param d_pk: Docket primary key
     :param recap_email_recipients: List of @recap.email addresses to send the
     notification to.
-    :param for_recap_email_user: If we need to get recipients only for a recap
-    email user to send the alert independently.
+    :param recap_email_user_only: True if we need to get recipients only for
+    a recap.email user to send the alert independently and avoid sending
+    duplicate docket alerts for current subscribers.
     :return: A list of DocketAlertRecipients objects and a list of @recap.email
      addresses that don't belong to any user if any.
     """
@@ -62,7 +63,7 @@ def get_docket_alert_recipients(
     recap_email_user_does_not_exist_list = []
 
     # First, get current docket alert recipients to avoid duplicate alerts
-    if not for_recap_email_user:
+    if not recap_email_user_only:
         docket_alerts_current_subscribers = DocketAlert.objects.select_related(
             "user"
         ).filter(docket_id=d_pk, alert_type=DocketAlert.SUBSCRIPTION)
@@ -178,20 +179,20 @@ def send_alert_and_webhook(
     :return: None
     """
 
-    for_recap_email_user = False
-    if docket_entries:
-        for_recap_email_user = True
     if recap_email_recipients is None:
         recap_email_recipients = []
+    recap_email_user_only = False
+    if docket_entries:
+        recap_email_user_only = True
 
     da_recipients, re_user_does_not_exist_list = get_docket_alert_recipients(
-        d_pk, recap_email_recipients, for_recap_email_user
+        d_pk, recap_email_recipients, recap_email_user_only
     )
 
     if re_user_does_not_exist_list:
         send_recap_email_user_not_found(re_user_does_not_exist_list)
 
-    if not da_recipients and not for_recap_email_user:
+    if not da_recipients and not recap_email_user_only:
         # Nobody subscribed to the docket.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -203,7 +204,7 @@ def send_alert_and_webhook(
         new_des = list(
             DocketEntry.objects.filter(date_created__gte=since, docket=d)
         )
-    if len(new_des) == 0 and not for_recap_email_user:
+    if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -218,7 +219,7 @@ def send_alert_and_webhook(
 
     # Send the docket to webhook
     send_docket_alert_webhooks.delay(d_pk, since, new_des)
-    if not for_recap_email_user:
+    if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 

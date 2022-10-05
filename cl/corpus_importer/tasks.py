@@ -1550,7 +1550,6 @@ def download_pacer_pdf_by_rd(
     pacer_doc_id: int,
     cookies: RequestsCookieJar,
     magic_number: Optional[str] = None,
-    appellate: bool = False,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1562,8 +1561,6 @@ def download_pacer_pdf_by_rd(
     logged-in PACER user.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
-    :param appellate: Whether the document belongs to an appellate court
-    obtained from recap.email
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -1574,21 +1571,19 @@ def download_pacer_pdf_by_rd(
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
 
-    r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate
-    )
+    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
 
     return r, r_msg
 
 
-def download_free_appellate_pacer_pdf(
+def download_appellate_pdf_by_magic_number(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
     cookies: RequestsCookieJar,
     magic_number: str,
 ) -> tuple[Response | None, str]:
-    """Small wrapper to fetch a free appellate PACER PDF.
+    """Small wrapper to fetch an appellate PACER PDF document by magic number.
 
     For appellate documents we need to download the PDF before creating the
     RECAPDocument in order try getting the document number from the PDF file.
@@ -1637,13 +1632,13 @@ def get_document_number_from_confirmation_page(
     return data.get("document_number", "")
 
 
-def get_document_number_appellate(
+def fetch_pacer_doc_appellate(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
     cookies: RequestsCookieJar,
     magic_number: str,
-) -> tuple[str, Response | None, str | None]:
+) -> tuple[str, Response | None, str]:
     """A wrapper to get the PACER document number either from the download
     confirmation page or from the PDF document.
 
@@ -1658,15 +1653,18 @@ def get_document_number_appellate(
     there was one.
     """
 
-    # Try to download the free appellate PDF.
-    pdf_response, r_msg = download_free_appellate_pacer_pdf(
-        court_id,
-        pacer_doc_id,
-        pacer_case_id,
-        cookies,
-        magic_number,
-    )
+    pdf_response = None
+    r_msg = ""
     document_number = ""
+    # Try to download the free appellate PDF.
+    if magic_number:
+        pdf_response, r_msg = download_appellate_pdf_by_magic_number(
+            court_id,
+            pacer_doc_id,
+            pacer_case_id,
+            cookies,
+            magic_number,
+        )
     if court_id in ("ca8", "ca11", "cadc"):
         # For ca8, ca11 and cadc the PACER document number is not available
         # in the PDF, try to get it directly from the Download confirmation
@@ -1674,23 +1672,24 @@ def get_document_number_appellate(
         document_number = get_document_number_from_confirmation_page(
             court_id, pacer_doc_id
         )
-    elif pdf_response:
-        pdf_bytes = pdf_response.content
-        # For other jurisdictions try first to get it from the PDF document.
-        dn_response = microservice(
-            service="document-number",
-            file_type="pdf",
-            file=pdf_bytes,
-        )
-        if dn_response.ok:
-            document_number = dn_response.text
+    else:
+        if pdf_response:
+            pdf_bytes = pdf_response.content
+            # For other jurisdictions try first to get it from the PDF document.
+            dn_response = microservice(
+                service="document-number",
+                file_type="pdf",
+                file=pdf_bytes,
+            )
+            if dn_response.ok and dn_response.text:
+                document_number = dn_response.text
 
-    # If we still don't have the document number fall back on the download
-    # confirmation page except for ca8, ca11, and cadc (we've already tried)
-    if not document_number and court_id not in ("ca8", "ca11", "cadc"):
-        document_number = get_document_number_from_confirmation_page(
-            court_id, pacer_doc_id
-        )
+        if not document_number:
+            # If we still don't have the document number fall back on the
+            # download confirmation page
+            document_number = get_document_number_from_confirmation_page(
+                court_id, pacer_doc_id
+            )
 
     # Document numbers from documents with attachments have the format
     # 1-1, 1-2, 1-3 in those cases the document number is the left number.
@@ -1699,8 +1698,9 @@ def get_document_number_appellate(
         document_number = document_number_split[0]
 
     if len(document_number) > 9:
-        # If is a larger document number is likely a pacer_doc_id force
-        # the four-digit to 0
+        # If the number is really big, it's probably a court that uses
+        # pacer_doc_id instead of regular docket entry numbering.
+        # Force the fourth-digit to 0:
         # 00218987740 -> 00208987740, 123119177518 -> 123019177518
         document_number = f"{document_number[:3]}0{document_number[4:]}"
 

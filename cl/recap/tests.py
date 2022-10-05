@@ -70,7 +70,7 @@ from cl.recap.models import (
 from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
-    fetch_pacer_doc_by_rd_or_binary,
+    fetch_pacer_doc_by_rd,
     process_recap_appellate_docket,
     process_recap_attachment,
     process_recap_claims_register,
@@ -489,7 +489,7 @@ class RecapPdfFetchApiTest(TestCase):
     def test_fetch_available_pdf(self, mock_get_cookie):
         orig_date_modified = self.rd.date_modified
 
-        response = fetch_pacer_doc_by_rd_or_binary(self.rd.pk, self.fq.pk)
+        response = fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
         self.assertIsNone(
             response,
             "Did not get None from fetch, indicating that the fetch did "
@@ -2071,7 +2071,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2131,7 +2131,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_new_recap_email_case_auto_subscription_prev_user(
         self,
@@ -2188,7 +2188,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2244,7 +2244,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
@@ -2302,10 +2302,10 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse(
                 "Testing",
@@ -2349,7 +2349,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2439,7 +2439,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_new_recap_email_subscribe_by_email_link(
         self,
@@ -2493,7 +2493,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_new_recap_email_unsubscribe_by_email_link(
         self,
@@ -2559,7 +2559,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_new_recap_email_alerts_integration(
         self,
@@ -2657,7 +2657,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     def test_docket_alert_toggle_confirmation_fails(
         self,
@@ -2726,7 +2726,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: exec("raise(HTTPError)"),
+        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2821,7 +2821,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, a: (
+        side_effect=lambda z, x, c, v, b: (
             MockResponse(
                 "OK",
                 200,
@@ -2859,7 +2859,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse("Testing", 200, b""),
             "OK",
@@ -2904,7 +2904,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse("Testing", 200, b""),
             "OK",
@@ -2969,7 +2969,7 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse("Testing", 200, b""),
             "OK",
@@ -3121,7 +3121,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
+        cls.court_ca9 = CourtFactory(id="ca9", jurisdiction="F")
         cls.court_ca11 = CourtFactory(id="ca11", jurisdiction="F")
         cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
         cls.court_ca8 = CourtFactory(id="ca8", jurisdiction="F")
@@ -3148,8 +3148,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
             recap_mail_receipt_nda_ca11 = json.load(ca11_file)
             recap_mail_receipt_nda_ca2 = json.load(ca2_file)
             recap_mail_receipt_nda_ca8 = json.load(ca8_file)
-        cls.data_nda = {
-            "court": cls.court_nda.id,
+        cls.data_ca9 = {
+            "court": cls.court_ca9.id,
             "mail": recap_mail_receipt_nda["mail"],
             "receipt": recap_mail_receipt_nda["receipt"],
         }
@@ -3177,7 +3177,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.path = "/api/rest/v3/recap-email/"
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse(
                 "Testing",
@@ -3200,7 +3200,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_nda, format="json")
+        self.client.post(self.path, self.data_ca9, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
         self.assertEqual(len(email_processing), 1)
@@ -3213,7 +3213,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, 138)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse(
                 "Testing",
@@ -3258,7 +3258,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         )
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse(
                 "Testing",
@@ -3302,7 +3302,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, 148)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse("Testing", 200, b""),
             "OK",
@@ -3338,7 +3338,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, None)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_free_appellate_pacer_pdf",
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b: (
             MockResponse("Testing", 200, b""),
             "OK",
@@ -3382,6 +3382,42 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(len(docket_entry_2), 1)
         self.assertEqual(recap_document[0].pk, recap_document_2[0].pk)
         self.assertEqual(docket_entry[0].pk, docket_entry_2[0].pk)
+
+    @mock.patch(
+        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b: (
+            None,
+            "Failed to get PDF from network.",
+        ),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "148",
+    )
+    def test_nda_document_not_available_get_from_confirmation_page(
+        self,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookies_cache,
+        mock_download_pacer_pdf,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """This test checks if the PDF document is not available the
+        document number is obtained from download confirmation page.
+        """
+
+        # Trigger a new nda recap.email notification from testing_1@recap.email
+        self.client.post(self.path, self.data_ca2, format="json")
+
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(len(email_processing), 1)
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+
+        # Compare the NDA docket and recap document metadata
+        self.assertEqual(recap_document[0].document_number, "148")
+        self.assertEqual(recap_document[0].docket_entry.entry_number, 148)
 
 
 class CheckCourtConnectivityTest(TestCase):

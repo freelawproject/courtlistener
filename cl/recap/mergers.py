@@ -601,9 +601,9 @@ def add_docket_entries(d, docket_entries, tags=None):
     :param docket_entries: A list of dicts containing docket entry data.
     :param tags: A list of tag objects to apply to the recap documents and
     docket entries created or updated in this function.
-    :returns tuple of a list of RECAPDocument objects created, whether
-    any docket entry was created and a list of created or existing
-    RECAPDocument objects.
+    :returns tuple of a list of created or existing
+    DocketEntry objects,  a list of RECAPDocument objects created, whether
+    any docket entry was created.
     """
     # Remove items without a date filed value.
     docket_entries = [de for de in docket_entries if de.get("date_filed")]
@@ -704,7 +704,7 @@ def add_docket_entries(d, docket_entries, tags=None):
             date_last_filing=max(known_filing_dates)
         )
 
-    return rds_created, content_updated, des_returned
+    return des_returned, rds_created, content_updated
 
 
 def check_json_for_terminated_entities(parties) -> bool:
@@ -1216,7 +1216,7 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    rds_created, content_updated, des_returned = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         d, docket_data["docket_entries"], tags=tags
     )
     add_parties_and_attorneys(d, docket_data["parties"])

@@ -34,8 +34,8 @@ from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
+    fetch_pacer_doc_appellate,
     get_attachment_page_by_rd,
-    get_document_number_appellate,
     make_attachment_pq_object,
     update_rd_metadata,
 )
@@ -135,7 +135,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
         # Request by recap_document_id
         rd_pk = fq.recap_document_id
         result = chain(
-            fetch_pacer_doc_by_rd_or_binary.si(rd_pk, fq.pk),
+            fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
             extract_recap_pdf.si(rd_pk),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             mark_fq_successful.si(fq.pk),
@@ -542,7 +542,7 @@ def process_recap_docket(self, pk):
         ContentFile(text.encode()),
     )
 
-    rds_created, content_updated, des_returned = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         d, data["docket_entries"]
     )
     add_parties_and_attorneys(d, data["parties"])
@@ -804,7 +804,7 @@ def process_recap_docket_history_report(self, pk):
         ContentFile(text.encode()),
     )
 
-    rds_created, content_updated, des_returned = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         d, data["docket_entries"]
     )
     process_orphan_documents(rds_created, pq.court_id, d.date_filed)
@@ -900,7 +900,7 @@ def process_recap_appellate_docket(self, pk):
         ContentFile(text.encode()),
     )
 
-    rds_created, content_updated, des_returned = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         d, data["docket_entries"]
     )
     add_parties_and_attorneys(d, data["parties"])
@@ -1118,16 +1118,10 @@ def update_docket_from_hidden_api(data):
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_pacer_doc_by_rd_or_binary(
-    self,
-    rd_pk: int,
-    fq_pk: int,
-    magic_number: Optional[str] = None,
-    appellate: bool = False,
-    r: Response | None = None,
-    r_msg: str = None,
+def fetch_pacer_doc_by_rd(
+    self, rd_pk: int, fq_pk: int, magic_number: Optional[str] = None
 ) -> Optional[int]:
-    """Fetch a PACER PDF by rd_pk or save the PDF binary previously downloaded.
+    """Fetch a PACER PDF by rd_pk
 
     This is very similar to get_pacer_doc_by_rd, except that it manages
     status as it proceeds and it gets the cookie info from redis.
@@ -1136,13 +1130,6 @@ def fetch_pacer_doc_by_rd_or_binary(
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
-    :param appellate: Whether the document belongs to an appellate court
-    obtained from recap.email
-    :param r: A optional requests.Response object containing the PDF data. Used
-    for appellate documents where the PDF document it's previously downloaded
-    in order to get the document number.
-    :param r_msg: A message from the download function about an error that was
-    encountered.
     :return: The RECAPDocument PK
     """
 
@@ -1186,24 +1173,19 @@ def fetch_pacer_doc_by_rd_or_binary(
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
-
-    # If a response containing the PDF data is not provided, try to download
-    # the PDF document by rd.
-    if not r:
-        try:
-            r, r_msg = download_pacer_pdf_by_rd(
-                rd.pk,
-                pacer_case_id,
-                rd.pacer_doc_id,
-                cookies,
-                magic_number,
-                appellate,
-            )
-        except (requests.RequestException, HTTPError):
-            msg = "Failed to get PDF from network."
-            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-            self.request.chain = None
-            return
+    try:
+        r, r_msg = download_pacer_pdf_by_rd(
+            rd.pk,
+            pacer_case_id,
+            rd.pacer_doc_id,
+            cookies,
+            magic_number,
+        )
+    except (requests.RequestException, HTTPError):
+        msg = "Failed to get PDF from network."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return
 
     court_id = rd.docket_entry.docket.court_id
     success, msg = update_rd_metadata(
@@ -1564,6 +1546,74 @@ def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
     return att_response.text
 
 
+def save_pacer_doc_appellate(
+    self: Task,
+    rd_pk: int,
+    fq_pk: int,
+    r: Response | None,
+    r_msg: str,
+) -> Optional[int]:
+    """Save the PDF binary previously downloaded.
+
+    :param self: The celery task
+    :param rd_pk: The PK of the RECAP Document to get.
+    :param fq_pk: The PK of the RECAP Fetch Queue to update.
+    :param r: A requests.Response object containing the PDF data. Used
+    for appellate documents where the PDF document it's previously downloaded
+    in order to get the document number.
+    :param r_msg: A message from the download function about an error that was
+    encountered.
+    :return: The RECAPDocument PK
+    """
+
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    fq = PacerFetchQueue.objects.get(pk=fq_pk)
+
+    if not r:
+        mark_fq_status(fq, r_msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return
+
+    if rd.is_available:
+        msg = "PDF already marked as 'is_available'. Doing nothing."
+        mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
+        self.request.chain = None
+        return
+
+    if not rd.pacer_doc_id:
+        msg = (
+            "Missing 'pacer_doc_id' attribute. Without this attribute we "
+            "cannot identify the document properly. Missing pacer_doc_id "
+            "attributes usually indicate that the item may not have a "
+            "document associated with it, or it may need to be updated via "
+            "the docket report to acquire a pacer_doc_id. Aborting request."
+        )
+        mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
+        return
+
+    pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    court_id = rd.docket_entry.docket.court_id
+    success, msg = update_rd_metadata(
+        self,
+        rd_pk,
+        r,
+        r_msg,
+        court_id,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        rd.document_number,
+        rd.attachment_number,
+    )
+
+    if success is False:
+        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+        self.request.chain = None
+        return
+
+    return rd.pk
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -1634,13 +1684,13 @@ def process_recap_email(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     magic_number = docket_entry["pacer_magic_num"]
-    # Appellate documents obtained from recap.email don't contain a document
+    # NDAs obtained from recap.email don't contain a document
     # number try to get it either from the PDF document or the download
     # confirmation page.
     appellate = data["appellate"]
     response = r_msg = None
     if appellate:
-        doc_num, response, r_msg = get_document_number_appellate(
+        doc_num, response, r_msg = fetch_pacer_doc_appellate(
             epq.court_id,
             docket_entry["pacer_doc_id"],
             docket_entry["pacer_case_id"],
@@ -1651,21 +1701,22 @@ def process_recap_email(
             docket_entry["document_number"] = doc_num
 
     start_time = now()
-    rds_created, content_updated, des_returned = add_docket_entries(
+    des_returned, rds_created, content_updated = add_docket_entries(
         docket, data["docket_entries"]
     )
     for rd in rds_created:
-        # Try to download free main document.
+        # Try to download/store the main document.
         fq = PacerFetchQueue.objects.create(
             user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
         )
-        # If we don't have a magic number avoid fetching the document
-        if magic_number:
-            fetch_pacer_doc_by_rd_or_binary(
-                rd.pk, fq.pk, magic_number, appellate, response, r_msg
-            )
-        # TODO send an email to tell user that notification didn't have a
-        # magic link
+        if appellate:
+            save_pacer_doc_appellate(self, rd.pk, fq.pk, response, r_msg)
+        else:
+            # If we don't have a magic number avoid fetching the document
+            if magic_number:
+                fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
+            # TODO send an email to tell user that notification didn't have a
+            # magic link
 
     rds_attachments = []
     if data["contains_attachments"] is True:
@@ -1693,9 +1744,7 @@ def process_recap_email(
         )
         # If we don't have a magic number avoid fetching the document
         if magic_number:
-            fetch_pacer_doc_by_rd_or_binary(
-                rd.pk, fq.pk, magic_number, appellate
-            )
+            fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
 
     recap_email_recipients = get_recap_email_recipients(epq.destination_emails)
     if content_updated:
