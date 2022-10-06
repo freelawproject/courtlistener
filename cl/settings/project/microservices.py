@@ -33,6 +33,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/utils/file/extension/",
         "timeout": 5,
     },
+    "document-number": {
+        "url": f"{DOCTOR_HOST}/utils/document-number/pdf/",
+        "timeout": 60,
+    },
     # Converter Endpoints
     "generate-thumbnail": {
         "url": f"{DOCTOR_HOST}/convert/pdf/thumbnail/",

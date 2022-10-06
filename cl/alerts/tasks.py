@@ -6,7 +6,6 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
-from django.db.models import QuerySet
 from django.template import loader
 from django.utils.timezone import now
 from rest_framework.renderers import JSONRenderer
@@ -44,12 +43,16 @@ class DocketAlertRecipient:
 def get_docket_alert_recipients(
     d_pk: int,
     recap_email_recipients: list[str],
+    recap_email_user_only: bool = False,
 ) -> tuple[list[DocketAlertRecipient], list[str]]:
     """Get the notification's recipients for a docket alert.
 
     :param d_pk: Docket primary key
     :param recap_email_recipients: List of @recap.email addresses to send the
     notification to.
+    :param recap_email_user_only: True if we need to get recipients only for
+    a recap.email user to send the alert independently and avoid sending
+    duplicate docket alerts for current subscribers.
     :return: A list of DocketAlertRecipients objects and a list of @recap.email
      addresses that don't belong to any user if any.
     """
@@ -60,17 +63,18 @@ def get_docket_alert_recipients(
     recap_email_user_does_not_exist_list = []
 
     # First, get current docket alert recipients to avoid duplicate alerts
-    docket_alerts_current_subscribers = DocketAlert.objects.select_related(
-        "user"
-    ).filter(docket_id=d_pk, alert_type=DocketAlert.SUBSCRIPTION)
-    for da in docket_alerts_current_subscribers:
-        dar = DocketAlertRecipient(
-            email_address=da.user.email,
-            secret_key=da.secret_key,
-            auto_subscribe=False,
-            first_email=False,
-        )
-        da_recipients_list.append(dar)
+    if not recap_email_user_only:
+        docket_alerts_current_subscribers = DocketAlert.objects.select_related(
+            "user"
+        ).filter(docket_id=d_pk, alert_type=DocketAlert.SUBSCRIPTION)
+        for da in docket_alerts_current_subscribers:
+            dar = DocketAlertRecipient(
+                email_address=da.user.email,
+                secret_key=da.secret_key,
+                auto_subscribe=False,
+                first_email=False,
+            )
+            da_recipients_list.append(dar)
 
     # Get recap email recipients and create new docket alerts objects
     for email_address in recap_email_recipients:
@@ -109,7 +113,7 @@ def get_docket_alert_recipients(
 
 def make_alert_messages(
     d: Docket,
-    new_des: QuerySet,
+    new_des: list[DocketEntry],
     da_recipients: list[DocketAlertRecipient],
 ) -> list[EmailMultiAlternatives]:
     """Make docket alert messages that can be sent to users
@@ -126,7 +130,7 @@ def make_alert_messages(
     subject_template = loader.get_template("docket_alert_subject.txt")
     subject_context = {
         "docket": d,
-        "count": new_des.count(),
+        "count": len(new_des),
         "case_name": case_name,
     }
     email_context = {
@@ -162,34 +166,83 @@ def send_alert_and_webhook(
     d_pk: int,
     since: datetime,
     recap_email_recipients: list[str] = None,
+    docket_entries: list[DocketEntry] = None,
 ) -> None:
     """Send an alert and webhook for a given docket
+
+    There are two methods to send docket alerts. The first one is based on the
+    time *since* new docket entries for a docket were created. This method is
+    the most common to send docket alerts since we send alerts for new docket
+    entries.
+
+    There's an exception when sending docket alerts triggered by recap.email.
+    If we receive a recap.email notification two or more times for the same
+    docket entry we must avoid sending duplicated docket alerts to subscribed
+    users and send the alert independently for the recap.email user from whom
+    we received additional notifications for the same docket entry.
+
+    This works as follows for recap.email users:
+
+    - Bob: Subscribed to the case, via the "Subscribe" button on the website.
+    - Atty1: Uses recap.email, and has atty1@recap.email set up in her PACER
+      account for the case.
+    - Atty2: Just started using recap.email and just added atty2@recap.email to
+     their PACER account for the case.
+
+    An email comes in for atty1@recap.email. We:
+    - Send emails to atty1@recap.email and to Bob.
+    - atty1@recap.email has the auto-subscribe option enabled so is now
+      subscribed to the case.
+
+    Another email for the same docket entry comes in for atty2@recap.email. We:
+    - Already sent out notifications for everybody else.
+      Don't want to send additional ones.
+    - Just sent a notification to atty2.
+    - atty2@recap.email has the auto-subscribe option enabled so is now
+      subscribed to the case.
+
+    Later, another docket entry is filed and we get two more emails.
+    The first is to atty2@recap.email (but the order doesn't matter). We:
+    - Send emails to all subscribers, which includes atty2, Bob, and atty1.
+
+     The second email comes in to atty1@recap.email. We:
+     -Do nothing.
 
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
     :param recap_email_recipients: The recap.email addresses if needed to send
     the first case-user notification email.
+    :param docket_entries: A list of docket entries used if we need to send an
+    alert again for a recap.email user independently
     :return: None
     """
 
     if recap_email_recipients is None:
         recap_email_recipients = []
+    recap_email_user_only = False
+    if docket_entries:
+        recap_email_user_only = True
 
     da_recipients, re_user_does_not_exist_list = get_docket_alert_recipients(
-        d_pk, recap_email_recipients
+        d_pk, recap_email_recipients, recap_email_user_only
     )
 
     if re_user_does_not_exist_list:
         send_recap_email_user_not_found(re_user_does_not_exist_list)
 
-    if not da_recipients:
+    if not da_recipients and not recap_email_user_only:
         # Nobody subscribed to the docket.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
 
     d = Docket.objects.get(pk=d_pk)
-    new_des = DocketEntry.objects.filter(date_created__gte=since, docket=d)
-    if new_des.count() == 0:
+    if docket_entries is not None:
+        new_des = docket_entries
+    else:
+        new_des = list(
+            DocketEntry.objects.filter(date_created__gte=since, docket=d)
+        )
+    if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
         return
@@ -203,8 +256,9 @@ def send_alert_and_webhook(
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send the docket to webhook
-    send_docket_alert_webhooks.delay(d_pk, since)
-    delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
+    send_docket_alert_webhooks.delay(d_pk, since, new_des)
+    if not recap_email_user_only:
+        delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
 
 @app.task(ignore_result=True)
@@ -276,18 +330,22 @@ def send_unsubscription_confirmation(
 def send_docket_alert_webhooks(
     d_pk: int,
     since: datetime,
+    docket_entries: list[DocketEntry] = None,
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s)
 
     :param d_pk: The Docket primary key
     :param since: Start time for querying the docket entries
+    :param docket_entries: A list of docket entries used if we need to send a
+    webhook for a recap.email user independently
     :return: None
     """
 
-    docket_entries = DocketEntry.objects.filter(
-        date_created__gte=since, docket_id=d_pk
-    )
-    if docket_entries.count() == 0:
+    if docket_entries is None:
+        docket_entries = DocketEntry.objects.filter(
+            date_created__gte=since, docket_id=d_pk
+        )
+    if len(docket_entries) == 0:
         # No new docket entries.
         return
 

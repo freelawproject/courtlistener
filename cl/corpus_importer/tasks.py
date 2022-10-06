@@ -27,6 +27,7 @@ from juriscraper.pacer import (
     CaseQuery,
     ClaimsRegister,
     DocketReport,
+    DownloadConfirmationPage,
     FreeOpinionReport,
     PacerSession,
     PossibleCaseNumberApi,
@@ -1575,6 +1576,137 @@ def download_pacer_pdf_by_rd(
     return r, r_msg
 
 
+def download_appellate_pdf_by_magic_number(
+    court_id: str,
+    pacer_doc_id: str,
+    pacer_case_id: str,
+    cookies: RequestsCookieJar,
+    magic_number: str,
+) -> tuple[Response | None, str]:
+    """Small wrapper to fetch an appellate PACER PDF document by magic number.
+
+    For appellate documents we need to download the PDF before creating the
+    RECAPDocument in order try getting the document number from the PDF file.
+
+    :param court_id: A CourtListener court ID to query the free document.
+    :param pacer_doc_id: The pacer_doc_id to query the free document.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :return: A two-tuple of requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
+    """
+
+    s = PacerSession(cookies=cookies)
+    report = FreeOpinionReport(court_id, s)
+    appellate = True
+    try:
+        r, r_msg = report.download_pdf(
+            pacer_case_id, pacer_doc_id, magic_number, appellate
+        )
+    except (requests.RequestException, HTTPError):
+        msg = "Failed to get PDF from network."
+        return None, msg
+    return r, r_msg
+
+
+def get_document_number_from_confirmation_page(
+    court_id: str, pacer_doc_id: str
+) -> str:
+    """Get the PACER document number from the PACER download confirmation page.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
+    :return: The PACER document number is available or an empty string if not.
+    """
+
+    recap_email_user = User.objects.get(username="recap-email")
+    cookies = get_or_cache_pacer_cookies(
+        recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+    s = PacerSession(cookies=cookies)
+    doc_num_report = DownloadConfirmationPage(court_id, s)
+    doc_num_report.query(pacer_doc_id)
+    data = doc_num_report.data
+    return data.get("document_number", "")
+
+
+def fetch_pacer_doc_appellate(
+    court_id: str,
+    pacer_doc_id: str,
+    pacer_case_id: str,
+    cookies: RequestsCookieJar,
+    magic_number: str,
+) -> tuple[str, Response | None, str]:
+    """A wrapper to get the PACER document number either from the download
+    confirmation page or from the PDF document.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :return: A tuple containing the PACER document number is available or an
+    empty string if not, a requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
+    """
+
+    pdf_response = None
+    r_msg = ""
+    document_number = ""
+    # Try to download the free appellate PDF.
+    if magic_number:
+        pdf_response, r_msg = download_appellate_pdf_by_magic_number(
+            court_id,
+            pacer_doc_id,
+            pacer_case_id,
+            cookies,
+            magic_number,
+        )
+    if court_id in ("ca8", "ca11", "cadc"):
+        # For ca8, ca11 and cadc the PACER document number is not available
+        # in the PDF, try to get it directly from the Download confirmation
+        # page.
+        document_number = get_document_number_from_confirmation_page(
+            court_id, pacer_doc_id
+        )
+    else:
+        if pdf_response:
+            pdf_bytes = pdf_response.content
+            # For other jurisdictions try first to get it from the PDF document.
+            dn_response = microservice(
+                service="document-number",
+                file_type="pdf",
+                file=pdf_bytes,
+            )
+            if dn_response.ok and dn_response.text:
+                document_number = dn_response.text
+
+        if not document_number:
+            # If we still don't have the document number fall back on the
+            # download confirmation page
+            document_number = get_document_number_from_confirmation_page(
+                court_id, pacer_doc_id
+            )
+
+    # Document numbers from documents with attachments have the format
+    # 1-1, 1-2, 1-3 in those cases the document number is the left number.
+    document_number_split = document_number.split("-")
+    if not len(document_number_split) == 1:
+        document_number = document_number_split[0]
+
+    if len(document_number) > 9:
+        # If the number is really big, it's probably a court that uses
+        # pacer_doc_id instead of regular docket entry numbering.
+        # Force the fourth-digit to 0:
+        # 00218987740 -> 00208987740, 123119177518 -> 123019177518
+        document_number = f"{document_number[:3]}0{document_number[4:]}"
+
+    return document_number, pdf_response, r_msg
+
+
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
@@ -1602,7 +1734,9 @@ def update_rd_metadata(
     :return: A two-tuple of a boolean indicating success and a corresponding
     error/success message string.
     """
+
     rd = RECAPDocument.objects.get(pk=rd_pk)
+
     if response is None:
         if r_msg:
             # Send a specific message all the way from Juriscraper
