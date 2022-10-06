@@ -170,6 +170,44 @@ def send_alert_and_webhook(
 ) -> None:
     """Send an alert and webhook for a given docket
 
+    There are two methods to send docket alerts. The first one is based on the
+    time *since* new docket entries for a docket were created. This method is
+    the most common to send docket alerts since we send alerts for new docket
+    entries.
+
+    There's an exception when sending docket alerts triggered by recap.email.
+    If we receive a recap.email notification two or more times for the same
+    docket entry we must avoid sending duplicated docket alerts to subscribed
+    users and send the alert independently for the recap.email user from whom
+    we received additional notifications for the same docket entry.
+
+    This works as follows for recap.email users:
+
+    - Bob: Subscribed to the case, via the "Subscribe" button on the website.
+    - Atty1: Uses recap.email, and has atty1@recap.email set up in her PACER
+      account for the case.
+    - Atty2: Just started using recap.email and just added atty2@recap.email to
+     their PACER account for the case.
+
+    An email comes in for atty1@recap.email. We:
+    - Send emails to atty1@recap.email and to Bob.
+    - atty1@recap.email has the auto-subscribe option enabled so is now
+      subscribed to the case.
+
+    Another email for the same docket entry comes in for atty2@recap.email. We:
+    - Already sent out notifications for everybody else.
+      Don't want to send additional ones.
+    - Just sent a notification to atty2.
+    - atty2@recap.email has the auto-subscribe option enabled so is now
+      subscribed to the case.
+
+    Later, another docket entry is filed and we get two more emails.
+    The first is to atty2@recap.email (but the order doesn't matter). We:
+    - Send emails to all subscribers, which includes atty2, Bob, and atty1.
+
+     The second email comes in to atty1@recap.email. We:
+     -Do nothing.
+
     :param d_pk: The docket PK that was modified
     :param since: If we run alerts, notify users about items *since* this time.
     :param recap_email_recipients: The recap.email addresses if needed to send
