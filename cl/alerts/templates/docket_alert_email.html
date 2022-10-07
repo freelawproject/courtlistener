@@ -47,7 +47,7 @@
       {% endif %}
     <h1 class="bottom"  style="font-size: 3em; font-weight: normal; line-height: 1; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">CourtListener Docket Alert</h1>
     <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
-      {{ new_des.count }} New Entr{{ new_des.count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}
+      {{ count }} New Entr{{ count|pluralize:"y,ies" }} in {{ docket|best_case_name|safe }}
       {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
     </h2>
     <h3 class="alt bottom" style="font-size: 1.5em; font-weight: normal; line-height: 1; font-family: 'Warnock Pro', 'Goudy Old Style','Palatino','Book Antiqua', Georgia, serif; color: #666; border: 0; vertical-align: baseline; margin: 0; padding: 0;">{{ docket.court }}</h3>
