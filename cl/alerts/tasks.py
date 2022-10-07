@@ -128,13 +128,15 @@ def make_alert_messages(
     txt_template = loader.get_template("docket_alert_email.txt")
     html_template = loader.get_template("docket_alert_email.html")
     subject_template = loader.get_template("docket_alert_subject.txt")
+    de_count = len(new_des)
     subject_context = {
         "docket": d,
-        "count": len(new_des),
+        "count": de_count,
         "case_name": case_name,
     }
     email_context = {
         "new_des": new_des,
+        "count": de_count,
         "docket": d,
         "docket_alert_secret_key": None,
     }
