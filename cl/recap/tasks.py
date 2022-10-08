@@ -1644,8 +1644,15 @@ def process_recap_email(
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
     message_id = epq.message_id
     bucket = RecapEmailSESStorage()
-    with bucket.open(message_id, "r") as f:
-        body = f.read()
+
+    # Try to read the file using utf-8.
+    # If it fails fallback on iso-8859-1
+    try:
+        with bucket.open(message_id, "rb") as f:
+            body = f.read().decode("utf-8")
+    except UnicodeDecodeError:
+        with bucket.open(message_id, "rb") as f:
+            body = f.read().decode("iso-8859-1")
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data

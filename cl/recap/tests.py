@@ -619,7 +619,7 @@ def mock_bucket_open(message_id, r, read_file=False):
         with open(test_dir / message_id, "rb") as file:
             return file.read()
 
-    recap_mail_example = open(test_dir / message_id, "r", encoding="utf-8")
+    recap_mail_example = open(test_dir / message_id, "rb")
     return recap_mail_example
 
 
