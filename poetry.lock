@@ -1147,7 +1147,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.21"
+version = "2.5.22"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -2292,7 +2292,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "5ca3932a9e9a9f43b553786a0a927e9efd4c9223f9c0377885fad4ab36faf427"
+content-hash = "1c84e80311110941a7f0cb01b5418596098303f1c57ece006211ba4733d01f97"
 
 [metadata.files]
 amqp = [
@@ -2900,8 +2900,8 @@ judge-pics = [
     {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.5.21-py27-none-any.whl", hash = "sha256:a42de4245c018198b9622319573ff573a57be53ae2f50181b2c316feaf1f9943"},
-    {file = "juriscraper-2.5.21.tar.gz", hash = "sha256:f56cc08ef5df6ce5f0a995228a58f0dc8a2c6a7eb1d640d1cdd66c5a938a11df"},
+    {file = "juriscraper-2.5.22-py27-none-any.whl", hash = "sha256:b921e83879e0323986f6e84d778cf7502a86abdae20fed84c7d77d8cc029fc88"},
+    {file = "juriscraper-2.5.22.tar.gz", hash = "sha256:4752b4bcf55646fcde1debb4116b7eeb2206488a0c5a42dd08984dab8a28aa9a"},
 ]
 kdtree = [
     {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
