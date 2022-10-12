@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block privacy %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block title %}CSRF Error 403 – CourtListener.com{% endblock %}
+
+{% block content %}
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+  <div class="col-xs-12 col-sm-8 col-md-6">
+    <h2>Sorry, We had Trouble Submitting that Form</h2>
+    <p>To fix this, go back to the page you were on, reload it and re-submit it.</p>
+    <p>This <a href="https://owasp.org/www-community/attacks/csrf">type of error</a> usually happens when you load a form on one tab, log in on another browser or device, and then try to submit the form on the first one without refreshing the page first.</p>
+    <p>Sorry about the inconvenience. If you continue getting this error, <a href="{% url "contact" %}">please let us know</a>.</p>
+  </div>
+  <div class="hidden-xs col-sm-2 col-md-3"></div>
+{% endblock %}
