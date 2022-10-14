@@ -307,7 +307,7 @@
 
   {% block newsletter %}
     {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
-    <div class="row base-newsletter">
+    <div class="row base-newsletter hidden-print">
       <div class="col-sm-6">
         <p class="bold bottom">Newsletter</p>
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
