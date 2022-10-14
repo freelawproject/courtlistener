@@ -6,6 +6,9 @@
 
 {% block nav-api %}active{% endblock %}
 {% block footer-scripts %}
+  <link rel="stylesheet" href="{% static "css/custom_loading_states.css" %}" />
+  <script src="{% static "js/loading-states.js" %}" defer></script> 
+
   {% if DEBUG %}
     <script src="{% static "js/htmx.js" %}"></script>
   {% else %}
@@ -27,11 +30,41 @@
       }
     })
     htmx.on("htmx:beforeSwap", (e) => {
-      //After submitting the POST request, toggle the modal back to hidden.
+      /*
+      After submitting the POST request, toggle the modal back to hidden.
+      */
       if (e.detail.target.id == "webhook-form" && !e.detail.xhr.response) {
         $('#webhook-modal').modal('toggle');
+        
+        $('#webhook_table_body').addClass('hidden');
+        $('#webhook_list_loader').removeClass('hidden');
+
         e.detail.shouldSwap = false;
       }
+
+      /*
+      Make sure the loader inside the table is hidden to load new data.
+      */
+      if (e.detail.target.id == "webhook_table_body" && !e.detail.isError){
+        $('#webhook_list_loader').addClass('hidden');
+        $('#webhook_table_body').removeClass('hidden');
+      }
+
+      /*
+      After submitting the DELETE request, handle the response to show
+      the spinner inside the table or an alert if the request failed
+      */ 
+      if (e.detail.requestConfig.verb=="delete" && !e.detail.isError){
+          $('#webhook_table_body').addClass('hidden');
+          $('#webhook_list_loader').removeClass('hidden');
+      }
+
+      /*
+      Show error if the response does not have a 20x status code 
+      */
+      if (e.detail.isError){
+        alert("The server can't handle your request now, please try again")
+    }
     })
   </script>
 {% endblock %}
@@ -53,14 +86,26 @@
                <div class="col-xs-6 col-sm-6 col-md-4 text-right">
                  <button id="add-webhook" class="btn btn-primary btn-xs"
                          hx-get="{% url 'webhooks-render-form' format="html" %}"
-                         hx-target="#webhooks-body">
+                         hx-target="#webhooks-body"
+                         hx-ext="loading-states" 
+                         data-loading-class="hidden"
+                         data-loading-states
+                         >
                    <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
                </div>
+             </div>
+             <div data-loading="block" class="row">
+                <div class="text-center">
+                  <i class="fa fa-spinner fa-spin"></i> Loading
+                </div>
              </div>
             </div>
             <div class="panel-body">
               <div class="table-responsive">
-                <table class="table settings-table">
+                <table class="table settings-table"
+                  hx-ext="loading-states" 
+                  data-loading-class="hidden"
+                  >
                   <thead>
                   <tr class="active">
                     <th>Event&nbsp;Type</th>
@@ -69,10 +114,17 @@
                     <th></th>
                   </tr>
                   </thead>
+                  <tr id="webhook_list_loader" class="hidden">
+                    <td class="text-center" colspan="4">
+                      <i class="fa fa-spinner fa-spin"></i> Loading
+                    </div>
+                  </tr>
                   <tbody
                     hx-trigger="load, webhooksListChanged from:body"
                     hx-get="{% url 'webhooks-list' format="html" %}"
-                    hx-target="this">
+                    hx-target="this"
+                    id="webhook_table_body"
+                    >
                   </tbody>
                 </table>
               </div>
