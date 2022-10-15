@@ -7,7 +7,7 @@
 {% block nav-api %}active{% endblock %}
 {% block footer-scripts %}
   <link rel="stylesheet" href="{% static "css/custom_loading_states.css" %}" />
-  <script src="{% static "js/loading-states.js" %}" defer></script> 
+  <script src="{% static "js/loading-states.js" %}" defer></script>
 
   {% if DEBUG %}
     <script src="{% static "js/htmx.js" %}"></script>
@@ -35,7 +35,7 @@
       */
       if (e.detail.target.id == "webhook-form" && !e.detail.xhr.response) {
         $('#webhook-modal').modal('toggle');
-        
+
         $('#webhook_table_body').addClass('hidden');
         $('#webhook_list_loader').removeClass('hidden');
 
@@ -53,14 +53,14 @@
       /*
       After submitting the DELETE request, handle the response to show
       the spinner inside the table or an alert if the request failed
-      */ 
+      */
       if (e.detail.requestConfig.verb=="delete" && !e.detail.isError){
           $('#webhook_table_body').addClass('hidden');
           $('#webhook_list_loader').removeClass('hidden');
       }
 
       /*
-      Show error if the response does not have a 20x status code 
+      Show error if the response does not have a 20x status code
       */
       if (e.detail.isError){
         alert("The server can't handle your request now, please try again")
@@ -87,7 +87,7 @@
                  <button id="add-webhook" class="btn btn-primary btn-xs"
                          hx-get="{% url 'webhooks-render-form' format="html" %}"
                          hx-target="#webhooks-body"
-                         hx-ext="loading-states" 
+                         hx-ext="loading-states"
                          data-loading-class="hidden"
                          data-loading-states
                          >
@@ -103,7 +103,7 @@
             <div class="panel-body">
               <div class="table-responsive">
                 <table class="table settings-table"
-                  hx-ext="loading-states" 
+                  hx-ext="loading-states"
                   data-loading-class="hidden"
                   >
                   <thead>

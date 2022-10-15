@@ -1,5 +1,5 @@
 <form id="webhook-form" hx-post="{% url 'webhooks-list' %}"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' 
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       hx-ext="loading-states" data-loading-states
       >
   {% include "includes/webhooks_htmx/webhooks-form-common.html" %}
