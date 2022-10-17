@@ -76,7 +76,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
 
@@ -188,7 +188,7 @@ def mark_pq_status(pq, msg, status, message_property_name="error_message"):
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError,),
+    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
     max_retries=5,
     interval_start=5 * 60,
     interval_step=10 * 60,
@@ -350,7 +350,7 @@ def process_recap_pdf(self, pk):
             return None
 
     if not existing_document and not pq.debug:
-        extract_recap_pdf(rd.pk)
+        extract_recap_pdf_base(rd.pk),
         add_items_to_solr([rd.pk], "search.RECAPDocument")
 
     mark_pq_successful(
