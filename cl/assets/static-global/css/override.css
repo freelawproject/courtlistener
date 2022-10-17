@@ -1179,5 +1179,9 @@ emphasis {
 .empty-webhooks{
     padding: 1rem;
 }
+
+[data-loading] {
+  display: none;
+}
 /* END Webhooks styles */
 
