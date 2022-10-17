@@ -720,7 +720,7 @@ class DebugRecapUploadtest(TestCase):
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
@@ -837,7 +837,7 @@ class RecapPdfTaskTest(TestCase):
     def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     def test_recap_document_already_exists(self, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
@@ -880,7 +880,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.status, PROCESSING_STATUS.QUEUED_FOR_RETRY)
         self.assertIn("Unable to find docket entry", self.pq.error_message)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
@@ -978,7 +978,7 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf")
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.

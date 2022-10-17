@@ -98,7 +98,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_recap_pdf_base
 from cl.search.models import (
     ClaimHistory,
     Court,
@@ -655,7 +655,7 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    extract_recap_pdf(rd.pk, ocr_available=False, check_if_needed=False)
+    extract_recap_pdf_base(rd.pk, ocr_available=False, check_if_needed=False)
     return {"result": result, "rd_pk": rd.pk}
 
 
@@ -1949,7 +1949,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    extract_recap_pdf(rd.pk, ocr_available=False)
+    extract_recap_pdf_base(rd.pk, ocr_available=False)
     add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 
