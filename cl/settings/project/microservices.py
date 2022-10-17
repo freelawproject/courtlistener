@@ -16,6 +16,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 15,
     },
+    "document-extract-ocr": {
+        "url": f"{DOCTOR_HOST}/extract/doc/text/",
+        "timeout": 60 * 90,
+    },
     # Utils Endpoints
     "page-count": {
         "url": f"{DOCTOR_HOST}/utils/page-count/pdf/",
