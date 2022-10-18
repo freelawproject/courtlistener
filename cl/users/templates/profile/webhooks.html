@@ -82,15 +82,16 @@
                <div class="col-xs-6 col-sm-6 col-md-8">
                  <h3 class="panel-title">Webhooks</h3>
                </div>
-               <div class="col-xs-6 col-sm-6 col-md-4 text-right">
-                 <button id="add-webhook" class="btn btn-primary btn-xs"
+               <div class="col-xs-6 col-sm-6 col-md-4 text-right" hx-ext="loading-states" data-loading-states>
+                <button id="add-webhook" class="btn btn-primary btn-xs"
                          hx-get="{% url 'webhooks-render-form' format="html" %}"
                          hx-target="#webhooks-body"
-                         hx-ext="loading-states"
-                         data-loading-class="hidden"
-                         data-loading-states
+                         data-loading-target="#add-webhook"
+                         data-loading-disable
                          >
-                   <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
+                   <i class="fa fa-plus"></i>&nbsp;Add webhook
+                   <i data-loading class="fa fa-spinner fa-spin"></i>
+                </button>
                </div>
              </div>
              <div data-loading="block" class="row">
@@ -119,10 +120,12 @@
                     </div>
                   </tr>
                   <tbody
+                    id="webhook_table_body"
                     hx-trigger="load, webhooksListChanged from:body"
                     hx-get="{% url 'webhooks-list' format="html" %}"
+                    data-loading-target="#add-webhook"
+                    data-loading-class="hidden"
                     hx-target="this"
-                    id="webhook_table_body"
                     >
                   </tbody>
                 </table>

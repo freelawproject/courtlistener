@@ -35,7 +35,11 @@
     <p>Create a new webhook:</p>
     <button id="add-webhook" class="btn btn-primary btn-xs"
             hx-get="{% url 'webhooks-render-form' format="html" %}"
-            hx-target="#webhooks-body">
-      <i class="fa fa-plus"></i>&nbsp;Add webhook</button>
+            hx-target="#webhooks-body"
+            data-loading-target="#add-webhook"
+            data-loading-disable>
+      <i class="fa fa-plus"></i>&nbsp;Add webhook
+      <i data-loading class="fa fa-spinner fa-spin"></i>
+    </button>
   </td>
 {% endif %}
