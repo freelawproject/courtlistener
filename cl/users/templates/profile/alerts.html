@@ -114,7 +114,9 @@
     <div class="col-xs-12">
       <h2>RECAP Docket Alerts for PACER Cases</h2>
       {% if user.profile.unlimited_docket_alerts %}
-        <h3 class="gray caps">Your account has unlimited docket alerts</h3>
+        <h3 class="gray caps">🎉 Your account has unlimited docket alerts</h3>
+      {% elif user.profile.email_grants_unlimited_docket_alerts %}
+        <h3 class="gray caps">🎉 Your email address provides you unlimited docket alerts</h3>
       {% endif %}
 
       <div class="table-responsive">
