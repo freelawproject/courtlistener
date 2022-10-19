@@ -1180,6 +1180,15 @@ emphasis {
     padding: 1rem;
 }
 
+.justify-content-end{
+  justify-content: flex-end;
+}
+
+.mr-1 {
+  margin-right: 0.25em;
+}
+
+
 [data-loading] {
   display: none;
 }
