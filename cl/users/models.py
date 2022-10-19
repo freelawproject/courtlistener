@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
@@ -162,6 +163,43 @@ class UserProfile(models.Model):
         :return bool: True if so, False if not.
         """
         return bool(self.user.monthly_donations.filter(enabled=True).count())
+
+    @property
+    def email_grants_unlimited_docket_alerts(self) -> bool:
+        """Does the user's email grant them unlimited docket alerts?
+
+        :return: True if their email is on the list; else False.
+        """
+        # Don't check if the email is confirmed. They can't log in if so.
+        domain = self.user.email.split("@")[1]
+        if domain in settings.UNLIMITED_DOCKET_ALERT_EMAIL_DOMAINS:
+            return True
+        return False
+
+    @property
+    def can_make_another_alert(self) -> bool:
+        """Can the user make another alert?
+
+        The answer is yes, if any of the following is true:
+         - They get unlimited ones
+         - They are a monthly donor
+         - They are under the threshold
+         - Their email domain is unlimited
+
+        return: True if they can make another alert; else False.
+        """
+        if any(
+            [
+                # Place performant checks first
+                self.unlimited_docket_alerts,
+                self.email_grants_unlimited_docket_alerts,
+                self.is_monthly_donor,
+                self.user.docket_alerts.subscriptions().count()
+                < settings.MAX_FREE_DOCKET_ALERTS,
+            ]
+        ):
+            return True
+        return False
 
     @property
     def recent_api_usage(self) -> Dict[str, int]:

@@ -4,7 +4,7 @@ from unittest import mock
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import (
@@ -219,6 +219,60 @@ class DisableDocketAlertTest(TestCase):
             self.alert.docket.save()
             report = build_user_report(self.alert.user, delete=True)
             self.assertEqual(report.ninety_ago, [self.alert.docket])
+
+
+class UnlimitedAlertsTest(TestCase):
+    def test_create_one_alert(self) -> None:
+        """Can a user create an alert?"""
+        up = UserProfileWithParentsFactory()
+        self.assertTrue(
+            up.can_make_another_alert,
+            msg="User with no alerts cannot make its first alert.",
+        )
+
+        # Make another alert, and see if the user can still make yet another
+        _ = DocketAlertWithParentsFactory(
+            user=up.user,
+            docket__source=Docket.RECAP,
+            docket__date_terminated="2020-01-01",
+        )
+
+        self.assertTrue(
+            up.can_make_another_alert,
+            msg="User with one alert cannot make another.",
+        )
+
+    @override_settings(MAX_FREE_DOCKET_ALERTS=0)
+    def test_email_grantlist(self) -> None:
+        """Do you get unlimited alerts by email address?"""
+        up = UserProfileWithParentsFactory(user__email="juno@free.law")
+        self.assertFalse(
+            up.unlimited_docket_alerts,
+            msg="User has unlimited alerts, but shouldn't.",
+        )
+        self.assertFalse(
+            up.email_grants_unlimited_docket_alerts,
+            msg="Grantlist allowed even though email should not be on list.",
+        )
+        self.assertFalse(
+            up.is_monthly_donor,
+            msg="User is marked as monthly donor, but isn't.",
+        )
+        self.assertFalse(
+            up.can_make_another_alert,
+            msg="Was able to make alerts even though the max free "
+            "alerts was overridden to zero.",
+        )
+        with self.settings(UNLIMITED_DOCKET_ALERT_EMAIL_DOMAINS=["free.law"]):
+            self.assertTrue(
+                up.email_grants_unlimited_docket_alerts,
+                msg="Grantlist denied even though email should be allowed. ",
+            )
+            self.assertTrue(
+                up.can_make_another_alert,
+                msg="Unable to make an alert even though user's email is "
+                "granted unlimited docket alerts",
+            )
 
 
 class AlertSeleniumTest(BaseSeleniumTest):

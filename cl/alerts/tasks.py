@@ -6,6 +6,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
+from django.db import transaction
 from django.template import loader
 from django.utils.timezone import now
 from rest_framework.renderers import JSONRenderer
@@ -85,29 +86,35 @@ def get_docket_alert_recipients(
         except UserProfile.DoesNotExist:
             recap_email_user_does_not_exist_list.append(email_address)
             continue
-        docket_alert_exist = DocketAlert.objects.filter(
-            docket_id=d_pk, user=user_profile.user
-        ).exists()
-        if docket_alert_exist:
-            # If a docket alert exists for this @recap.email user, avoid
-            # sending the first email
-            continue
 
         alert_type = (
             DocketAlert.SUBSCRIPTION
             if user_profile.auto_subscribe
             else DocketAlert.UNSUBSCRIPTION
         )
-        docket_alert = DocketAlert.objects.create(
-            docket_id=d_pk, user=user_profile.user, alert_type=alert_type
-        )
-        dar = DocketAlertRecipient(
-            email_address=user_profile.user.email,
-            secret_key=docket_alert.secret_key,
-            auto_subscribe=user_profile.auto_subscribe,
-            first_email=True,
-        )
-        da_recipients_list.append(dar)
+        with transaction.atomic():
+            # select_for_update to avoid a race condition when creating the
+            # docket alert.
+            (
+                docket_alert,
+                created,
+            ) = DocketAlert.objects.select_for_update().get_or_create(
+                docket_id=d_pk,
+                user=user_profile.user,
+                defaults={"alert_type": alert_type},
+            )
+            if not created:
+                # If a docket alert exists for this @recap.email user, avoid
+                # sending the first email
+                continue
+
+            dar = DocketAlertRecipient(
+                email_address=user_profile.user.email,
+                secret_key=docket_alert.secret_key,
+                auto_subscribe=user_profile.auto_subscribe,
+                first_email=True,
+            )
+            da_recipients_list.append(dar)
     return da_recipients_list, recap_email_user_does_not_exist_list
 
 
