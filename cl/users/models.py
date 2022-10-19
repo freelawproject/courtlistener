@@ -292,10 +292,16 @@ class EmailFlag(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    checked = models.BooleanField(
+        help_text="Whether the backoff event has been checked for recipient "
+        "deliverability since the last bounce event.",
+        default=False,
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=["email_address"]),
+            models.Index(fields=["flag_type", "checked"]),
         ]
         # Creates a unique constraint to allow only one BAN and Backoff Event
         # object for each email_address

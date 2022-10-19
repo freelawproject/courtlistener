@@ -6,6 +6,7 @@ from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.template import loader
 
 from cl.api.models import Webhook
@@ -116,23 +117,28 @@ def send_failed_email(
 ) -> None:
     """Task to retry failed email messages"""
 
-    failed_email = FailedEmail.objects.get(pk=failed_pk)
-    if failed_email.status != STATUS_TYPES.SUCCESSFUL:
-        # Only execute this task if it has not been previously processed.
-        failed_email.status = STATUS_TYPES.IN_PROGRESS
-        failed_email.save()
-        # Compose email from stored message.
-        email = failed_email.stored_email.convert_to_email_multipart()
-        try:
-            email.send()
-        except (
-            botocore_exception.HTTPClientError,
-            botocore_exception.ConnectionError,
-        ) as exc:
-            # In case of error when sending e.g: SES downtime, retry the task.
-            raise self.retry(exc=exc)
-        failed_email.status = STATUS_TYPES.SUCCESSFUL
-        failed_email.save()
+    with transaction.atomic():
+        # Uses select_for_update() to create a DB lock in order to avoid
+        # a race condition in case the task is called multiple times.
+        failed_email = FailedEmail.objects.select_for_update().get(
+            pk=failed_pk
+        )
+        if failed_email.status != STATUS_TYPES.SUCCESSFUL:
+            # Only execute this task if it has not been previously processed.
+            failed_email.status = STATUS_TYPES.IN_PROGRESS
+            failed_email.save()
+            # Compose email from stored message.
+            email = failed_email.stored_email.convert_to_email_multipart()
+            try:
+                email.send()
+            except (
+                botocore_exception.HTTPClientError,
+                botocore_exception.ConnectionError,
+            ) as exc:
+                # In case of error when sending e.g: SES downtime, retry the task.
+                raise self.retry(exc=exc)
+            failed_email.status = STATUS_TYPES.SUCCESSFUL
+            failed_email.save()
 
 
 @app.task
@@ -151,15 +157,15 @@ def check_recipient_deliverability(
     :return: None
     """
 
-    backoff_event = EmailFlag.objects.filter(
+    backoff_event = EmailFlag.objects.select_for_update().filter(
         email_address=recipient, flag_type=FLAG_TYPES.BACKOFF
     )
-    if not backoff_event.exists():
-        schedule_failed_email(recipient)
-        return
-
-    if backoff_event.last().retry_counter == backoff_prev_counter:
-        # There wasn't a new bounce after the last retry, seems that the
-        # recipient accepted the email, so we can schedule the waiting failed
-        # emails to be sent.
-        schedule_failed_email(recipient)
+    with transaction.atomic():
+        if not backoff_event.exists():
+            schedule_failed_email(recipient)
+            return
+        if backoff_event.last().retry_counter == backoff_prev_counter:
+            # There wasn't a new bounce after the last retry, seems that the
+            # recipient accepted the email, so we can schedule the waiting failed
+            # emails to be sent.
+            schedule_failed_email(recipient)
