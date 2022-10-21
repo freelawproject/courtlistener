@@ -1746,7 +1746,6 @@ def update_rd_metadata(
                 "Unable to get PDF for RECAP Document '%s' "
                 "at '%s' with doc id '%s'" % (rd_pk, court_id, pacer_doc_id)
             )
-        logger.error(msg)
         self.request.chain = None
         return False, msg
 
