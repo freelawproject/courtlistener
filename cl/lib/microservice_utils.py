@@ -3,6 +3,7 @@ from django.db import models
 from requests import Request, Response, Session
 
 from cl.audio.models import Audio
+from cl.lib.search_utils import clean_up_recap_document_file
 from cl.search.models import Opinion, RECAPDocument
 
 
@@ -50,10 +51,14 @@ def microservice(
     # Sadly these are not uniform
     if item:
         if type(item) == RECAPDocument:
-            with item.filepath_local.open(mode="rb") as local_path:
-                req.files = {
-                    "file": (item.filepath_local.name, local_path.read())
-                }
+            try:
+                with item.filepath_local.open(mode="rb") as local_path:
+                    req.files = {
+                        "file": (item.filepath_local.name, local_path.read())
+                    }
+            except FileNotFoundError:
+                # The file is no longer available, clean it up in DB
+                clean_up_recap_document_file(item)
         elif type(item) == Opinion:
             with item.local_path.open(mode="rb") as local_path:
                 req.files = {"file": (item.local_path.name, local_path.read())}
