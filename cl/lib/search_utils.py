@@ -27,6 +27,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
+    RECAPDocument,
 )
 
 recap_boosts_qf = {
@@ -1236,3 +1237,21 @@ def get_mlt_query(
     )
 
     return si.mlt_query(hl_fields).add_extra(**q)
+
+
+def clean_up_recap_document_file(item: RECAPDocument) -> None:
+    """Clean up the RecapDocument file-related fields after detecting the file
+    doesn't exist in the storage.
+
+    :param item: The RECAPDocument to work on.
+    :return: None
+    """
+
+    if type(item) == RECAPDocument:
+        item.filepath_local.delete()
+        item.sha1 = ""
+        item.date_upload = None
+        item.file_size = None
+        item.page_count = None
+        item.is_available = False
+        item.save()

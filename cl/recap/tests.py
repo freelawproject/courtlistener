@@ -3033,6 +3033,10 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
     """
 
     def setUp(self) -> None:
+        d = Docket.objects.create(
+            source=0, court_id="scotus", pacer_case_id="asdf"
+        )
+        self.de = DocketEntry.objects.create(docket=d, entry_number=1)
         self.user = User.objects.get(username="recap")
         file_content = mock_bucket_open(
             "gov.uscourts.ca1.12-2209.00106475093.0.pdf", "rb", True
@@ -3043,14 +3047,9 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
     def test_extract_missed_recap_documents(self):
         """Can we extract only recap documents that need content extraction?"""
 
-        d = Docket.objects.create(
-            source=0, court_id="scotus", pacer_case_id="asdf"
-        )
-        de = DocketEntry.objects.create(docket=d, entry_number=1)
-
         # RD is_available and has a valid PDF, needs extraction.
         rd = RECAPDocument.objects.create(
-            docket_entry=de,
+            docket_entry=self.de,
             document_number="1",
             pacer_doc_id="04505578698",
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -3062,7 +3061,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         # RD is_available, has a valid PDF, only document header extracted,
         # needs extraction using OCR.
         rd_2 = RECAPDocument.objects.create(
-            docket_entry=de,
+            docket_entry=self.de,
             document_number="2",
             pacer_doc_id="04505578698",
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -3075,7 +3074,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 
         # RD doesn't have a valid PDF. Don't need extraction.
         RECAPDocument.objects.create(
-            docket_entry=de,
+            docket_entry=self.de,
             document_number="3",
             pacer_doc_id="04505578699",
             document_type=RECAPDocument.PACER_DOCUMENT,
@@ -3097,6 +3096,43 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
             if x.needs_extraction and needs_ocr(x.plain_text)
         ]
         self.assertEqual(len(rd_needs_extraction_after), 0)
+
+    @mock.patch(
+        "cl.lib.microservice_utils.models.fields.files.FieldFile.open",
+        side_effect=lambda mode: exec("raise FileNotFoundError"),
+    )
+    def test_clean_up_recap_document_file(self, mock_open):
+        """Can we clean up the recap document file-related fields after a
+        failed extraction due to a missing file in storage?"""
+
+        # RD is_available and has a valid PDF, needs extraction.
+        date_upload = datetime.now(timezone.utc)
+        RECAPDocument.objects.create(
+            docket_entry=self.de,
+            document_number="1",
+            sha1="asdfasdfasdfasdfasdfasddf",
+            pacer_doc_id="04505578698",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            date_upload=date_upload,
+            file_size=320,
+            page_count=10,
+        )
+        cf = ContentFile(self.file_content)
+        rd = RECAPDocument.objects.all()
+        rd[0].filepath_local.save(self.filename, cf)
+
+        self.assertEqual(rd[0].is_available, True)
+        self.assertEqual(rd[0].file_size, 320)
+        self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
+        self.assertEqual(rd[0].date_upload, date_upload)
+
+        extract_unextracted_rds_and_add_to_solr("celery")
+        # File related fields should be cleaned up after the failed extraction.
+        self.assertEqual(rd[0].is_available, False)
+        self.assertEqual(rd[0].file_size, None)
+        self.assertEqual(rd[0].sha1, "")
+        self.assertEqual(rd[0].date_upload, None)
 
 
 @mock.patch(
