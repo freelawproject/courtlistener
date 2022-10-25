@@ -84,6 +84,8 @@ jobs:
           cl/donate/utils.py \
           cl/tests/utils.py \
           cl/users/management/commands/cl_account_management.py \
+          cl/users/management/commands/cl_delete_old_emails.py \
+          cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/forms.py \
           cl/users/email_handlers.py \
           cl/users/tasks.py

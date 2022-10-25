@@ -910,7 +910,7 @@ class SNSWebhookTest(TestCase):
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
         # Backoff event checked field is set to True
-        self.assertEqual(email_backoff_event[0].checked, True)
+        self.assertEqual(email_backoff_event[0].checked, fake_now_1)
 
         # Trigger a new soft bounce event to update the backoff event
         with time_machine.travel(fake_now_1, tick=False):
@@ -919,7 +919,7 @@ class SNSWebhookTest(TestCase):
             )
 
         # Backoff event is updated, checked set to False.
-        self.assertEqual(email_backoff_event[0].checked, False)
+        self.assertEqual(email_backoff_event[0].checked, None)
         self.assertEqual(email_backoff_event.count(), 1)
         self.assertEqual(email_backoff_event[0].retry_counter, 1)
 
@@ -932,7 +932,7 @@ class SNSWebhookTest(TestCase):
 
         # Check if schedule_failed_email is called and backoff marked checked
         self.assertEqual(mock_schedule.call_count, 2)
-        self.assertEqual(email_backoff_event[0].checked, True)
+        self.assertEqual(email_backoff_event[0].checked, fake_now_2)
 
     @mock.patch(
         "cl.users.management.commands.cl_retry_failed_email.schedule_failed_email"
@@ -962,7 +962,7 @@ class SNSWebhookTest(TestCase):
             self.send_signal(
                 self.soft_bounce_asset, "bounce", signals.bounce_received
             )
-        self.assertEqual(email_backoff_event[0].checked, False)
+        self.assertEqual(email_backoff_event[0].checked, None)
 
         # Fake time one hour before backoff event expires.
         second_retry_future_time = 3 + settings.DELIVERABILITY_THRESHOLD
@@ -979,7 +979,7 @@ class SNSWebhookTest(TestCase):
         # Check if schedule_failed_email is not called
         mock_schedule.assert_not_called()
         # Backoff event checked continue as False
-        self.assertEqual(email_backoff_event[0].checked, False)
+        self.assertEqual(email_backoff_event[0].checked, None)
 
     def test_update_ban_object(self) -> None:
         """This test checks if an email ban object is updated when receiving

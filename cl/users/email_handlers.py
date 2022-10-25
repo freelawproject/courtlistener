@@ -145,7 +145,7 @@ def handle_soft_bounce(
                         hours=INITIAL_HOURS
                     )
                     backoff_event.retry_counter = 0
-                    backoff_event.checked = False
+                    backoff_event.checked = None
                     backoff_event.next_retry_date = new_next_retry_date
                     backoff_event.save()
 
@@ -179,7 +179,7 @@ def handle_soft_bounce(
                             hours=pow(INITIAL_HOURS, new_retry_counter + 1)
                         )
                         backoff_event.retry_counter = new_retry_counter
-                        backoff_event.checked = False
+                        backoff_event.checked = None
                         backoff_event.next_retry_date = new_next_retry_date
                         backoff_event.save()
 

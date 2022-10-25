@@ -17,16 +17,16 @@ def periodic_check_recipient_deliverability_and_send_failed_email() -> int:
 
     Checks recipients' deliverability:
     It works by looking for backoff events that need to be checked
-    (checked False) and that have expired DELIVERABILITY_THRESHOLD hours ago.
+    (checked None) and that have expired DELIVERABILITY_THRESHOLD hours ago.
     That is, they have not received a new bounce event recently:
 
     e.g: considering DELIVERABILITY_THRESHOLD = 1:
-    - 11:00 bounce be1 -> next_retry_date 13:00, checked: False
+    - 11:00 bounce be1 -> next_retry_date 13:00, checked: None
     - 14:00 check_recipient_deliverability() be1 is now deliverable, no new
     bounce in the last hour
 
-    - 11:00 bounce be2 -> next_retry_date 13:00, checked: False
-    - 13:30 bounce be2 -> next_retry_date 17:30, checked: False
+    - 11:00 bounce be2 -> next_retry_date 13:00, checked: None
+    - 13:30 bounce be2 -> next_retry_date 17:30, checked: None
     - 14:00 check_recipient_deliverability() be2 is not deliverable, a new
     bounce in the last hour
     ...
@@ -45,7 +45,7 @@ def periodic_check_recipient_deliverability_and_send_failed_email() -> int:
     # Checks recipients' deliverability
     active_backoff_events = EmailFlag.objects.select_for_update().filter(
         flag_type=FLAG_TYPES.BACKOFF,
-        checked=False,
+        checked=None,
         next_retry_date__lte=now()
         - timedelta(hours=settings.DELIVERABILITY_THRESHOLD),
     )
@@ -54,7 +54,7 @@ def periodic_check_recipient_deliverability_and_send_failed_email() -> int:
             # There wasn't a new bounce recently, seems that the
             # recipient accepted the email, so we can schedule the waiting failed
             # emails to be sent.
-            backoff_event.checked = True
+            backoff_event.checked = now()
             backoff_event.save()
             schedule_failed_email(backoff_event.email_address)
 

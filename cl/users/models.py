@@ -292,10 +292,11 @@ class EmailFlag(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
-    checked = models.BooleanField(
-        help_text="Whether the backoff event has been checked for recipient "
-        "deliverability since the last bounce event.",
-        default=False,
+    checked = models.DateTimeField(
+        help_text="The datetime the recipient's deliverability was checked"
+        " since the last bounce event.",
+        blank=True,
+        null=True,
     )
 
     class Meta:
