@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
+import time_machine
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -16,7 +17,6 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from freezegun import freeze_time
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -43,8 +43,7 @@ from cl.users.factories import (
 )
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.management.commands.cl_retry_failed_email import (
-    periodic_check_recipient_deliverability,
-    periodic_send_failed_email,
+    periodic_check_recipient_deliverability_and_send_failed_email,
 )
 from cl.users.management.commands.cl_welcome_new_users import (
     get_welcome_recipients,
@@ -903,10 +902,10 @@ class SNSWebhookTest(TestCase):
         # Fake time, DELIVERABILITY_THRESHOLD hours after backoff event expires
         first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
         fake_now_1 = now() + timedelta(hours=first_retry_future_time)
-        with freeze_time(fake_now_1):
+        with time_machine.travel(fake_now_1, tick=False):
             # Check recipient's deliverability 3 hours in the future
             # One hour after backoff event expires
-            periodic_check_recipient_deliverability()
+            periodic_check_recipient_deliverability_and_send_failed_email()
 
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
@@ -914,7 +913,7 @@ class SNSWebhookTest(TestCase):
         self.assertEqual(email_backoff_event[0].checked, True)
 
         # Trigger a new soft bounce event to update the backoff event
-        with freeze_time(fake_now_1):
+        with time_machine.travel(fake_now_1, tick=False):
             self.send_signal(
                 self.soft_bounce_asset, "bounce", signals.bounce_received
             )
@@ -927,9 +926,9 @@ class SNSWebhookTest(TestCase):
         # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
         second_retry_future_time = 4 + settings.DELIVERABILITY_THRESHOLD
         fake_now_2 = fake_now_1 + timedelta(hours=second_retry_future_time)
-        with freeze_time(fake_now_2):
+        with time_machine.travel(fake_now_2, tick=False):
             # Check recipient's deliverability
-            periodic_check_recipient_deliverability()
+            periodic_check_recipient_deliverability_and_send_failed_email()
 
         # Check if schedule_failed_email is called and backoff marked checked
         self.assertEqual(mock_schedule.call_count, 2)
@@ -958,7 +957,7 @@ class SNSWebhookTest(TestCase):
         # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
         first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
         fake_now_1 = now() + timedelta(hours=first_retry_future_time)
-        with freeze_time(fake_now_1):
+        with time_machine.travel(fake_now_1, tick=False):
             # Trigger soft bounce event to update the backoff event
             self.send_signal(
                 self.soft_bounce_asset, "bounce", signals.bounce_received
@@ -968,10 +967,10 @@ class SNSWebhookTest(TestCase):
         # Fake time one hour before backoff event expires.
         second_retry_future_time = 3 + settings.DELIVERABILITY_THRESHOLD
         fake_now_2 = fake_now_1 + timedelta(hours=second_retry_future_time)
-        with freeze_time(fake_now_2):
+        with time_machine.travel(fake_now_2, tick=False):
             # Check recipient's deliverability, deliverability shouldn't be
             # proven.
-            periodic_check_recipient_deliverability()
+            periodic_check_recipient_deliverability_and_send_failed_email()
 
         email_backoff_exists = email_backoff_event.exists()
         # Check if backoff event was not deleted
@@ -2363,46 +2362,63 @@ class RetryFailedEmailTest(TestCase):
         )
 
         # Messages are queued, one in ENQUEUED status and two in WAITING.
-        failed_email_e = FailedEmail.objects.filter(
+        failed_email_enqueued = FailedEmail.objects.filter(
             status=STATUS_TYPES.ENQUEUED
         )
-        self.assertEqual(failed_email_e.count(), 1)
-        self.assertEqual(failed_email_e[0].status, STATUS_TYPES.ENQUEUED)
-        self.assertEqual(failed_email_e[0].stored_email.pk, stored_email[0].pk)
-        failed_email_w = FailedEmail.objects.filter(
+        self.assertEqual(failed_email_enqueued.count(), 1)
+        self.assertEqual(
+            failed_email_enqueued[0].status, STATUS_TYPES.ENQUEUED
+        )
+        self.assertEqual(
+            failed_email_enqueued[0].stored_email.pk, stored_email[0].pk
+        )
+        failed_email_waiting = FailedEmail.objects.filter(
             status=STATUS_TYPES.WAITING
         )
-        self.assertEqual(failed_email_w.count(), 2)
+        self.assertEqual(failed_email_waiting.count(), 2)
 
-        # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
-        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
-        fake_now_1 = now() + timedelta(hours=first_retry_future_time)
-        with freeze_time(fake_now_1):
-            # Check recipient's deliverability
-            periodic_check_recipient_deliverability()
+        # Fake time 30 minutes after ENQUEUED FailedEmail was created
+        fake_now_1 = now() + timedelta(minutes=30)
+        with time_machine.travel(fake_now_1, tick=False):
+            # Check recipient's deliverability and send failed emails
+            periodic_check_recipient_deliverability_and_send_failed_email()
 
-        # After the deliverability check, failed messages under WAITING status
-        # are scheduled, now under ENQUEUED_DELIVERY status
-        failed_email_e = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED
-        )
-        self.assertEqual(failed_email_e.count(), 1)
-
-        failed_email_ed = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED_DELIVERY
-        )
-        self.assertEqual(failed_email_ed.count(), 2)
-
-        # Send failed messages before the scheduled time, no messages should be
-        # sent.
-        periodic_send_failed_email()
+        # After the deliverability check/send failed email, no new FailedEmail
+        # is enqueued for delivery or sent since it's not time for it.
+        self.assertEqual(failed_email_enqueued.count(), 1)
+        self.assertEqual(failed_email_waiting.count(), 2)
         self.assertEqual(len(mail.outbox), 0)
 
-        # Send failed messages one hour after backoff event expires.
-        with freeze_time(fake_now_1):
-            # Send failed messages after the recipient's deliverability check
-            periodic_send_failed_email()
-        # Failed messages should be sent.
+        # Fake time, 1 hour before meeting the DELIVERABILITY_THRESHOLD time
+        first_retry_future_time = 1 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_2 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_2, tick=False):
+            # Check recipient's deliverability and send failed emails
+            periodic_check_recipient_deliverability_and_send_failed_email()
+
+        # After the deliverability check/send failed email, no new FailedEmail
+        # are enqueued for delivery since it's not time for it. Only the
+        # ENQUEUED FailedEmai is sent and marked as SUCCESSFUL.
+        failed_email_successful = FailedEmail.objects.filter(
+            status=STATUS_TYPES.SUCCESSFUL
+        )
+        # 1 FailedEmail now in SUCCESSFUL status
+        self.assertEqual(failed_email_successful.count(), 1)
+        # 1 FailedEmail is sent.
+        self.assertEqual(len(mail.outbox), 1)
+        # 2 FailedEmails continue in WAITING status
+        self.assertEqual(failed_email_waiting.count(), 2)
+
+        # Fake time, meeting the DELIVERABILITY_THRESHOLD time
+        first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
+        fake_now_3 = now() + timedelta(hours=first_retry_future_time)
+        with time_machine.travel(fake_now_3, tick=False):
+            # Check recipient's deliverability and send failed emails
+            periodic_check_recipient_deliverability_and_send_failed_email()
+
+        # After the deliverability check/send failed email, WAITING FailedEmail
+        # are ENQUEUED_DELIVERY, sent them and marked as SUCCESSFUL.
+        self.assertEqual(failed_email_successful.count(), 3)
         self.assertEqual(len(mail.outbox), 3)
 
     def test_retry_datetime(self) -> None:
@@ -2475,32 +2491,32 @@ class RetryFailedEmailTest(TestCase):
         # Fake time DELIVERABILITY_THRESHOLD hours after backoff event expires
         first_retry_future_time = 2 + settings.DELIVERABILITY_THRESHOLD
         fake_now_1 = now() + timedelta(hours=first_retry_future_time)
-        with freeze_time(fake_now_1):
-            # Check recipient's deliverability
-            periodic_check_recipient_deliverability()
+        with time_machine.travel(fake_now_1, tick=False):
+            # Check recipient's deliverability and send failed emails
+            periodic_check_recipient_deliverability_and_send_failed_email()
             fake_now_time = now()
 
         # WAITING FailedEmail objects were scheduled with
-        # ENQUEUED_DELIVERY status
+        # ENQUEUED_DELIVERY status and then sent, now in SUCCESSFUL status
         failed_email = FailedEmail.objects.filter(
-            status=STATUS_TYPES.ENQUEUED_DELIVERY
+            status=STATUS_TYPES.SUCCESSFUL
         ).order_by("next_retry_date")
-        self.assertEqual(failed_email.count(), 3)
+        self.assertEqual(failed_email.count(), 4)
 
         # Failed messages after a successful deliverability recipient's check
         # should be granted to be sent from now()
         expected_datetime = fake_now_time
 
         self.assertEqual(
-            failed_email[0].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
-            expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-        )
-        self.assertEqual(
             failed_email[1].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
             expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
         )
         self.assertEqual(
             failed_email[2].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
+            expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+        self.assertEqual(
+            failed_email[3].next_retry_date.strftime("%Y-%m-%d %H:%M:%S"),
             expected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
