@@ -43,7 +43,7 @@ from cl.users.factories import (
 )
 from cl.users.management.commands.cl_delete_old_emails import delete_old_emails
 from cl.users.management.commands.cl_retry_failed_email import (
-    periodic_check_recipient_deliverability_and_send_failed_email,
+    handle_failing_emails,
 )
 from cl.users.management.commands.cl_welcome_new_users import (
     get_welcome_recipients,
@@ -905,7 +905,7 @@ class SNSWebhookTest(TestCase):
         with time_machine.travel(fake_now_1, tick=False):
             # Check recipient's deliverability 3 hours in the future
             # One hour after backoff event expires
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         # Check if schedule_failed_email is called
         mock_schedule.assert_called()
@@ -928,7 +928,7 @@ class SNSWebhookTest(TestCase):
         fake_now_2 = fake_now_1 + timedelta(hours=second_retry_future_time)
         with time_machine.travel(fake_now_2, tick=False):
             # Check recipient's deliverability
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         # Check if schedule_failed_email is called and backoff marked checked
         self.assertEqual(mock_schedule.call_count, 2)
@@ -970,7 +970,7 @@ class SNSWebhookTest(TestCase):
         with time_machine.travel(fake_now_2, tick=False):
             # Check recipient's deliverability, deliverability shouldn't be
             # proven.
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         email_backoff_exists = email_backoff_event.exists()
         # Check if backoff event was not deleted
@@ -2381,7 +2381,7 @@ class RetryFailedEmailTest(TestCase):
         fake_now_1 = now() + timedelta(minutes=30)
         with time_machine.travel(fake_now_1, tick=False):
             # Check recipient's deliverability and send failed emails
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         # After the deliverability check/send failed email, no new FailedEmail
         # is enqueued for delivery or sent since it's not time for it.
@@ -2394,7 +2394,7 @@ class RetryFailedEmailTest(TestCase):
         fake_now_2 = now() + timedelta(hours=first_retry_future_time)
         with time_machine.travel(fake_now_2, tick=False):
             # Check recipient's deliverability and send failed emails
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         # After the deliverability check/send failed email, no new FailedEmail
         # are enqueued for delivery since it's not time for it. Only the
@@ -2414,7 +2414,7 @@ class RetryFailedEmailTest(TestCase):
         fake_now_3 = now() + timedelta(hours=first_retry_future_time)
         with time_machine.travel(fake_now_3, tick=False):
             # Check recipient's deliverability and send failed emails
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
 
         # After the deliverability check/send failed email, WAITING FailedEmail
         # are ENQUEUED_DELIVERY, sent them and marked as SUCCESSFUL.
@@ -2493,7 +2493,7 @@ class RetryFailedEmailTest(TestCase):
         fake_now_1 = now() + timedelta(hours=first_retry_future_time)
         with time_machine.travel(fake_now_1, tick=False):
             # Check recipient's deliverability and send failed emails
-            periodic_check_recipient_deliverability_and_send_failed_email()
+            handle_failing_emails()
             fake_now_time = now()
 
         # WAITING FailedEmail objects were scheduled with

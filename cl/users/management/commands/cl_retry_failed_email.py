@@ -11,7 +11,7 @@ from cl.users.email_handlers import schedule_failed_email
 from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
 
 
-def periodic_check_recipient_deliverability_and_send_failed_email() -> int:
+def handle_failing_emails() -> int:
     """Method to look for email addresses that are now deliverable after a
     backoff event expires and then retry failed email messages periodically.
 
@@ -82,22 +82,11 @@ class Command(VerboseCommand):
     """Command to check email recipients' deliverability and send failed emails
     periodically."""
 
-    help = "Check email recipients' deliverability or send failed emails."
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            "--check-recipients-deliverability-and-send-failed-email",
-            action="store_true",
-            default=False,
-            help="Send failed email.",
-        )
+    help = "Check email recipients' deliverability and send failed emails."
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        if options["check_recipients_deliverability_and_send_failed_email"]:
-            sys.stdout.write("Sending failed email...")
-            email_sent = (
-                periodic_check_recipient_deliverability_and_send_failed_email()
-            )
-            sys.stdout.write(f"{email_sent} emails sent.")
-            return
+        sys.stdout.write("Sending failed email...")
+        email_sent = handle_failing_emails()
+        sys.stdout.write(f"{email_sent} emails sent.")
+        return
