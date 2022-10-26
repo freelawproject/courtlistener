@@ -1768,6 +1768,8 @@ def process_recap_email(
         )
 
     rds_to_download = rds_attachments + rds_created
+    msg = "Successful upload! Nice work."
+    mark_pq_status(epq, msg, PROCESSING_STATUS.SUCCESSFUL, "status_message")
     return [rd.pk for rd in rds_to_download]
 
 

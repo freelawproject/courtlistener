@@ -1147,7 +1147,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.22"
+version = "2.5.23"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -2292,7 +2292,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "d8befe8bfbc06ca7dd4047660fcc1d5bf54a884f0874af7c78991b18478546ee"
+content-hash = "2041b07457939387d5cf50c43e15ae4d9c3f0e2144ed241b1789ce95763f6b6e"
 
 [metadata.files]
 amqp = [
@@ -2900,8 +2900,8 @@ judge-pics = [
     {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.5.22-py27-none-any.whl", hash = "sha256:b921e83879e0323986f6e84d778cf7502a86abdae20fed84c7d77d8cc029fc88"},
-    {file = "juriscraper-2.5.22.tar.gz", hash = "sha256:4752b4bcf55646fcde1debb4116b7eeb2206488a0c5a42dd08984dab8a28aa9a"},
+    {file = "juriscraper-2.5.23-py27-none-any.whl", hash = "sha256:4671a62b264578c9cccb0c1b11ea5abb764fc2aff396d17e13a5672f42739c25"},
+    {file = "juriscraper-2.5.23.tar.gz", hash = "sha256:387c573b6adc26ae6be8936b19ffa6f73e80ec04943e80ec4059bbc5da2243bc"},
 ]
 kdtree = [
     {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
@@ -3214,8 +3214,8 @@ pillow = [
     {file = "Pillow-9.2.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:37ff6b522a26d0538b753f0b4e8e164fdada12db6c6f00f62145d732d8a3152e"},
     {file = "Pillow-9.2.0-cp310-cp310-win32.whl", hash = "sha256:c79698d4cd9318d9481d89a77e2d3fcaeff5486be641e60a4b49f3d2ecca4e28"},
     {file = "Pillow-9.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:254164c57bab4b459f14c64e93df11eff5ded575192c294a0c49270f22c5d93d"},
-    {file = "Pillow-9.2.0-cp311-cp311-macosx_10_10_universal2.whl", hash = "sha256:408673ed75594933714482501fe97e055a42996087eeca7e5d06e33218d05aa8"},
-    {file = "Pillow-9.2.0-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:727dd1389bc5cb9827cbd1f9d40d2c2a1a0c9b32dd2261db522d22a604a6eec9"},
+    {file = "Pillow-9.2.0-cp311-cp311-macosx_10_10_x86_64.whl", hash = "sha256:adabc0bce035467fb537ef3e5e74f2847c8af217ee0be0455d4fec8adc0462fc"},
+    {file = "Pillow-9.2.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:336b9036127eab855beec9662ac3ea13a4544a523ae273cbf108b228ecac8437"},
     {file = "Pillow-9.2.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:50dff9cc21826d2977ef2d2a205504034e3a4563ca6f5db739b0d1026658e004"},
     {file = "Pillow-9.2.0-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:cb6259196a589123d755380b65127ddc60f4c64b21fc3bb46ce3a6ea663659b0"},
     {file = "Pillow-9.2.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7b0554af24df2bf96618dac71ddada02420f946be943b181108cac55a7a2dcd4"},
@@ -3316,18 +3316,7 @@ pyahocorasick = [
     {file = "pyahocorasick-1.4.2.tar.gz", hash = "sha256:88f79307c74ae6a84f8d88c2522a082f1d21c425762aba7f7e4d14dd431d2fb7"},
 ]
 pyasn1 = [
-    {file = "pyasn1-0.4.8-py2.4.egg", hash = "sha256:fec3e9d8e36808a28efb59b489e4528c10ad0f480e57dcc32b4de5c9d8c9fdf3"},
-    {file = "pyasn1-0.4.8-py2.5.egg", hash = "sha256:0458773cfe65b153891ac249bcf1b5f8f320b7c2ce462151f8fa74de8934becf"},
-    {file = "pyasn1-0.4.8-py2.6.egg", hash = "sha256:5c9414dcfede6e441f7e8f81b43b34e834731003427e5b09e4e00e3172a10f00"},
-    {file = "pyasn1-0.4.8-py2.7.egg", hash = "sha256:6e7545f1a61025a4e58bb336952c5061697da694db1cae97b116e9c46abcf7c8"},
     {file = "pyasn1-0.4.8-py2.py3-none-any.whl", hash = "sha256:39c7e2ec30515947ff4e87fb6f456dfc6e84857d34be479c9d4a4ba4bf46aa5d"},
-    {file = "pyasn1-0.4.8-py3.1.egg", hash = "sha256:78fa6da68ed2727915c4767bb386ab32cdba863caa7dbe473eaae45f9959da86"},
-    {file = "pyasn1-0.4.8-py3.2.egg", hash = "sha256:08c3c53b75eaa48d71cf8c710312316392ed40899cb34710d092e96745a358b7"},
-    {file = "pyasn1-0.4.8-py3.3.egg", hash = "sha256:03840c999ba71680a131cfaee6fab142e1ed9bbd9c693e285cc6aca0d555e576"},
-    {file = "pyasn1-0.4.8-py3.4.egg", hash = "sha256:7ab8a544af125fb704feadb008c99a88805126fb525280b2270bb25cc1d78a12"},
-    {file = "pyasn1-0.4.8-py3.5.egg", hash = "sha256:e89bf84b5437b532b0803ba5c9a5e054d21fec423a89952a74f87fa2c9b7bce2"},
-    {file = "pyasn1-0.4.8-py3.6.egg", hash = "sha256:014c0e9976956a08139dc0712ae195324a75e142284d5f87f1a87ee1b068a359"},
-    {file = "pyasn1-0.4.8-py3.7.egg", hash = "sha256:99fcc3c8d804d1bc6d9a099921e39d827026409a58f2a720dcdb89374ea0c776"},
     {file = "pyasn1-0.4.8.tar.gz", hash = "sha256:aef77c9fb94a3ac588e87841208bdec464471d9871bd5050a287cc9a475cd0ba"},
 ]
 pycodestyle = [
@@ -3408,14 +3397,6 @@ python-crfsuite = [
     {file = "python_crfsuite-0.9.8-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:7e648326bb5dcdececb22c198a2d4d71da3d208af97b3cf3185a5e0f92cc657e"},
     {file = "python_crfsuite-0.9.8-cp39-cp39-win32.whl", hash = "sha256:aa8715f34fcd72b34b16116533b0ee156c55a06eef10950a7afb5fc248c8dd61"},
     {file = "python_crfsuite-0.9.8-cp39-cp39-win_amd64.whl", hash = "sha256:cec973c7a1ef75ebeade4e18607c195c922a0276dabeaa4ba134f8576901d04a"},
-    {file = "python_crfsuite-0.9.8-py2.7-win-amd64.egg", hash = "sha256:18c46286c179e642876364f48d92f42ba5172decaf33409f8b26450744c8dd80"},
-    {file = "python_crfsuite-0.9.8-py2.7-win32.egg", hash = "sha256:2210ea3936090d023d6770aa1d3b6ba0831153fda34558c99ee3dfe13000b07d"},
-    {file = "python_crfsuite-0.9.8-py3.6-win-amd64.egg", hash = "sha256:814c9920a87530c9ab56324cad90f69e703dcf399c51e2660584bfdd30a4213b"},
-    {file = "python_crfsuite-0.9.8-py3.6-win32.egg", hash = "sha256:dbf4cbd1babec759b8a3211c3c50507d5f300fa9b5f0c2be1a03246dd1e4c251"},
-    {file = "python_crfsuite-0.9.8-py3.7-win-amd64.egg", hash = "sha256:e984e3aa4e68a5db671562008373f1a07496cfbd9cfd7c79716f44b3eadf5e9e"},
-    {file = "python_crfsuite-0.9.8-py3.7-win32.egg", hash = "sha256:f1d7d20af284f20f8ccc6e019c82a6ce699c29166f2a49e86b648e892e4e0994"},
-    {file = "python_crfsuite-0.9.8-py3.8-win-amd64.egg", hash = "sha256:ea22ddcbe62797da0ae86f4a700f6215fd2d45e8a3bd38e92956aa9646e5f277"},
-    {file = "python_crfsuite-0.9.8-py3.8-win32.egg", hash = "sha256:2d2bea92593876c007969d86bbc0254f6f31b67a085b3f396311290be750b14b"},
 ]
 python-dateutil = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
