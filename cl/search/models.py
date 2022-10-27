@@ -1722,6 +1722,8 @@ class Court(models.Model):
     STATE_ATTORNEY_GENERAL = "SAG"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
+    TRIBAL = "TRIB"
+    TERRITORY = "TERR"
     TESTING_COURT = "T"
     JURISDICTIONS = (
         (FEDERAL_APPELLATE, "Federal Appellate"),
@@ -1736,6 +1738,8 @@ class Court(models.Model):
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
+        (TRIBAL, "Tribal"),
+        (TERRITORY, "Territory"),
         (TESTING_COURT, "Testing"),
     )
     FEDERAL_JURISDICTIONS = [
