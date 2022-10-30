@@ -1,4 +1,6 @@
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -13,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
@@ -27,15 +30,17 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from redis import ConnectionError as RedisConnectionError
-from requests import HTTPError, Response
+from requests import HTTPError
+from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
     download_pacer_pdf_by_rd,
-    fetch_pacer_doc_appellate,
+    download_pdf_by_magic_number,
     get_attachment_page_by_rd,
+    get_document_number_for_appellate,
     make_attachment_pq_object,
     update_rd_metadata,
 )
@@ -568,7 +573,7 @@ def process_recap_attachment(
 ) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
-    :param self: The Celery teask
+    :param self: The Celery task
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
@@ -1188,10 +1193,14 @@ def fetch_pacer_doc_by_rd(
         return
 
     court_id = rd.docket_entry.docket.court_id
+
+    pdf_bytes = None
+    if r:
+        pdf_bytes = force_bytes(r.content)
     success, msg = update_rd_metadata(
         self,
         rd_pk,
-        r,
+        pdf_bytes,
         r_msg,
         court_id,
         pacer_case_id,
@@ -1546,72 +1555,190 @@ def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
     return att_response.text
 
 
-def save_pacer_doc_appellate(
+def save_pacer_doc_from_pq(
     self: Task,
-    rd_pk: int,
-    fq_pk: int,
-    r: Response | None,
-    r_msg: str,
+    rd: RECAPDocument,
+    fq: PacerFetchQueue,
+    pq: ProcessingQueue,
 ) -> Optional[int]:
-    """Save the PDF binary previously downloaded.
+    """Save the PDF binary previously downloaded and stored in a PQ object to
+    the corresponding RECAPDocument.
 
-    :param self: The celery task
-    :param rd_pk: The PK of the RECAP Document to get.
-    :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :param r: A requests.Response object containing the PDF data. Used
-    for appellate documents where the PDF document it's previously downloaded
-    in order to get the document number.
-    :param r_msg: A message from the download function about an error that was
-    encountered.
+    :param self: The parent celery task
+    :param rd: The RECAP Document to get.
+    :param fq: The RECAP Fetch Queue to update.
+    :param pq: The ProcessingQueue that contains the PDF document.
     :return: The RECAPDocument PK
     """
-
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    fq = PacerFetchQueue.objects.get(pk=fq_pk)
-
-    if not r:
-        mark_fq_status(fq, r_msg, PROCESSING_STATUS.FAILED)
-        self.request.chain = None
-        return
 
     if rd.is_available:
         msg = "PDF already marked as 'is_available'. Doing nothing."
         mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
-        self.request.chain = None
         return
 
-    if not rd.pacer_doc_id:
-        msg = (
-            "Missing 'pacer_doc_id' attribute. Without this attribute we "
-            "cannot identify the document properly. Missing pacer_doc_id "
-            "attributes usually indicate that the item may not have a "
-            "document associated with it, or it may need to be updated via "
-            "the docket report to acquire a pacer_doc_id. Aborting request."
-        )
-        mark_fq_status(fq, msg, PROCESSING_STATUS.INVALID_CONTENT)
-        self.request.chain = None
+    if pq.status == PROCESSING_STATUS.FAILED or not pq.filepath_local:
+        mark_fq_status(fq, pq.error_message, PROCESSING_STATUS.FAILED)
         return
+
+    with pq.filepath_local.open(mode="rb") as local_path:
+        pdf_bytes = local_path.read()
+
+    mark_fq_status(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     court_id = rd.docket_entry.docket.court_id
     success, msg = update_rd_metadata(
         self,
-        rd_pk,
-        r,
-        r_msg,
+        rd.pk,
+        pdf_bytes,
+        pq.error_message,
         court_id,
         pacer_case_id,
         rd.pacer_doc_id,
         rd.document_number,
         rd.attachment_number,
     )
-
     if success is False:
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        self.request.chain = None
         return
 
+    msg = "Successfully completed fetch and save."
+    mark_fq_status(fq, msg, PROCESSING_STATUS.SUCCESSFUL)
     return rd.pk
+
+
+def download_pacer_pdf_and_save_to_pq(
+    court_id: str,
+    cookies: RequestsCookieJar,
+    cutoff_date: datetime,
+    magic_number: str,
+    pacer_case_id: str,
+    pacer_doc_id: str,
+    user_pk: int,
+    appellate: bool,
+    attachment_number: int = None,
+) -> ProcessingQueue:
+
+    """Try to download a PACER document from the notification via the magic
+    link and store it in a ProcessingQueue object. So it can be copied to every
+    Case/RECAPDocument (multi-docket NEFs). In case of a failure/retry in any
+    following step, the one-look PACER document will be already stored in the
+    PQ object. Increasing the reliability of saving PACER documents.
+
+    :param court_id: A CourtListener court ID to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param cutoff_date: The datetime from which we should query
+     ProcessingQueue objects. For the main RECAPDocument the datetime the
+     EmailProcessingQueue was created. For attachments the datetime the
+     attachment RECAPDocument was created.
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param pacer_doc_id: The pacer_doc_id to query the free document.
+    :param user_pk: The user to associate with the ProcessingQueue object when
+     it's created.
+    :param appellate: Whether the download belongs to an appellate court.
+    :param attachment_number: The RECAPDocument attachment_number in case the
+     request belongs to an attachment document.
+    :return: The ProcessingQueue object that's created or returned if existed.
+    """
+
+    with transaction.atomic():
+        (pq, created,) = ProcessingQueue.objects.get_or_create(
+            uploader_id=user_pk,
+            pacer_doc_id=pacer_doc_id,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+            upload_type=UPLOAD_TYPE.PDF,
+            date_created__gt=cutoff_date,
+        )
+        if created and magic_number:
+            response, r_msg = download_pdf_by_magic_number(
+                court_id,
+                pacer_doc_id,
+                pacer_case_id,
+                cookies,
+                magic_number,
+                appellate,
+            )
+            if response:
+                file_name = get_document_filename(
+                    court_id,
+                    pacer_case_id,
+                    pacer_doc_id,
+                    attachment_number,
+                )
+                cf = ContentFile(response.content)
+                pq.filepath_local.save(file_name, cf, save=False)
+                pq.save()
+                return pq
+
+            # PACER document not available via magic link.
+            mark_pq_status(
+                pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
+            )
+        # Return an existing PQ object after retry or for multi-docket NEFs.
+        return pq
+
+
+def get_and_copy_recap_attachment_docs(
+    self: Task,
+    att_rds: list[RECAPDocument],
+    court_id: str,
+    cookies: RequestsCookieJar,
+    magic_number: str,
+    pacer_case_id: str,
+    user_pk: int,
+) -> None:
+    """Download and copy the corresponding PACER PDF to all the notification
+    RECAPDocument attachments, including support for multi-docket NEFs.
+
+    :param self: The parent celery task.
+    :param att_rds: A list for RECAPDocument attachments to process.
+    :param court_id: A CourtListener court ID to query the free document.
+    :param cookies: The cookies of a logged in PACER session
+    :param magic_number: The magic number to fetch PACER documents for free.
+    :param pacer_case_id: The pacer_case_id to query the free document.
+    :param user_pk: The user to associate with the ProcessingQueue object.
+    :return: None
+    """
+
+    appellate = False
+    unique_pqs = []
+    for rd_att in att_rds:
+        cutoff_date = rd_att.date_created
+        pq = download_pacer_pdf_and_save_to_pq(
+            court_id,
+            cookies,
+            cutoff_date,
+            magic_number,
+            pacer_case_id,
+            rd_att.pacer_doc_id,
+            user_pk,
+            appellate,
+            rd_att.attachment_number,
+        )
+        fq = PacerFetchQueue.objects.create(
+            user_id=user_pk,
+            request_type=REQUEST_TYPE.PDF,
+            recap_document=rd_att,
+        )
+        save_pacer_doc_from_pq(self, rd_att, fq, pq)
+        if pq not in unique_pqs:
+            unique_pqs.append(pq)
+
+    # After properly copied the docs to the RECAPDocuments, mark the PQ objects
+    # as successful and delete its filepath_local
+    for pq in unique_pqs:
+        if pq.status != PROCESSING_STATUS.FAILED:
+            mark_pq_successful(pq)
+
+
+@dataclass
+class DocketUpdatedData:
+    docket: Docket
+    des_returned: list
+    rds_created: list
+    content_updated: bool
 
 
 @app.task(
@@ -1620,6 +1747,7 @@ def save_pacer_doc_appellate(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
         requests.ConnectionError,
+        requests.RequestException,
         requests.ReadTimeout,
         PacerLoginException,
         RedisConnectionError,
@@ -1644,7 +1772,6 @@ def process_recap_email(
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
     message_id = epq.message_id
     bucket = RecapEmailSESStorage()
-
     # Try to read the file using utf-8.
     # If it fails fallback on iso-8859-1
     try:
@@ -1656,10 +1783,14 @@ def process_recap_email(
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
+
+    # Check if is a valid notification, there would exist at least one valid
+    # docket/docket entry. In multi-docket nefs the pacer_doc_id is the same
+    # in all docket entries.
     if (
         data == {}
-        or len(data["docket_entries"]) == 0
-        or data["docket_entries"][0]["pacer_doc_id"] is None
+        or len(data["dockets"][0]["docket_entries"]) == 0
+        or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
     ):
         msg = "Not a valid notification email. No message content."
         mark_pq_status(
@@ -1667,110 +1798,173 @@ def process_recap_email(
         )
         self.request.chain = None
         return None
-    docket_entry = data["docket_entries"][0]
-    docket = find_docket_object(
-        epq.court_id, docket_entry["pacer_case_id"], data["docket_number"]
-    )
-    docket.add_recap_source()
-    update_docket_metadata(docket, data)
 
-    if not docket.pacer_case_id:
-        docket.pacer_case_id = docket_entry["pacer_case_id"]
-    docket.save()
+    dockets = data["dockets"]
+    # Look for the main docket that has the valid magic number
+    magic_number = None
+    for docket_data in dockets:
+        docket_entry = docket_data["docket_entries"][0]
+        if docket_entry["pacer_magic_num"] is not None:
+            magic_number = docket_entry["pacer_magic_num"]
+            pacer_doc_id = docket_entry["pacer_doc_id"]
+            pacer_case_id = docket_entry["pacer_case_id"]
+            document_url = docket_entry["document_url"]
+            break
 
-    # Add the HTML to the docket in case we need it someday.
-    pacer_file = PacerHtmlFiles(
-        content_object=docket, upload_type=UPLOAD_TYPE.SES_EMAIL
-    )
-    pacer_file.filepath.save(
-        "docket.txt",  # We only care about the ext w/S3PrivateUUIDStorageTest
-        ContentFile(body.encode()),
-    )
+    start_time = now()
     # Ensures we have PACER cookies ready to go.
     cookies = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-    magic_number = docket_entry["pacer_magic_num"]
-    # NDAs obtained from recap.email don't contain a document
-    # number try to get it either from the PDF document or the download
-    # confirmation page.
     appellate = data["appellate"]
-    response = r_msg = None
-    if appellate:
-        doc_num, response, r_msg = fetch_pacer_doc_appellate(
-            epq.court_id,
-            docket_entry["pacer_doc_id"],
-            docket_entry["pacer_case_id"],
-            cookies,
-            magic_number,
-        )
-        if doc_num:
-            docket_entry["document_number"] = doc_num
-
-    start_time = now()
-    des_returned, rds_created, content_updated = add_docket_entries(
-        docket, data["docket_entries"]
+    # Try to download and store the main pacer document into a PQ object for
+    # its future processing.
+    pq = download_pacer_pdf_and_save_to_pq(
+        epq.court_id,
+        cookies,
+        epq.date_created,
+        magic_number,
+        pacer_case_id,
+        pacer_doc_id,
+        user_pk,
+        appellate,
     )
-    for rd in rds_created:
-        # Try to download/store the main document.
-        fq = PacerFetchQueue.objects.create(
-            user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
-        )
-        if appellate:
-            save_pacer_doc_appellate(self, rd.pk, fq.pk, response, r_msg)
-        else:
-            # If we don't have a magic number avoid fetching the document
-            if magic_number:
-                fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
-            # TODO send an email to tell user that notification didn't have a
-            # magic link
 
-    rds_attachments = []
-    if data["contains_attachments"] is True:
+    if appellate:
+        # Get the document number for appellate documents.
+        appellate_doc_num = get_document_number_for_appellate(
+            epq.court_id, pacer_doc_id, pq
+        )
+        if appellate_doc_num:
+            data["dockets"][0]["docket_entries"][0][
+                "document_number"
+            ] = appellate_doc_num
+
+    with transaction.atomic():
+        # Add/update docket entries for each docket mentioned in the
+        # notification.
+        dockets_updated = []
+        for docket_data in dockets:
+            docket_entry = docket_data["docket_entries"][0]
+            docket = find_docket_object(
+                epq.court_id,
+                docket_entry["pacer_case_id"],
+                docket_data["docket_number"],
+            )
+            docket.add_recap_source()
+            update_docket_metadata(docket, docket_data)
+
+            if not docket.pacer_case_id:
+                docket.pacer_case_id = docket_entry["pacer_case_id"]
+            docket.save()
+
+            # Add the HTML to the docket in case we need it someday.
+            pacer_file = PacerHtmlFiles(
+                content_object=docket, upload_type=UPLOAD_TYPE.SES_EMAIL
+            )
+            pacer_file.filepath.save(
+                "docket.txt",  # We only care about the ext w/S3PrivateUUIDStorageTest
+                ContentFile(body.encode()),
+            )
+            # Add docket entries for each docket
+            des_returned, rds_created, content_updated = add_docket_entries(
+                docket, docket_data["docket_entries"]
+            )
+
+            d_updated = DocketUpdatedData(
+                docket=docket,
+                des_returned=des_returned,
+                rds_created=rds_created,
+                content_updated=content_updated,
+            )
+            dockets_updated.append(d_updated)
+            for rd in rds_created:
+                # Download and store the main PACER document and then
+                # assign/copy it to each corresponding RECAPDocument.
+                fq = PacerFetchQueue.objects.create(
+                    user_id=user_pk,
+                    request_type=REQUEST_TYPE.PDF,
+                    recap_document=rd,
+                )
+                save_pacer_doc_from_pq(self, rd, fq, pq)
+
+        # After properly copying the PDF to the main RECAPDocuments,
+        # mark the PQ object as successful and delete its filepath_local
+        if pq.status != PROCESSING_STATUS.FAILED:
+            mark_pq_successful(pq)
+
         # Get NEF attachments and merge them.
-        for rd in rds_created:
+        all_attachment_rds = []
+        if data["contains_attachments"] is True:
+            rd = dockets_updated[0].rds_created[0]
             # Try to get the attachment page without being logged into PACER
             att_report_text = get_attachment_page_by_url(
-                docket_entry["document_url"], epq.court
+                document_url, epq.court
             )
             if att_report_text:
                 att_report = AttachmentPage(epq.court_id)
             else:
                 # Get the attachment page being logged into PACER
                 att_report = get_attachment_page_by_rd(rd.pk, cookies)
-            pq_pk = make_attachment_pq_object(
-                att_report, rd.pk, user_pk, att_report_text
+
+            for docket_entry in dockets_updated:
+                # Merge the attachments for each recap document
+                pq_pk = make_attachment_pq_object(
+                    att_report,
+                    docket_entry.rds_created[0].pk,
+                    user_pk,
+                    att_report_text,
+                )
+                pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
+
+                for rd_att in rds_affected:
+                    # We only query and parse the Attachment report for the
+                    # first docket entry. The only field that needs to be
+                    # overwritten is the document number since it changes from
+                    # case to case. Assigns it from its main RECAPDocument.
+                    rd_att.document_number = docket_entry.rds_created[
+                        0
+                    ].document_number
+                    rd_att.save()
+                all_attachment_rds += rds_affected
+
+            get_and_copy_recap_attachment_docs(
+                self,
+                all_attachment_rds,
+                epq.court_id,
+                cookies,
+                magic_number,
+                pacer_case_id,
+                user_pk,
             )
-            pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
-            rds_attachments += rds_affected
 
-    for rd in rds_attachments:
-        # Try to download attachments free documents.
-        fq = PacerFetchQueue.objects.create(
-            user_id=user_pk, request_type=REQUEST_TYPE.PDF, recap_document=rd
-        )
-        # If we don't have a magic number avoid fetching the document
-        if magic_number:
-            fetch_pacer_doc_by_rd(rd.pk, fq.pk, magic_number)
-
+    # Send docket alerts and webhooks for each docket updated.
     recap_email_recipients = get_recap_email_recipients(epq.destination_emails)
-    if content_updated:
-        newly_enqueued = enqueue_docket_alert(docket.pk)
-        if newly_enqueued:
+    all_main_rds = []
+    for docket_updated in dockets_updated:
+        if docket_updated.content_updated:
+            newly_enqueued = enqueue_docket_alert(docket_updated.docket.pk)
+            if newly_enqueued:
+                send_alert_and_webhook.delay(
+                    docket_updated.docket.pk,
+                    start_time,
+                    recap_email_recipients,
+                )
+        else:
+            # If the current docket entry was added previously, send the alert
+            # only to the recap email user that triggered the new alert.
             send_alert_and_webhook.delay(
-                docket.pk, start_time, recap_email_recipients
+                docket_updated.docket.pk,
+                start_time,
+                recap_email_recipients,
+                docket_updated.des_returned,
             )
-    else:
-        # If the current docket entry was added previously, send the alert only
-        # to the recap email user that triggered the new alert.
-        send_alert_and_webhook.delay(
-            docket.pk, start_time, recap_email_recipients, des_returned
-        )
+        all_main_rds += docket_updated.rds_created
 
-    rds_to_download = rds_attachments + rds_created
+    rds_to_extract_add_to_solr = all_attachment_rds + all_main_rds
     msg = "Successful upload! Nice work."
     mark_pq_status(epq, msg, PROCESSING_STATUS.SUCCESSFUL, "status_message")
-    return [rd.pk for rd in rds_to_download]
+    return [rd.pk for rd in rds_to_extract_add_to_solr]
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:

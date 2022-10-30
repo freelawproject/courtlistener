@@ -71,6 +71,7 @@ from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
+    get_and_copy_recap_attachment_docs,
     process_recap_appellate_docket,
     process_recap_attachment,
     process_recap_claims_register,
@@ -1966,6 +1967,8 @@ class RecapEmailDocketAlerts(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
         cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.court_okwd = CourtFactory(id="okwd", jurisdiction="FD")
+        cls.court_jpml = CourtFactory(id="jpml", jurisdiction="FS")
         cls.webhook = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.DOCKET_ALERT,
@@ -2004,6 +2007,14 @@ class RecapEmailDocketAlerts(TestCase):
                 test_dir / "recap_mail_custom_receipt_no_re_user.json",
                 encoding="utf-8",
             ) as file_6,
+            open(
+                test_dir / "recap_mail_custom_receipt_multi_nef_okwd.json",
+                encoding="utf-8",
+            ) as file_7,
+            open(
+                test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
+                encoding="utf-8",
+            ) as file_jpml,
         ):
             recap_mail_receipt = json.load(file)
             recap_mail_receipt_2 = json.load(file_2)
@@ -2011,6 +2022,8 @@ class RecapEmailDocketAlerts(TestCase):
             recap_mail_receipt_4 = json.load(file_4)
             recap_mail_receipt_nda = json.load(file_5)
             recap_mail_receipt_no_re_user = json.load(file_6)
+            recap_mail_receipt_multi_nef = json.load(file_7)
+            recap_mail_receipt_multi_nef_jpml = json.load(file_jpml)
 
         cls.data = {
             "court": cls.court.id,
@@ -2044,6 +2057,18 @@ class RecapEmailDocketAlerts(TestCase):
             "receipt": recap_mail_receipt_no_re_user["receipt"],
         }
 
+        cls.data_multi_nef = {
+            "court": cls.court_okwd.id,
+            "mail": recap_mail_receipt_multi_nef["mail"],
+            "receipt": recap_mail_receipt_multi_nef["receipt"],
+        }
+
+        cls.data_multi_jpml = {
+            "court": cls.court_jpml.id,
+            "mail": recap_mail_receipt_multi_nef_jpml["mail"],
+            "receipt": recap_mail_receipt_multi_nef_jpml["receipt"],
+        }
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap-email")
@@ -2070,8 +2095,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.recipient_user_2 = recipient_user_2
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2130,8 +2155,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_new_recap_email_case_auto_subscription_prev_user(
         self,
@@ -2187,8 +2212,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 3)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2243,8 +2268,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(webhook_triggered.count(), 0)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
@@ -2301,12 +2326,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
-    )
-    @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
                 "Testing",
                 200,
@@ -2324,7 +2345,6 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
-        mock_download_pacer_pdf_by_rd,
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
@@ -2348,8 +2368,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2438,8 +2458,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_new_recap_email_subscribe_by_email_link(
         self,
@@ -2492,8 +2512,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(docket_alert_subscription.count(), 1)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_new_recap_email_unsubscribe_by_email_link(
         self,
@@ -2558,8 +2578,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 2)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_new_recap_email_alerts_integration(
         self,
@@ -2656,8 +2676,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Unsubscribed]", message_sent.subject)
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     def test_docket_alert_toggle_confirmation_fails(
         self,
@@ -2725,8 +2745,8 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: exec("raise(HTTPError)"),
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
         "cl.alerts.tasks.requests.post",
@@ -2820,8 +2840,8 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda x: True,
     )
     @mock.patch(
-        "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
                 "OK",
                 200,
@@ -2859,8 +2879,8 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse("Testing", 200, b""),
             "OK",
         ),
@@ -2904,8 +2924,8 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse("Testing", 200, b""),
             "OK",
         ),
@@ -2969,8 +2989,8 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
     )
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse("Testing", 200, b""),
             "OK",
         ),
@@ -3025,6 +3045,298 @@ class RecapEmailDocketAlerts(TestCase):
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 0)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
+            MockResponse("Testing", 200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(
+            mock_bucket_open("jpml_85001321035.html", "r", True), 200
+        ),
+    )
+    def test_multiple_docket_nef(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_cookie,
+        mock_download_pdf,
+        mock_att_response,
+    ):
+        """This test verifies that if a new multi docket nef recap.email
+        notification comes in we can parse it properly. Send docket alerts and
+        webhooks for each case.
+        """
+
+        # Trigger a new nda recap.email notification from testing_1@recap.email
+        # Multi Docket NEF.
+        self.client.post(self.path, self.data_multi_jpml, format="json")
+
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(len(email_processing), 1)
+
+        # Compare the NDA docket and recap document metadata
+        dockets = Docket.objects.all()
+        self.assertEqual(len(dockets), 3)
+
+        case_names = [docket.case_name for docket in dockets]
+        # Check that all the case names are different between them
+        self.assertTrue(len(set(case_names)) == len(case_names))
+
+        docket_numbers = [docket.docket_number for docket in dockets]
+        # Check that all the docket_numbers are different between them
+        self.assertTrue(len(set(docket_numbers)) == len(docket_numbers))
+
+        docket_entries = DocketEntry.objects.all()
+        self.assertEqual(len(docket_entries), 3)
+        docket_entry_numbers = [
+            docket_entry.entry_number for docket_entry in docket_entries
+        ]
+        # Check that all the docket_entry_numbers are different between them
+        self.assertTrue(
+            len(set(docket_entry_numbers)) == len(docket_entry_numbers)
+        )
+
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_documents), 6)
+
+        for rd in recap_documents:
+            # Every RECAPDocument should have a file stored at this point.
+            self.assertTrue(rd.filepath_local)
+            if not rd.attachment_number:
+                # Check that every main RECAPDocument has the main pacer_doc_id
+                self.assertEqual(rd.pacer_doc_id, "85001321035")
+            if rd.attachment_number == 1:
+                # Check that every attachment RECAPDocument has the attachment
+                # pacer_doc_id
+                self.assertEqual(rd.pacer_doc_id, "85001321036")
+
+        docket_alerts = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alerts.count(), 3)
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 3)
+
+        # Webhook should be triggered
+        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 3)
+
+        webhook_entry_numbers = [
+            webhook.content["results"][0]["entry_number"]
+            for webhook in webhook_triggered
+        ]
+        # Check that all the webhook entry numbers are different between them
+        self.assertTrue(
+            len(set(webhook_entry_numbers)) == len(webhook_entry_numbers)
+        )
+
+        webhook_document_numbers = [
+            webhook.content["results"][0]["recap_documents"][0][
+                "document_number"
+            ]
+            for webhook in webhook_triggered
+        ]
+        # Check that all the webhook_document_numbers are different between
+        # them
+        self.assertTrue(
+            len(set(webhook_document_numbers)) == len(webhook_document_numbers)
+        )
+
+        webhook_att_document_numbers = [
+            webhook.content["results"][0]["recap_documents"][1][
+                "document_number"
+            ]
+            for webhook in webhook_triggered
+        ]
+        # Check that all the webhook_att_document_numbers are different between
+        # them
+        self.assertTrue(
+            len(set(webhook_att_document_numbers))
+            == len(webhook_att_document_numbers)
+        )
+
+        # Check that all the PQ objects created are marked as SUCCESSFUL and
+        # filepath_local deleted.
+        pqs = ProcessingQueue.objects.all()
+        for pq in pqs:
+            self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+            self.assertFalse(pq.filepath_local)
+
+
+class GetAndCopyRecapAttachments(TestCase):
+    """Test the get_and_copy_recap_attachment_docs method"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get(username="recap-email")
+        cls.d_1 = Docket.objects.create(
+            source=0, court_id="scotus", pacer_case_id="12345"
+        )
+        cls.d_2 = Docket.objects.create(
+            source=0, court_id="scotus", pacer_case_id="12345-1"
+        )
+        cls.d_3 = Docket.objects.create(
+            source=0, court_id="scotus", pacer_case_id="12345-2"
+        )
+        de_1_1 = DocketEntry.objects.create(docket=cls.d_1, entry_number=1)
+        de_2_1 = DocketEntry.objects.create(docket=cls.d_2, entry_number=1)
+        de_3_1 = DocketEntry.objects.create(docket=cls.d_3, entry_number=1)
+
+        des = [de_1_1, de_2_1, de_3_1]
+        cls.rds_att = []
+        for de in des:
+            # Create main RDs
+            RECAPDocument.objects.create(
+                docket_entry=de,
+                document_number="1",
+                pacer_doc_id="04505578698",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+            )
+
+            # Create two attachments for each RD.
+            rd_att_1 = RECAPDocument.objects.create(
+                docket_entry=de,
+                pacer_doc_id="04505578699",
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+            )
+            rd_att_2 = RECAPDocument.objects.create(
+                docket_entry=de,
+                pacer_doc_id="04505578700",
+                document_number="1",
+                attachment_number=2,
+                document_type=RECAPDocument.ATTACHMENT,
+            )
+
+            cls.rds_att.append(rd_att_1)
+            cls.rds_att.append(rd_att_2)
+
+    def test_copy_pdf_attachments_from_pqs(self):
+        """This test verifies that we can properly copy a PDF attachment from a
+        PQ object to its corresponding RECAPDocument.
+        """
+
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(len(rds), 9)
+
+        pq_att1 = ProcessingQueue.objects.create(
+            court_id="scotus",
+            uploader=self.user,
+            pacer_case_id=self.d_1.pacer_case_id,
+            pacer_doc_id="04505578699",
+            status=PROCESSING_STATUS.ENQUEUED,
+            upload_type=UPLOAD_TYPE.PDF,
+        )
+        att1_content = b"Hello World att 1"
+        filename_att1 = "att_1.pdf"
+        cf_1 = ContentFile(att1_content)
+        pq_att1.filepath_local.save(filename_att1, cf_1)
+
+        pq_att2 = ProcessingQueue.objects.create(
+            court_id="scotus",
+            uploader=self.user,
+            pacer_case_id=self.d_1.pacer_case_id,
+            pacer_doc_id="04505578700",
+            status=PROCESSING_STATUS.ENQUEUED,
+            upload_type=UPLOAD_TYPE.PDF,
+        )
+        att2_content = b"Hello World att 2"
+        filename_att2 = "att_2.pdf"
+        cf_2 = ContentFile(att2_content)
+        pq_att2.filepath_local.save(filename_att2, cf_2)
+
+        cookies = None
+        get_and_copy_recap_attachment_docs(
+            self,
+            self.rds_att,
+            "scotus",
+            cookies,
+            "magic1234",
+            "12345",
+            self.user.pk,
+        )
+
+        rds_all = RECAPDocument.objects.all()
+        for rd in rds_all:
+            if rd.attachment_number == 1:
+                with rd.filepath_local.open(mode="rb") as local_path:
+                    self.assertEqual(local_path.read(), b"Hello World att 1")
+            elif rd.attachment_number == 2:
+                with rd.filepath_local.open(mode="rb") as local_path:
+                    self.assertEqual(local_path.read(), b"Hello World att 2")
+
+        # After successfully copying the attachment document from the PQ object
+        # check if the PQ object is marked as successful and the file is deleted
+        pqs = ProcessingQueue.objects.all()
+        for pq in pqs:
+            self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+            self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
+            MockResponse("Testing", 200, b"Hello World from magic"),
+            "OK",
+        ),
+    )
+    def test_assign_pdf_attachmments_from_magic(
+        self,
+        mock_cookie,
+        mock_download,
+    ):
+        """This test verifies that we can properly save a PDF attachment from a
+        magic link, store it in a PQ object and finally copy the PDF
+        attachment from the PQ object to its corresponding RECAPDocument.
+        """
+
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(len(rds), 9)
+        cookies = None
+        get_and_copy_recap_attachment_docs(
+            self,
+            self.rds_att,
+            "scotus",
+            cookies,
+            "magic1234",
+            "12345",
+            self.user.pk,
+        )
+        rds_all = RECAPDocument.objects.all()
+        for rd in rds_all:
+            if rd.attachment_number == 1:
+                with rd.filepath_local.open(mode="rb") as local_path:
+                    self.assertEqual(
+                        local_path.read(), b"Hello World from magic"
+                    )
+            elif rd.attachment_number == 2:
+                with rd.filepath_local.open(mode="rb") as local_path:
+                    self.assertEqual(
+                        local_path.read(), b"Hello World from magic"
+                    )
+
+        # After successfully copying the attachment document from the PQ object
+        # check if the PQ object is marked as successful and the file is deleted
+        pqs = ProcessingQueue.objects.all()
+        for pq in pqs:
+            self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+            self.assertFalse(pq.filepath_local)
 
 
 class TestRecapDocumentsExtractContentCommand(TestCase):
@@ -3213,8 +3525,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.path = "/api/rest/v3/recap-email/"
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
                 "Testing",
                 200,
@@ -3249,8 +3561,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, 138)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
                 "Testing",
                 200,
@@ -3294,8 +3606,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         )
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
                 "Testing",
                 200,
@@ -3338,8 +3650,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, 148)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse("Testing", 200, b""),
             "OK",
         ),
@@ -3374,8 +3686,8 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(recap_document[0].docket_entry.entry_number, None)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             MockResponse("Testing", 200, b""),
             "OK",
         ),
@@ -3420,10 +3732,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(docket_entry[0].pk, docket_entry_2[0].pk)
 
     @mock.patch(
-        "cl.corpus_importer.tasks.download_appellate_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b: (
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (
             None,
-            "Failed to get PDF from network.",
+            "Document not available from magic link.",
         ),
     )
     @mock.patch(

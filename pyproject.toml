@@ -103,8 +103,8 @@ django-ipware = "^4.0.2"
 sentry-sdk = "^1.9.0"
 selenium = "4.0.0.a7"
 ipython = "^8.5.0"
-juriscraper = "^2.5.23"
 time-machine = "^2.8.2"
+juriscraper = {git = "https://github.com/freelawproject/juriscraper.git", rev = "add-support-for-notifications-with-multiple-dockets"}
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
