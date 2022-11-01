@@ -106,7 +106,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 dev = ["coverage[toml] (>=5.0.2)", "furo", "hypothesis", "pre-commit", "pympler", "pytest (>=4.3.0)", "six", "sphinx", "zope.interface"]
 docs = ["furo", "sphinx", "zope.interface"]
 tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface"]
-tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
+tests-no-zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
 
 [[package]]
 name = "backcall"
@@ -297,7 +297,7 @@ optional = false
 python-versions = ">=3.5.0"
 
 [package.extras]
-unicode_backport = ["unicodedata2"]
+unicode-backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
@@ -413,7 +413,7 @@ scipy = ">=1.0.0"
 [package.extras]
 benchmark = ["SetSimilaritySearch (>=0.1.7)", "matplotlib (>=3.1.2)", "nltk (>=3.4.5)", "pandas (>=0.25.3)", "pyfarmhash (>=0.2.2)", "pyhash (>=0.9.3)", "scikit-learn (>=0.21.3)", "scipy (>=1.3.3)"]
 cassandra = ["cassandra-driver (>=3.20)"]
-experimental_aio = ["aiounittest", "motor"]
+experimental-aio = ["aiounittest", "motor"]
 redis = ["redis (>=2.10.0)"]
 test = ["cassandra-driver (>=3.20)", "coverage", "mock (>=2.0.0)", "mockredispy", "nose (>=1.3.7)", "nose-exclude (>=0.5.0)", "pymongo (>=3.9.0)", "redis (>=2.10.0)"]
 
@@ -688,7 +688,7 @@ typing-extensions = "*"
 
 [[package]]
 name = "django-waffle"
-version = "2.1.0"
+version = "3.0.0"
 description = "A feature flipper for Django."
 category = "main"
 optional = false
@@ -1050,7 +1050,7 @@ notebook = ["ipywidgets", "notebook"]
 parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
 test = ["pytest (<7.1)", "pytest-asyncio", "testpath"]
-test_extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.19)", "pandas", "pytest (<7.1)", "pytest-asyncio", "testpath", "trio"]
+test-extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.19)", "pandas", "pytest (<7.1)", "pytest-asyncio", "testpath", "trio"]
 
 [[package]]
 name = "isort"
@@ -1062,8 +1062,8 @@ python-versions = ">=3.6,<4.0"
 
 [package.extras]
 colors = ["colorama (>=0.4.3,<0.5.0)"]
-pipfile_deprecated_finder = ["pipreqs", "requirementslib"]
-requirements_deprecated_finder = ["pip-api", "pipreqs"]
+pipfile-deprecated-finder = ["pipreqs", "requirementslib"]
+requirements-deprecated-finder = ["pip-api", "pipreqs"]
 
 [[package]]
 name = "itypes"
@@ -1795,7 +1795,7 @@ urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
+use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-file"
@@ -1900,7 +1900,7 @@ falcon = ["falcon (>=1.4)"]
 fastapi = ["fastapi (>=0.79.0)"]
 flask = ["blinker (>=1.1)", "flask (>=0.11)"]
 httpx = ["httpx (>=0.16.0)"]
-pure_eval = ["asttokens", "executing", "pure-eval"]
+pure-eval = ["asttokens", "executing", "pure-eval"]
 pyspark = ["pyspark (>=2.4.4)"]
 quart = ["blinker (>=1.1)", "quart (>=0.16.1)"]
 rq = ["rq (>=0.6)"]
@@ -2303,7 +2303,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "e144f479651ce143acee7d01b5ea922db5a38e2a553326733f4820219fc95a65"
+content-hash = "017b28eaa320b374ca6f32d8a38409e7ed9862a6aa7209395951b45ba71ddcea"
 
 [metadata.files]
 amqp = [
@@ -2653,8 +2653,8 @@ django-stubs-ext = [
     {file = "django_stubs_ext-0.3.1-py3-none-any.whl", hash = "sha256:a51a3e9e844d4e1cacaaedbb33bf3def78a3956eed5d9575a640bd97ccd99cec"},
 ]
 django-waffle = [
-    {file = "django-waffle-2.1.0.tar.gz", hash = "sha256:a96b52ed6256238b7e0dda8c5c18b6f00e38008fae380f9ff22e12fd1a702c7f"},
-    {file = "django_waffle-2.1.0-py2.py3-none-any.whl", hash = "sha256:a39f294f8c4e026b9e441d0e4d35ff3b26d1eb2da1d52196ba4bc04ba78b1db1"},
+    {file = "django-waffle-3.0.0.tar.gz", hash = "sha256:3acef6692cb745ed8109f0a3076c5a27da38a716deb70d64c5fb404d65ccd910"},
+    {file = "django_waffle-3.0.0-py3-none-any.whl", hash = "sha256:dd8bcc62269b35000a05a7d87e8a000136b6b1568952e2e707ef450717b1cd9f"},
 ]
 djangorestframework = [
     {file = "djangorestframework-3.12.4-py3-none-any.whl", hash = "sha256:6d1d59f623a5ad0509fe0d6bfe93cbdfe17b8116ebc8eda86d45f6e16e819aaf"},
