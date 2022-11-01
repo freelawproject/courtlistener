@@ -106,7 +106,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 dev = ["coverage[toml] (>=5.0.2)", "furo", "hypothesis", "pre-commit", "pympler", "pytest (>=4.3.0)", "six", "sphinx", "zope.interface"]
 docs = ["furo", "sphinx", "zope.interface"]
 tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface"]
-tests-no-zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
+tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
 
 [[package]]
 name = "backcall"
@@ -297,7 +297,7 @@ optional = false
 python-versions = ">=3.5.0"
 
 [package.extras]
-unicode-backport = ["unicodedata2"]
+unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
@@ -392,11 +392,11 @@ test = ["hypothesis (>=1.11.4,!=3.79.2)", "iso8601", "pretend", "pytest (>=6.2.0
 
 [[package]]
 name = "cssselect"
-version = "1.1.0"
+version = "1.2.0"
 description = "cssselect parses CSS3 Selectors and translates them to XPath 1.0"
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "datasketch"
@@ -413,7 +413,7 @@ scipy = ">=1.0.0"
 [package.extras]
 benchmark = ["SetSimilaritySearch (>=0.1.7)", "matplotlib (>=3.1.2)", "nltk (>=3.4.5)", "pandas (>=0.25.3)", "pyfarmhash (>=0.2.2)", "pyhash (>=0.9.3)", "scikit-learn (>=0.21.3)", "scipy (>=1.3.3)"]
 cassandra = ["cassandra-driver (>=3.20)"]
-experimental-aio = ["aiounittest", "motor"]
+experimental_aio = ["aiounittest", "motor"]
 redis = ["redis (>=2.10.0)"]
 test = ["cassandra-driver (>=3.20)", "coverage", "mock (>=2.0.0)", "mockredispy", "nose (>=1.3.7)", "nose-exclude (>=0.5.0)", "pymongo (>=3.9.0)", "redis (>=2.10.0)"]
 
@@ -1050,7 +1050,7 @@ notebook = ["ipywidgets", "notebook"]
 parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
 test = ["pytest (<7.1)", "pytest-asyncio", "testpath"]
-test-extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.19)", "pandas", "pytest (<7.1)", "pytest-asyncio", "testpath", "trio"]
+test_extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.19)", "pandas", "pytest (<7.1)", "pytest-asyncio", "testpath", "trio"]
 
 [[package]]
 name = "isort"
@@ -1062,8 +1062,8 @@ python-versions = ">=3.6,<4.0"
 
 [package.extras]
 colors = ["colorama (>=0.4.3,<0.5.0)"]
-pipfile-deprecated-finder = ["pipreqs", "requirementslib"]
-requirements-deprecated-finder = ["pip-api", "pipreqs"]
+pipfile_deprecated_finder = ["pipreqs", "requirementslib"]
+requirements_deprecated_finder = ["pip-api", "pipreqs"]
 
 [[package]]
 name = "itypes"
@@ -1152,6 +1152,7 @@ description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
 python-versions = "*"
+develop = false
 
 [package.dependencies]
 argparse = "*"
@@ -1167,6 +1168,12 @@ python-dateutil = "2.8.2"
 requests = ">=2.20.0"
 selenium = "4.0.0.a7"
 tldextract = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/freelawproject/juriscraper.git"
+reference = "add-support-for-notifications-with-multiple-dockets"
+resolved_reference = "a581d499473a1937bc01b57d2ead56672eed6992"
 
 [[package]]
 name = "kdtree"
@@ -1795,7 +1802,7 @@ urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-file"
@@ -1900,7 +1907,7 @@ falcon = ["falcon (>=1.4)"]
 fastapi = ["fastapi (>=0.79.0)"]
 flask = ["blinker (>=1.1)", "flask (>=0.11)"]
 httpx = ["httpx (>=0.16.0)"]
-pure-eval = ["asttokens", "executing", "pure-eval"]
+pure_eval = ["asttokens", "executing", "pure-eval"]
 pyspark = ["pyspark (>=2.4.4)"]
 quart = ["blinker (>=1.1)", "quart (>=0.16.1)"]
 rq = ["rq (>=0.6)"]
@@ -2303,7 +2310,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "017b28eaa320b374ca6f32d8a38409e7ed9862a6aa7209395951b45ba71ddcea"
+content-hash = "e84743f2d8bb7418472ea0dc8a5871478a73befee528e8fa7f3d50e51c1b81cd"
 
 [metadata.files]
 amqp = [
@@ -2552,8 +2559,8 @@ cryptography = [
     {file = "cryptography-36.0.2.tar.gz", hash = "sha256:70f8f4f7bb2ac9f340655cbac89d68c527af5bb4387522a8413e841e3e6628c9"},
 ]
 cssselect = [
-    {file = "cssselect-1.1.0-py2.py3-none-any.whl", hash = "sha256:f612ee47b749c877ebae5bb77035d8f4202c6ad0f0fc1271b3c18ad6c4468ecf"},
-    {file = "cssselect-1.1.0.tar.gz", hash = "sha256:f95f8dedd925fd8f54edb3d2dfb44c190d9d18512377d3c1e2388d16126879bc"},
+    {file = "cssselect-1.2.0-py2.py3-none-any.whl", hash = "sha256:da1885f0c10b60c03ed5eccbb6b68d6eff248d91976fcde348f395d54c9fd35e"},
+    {file = "cssselect-1.2.0.tar.gz", hash = "sha256:666b19839cfaddb9ce9d36bfe4c969132c647b92fc9088c4e23f786b30f1b3dc"},
 ]
 datasketch = [
     {file = "datasketch-1.5.7-py2.py3-none-any.whl", hash = "sha256:9b85866297d42261f145cfa370a76920ede42a8742930fac704114ad791dc74b"},
@@ -2910,10 +2917,7 @@ judge-pics = [
     {file = "judge-pics-2.0.2.tar.gz", hash = "sha256:c3b174766f862d227fb55754808d08527849ab3bbe5efd1d3d76d769a9d4344b"},
     {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
-juriscraper = [
-    {file = "juriscraper-2.5.23-py27-none-any.whl", hash = "sha256:4671a62b264578c9cccb0c1b11ea5abb764fc2aff396d17e13a5672f42739c25"},
-    {file = "juriscraper-2.5.23.tar.gz", hash = "sha256:387c573b6adc26ae6be8936b19ffa6f73e80ec04943e80ec4059bbc5da2243bc"},
-]
+juriscraper = []
 kdtree = [
     {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
     {file = "kdtree-0.16.tar.gz", hash = "sha256:386df6c7816a05e0fab974e3035df944f99ef68b5615f4a416771391e33d7534"},
