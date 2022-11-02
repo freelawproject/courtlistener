@@ -1967,7 +1967,6 @@ class RecapEmailDocketAlerts(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
         cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FB")
-        cls.court_okwd = CourtFactory(id="okwd", jurisdiction="FD")
         cls.court_jpml = CourtFactory(id="jpml", jurisdiction="FS")
         cls.webhook = WebhookFactory(
             user=cls.user_profile.user,
@@ -2008,10 +2007,6 @@ class RecapEmailDocketAlerts(TestCase):
                 encoding="utf-8",
             ) as file_6,
             open(
-                test_dir / "recap_mail_custom_receipt_multi_nef_okwd.json",
-                encoding="utf-8",
-            ) as file_7,
-            open(
                 test_dir / "recap_mail_custom_receipt_multi_nef_jpml.json",
                 encoding="utf-8",
             ) as file_jpml,
@@ -2022,7 +2017,6 @@ class RecapEmailDocketAlerts(TestCase):
             recap_mail_receipt_4 = json.load(file_4)
             recap_mail_receipt_nda = json.load(file_5)
             recap_mail_receipt_no_re_user = json.load(file_6)
-            recap_mail_receipt_multi_nef = json.load(file_7)
             recap_mail_receipt_multi_nef_jpml = json.load(file_jpml)
 
         cls.data = {
@@ -2056,13 +2050,6 @@ class RecapEmailDocketAlerts(TestCase):
             "mail": recap_mail_receipt_no_re_user["mail"],
             "receipt": recap_mail_receipt_no_re_user["receipt"],
         }
-
-        cls.data_multi_nef = {
-            "court": cls.court_okwd.id,
-            "mail": recap_mail_receipt_multi_nef["mail"],
-            "receipt": recap_mail_receipt_multi_nef["receipt"],
-        }
-
         cls.data_multi_jpml = {
             "court": cls.court_jpml.id,
             "mail": recap_mail_receipt_multi_nef_jpml["mail"],
