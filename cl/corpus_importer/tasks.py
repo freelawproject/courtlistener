@@ -634,7 +634,7 @@ def get_and_process_free_pdf(
 
     pdf_bytes = None
     if r:
-        pdf_bytes = force_bytes(r.content)
+        pdf_bytes = r.content
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
         self,
@@ -1813,7 +1813,7 @@ def get_pacer_doc_by_rd(
 
     pdf_bytes = None
     if r:
-        pdf_bytes = force_bytes(r.content)
+        pdf_bytes = r.content
     success, msg = update_rd_metadata(
         self,
         rd_pk,
@@ -1922,7 +1922,7 @@ def get_pacer_doc_by_rd_and_description(
 
     pdf_bytes = None
     if r:
-        pdf_bytes = force_bytes(r.content)
+        pdf_bytes = r.content
     success, msg = update_rd_metadata(
         self,
         rd_pk,

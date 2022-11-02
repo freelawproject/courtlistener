@@ -1196,7 +1196,7 @@ def fetch_pacer_doc_by_rd(
 
     pdf_bytes = None
     if r:
-        pdf_bytes = force_bytes(r.content)
+        pdf_bytes = r.content
     success, msg = update_rd_metadata(
         self,
         rd_pk,
