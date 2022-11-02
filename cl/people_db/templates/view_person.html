@@ -221,7 +221,7 @@ $(document).ready(function(){
             {% if person.religion %}
             <p>
               <span class="meta-data-header">Religion:</span>
-              <span class="meta-data-value">{{ person.religion }}</span>
+              <span class="meta-data-value">{{ person.get_religion_display }}</span>
             </p>
             {% endif %}
           </div>
