@@ -5,6 +5,7 @@
 # These support meta robots and x-robots-tag or are otherwise harmless (DDG)
 # Crawl everything except a few explicit blocks
 User-agent: Googlebot
+# Blocking robots.txt makes it not get a search snippet in Google results.
 Disallow: /robots.txt
 Disallow: /assets/
 Disallow: /api/rest/v1/
