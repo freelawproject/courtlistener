@@ -120,7 +120,7 @@ $(document).ready(function(){
           {% endif %}
         </h2>
         <span class="small gray top">
-          {% if person.fjc_id %},  FJC ID:
+          {% if person.fjc_id %}FJC ID:
             {% filter lower %}
             {% if person.name_middle %}
               {% if person.name_suffix %}
@@ -556,20 +556,24 @@ $(document).ready(function(){
     {% endif %}
 
     {% if disclosures %}
-      <h3 class="bottom">
-        <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
-      </h3>
-      <p class="gray">Annual financial disclosure records filed by Federal judges, magistrates and clerks of the court.</p>
-      <hr class="top">
-      <div class="row">
-        {% for disclosure in disclosures %}
-          <div class="col-xs-3">
-            <h4 class="text">
-              <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
-            </h4>
-          </div>
-        {% endfor %}
+    <div class="row v-offset-below-3">
+      <div class="col-xs-12">
+        <h3 id="disclosures">
+          <i class="gray fa fa-file-text-o"></i> Financial Disclosures ({{ disclosures|length }})
+        </h3>
+        <p class="gray">Annual financial disclosure records filed by Federal judges, magistrates and clerks of the court.</p>
+        <hr class="top">
+        <div class="row">
+          {% for disclosure in disclosures %}
+            <div class="col-xs-3">
+              <h4 class="text">
+                <a href="{% url 'financial_disclosures_viewer' person.id disclosure.id person.slug %}">{{ disclosure.year }}</a>
+              </h4>
+            </div>
+          {% endfor %}
+        </div>
       </div>
+    </div>
     {% endif %}
 
     {% if authored_opinions.result.numFound > 0 %}
@@ -657,33 +661,35 @@ $(document).ready(function(){
         </h3>
         <hr class="top">
 
-        {% for o in recap_cases_assigned %}
+        {% for result in recap_cases_assigned %}
         <div class="row">
-        <div class="col-xs-12">
+          <div class="col-xs-12">
           <article class="v-offset-below-2">
-          <h4 class="bottom">
-            <a href="{{ o.docket_absolute_url }}">
-              {{ o.doclist.docs.0.caseName|safe|v_wrapper }}
-              ({% if o.doclist.docs.0.court_id != 'scotus' %}{{ o.doclist.docs.0.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ o.doclist.docs.0.dateFiled|date:"Y" }})
-            </a>
-          </h4>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Date Filed:</span>
-            <time class="meta-data-value"
-                datetime="{{ o.doclist.docs.0.dateFiled|date:'Y-m-d' }}">
-              {% if o.doclist.docs.0.dateFiled %}
-                {{ o.doclist.docs.0.dateFiled|date:"F jS, Y" }}
-              {% else %}
-                Unknown Date
-              {% endif %}
-            </time>
-          </div>
-          {% if o.doclist.docs.0.docketNumber %}
+          {% with doc0=result.doclist.docs.0 %}
+            <h4 class="bottom">
+              <a href="{{ doc0.docket_absolute_url }}">
+                {{ doc0.caseName|safe|v_wrapper }}
+                ({% if doc0.court_id != 'scotus' %}{{ doc0.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ doc0.dateFiled|date:"Y" }})
+              </a>
+            </h4>
             <div class="inline nowrap">
-              <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value">{{ o.doclist.docs.0.docketNumber|safe }}</span>
+              <span class="meta-data-header">Date Filed:</span>
+              <time class="meta-data-value"
+                  datetime="{{ doc0.dateFiled|date:'Y-m-d' }}">
+                {% if doc0.dateFiled %}
+                  {{ doc0.dateFiled|date:"F jS, Y" }}
+                {% else %}
+                  Unknown Date
+                {% endif %}
+              </time>
             </div>
-          {% endif %}
+            {% if doc0.docketNumber %}
+              <div class="inline nowrap">
+                <span class="meta-data-header">Docket Number:</span>
+                <span class="meta-data-value">{{ doc0.docketNumber|safe }}</span>
+              </div>
+            {% endif %}
+          {% endwith %}
           </article>
         </div>
         </div>
