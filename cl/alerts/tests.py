@@ -7,6 +7,7 @@ from django.core import mail
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from requests import Response
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -93,12 +94,15 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(self.alert.rate, new_rate)
 
 
-class MockResponse:
+class MockResponse(Response):
     """Mock a Request Response"""
 
-    def __init__(self, text, status_code):
-        self.text = text
+    def __init__(self, status_code, content=None, reason=None, url=None):
         self.status_code = status_code
+        self._content = content
+        self.reason = reason
+        self.url = url
+        self.encoding = None
 
 
 class DocketAlertTest(TestCase):
@@ -162,8 +166,10 @@ class DocketAlertTest(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(
+            200, content=b"{'message': 'OK'}"
+        ),
     )
     def test_triggering_docket_webhook(self, mock_post) -> None:
         """Does the docket alert trigger the DocketAlert Webhook?"""

@@ -1,13 +1,15 @@
 import logging
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Set, Union
 
+import requests
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.db.models import F
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -15,14 +17,17 @@ from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from ipware import get_client_ip
+from requests import Response
 from rest_framework import serializers
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
+from rest_framework.renderers import JSONRenderer
 from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent
 from cl.lib.redis_utils import make_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
@@ -540,3 +545,123 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     results = pipe.execute()
 
     return results[0] / results[1]
+
+
+def get_next_webhook_retry_date(retry_counter: int) -> datetime:
+    """Returns the next retry datetime to schedule a webhook retry based on its
+    current retry counter.
+
+    The next retry date is computed based to meet an exponential backoff with a
+    starting multiplier of three.
+
+      Retry counter | New Delay
+      -------------+------------
+            1      |     0:03
+            2      |     0:09
+            3      |     0:27
+            4      |     1:21
+            5      |     4:03
+            6      |     12:09
+            7      |     36:27
+
+
+    The total elapsed time might vary for each webhook event depending on when
+    the retry is executed since the retry method is going to be executed every
+    minute. On average the total elapsed time in the 7th retry would be 54
+    hours and 39 minutes.
+
+    :param retry_counter: The current retry_counter used to compute the next
+    retry date.
+    :return datatime: The next retry datetime.
+    """
+
+    INITIAL_TIME = 3  # minutes
+    # Update new_next_retry_date exponentially
+    new_next_retry_date = now() + timedelta(
+        minutes=pow(INITIAL_TIME, retry_counter)
+    )
+    return new_next_retry_date
+
+
+def update_webhook_event_after_request(
+    webhook_event: WebhookEvent, response: Response = None, error: str = None
+) -> None:
+    """Update the webhook event after sending the POST request. If the webhook
+    event fails, increase the retry counter, next retry date and increase its
+    parent webhook failure count. If the webhook event reaches the max retry
+    counter marks it as Failed. If there is no error marks it as Successful.
+
+    :param webhook_event: The WebhookEvent to update.
+    :param response: Optional in case we receive a requests Response object, to
+    update the WebhookEvent accordingly.
+    :param error: Optional, if we don't receive a request Response we would
+    receive an error to log it.
+    :return: None
+    """
+
+    WEBHOOK_MAX_RETRY_COUNTER = 7
+
+    failed_request = False
+    if response is not None:
+        webhook_event.status_code = response.status_code
+        webhook_event.response = response.text
+        # If the response status code is not between 200 and 400, it's
+        # considered a failed attempt and will be enqueued for retry.
+        if not response.ok:
+            failed_request = True
+    if failed_request or error:
+        webhook = webhook_event.webhook
+        webhook.failure_count = F("failure_count") + 1
+        # Avoid notify to admins in cl.users.signals webhook_created_or_updated
+        webhook.save(update_fields=["failure_count"])
+        if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
+            # If the webhook has reached the max retry counter, mark as failed
+            webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
+            webhook_event.save()
+            return
+
+        webhook_event.retry_counter = F("retry_counter") + 1
+        webhook_event.save()
+        webhook_event.refresh_from_db()
+        webhook_event.next_retry_date = get_next_webhook_retry_date(
+            webhook_event.retry_counter
+        )
+        webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        webhook_event.error_message = error
+    else:
+        webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
+    webhook_event.save()
+
+
+def send_webhook_event(
+    webhook_event: WebhookEvent, content_str: str = None
+) -> None:
+    """Send the webhook POST request.
+
+    :param webhook_event: An WebhookEvent to send.
+    :param content_str: Optional, the str JSON content to send the first time
+    the webhook is sent.
+    """
+    headers = {
+        "Content-type": "application/json",
+        "Idempotency-Key": str(webhook_event.event_id),
+    }
+    if content_str:
+        json_str = content_str
+    else:
+        renderer = JSONRenderer()
+        json_str = renderer.render(
+            webhook_event.content,
+            accepted_media_type="application/json;",
+        ).decode()
+    try:
+        response = requests.post(
+            webhook_event.webhook.url,
+            data=json_str,
+            timeout=5,
+            headers=headers,
+        )
+        update_webhook_event_after_request(webhook_event, response)
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        error_str = f"{type(exc).__name__}: {exc}"
+        update_webhook_event_after_request(webhook_event, error=error_str)

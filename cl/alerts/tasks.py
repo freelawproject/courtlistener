@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Tuple, Union, cast
 
-import requests
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
@@ -13,6 +11,7 @@ from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.models import DocketAlert
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.utils import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -39,6 +38,7 @@ class DocketAlertRecipient:
     secret_key: str
     auto_subscribe: bool
     first_email: bool
+    user_pk: int
 
 
 def get_docket_alert_recipients(
@@ -74,6 +74,7 @@ def get_docket_alert_recipients(
                 secret_key=da.secret_key,
                 auto_subscribe=False,
                 first_email=False,
+                user_pk=da.user.pk,
             )
             da_recipients_list.append(dar)
 
@@ -113,6 +114,7 @@ def get_docket_alert_recipients(
                 secret_key=docket_alert.secret_key,
                 auto_subscribe=user_profile.auto_subscribe,
                 first_email=True,
+                user_pk=user_profile.user.pk,
             )
             da_recipients_list.append(dar)
     return da_recipients_list, recap_email_user_does_not_exist_list
@@ -265,7 +267,7 @@ def send_alert_and_webhook(
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send the docket to webhook
-    send_docket_alert_webhooks.delay(d_pk, since, new_des)
+    send_docket_alert_webhooks.delay(new_des, da_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
@@ -337,35 +339,30 @@ def send_unsubscription_confirmation(
 
 @app.task()
 def send_docket_alert_webhooks(
-    d_pk: int,
-    since: datetime,
-    docket_entries: list[DocketEntry] = None,
+    docket_entries: list[DocketEntry],
+    da_recipients: list[DocketAlertRecipient],
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s)
 
-    :param d_pk: The Docket primary key
-    :param since: Start time for querying the docket entries
-    :param docket_entries: A list of docket entries used if we need to send a
-    webhook for a recap.email user independently
+    :param docket_entries: The new docket entries to send.
+    :param da_recipients: A list of DocketAlertRecipients objects to send the
+    webhook to.
     :return: None
     """
 
-    if docket_entries is None:
-        docket_entries = DocketEntry.objects.filter(
-            date_created__gte=since, docket_id=d_pk
-        )
-    if len(docket_entries) == 0:
-        # No new docket entries.
-        return
-
-    webhook_recipients = User.objects.filter(
-        docket_alerts__docket_id=d_pk,
-        docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
-    ).distinct()
-
+    # Only send the webhook event to users for whom this isn't their first
+    # notification for the case or if it's, only sends it if auto_subscribe is
+    # turned on.
+    webhook_recipients = [
+        da_re.user_pk
+        for da_re in da_recipients
+        if da_re.first_email is True
+        and da_re.auto_subscribe is True
+        or da_re.first_email is False
+    ]
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
-        user__in=webhook_recipients,
+        user_id__in=webhook_recipients,
         enabled=True,
     )
 
@@ -388,19 +385,12 @@ def send_docket_alert_webhooks(
             post_content,
             accepted_media_type="application/json;",
         ).decode()
-        headers = {"Content-type": "application/json"}
-        response = requests.post(
-            webhook.url, data=json_str, timeout=2, headers=headers
-        )
-        WebhookEvent.objects.create(
+
+        webhook_event = WebhookEvent.objects.create(
             webhook=webhook,
-            status_code=response.status_code,
             content=post_content,
-            response=response.text,
         )
-        if not response.ok:
-            webhook.failure_count = webhook.failure_count + 1
-            webhook.save()
+        send_webhook_event(webhook_event, json_str)
 
 
 def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:

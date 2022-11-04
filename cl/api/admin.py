@@ -27,9 +27,13 @@ class WebhookAdmin(admin.ModelAdmin):
 
 @admin.register(WebhookEvent)
 class WebhookEventAdmin(admin.ModelAdmin):
+    raw_id_fields = ("webhook",)
     list_display = (
         "__str__",
         "webhook",
+        "date_created",
+        "next_retry_date",
+        "event_status",
         "status_code",
     )
     list_filter = ("status_code",)

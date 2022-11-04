@@ -1,3 +1,4 @@
+import uuid
 from http import HTTPStatus
 
 from django.contrib.auth.models import User
@@ -44,8 +45,28 @@ class Webhook(AbstractDateTimeModel):
         default=0,
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["enabled"]),
+        ]
+
     def __str__(self) -> str:
         return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
+
+
+class WEBHOOK_EVENT_STATUS(object):
+    """WebhookEvent Status Types"""
+
+    IN_PROGRESS = 0
+    ENQUEUED_RETRY = 1
+    SUCCESSFUL = 2
+    FAILED = 3
+    STATUS = (
+        (IN_PROGRESS, "Delivery in progress"),
+        (ENQUEUED_RETRY, "Enqueued for retry"),
+        (SUCCESSFUL, "Delivered successfully"),
+        (FAILED, "Failed"),
+    )
 
 
 class WebhookEvent(AbstractDateTimeModel):
@@ -55,17 +76,54 @@ class WebhookEvent(AbstractDateTimeModel):
         related_name="webhook_events",
         on_delete=models.CASCADE,
     )
-    status_code = models.IntegerField(
-        help_text="The HTTP status code received when the webhook event was "
-        "created.",
-        choices=HttpStatusCodes.choices,
+    event_id = models.UUIDField(
+        help_text="Unique event identifier",
+        default=uuid.uuid4,
+        editable=False,
+    )
+    event_status = models.SmallIntegerField(
+        help_text="The webhook event status.",
+        default=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+        choices=WEBHOOK_EVENT_STATUS.STATUS,
     )
     content = models.JSONField(  # type: ignore
-        help_text="The content of the outgoing body in the POST request."
+        help_text="The content of the outgoing body in the POST request.",
+        blank=True,
+        null=True,
+    )
+    next_retry_date = models.DateTimeField(
+        help_text="The scheduled datetime to retry the webhook event.",
+        blank=True,
+        null=True,
+    )
+    error_message = models.TextField(
+        help_text="The error raised by a failed POST request.",
+        blank=True,
+        null=True,
     )
     response = models.TextField(
-        help_text="The response received from the POST request."
+        help_text="The response received from the POST request.",
+        blank=True,
+        null=True,
     )
+    retry_counter = models.SmallIntegerField(
+        help_text="The retry counter for the exponential backoff event.",
+        default=0,
+    )
+    status_code = models.IntegerField(
+        help_text="The HTTP status code received from the POST request.",
+        choices=HttpStatusCodes.choices,
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["next_retry_date", "event_status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Webhook Event: {self.event_id}"
 
     @property
     def event_type(self):

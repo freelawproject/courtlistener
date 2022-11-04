@@ -1,10 +1,11 @@
 import json
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
 
+import time_machine
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
@@ -13,8 +14,9 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.urls import reverse
+from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
-from requests import HTTPError
+from requests import ConnectionError, HTTPError, Response
 from rest_framework.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -25,8 +27,14 @@ from rest_framework.test import APIClient
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
-from cl.api.factories import WebhookFactory
+from cl.api.factories import (
+    WEBHOOK_EVENT_STATUS,
+    WebhookEventFactory,
+    WebhookFactory,
+)
+from cl.api.management.commands.cl_retry_webhooks import retry_webhook_events
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.utils import get_next_webhook_retry_date
 from cl.lib.pacer import is_pacer_court_accessible
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import make_redis_interface
@@ -612,14 +620,9 @@ def mock_bucket_open(message_id, r, read_file=False):
     recap.email notification fixture.
     """
     test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
-
-    if read_file and r == "r":
-        with open(test_dir / message_id, encoding="utf-8") as file:
-            return file.read()
-    if read_file and r == "rb":
+    if read_file:
         with open(test_dir / message_id, "rb") as file:
             return file.read()
-
     recap_mail_example = open(test_dir / message_id, "rb")
     return recap_mail_example
 
@@ -1936,13 +1939,15 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
-class MockResponse:
+class MockResponse(Response):
     """Mock a Request Response"""
 
-    def __init__(self, text, status_code, content=None):
-        self.text = text
+    def __init__(self, status_code, content=None, reason=None, url=None):
         self.status_code = status_code
-        self.content = content
+        self._content = content
+        self.reason = reason
+        self.url = url
+        self.encoding = None
 
 
 @mock.patch(
@@ -2086,16 +2091,16 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_new_recap_email_case_auto_subscription(
         self,
         mock_bucket_open,
         mock_cookies,
-        mock_post,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies that if a new recap.email notification comes in
         (first time) and the user has the auto-subscribe option enabled, a new
@@ -2145,12 +2150,17 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_new_recap_email_case_auto_subscription_prev_user(
         self,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies that if two users with the auto-subscribe option
         enabled are properly subscribed for a case when two recap.email
@@ -2173,6 +2183,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document.count(), 1)
         message_sent_2 = mail.outbox[0]
         self.assertEqual(message_sent_2.to, [self.recipient_user_2.user.email])
+
+        # One webhook should be triggered
+        webhook_triggered = WebhookEvent.objects.filter()
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(
+            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        )
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
@@ -2198,21 +2216,35 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
         self.assertEqual(len(mail.outbox), 3)
 
+        # Two more webhooks should be triggered, one for testing_2@recap.email
+        # and one for testing_1@recap.email
+        webhooks_triggered = WebhookEvent.objects.filter()
+        self.assertEqual(webhooks_triggered.count(), 3)
+
+        for webhook_sent in webhooks_triggered:
+            self.assertEqual(
+                webhook_sent.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            )
+        webhook_user_2 = WebhookEvent.objects.filter(webhook=self.webhook_2)
+        self.assertEqual(webhook_user_2.count(), 2)
+        webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
+        self.assertEqual(webhook_user_1.count(), 1)
+
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_new_recap_email_case_no_auto_subscription(
         self,
         mock_bucket_open,
         mock_cookies,
-        mock_post,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies that if a new recap.email notification comes in
         and the user has auto-subscribe option disabled an Unsubscription
@@ -2250,7 +2282,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message.subject)
 
         # No webhook should be triggered
-        webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
+        webhook_triggered = WebhookEvent.objects.all()
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 0)
 
@@ -2258,12 +2290,17 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test checks if a new recap.email (first time) notification
         comes in and user has auto-subscribe option disabled, an unsubscription
@@ -2281,6 +2318,14 @@ class RecapEmailDocketAlerts(TestCase):
         message_sent = mail.outbox[0]
         self.assertIn("1 New Docket Entry for", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
+
+        # One webhook should be triggered for testing_2@recap.email
+        webhook_triggered = WebhookEvent.objects.filter()
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(
+            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        )
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option disabled
@@ -2312,11 +2357,23 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn("[Sign-Up Needed]:", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
+        # One more webhook should be triggered, one for testing_2@recap.email
+        # none for testing_1@recap.email
+        webhooks_triggered = WebhookEvent.objects.filter()
+        self.assertEqual(webhooks_triggered.count(), 2)
+        for webhook_sent in webhooks_triggered:
+            self.assertEqual(
+                webhook_sent.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            )
+        webhook_user_2 = WebhookEvent.objects.filter(webhook=self.webhook_2)
+        self.assertEqual(webhook_user_2.count(), 2)
+        webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
+        self.assertEqual(webhook_user_1.count(), 0)
+
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
-                "Testing",
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
             ),
@@ -2359,8 +2416,8 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_receive_same_recap_email_notification_different_users(
         self,
@@ -2368,7 +2425,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
-        mock_post,
+        mock_webhook_post,
     ):
         """This test verifies that if we receive two notifications for the same
         case/document but different users. The first user has auto-subscribe
@@ -2448,12 +2505,17 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_new_recap_email_subscribe_by_email_link(
         self,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies if a recap.email user with the auto-subscribe
         option disabled can successfully subscribe to a case from the
@@ -2477,6 +2539,11 @@ class RecapEmailDocketAlerts(TestCase):
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
         self.assertEqual(docket_alert.count(), 1)
+
+        # No webhook should be triggered for testing_1@recap.email
+        webhook_triggered = WebhookEvent.objects.filter()
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 0)
 
         # Authenticate user to avoid the subscription confirmation form
         self.client.login(
@@ -2502,12 +2569,17 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_new_recap_email_unsubscribe_by_email_link(
         self,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies if a recap.email user can successfully
         unsubscribe to a case from the unsubscription link.
@@ -2533,6 +2605,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         message_sent = mail.outbox[0]
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
+
+        # One webhook should be triggered for testing_1@recap.email
+        webhook_triggered = WebhookEvent.objects.filter()
+        # Does the webhook was triggered?
+        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(
+            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+        )
 
         # Authenticate user to avoid the unsubscription confirmation form
         self.client.login(
@@ -2564,9 +2644,17 @@ class RecapEmailDocketAlerts(TestCase):
         # No new notification for the same case should go out
         self.assertEqual(len(mail.outbox), 2)
 
+        # No more webhooks should be triggered
+        webhook_triggered = WebhookEvent.objects.filter()
+        self.assertEqual(webhook_triggered.count(), 1)
+
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_new_recap_email_alerts_integration(
         self,
@@ -2574,6 +2662,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies if a user can successfully unsubscribe to a case
         from the email unsubscription link, the user won't longer receive more
@@ -2666,12 +2755,17 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_docket_alert_toggle_confirmation_fails(
         self,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
     ):
         """This test verifies if the unsubscription/subscription fails if a bot
         tries to unsubscribe/subscribe from/to a docket alert.
@@ -2736,13 +2830,13 @@ class RecapEmailDocketAlerts(TestCase):
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     @mock.patch(
         "cl.recap.tasks.requests.get",
         side_effect=lambda *args, **kwargs: MockResponse(
-            mock_bucket_open("nyed_123019137279.html", "r", True), 200
+            200, mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
     def test_new_recap_email_with_attachments(
@@ -2751,7 +2845,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookies,
         mock_pacer_court_accessible,
         mock_download_pacer_pdf_by_rd,
-        mock_post,
+        mock_webhook_post,
         mock_att_response,
     ):
         """This test verifies that if a recap.email notification with
@@ -2830,7 +2924,6 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
-                "OK",
                 200,
                 mock_bucket_open(
                     "gov.uscourts.ca1.12-2209.00106475093.0.pdf", "rb", True
@@ -2839,6 +2932,10 @@ class RecapEmailDocketAlerts(TestCase):
             "OK",
         ),
     )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
+    )
     def test_extract_pdf_for_recap_email(
         self,
         mock_bucket_open,
@@ -2846,6 +2943,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookies,
         mock_cookie,
         mock_download_pdf,
+        mock_webhook_post,
     ):
         """This test checks if the content extraction of a PDF obtained from
         recap.email is successfully performed..
@@ -2868,13 +2966,17 @@ class RecapEmailDocketAlerts(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b""),
+            MockResponse(200, b""),
             "OK",
         ),
     )
     @mock.patch(
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "009033568259",
+    )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_new_nda_recap_email(
         self,
@@ -2883,6 +2985,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_pacer_court_accessible,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
+        mock_webhook_post,
     ):
         """This test verifies that if a new NDA recap.email notification comes
         in we can parse it properly.
@@ -2907,13 +3010,13 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(docket.docket_number, "21-16499")
 
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b""),
+            MockResponse(200, b""),
             "OK",
         ),
     )
@@ -2926,7 +3029,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
-        mock_post,
+        mock_webhook_post,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
@@ -2972,13 +3075,13 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b""),
+            MockResponse(200, b""),
             "OK",
         ),
     )
@@ -2991,7 +3094,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
-        mock_post,
+        mock_webhook_post,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
@@ -3040,15 +3143,19 @@ class RecapEmailDocketAlerts(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b"Hello World"),
+            MockResponse(200, b"Hello World"),
             "OK",
         ),
     )
     @mock.patch(
         "cl.recap.tasks.requests.get",
         side_effect=lambda *args, **kwargs: MockResponse(
-            mock_bucket_open("jpml_85001321035.html", "r", True), 200
+            200, mock_bucket_open("jpml_85001321035.html", "r", True)
         ),
+    )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200),
     )
     def test_multiple_docket_nef(
         self,
@@ -3058,6 +3165,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_cookie,
         mock_download_pdf,
         mock_att_response,
+        mock_webhook_response,
     ):
         """This test verifies that if a new multi docket nef recap.email
         notification comes in we can parse it properly. Send docket alerts and
@@ -3119,6 +3227,10 @@ class RecapEmailDocketAlerts(TestCase):
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
         self.assertEqual(webhook_triggered.count(), 3)
+        for webhook_event in webhook_triggered:
+            self.assertEqual(
+                webhook_event.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            )
 
         webhook_entry_numbers = [
             webhook.content["results"][0]["entry_number"]
@@ -3279,7 +3391,7 @@ class GetAndCopyRecapAttachments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b"Hello World from magic"),
+            MockResponse(200, b"Hello World from magic"),
             "OK",
         ),
     )
@@ -3515,7 +3627,6 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
-                "Testing",
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
             ),
@@ -3551,7 +3662,6 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
-                "Testing",
                 200,
                 mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
@@ -3596,7 +3706,6 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
             MockResponse(
-                "Testing",
                 200,
                 mock_bucket_open(
                     "gov.uscourts.ca8.17-2543.00803263743.0.pdf", "rb", True
@@ -3639,7 +3748,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b""),
+            MockResponse(200, b""),
             "OK",
         ),
     )
@@ -3675,7 +3784,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (
-            MockResponse("Testing", 200, b""),
+            MockResponse(200, b""),
             "OK",
         ),
     )
@@ -3785,3 +3894,556 @@ class CheckCourtConnectivityTest(TestCase):
     def test_is_pacer_court_accessible_fails(self, mock_check_court):
         court_status = is_pacer_court_accessible("alnb")
         self.assertEqual(court_status, False)
+
+
+@mock.patch(
+    "cl.recap.tasks.RecapEmailSESStorage.open",
+    side_effect=mock_bucket_open,
+)
+@mock.patch(
+    "cl.recap.tasks.get_or_cache_pacer_cookies",
+    side_effect=lambda x, y, z: None,
+)
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
+class WebhooksRetries(TestCase):
+    """Test WebhookEvents retries"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.court_nda = CourtFactory(id="ca9", jurisdiction="F")
+        cls.court_nyed = CourtFactory(id="nyed", jurisdiction="FB")
+        cls.webhook = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=False,
+        )
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
+        with (
+            open(
+                test_dir / "recap_mail_custom_receipt_4.json",
+                encoding="utf-8",
+            ) as file_4,
+            open(
+                test_dir / "recap_mail_custom_receipt_nda.json",
+                encoding="utf-8",
+            ) as file_5,
+        ):
+            recap_mail_receipt_4 = json.load(file_4)
+            recap_mail_receipt_nda = json.load(file_5)
+
+        cls.data_nef_att = {
+            "court": cls.court_nyed.id,
+            "mail": recap_mail_receipt_4["mail"],
+            "receipt": recap_mail_receipt_4["receipt"],
+        }
+        cls.data_nda = {
+            "court": cls.court_nda.id,
+            "mail": recap_mail_receipt_nda["mail"],
+            "receipt": recap_mail_receipt_nda["receipt"],
+        }
+
+    def setUp(self) -> None:
+        self.client = APIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v3/recap-email/"
+
+        recipient_user = self.user_profile
+        recipient_user.user.email = "testing_1@mail.com"
+        recipient_user.user.password = make_password("password")
+        recipient_user.user.save()
+        recipient_user.recap_email = "testing_1@recap.email"
+        recipient_user.auto_subscribe = True
+        recipient_user.save()
+        self.recipient_user = recipient_user
+
+    def test_get_next_webhook_retry_date(
+        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+    ):
+        """Verifies that the WebhookEvent next retry date is computed properly
+        based on the exponential backoff retry policy defined in cl.api.utils
+        get_next_webhook_retry_date.
+        """
+        fake_now = now()
+        with time_machine.travel(fake_now, tick=False):
+            # Elapsed time 0:03
+            retry_counter = 1
+            expected_next_retry_date = fake_now + timedelta(minutes=3)
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 0:12
+            retry_counter = 2
+            expected_next_retry_date = fake_now + timedelta(minutes=12)
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 0:39
+            retry_counter = 3
+            expected_next_retry_date = fake_now + timedelta(minutes=39)
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 2:00
+            retry_counter = 4
+            expected_next_retry_date = fake_now + timedelta(hours=2)
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 6:03
+            retry_counter = 5
+            expected_next_retry_date = fake_now + timedelta(hours=6, minutes=3)
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 18:12
+            retry_counter = 6
+            expected_next_retry_date = fake_now + timedelta(
+                hours=18, minutes=12
+            )
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+        with time_machine.travel(next_retry_date, tick=False):
+            # Elapsed time 54:39
+            retry_counter = 7
+            expected_next_retry_date = fake_now + timedelta(
+                hours=54, minutes=39
+            )
+            next_retry_date = get_next_webhook_retry_date(retry_counter)
+            self.assertEqual(next_retry_date, expected_next_retry_date)
+
+    def test_retry_webhook_disabled(
+        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+    ):
+        """This test checks if WebhookEvent that its parent Webhook is disabled
+        it won't be retried.
+        """
+        fake_now = now()
+        webhook_e1 = WebhookEventFactory(
+            webhook=self.webhook_disabled,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, content=b"{'message': 'OK'}"
+            ),
+        ):
+            # Try to retry on the exact time, 3 minutes later.
+            next_retry_date = fake_now + timedelta(minutes=3)
+            with time_machine.travel(next_retry_date, tick=False):
+                with mock.patch("cl.api.utils.send_webhook_event"):
+                    # webhook_e1 shouldn't be retried since its parent webhook
+                    # is disabled.
+                    retried_webhooks = retry_webhook_events()
+                    self.assertEqual(retried_webhooks, 0)
+
+    def test_retry_webhook_events(
+        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+    ):
+        """This test checks if only a WebhookEvent in ENQUEUED_RETRY status and
+        that its next_retry_date is equal to or lower than now can be retried.
+        """
+        fake_now = now()
+        webhook_e1 = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+        webhook_e2 = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_2'}",
+            event_status=WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+        webhook_e3 = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_3'}",
+            event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+        webhook_e4 = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_4'}",
+            event_status=WEBHOOK_EVENT_STATUS.FAILED,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, content=b"{'message': 'OK'}"
+            ),
+        ):
+            next_retry_date = fake_now + timedelta(minutes=1)
+            with time_machine.travel(next_retry_date, tick=False):
+                with mock.patch(
+                    "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
+                ):
+                    webhooks_to_retry = retry_webhook_events()
+                    # No webhooks events should be retried since it's no time.
+                    self.assertEqual(webhooks_to_retry, 0)
+
+            # Try to retry on the exact time, 3 minutes later.
+            next_retry_date = fake_now + timedelta(minutes=3)
+            with time_machine.travel(next_retry_date, tick=False):
+                with mock.patch(
+                    "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
+                ):
+                    # Only webhook_e1 should be retried.
+                    webhooks_to_retry = retry_webhook_events()
+                    self.assertEqual(webhooks_to_retry, 1)
+
+            # Try to retry 5 minutes later.
+            next_retry_date = fake_now + timedelta(minutes=5)
+            with time_machine.travel(next_retry_date, tick=False):
+                with mock.patch(
+                    "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
+                ):
+                    # Only webhook_e1 should be retried.
+                    webhooks_to_retry = retry_webhook_events()
+                    self.assertEqual(webhooks_to_retry, 1)
+
+            # Try to retry 10 hours later.
+            next_retry_date = fake_now + timedelta(hours=10)
+            with time_machine.travel(next_retry_date, tick=False):
+                with mock.patch(
+                    "cl.api.management.commands.cl_retry_webhooks.send_webhook_event"
+                ):
+                    webhooks_to_retry = retry_webhook_events()
+                    self.assertEqual(webhooks_to_retry, 1)
+
+            webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
+            # Retry without mocking send_webhook_event
+            next_retry_date = fake_now + timedelta(minutes=10)
+            with time_machine.travel(next_retry_date, tick=False):
+                webhooks_to_retry = retry_webhook_events()
+                self.assertEqual(webhooks_to_retry, 1)
+                self.assertEqual(
+                    webhook_e1_compare[0].event_status,
+                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                )
+                self.assertEqual(webhook_e1_compare[0].status_code, 200)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    def test_update_webhook_after_http_error(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+    ):
+        """This test verifies if a WebhookEvent is properly enqueued for retry
+        after receiving an HttpResponse with a failure status code.
+        """
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                500,
+                content=b"{'message': 'Bad request'}",
+                reason="500 Server Error",
+                url="https://example.com",
+            ),
+        ):
+            fake_now_0 = now()
+            with time_machine.travel(fake_now_0, tick=False):
+                # Trigger a new recap.email notification from testing_1@recap.email
+                # auto-subscription option enabled
+                self.client.post(self.path, self.data_nda, format="json")
+
+                # Webhook should be triggered
+                webhook_triggered = WebhookEvent.objects.filter(
+                    webhook=self.webhook
+                )
+                # Does the webhook was triggered?
+                self.assertEqual(webhook_triggered.count(), 1)
+                content = webhook_triggered.first().content
+                # Compare the content of the webhook to the recap document
+                pacer_doc_id = content["results"][0]["recap_documents"][0][
+                    "pacer_doc_id"
+                ]
+                recap_document = RECAPDocument.objects.all()
+                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+
+                # Does the Idempotency-Key is generated
+                self.assertNotEqual(webhook_triggered[0].event_id, "")
+                self.assertEqual(webhook_triggered[0].status_code, 500)
+                self.assertEqual(webhook_triggered[0].error_message, None)
+
+                # Is the webhook event updated for retry?
+                first_retry_time = fake_now_0 + timedelta(minutes=3)
+                self.assertEqual(
+                    webhook_triggered[0].next_retry_date, first_retry_time
+                )
+                self.assertEqual(
+                    webhook_triggered[0].event_status,
+                    WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                )
+                self.assertEqual(webhook_triggered[0].retry_counter, 1)
+                self.assertEqual(
+                    webhook_triggered[0].response, "{'message': 'Bad request'}"
+                )
+                self.assertEqual(webhook_triggered[0].webhook.failure_count, 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    def test_update_webhook_after_network_error(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+    ):
+        """This test verifies if a WebhookEvent is properly enqueued for retry
+        after a network failure when trying to send the webhook.
+        """
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: exec(
+                "raise ConnectionError('Connection Error')"
+            ),
+        ):
+            fake_now_0 = now()
+            with time_machine.travel(fake_now_0, tick=False):
+                # Trigger a new recap.email notification from testing_1@recap.email
+                # auto-subscription option enabled
+                self.client.post(self.path, self.data_nda, format="json")
+
+                # Webhook should be triggered
+                webhook_triggered = WebhookEvent.objects.filter(
+                    webhook=self.webhook
+                )
+                # Does the webhook was triggered?
+                self.assertEqual(webhook_triggered.count(), 1)
+                content = webhook_triggered.first().content
+                # Compare the content of the webhook to the recap document
+                pacer_doc_id = content["results"][0]["recap_documents"][0][
+                    "pacer_doc_id"
+                ]
+                recap_document = RECAPDocument.objects.all()
+                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+
+                # Does the Idempotency-Key is generated
+                self.assertNotEqual(webhook_triggered[0].event_id, "")
+                self.assertEqual(webhook_triggered[0].status_code, None)
+                self.assertEqual(
+                    webhook_triggered[0].error_message,
+                    "ConnectionError: Connection Error",
+                )
+
+                # Is the webhook event updated for retry?
+                first_retry_time = fake_now_0 + timedelta(minutes=3)
+                self.assertEqual(
+                    webhook_triggered[0].next_retry_date, first_retry_time
+                )
+                self.assertEqual(
+                    webhook_triggered[0].event_status,
+                    WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                )
+                self.assertEqual(webhook_triggered[0].retry_counter, 1)
+                self.assertEqual(webhook_triggered[0].response, None)
+                self.assertEqual(webhook_triggered[0].webhook.failure_count, 1)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    def test_success_webhook_delivery(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+    ):
+        """This test verifies if a WebhookEvent is properly updated after a
+        successful delivery.
+        """
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, content=b"{'message': 'OK'}"
+            ),
+        ):
+            fake_now_0 = now()
+            with time_machine.travel(fake_now_0, tick=False):
+                # Trigger a new recap.email notification from testing_1@recap.email
+                # auto-subscription option enabled
+                self.client.post(self.path, self.data_nda, format="json")
+
+                # Webhook should be triggered
+                webhook_triggered = WebhookEvent.objects.filter(
+                    webhook=self.webhook
+                )
+                # Does the webhook was triggered?
+                self.assertEqual(webhook_triggered.count(), 1)
+                content = webhook_triggered.first().content
+                # Compare the content of the webhook to the recap document
+                pacer_doc_id = content["results"][0]["recap_documents"][0][
+                    "pacer_doc_id"
+                ]
+                recap_document = RECAPDocument.objects.all()
+                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+
+                # Does the Idempotency-Key is generated
+                self.assertNotEqual(webhook_triggered[0].event_id, "")
+                self.assertEqual(webhook_triggered[0].status_code, 200)
+                self.assertEqual(webhook_triggered[0].error_message, None)
+
+                self.assertEqual(webhook_triggered[0].next_retry_date, None)
+                self.assertEqual(
+                    webhook_triggered[0].event_status,
+                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                )
+                self.assertEqual(webhook_triggered[0].retry_counter, 0)
+                self.assertEqual(
+                    webhook_triggered[0].response, "{'message': 'OK'}"
+                )
+                self.assertEqual(webhook_triggered[0].webhook.failure_count, 0)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    def test_retry_webhooks_integration(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+    ):
+        """This test checks if a recap.email notification comes in and its
+        WebhookEvent fails it's properly retried accordingly to the retry
+        policy.
+        """
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(500),
+        ):
+            fake_now_0 = now()
+            with time_machine.travel(fake_now_0, tick=False):
+                # Trigger a new recap.email notification from testing_1@recap.email
+                # auto-subscription option enabled
+                self.client.post(self.path, self.data_nda, format="json")
+
+                # Webhook should be triggered
+                webhook_triggered = WebhookEvent.objects.filter(
+                    webhook=self.webhook
+                )
+                # Does the webhook was triggered?
+                self.assertEqual(webhook_triggered.count(), 1)
+                content = webhook_triggered.first().content
+                # Compare the content of the webhook to the recap document
+                pacer_doc_id = content["results"][0]["recap_documents"][0][
+                    "pacer_doc_id"
+                ]
+                recap_document = RECAPDocument.objects.all()
+                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+                self.assertNotEqual(webhook_triggered[0].event_id, "")
+                self.assertEqual(webhook_triggered[0].status_code, 500)
+                first_retry_time = fake_now_0 + timedelta(minutes=3)
+                self.assertEqual(
+                    webhook_triggered[0].next_retry_date, first_retry_time
+                )
+                self.assertEqual(
+                    webhook_triggered[0].event_status,
+                    WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                )
+                self.assertEqual(webhook_triggered[0].retry_counter, 1)
+
+                # Retry attempt 2 minutes after, shouldn't be retried.
+                fake_now_2 = fake_now_0 + timedelta(minutes=2)
+                with time_machine.travel(fake_now_2, tick=False):
+                    retry_webhook_events()
+
+                    # Not triggered
+                    self.assertEqual(
+                        webhook_triggered[0].event_status,
+                        WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                    )
+                    self.assertEqual(webhook_triggered[0].retry_counter, 1)
+                    self.assertEqual(
+                        webhook_triggered[0].next_retry_date, first_retry_time
+                    )
+
+                # Retry attempt 3 minutes after, should be retried.
+                fake_now_3 = fake_now_0 + timedelta(minutes=3)
+                with time_machine.travel(fake_now_3, tick=False):
+                    retry_webhook_events()
+                    # Triggered
+                    self.assertEqual(
+                        webhook_triggered[0].event_status,
+                        WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                    )
+                    self.assertEqual(webhook_triggered[0].retry_counter, 2)
+
+                    second_retry_time = fake_now_3 + timedelta(minutes=9)
+                    self.assertEqual(
+                        webhook_triggered[0].next_retry_date, second_retry_time
+                    )
+
+                # Update the retry counter and next_retry_date to mock the 6th
+                # retry.
+                fake_now_4 = fake_now_0 + timedelta(hours=18, minutes=12)
+                webhook_triggered.update(
+                    retry_counter=6, next_retry_date=fake_now_4
+                )
+                with time_machine.travel(fake_now_4, tick=False):
+                    retry_webhook_events()
+                    # Triggered
+                    self.assertEqual(
+                        webhook_triggered[0].event_status,
+                        WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                    )
+                    self.assertEqual(webhook_triggered[0].retry_counter, 7)
+
+                    seven_retry_time = fake_now_4 + timedelta(
+                        hours=36, minutes=27
+                    )
+                    self.assertEqual(
+                        webhook_triggered[0].next_retry_date, seven_retry_time
+                    )
+
+                # Failed retry after the 7th retry, the WebhookEvent should be
+                # marked as failed.
+                fake_now_5 = fake_now_0 + timedelta(hours=54, minutes=39)
+                with time_machine.travel(fake_now_5, tick=False):
+                    retry_webhook_events()
+
+                    self.assertEqual(
+                        webhook_triggered[0].event_status,
+                        WEBHOOK_EVENT_STATUS.FAILED,
+                    )
+                    self.assertEqual(webhook_triggered[0].retry_counter, 7)
+                    self.assertEqual(
+                        webhook_triggered[0].next_retry_date, seven_retry_time
+                    )
