@@ -30,6 +30,7 @@ REST_FRAMEWORK = {
         # Sent multiple emails, but no response.
         "bchecker": "1/hour",
         # No response
+        "commernet": "1/hour",
         "zealousgalileo": "1/hour",
         "tuhinharit": "1/hour",  # Deep pagination
         "JaneDoe": "1/hour",
