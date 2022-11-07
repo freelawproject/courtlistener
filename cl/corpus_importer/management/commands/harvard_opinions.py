@@ -538,6 +538,10 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         if not citation:
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
+        # Skip ID Citations
+        if "page" not in citation[0].groups.keys():
+            logger.warning(f"Skipping incomplete citation {clean_cite}")
+            continue
 
         # Because of non-canonical reporters this code breaks for states like
         # Washington, where there are reporter abbreviations like "wash", that
@@ -885,6 +889,10 @@ def find_previously_imported_cases(
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"])
         if found_cite:
+            # Skip ID Citations
+            if "reporter" not in found_cite[0].groups.keys():
+                continue
+
             possible_cases = OpinionCluster.objects.filter(
                 citations__reporter=found_cite[0].corrected_reporter(),
                 citations__volume=found_cite[0].groups["volume"],
