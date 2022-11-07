@@ -1720,6 +1720,14 @@ class Court(models.Model):
     STATE_TRIAL = "ST"
     STATE_SPECIAL = "SS"
     STATE_ATTORNEY_GENERAL = "SAG"
+    TRIBAL_SUPREME = "TRS"
+    TRIBAL_APPELLATE = "TRA"
+    TRIBAL_TRIAL = "TRT"
+    TRIBAL_SPECIAL = "TRX"
+    TERRITORY_SUPREME = "TS"
+    TERRITORY_APPELLATE = "TA"
+    TERRITORY_TRIAL = "TT"
+    TERRITORY_SPECIAL = "TSP"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1733,6 +1741,14 @@ class Court(models.Model):
         (STATE_APPELLATE, "State Appellate"),
         (STATE_TRIAL, "State Trial"),
         (STATE_SPECIAL, "State Special"),
+        (TRIBAL_SUPREME, "Tribal Supreme"),
+        (TRIBAL_APPELLATE, "Tribal Appellate"),
+        (TRIBAL_TRIAL, "Tribal Trial"),
+        (TRIBAL_SPECIAL, "Tribal Special"),
+        (TERRITORY_SUPREME, "Tribal Appellate"),
+        (TERRITORY_APPELLATE, "Tribal Appellate"),
+        (TERRITORY_TRIAL, "Territory Trial"),
+        (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
@@ -1756,6 +1772,19 @@ class Court(models.Model):
         FEDERAL_BANKRUPTCY,
         FEDERAL_BANKRUPTCY_PANEL,
     ]
+    TRIBAL_JURISDICTIONS = [
+        TRIBAL_SUPREME,
+        TRIBAL_APPELLATE,
+        TRIBAL_TRIAL,
+        TRIBAL_SPECIAL,
+    ]
+    TERRITORY_JURISDICTIONS = [
+        TERRITORY_SUPREME,
+        TERRITORY_APPELLATE,
+        TERRITORY_TRIAL,
+        TERRITORY_SPECIAL,
+    ]
+
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
