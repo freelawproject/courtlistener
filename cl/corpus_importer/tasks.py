@@ -632,11 +632,14 @@ def get_and_process_free_pdf(
         logger.info(f"{msg} Retrying.")
         raise self.retry(exc=exc)
 
+    pdf_bytes = None
+    if r:
+        pdf_bytes = r.content
     attachment_number = 0  # Always zero for free opinions
     success, msg = update_rd_metadata(
         self,
         rd.pk,
-        r,
+        pdf_bytes,
         r_msg,
         result.court_id,
         result.pacer_case_id,
@@ -1576,23 +1579,22 @@ def download_pacer_pdf_by_rd(
     return r, r_msg
 
 
-def download_appellate_pdf_by_magic_number(
+def download_pdf_by_magic_number(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
     cookies: RequestsCookieJar,
     magic_number: str,
+    appellate: bool = False,
 ) -> tuple[Response | None, str]:
-    """Small wrapper to fetch an appellate PACER PDF document by magic number.
-
-    For appellate documents we need to download the PDF before creating the
-    RECAPDocument in order try getting the document number from the PDF file.
+    """Small wrapper to fetch a PACER PDF document by magic number.
 
     :param court_id: A CourtListener court ID to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param cookies: The cookies of a logged in PACER session
     :param magic_number: The magic number to fetch PACER documents for free.
+    :param appellate: Whether the download belongs to an appellate court.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -1600,14 +1602,9 @@ def download_appellate_pdf_by_magic_number(
 
     s = PacerSession(cookies=cookies)
     report = FreeOpinionReport(court_id, s)
-    appellate = True
-    try:
-        r, r_msg = report.download_pdf(
-            pacer_case_id, pacer_doc_id, magic_number, appellate
-        )
-    except (requests.RequestException, HTTPError):
-        msg = "Failed to get PDF from network."
-        return None, msg
+    r, r_msg = report.download_pdf(
+        pacer_case_id, pacer_doc_id, magic_number, appellate
+    )
     return r, r_msg
 
 
@@ -1632,39 +1629,24 @@ def get_document_number_from_confirmation_page(
     return data.get("document_number", "")
 
 
-def fetch_pacer_doc_appellate(
+def get_document_number_for_appellate(
     court_id: str,
     pacer_doc_id: str,
-    pacer_case_id: str,
-    cookies: RequestsCookieJar,
-    magic_number: str,
-) -> tuple[str, Response | None, str]:
+    pq: ProcessingQueue,
+) -> str:
     """A wrapper to get the PACER document number either from the download
     confirmation page or from the PDF document.
 
     :param court_id: A CourtListener court ID to query the confirmation page.
     :param pacer_doc_id: The pacer_doc_id to query the confirmation page.
-    :param pacer_case_id: The pacer_case_id to query the free document.
-    :param cookies: The cookies of a logged in PACER session
-    :param magic_number: The magic number to fetch PACER documents for free.
-    :return: A tuple containing the PACER document number is available or an
-    empty string if not, a requests.Response object usually containing a PDF,
-    or None if that wasn't possible, and a string representing the error if
-    there was one.
+    :param pq: The ProcessingQueue that contains the PDF document.
+    :return: The PACER document number if available or an
+    empty string if not.
     """
 
-    pdf_response = None
-    r_msg = ""
+    # Get the document number for appellate documents.
+    pdf_bytes = None
     document_number = ""
-    # Try to download the free appellate PDF.
-    if magic_number:
-        pdf_response, r_msg = download_appellate_pdf_by_magic_number(
-            court_id,
-            pacer_doc_id,
-            pacer_case_id,
-            cookies,
-            magic_number,
-        )
     if court_id in ("ca8", "ca11", "cadc"):
         # For ca8, ca11 and cadc the PACER document number is not available
         # in the PDF, try to get it directly from the Download confirmation
@@ -1673,8 +1655,10 @@ def fetch_pacer_doc_appellate(
             court_id, pacer_doc_id
         )
     else:
-        if pdf_response:
-            pdf_bytes = pdf_response.content
+        if pq.filepath_local:
+            with pq.filepath_local.open(mode="rb") as local_path:
+                pdf_bytes = local_path.read()
+        if pdf_bytes:
             # For other jurisdictions try first to get it from the PDF document.
             dn_response = microservice(
                 service="document-number",
@@ -1704,13 +1688,13 @@ def fetch_pacer_doc_appellate(
         # 00218987740 -> 00208987740, 123119177518 -> 123019177518
         document_number = f"{document_number[:3]}0{document_number[4:]}"
 
-    return document_number, pdf_response, r_msg
+    return document_number
 
 
 def update_rd_metadata(
     self: Task,
     rd_pk: int,
-    response: Optional[Response],
+    pdf_bytes: Optional[bytes],
     r_msg: str,
     court_id: str,
     pacer_case_id: str,
@@ -1722,7 +1706,7 @@ def update_rd_metadata(
 
     :param self: The celery task
     :param rd_pk: The primary key of the RECAPDocument to work on
-    :param response: A requests.Response object containing the PDF data.
+    :param pdf_bytes: The byte array of the PDF.
     :param r_msg: A message from the download function about an error that was
     encountered.
     :param court_id: A CourtListener court ID to use for file names.
@@ -1736,8 +1720,7 @@ def update_rd_metadata(
     """
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
-
-    if response is None:
+    if pdf_bytes is None:
         if r_msg:
             # Send a specific message all the way from Juriscraper
             msg = f"{r_msg}: {court_id=}, {rd_pk=}"
@@ -1752,7 +1735,7 @@ def update_rd_metadata(
     file_name = get_document_filename(
         court_id, pacer_case_id, document_number, attachment_number
     )
-    cf = ContentFile(response.content)
+    cf = ContentFile(pdf_bytes)
     rd.filepath_local.save(file_name, cf, save=False)
     rd.file_size = rd.filepath_local.size
     rd.is_available = True  # We've got the PDF.
@@ -1760,7 +1743,7 @@ def update_rd_metadata(
 
     # request.content is sometimes a str, sometimes unicode, so
     # force it all to be bytes, pleasing hashlib.
-    rd.sha1 = sha1(force_bytes(response.content))
+    rd.sha1 = sha1(pdf_bytes)
     response = microservice(
         service="page-count",
         item=rd,
@@ -1827,10 +1810,14 @@ def get_pacer_doc_by_rd(
         rd.pk, pacer_case_id, rd.pacer_doc_id, cookies
     )
     court_id = rd.docket_entry.docket.court_id
+
+    pdf_bytes = None
+    if r:
+        pdf_bytes = r.content
     success, msg = update_rd_metadata(
         self,
         rd_pk,
-        r,
+        pdf_bytes,
         r_msg,
         court_id,
         pacer_case_id,
@@ -1932,10 +1919,14 @@ def get_pacer_doc_by_rd_and_description(
         rd.pk, pacer_case_id, att_found["pacer_doc_id"], cookies
     )
     court_id = rd.docket_entry.docket.court_id
+
+    pdf_bytes = None
+    if r:
+        pdf_bytes = r.content
     success, msg = update_rd_metadata(
         self,
         rd_pk,
-        r,
+        pdf_bytes,
         r_msg,
         court_id,
         pacer_case_id,

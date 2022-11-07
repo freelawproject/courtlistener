@@ -392,11 +392,11 @@ test = ["hypothesis (>=1.11.4,!=3.79.2)", "iso8601", "pretend", "pytest (>=6.2.0
 
 [[package]]
 name = "cssselect"
-version = "1.1.0"
+version = "1.2.0"
 description = "cssselect parses CSS3 Selectors and translates them to XPath 1.0"
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "datasketch"
@@ -688,7 +688,7 @@ typing-extensions = "*"
 
 [[package]]
 name = "django-waffle"
-version = "2.1.0"
+version = "3.0.0"
 description = "A feature flipper for Django."
 category = "main"
 optional = false
@@ -1147,7 +1147,7 @@ requests = ">=2.0,<3.0"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.23"
+version = "2.5.24"
 description = "An API to scrape American court websites for metadata."
 category = "main"
 optional = false
@@ -2303,7 +2303,7 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10, <3.11"
-content-hash = "e144f479651ce143acee7d01b5ea922db5a38e2a553326733f4820219fc95a65"
+content-hash = "520fa2586336101183c4960fe5e91586383ae17e5bedcfdf399e06537a13516b"
 
 [metadata.files]
 amqp = [
@@ -2552,8 +2552,8 @@ cryptography = [
     {file = "cryptography-36.0.2.tar.gz", hash = "sha256:70f8f4f7bb2ac9f340655cbac89d68c527af5bb4387522a8413e841e3e6628c9"},
 ]
 cssselect = [
-    {file = "cssselect-1.1.0-py2.py3-none-any.whl", hash = "sha256:f612ee47b749c877ebae5bb77035d8f4202c6ad0f0fc1271b3c18ad6c4468ecf"},
-    {file = "cssselect-1.1.0.tar.gz", hash = "sha256:f95f8dedd925fd8f54edb3d2dfb44c190d9d18512377d3c1e2388d16126879bc"},
+    {file = "cssselect-1.2.0-py2.py3-none-any.whl", hash = "sha256:da1885f0c10b60c03ed5eccbb6b68d6eff248d91976fcde348f395d54c9fd35e"},
+    {file = "cssselect-1.2.0.tar.gz", hash = "sha256:666b19839cfaddb9ce9d36bfe4c969132c647b92fc9088c4e23f786b30f1b3dc"},
 ]
 datasketch = [
     {file = "datasketch-1.5.7-py2.py3-none-any.whl", hash = "sha256:9b85866297d42261f145cfa370a76920ede42a8742930fac704114ad791dc74b"},
@@ -2653,8 +2653,8 @@ django-stubs-ext = [
     {file = "django_stubs_ext-0.3.1-py3-none-any.whl", hash = "sha256:a51a3e9e844d4e1cacaaedbb33bf3def78a3956eed5d9575a640bd97ccd99cec"},
 ]
 django-waffle = [
-    {file = "django-waffle-2.1.0.tar.gz", hash = "sha256:a96b52ed6256238b7e0dda8c5c18b6f00e38008fae380f9ff22e12fd1a702c7f"},
-    {file = "django_waffle-2.1.0-py2.py3-none-any.whl", hash = "sha256:a39f294f8c4e026b9e441d0e4d35ff3b26d1eb2da1d52196ba4bc04ba78b1db1"},
+    {file = "django-waffle-3.0.0.tar.gz", hash = "sha256:3acef6692cb745ed8109f0a3076c5a27da38a716deb70d64c5fb404d65ccd910"},
+    {file = "django_waffle-3.0.0-py3-none-any.whl", hash = "sha256:dd8bcc62269b35000a05a7d87e8a000136b6b1568952e2e707ef450717b1cd9f"},
 ]
 djangorestframework = [
     {file = "djangorestframework-3.12.4-py3-none-any.whl", hash = "sha256:6d1d59f623a5ad0509fe0d6bfe93cbdfe17b8116ebc8eda86d45f6e16e819aaf"},
@@ -2911,8 +2911,8 @@ judge-pics = [
     {file = "judge_pics-2.0.2-py2.py3-none-any.whl", hash = "sha256:73d3add163bcd3574e485d7e1c744425eb7a3faf52958e0bd4059ef1b05097ab"},
 ]
 juriscraper = [
-    {file = "juriscraper-2.5.23-py27-none-any.whl", hash = "sha256:4671a62b264578c9cccb0c1b11ea5abb764fc2aff396d17e13a5672f42739c25"},
-    {file = "juriscraper-2.5.23.tar.gz", hash = "sha256:387c573b6adc26ae6be8936b19ffa6f73e80ec04943e80ec4059bbc5da2243bc"},
+    {file = "juriscraper-2.5.24-py27-none-any.whl", hash = "sha256:5c7dfc5799f0bcc36f660db2c7a22d38024769782e3d2ac6b1264303df5945ef"},
+    {file = "juriscraper-2.5.24.tar.gz", hash = "sha256:22c91a5f6fb28f9a18c42e133743e0b1789d44694be608fe2feb0d79abc31115"},
 ]
 kdtree = [
     {file = "kdtree-0.16-py2.py3-none-any.whl", hash = "sha256:083945db69bc3cf0d349d8d0efe66c056de28d1c2f1e81f762dc5ce46f0dcf0a"},
