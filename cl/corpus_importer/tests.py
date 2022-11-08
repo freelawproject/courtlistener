@@ -485,13 +485,14 @@ class HarvardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        for court in ["mass", "tax", "cadc", "kan", "bta"]:
+        for court in ["mass", "tax", "cadc", "kan", "bta", "alnb", "ganb"]:
             CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def assertSuccessfulParse(self, expected_count_diff):
+    def assertSuccessfulParse(self, expected_count_diff,
+                              bankruptcy_cases=False):
         pre_install_count = OpinionCluster.objects.all().count()
         parse_harvard_opinions(
             {
@@ -501,6 +502,7 @@ class HarvardTests(TestCase):
                 "make_searchable": False,
                 "court_id": None,
                 "location": None,
+                "bankruptcy_cases": bankruptcy_cases
             }
         )
         post_install_count = OpinionCluster.objects.all().count()
@@ -683,10 +685,29 @@ class HarvardTests(TestCase):
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
 
-    def test_bankruptcy_courts(self) -> None:
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
+    )
+    def test_bankruptcy_cases_no_flag(self, mock) -> None:
+        """ Bankruptcy cases can be imported without flag? """
+        self.assertSuccessfulParse(0)
+        print("Success, no bankruptcy case imported")
 
-        bankruptcy_court_name = "United States Bankruptcy Court for the Northern " \
-                     "District of Alabama "
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
+    )
+    def test_bankruptcy_cases_with_flag(self, mock) -> None:
+        """ Bankruptcy cases can be imported with flag? """
+        self.assertSuccessfulParse(2, bankruptcy_cases=True)
+        print("Success, bankruptcy cases imported")
+
+    def test_bankruptcy_courts(self) -> None:
+        """ Test bankruptcy court names """
+
+        bankruptcy_court_name = "United States Bankruptcy Court for the " \
+                                "Northern District of Alabama "
 
         # Test without bankruptcy flag
         found_court = find_court(
