@@ -258,7 +258,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -439,12 +439,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -455,7 +455,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -491,8 +491,9 @@ class HarvardTests(TestCase):
     def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def assertSuccessfulParse(self, expected_count_diff,
-                              bankruptcy_cases=False):
+    def assertSuccessfulParse(
+        self, expected_count_diff, bankruptcy_cases=False
+    ):
         pre_install_count = OpinionCluster.objects.all().count()
         parse_harvard_opinions(
             {
@@ -502,7 +503,7 @@ class HarvardTests(TestCase):
                 "make_searchable": False,
                 "court_id": None,
                 "location": None,
-                "bankruptcy_cases": bankruptcy_cases
+                "bankruptcy_cases": bankruptcy_cases,
             }
         )
         post_install_count = OpinionCluster.objects.all().count()
@@ -690,7 +691,7 @@ class HarvardTests(TestCase):
         side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
     )
     def test_bankruptcy_cases_no_flag(self, mock) -> None:
-        """ Bankruptcy cases can be imported without flag? """
+        """Bankruptcy cases can be imported without flag?"""
         self.assertSuccessfulParse(0)
         print("Success, no bankruptcy case imported")
 
@@ -699,15 +700,17 @@ class HarvardTests(TestCase):
         side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
     )
     def test_bankruptcy_cases_with_flag(self, mock) -> None:
-        """ Bankruptcy cases can be imported with flag? """
+        """Bankruptcy cases can be imported with flag?"""
         self.assertSuccessfulParse(2, bankruptcy_cases=True)
         print("Success, bankruptcy cases imported")
 
     def test_bankruptcy_courts(self) -> None:
-        """ Test bankruptcy court names """
+        """Test bankruptcy court names"""
 
-        bankruptcy_court_name = "United States Bankruptcy Court for the " \
-                                "Northern District of Alabama "
+        bankruptcy_court_name = (
+            "United States Bankruptcy Court for the "
+            "Northern District of Alabama "
+        )
 
         # Test without bankruptcy flag
         found_court = find_court(
