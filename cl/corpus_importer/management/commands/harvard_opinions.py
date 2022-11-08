@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError, OperationalError
 from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
@@ -312,6 +313,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         # Cleanup whitespace on citations
         clean_cite = re.sub(r"\s+", " ", data["citations"][0]["cite"])
         cites = get_citations(clean_cite)
+        cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
             logger.warning(f"No citation found for {clean_cite}")
             continue
@@ -535,7 +537,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Cleanup citations with extra spaces
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
-        if not citation:
+        if not citation or isinstance(citation, FullCaseCitation):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
         # Skip ID Citations
@@ -888,7 +890,7 @@ def find_previously_imported_cases(
     # Match against known citations.
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"])
-        if found_cite:
+        if found_cite and isinstance(found_cite[0], FullCaseCitation):
             # Skip ID Citations
             if "reporter" not in found_cite[0].groups.keys():
                 continue
