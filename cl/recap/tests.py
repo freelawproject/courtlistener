@@ -3908,6 +3908,10 @@ class CheckCourtConnectivityTest(TestCase):
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
 )
+@mock.patch(
+    "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+    side_effect=lambda z, x: "011112443447",
+)
 class WebhooksRetries(TestCase):
     """Test WebhookEvents retries"""
 
@@ -3971,7 +3975,11 @@ class WebhooksRetries(TestCase):
         self.recipient_user = recipient_user
 
     def test_get_next_webhook_retry_date(
-        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
     ):
         """Verifies that the WebhookEvent next retry date is computed properly
         based on the exponential backoff retry policy defined in cl.api.utils
@@ -4032,7 +4040,11 @@ class WebhooksRetries(TestCase):
             self.assertEqual(next_retry_date, expected_next_retry_date)
 
     def test_retry_webhook_disabled(
-        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
     ):
         """This test checks if WebhookEvent that its parent Webhook is disabled
         it won't be retried.
@@ -4060,7 +4072,11 @@ class WebhooksRetries(TestCase):
                     self.assertEqual(retried_webhooks, 0)
 
     def test_retry_webhook_events(
-        self, mock_bucket_open, mock_cookies, mock_pacer_court_accessible
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
     ):
         """This test checks if only a WebhookEvent in ENQUEUED_RETRY status and
         that its next_retry_date is equal to or lower than now can be retried.
@@ -4156,6 +4172,7 @@ class WebhooksRetries(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a WebhookEvent is properly enqueued for retry
@@ -4219,6 +4236,7 @@ class WebhooksRetries(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a WebhookEvent is properly enqueued for retry
@@ -4281,6 +4299,7 @@ class WebhooksRetries(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
         """This test verifies if a WebhookEvent is properly updated after a
@@ -4338,6 +4357,7 @@ class WebhooksRetries(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
         mock_download_pacer_pdf_by_rd,
     ):
         """This test checks if a recap.email notification comes in and its
