@@ -5,6 +5,7 @@ from glob import iglob
 from unittest.mock import patch
 
 import pytest
+from courts_db import find_court
 
 from cl.corpus_importer.court_regexes import match_court_string
 from cl.corpus_importer.import_columbia.parse_opinions import (
@@ -257,7 +258,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                    "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -438,12 +439,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+                "Got %s, expected %s: \n%s"
+                % (
+                    actual_num_attorneys,
+                    expected_num_attorneys,
+                    first_party_attorneys,
+                ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -454,7 +455,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -681,3 +682,25 @@ class HarvardTests(TestCase):
 
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
+
+    def test_bankruptcy_courts(self) -> None:
+
+        bankruptcy_court_name = "United States Bankruptcy Court for the Northern " \
+                     "District of Alabama "
+
+        # Test without bankruptcy flag
+        found_court = find_court(
+            bankruptcy_court_name,
+            bankruptcy=False,
+            location=None,
+        )
+
+        self.assertEqual(len(found_court), 0)
+
+        # Test with bankruptcy flag
+        found_court = find_court(
+            bankruptcy_court_name,
+            bankruptcy=True,
+            location=None,
+        )
+        self.assertEqual(len(found_court), 1)

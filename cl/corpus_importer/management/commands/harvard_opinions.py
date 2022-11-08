@@ -273,6 +273,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     page = options["page"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
+    bankruptcy_cases = options["bankruptcy_cases"]
 
     if not reporter and volumes:
         logger.error("You provided volume(s) but no reporter. Exiting.")
@@ -329,7 +330,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # This is used to alleviate certain circumstances.
             found_court = find_court(
                 data["court"]["name"],
-                bankruptcy=options["bankruptcy_cases"],
+                bankruptcy=bankruptcy_cases,
                 location=options["location"],
             )
             if len(found_court) != 1:
