@@ -257,7 +257,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -438,12 +438,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -454,7 +454,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
