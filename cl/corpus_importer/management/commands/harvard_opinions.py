@@ -537,7 +537,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Cleanup citations with extra spaces
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
-        if not citation or isinstance(citation, FullCaseCitation):
+        if not citation or not isinstance(citation[0], FullCaseCitation):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
 
@@ -554,6 +554,10 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # the same type, in Arkansas and Ark App. - We can resolve these by
         # defining the regex pattern much more narrowly.  The neutral cite
         # follows a four digit year volume while the state reporter does not.
+
+        print("\n\n\n\n\n\n\n\n")
+        print(isinstance(citation[0], FullCaseCitation))
+        print("\n\n\n\n\n\n\n\n")
         if not citation[0].corrected_reporter():
             reporter_type = Citation.STATE
         else:

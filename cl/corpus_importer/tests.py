@@ -484,7 +484,7 @@ class HarvardTests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        for court in ["mass", "tax", "cadc", "kan", "bta"]:
+        for court in ["mass", "tax", "cadc", "kan", "bta", "scotus"]:
             CourtFactory.create(id=court)
 
     def tearDown(self) -> None:
@@ -557,6 +557,14 @@ class HarvardTests(TestCase):
         """Will we add a case with the same citation but a different case
         name?
         """
+        self.assertSuccessfulParse(1)
+
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
+        side_effect=[iglob(os.path.join(test_dir, "ibid*"))],
+    )
+    def test_bad_parallel_citation(self, mock):
+        """Can we skip a bad ibid citation?"""
         self.assertSuccessfulParse(1)
 
     @patch(
