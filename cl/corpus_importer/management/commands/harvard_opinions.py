@@ -220,7 +220,7 @@ class OptionsType(TypedDict):
     court_id: Optional[str]
     location: Optional[str]
     make_searchable: bool
-    bankruptcy_cases: bool
+    bankruptcy: bool
 
 
 def get_fix_list() -> List[str]:
@@ -273,7 +273,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     page = options["page"]
     court_id = options["court_id"]
     make_searchable = options["make_searchable"]
-    bankruptcy_cases = options["bankruptcy_cases"]
+    is_bankruptcy = options["bankruptcy"]
 
     if not reporter and volumes:
         logger.error("You provided volume(s) but no reporter. Exiting.")
@@ -330,7 +330,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # This is used to alleviate certain circumstances.
             found_court = find_court(
                 data["court"]["name"],
-                bankruptcy=bankruptcy_cases,
+                bankruptcy=is_bankruptcy,
                 location=options["location"],
             )
             if len(found_court) != 1:
@@ -1096,7 +1096,7 @@ class Command(VerboseCommand):
             required=False,
             type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
-            "'1:' will start at 1 and to 2000; '5' will do volume 5",
+                 "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
@@ -1121,7 +1121,7 @@ class Command(VerboseCommand):
             "--location",
             type=str,
             help="The location of the court (if applicable) ex. Florida"
-            "for courts-db differentiation.",
+                 "for courts-db differentiation.",
             required=False,
             default=None,
         )
@@ -1129,13 +1129,13 @@ class Command(VerboseCommand):
             "--make-searchable",
             action="store_true",
             help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
+                 "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
-            "--bankruptcy-cases",
+            "--bankruptcy",
             action="store_true",
             help="Tells function to use bankruptcy courts for bankruptcy "
-            "cases.",
+                 "cases.",
         )
         parser.add_argument(
             "--no-debug",
