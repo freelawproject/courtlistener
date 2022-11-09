@@ -2,11 +2,12 @@ BEGIN;
 --
 -- Add field error_message to webhookevent
 --
-ALTER TABLE "api_webhookevent" ADD COLUMN "error_message" text NULL;
+ALTER TABLE "api_webhookevent" ADD COLUMN "error_message" text DEFAULT '' NOT NULL;
+ALTER TABLE "api_webhookevent" ALTER COLUMN "error_message" DROP DEFAULT;
 --
 -- Add field event_id to webhookevent
 --
-ALTER TABLE "api_webhookevent" ADD COLUMN "event_id" uuid DEFAULT '3071dc56-6f22-47bd-819d-f7021ac7a66e'::uuid NOT NULL;
+ALTER TABLE "api_webhookevent" ADD COLUMN "event_id" uuid DEFAULT '2c8a17f9-4823-44ed-b09b-7ce4aeeb9a66'::uuid NOT NULL;
 ALTER TABLE "api_webhookevent" ALTER COLUMN "event_id" DROP DEFAULT;
 --
 -- Add field event_status to webhookevent
@@ -29,7 +30,6 @@ ALTER TABLE "api_webhookevent" ALTER COLUMN "content" DROP NOT NULL;
 --
 -- Alter field response on webhookevent
 --
-ALTER TABLE "api_webhookevent" ALTER COLUMN "response" DROP NOT NULL;
 --
 -- Alter field status_code on webhookevent
 --

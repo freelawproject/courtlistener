@@ -4210,7 +4210,7 @@ class WebhooksRetries(TestCase):
                 # Does the Idempotency-Key is generated
                 self.assertNotEqual(webhook_triggered[0].event_id, "")
                 self.assertEqual(webhook_triggered[0].status_code, 500)
-                self.assertEqual(webhook_triggered[0].error_message, None)
+                self.assertEqual(webhook_triggered[0].error_message, "")
 
                 # Is the webhook event updated for retry?
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
@@ -4287,7 +4287,7 @@ class WebhooksRetries(TestCase):
                     WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 )
                 self.assertEqual(webhook_triggered[0].retry_counter, 1)
-                self.assertEqual(webhook_triggered[0].response, None)
+                self.assertEqual(webhook_triggered[0].response, "")
                 self.assertEqual(webhook_triggered[0].webhook.failure_count, 1)
 
     @mock.patch(
@@ -4335,7 +4335,7 @@ class WebhooksRetries(TestCase):
                 # Does the Idempotency-Key is generated
                 self.assertNotEqual(webhook_triggered[0].event_id, "")
                 self.assertEqual(webhook_triggered[0].status_code, 200)
-                self.assertEqual(webhook_triggered[0].error_message, None)
+                self.assertEqual(webhook_triggered[0].error_message, "")
 
                 self.assertEqual(webhook_triggered[0].next_retry_date, None)
                 self.assertEqual(

@@ -99,12 +99,10 @@ class WebhookEvent(AbstractDateTimeModel):
     error_message = models.TextField(
         help_text="The error raised by a failed POST request.",
         blank=True,
-        null=True,
     )
     response = models.TextField(
         help_text="The response received from the POST request.",
         blank=True,
-        null=True,
     )
     retry_counter = models.SmallIntegerField(
         help_text="The retry counter for the exponential backoff event.",

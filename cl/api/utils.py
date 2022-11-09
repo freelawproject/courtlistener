@@ -584,7 +584,7 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
 
 
 def update_webhook_event_after_request(
-    webhook_event: WebhookEvent, response: Response = None, error: str = None
+    webhook_event: WebhookEvent, response: Response = None, error: str = ""
 ) -> None:
     """Update the webhook event after sending the POST request. If the webhook
     event fails, increase the retry counter, next retry date and increase its
