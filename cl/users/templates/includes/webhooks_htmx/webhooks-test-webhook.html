@@ -1,0 +1,56 @@
+ <div class="row form-group">
+    <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook.url }}</p>
+</div>
+
+<div class="row form-group">
+  <div class="col-xs-12">
+    <label for="dummy_data">Dummy Content:</label>
+    <div class="dummy-area">
+      <div class="copy-text" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
+      <textarea readonly class="form-control" id="dummy_data" rows="4">
+        {{ dummy_content }}
+      </textarea>
+    </div>
+  </div>
+</div>
+
+{% if da_type == webhook.event_type %}
+  <div class="row form-group">
+    <div class="col-xs-12" hx-ext="loading-states" data-loading-states>
+      <button id="webhook-send-test" class="btn btn-primary"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              hx-post="{% url "webhooks-test-webhook" pk=webhook.id format='json' %}"
+              hx-target="#webhook-test-sent"
+              data-loading-target="#webhook-send-test"
+              data-loading-disable
+              >
+            Send Webhook Event Test
+            <i data-loading class="fa fa-spinner fa-spin"></i>
+      </button>
+      <span id="webhook-test-sent"></span>
+      <button id="view-in-logs-button" type="button" class="hidden btn btn-success">Sent it, view in Test Logs</button>
+    </div>
+  </div>
+{% endif %}
+
+<div class="row form-group">
+  <div class="col-xs-12">
+    <label for="dummy_curl">Test this Webhook event locally with the following <a data-toggle="collapse" href="#curl-command">CURL command:</a></label>
+    <div class="collapse" id="curl-command">
+      <div class="dummy-area">
+        <div class="copy-text" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+        <textarea readonly class="form-control" id="dummy_curl" rows="4">
+          {{ dummy_curl }}
+        </textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  <div class="modal-footer">
+    <p>
+      <button type="button" class="btn btn-secondary" data-dismiss="modal" data-loading-disable>Cancel</button>
+    </p>
+  </div>
