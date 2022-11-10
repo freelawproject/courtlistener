@@ -80,3 +80,12 @@ class LegalProvider(BaseProvider):
         plaintiff = self._make_random_party(full)
         defendant = self._make_random_party(full)
         return titlecase(f"{plaintiff} v. {defendant}")
+
+    def random_citation(self) -> str:
+        """Make a random citation e.g. 345 Mass. 76"""
+        volume = random.randint(1, 999)
+        page = random.randint(1, 999)
+        reporter = random.choice(
+            ["U.S.", "Mass.", "S.E. 2d", "MT", "Cal.", "Ohio"]
+        )
+        return f"{volume} {reporter} {page}"

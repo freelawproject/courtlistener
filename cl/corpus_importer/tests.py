@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from cl.corpus_importer.court_regexes import match_court_string
+from cl.corpus_importer.factories import CaseLawCourtFactory, CaseLawFactory
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
@@ -490,9 +491,7 @@ class HarvardTests(TestCase):
     def tearDown(self) -> None:
         Docket.objects.all().delete()
 
-    def assertSuccessfulParse(
-        self, expected_count_diff, bankruptcy_cases=False
-    ):
+    def assertSuccessfulParse(self, expected_count_diff, bankruptcy=False):
         pre_install_count = OpinionCluster.objects.all().count()
         parse_harvard_opinions(
             {
@@ -502,7 +501,7 @@ class HarvardTests(TestCase):
                 "make_searchable": False,
                 "court_id": None,
                 "location": None,
-                "bankruptcy": bankruptcy_cases,
+                "bankruptcy": bankruptcy,
             }
         )
         post_install_count = OpinionCluster.objects.all().count()
@@ -686,19 +685,21 @@ class HarvardTests(TestCase):
         self.assertEqual(bad_match, 81)
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_bankruptcy_cases_no_flag(self, mock) -> None:
-        """Bankruptcy cases can be imported without flag?"""
-        self.assertSuccessfulParse(0)
-        print("Success, no bankruptcy case imported")
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_bankruptcy_flag(self, read_json_func, filepath_list_func):
+        """Can we test bankruptcy court imports"""
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
+        court = CaseLawCourtFactory.create(
+            name="United States Bankruptcy Court for the Northern District of Alabama"
+        )
+        caselawdata = CaseLawFactory()
+        caselawdata["court"] = court
+        read_json_func.return_value = caselawdata
 
-    @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "bankruptcy_case_*.json"))],
-    )
-    def test_bankruptcy_cases_with_flag(self, mock) -> None:
-        """Bankruptcy cases can be imported with flag?"""
-        self.assertSuccessfulParse(2, bankruptcy_cases=True)
-        print("Success, bankruptcy cases imported")
+        # Test Alabama Bankruptcy Case without bankruptcy flag
+        self.assertSuccessfulParse(0, bankruptcy=False)
+
+        # Test with bankruptcy flag turned on
+        self.assertSuccessfulParse(1, bankruptcy=True)

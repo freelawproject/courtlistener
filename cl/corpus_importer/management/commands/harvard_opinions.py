@@ -250,6 +250,25 @@ def merge_fixes(data: Dict[str, Any], identifier: str) -> Dict[str, Any]:
     return data
 
 
+def read_json(file_path: str, ia_download_url: str) -> Optional[Any]:
+    """Read JSON file and throw a warning if exceptions occur
+
+    :param file_path: Filepath to JSON
+    :param ia_download_url: URL of file
+    :return: JSON object if avaialble
+    """
+    try:
+        with open(file_path) as f:
+            data = json.load(f)
+    except ValueError:
+        logger.warning(f"Empty json: missing case at: {ia_download_url}")
+        return None
+    except Exception as e:
+        logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        return None
+    return data
+
+
 def parse_harvard_opinions(options: OptionsType) -> None:
     """Parse Harvard Opinions
 
@@ -296,14 +315,8 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             )
             continue
 
-        try:
-            with open(file_path) as f:
-                data = json.load(f)
-        except ValueError:
-            logger.warning(f"Empty json: missing case at: {ia_download_url}")
-            continue
-        except Exception as e:
-            logger.warning(f"Unknown error {e} for: {ia_download_url}")
+        data = read_json(file_path, ia_download_url)
+        if not data:
             continue
 
         identifier = "/".join(file_path.rsplit("/", 2)[1:])
@@ -359,6 +372,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             # See: https://cite.case.law/pdf/1305086/Vinson%20v.%20Cox,%2099%20Fla.%201373%20(1930).pdf
             logger.warning(f"No opinion in Harvard XML at {file_path}")
             continue
+
         previously_imported_case = find_previously_imported_cases(
             data,
             court_id,
@@ -380,7 +394,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             continue
 
         logger.info(f"Adding case {case_name_full}")
-        # This case appears new to CL - lets add it.
         add_new_case(
             data,
             case_body,
