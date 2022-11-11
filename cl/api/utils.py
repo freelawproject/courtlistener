@@ -29,6 +29,7 @@ from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent
 from cl.lib.redis_utils import make_redis_interface
+from cl.lib.string_utils import trunc
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 
@@ -578,13 +579,15 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     INITIAL_TIME = 3  # minutes
     # Update new_next_retry_date exponentially
     new_next_retry_date = now() + timedelta(
-        minutes=pow(INITIAL_TIME, retry_counter)
+        minutes=pow(INITIAL_TIME, retry_counter + 1)
     )
     return new_next_retry_date
 
 
 def update_webhook_event_after_request(
-    webhook_event: WebhookEvent, response: Response = None, error: str = ""
+    webhook_event: WebhookEvent,
+    response: Response | None = None,
+    error: str | None = "",
 ) -> None:
     """Update the webhook event after sending the POST request. If the webhook
     event fails, increase the retry counter, next retry date and increase its
@@ -594,7 +597,7 @@ def update_webhook_event_after_request(
     :param webhook_event: The WebhookEvent to update.
     :param response: Optional in case we receive a requests Response object, to
     update the WebhookEvent accordingly.
-    :param error: Optional, if we don't receive a request Response we would
+    :param error: Optional, if we don't receive a request Response we'll
     receive an error to log it.
     :return: None
     """
@@ -603,12 +606,21 @@ def update_webhook_event_after_request(
 
     failed_request = False
     if response is not None:
+        # The webhook response is consumed as a stream to avoid blocking the
+        # process and overflowing memory on huge responses. We only read and
+        # store the first 4KB
+        data = ""
+        for chunk in response.iter_content(1024 * 4, decode_unicode=True):
+            data = chunk
+            break
+        response.close()
         webhook_event.status_code = response.status_code
-        webhook_event.response = response.text
-        # If the response status code is not between 200 and 400, it's
-        # considered a failed attempt and will be enqueued for retry.
-        if not response.ok:
+        webhook_event.response = data
+        # If the response status code is not 2xx. It's considered a failed
+        # attempt, and it'll be enqueued for retry.
+        if not 200 <= response.status_code < 300:
             failed_request = True
+
     if failed_request or error:
         webhook = webhook_event.webhook
         webhook.failure_count = F("failure_count") + 1
@@ -620,13 +632,13 @@ def update_webhook_event_after_request(
             webhook_event.save()
             return
 
-        webhook_event.retry_counter = F("retry_counter") + 1
-        webhook_event.save()
-        webhook_event.refresh_from_db()
         webhook_event.next_retry_date = get_next_webhook_retry_date(
             webhook_event.retry_counter
         )
+        webhook_event.retry_counter = F("retry_counter") + 1
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        if error is None:
+            error = ""
         webhook_event.error_message = error
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
@@ -634,7 +646,7 @@ def update_webhook_event_after_request(
 
 
 def send_webhook_event(
-    webhook_event: WebhookEvent, content_str: str = None
+    webhook_event: WebhookEvent, content_str: str | None = None
 ) -> None:
     """Send the webhook POST request.
 
@@ -658,10 +670,13 @@ def send_webhook_event(
         response = requests.post(
             webhook_event.webhook.url,
             data=json_str,
-            timeout=5,
+            timeout=(1, 1),
+            stream=True,
             headers=headers,
+            allow_redirects=False,
         )
         update_webhook_event_after_request(webhook_event, response)
     except (requests.ConnectionError, requests.Timeout) as exc:
         error_str = f"{type(exc).__name__}: {exc}"
+        trunc(error_str, 500)
         update_webhook_event_after_request(webhook_event, error=error_str)

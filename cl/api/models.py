@@ -45,11 +45,6 @@ class Webhook(AbstractDateTimeModel):
         default=0,
     )
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["enabled"]),
-        ]
-
     def __str__(self) -> str:
         return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
 
@@ -108,7 +103,7 @@ class WebhookEvent(AbstractDateTimeModel):
         help_text="The retry counter for the exponential backoff event.",
         default=0,
     )
-    status_code = models.IntegerField(
+    status_code = models.SmallIntegerField(
         help_text="The HTTP status code received from the POST request.",
         choices=HttpStatusCodes.choices,
         blank=True,

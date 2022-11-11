@@ -45,7 +45,7 @@ def get_docket_alert_recipients(
     d_pk: int,
     recap_email_recipients: list[str],
     recap_email_user_only: bool = False,
-) -> tuple[list[DocketAlertRecipient], list[str]]:
+) -> tuple[list[DocketAlertRecipient], list[int], list[str]]:
     """Get the notification's recipients for a docket alert.
 
     :param d_pk: Docket primary key
@@ -54,12 +54,15 @@ def get_docket_alert_recipients(
     :param recap_email_user_only: True if we need to get recipients only for
     a recap.email user to send the alert independently and avoid sending
     duplicate docket alerts for current subscribers.
-    :return: A list of DocketAlertRecipients objects and a list of @recap.email
-     addresses that don't belong to any user if any.
+    :return: A list of DocketAlertRecipients objects, a list of User pks as
+    webhook recipients and a list of @recap.email addresses that don't belong
+    to any user if any.
     """
 
-    # List of DocketAlertRecipient objects
+    # List of DocketAlertRecipient objects to send docket alerts
     da_recipients_list = []
+    # List of DocketAlertRecipient objects to send webhooks
+    webhook_recipients_list = []
     # List of @recap.email addresses that don't belong to any user
     recap_email_user_does_not_exist_list = []
 
@@ -77,6 +80,7 @@ def get_docket_alert_recipients(
                 user_pk=da.user.pk,
             )
             da_recipients_list.append(dar)
+            webhook_recipients_list.append(da.user.pk)
 
     # Get recap email recipients and create new docket alerts objects
     for email_address in recap_email_recipients:
@@ -105,8 +109,8 @@ def get_docket_alert_recipients(
                 defaults={"alert_type": alert_type},
             )
             if not created:
-                # If a docket alert exists for this @recap.email user, avoid
-                # sending the first email
+                # If a docket alert exists for this @recap.email user-case,
+                # avoid sending the first email or webhook event
                 continue
 
             dar = DocketAlertRecipient(
@@ -117,7 +121,16 @@ def get_docket_alert_recipients(
                 user_pk=user_profile.user.pk,
             )
             da_recipients_list.append(dar)
-    return da_recipients_list, recap_email_user_does_not_exist_list
+            # For first-time user-case notifications we only send webhook
+            # events if the user has the auto-subscribe option enabled.
+            if user_profile.auto_subscribe:
+                webhook_recipients_list.append(user_profile.user.pk)
+
+    return (
+        da_recipients_list,
+        webhook_recipients_list,
+        recap_email_user_does_not_exist_list,
+    )
 
 
 def make_alert_messages(
@@ -176,8 +189,8 @@ def make_alert_messages(
 def send_alert_and_webhook(
     d_pk: int,
     since: datetime,
-    recap_email_recipients: list[str] = None,
-    docket_entries: list[DocketEntry] = None,
+    recap_email_recipients: list[str] | None = None,
+    des_pks: list[int] | None = None,
 ) -> None:
     """Send an alert and webhook for a given docket
 
@@ -223,7 +236,7 @@ def send_alert_and_webhook(
     :param since: If we run alerts, notify users about items *since* this time.
     :param recap_email_recipients: The recap.email addresses if needed to send
     the first case-user notification email.
-    :param docket_entries: A list of docket entries used if we need to send an
+    :param des_pks: A list of docket entries pks used if we need to send an
     alert again for a recap.email user independently
     :return: None
     """
@@ -231,10 +244,14 @@ def send_alert_and_webhook(
     if recap_email_recipients is None:
         recap_email_recipients = []
     recap_email_user_only = False
-    if docket_entries:
+    if des_pks:
         recap_email_user_only = True
 
-    da_recipients, re_user_does_not_exist_list = get_docket_alert_recipients(
+    (
+        da_recipients,
+        webhook_recipients,
+        re_user_does_not_exist_list,
+    ) = get_docket_alert_recipients(
         d_pk, recap_email_recipients, recap_email_user_only
     )
 
@@ -247,12 +264,13 @@ def send_alert_and_webhook(
         return
 
     d = Docket.objects.get(pk=d_pk)
-    if docket_entries is not None:
-        new_des = docket_entries
+    if des_pks is not None:
+        new_des = DocketEntry.objects.filter(pk__in=des_pks)
     else:
         new_des = list(
             DocketEntry.objects.filter(date_created__gte=since, docket=d)
         )
+        des_pks = [de.pk for de in new_des]
     if len(new_des) == 0 and not recap_email_user_only:
         # No new docket entries.
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
@@ -266,8 +284,8 @@ def send_alert_and_webhook(
     tally_stat("alerts.docket.alerts.sent", inc=len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
-    # Send the docket to webhook
-    send_docket_alert_webhooks.delay(new_des, da_recipients)
+    # Send docket entries to webhook
+    send_docket_alert_webhooks.delay(des_pks, webhook_recipients)
     if not recap_email_user_only:
         delete_redis_semaphore("ALERTS", make_alert_key(d_pk))
 
@@ -339,33 +357,22 @@ def send_unsubscription_confirmation(
 
 @app.task()
 def send_docket_alert_webhooks(
-    docket_entries: list[DocketEntry],
-    da_recipients: list[DocketAlertRecipient],
+    des_pks: list[int],
+    webhook_recipients_pks: list[int],
 ) -> None:
     """POSTS the DocketAlert to the recipients webhook(s)
 
-    :param docket_entries: The new docket entries to send.
-    :param da_recipients: A list of DocketAlertRecipients objects to send the
-    webhook to.
+    :param des_pks: The list of docket entries primary keys.
+    :param webhook_recipients_pks: A list of User pks to send the webhook to.
     :return: None
     """
 
-    # Only send the webhook event to users for whom this isn't their first
-    # notification for the case or if it's, only sends it if auto_subscribe is
-    # turned on.
-    webhook_recipients = [
-        da_re.user_pk
-        for da_re in da_recipients
-        if da_re.first_email is True
-        and da_re.auto_subscribe is True
-        or da_re.first_email is False
-    ]
     webhooks = Webhook.objects.filter(
         event_type=WebhookEventType.DOCKET_ALERT,
-        user_id__in=webhook_recipients,
+        user_id__in=webhook_recipients_pks,
         enabled=True,
     )
-
+    docket_entries = DocketEntry.objects.filter(pk__in=des_pks)
     serialized_docket_entries = []
     for de in docket_entries:
         serialized_docket_entries.append(DocketEntrySerializer(de).data)

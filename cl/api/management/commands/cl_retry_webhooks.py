@@ -10,9 +10,7 @@ from cl.lib.command_utils import VerboseCommand
 
 
 def retry_webhook_events() -> int:
-    """Retry Webhook events that need to be retried. Those in ENQUEUED_RETRY
-    status and that their next_retry_date is lower or equal to the current time
-    and their parent webhook is not disabled.
+    """Retry Webhook events that need to be retried.
 
     :return: Number of retried webhooks .
     """
