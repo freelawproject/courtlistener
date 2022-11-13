@@ -28,9 +28,9 @@ from timeout_decorator import timeout_decorator
 
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.lib.test_helpers import SimpleUserDataMixin
-from cl.recap.tests import MockResponse as MockPostResponse
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -3036,7 +3036,7 @@ class WebhooksHTMXTests(APITestCase):
         with mock.patch(
             "cl.api.utils.requests.post",
             side_effect=lambda *args, **kwargs: MockPostResponse(
-                200, content=b"{'message': 'OK'}"
+                200, mock_raw=True
             ),
         ):
             response = self.client.post(webhook_1_path_test, {})
@@ -3046,5 +3046,5 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
         self.assertEqual(webhook_event[0].debug, True)
         self.assertEqual(
-            webhook_event[0].content["results"][0]["id"], 210763800
+            webhook_event[0].content["results"][0]["id"], 2208776613
         )

@@ -17,10 +17,6 @@ def send_test_webhook_event(
     :return: None
     """
 
-    # Only send the webhook event to users for whom this isn't their first
-    # notification for the case or if it's, only sends it if auto_subscribe is
-    # turned on.
-
     webhook = Webhook.objects.get(pk=webhook_pk)
     json_obj = json.loads(content_str)
     webhook_event = WebhookEvent.objects.create(

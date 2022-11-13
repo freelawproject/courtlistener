@@ -4081,6 +4081,13 @@ class WebhooksRetries(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             next_retry_date=fake_now + timedelta(minutes=3),
         )
+        webhook_e1_debug = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+            next_retry_date=fake_now + timedelta(minutes=3),
+            debug=True,
+        )
         webhook_e2 = WebhookEventFactory(
             webhook=self.webhook,
             content="{'message': 'ok_2'}",

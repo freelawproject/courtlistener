@@ -1356,7 +1356,7 @@ emphasis {
   display: none;
 }
 
-.webhooks textarea {
+textarea {
   resize: vertical;
 }
 
@@ -1364,7 +1364,7 @@ emphasis {
   position:relative;
 }
 
-.copy-text {
+.copy-text-icon {
     color: #999;
     font-size: 1.5em;
     width: 20px;
@@ -1378,7 +1378,7 @@ emphasis {
     cursor: pointer;
 }
 
-.copy-text:hover{
+.copy-text-icon:hover{
   color: #222;
 }
 

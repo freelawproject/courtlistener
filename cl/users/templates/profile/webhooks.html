@@ -55,17 +55,17 @@
       let webhook_title = document.querySelector("#webhook-modal .modal-title");
       let webhook_form = document.getElementById("webhooks-body");
       let webhook_form_testing = document.getElementById("webhooks-body-testing");
-       if (e.detail.target.id == "webhooks-body" ) {
-          // Clean and set the right title according to the HTMX request.
-          webhook_form.innerHTML = "";
-          webhook_form_testing.innerHTML = "";
-          webhook_title.innerHTML = "Add a webhook endpoint"
+      if (e.detail.target.id == "webhooks-body" ) {
+        // Clean and set the right title according to the HTMX request.
+        webhook_form.innerHTML = "";
+        webhook_form_testing.innerHTML = "";
+        webhook_title.innerHTML = "Add a webhook endpoint"
       }
-       if (e.detail.target.id == "webhooks-body-testing") {
-          // Clean and set the right title according to the HTMX request.
-          webhook_form.innerHTML = "";
-          webhook_form_testing.innerHTML = "";
-          webhook_title.innerHTML = "Test a webhook event"
+      if (e.detail.target.id == "webhooks-body-testing") {
+        // Clean and set the right title according to the HTMX request.
+        webhook_form.innerHTML = "";
+        webhook_form_testing.innerHTML = "";
+        webhook_title.innerHTML = "Test a webhook event"
       }
 
       /*

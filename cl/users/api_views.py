@@ -113,8 +113,6 @@ class WebhooksViewSet(ModelViewSet):
 
         webhook = self.get_object()
         event_type = webhook.event_type
-        da_dummy_content = ""
-        da_dummy_curl = ""
         match event_type:
             case WebhookEventType.DOCKET_ALERT:
                 da_template = loader.get_template(
@@ -127,25 +125,15 @@ class WebhooksViewSet(ModelViewSet):
                 da_dummy_curl = da_curl_template.render(
                     {"endpoint_url": webhook.url}
                 ).strip()
-            case WebhookEventType.SEARCH_ALERT:
-                # Currently, we don't yet support search alert webhooks.
+            case _:
+                # Webhook types with no support yet.
                 da_dummy_content = (
-                    "Currently, we don't yet support "
-                    f"{WebhookEventType.SEARCH_ALERT.label} webhooks."
+                    "Currently, we don't yet support events for this type of "
+                    "webhook."
                 )
                 da_dummy_curl = (
-                    "Currently, we don't yet support "
-                    f"{WebhookEventType.SEARCH_ALERT.label} webhooks."
-                )
-            case WebhookEventType.RECAP_FETCH:
-                # Currently, we don't yet support recap fetch webhooks.
-                da_dummy_content = (
-                    "Currently, we don't yet support "
-                    f"{WebhookEventType.RECAP_FETCH.label} webhooks."
-                )
-                da_dummy_curl = (
-                    "Currently, we don't yet support "
-                    f"{WebhookEventType.RECAP_FETCH.label} webhooks."
+                    "Currently, we don't yet support events for this type of "
+                    "webhook."
                 )
 
         if self.request.method == "GET":
@@ -159,7 +147,7 @@ class WebhooksViewSet(ModelViewSet):
                 template_name="includes/webhooks_htmx/webhooks-test-webhook.html",
             )
 
-        # On POST send the webhook test event.
+        # On POST enqueue the webhook test event.
         send_test_webhook_event.delay(webhook.pk, da_dummy_content)
         return Response(
             status=HTTP_200_OK,

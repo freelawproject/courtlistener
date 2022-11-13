@@ -6,7 +6,7 @@
   <div class="col-xs-12">
     <label for="dummy_data">Dummy Content:</label>
     <div class="dummy-area">
-      <div class="copy-text" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
+      <div class="copy-text-icon" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
       <textarea readonly class="form-control" id="dummy_data" rows="4">
         {{ dummy_content }}
       </textarea>
@@ -35,13 +35,19 @@
 
 <div class="row form-group">
   <div class="col-xs-12">
-    <label for="dummy_curl">Test this Webhook event locally with the following <a data-toggle="collapse" href="#curl-command">CURL command:</a></label>
+    <button id="webhook-curl-command" class="btn btn-primary v-offset-below-1"
+              data-toggle="collapse"
+              href="#curl-command"
+              >
+            Show cURL Command
+    </button>
     <div class="collapse" id="curl-command">
       <div class="dummy-area">
-        <div class="copy-text" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
-        <textarea readonly class="form-control" id="dummy_curl" rows="4">
+        <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
+        <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="4">
           {{ dummy_curl }}
         </textarea>
+        <label for="dummy_curl">Use this command locally to replicate this event from our servers.</label>
       </div>
     </div>
   </div>

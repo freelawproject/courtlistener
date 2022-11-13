@@ -1,5 +1,10 @@
 BEGIN;
 --
+-- Add field debug to webhookevent
+--
+ALTER TABLE "api_webhookevent" ADD COLUMN "debug" boolean DEFAULT false NOT NULL;
+ALTER TABLE "api_webhookevent" ALTER COLUMN "debug" DROP DEFAULT;
+--
 -- Add field error_message to webhookevent
 --
 ALTER TABLE "api_webhookevent" ADD COLUMN "error_message" text DEFAULT '' NOT NULL;
@@ -7,7 +12,7 @@ ALTER TABLE "api_webhookevent" ALTER COLUMN "error_message" DROP DEFAULT;
 --
 -- Add field event_id to webhookevent
 --
-ALTER TABLE "api_webhookevent" ADD COLUMN "event_id" uuid DEFAULT 'ca986013-2cf0-4f0b-88b2-d54705410ab2'::uuid NOT NULL;
+ALTER TABLE "api_webhookevent" ADD COLUMN "event_id" uuid DEFAULT '962a3abe-713f-497e-b660-83bf9763efdd'::uuid NOT NULL;
 ALTER TABLE "api_webhookevent" ALTER COLUMN "event_id" DROP DEFAULT;
 --
 -- Add field event_status to webhookevent
