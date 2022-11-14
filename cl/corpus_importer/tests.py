@@ -14,7 +14,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
     compare_documents,
     parse_harvard_opinions,
-    validate_dt,
+    validate_dt, case_names_dont_overlap,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -22,7 +22,8 @@ from cl.lib.pacer import process_docket_data
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
-from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.factories import CourtFactory, DocketFactory, \
+    OpinionClusterFactoryWithChildrenAndParents
 from cl.search.models import (
     Citation,
     Docket,
@@ -257,7 +258,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                "               Instead we got: '%s'" % (d["answer"], got),
+                    "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -438,12 +439,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-            "Got %s, expected %s: \n%s"
-            % (
-                actual_num_attorneys,
-                expected_num_attorneys,
-                first_party_attorneys,
-            ),
+                "Got %s, expected %s: \n%s"
+                % (
+                    actual_num_attorneys,
+                    expected_num_attorneys,
+                    first_party_attorneys,
+                ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -454,7 +455,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -681,3 +682,54 @@ class HarvardTests(TestCase):
 
         bad_match = compare_documents(harvard_characters, bad_characters)
         self.assertEqual(bad_match, 81)
+
+    def test_casename_overlap(self):
+        """ Check if case names overlap """
+
+        court_ca4 = CourtFactory(id="ca4")
+        court_fladistctapp = CourtFactory(id="fladistctapp")
+        court_arkctapp = CourtFactory(id="arkctapp")
+
+        # Create opinion cluster object, pass case full name and name
+        # abbreviation extracted from json file and expected result returned
+        # from case_names_dont_overlap function
+        test_case_1 = (OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_ca4),
+            case_name="United States v. Frank Esquivel",
+            date_filed=date(2012, 2, 3)),
+                       "UNITED STATES of America, Plaintiff—Appellee v. "
+                       "Frank ESQUIVEL, Defendant—Appellant",
+                       "United States v. Esquivel", False)
+
+        test_case_2 = (OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_ca4),
+            case_name="United States v. Truman Scott",
+            date_filed=date(2012, 2, 3)),
+                       "UNITED STATES of America, Plaintiff—Appellee v. "
+                       "Truman SCOTT, Defendant—Appellant",
+                       "United States v. Scott", False)
+
+        test_case_3 = (OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_fladistctapp),
+            case_name="Moore v. State",
+            date_filed=date(1974, 8, 20)),
+                       "Carlos E. MOORE, Appellant, v. STATE of Florida, "
+                       "Appellee; Robert Lee MARTIN, Appellant, v. STATE of "
+                       "Florida, Appellee; John RIM, Appellant, v. STATE of "
+                       "Florida, Appellee; Michael J. KEENY, Appellant, "
+                       "v. STATE of Florida, Appellee; James Kelly HAMLIN, "
+                       "Appellant, v. STATE of Florida, Appellee",
+                       "Moore v. State", False)
+
+        test_case_4 = (OpinionClusterFactoryWithChildrenAndParents(
+            docket=DocketFactory(court=court_arkctapp),
+            case_name="Kingsley v. State",
+            date_filed=date(2019, 2, 8)),
+                       "STATE of Kansas, Appellee, v. Margo Lane STEVENS, "
+                       "Appellant.",
+                       "Larson v. State", True)
+
+        cases = [test_case_1, test_case_2, test_case_3, test_case_4]
+
+        for c in cases:
+            self.assertEqual(case_names_dont_overlap(c[0], c[1], c[2]), c[3])
