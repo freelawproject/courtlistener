@@ -104,3 +104,42 @@ def notify_new_or_updated_webhook(
     )
     msg.attach_alternative(html, "text/html")
     msg.send()
+
+
+@app.task(ignore_result=True)
+def notify_failing_webhook(
+    webhook_pk: int,
+    disabled: bool,
+) -> None:
+    """Send a notification to the webhook user when a webhook event fails, or
+    it has been disabled.
+
+    :param webhook_pk: The related webhook PK.
+    :param disabled: Whether the webhook has been disabled.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    first_name = webhook.user.first_name
+    subject = f"Your {webhook.get_event_type_display()} webhook is failing."
+    if disabled:
+        subject = (
+            f"Your {webhook.get_event_type_display()} webhook was disabled."
+        )
+    txt_template = loader.get_template("emails/failing_webhook.txt")
+    html_template = loader.get_template("emails/failing_webhook.html")
+    context = {
+        "webhook": webhook,
+        "first_name": first_name,
+        "disabled": disabled,
+    }
+    txt = txt_template.render(context)
+    html = html_template.render(context)
+    msg = EmailMultiAlternatives(
+        subject,
+        txt,
+        settings.DEFAULT_FROM_EMAIL,
+        [webhook.user.email],
+    )
+    msg.attach_alternative(html, "text/html")
+    msg.send()

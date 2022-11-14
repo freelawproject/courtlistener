@@ -1,0 +1,52 @@
+{% load humanize %}
+
+<!DOCTYPE html>
+<html style="font-size: 100.01%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+             font-style: inherit; margin: 0; padding: 0;">
+<head>
+    <meta charset="utf-8">
+    <style type="text/css">
+        a:visited { text-decoration: none !important; }
+        a:hover { text-decoration: none !important; }
+        a:focus { text-decoration: none !important; }
+    </style>
+</head>
+<body style="font-size: 100%; font-weight: inherit; line-height: 1.5;
+             font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif; color: #222; border: 0;
+             vertical-align: baseline; font-style: inherit; background: #fff; margin: 0; padding: 0;">
+<hr style="background: #ddd; color: #ddd; clear: both; float: none; width: 60%; height: .1em; margin: 0 0 1.45em;
+           border: none;">
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+  {% if first_name %}
+    Hello {{ first_name }},
+  {% else %}
+    Hello,
+  {% endif %}
+</p>
+  {% if disabled %}
+    <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">One of your webhook events has reached the max number of retries (7), and we couldn't deliver it successfully.</p>
+    <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">So we've disabled the related Webhook to this event. Find more details below:</p>
+  {% else %}
+    <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">We couldn't deliver one or more Webhook events that belong to the following Webhook:</p>
+  {% endif %}
+
+<ul>
+  <li>Webhook Type: {{ webhook.get_event_type_display }}</li>
+  <li>Webhook Endpoint: {{ webhook.url }}</li>
+</ul>
+
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+  {% if disabled %}
+    Use this information to solve the problem. Then you can re-enable it within your <a href="https://www.courtlistener.com{% url 'view_webhooks' %}">Webhooks panel.</a>
+  {% else %}
+    We'll continue trying to deliver failing webhook events a few more times. When a webhook event reaches 7 retries we'll disable this Webhook.
+  {% endif %}
+</p>
+
+</body>
+</html>

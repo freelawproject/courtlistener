@@ -1,0 +1,24 @@
+{% if first_name %}
+Hello {{ first_name }},
+{% else %}
+Hello,
+{% endif %}
+
+{% if disabled %}
+One of your webhook events has reached the max number of retries (7), and we couldn't deliver it successfully.
+So we've disabled the related Webhook to this event. Find more details below:
+{% else %}
+We couldn't deliver one or more Webhook events that belong to the following Webhook:
+{% endif %}
+
+Webhook Type: {{ webhook.get_event_type_display }}
+Webhook Endpoint: {{ webhook.url }}
+
+{% if disabled %}
+Use this information to solve the problem. Then you can re-enable it within your Webhooks panel.
+https://www.courtlistener.com{% url 'view_webhooks' %}
+{% else %}
+We'll continue trying to deliver failing webhook events a few more times. When a webhook event reaches 7 retries we'll disable this Webhook.
+{% endif %}
+
+

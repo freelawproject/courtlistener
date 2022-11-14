@@ -127,6 +127,6 @@ def webhook_created_or_updated(
         notify_new_or_updated_webhook.delay(instance.pk, created=True)
     else:
         if update_fields:
-            if "failure_count" in update_fields:
+            if "failure_count" or "enabled" in update_fields:
                 return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)
