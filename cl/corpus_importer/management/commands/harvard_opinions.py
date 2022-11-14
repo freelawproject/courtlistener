@@ -968,12 +968,11 @@ def winnow_case_name(case_name: str) -> Set:
     }
 
     # strings where order matters
-    false_positive_strings = [
-        "united states"
-    ]
+    false_positive_strings = ["united states"]
 
     false_positive_strings_regex = re.compile(
-        '|'.join(map(re.escape, false_positive_strings)))
+        "|".join(map(re.escape, false_positive_strings))
+    )
 
     # Remove all non alphanumeric characters
     case_name = harmonize(case_name)
@@ -1105,7 +1104,7 @@ class Command(VerboseCommand):
             required=False,
             type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
-                 "'1:' will start at 1 and to 2000; '5' will do volume 5",
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
@@ -1130,7 +1129,7 @@ class Command(VerboseCommand):
             "--location",
             type=str,
             help="The location of the court (if applicable) ex. Florida"
-                 "for courts-db differentiation.",
+            "for courts-db differentiation.",
             required=False,
             default=None,
         )
@@ -1138,7 +1137,7 @@ class Command(VerboseCommand):
             "--make-searchable",
             action="store_true",
             help="Add items to solr as we create opinions. "
-                 "Items are not searchable unless flag is raised.",
+            "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
             "--no-debug",
