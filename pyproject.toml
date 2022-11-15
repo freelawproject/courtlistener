@@ -104,7 +104,7 @@ sentry-sdk = "^1.9.0"
 selenium = "4.0.0.a7"
 ipython = "^8.5.0"
 time-machine = "^2.8.2"
-juriscraper = "^2.5.25"
+juriscraper = "^2.5.26"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.7.2"
