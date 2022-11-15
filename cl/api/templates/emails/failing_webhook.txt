@@ -22,7 +22,10 @@ We'll continue trying to deliver events to this webhook up to seven times before
 {% endif %}
 
 Thank you for looking into this.
+
 If you need further assistance, please contact support:
 https://www.courtlistener.com{% url 'contact' %}
+
 Sincerely,
+
 The FLP Bots
