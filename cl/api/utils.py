@@ -32,6 +32,7 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.lib.string_utils import trunc
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
+from cl.users.tasks import notify_failing_webhook
 
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
@@ -584,6 +585,45 @@ def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     return new_next_retry_date
 
 
+WEBHOOK_MAX_RETRY_COUNTER = 7
+
+
+def check_webhook_failure_count_and_notify(
+    webhook_event: WebhookEvent,
+) -> None:
+    """Check if a Webhook needs to be disabled and/or send a notification about
+     a failing webhook event.
+
+    :param webhook_event: The related WebhookEvent to check.
+    :return: None
+    """
+
+    # Send failing webhook events notifications for only some of the retries
+    notify_on = {
+        0: False,
+        1: True,  # Send first webhook failing notification
+        2: False,
+        3: False,
+        4: True,  # Send second webhook failing notification
+        5: False,
+        6: True,  # Send third webhook failing notification
+        7: True,  # Send webhook disabled notification
+    }
+
+    current_try_counter = webhook_event.retry_counter
+    disabled = False
+    webhook = webhook_event.webhook
+    if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER and webhook.enabled:
+        webhook.enabled = False
+        # Don't send notification email via signal in cl.users.signals
+        webhook.save(update_fields=["enabled"])
+        disabled = True
+
+    notify = notify_on[current_try_counter]
+    if notify:
+        notify_failing_webhook.delay(webhook_event.webhook.pk, disabled)
+
+
 def update_webhook_event_after_request(
     webhook_event: WebhookEvent,
     response: Response | None = None,
@@ -601,8 +641,6 @@ def update_webhook_event_after_request(
     receive an error to log it.
     :return: None
     """
-
-    WEBHOOK_MAX_RETRY_COUNTER = 7
 
     failed_request = False
     if response is not None:
@@ -624,8 +662,9 @@ def update_webhook_event_after_request(
     if failed_request or error:
         webhook = webhook_event.webhook
         webhook.failure_count = F("failure_count") + 1
-        # Avoid notify to admins in cl.users.signals webhook_created_or_updated
+        # Don't send notification email via signal in cl.users.signals
         webhook.save(update_fields=["failure_count"])
+        check_webhook_failure_count_and_notify(webhook_event)
         if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             # If the webhook has reached the max retry counter, mark as failed
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED

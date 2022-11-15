@@ -4498,3 +4498,88 @@ class WebhooksRetries(TestCase):
                     self.assertEqual(
                         webhook_triggered[0].next_retry_date, seven_retry_time
                     )
+
+    def test_webhook_disabling(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """Can we properly send failing webhook events and disable webhooks
+        if max retries are expired?
+        """
+
+        fake_now = now()
+        webhook_e1 = WebhookEventFactory(
+            webhook=self.webhook,
+            content="{'message': 'ok_1'}",
+            event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+            next_retry_date=fake_now + timedelta(minutes=3),
+        )
+        # (try_count, total_notifications_sent, webhook_enabled)
+        iterations = [
+            (1, 0, True),
+            (2, 1, True),  # Send first webhook failing notification
+            (3, 1, True),
+            (4, 1, True),
+            (5, 2, True),  # Send second webhook failing notification
+            (6, 2, True),
+            (7, 3, True),  # Send third webhook failing notification
+            (8, 4, False),  # Send webhook disabled notification
+            (9, 4, False),
+        ]
+        webhook_e1_compare = WebhookEvent.objects.filter(pk=webhook_e1.id)
+        for try_count, notification_out, webhook_enabled in iterations:
+            with mock.patch(
+                "cl.api.utils.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    500, mock_raw=True
+                ),
+            ):
+                next_retry_date = fake_now + timedelta(minutes=3)
+                with time_machine.travel(next_retry_date, tick=False):
+                    expected_webhooks_to_retry = 1
+                    if try_count >= 8:
+                        # After the 7 try, the webhook event is marked as
+                        # Failed.
+                        status_to_compare = WEBHOOK_EVENT_STATUS.FAILED
+                        expected_try_count = 7
+                    else:
+                        status_to_compare = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+                        expected_try_count = try_count
+
+                    if try_count >= 9:
+                        # No webhook events should be retried after 8 tries.
+                        expected_webhooks_to_retry = 0
+
+                    webhooks_to_retry = retry_webhook_events()
+                    self.assertEqual(
+                        webhooks_to_retry, expected_webhooks_to_retry
+                    )
+                    self.assertEqual(
+                        webhook_e1_compare[0].event_status,
+                        status_to_compare,
+                    )
+                    self.assertEqual(
+                        webhook_e1_compare[0].retry_counter,
+                        expected_try_count,
+                    )
+                    self.assertEqual(
+                        webhook_e1_compare[0].webhook.enabled,
+                        webhook_enabled,
+                    )
+                    self.assertEqual(len(mail.outbox), notification_out)
+
+                    if notification_out >= 1:
+                        message = mail.outbox[notification_out - 1]
+                        subject_to_compare = "webhook is failing"
+                        if try_count in [8, 9]:
+                            subject_to_compare = "webhook is now disabled"
+                        self.assertIn(subject_to_compare, message.subject)
+
+                    # Restore webhook event to test the remaining options
+                    # We can update this if we want to use real times...
+                    webhook_e1_compare.update(
+                        next_retry_date=webhook_e1.next_retry_date,
+                    )
