@@ -3,15 +3,15 @@ from factory import Faker
 
 
 class CitationFactory(factory.DictFactory):
-    cite = Faker("random_citation")
+    cite = Faker("citation")
 
 
 class CaseLawCourtFactory(factory.DictFactory):
-    name = Faker("court_name")
+    name = Faker("court_name", known=True)
 
 
 class CaseBodyFactory(factory.DictFactory):
-    data = '<casebody firstpage="1" lastpage="2">\n  <opinion type="majority">Everybody wins.</opinion>\n</casebody>'
+    data = '<casebody firstpage="1" lastpage="2">\n <otherdate id="Ail">March 3, 2009.</otherdate>  <opinion type="majority"><author id="b123-14">Cowin, J.</author>Everybody wins.</opinion>\n</casebody>'
 
 
 class CaseLawFactory(factory.DictFactory):
