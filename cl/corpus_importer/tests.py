@@ -1,13 +1,17 @@
 import json
 import os
+import re
 from datetime import date, datetime
-from glob import iglob
 from unittest.mock import patch
 
 import pytest
 
 from cl.corpus_importer.court_regexes import match_court_string
-from cl.corpus_importer.factories import CaseLawCourtFactory, CaseLawFactory
+from cl.corpus_importer.factories import (
+    CaseBodyFactory,
+    CaseLawCourtFactory,
+    CaseLawFactory,
+)
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
@@ -510,16 +514,32 @@ class HarvardTests(TestCase):
         )
         print(post_install_count - pre_install_count, "✓")
 
+    def _get_cite(self, case_law) -> Citation:
+        m = re.findall(r"(\d+) (.+) (\d+)", case_law["citations"][0]["cite"])
+        volume, reporter, page = m[0]
+        cite = Citation.objects.get(
+            volume=volume, reporter=reporter, page=page
+        )
+        return cite
+
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[[os.path.join(test_dir, "mass_court_new.json")]],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_new_case(self, mock):
-        """Simple case: Can we install a case from JSON?"""
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_new_case(self, read_json_func, filepath_list_func):
+        """Can we add a injest a new case"""
+        case_law = CaseLawFactory(court=CaseLawCourtFactory.create(known=True))
+        read_json_func.return_value = case_law
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
         self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=454, reporter="Mass.", page=101)
 
         # Test some opinion attributes
+        m = re.findall(r"(\d+) (.+) (\d+)", case_law["citations"][0]["cite"])
+        volume, reporter, page = m[0]
+        cite = Citation.objects.get(
+            volume=volume, reporter=reporter, page=page
+        )
+
         ops = cite.cluster.sub_opinions.all()
         expected_opinion_count = 1
         self.assertEqual(ops.count(), expected_opinion_count)
@@ -533,64 +553,77 @@ class HarvardTests(TestCase):
 
         # Test some cluster attributes
         cluster = cite.cluster
-        expected_judges = "Cowin"
-        self.assertEqual(cluster.judges, expected_judges)
 
-        expected_date_filed = date(2009, 6, 12)
-        self.assertEqual(cluster.date_filed, expected_date_filed)
-
-        expected_case_name_full = "Commonwealth v. Willie Furr"
-        self.assertEqual(cluster.case_name_full, expected_case_name_full)
+        self.assertEqual(cluster.judges, expected_author_str)
+        self.assertEqual(
+            cluster.date_filed,
+            datetime.strptime(case_law["decision_date"], "%Y-%m-%d").date(),
+        )
+        self.assertEqual(cluster.case_name_full, case_law["name"])
 
         expected_other_dates = "March 3, 2009."
         self.assertEqual(cluster.other_dates, expected_other_dates)
 
         # Test some docket attributes
         docket = cite.cluster.docket
-
-        expected_docket_number = "Docket No. 105739"
-        self.assertEqual(docket.docket_number, expected_docket_number)
+        self.assertEqual(docket.docket_number, case_law["docket_number"])
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "tax_court_similar*"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_duplicate_cite_different_case(self, mock):
-        """Will we add a case with the same citation but a different case
-        name?
-        """
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_syllabus_and_summary_wrapping(
+        self, read_json_func, filepath_list_func
+    ):
+        """Did we properly parse syllabi?"""
+        case_law = CaseLawFactory.create(
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+            casebody=CaseBodyFactory.create(
+                data='<casebody>  <summary id="b283-8"><em>Error from Bourbon \
+Bounty.</em></summary>\
+<syllabus id="b283-9">Confessions of judgment, provided for in title 11,\
+ chap. 3, civil code, must be made in open court; a judgment entered on a \
+confession taken by the clerk in vacation, is a nullity. <em>Semble, </em>the \
+clerk, in vacation, is only authorized by § 389 to enter in vacation a judgment \
+rendered by the court.</syllabus> <opinion type="majority"><p id="AvW"> \
+delivered the opinion of the Court.</p></opinion> </casebody>'
+            ),
+        )
+        read_json_func.return_value = case_law
+        filepath_list_func.return_value = ["/one/fake/percuriam.json"]
         self.assertSuccessfulParse(1)
+        cite = self._get_cite(case_law)
+        self.assertEqual(cite.cluster.syllabus.count("<p>"), 1)
+        self.assertEqual(cite.cluster.summary.count("<p>"), 1)
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "bta_*.json"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_real_bta_failure(self, mock):
-        """Will we add a case with the same citation but a different case
-        name?
-        """
-        self.assertSuccessfulParse(2)
-
-    @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
-    )
-    def test_syllabus_and_summary_wrapping(self, mock):
-        """Did we properly parse three syllabi?"""
-        self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=4, reporter="Kan.", page=283)
-        self.assertEqual(cite.cluster.syllabus.count("<p>"), 3)
-        self.assertEqual(cite.cluster.summary.count("<p>"), 32)
-
-    @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "syllabus*"))],
-    )
-    def test_attorney_extraction(self, mock):
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_attorney_extraction(self, read_json_func, filepath_list_func):
         """Did we properly parse attorneys?"""
+
+        case_law = CaseLawFactory.create(
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+            casebody=CaseBodyFactory.create(
+                data='<casebody> <attorneys id="b284-5"><em>M. V. Voss, \
+</em>for plaintiff in error.</attorneys> <attorneys id="b284-6">\
+<em>W. O. Webb, </em>for defendant in error.</attorneys> \
+<attorneys id="b284-7"><em>Voss, </em>for plaintiff in error,\
+</attorneys> <attorneys id="b289-5"><em>Webb, </em>\
+<page-number citation-index="1" label="294">*294</page-number>for \
+defendant in error,</attorneys> <opinion type="majority"><p id="AvW"> \
+delivered the opinion of the Court.</p></opinion> </casebody>'
+            ),
+        )
+        read_json_func.return_value = case_law
+        filepath_list_func.return_value = ["/one/fake/percuriam.json"]
         self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=4, reporter="Kan.", page=283)
-        print(cite.cluster.attorneys)
+        cite = self._get_cite(case_law)
         self.assertEqual(
             cite.cluster.attorneys,
             "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant in error., Voss, for plaintiff in error,, Webb, for defendant in error,",
@@ -598,26 +631,62 @@ class HarvardTests(TestCase):
         print("✓")
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "per_curiam*"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_per_curiam(self, mock):
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_per_curiam(self, read_json_func, filepath_list_func):
         """Did we identify the per curiam case."""
+        case_law = CaseLawFactory.create(
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+            casebody=CaseBodyFactory.create(
+                data='<casebody><opinion type="majority"><author id="b56-3">PER CURIAM:</author></casebody>'
+            ),
+        )
+        read_json_func.return_value = case_law
+        filepath_list_func.return_value = ["/one/fake/percuriam.json"]
         self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=381, reporter="A.2d", page=3)
+        cite = self._get_cite(case_law)
+
         ops = cite.cluster.sub_opinions.all()
         self.assertEqual(ops[0].author_str, "Per Curiam")
         self.assertTrue(ops[0].per_curiam)
         print("Success ✓")
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_authors(self, mock):
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_authors(self, read_json_func, filepath_list_func):
         """Did we find the authors and the list of judges."""
+        casebody = """<casebody>
+  <judges id="b246-5">Thomas, J., delivered the opinion of the \
+  Court, in which Roberts, C. J., and Scaua, <page-number citation-index="1" \
+  label="194">Kennedy, Sotjter, Ginsbtjrg, and Auto, JJ., joined. Stevens, J., \
+   filed a dissenting opinion, in which Breyer, J., joined, \
+   <em>post, </em>p. 202.</judges>
+  <opinion type="majority">
+    <author id="b247-5">Justice Thomas</author>
+    <p id="AvW">delivered the opinion of the Court.</p>
+  </opinion>
+  <opinion type="dissent">
+    <author id="b254-6">Justice Stevens,</author>
+    <p id="Ab5">with whom Justice Breyer joins, dissenting.</p>
+  </opinion>
+</casebody>
+        """
+        case_law = CaseLawFactory(
+            casebody=CaseBodyFactory.create(data=casebody),
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+        )
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
+        read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
+
+        cite = self._get_cite(case_law)
         ops = cite.cluster.sub_opinions.all().order_by("author_str")
 
         self.assertEqual(ops[0].author_str, "Stevens")
@@ -630,26 +699,34 @@ class HarvardTests(TestCase):
         print("Success ✓")
 
     @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "joined_by*"))],
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
     )
-    def test_xml_harvard_extraction(self, mock):
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_xml_harvard_extraction(self, read_json_func, filepath_list_func):
         """Did we successfully not remove page citations while
         processing other elements?"""
+        case_body = """
+<casebody firstpage="1" lastpage="2">
+<opinion type="majority">Everybody <page-number citation-index="1" \
+label="194">*194</page-number>
+ and next page <page-number citation-index="1" label="195">*195
+ </page-number>wins.
+ </opinion>
+ </casebody>
+"""
+        case_law = CaseLawFactory.create(
+            casebody=CaseBodyFactory.create(data=case_body),
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+        )
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
+        read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
-        cite = Citation.objects.get(volume=551, reporter="U.S.", page=193)
+        cite = self._get_cite(case_law)
+
         opinions = cite.cluster.sub_opinions.all().order_by("-pk")
         self.assertEqual(opinions[0].xml_harvard.count("</page-number>"), 2)
-        print("Success ✓")
-
-    @patch(
-        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list",
-        side_effect=[iglob(os.path.join(test_dir, "no_author_tag*"))],
-    )
-    def test_missing_page_numbers(self, mock):
-        """Can we parse a case without an author or author tag?"""
-        self.assertSuccessfulParse(1)
-        print("Success ✓")
 
     def test_partial_dates(self) -> None:
         """Can we validate partial dates?"""
@@ -669,10 +746,18 @@ class HarvardTests(TestCase):
 
     def test_short_opinion_matching(self) -> None:
         """Can we match opinions successfully when very small"""
-        aspby_case_body = '<casebody firstpage="1007" lastpage="1007" xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n  <parties id="b985-7">State, Respondent, v. Aspby, Petitioner,</parties>\n  <docketnumber id="Apx">No. 73722-3.</docketnumber>\n  <opinion type="majority">\n    <p id="AJ6">Petition for review of a decision of the Court of Appeals, No. 48369-2-1, September 19, 2002. <em>Denied </em>September 30, 2003.</p>\n  </opinion>\n</casebody>\n'
+        aspby_case_body = '<casebody firstpage="1007" lastpage="1007" \
+xmlns="http://nrs.harvard.edu/urn-3:HLS.Libr.US_Case_Law.Schema.Case_Body:v1">\n\
+<parties id="b985-7">State, Respondent, v. Aspby, Petitioner,</parties>\n \
+<docketnumber id="Apx">No. 73722-3.</docketnumber>\n  <opinion type="majority">\n \
+<p id="AJ6">Petition for review of a decision of the Court of Appeals,\
+ No. 48369-2-1, September 19, 2002. <em>Denied </em>September 30, 2003.\
+</p>\n  </opinion>\n</casebody>\n'
 
-        matching_cl_case = "Petition for review of a decision of the Court of Appeals, No. 48369-2-1, September 19, 2002. Denied September 30, 2003."
-        nonmatch_cl_case = "Petition for review of a decision of the Court of Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
+        matching_cl_case = "Petition for review of a decision of the Court of \
+Appeals, No. 48369-2-1, September 19, 2002. Denied September 30, 2003."
+        nonmatch_cl_case = "Petition for review of a decision of the Court of \
+Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
 
         harvard_characters = clean_body_content(aspby_case_body)
         good_characters = clean_body_content(matching_cl_case)
@@ -690,16 +775,44 @@ class HarvardTests(TestCase):
     @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
     def test_bankruptcy_flag(self, read_json_func, filepath_list_func):
         """Can we test bankruptcy court imports"""
-        filepath_list_func.return_value = ["/one/fake/filepath.json"]
-        court = CaseLawCourtFactory.create(
-            name="United States Bankruptcy Court for the Northern District of Alabama"
+        caselawdata = CaseLawFactory(
+            court=CaseLawCourtFactory.create(
+                name="United States Bankruptcy Court for the Northern \
+            District of Alabama"
+            )
         )
-        caselawdata = CaseLawFactory()
-        caselawdata["court"] = court
         read_json_func.return_value = caselawdata
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
 
         # Test Alabama Bankruptcy Case without bankruptcy flag
         self.assertSuccessfulParse(0, bankruptcy=False)
 
         # Test with bankruptcy flag turned on
         self.assertSuccessfulParse(1, bankruptcy=True)
+
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
+    )
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_same_citation_different_case(
+        self, read_json_func, filepath_list_func
+    ):
+        """Same case name, different opinion - based on a BTA bug"""
+        caselawdata = CaseLawFactory(
+            court=CaseLawCourtFactory.create(
+                known=True,
+            )
+        )
+        read_json_func.return_value = caselawdata
+        filepath_list_func.return_value = ["/one/fake/bta.json"]
+        self.assertSuccessfulParse(1)
+
+        casebody2 = CaseBodyFactory.create(
+            data='<casebody firstpage="1" lastpage="2">\n  \
+            <opinion type="minority">Something else.</opinion>\n</casebody>'
+        )
+        caselawdata["casebody"] = casebody2
+
+        read_json_func.return_value = caselawdata
+        filepath_list_func.return_value = ["/one/fake/bta2.json"]
+        self.assertSuccessfulParse(1)
