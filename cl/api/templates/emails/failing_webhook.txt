@@ -5,20 +5,24 @@ Hello,
 {% endif %}
 
 {% if disabled %}
-One of your webhook events has reached the max number of retries (7), and we couldn't deliver it successfully.
-So we've disabled the related Webhook to this event. Find more details below:
+After seven failed retries over the last two days, one of your webhooks has been disabled and will no longer receive events.
 {% else %}
-We couldn't deliver one or more Webhook events that belong to the following Webhook:
+We couldn't deliver events to one of your webhooks. If this problem persists for approximately 48 hours, this webhook will be disabled until it is fixed on your server.
 {% endif %}
 
+Please find more details below:
 Webhook Type: {{ webhook.get_event_type_display }}
 Webhook Endpoint: {{ webhook.url }}
 
 {% if disabled %}
-Use this information to solve the problem. Then you can re-enable it within your Webhooks panel.
+To re-enable this webhook, review your logs in the webhook settings to see the responses we are getting from your server. Once your server is fixed, you can re-enable the webhook in your settings:
 https://www.courtlistener.com{% url 'view_webhooks' %}
 {% else %}
-We'll continue trying to deliver failing webhook events a few more times. When a webhook event reaches 7 retries we'll disable this Webhook.
+We'll continue trying to deliver events to this webhook up to seven times before disabling further events.
 {% endif %}
 
-
+Thank you for looking into this.
+If you need further assistance, please contact support:
+https://www.courtlistener.com{% url 'contact' %}
+Sincerely,
+The FLP Bots

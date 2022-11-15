@@ -4506,8 +4506,8 @@ class WebhooksRetries(TestCase):
         mock_pacer_court_accessible,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test checks if we can send properly failing webhook events
-        notifications and disable the webhook after a webhook event is max retried.
+        """Can we properly send failing webhook events and disable webhooks
+        if max retries are expired?
         """
 
         fake_now = now()
@@ -4575,7 +4575,7 @@ class WebhooksRetries(TestCase):
                         message = mail.outbox[notification_out - 1]
                         subject_to_compare = "webhook is failing"
                         if try_count in [8, 9]:
-                            subject_to_compare = "webhook was disabled"
+                            subject_to_compare = "webhook is now disabled"
                         self.assertIn(subject_to_compare, message.subject)
 
                     # Restore webhook event to test the remaining options
