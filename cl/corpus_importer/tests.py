@@ -11,6 +11,7 @@ from cl.corpus_importer.factories import (
     CaseBodyFactory,
     CaseLawCourtFactory,
     CaseLawFactory,
+    CitationFactory,
 )
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
@@ -816,3 +817,26 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         read_json_func.return_value = caselawdata
         filepath_list_func.return_value = ["/one/fake/bta2.json"]
         self.assertSuccessfulParse(1)
+
+    @patch(
+        "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
+    )
+    @patch("cl.corpus_importer.management.commands.harvard_opinions.read_json")
+    def test_bad_ibid_citation(self, read_json_func, filepath_list_func):
+        """Can we add a case with a bad ibid citation?"""
+        citations = [
+            "7 Ct. Cl. 65",
+            "1 Ct. Cls. R., p. 270, 3 id., p. 10; 7 W. R., p. 666",
+        ]
+        case_law = CaseLawFactory(
+            court=CaseLawCourtFactory.create(
+                known=True,
+            ),
+            citations=[CitationFactory(cite=cite) for cite in citations],
+        )
+        read_json_func.return_value = case_law
+        filepath_list_func.return_value = ["/one/fake/filepath.json"]
+
+        self.assertSuccessfulParse(1)
+        cite = self._get_cite(case_law)
+        self.assertEqual(str(cite), "7 Ct. Cl. 65")
