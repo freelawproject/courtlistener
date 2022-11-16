@@ -20,7 +20,7 @@ class LegalProvider(BaseProvider):
         """
         return "".join(fake.random_letters(length=15)).lower()
 
-    def court_name(self, known: bool = False) -> str:
+    def court_name(self) -> str:
         """
         Generate court names like:
 
@@ -30,14 +30,6 @@ class LegalProvider(BaseProvider):
 
         :return: A court name
         """
-        if known:
-            return random.choice(
-                [
-                    "Supreme Court of the United States",
-                    "Massachusetts Supreme Judicial Court",
-                    "United States Board of Tax Appeals",
-                ]
-            )
         first_word = random.choice(
             [
                 "Thirteenth circuit",
@@ -91,8 +83,20 @@ class LegalProvider(BaseProvider):
         return titlecase(f"{plaintiff} v. {defendant}")
 
     def citation(self) -> str:
-        """Make a citation e.g. 345 Mass. 76"""
+        """Make or fetch a citation e.g. 345 Mass. 76
+
+        This method generates a random citation unless an example is
+        provided in reporters-db.  Typically reporters-db has examples
+        for atypcial citation patterns.
+
+        :return Citation as a string
+        """
+
+        reporter = random.choice(list(REPORTERS.keys()))
+        examples = REPORTERS[reporter][0].get("examples")
+        if examples:
+            return random.choice(examples)
+
         volume = random.randint(1, 999)
         page = random.randint(1, 999)
-        reporter = random.choice(list(REPORTERS.keys()))
         return f"{volume} {reporter} {page}"
