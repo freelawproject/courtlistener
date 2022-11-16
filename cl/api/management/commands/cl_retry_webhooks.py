@@ -20,6 +20,7 @@ def retry_webhook_events() -> int:
     webhook_events = WebhookEvent.objects.select_for_update().filter(
         event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
         next_retry_date__lte=now(),
+        debug=False,
         webhook__enabled=True,
     )
     with transaction.atomic():

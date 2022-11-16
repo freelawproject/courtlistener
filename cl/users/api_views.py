@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.template import loader
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -8,7 +9,8 @@ from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
-from cl.api.models import Webhook
+from cl.api.models import Webhook, WebhookEventType
+from cl.api.tasks import send_test_webhook_event
 from cl.users.forms import WebhookForm
 
 
@@ -101,4 +103,52 @@ class WebhooksViewSet(ModelViewSet):
         return Response(
             {"webhook_form": form},
             template_name="includes/webhooks_htmx/webhooks-form-create.html",
+        )
+
+    @action(detail=True, methods=["get", "post"])
+    def test_webhook(self, request, *args, **kwargs):
+        """Render the webhook test template on GET and send the test webhook
+        event on POST.
+        """
+
+        webhook = self.get_object()
+        event_type = webhook.event_type
+        match event_type:
+            case WebhookEventType.DOCKET_ALERT:
+                da_template = loader.get_template(
+                    "includes/docket_alert_webhook_dummy.txt"
+                )
+                da_dummy_content = da_template.render().strip()
+                da_curl_template = loader.get_template(
+                    "includes/docket_alert_webhook_dummy_curl.txt"
+                )
+                da_dummy_curl = da_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case _:
+                # Webhook types with no support yet.
+                da_dummy_content = (
+                    "Currently, we don't yet support events for this type of "
+                    "webhook."
+                )
+                da_dummy_curl = (
+                    "Currently, we don't yet support events for this type of "
+                    "webhook."
+                )
+
+        if self.request.method == "GET":
+            return Response(
+                {
+                    "webhook": webhook,
+                    "dummy_content": da_dummy_content,
+                    "dummy_curl": da_dummy_curl,
+                    "da_type": WebhookEventType.DOCKET_ALERT,
+                },
+                template_name="includes/webhooks_htmx/webhooks-test-webhook.html",
+            )
+
+        # On POST enqueue the webhook test event.
+        send_test_webhook_event.delay(webhook.pk, da_dummy_content)
+        return Response(
+            status=HTTP_200_OK,
         )

@@ -109,6 +109,10 @@ class WebhookEvent(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    debug = models.BooleanField(
+        help_text="Enabled if this is a test event for debugging purposes.",
+        default=False,
+    )
 
     class Meta:
         indexes = [
