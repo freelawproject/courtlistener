@@ -126,6 +126,11 @@ jobs:
     - name: Watch cl-scrape-rss rollout status
       run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
 
+    - name: Rollout cl-retry-webhooks
+      run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-webhooks-retry
+    - name: Watch cl-retry-webhooks rollout status
+      run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
+
     # Watch "cronjobs" in k9s
     - name: Update cronjobs
       run: |
