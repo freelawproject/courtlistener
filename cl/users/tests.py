@@ -26,10 +26,11 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.api.models import Webhook, WebhookEventType
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, LiveServerTestCase, TestCase
+from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -3019,3 +3020,31 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(len(mail.outbox), 2)
         message_sent = mail.outbox[1]
         self.assertIn("A webhook was updated", message_sent.subject)
+
+    def test_send_webhook_test(self) -> None:
+        """Can we send a test webhook event?"""
+
+        # Make one webhook for user_1
+        self.make_a_webhook(self.client)
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        webhook_1_path_test = reverse(
+            "webhooks-test-webhook",
+            kwargs={"pk": webhooks[0].pk, "format": "json"},
+        )
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockPostResponse(
+                200, mock_raw=True
+            ),
+        ):
+            response = self.client.post(webhook_1_path_test, {})
+        # Compare the test webhook event data.
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        webhook_event = WebhookEvent.objects.all()
+        self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
+        self.assertEqual(webhook_event[0].debug, True)
+        self.assertEqual(
+            webhook_event[0].content["results"][0]["id"], 2208776613
+        )

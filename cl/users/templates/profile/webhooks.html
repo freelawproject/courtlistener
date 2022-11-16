@@ -27,6 +27,17 @@
         //Toggle form modal
         $('#webhook-modal').modal('toggle');
       }
+
+      if (e.detail.target.id == "webhooks-body-testing") {
+        //Toggle the webhook testing modal.
+        $('#webhook-modal').modal('toggle');
+      }
+
+      if (e.detail.target.id == "webhook-test-sent") {
+        // Show the View in Logs button after send the test webhook request.
+        $('#view-in-logs-button').removeClass('hidden');
+      }
+
     })
     htmx.on("htmx:beforeSwap", (e) => {
       /*
@@ -39,6 +50,22 @@
         $('#webhook_list_loader').removeClass('hidden');
 
         e.detail.shouldSwap = false;
+      }
+
+      let webhook_title = document.querySelector("#webhook-modal .modal-title");
+      let webhook_form = document.getElementById("webhooks-body");
+      let webhook_form_testing = document.getElementById("webhooks-body-testing");
+      if (e.detail.target.id == "webhooks-body" ) {
+        // Clean and set the right title according to the HTMX request.
+        webhook_form.innerHTML = "";
+        webhook_form_testing.innerHTML = "";
+        webhook_title.innerHTML = "Add a webhook endpoint"
+      }
+      if (e.detail.target.id == "webhooks-body-testing") {
+        // Clean and set the right title according to the HTMX request.
+        webhook_form.innerHTML = "";
+        webhook_form_testing.innerHTML = "";
+        webhook_title.innerHTML = "Test a webhook event"
       }
 
       /*
@@ -65,6 +92,16 @@
         alert("The server can't handle your request now, please try again")
     }
     })
+
+    /*
+      Method to copy the webhook test content to the clipboard.
+    */
+    function copy_text(selector_id) {
+      let text_area = document.getElementById(selector_id).closest('textarea')
+      text_area.select();
+      navigator.clipboard.writeText(text_area.value);
+    }
+
   </script>
 {% endblock %}
 

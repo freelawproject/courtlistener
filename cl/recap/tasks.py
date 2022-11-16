@@ -1952,11 +1952,12 @@ def process_recap_email(
         else:
             # If the current docket entry was added previously, send the alert
             # only to the recap email user that triggered the new alert.
+            des_pks = [de.pk for de in docket_updated.des_returned]
             send_alert_and_webhook.delay(
                 docket_updated.docket.pk,
                 start_time,
                 recap_email_recipients,
-                docket_updated.des_returned,
+                des_pks,
             )
         all_main_rds += docket_updated.rds_created
 

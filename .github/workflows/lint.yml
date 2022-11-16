@@ -78,6 +78,7 @@ jobs:
           cl/api/models.py \
           cl/api/routers.py \
           cl/api/tests.py \
+          cl/api/utils.py \
           cl/api/views.py \
           cl/corpus_importer/management/commands/import_tn.py \
           cl/donate/management/commands/charge_monthly_donors.py \

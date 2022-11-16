@@ -4,11 +4,10 @@ from urllib.parse import urljoin
 import requests
 from celery import Task
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
-from django.template import loader
 
 from cl.api.models import Webhook
 from cl.celery_init import app
+from cl.lib.email_utils import make_multipart_email
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +82,7 @@ def notify_new_or_updated_webhook(
     """Send a notification to the admins if a webhook was created or updated.
 
     :param webhook_pk: The webhook PK that was created or updated.
-    :created: Whether the webhook was just created or not.
+    :param created: Whether the webhook was just created or not.
     :return: None
     """
 
@@ -91,16 +90,45 @@ def notify_new_or_updated_webhook(
 
     action = "created" if created else "updated"
     subject = f"A webhook was {action}"
-    txt_template = loader.get_template("emails/new_or_updated_webhook.txt")
-    html_template = loader.get_template("emails/new_or_updated_webhook.html")
+    txt_template = "emails/new_or_updated_webhook.txt"
+    html_template = "emails/new_or_updated_webhook.html"
     context = {"webhook": webhook, "action": action}
-    txt = txt_template.render(context)
-    html = html_template.render(context)
-    msg = EmailMultiAlternatives(
+    msg = make_multipart_email(
         subject,
-        txt,
-        settings.DEFAULT_FROM_EMAIL,
+        html_template,
+        txt_template,
+        context,
         [a[1] for a in settings.MANAGERS],
     )
-    msg.attach_alternative(html, "text/html")
+    msg.send()
+
+
+@app.task(ignore_result=True)
+def notify_failing_webhook(
+    webhook_pk: int,
+    disabled: bool,
+) -> None:
+    """Send a notification to the webhook user when a webhook event fails, or
+    it has been disabled.
+
+    :param webhook_pk: The related webhook PK.
+    :param disabled: Whether the webhook has been disabled.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    first_name = webhook.user.first_name
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is failing."
+    if disabled:
+        subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is now disabled."
+    txt_template = "emails/failing_webhook.txt"
+    html_template = "emails/failing_webhook.html"
+    context = {
+        "webhook": webhook,
+        "first_name": first_name,
+        "disabled": disabled,
+    }
+    msg = make_multipart_email(
+        subject, html_template, txt_template, context, [webhook.user.email]
+    )
     msg.send()

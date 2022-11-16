@@ -23,12 +23,12 @@ from cl.alerts.management.commands.handle_old_docket_alerts import (
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_alert_and_webhook
 from cl.api.factories import WebhookFactory
-from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
-from cl.tests.utils import make_client
+from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
@@ -93,14 +93,6 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(self.alert.rate, new_rate)
 
 
-class MockResponse:
-    """Mock a Request Response"""
-
-    def __init__(self, text, status_code):
-        self.text = text
-        self.status_code = status_code
-
-
 class DocketAlertTest(TestCase):
     """Do docket alerts work properly?"""
 
@@ -162,8 +154,8 @@ class DocketAlertTest(TestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch(
-        "cl.alerts.tasks.requests.post",
-        side_effect=lambda *args, **kwargs: MockResponse("Testing", 200),
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
     def test_triggering_docket_webhook(self, mock_post) -> None:
         """Does the docket alert trigger the DocketAlert Webhook?"""
@@ -178,6 +170,10 @@ class DocketAlertTest(TestCase):
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
+        self.assertEqual(
+            webhook_triggered.first().event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+        )
 
 
 class DisableDocketAlertTest(TestCase):

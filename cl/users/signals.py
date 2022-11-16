@@ -118,9 +118,15 @@ def assign_recap_email(sender, instance=None, created=False, **kwargs) -> None:
 
 @receiver(post_save, sender=Webhook, dispatch_uid="webhook_created_or_updated")
 def webhook_created_or_updated(
-    sender, instance=None, created=False, **kwargs
+    sender, instance=None, created=False, update_fields=None, **kwargs
 ) -> None:
+    """Notify admins when a new webhook is created or updated. Avoid sending
+    the notification when the webhook failure_count is updated.
+    """
     if created:
         notify_new_or_updated_webhook.delay(instance.pk, created=True)
     else:
+        if update_fields:
+            if "failure_count" or "enabled" in update_fields:
+                return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)
