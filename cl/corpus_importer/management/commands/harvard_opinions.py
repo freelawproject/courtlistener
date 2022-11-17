@@ -1034,8 +1034,8 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
-    # If we checked our subsets as we parsed- we wouldnt need to do this
-    # filtering here. This is a good candiate for refactoring.
+    # If we checked our subsets as we parsed- we wouldn't need to do this
+    # filtering here. This is a good candidate for refactoring.
     filtered_subset = list(filter_subsets(found_overlaps))
     for overlap in filtered_subset:
         count += len(overlap)
