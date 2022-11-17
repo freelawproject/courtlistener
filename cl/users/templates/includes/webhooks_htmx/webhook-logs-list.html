@@ -1,0 +1,37 @@
+{% if results %}
+  {% for webhook in results %}
+    <tr>
+      <td>
+        <p class="bottom ">
+         {{ webhook.webhook.get_event_type_display }}
+        </p>
+      </td>
+      <td>
+        <p class="bottom bold status-{{ webhook.event_status }}">
+          {{ webhook.get_event_status_display }}
+        </p>
+      </td>
+      <td>
+        <p class="bottom bold">
+          {{ webhook.status_code }}
+        </p>
+      </td>
+      <td>{{ webhook.date_created }}</td>
+      {% if not webhook.debug %}
+        <td>{{ webhook.next_retry_date }}</td>
+      {% endif %}
+      <td class="right">
+        <div class="flex justify-content-end">
+          <a href="{% url "view_webhook_logs_detail" pk=webhook.id %}" id='btn-test-{{ webhook.id }}' class="btn btn-primary btn-xs">
+            <i class="fa fa-info"></i>&nbsp;Detail
+          </a>
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+  <tr>
+    <td colspan="100%">
+      {% include "includes/webhooks_htmx/webhooks-pagination.html" %}
+    </td>
+  </tr>
+{% endif %}

@@ -26,6 +26,7 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -3048,3 +3049,48 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(
             webhook_event[0].content["results"][0]["id"], 2208776613
         )
+
+    def test_list_webhook_events(self) -> None:
+        """Can we list the user's webhook events?"""
+
+        da_webhook = WebhookFactory(
+            user=self.user_2,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=da_webhook,
+        )
+
+        webhook_event_path_list = reverse(
+            "webhook_events-list",
+            kwargs={"format": "html"},
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There shouldn't be results for user_1
+        self.assertEqual(response.content, b"\n")
+
+        sa_webhook = WebhookFactory(
+            user=self.user_1,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=sa_webhook,
+        )
+
+        self.assertEqual(webhooks.count(), 2)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There should be results for user_1
+        self.assertNotEqual(response.content, b"\n")

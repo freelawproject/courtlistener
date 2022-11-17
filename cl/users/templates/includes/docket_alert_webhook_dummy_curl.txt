@@ -1,5 +1,5 @@
 curl --request POST \
-  --url {{ endpoint_url }} \
+  --url '{{ endpoint_url }}' \
   --header 'Content-Type: application/json' \
   --header 'Idempotency-Key: 59f1be59-e428-427a-a346-9cacded5c1d4' \
   --data '{

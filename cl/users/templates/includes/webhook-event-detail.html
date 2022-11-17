@@ -1,0 +1,73 @@
+{% extends "profile/webhooks_base.html" %}
+{% load static %}
+{% load waffle_tags %}
+{% load humanize %}
+{% block title %} Webhook Event Detail &ndash; CourtListener.com{% endblock %}
+
+{% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/developer-tabs.html" %}
+  {% flag "user-webhooks" %}
+    <div class="hidden-xs col-sm-1 col-md-2"></div>
+    <div class="col-xs-12 col-sm-10 col-md-8 text-center">
+      <div class="row text-left">
+        <div class="col-xs-12">
+          <div class="panel panel-default webhooks">
+            <div class="panel-heading">
+              <div class="row">
+                   {% include "includes/webhooks-header.html" %}
+             </div>
+            </div>
+            <div class="panel-body">
+              <div class="webhook-detail">
+                <h3 class="v-offset-below-2">Webhook event detail{% if webhook_event.debug %} (Testing){% endif %}:</h3>
+                <div class="row form-group">
+                  <label class="col-md-2">Endpoint URL: </label><p class="col-md-10">{{ webhook_event.webhook.url }}</p>
+                  <label class="col-md-2">Endpoint status: </label><p class="col-md-10">{% if webhook_event.webhook.enabled %} Enabled {% else %} Disabled {% endif %}</p>
+                  <label class="col-md-2">Event type: </label><p class="col-md-10">{{ webhook_event.webhook.get_event_type_display }}</p>
+                  <label class="col-md-2">Event ID: </label><p class="col-md-10">{{ webhook_event.event_id }}</p>
+                  <label class="col-md-2">Date created: </label><p class="col-md-10">{{ webhook_event.date_created }}</p>
+                  <label class="col-md-2">Status code: </label><p class="col-md-10 bold">{{ webhook_event.status_code }}</p>
+                  <label class="col-md-2">Event status: </label><p class="col-md-10 bold status-{{ webhook_event.event_status }}">{{ webhook_event.get_event_status_display }}</p>
+                  <label class="col-md-2">Try counter: </label><p class="col-md-10">{{ webhook_event.retry_counter }}</p>
+                  <label class="col-md-2">Next retry date: </label><p class="col-md-10">{% if not webhook_event.debug %}{{ webhook_event.next_retry_date }}{% else %}Test events will not be retried{% endif %}</p>
+                </div>
+                <div class="row form-group">
+                  <div class="col-xs-12">
+                    <label for="content">Content:</label>
+                    <div class="dummy-area">
+                      <div class="copy-text-icon" onclick="copy_text('content')"><i class="fa fa-copy"></i></div>
+                      <textarea readonly class="form-control" id="content" rows="8">{{ json_content }}</textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="row form-group">
+                  <div class="col-xs-12">
+                    <label for="response">Response:</label>
+                    <div class="dummy-area">
+                      <div class="copy-text-icon" onclick="copy_text('response')"><i class="fa fa-copy"></i></div>
+                      <textarea readonly class="form-control" id="response" rows="8">{{ webhook_event.response }}</textarea>
+                    </div>
+                  </div>
+                </div>
+                <div class="row form-group">
+                    <div class="col-xs-12">
+                      <label for="error_message">Error message:</label>
+                      <div class="dummy-area">
+                        <div class="copy-text-icon" onclick="copy_text('error_message')"><i class="fa fa-copy"></i></div>
+                        <textarea readonly class="form-control" id="error_message" rows="4">{{ webhook_event.error_message }}</textarea>
+                      </div>
+                    </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% include "includes/webhooks_htmx/webhooks-modal.html" %}
+      <p>Webhooks enable bi-directional APIs by sending data to your server whenever events happen on ours. Use webhooks to get the fastest updates &mdash; without polling.</p>
+      <p class="v-offset-below-2"><a href="{% url "api_index" %}#webhooks" class="btn btn-default btn-lg">Read the Webhook Documentation</a></p>
+    </div>
+  {% endflag %}
+  <div class="hidden-xs col-sm-1 col-md-2"></div>
+{% endblock %}

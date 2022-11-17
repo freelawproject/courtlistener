@@ -1,8 +1,8 @@
 {% extends "profile/webhooks_base.html" %}
 {% load static %}
 {% load waffle_tags %}
-
-{% block title %} Webhooks &ndash; CourtListener.com{% endblock %}
+{% load humanize %}
+{% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
 
 {% block content %}
 {# Navigation Tabs #}
@@ -15,8 +15,8 @@
           <div class="panel panel-default webhooks">
             <div class="panel-heading">
               <div class="row">
-                {% include "includes/webhooks-header.html" %}
-             </div>
+               {% include "includes/webhooks-header.html" %}
+              </div>
              <div data-loading="block" class="row">
                 <div class="text-center">
                   <i class="fa fa-spinner fa-spin"></i> Loading
@@ -25,18 +25,21 @@
             </div>
             <div class="panel-body">
               <div class="table-responsive">
-                <table class="table settings-table"
+                <table class="table"
                   hx-ext="loading-states"
                   data-loading-class="hidden"
                   >
                     <thead>
-                      <tr class="active">
-                        <th>Event&nbsp;type</th>
-                        <th>Status</th>
-                        <th>URL</th>
-                        <th>Failure count</th>
-                        <th></th>
-                      </tr>
+                    <tr class="active">
+                      <th>Event&nbsp;Type</th>
+                      <th>Event Status</th>
+                      <th>Status code</th>
+                      <th>Date created</th>
+                      {% if sub_page == "logs" %}
+                        <th>Next attempt</th>
+                      {% endif %}
+                      <th></th>
+                    </tr>
                     </thead>
                     <tr id="webhook_list_loader" class="hidden">
                       <td class="text-center" colspan="4">
@@ -45,8 +48,8 @@
                     </tr>
                     <tbody
                       id="webhook_table_body"
-                      hx-trigger="load, webhooksListChanged from:body"
-                      hx-get="{% url 'webhooks-list' format="html" %}"
+                      hx-trigger="load, webhookLogsListChanged from:body"
+                      hx-get="{% url 'webhook_events-list' format="html" %}?debug={{debug}}"
                       data-loading-target="#add-webhook"
                       data-loading-class="hidden"
                       hx-target="this"
@@ -58,7 +61,6 @@
             </div>
           </div>
         </div>
-      {% include "includes/webhooks_htmx/webhooks-modal.html" %}
       <p>Webhooks enable bi-directional APIs by sending data to your server whenever events happen on ours. Use webhooks to get the fastest updates &mdash; without polling.</p>
       <p class="v-offset-below-2"><a href="{% url "api_index" %}#webhooks" class="btn btn-default btn-lg">Read the Webhook Documentation</a></p>
     </div>

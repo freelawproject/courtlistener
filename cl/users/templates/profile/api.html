@@ -1,7 +1,7 @@
 {% extends "profile/nav.html" %}
 {% load waffle_tags %}
 
-{% block title %}{% flag "user-webhooks" %}Developer Tools{% else %}API{% endflag %} &ndash; CourtListener.com{% endblock %}
+{% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
 
 {% block nav-api %}active{% endblock %}
 

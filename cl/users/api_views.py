@@ -1,16 +1,21 @@
+from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.template import loader
-from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer, TemplateHTMLRenderer
 from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED
+from rest_framework.status import (
+    HTTP_200_OK,
+    HTTP_201_CREATED,
+    HTTP_204_NO_CONTENT,
+)
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
-from cl.api.models import Webhook, WebhookEventType
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.tasks import send_test_webhook_event
+from cl.users.filters import WebhookEventViewFilter
 from cl.users.forms import WebhookForm
 
 
@@ -42,7 +47,7 @@ class WebhooksViewSet(ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            status=status.HTTP_204_NO_CONTENT,
+            status=HTTP_204_NO_CONTENT,
             headers={"HX-Trigger": "webhooksListChanged"},
         )
 
@@ -151,4 +156,44 @@ class WebhooksViewSet(ModelViewSet):
         send_test_webhook_event.delay(webhook.pk, da_dummy_content)
         return Response(
             status=HTTP_200_OK,
+        )
+
+
+class WebhookEventViewSet(ModelViewSet):
+    """
+    A set of actions to handle listing and filtering webhooks events for htmx.
+    """
+
+    permission_classes = [IsAuthenticated, IsOwner]
+    renderer_classes = [TemplateHTMLRenderer]
+    filterset_class = WebhookEventViewFilter
+
+    def get_queryset(self):
+        """
+        Returns a list of all webhook events for the currently authenticated
+        user.
+        """
+        user = self.request.user
+        return WebhookEvent.objects.filter(webhook__user=user).order_by(
+            "-date_created"
+        )
+
+    def list(self, request, *args, **kwargs):
+        webhook_events = self.filter_queryset(self.get_queryset())
+        page_number = self.request.query_params.get("page")
+        paginator = Paginator(webhook_events, 20)
+        results = paginator.get_page(page_number)
+
+        debug = self.request.query_params.get("debug", "")
+        type_filter = self.request.query_params.get("webhook__event_type", "")
+        status_filter = self.request.query_params.get("event_status", "")
+
+        return Response(
+            {
+                "results": results,
+                "type_filter": type_filter,
+                "status_filter": status_filter,
+                "debug": debug,
+            },
+            template_name="includes/webhooks_htmx/webhook-logs-list.html",
         )

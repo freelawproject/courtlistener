@@ -18,6 +18,7 @@ from cl.recap.api_serializers import (
     ProcessingQueueSerializer,
 )
 from cl.recap.filters import (
+    EmailProcessingQueueFilter,
     FjcIntegratedDatabaseFilter,
     PacerFetchQueueFilter,
     ProcessingQueueFilter,
@@ -57,6 +58,7 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (EmailProcessingQueueAPIUsers,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
+    filterset_class = EmailProcessingQueueFilter
 
     def get_message_id_from_request_data(self):
         return self.request.data.get("mail", {}).get("message_id")

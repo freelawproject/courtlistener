@@ -1,4 +1,4 @@
- <div class="row form-group">
+<div class="row form-group">
     <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook.url }}</p>
 </div>
 
@@ -7,9 +7,7 @@
     <label for="dummy_data">Dummy Content:</label>
     <div class="dummy-area">
       <div class="copy-text-icon" onclick="copy_text('dummy_data')"><i class="fa fa-copy"></i></div>
-      <textarea readonly class="form-control" id="dummy_data" rows="4">
-        {{ dummy_content }}
-      </textarea>
+      <textarea readonly class="form-control" id="dummy_data" rows="4">{{ dummy_content }}</textarea>
     </div>
   </div>
 </div>
@@ -24,39 +22,35 @@
               data-loading-target="#webhook-send-test"
               data-loading-disable
               >
-            Send Webhook Event Test
+            Send Webhook Test Event
             <i data-loading class="fa fa-spinner fa-spin"></i>
       </button>
       <span id="webhook-test-sent"></span>
-      <button id="view-in-logs-button" type="button" class="hidden btn btn-success">Sent it, view in Test Logs</button>
+      <a href="{% url "view_webhook_test_logs" %}" id="view-in-logs-button" type="button" class="hidden btn btn-success">Sent it, view in Test Logs</a>
+      <button id="webhook-curl-command" class="btn btn-primary"
+              data-toggle="collapse"
+              href="#curl-command"
+              >
+            Show cURL Command
+      </button>
     </div>
   </div>
 {% endif %}
 
 <div class="row form-group">
   <div class="col-xs-12">
-    <button id="webhook-curl-command" class="btn btn-primary v-offset-below-1"
-              data-toggle="collapse"
-              href="#curl-command"
-              >
-            Show cURL Command
-    </button>
     <div class="collapse" id="curl-command">
       <div class="dummy-area">
         <div class="copy-text-icon" onclick="copy_text('dummy_curl')"><i class="fa fa-copy"></i></div>
-        <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="4">
-          {{ dummy_curl }}
-        </textarea>
+        <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="4">{{ dummy_curl }}</textarea>
         <label for="dummy_curl">Use this command locally to replicate this event from our servers.</label>
       </div>
     </div>
   </div>
 </div>
 
-
-
-  <div class="modal-footer">
-    <p>
-      <button type="button" class="btn btn-secondary" data-dismiss="modal" data-loading-disable>Cancel</button>
-    </p>
-  </div>
+<div class="modal-footer">
+  <p>
+    <button type="button" class="btn btn-secondary" data-dismiss="modal" data-loading-disable>Close</button>
+  </p>
+</div>

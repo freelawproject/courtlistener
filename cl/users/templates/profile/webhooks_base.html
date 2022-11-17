@@ -1,0 +1,20 @@
+{% extends "profile/nav.html" %}
+{% load static %}
+{% load waffle_tags %}
+
+{% block title %}{% endblock %}
+
+{% block nav-api %}active{% endblock %}
+{% block footer-scripts %}
+  <script src="{% static "js/loading-states.js" %}" defer></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+  <script src="{% static "js/webhooks-page.js" %}" defer></script>
+{% endblock %}
+
+{% block content %}
+
+{% endblock %}
