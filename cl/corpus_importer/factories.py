@@ -11,7 +11,10 @@ class CaseLawCourtFactory(factory.DictFactory):
 
 
 class CaseBodyFactory(factory.DictFactory):
-    data = '<casebody firstpage="1" lastpage="2">\n <otherdate id="Ail">March 3, 2009.</otherdate>  <opinion type="majority"><author id="b123-14">Cowin, J.</author>Everybody wins.</opinion>\n</casebody>'
+    data = '<casebody firstpage="1" lastpage="2">\n <otherdate ' \
+           'id="Ail">March 3, 2009.</otherdate>  <opinion ' \
+           'type="majority"><author id="b123-14">Cowin, J.</author>Everybody ' \
+           'wins.</opinion>\n</casebody> '
 
 
 class CaseLawFactory(factory.DictFactory):
