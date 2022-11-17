@@ -19,7 +19,8 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
     compare_documents,
     parse_harvard_opinions,
-    validate_dt, winnow_case_name,
+    validate_dt,
+    winnow_case_name,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -276,7 +277,7 @@ class CourtMatchingTest(SimpleTestCase):
                 got,
                 d["answer"],
                 msg="\nDid not get court we expected: '%s'.\n"
-                    "               Instead we got: '%s'" % (d["answer"], got),
+                "               Instead we got: '%s'" % (d["answer"], got),
             )
 
     def test_get_fed_court_object_from_string(self) -> None:
@@ -457,12 +458,12 @@ class IAUploaderTest(TestCase):
             expected_num_attorneys,
             actual_num_attorneys,
             msg="Got wrong number of attorneys when making IA JSON. "
-                "Got %s, expected %s: \n%s"
-                % (
-                    actual_num_attorneys,
-                    expected_num_attorneys,
-                    first_party_attorneys,
-                ),
+            "Got %s, expected %s: \n%s"
+            % (
+                actual_num_attorneys,
+                expected_num_attorneys,
+                first_party_attorneys,
+            ),
         )
 
         first_attorney = first_party_attorneys[0]
@@ -473,7 +474,7 @@ class IAUploaderTest(TestCase):
             actual_num_roles,
             expected_num_roles,
             msg="Got wrong number of roles on attorneys when making IA JSON. "
-                "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
+            "Got %s, expected %s" % (actual_num_roles, expected_num_roles),
         )
 
     def test_num_queries_ok(self) -> None:
@@ -648,7 +649,7 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
                 name="United States Bankruptcy Court for the Northern "
-                     "District of Alabama "
+                "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -702,7 +703,7 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
                 data='<casebody><opinion type="majority"><author '
-                     'id="b56-3">PER CURIAM:</author></casebody> '
+                'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -801,7 +802,7 @@ label="194">*194</page-number>
 
     def test_no_volume_citation(self):
         """Can we handle an opinion that contains a citation without a
-        volume? """
+        volume?"""
         citations = [
             "Miller's Notebook, 179",
         ]
@@ -815,12 +816,15 @@ label="194">*194</page-number>
         """
         Check if there is an overlap between two similar case names.
         """
-        case_name_full = "UNITED STATES of America, Plaintiff-Appellee, " \
-                         "v. Wayne VINSON, Defendant-Appellant "
+        case_name_full = (
+            "UNITED STATES of America, Plaintiff-Appellee, "
+            "v. Wayne VINSON, Defendant-Appellant "
+        )
         case_name_abbreviation = "United States v. Vinson"
         harvard_case = f"{case_name_full} {case_name_abbreviation}"
 
         case_name_cl = "United States v. Frank Esquivel"
         overlap = winnow_case_name(case_name_cl) & winnow_case_name(
-            harvard_case)
+            harvard_case
+        )
         self.assertEqual(len(overlap), 0)
