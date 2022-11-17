@@ -555,7 +555,7 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         if (
             not citation
             or not isinstance(citation[0], FullCaseCitation)
-            or citation[0].groups.get("volume", True)
+            or not citation[0].groups.get("volume", False)
         ):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
