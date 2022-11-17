@@ -19,6 +19,7 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError, OperationalError
 from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
@@ -327,6 +328,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
         # Cleanup whitespace on citations
         clean_cite = re.sub(r"\s+", " ", data["citations"][0]["cite"])
         cites = get_citations(clean_cite)
+        cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
             logger.warning(f"No citation found for {clean_cite}")
             continue
@@ -550,7 +552,11 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Cleanup citations with extra spaces
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
-        if not citation:
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
+        ):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
 
@@ -899,7 +905,11 @@ def find_previously_imported_cases(
     # Match against known citations.
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"])
-        if found_cite:
+        if (
+            found_cite
+            and isinstance(found_cite[0], FullCaseCitation)
+            and found_cite[0].groups.get("volume", False)
+        ):
             possible_cases = OpinionCluster.objects.filter(
                 citations__reporter=found_cite[0].corrected_reporter(),
                 citations__volume=found_cite[0].groups["volume"],
@@ -1024,8 +1034,8 @@ def compare_documents(harvard_characters: str, cl_characters: str) -> int:
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
-    # If we checked our subsets as we parsed- we wouldnt need to do this
-    # filtering here. This is a good candiate for refactoring.
+    # If we checked our subsets as we parsed- we wouldn't need to do this
+    # filtering here. This is a good candidate for refactoring.
     filtered_subset = list(filter_subsets(found_overlaps))
     for overlap in filtered_subset:
         count += len(overlap)

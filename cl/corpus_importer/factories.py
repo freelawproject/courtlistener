@@ -7,7 +7,7 @@ class CitationFactory(factory.DictFactory):
 
 
 class CaseLawCourtFactory(factory.DictFactory):
-    name = Faker("court_name", known=True)
+    name = Faker("court_name")
 
 
 class CaseBodyFactory(factory.DictFactory):

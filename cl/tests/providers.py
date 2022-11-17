@@ -20,7 +20,7 @@ class LegalProvider(BaseProvider):
         """
         return "".join(fake.random_letters(length=15)).lower()
 
-    def court_name(self, known: bool = False) -> str:
+    def court_name(self) -> str:
         """
         Generate court names like:
 
@@ -30,14 +30,6 @@ class LegalProvider(BaseProvider):
 
         :return: A court name
         """
-        if known:
-            return random.choice(
-                [
-                    "Supreme Court of the United States",
-                    "Massachusetts Supreme Judicial Court",
-                    "United States Board of Tax Appeals",
-                ]
-            )
         first_word = random.choice(
             [
                 "Thirteenth circuit",
@@ -91,8 +83,22 @@ class LegalProvider(BaseProvider):
         return titlecase(f"{plaintiff} v. {defendant}")
 
     def citation(self) -> str:
-        """Make a citation e.g. 345 Mass. 76"""
+        """Make or fetch a citation e.g. 345 Mass. 76
+
+        Grab a random reporter if it contains a typical full_cite pattern
+        Exclude reporters that rely on regex patterns.
+
+        :return Citation as a string
+        """
+
+        # Filter to only vol-reporter-page reporters
+        reporters = [
+            edition
+            for edition in REPORTERS.keys()
+            if "regexes"
+            not in REPORTERS[edition][0]["editions"][edition].keys()
+        ]
+        reporter = random.choice(reporters)
         volume = random.randint(1, 999)
         page = random.randint(1, 999)
-        reporter = random.choice(list(REPORTERS.keys()))
         return f"{volume} {reporter} {page}"
