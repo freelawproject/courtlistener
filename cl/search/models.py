@@ -1703,6 +1703,12 @@ class FederalCourtsQuerySet(models.QuerySet):
     def appellate_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
+    def tribal_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
+
+    def territorial_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
+
 
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
