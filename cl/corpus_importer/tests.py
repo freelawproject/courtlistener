@@ -811,9 +811,10 @@ label="194">*194</page-number>
         self.read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
 
-    def test_failing_name(self):
+    def test_case_name_winnowing_comparison(self):
         """
-        Check if there is an overlap between two similar case names.
+        Test removing "United States" from case names and check if there is an
+        overlap between two case names.
         """
         case_name_full = "UNITED STATES of America, Plaintiff-Appellee, " \
                          "v. Wayne VINSON, Defendant-Appellant "
