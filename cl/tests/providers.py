@@ -91,6 +91,7 @@ class LegalProvider(BaseProvider):
         :return Citation as a string
         """
 
+        # Filter to only vol-reporter-page reporters
         reporters = [
             edition
             for edition in REPORTERS.keys()
