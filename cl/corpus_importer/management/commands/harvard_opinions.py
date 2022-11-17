@@ -992,9 +992,19 @@ def winnow_case_name(case_name: str) -> Set:
         "rel",
     }
 
+    # strings where order matters
+    false_positive_strings = ["united states"]
+
+    false_positive_strings_regex = re.compile(
+        "|".join(map(re.escape, false_positive_strings))
+    )
+
     # Remove all non alphanumeric characters
     case_name = harmonize(case_name)
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
+
+    # Remove strings that can cause an unnecessary overlap
+    case_title = false_positive_strings_regex.sub("", case_title)
 
     # Remove one letter words, initials etc.
     case_title = re.sub(r"\b[^ ]\b", "", case_title)

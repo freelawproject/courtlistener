@@ -20,6 +20,7 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
     compare_documents,
     parse_harvard_opinions,
     validate_dt,
+    winnow_case_name,
 )
 from cl.corpus_importer.tasks import generate_ia_json
 from cl.corpus_importer.utils import get_start_of_quarter
@@ -70,7 +71,8 @@ class CourtMatchingTest(SimpleTestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Division, Kern County.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    "california/supreme_court_opinions/documents"
+                    "/0dc538c63bd07a28.xml",
                     # noqa
                 ),
                 "answer": "calappdeptsuperct",
@@ -79,7 +81,8 @@ class CourtMatchingTest(SimpleTestCase):
                 "args": (
                     "California Superior Court  "
                     "Appellate Department, Sacramento.",
-                    "california/supreme_court_opinions/documents/0dc538c63bd07a28.xml",
+                    "california/supreme_court_opinions/documents"
+                    "/0dc538c63bd07a28.xml",
                     # noqa
                 ),
                 "answer": "calappdeptsuperct",
@@ -87,7 +90,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/0412a06c60a7c2a2.xml",
+                    "connecticut/appellate_court_opinions/documents"
+                    "/0412a06c60a7c2a2.xml",
                     # noqa
                 ),
                 "answer": "connsuperct",
@@ -95,7 +99,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Court of Errors and Appeals.",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    "new_jersey/supreme_court_opinions/documents"
+                    "/0032e55e607f4525.xml",
                     # noqa
                 ),
                 "answer": "nj",
@@ -103,7 +108,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Court of Chancery",
-                    "new_jersey/supreme_court_opinions/documents/0032e55e607f4525.xml",
+                    "new_jersey/supreme_court_opinions/documents"
+                    "/0032e55e607f4525.xml",
                     # noqa
                 ),
                 "answer": "njch",
@@ -111,7 +117,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Workers' Compensation Commission",
-                    "connecticut/workers_compensation_commission/documents/0902142af68ef9df.xml",
+                    "connecticut/workers_compensation_commission/documents"
+                    "/0902142af68ef9df.xml",
                     # noqa
                 ),
                 "answer": "connworkcompcom",
@@ -119,7 +126,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Appellate Session of the Superior Court",
-                    "connecticut/appellate_court_opinions/documents/00ea30ce0e26a5fd.xml",
+                    "connecticut/appellate_court_opinions/documents"
+                    "/00ea30ce0e26a5fd.xml",
                     # noqa
                 ),
                 "answer": "connsuperct",
@@ -127,7 +135,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Superior Court  New Haven County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    "connecticut/superior_court_opinions/documents"
+                    "/0218655b78d2135b.xml",
                     # noqa
                 ),
                 "answer": "connsuperct",
@@ -135,7 +144,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Superior Court, Hartford County",
-                    "connecticut/superior_court_opinions/documents/0218655b78d2135b.xml",
+                    "connecticut/superior_court_opinions/documents"
+                    "/0218655b78d2135b.xml",
                     # noqa
                 ),
                 "answer": "connsuperct",
@@ -144,7 +154,8 @@ class CourtMatchingTest(SimpleTestCase):
                 "args": (
                     "Compensation Review Board  "
                     "WORKERS' COMPENSATION COMMISSION",
-                    "connecticut/workers_compensation_commission/documents/00397336451f6659.xml",
+                    "connecticut/workers_compensation_commission/documents"
+                    "/00397336451f6659.xml",
                     # noqa
                 ),
                 "answer": "connworkcompcom",
@@ -152,7 +163,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "Appellate Division Of The Circuit Court",
-                    "connecticut/superior_court_opinions/documents/03dd9ec415bf5bf4.xml",
+                    "connecticut/superior_court_opinions/documents"
+                    "/03dd9ec415bf5bf4.xml",
                     # noqa
                 ),
                 "answer": "connsuperct",
@@ -232,7 +244,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "District Court of Appeal of Florida, Second District.",
-                    "/data/dumps/florida/court_opinions/documents/25ce1e2a128df7ff.xml",
+                    "/data/dumps/florida/court_opinions/documents"
+                    "/25ce1e2a128df7ff.xml",
                     # noqa
                 ),
                 "answer": "fladistctapp",
@@ -240,7 +253,8 @@ class CourtMatchingTest(SimpleTestCase):
             {
                 "args": (
                     "U.S. Circuit Court",
-                    "north_carolina/court_opinions/documents/fa5b96d590ae8d48.xml",
+                    "north_carolina/court_opinions/documents"
+                    "/fa5b96d590ae8d48.xml",
                     # noqa
                 ),
                 "answer": "circtnc",
@@ -634,7 +648,8 @@ Appeals, No. 19667-4-III, October 31, 2002. Denied September 30, 2003."
 
         self.read_json_func.return_value = CaseLawFactory(
             court=CaseLawCourtFactory.create(
-                name="United States Bankruptcy Court for the Northern District of Alabama"
+                name="United States Bankruptcy Court for the Northern "
+                "District of Alabama "
             )
         )
         self.assertSuccessfulParse(0)
@@ -678,14 +693,17 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
         cite = self._get_cite(case_law)
         self.assertEqual(
             cite.cluster.attorneys,
-            "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant in error., Voss, for plaintiff in error,, Webb, for defendant in error,",
+            "M. V. Voss, for plaintiff in error., W. O. Webb, for defendant "
+            "in error., Voss, for plaintiff in error,, Webb, for defendant "
+            "in error,",
         )
 
     def test_per_curiam(self):
         """Did we identify the per curiam case."""
         case_law = CaseLawFactory.create(
             casebody=CaseBodyFactory.create(
-                data='<casebody><opinion type="majority"><author id="b56-3">PER CURIAM:</author></casebody>'
+                data='<casebody><opinion type="majority"><author '
+                'id="b56-3">PER CURIAM:</author></casebody> '
             ),
         )
         self.read_json_func.return_value = case_law
@@ -728,7 +746,8 @@ delivered the opinion of the Court.</p></opinion> </casebody>'
 
         self.assertEqual(
             cite.cluster.judges,
-            "Auto, Breyer, Ginsbtjrg, Kennedy, Roberts, Scaua, Sotjter, Stevens, Thomas",
+            "Auto, Breyer, Ginsbtjrg, Kennedy, Roberts, Scaua, Sotjter, "
+            "Stevens, Thomas",
         )
 
     def test_xml_harvard_extraction(self):
@@ -782,7 +801,8 @@ label="194">*194</page-number>
         self.assertEqual(str(cite), "7 Ct. Cl. 65")
 
     def test_no_volume_citation(self):
-        """Can we handle an opinion that contains a citation without a volume?"""
+        """Can we handle an opinion that contains a citation without a
+        volume?"""
         citations = [
             "Miller's Notebook, 179",
         ]
@@ -791,3 +811,21 @@ label="194">*194</page-number>
         )
         self.read_json_func.return_value = case_law
         self.assertSuccessfulParse(1)
+
+    def test_case_name_winnowing_comparison(self):
+        """
+        Test removing "United States" from case names and check if there is an
+        overlap between two case names.
+        """
+        case_name_full = (
+            "UNITED STATES of America, Plaintiff-Appellee, "
+            "v. Wayne VINSON, Defendant-Appellant "
+        )
+        case_name_abbreviation = "United States v. Vinson"
+        harvard_case = f"{case_name_full} {case_name_abbreviation}"
+
+        case_name_cl = "United States v. Frank Esquivel"
+        overlap = winnow_case_name(case_name_cl) & winnow_case_name(
+            harvard_case
+        )
+        self.assertEqual(len(overlap), 0)
