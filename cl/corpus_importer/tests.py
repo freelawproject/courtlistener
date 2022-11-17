@@ -780,3 +780,14 @@ label="194">*194</page-number>
         self.assertSuccessfulParse(1)
         cite = self._get_cite(case_law)
         self.assertEqual(str(cite), "7 Ct. Cl. 65")
+
+    def test_no_volume_citation(self):
+        """Can we handle an opinion that contains a citation without a volume?"""
+        citations = [
+            "Miller's Notebook, 179",
+        ]
+        case_law = CaseLawFactory(
+            citations=[CitationFactory(cite=cite) for cite in citations],
+        )
+        self.read_json_func.return_value = case_law
+        self.assertSuccessfulParse(1)

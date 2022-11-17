@@ -85,18 +85,19 @@ class LegalProvider(BaseProvider):
     def citation(self) -> str:
         """Make or fetch a citation e.g. 345 Mass. 76
 
-        This method generates a random citation unless an example is
-        provided in reporters-db.  Typically reporters-db has examples
-        for atypcial citation patterns.
+        Grab a random reporter if it contains a typical full_cite pattern
+        Exclude reporters that rely on regex patterns.
 
         :return Citation as a string
         """
 
-        reporter = random.choice(list(REPORTERS.keys()))
-        examples = REPORTERS[reporter][0].get("examples")
-        if examples:
-            return random.choice(examples)
-
+        reporters = [
+            edition
+            for edition in REPORTERS.keys()
+            if "regexes"
+            not in REPORTERS[edition][0]["editions"][edition].keys()
+        ]
+        reporter = random.choice(reporters)
         volume = random.randint(1, 999)
         page = random.randint(1, 999)
         return f"{volume} {reporter} {page}"

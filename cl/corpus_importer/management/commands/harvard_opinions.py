@@ -552,7 +552,11 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
         # Cleanup citations with extra spaces
         clean_cite = re.sub(r"\s+", " ", cite["cite"])
         citation = get_citations(clean_cite)
-        if not citation or not isinstance(citation[0], FullCaseCitation):
+        if (
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or citation[0].groups.get("volume", True)
+        ):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
 
@@ -901,7 +905,11 @@ def find_previously_imported_cases(
     # Match against known citations.
     for cite in data["citations"]:
         found_cite = get_citations(cite["cite"])
-        if found_cite and isinstance(found_cite[0], FullCaseCitation):
+        if (
+            found_cite
+            and isinstance(found_cite[0], FullCaseCitation)
+            and found_cite[0].groups.get("volume", False)
+        ):
             possible_cases = OpinionCluster.objects.filter(
                 citations__reporter=found_cite[0].corrected_reporter(),
                 citations__volume=found_cite[0].groups["volume"],
