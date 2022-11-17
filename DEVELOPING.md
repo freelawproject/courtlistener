@@ -141,7 +141,7 @@ Then run something like `docker restart cl-django` and you should be good, or if
 2. Add your problem here...
 
 
-## Code upgrades
+## Ongoing code upgrades you should do when possible
 
 Python and its ecosystem are always evolving. There are a number of best practices that we do to try to keep up:
 
@@ -204,6 +204,8 @@ for Intellij/PyCharm/et al.
         Fixes: #xyz
 
     We welcome LONG commit messages that could literally double as blog posts. If somebody is looking at the commit in five years, they *want* an essay, not a tweet.
+
+1. PR's that do anything visual (email templates, HTML pages, etc) should include a comment with a screenshot or gif of the visual changes.
 
 1. *KEEP YOUR PR's SMALL*. A good PR should land a specific thing of some sort.
 It doesn't have to be done — it doesn't even have to work! — but it should be
