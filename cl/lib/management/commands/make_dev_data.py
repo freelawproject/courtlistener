@@ -1,6 +1,7 @@
 from django.core.management.base import CommandParser
 
 from cl.alerts.factories import DocketAlertWithParentsFactory
+from cl.api.factories import WebhookEventWithParentsFactory
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
@@ -37,6 +38,8 @@ FACTORIES = {
     500: DocketAlertWithParentsFactory,
     # Audio
     600: AudioWithParentsFactory,
+    # API
+    700: WebhookEventWithParentsFactory,
 }
 factories_str = "\n".join([f"{k}: {v}" for k, v in FACTORIES.items()])
 

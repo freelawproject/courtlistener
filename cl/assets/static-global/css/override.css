@@ -1352,9 +1352,34 @@ emphasis {
   margin-right: 0.25em;
 }
 
-
 [data-loading] {
   display: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.dummy-area{
+  position:relative;
+}
+
+.copy-text-icon {
+    color: #999;
+    font-size: 1.5em;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    cursor: pointer;
+}
+
+.copy-text-icon:hover{
+  color: #222;
 }
 
 /* END Webhooks styles */

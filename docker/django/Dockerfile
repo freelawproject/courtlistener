@@ -131,3 +131,8 @@ FROM python-base as rss-scraper
 USER www-data
 CMD /opt/courtlistener/manage.py scrape_rss
 
+
+FROM python-base as retry-webhooks
+
+USER www-data
+CMD /opt/courtlistener/manage.py cl_retry_webhooks

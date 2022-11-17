@@ -3,6 +3,7 @@ import random
 from faker import Faker
 from faker.providers import BaseProvider
 from juriscraper.lib.string_utils import titlecase
+from reporters_db import REPORTERS
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 
@@ -19,7 +20,7 @@ class LegalProvider(BaseProvider):
         """
         return "".join(fake.random_letters(length=15)).lower()
 
-    def court_name(self) -> str:
+    def court_name(self, known: bool = False) -> str:
         """
         Generate court names like:
 
@@ -29,6 +30,14 @@ class LegalProvider(BaseProvider):
 
         :return: A court name
         """
+        if known:
+            return random.choice(
+                [
+                    "Supreme Court of the United States",
+                    "Massachusetts Supreme Judicial Court",
+                    "United States Board of Tax Appeals",
+                ]
+            )
         first_word = random.choice(
             [
                 "Thirteenth circuit",
@@ -80,3 +89,10 @@ class LegalProvider(BaseProvider):
         plaintiff = self._make_random_party(full)
         defendant = self._make_random_party(full)
         return titlecase(f"{plaintiff} v. {defendant}")
+
+    def citation(self) -> str:
+        """Make a citation e.g. 345 Mass. 76"""
+        volume = random.randint(1, 999)
+        page = random.randint(1, 999)
+        reporter = random.choice(list(REPORTERS.keys()))
+        return f"{volume} {reporter} {page}"
