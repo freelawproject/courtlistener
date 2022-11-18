@@ -592,7 +592,9 @@ def check_webhook_failure_count_and_notify(
     webhook_event: WebhookEvent,
 ) -> None:
     """Check if a Webhook needs to be disabled and/or send a notification about
-     a failing webhook event.
+     a failing webhook event. Only email failing webhook notifications based on
+     the oldest active ENQUEUED_RETRY WebhookEvent, avoiding sending
+     notifications for every failing webhook event.
 
     :param webhook_event: The related WebhookEvent to check.
     :return: None
@@ -604,24 +606,48 @@ def check_webhook_failure_count_and_notify(
         1: True,  # Send first webhook failing notification
         2: False,
         3: False,
-        4: True,  # Send second webhook failing notification
-        5: False,
-        6: True,  # Send third webhook failing notification
+        4: False,
+        5: True,  # Send second webhook failing notification
+        6: False,
         7: True,  # Send webhook disabled notification
     }
+    webhook = webhook_event.webhook
+    if not webhook.enabled or webhook_event.debug:
+        return
+
+    webhook.failure_count = F("failure_count") + 1
+    update_fields = ["failure_count"]
 
     current_try_counter = webhook_event.retry_counter
-    disabled = False
-    webhook = webhook_event.webhook
-    if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER and webhook.enabled:
-        webhook.enabled = False
-        # Don't send notification email via signal in cl.users.signals
-        webhook.save(update_fields=["enabled"])
-        disabled = True
-
     notify = notify_on[current_try_counter]
     if notify:
-        notify_failing_webhook.delay(webhook_event.webhook.pk, disabled)
+        disabled = False
+        all_enqueued_for_retry_we = WebhookEvent.objects.filter(
+            webhook=webhook_event.webhook,
+            event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+            debug=False,
+        ).order_by("date_created")
+        all_enqueued_for_retry_we_list = list(all_enqueued_for_retry_we)
+
+        if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
+            webhook.enabled = False
+            update_fields.append("enabled")
+            disabled = True
+            # If the parent webhook is disabled mark all current ENQUEUED_RETRY
+            # events as ENDPOINT_DISABLED
+            all_enqueued_for_retry_we.update(
+                event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED
+            )
+
+        oldest_enqueued_for_retry = all_enqueued_for_retry_we_list[0]
+        if oldest_enqueued_for_retry.pk == webhook_event.pk:
+            failure_counter = current_try_counter + 1
+            notify_failing_webhook.delay(
+                webhook_event.pk, failure_counter, disabled
+            )
+
+    # Save webhook and avoid emailing admins via signal in cl.users.signals
+    webhook.save(update_fields=update_fields)
 
 
 def update_webhook_event_after_request(
@@ -643,32 +669,33 @@ def update_webhook_event_after_request(
     """
 
     failed_request = False
+    data = ""
+    status_code = None
     if response is not None:
         # The webhook response is consumed as a stream to avoid blocking the
         # process and overflowing memory on huge responses. We only read and
         # store the first 4KB
-        data = ""
         for chunk in response.iter_content(1024 * 4, decode_unicode=True):
             data = chunk
             break
         response.close()
-        webhook_event.status_code = response.status_code
-        webhook_event.response = data
+        status_code = response.status_code
         # If the response status code is not 2xx. It's considered a failed
         # attempt, and it'll be enqueued for retry.
         if not 200 <= response.status_code < 300:
             failed_request = True
+    webhook_event.status_code = status_code
+    webhook_event.response = data
 
     if failed_request or error:
-        if not webhook_event.debug:
-            webhook = webhook_event.webhook
-            webhook.failure_count = F("failure_count") + 1
-            # Don't send notification email via signal in cl.users.signals
-            webhook.save(update_fields=["failure_count"])
-            check_webhook_failure_count_and_notify(webhook_event)
+        if error is None:
+            error = ""
+        webhook_event.error_message = error
+        check_webhook_failure_count_and_notify(webhook_event)
         if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             # If the webhook has reached the max retry counter, mark as failed
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
+            webhook_event.retry_counter = F("retry_counter") + 1
             webhook_event.save()
             return
 
@@ -677,9 +704,6 @@ def update_webhook_event_after_request(
         )
         webhook_event.retry_counter = F("retry_counter") + 1
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
-        if error is None:
-            error = ""
-        webhook_event.error_message = error
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
     webhook_event.save()

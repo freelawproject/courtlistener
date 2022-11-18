@@ -1,5 +1,6 @@
 import sys
 import time
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils.timezone import now
@@ -17,16 +18,43 @@ def retry_webhook_events() -> int:
 
     # Using select_for_update() and transaction.atomic() here will prevent more
     # than one instance retry pending webhooks, avoiding duplicated retries.
-    webhook_events = WebhookEvent.objects.select_for_update().filter(
-        event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
-        next_retry_date__lte=now(),
-        debug=False,
-        webhook__enabled=True,
+    webhook_events = (
+        WebhookEvent.objects.select_for_update()
+        .filter(
+            event_status__in=[
+                WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
+            ],
+            next_retry_date__lte=now(),
+            debug=False,
+            webhook__enabled=True,
+        )
+        .order_by("date_created")
     )
+
+    webhook_events_retried = 0
     with transaction.atomic():
+        cut_off_date_two_days = now() - timedelta(days=2)
         for webhook_event in webhook_events:
+            if webhook_event.date_created < cut_off_date_two_days:
+                # Mark as failed webhook events older than 2 days, avoid
+                # retrying.
+                webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
+                webhook_event.save()
+                continue
+
+            # Restore retry counter to 0 for ENDPOINT_DISABLED events after
+            # Webhook is re-enabled.
+            if (
+                webhook_event.event_status
+                == WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED
+            ):
+                webhook_event.retry_counter = 0
+                webhook_event.save()
+
             send_webhook_event(webhook_event)
-    return len(webhook_events)
+            webhook_events_retried += 1
+    return webhook_events_retried
 
 
 class Command(VerboseCommand):
