@@ -1,3 +1,4 @@
+{% load widget_tweaks %}
 {% if results %}
   {% for webhook in results %}
     <tr>
@@ -7,18 +8,28 @@
         </p>
       </td>
       <td>
-        <p class="bottom bold status-{{ webhook.event_status }}">
+        <p class="bottom bold {{ webhook.event_status|webhook_status_class }}">
           {{ webhook.get_event_status_display }}
         </p>
       </td>
       <td>
-        <p class="bottom bold">
-          {{ webhook.status_code }}
+        <p class="bottom bold text-center">
+          {% if webhook.status_code %}
+            {{ webhook.status_code }}
+          {% else %}
+            -
+          {% endif %}
         </p>
       </td>
       <td>{{ webhook.date_created }}</td>
       {% if not webhook.debug %}
-        <td>{{ webhook.next_retry_date }}</td>
+        <td class="text-center">
+          {% if webhook.next_retry_date %}
+            {{ webhook.next_retry_date }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
       {% endif %}
       <td class="right">
         <div class="flex justify-content-end">
@@ -31,7 +42,7 @@
   {% endfor %}
   <tr>
     <td colspan="100%">
-      {% include "includes/webhooks_htmx/webhooks-pagination.html" %}
+      {% include "includes/pagination.html" %}
     </td>
   </tr>
 {% endif %}

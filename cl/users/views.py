@@ -742,36 +742,29 @@ def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_webhook_logs(request: AuthenticatedHttpRequest) -> HttpResponse:
+def view_webhook_logs(
+    request: AuthenticatedHttpRequest,
+    route_prefix: str,
+) -> HttpResponse:
     """Render the webhooks logs page"""
+
+    page_title = "Webhook Logs"
+    sub_page = "logs"
+    debug = False
+    if route_prefix == "test-logs":
+        page_title = "Webhook Test Logs"
+        sub_page = "test_logs"
+        debug = True
+
     return TemplateResponse(
         request,
         "profile/webhooks_logs.html",
         {
             "private": True,
             "page": "api_webhooks",
-            "page_title": "Webhook Logs",
-            "sub_page": "logs",
-            "debug": False,
-            "event_types": WebhookEventType,
-            "event_statuses": WEBHOOK_EVENT_STATUS.STATUS,
-        },
-    )
-
-
-@login_required
-@never_cache
-def view_webhook_test_logs(request: AuthenticatedHttpRequest) -> HttpResponse:
-    """Render the webhook test logs page"""
-    return TemplateResponse(
-        request,
-        "profile/webhooks_logs.html",
-        {
-            "private": True,
-            "page": "api_webhooks",
-            "page_title": "Webhook Test Logs",
-            "sub_page": "test_logs",
-            "debug": True,
+            "page_title": page_title,
+            "sub_page": sub_page,
+            "debug": debug,
             "event_types": WebhookEventType,
             "event_statuses": WEBHOOK_EVENT_STATUS.STATUS,
         },

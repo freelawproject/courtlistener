@@ -5,11 +5,11 @@
           &nbsp;Webhooks </a>
       </li>
       <li class="{% if sub_page == "logs" %} active {% endif %} medium">
-        <a href="{% url "view_webhook_logs" %}">
+        <a href="{% url "view_webhook_logs" "logs" %}">
           &nbsp;Logs</a>
       </li>
       <li class="{% if sub_page == "test_logs" %} active {% endif %} medium">
-        <a href="{% url "view_webhook_test_logs" %}">
+        <a href="{% url "view_webhook_logs" "test-logs" %}">
           &nbsp;Test Logs</a>
       </li>
     </ul>

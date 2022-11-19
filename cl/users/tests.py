@@ -22,6 +22,7 @@ from rest_framework.status import (
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
     HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
 )
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
@@ -3050,6 +3051,25 @@ class WebhooksHTMXTests(APITestCase):
             webhook_event[0].content["results"][0]["id"], 2208776613
         )
 
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockPostResponse(
+                500, mock_raw=True
+            ),
+        ):
+            response = self.client.post(webhook_1_path_test, {})
+        # Compare the test webhook event data.
+        self.assertEqual(len(webhook_event), 2)
+        self.assertEqual(
+            webhook_event[1].status_code, HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        self.assertEqual(webhook_event[1].debug, True)
+        self.assertEqual(
+            webhook_event[1].content["results"][0]["id"], 2208776613
+        )
+        # Webhook failure count shouldn't be increased by a webhook test event
+        self.assertEqual(webhook_event[1].webhook.failure_count, 0)
+
     def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
@@ -3075,7 +3095,7 @@ class WebhooksHTMXTests(APITestCase):
         response = self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There shouldn't be results for user_1
-        self.assertEqual(response.content, b"\n")
+        self.assertEqual(response.content, b"\n\n")
 
         sa_webhook = WebhookFactory(
             user=self.user_1,
@@ -3093,4 +3113,4 @@ class WebhooksHTMXTests(APITestCase):
         response = self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There should be results for user_1
-        self.assertNotEqual(response.content, b"\n")
+        self.assertNotEqual(response.content, b"\n\n")

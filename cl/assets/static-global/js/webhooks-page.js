@@ -36,7 +36,7 @@ htmx.on('htmx:afterSwap', (e) => {
 
   if (e.detail.target.id === 'webhook-test-sent') {
     // Show the View in Logs button after send the test webhook request.
-    $('#view-in-logs-button').removeClass('hidden');
+    $('#webhook-test-sent').removeClass('hidden');
   }
 
   let target_trigger = e.detail.requestConfig.headers['HX-Trigger'];
@@ -106,7 +106,7 @@ htmx.on('htmx:beforeSwap', (e) => {
   Show error if the response does not have a 20x status code
   */
   if (e.detail.isError) {
-    alert("The server can't handle your request now, please try again");
+    alert('We ran into an error processing your request and will be looking into it. Please try again later.');
   }
 });
 

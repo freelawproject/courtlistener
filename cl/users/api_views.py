@@ -194,6 +194,7 @@ class WebhookEventViewSet(ModelViewSet):
                 "type_filter": type_filter,
                 "status_filter": status_filter,
                 "debug": debug,
+                "webhooks": True,
             },
             template_name="includes/webhooks_htmx/webhook-logs-list.html",
         )

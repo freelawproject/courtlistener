@@ -660,11 +660,12 @@ def update_webhook_event_after_request(
             failed_request = True
 
     if failed_request or error:
-        webhook = webhook_event.webhook
-        webhook.failure_count = F("failure_count") + 1
-        # Don't send notification email via signal in cl.users.signals
-        webhook.save(update_fields=["failure_count"])
-        check_webhook_failure_count_and_notify(webhook_event)
+        if not webhook_event.debug:
+            webhook = webhook_event.webhook
+            webhook.failure_count = F("failure_count") + 1
+            # Don't send notification email via signal in cl.users.signals
+            webhook.save(update_fields=["failure_count"])
+            check_webhook_failure_count_and_notify(webhook_event)
         if webhook_event.retry_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             # If the webhook has reached the max retry counter, mark as failed
             webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED

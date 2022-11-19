@@ -1388,16 +1388,6 @@ textarea {
   color: #222;
 }
 
-.status-0, .status-1{
-    color: #f0ad4e;
-}
-.status-2{
-    color: #5cb85c;
-}
-.status-3{
-    color: #d9534f;
-}
-
 .webhook-detail{
   padding: 1em;
 }
