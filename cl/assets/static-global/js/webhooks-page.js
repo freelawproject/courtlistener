@@ -35,7 +35,7 @@ htmx.on('htmx:afterSwap', (e) => {
   }
 
   if (e.detail.target.id === 'webhook-test-sent') {
-    // Show the View in Logs button after send the test webhook request.
+    // Show the button checkbox square after send the webhook test request.
     $('#webhook-test-sent').removeClass('hidden');
   }
 
@@ -73,7 +73,7 @@ htmx.on('htmx:beforeSwap', (e) => {
     webhook_form.innerHTML = '';
     webhook_form_testing.innerHTML = '';
     if (target_trigger === 'add-webhook') {
-      webhook_title.innerHTML = 'Add a webhook endpoint';
+      webhook_title.innerHTML = 'Add webhook endpoint';
     } else {
       webhook_title.innerHTML = 'Edit webhook endpoint';
     }

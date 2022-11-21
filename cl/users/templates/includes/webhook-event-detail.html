@@ -7,7 +7,7 @@
 
 {% block webhooks-content %}
   <div class="webhook-detail">
-    <h3 class="v-offset-below-2">Webhook Event Details{% if webhook_event.debug %} (Testing){% endif %}:</h3>
+    <h3 class="v-offset-below-2">Webhook Event Details{% if webhook_event.debug %} (Testing){% endif %}</h3>
     <div class="row form-group">
       <label class="col-md-3">Endpoint URL: </label><p class="col-md-9">{{ webhook_event.webhook.url }}</p>
       <label class="col-md-3">Endpoint status: </label><p class="col-md-9">{% if webhook_event.webhook.enabled %} Enabled {% else %} Disabled {% endif %}</p>
