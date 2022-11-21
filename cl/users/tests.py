@@ -22,10 +22,12 @@ from rest_framework.status import (
     HTTP_201_CREATED,
     HTTP_204_NO_CONTENT,
     HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
 )
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -3048,3 +3050,67 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(
             webhook_event[0].content["results"][0]["id"], 2208776613
         )
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockPostResponse(
+                500, mock_raw=True
+            ),
+        ):
+            response = self.client.post(webhook_1_path_test, {})
+        # Compare the test webhook event data.
+        self.assertEqual(len(webhook_event), 2)
+        self.assertEqual(
+            webhook_event[1].status_code, HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        self.assertEqual(webhook_event[1].debug, True)
+        self.assertEqual(
+            webhook_event[1].content["results"][0]["id"], 2208776613
+        )
+        # Webhook failure count shouldn't be increased by a webhook test event
+        self.assertEqual(webhook_event[1].webhook.failure_count, 0)
+
+    def test_list_webhook_events(self) -> None:
+        """Can we list the user's webhook events?"""
+
+        da_webhook = WebhookFactory(
+            user=self.user_2,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=da_webhook,
+        )
+
+        webhook_event_path_list = reverse(
+            "webhook_events-list",
+            kwargs={"format": "html"},
+        )
+
+        webhooks = Webhook.objects.all()
+        self.assertEqual(webhooks.count(), 1)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There shouldn't be results for user_1
+        self.assertEqual(response.content, b"\n\n")
+
+        sa_webhook = WebhookFactory(
+            user=self.user_1,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        WebhookEventFactory(
+            webhook=sa_webhook,
+        )
+
+        self.assertEqual(webhooks.count(), 2)
+
+        # Get the webhooks for user_1
+        response = self.client.get(webhook_event_path_list)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        # There should be results for user_1
+        self.assertNotEqual(response.content, b"\n\n")

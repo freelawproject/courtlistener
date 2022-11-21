@@ -13,11 +13,9 @@
       <a href="{% url "view_api_usage" %}">
         <i class="fa fa-pie-chart"></i>&nbsp;API Usage</a>
     </li>
-    {% flag "user-webhooks" %}
     <li class="{% if page == "api_webhooks" %} active {% endif %} medium">
       <a href="{% url "view_webhooks" %}">
         <i class="fa fa-plug"></i>&nbsp;Webhooks</a>
     </li>
-    {% endflag %}
   </ul>
 </div>

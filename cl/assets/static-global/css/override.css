@@ -1314,6 +1314,12 @@ emphasis {
   justify-content: center;
 }
 
+.left-tabs {
+  display: inline-flex;
+  width: 100%;
+  justify-content: left;
+}
+
 @media (max-width: 767px) {
   .centered-tabs {
     display: block;
@@ -1382,6 +1388,9 @@ textarea {
   color: #222;
 }
 
+.webhook-detail{
+  padding: 1em;
+}
 /* END Webhooks styles */
 
 

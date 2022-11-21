@@ -1,0 +1,51 @@
+<div class="col-sm-6 col-md-6">
+    <ul class="nav nav-pills left-tabs">
+      <li class="{% if sub_page == "webhooks" %} active {% endif %} medium">
+        <a href="{% url "view_webhooks" %}">
+          &nbsp;Webhooks </a>
+      </li>
+      <li class="{% if sub_page == "logs" %} active {% endif %} medium">
+        <a href="{% url "view_webhook_logs" "logs" %}">
+          &nbsp;Logs</a>
+      </li>
+      <li class="{% if sub_page == "test_logs" %} active {% endif %} medium">
+        <a href="{% url "view_webhook_logs" "test-logs" %}">
+          &nbsp;Test Logs</a>
+      </li>
+    </ul>
+</div>
+{% if sub_page == "webhooks" %}
+  <div class="col-sm-6 col-md-6 text-right" hx-ext="loading-states" data-loading-states>
+    <button id="add-webhook" class="btn btn-primary btn-xs"
+             hx-get="{% url 'webhooks-render-form' format="html" %}"
+             hx-target="#webhooks-body"
+             data-loading-target="#add-webhook"
+             data-loading-disable
+             >
+       <i class="fa fa-plus"></i>&nbsp;Add webhook
+       <i data-loading class="fa fa-spinner fa-spin"></i>
+    </button>
+  </div>
+{% elif sub_page == "logs" and not webhook_event or sub_page == "test_logs" and not webhook_event  %}
+  <div class="col-sm-6 col-md-6">
+    <form data-loading-states
+          id="webhook-filter-form" hx-trigger="change"
+          hx-get="{% url 'webhook_events-list' format="html" %}?debug={{debug}}"
+          hx-target="#webhook_table_body"
+    >
+      <select id="event_type" name="webhook__event_type" class="btn btn-default dropdown-toggle">
+        <option value="">All event types</option>
+        {% for event_type in event_types %}
+          <option value="{{ event_type }}">{{ event_type.label }}</option>
+        {% endfor %}
+      </select>
+      <select id="event_status" name="event_status" class="btn btn-default dropdown-toggle">
+        <option value="">All event status</option>
+        {% for event_status in event_statuses %}
+          <option value="{{ event_status.0 }}">{{ event_status.1 }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+{% elif webhook_event %}
+{% endif %}

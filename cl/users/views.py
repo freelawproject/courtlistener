@@ -30,8 +30,10 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.models import DocketAlert
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -77,6 +79,7 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
             "search_alerts": search_alerts,
             "page": "search_alerts",
             "private": True,
+            "page_title": "Search Alerts",
         },
     )
 
@@ -94,6 +97,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
             "docket_alerts": docket_alerts,
             "page": "docket_alerts",
             "private": True,
+            "page_title": "Docket Alerts",
         },
     )
 
@@ -242,7 +246,11 @@ def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_info"},
+        {
+            "private": True,
+            "page": "api_info",
+            "page_title": "API Documentation",
+        },
     )
 
 
@@ -252,7 +260,7 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_token"},
+        {"private": True, "page": "api_token", "page_title": "API Token"},
     )
 
 
@@ -262,7 +270,7 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_usage"},
+        {"private": True, "page": "api_usage", "page_title": "API Usage"},
     )
 
 
@@ -727,6 +735,68 @@ def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
         {
             "private": True,
             "page": "api_webhooks",
+            "sub_page": "webhooks",
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_webhook_logs(
+    request: AuthenticatedHttpRequest,
+    route_prefix: str,
+) -> HttpResponse:
+    """Render the webhooks logs page"""
+
+    page_title = "Webhook Logs"
+    sub_page = "logs"
+    debug = False
+    if route_prefix == "test-logs":
+        page_title = "Webhook Test Logs"
+        sub_page = "test_logs"
+        debug = True
+
+    return TemplateResponse(
+        request,
+        "profile/webhooks_logs.html",
+        {
+            "private": True,
+            "page": "api_webhooks",
+            "page_title": page_title,
+            "sub_page": sub_page,
+            "debug": debug,
+            "event_types": WebhookEventType,
+            "event_statuses": WEBHOOK_EVENT_STATUS.STATUS,
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_webhook_logs_detail(
+    request: AuthenticatedHttpRequest, pk: int
+) -> HttpResponse:
+    """Render the webhook event detail page"""
+
+    webhook_event = WebhookEvent.objects.get(webhook__user=request.user, pk=pk)
+    renderer = JSONRenderer()
+    json_content = renderer.render(
+        webhook_event.content,
+        accepted_media_type="application/json; indent=2;",
+    ).decode()
+    sub_page = "logs"
+    if webhook_event.debug:
+        sub_page = "test_logs"
+
+    return TemplateResponse(
+        request,
+        "includes/webhook-event-detail.html",
+        {
+            "private": True,
+            "page": "api_webhooks",
+            "sub_page": sub_page,
+            "webhook_event": webhook_event,
+            "json_content": json_content,
         },
     )
 
