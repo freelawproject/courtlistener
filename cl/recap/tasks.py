@@ -118,6 +118,8 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         process_recap_claims_register.delay(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
         process_recap_zip.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.IQUERY_PAGE:
+        process_docket_iquery_page.delay(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -820,6 +822,88 @@ def process_recap_docket_history_report(self, pk):
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
+    }
+
+
+@app.task(
+    bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
+)
+def process_docket_iquery_page(self, pk):
+    """Process the Docket iQuery page.
+
+    :param pk: The primary key of the processing queue item you want to work on
+    :returns: A dict indicating whether the docket needs Solr re-indexing.
+    """
+
+    pq = ProcessingQueue.objects.get(pk=pk)
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+
+    try:
+        text = pq.filepath_local.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        if (self.request.retries == self.max_retries) or pq.debug:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return None
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
+    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
+    report._parse_text(text)
+    data = report.data
+    logger.info(f"Parsing completed for item {pq}")
+
+    if data == {}:
+        # Bad docket iquery page.
+        msg = "Not a valid docket iquery page upload."
+        mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        self.request.chain = None
+        return None
+
+    # Merge the contents of the docket into CL.
+    d = find_docket_object(
+        pq.court_id, pq.pacer_case_id, data["docket_number"]
+    )
+    d.add_recap_source()
+    update_docket_metadata(d, data)
+
+    if pq.debug:
+        mark_pq_successful(pq, d_id=d.pk)
+        self.request.chain = None
+        return {"docket_pk": d.pk, "content_updated": False}
+
+    try:
+        d.save()
+    except IntegrityError as exc:
+        logger.warning(
+            "Race condition experienced while attempting docket save."
+        )
+        error_message = "Unable to save docket due to IntegrityError."
+        if self.request.retries == self.max_retries:
+            mark_pq_status(pq, error_message, PROCESSING_STATUS.FAILED)
+            self.request.chain = None
+            return None
+        else:
+            mark_pq_status(
+                pq, error_message, PROCESSING_STATUS.QUEUED_FOR_RETRY
+            )
+            raise self.retry(exc=exc)
+
+    # Add the HTML to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles(
+        content_object=d, upload_type=UPLOAD_TYPE.IQUERY_PAGE
+    )
+    pacer_file.filepath.save(
+        # We only care about the ext w/S3PrivateUUIDStorageTest
+        "docket_iquery_page.html",
+        ContentFile(text.encode()),
+    )
+    mark_pq_successful(pq, d_id=d.pk)
+    return {
+        "docket_pk": d.pk,
+        "content_updated": False,
     }
 
 

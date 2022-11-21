@@ -20,6 +20,7 @@ class UPLOAD_TYPE:
     CLAIMS_REGISTER = 9
     DOCUMENT_ZIP = 10
     SES_EMAIL = 11
+    IQUERY_PAGE = 12
 
     NAMES = (
         (DOCKET, "HTML Docket"),
@@ -33,6 +34,7 @@ class UPLOAD_TYPE:
         (CLAIMS_REGISTER, "Claims register page"),
         (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
         (SES_EMAIL, "Email in the SES storage format"),
+        (IQUERY_PAGE, "Docket iQuery page"),
     )
 
 
