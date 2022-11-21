@@ -15,7 +15,7 @@
       <label class="col-md-3">Idempotency-key: </label><p class="col-md-9">{{ webhook_event.event_id }}</p>
       <label class="col-md-3">Event date: </label><p class="col-md-9">{{ webhook_event.date_created }}</p>
       <label class="col-md-3">Status code: </label><p class="col-md-9 bold"> {% if webhook_event.status_code %}{{ webhook_event.status_code }} {{ webhook_event.get_status_code_display }} {% else %}-{% endif %}</p>
-      <label class="col-md-3">Event status: </label><p class="col-md-9 bold {{ webhook.event_status|webhook_status_class }}">{{ webhook_event.get_event_status_display }}</p>
+      <label class="col-md-3">Event status: </label><p class="col-md-9 bold {{ webhook_event.event_status|webhook_status_class }}">{{ webhook_event.get_event_status_display }}</p>
       <label class="col-md-3">Failure count: </label><p class="col-md-9">{{ webhook_event.retry_counter }}</p>
       <label class="col-md-3">Next retry date: </label><p class="col-md-9">{% if not webhook_event.debug %}{% if webhook_event.next_retry_date %}{{ webhook_event.next_retry_date }}{% else %}-{% endif %}{% else %}Test events will not be retried{% endif %}</p>
     </div>
