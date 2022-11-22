@@ -21,6 +21,7 @@ from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     AppellateDocketReport,
     AttachmentPage,
+    CaseQuery,
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
@@ -118,8 +119,11 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         process_recap_claims_register.delay(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCUMENT_ZIP:
         process_recap_zip.delay(pq.pk)
-    elif pq.upload_type == UPLOAD_TYPE.IQUERY_PAGE:
-        process_docket_iquery_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
+        chain(
+            process_case_query_page.s(pq.pk),
+            add_or_update_recap_docket.s(),
+        ).apply_async()
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -828,8 +832,8 @@ def process_recap_docket_history_report(self, pk):
 @app.task(
     bind=True, max_retries=3, interval_start=5 * 60, interval_step=5 * 60
 )
-def process_docket_iquery_page(self, pk):
-    """Process the Docket iQuery page.
+def process_case_query_page(self, pk):
+    """Process the case query (iquery.pl) page.
 
     :param pk: The primary key of the processing queue item you want to work on
     :returns: A dict indicating whether the docket needs Solr re-indexing.
@@ -850,14 +854,14 @@ def process_docket_iquery_page(self, pk):
             mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
             raise self.retry(exc=exc)
 
-    report = DocketHistoryReport(map_cl_to_pacer_id(pq.court_id))
+    report = CaseQuery(map_cl_to_pacer_id(pq.court_id))
     report._parse_text(text)
     data = report.data
     logger.info(f"Parsing completed for item {pq}")
 
     if data == {}:
         # Bad docket iquery page.
-        msg = "Not a valid docket iquery page upload."
+        msg = "Not a valid case query page upload."
         mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
         self.request.chain = None
         return None
@@ -866,8 +870,15 @@ def process_docket_iquery_page(self, pk):
     d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
+    content_updated = False
+    current_case_name = d.case_name
     d.add_recap_source()
     update_docket_metadata(d, data)
+
+    if current_case_name != d.case_name or not d.pk:
+        # This docket should be added to Solr or updated since is new or the
+        # case name has changed.
+        content_updated = True
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
@@ -876,6 +887,7 @@ def process_docket_iquery_page(self, pk):
 
     try:
         d.save()
+        add_bankruptcy_data_to_docket(d, data)
     except IntegrityError as exc:
         logger.warning(
             "Race condition experienced while attempting docket save."
@@ -893,17 +905,18 @@ def process_docket_iquery_page(self, pk):
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
-        content_object=d, upload_type=UPLOAD_TYPE.IQUERY_PAGE
+        content_object=d, upload_type=UPLOAD_TYPE.CASE_QUERY_PAGE
     )
     pacer_file.filepath.save(
         # We only care about the ext w/S3PrivateUUIDStorageTest
-        "docket_iquery_page.html",
+        "case_report.html",
         ContentFile(text.encode()),
     )
+
     mark_pq_successful(pq, d_id=d.pk)
     return {
         "docket_pk": d.pk,
-        "content_updated": False,
+        "content_updated": content_updated,
     }
 
 

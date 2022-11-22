@@ -287,14 +287,14 @@ class RecapUploadsTest(TestCase):
                 j[bad_key]
         mock.assert_called()
 
-    def test_uploading_a_docket_iquery_page(self, mock):
+    def test_uploading_a_case_query_page(self, mock):
         """Can we upload a docket iquery page and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
         docket due to the mock.
         """
         self.data.update(
-            {"upload_type": UPLOAD_TYPE.IQUERY_PAGE, "document_number": ""}
+            {"upload_type": UPLOAD_TYPE.CASE_QUERY_PAGE, "document_number": ""}
         )
         del self.data["pacer_doc_id"]
         r = self.client.post(self.path, self.data)
