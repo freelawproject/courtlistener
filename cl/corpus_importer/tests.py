@@ -838,32 +838,37 @@ label="194">*194</page-number>
         # Check against itself, there must be an overlap
         case_1_data = {
             "case_name_full": "In the matter of S.J.S., a minor child. "
-                              "D.L.M. and D.E.M., Petitioners/Respondents v."
-                              " T.J.S.",
+            "D.L.M. and D.E.M., Petitioners/Respondents v."
+            " T.J.S.",
             "case_name_abbreviation": "D.L.M. v. T.J.S.",
-            "case_name_cl": "D.L.M. v. T.J.S.", "overlaps": 2}
+            "case_name_cl": "D.L.M. v. T.J.S.",
+            "overlaps": 2,
+        }
 
         case_2_data = {
             "case_name_full": "Appeal of HAMILTON & CHAMBERS CO., INC.",
             "case_name_abbreviation": "Appeal of Hamilton & Chambers Co.",
-            "case_name_cl": "Appeal of Hamilton & Chambers Co.", "overlaps": 4}
+            "case_name_cl": "Appeal of Hamilton & Chambers Co.",
+            "overlaps": 4,
+        }
 
         # Check against different case name, there shouldn't be an overlap
         case_3_data = {
             "case_name_full": "Henry B. Wesselman et al., as Executors of "
-                              "Blanche Wesselman, Deceased, Respondents, "
-                              "v. The Engel Company, Inc., et al., "
-                              "Appellants, et al., Defendants",
+            "Blanche Wesselman, Deceased, Respondents, "
+            "v. The Engel Company, Inc., et al., "
+            "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
-            "case_name_cl": " McQuillan v. Schechter", "overlaps": 0}
+            "case_name_cl": " McQuillan v. Schechter",
+            "overlaps": 0,
+        }
 
         cases = [case_1_data, case_2_data, case_3_data]
 
         for case in cases:
             harvard_case = f"{case.get('case_name_full')} {case.get('case_name_abbreviation')}"
             overlap = winnow_case_name(
-                case.get('case_name_cl')) & winnow_case_name(
-                harvard_case
-            )
+                case.get("case_name_cl")
+            ) & winnow_case_name(harvard_case)
 
-            self.assertEqual(len(overlap), case.get('overlaps'))
+            self.assertEqual(len(overlap), case.get("overlaps"))
