@@ -999,18 +999,33 @@ def winnow_case_name(case_name: str) -> Set:
         "|".join(map(re.escape, false_positive_strings))
     )
 
-    # Remove all non alphanumeric characters
+    # Fix case name to be cleaner
     case_name = harmonize(case_name)
+
+    # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
+    case_name = re.sub(
+        r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
+        lambda m: m.group().replace(".", ""),
+        case_name,
+    )
+
+    # Remove all non-alphanumeric characters
     case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
 
     # Remove strings that can cause an unnecessary overlap
     case_title = false_positive_strings_regex.sub("", case_title)
 
-    # Remove one letter words, initials etc.
+    # Remove one-letter words, initials etc.
     case_title = re.sub(r"\b[^ ]\b", "", case_title)
+
+    if not case_title:
+        # Log case name if the process reduce it to blank
+        logger.warning(f"Case name: {case_name} reduced to blank.")
+
+    # Convert case name to set of words
     cleaned_set = set(case_title.split())
 
-    # Lastly remove our ever growing set of false positive words
+    # Lastly remove our ever-growing set of false positive words
     # This is different from bad words, but may have some overlap.
     return cleaned_set - (cleaned_set & false_positive_set)
 
