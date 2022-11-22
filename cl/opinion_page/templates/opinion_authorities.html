@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load humanize %}
+{% load text_filters %}
+
+{# Shown on authorities pages. #}
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+{% block title %}Table of Authorities for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Table of Authorities for {{ title }} –
+    CourtListener.com{% endblock %}
+{% block description %}Table of Authorities for {{ title }}{% endblock %}
+{% block og_description %}Table of Authorities for {{ title }}{% endblock %}
+
+{% block navbar-o %}active{% endblock %}
+
+{% block sidebar %}
+    <div class="col-sm-3" id="sidebar">
+        <div class="sidebar-section">
+            <h4 class="bottom">
+                <i class="fa fa-arrow-circle-o-left gray"></i>
+                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+                   {% if cluster.blocked %}rel="nofollow"{% endif %}>Back to Opinion</a>
+            </h4>
+        </div>
+    </div>
+{% endblock sidebar %}
+
+{% block content %}
+    <div class="col-sm-9">
+        <h2>
+          <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+             class="black-link no-underline"
+             {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
+        </h2>
+
+        <div id="authorities">
+            <h3>This opinion cites {{ authorities_with_data|length|intcomma }} opinion{{ authorities_with_data|length|pluralize }}.</h3>
+            <hr>
+            {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+            <ul>
+                {% for authority in authorities_with_data %}
+                    <li>
+                        {{ authority.citation_depth }} reference{{ authority.citation_depth|pluralize }} to
+                        <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+                           {% if authority.blocked %}rel="nofollow"{% endif %}>
+                            {{ authority.caption|safe|v_wrapper }}
+                        </a>
+                        <br/>
+                        <span class="bullet-tail">{{ authority.docket.court }}</span>
+                        <span class="bullet-tail">{{ authority.date_filed }}</span>
+                        {% if authority.citation_count > 1 %}
+                            Also cited by <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})"
+                                             rel="nofollow">{{ authority.citation_count|add:"-1" }} other opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
+                        {% else %}
+                            Cited by 0 other opinions
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

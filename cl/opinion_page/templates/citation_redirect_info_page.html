@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% load text_filters %}
-{% load cache %}
-{% load partition_util %}
+{% load cache extras partition_util text_filters %}
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -138,7 +138,8 @@
                 <ul>
                     {% for cluster in clusters %}
                         <li>
-                            <a href="{{ cluster.get_absolute_url }}">{{ cluster.caption|safe|v_wrapper }}</a>
+                            <a href="{{ cluster.get_absolute_url }}"
+                               {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
                             <br>
                             {{ cluster.docket.court }} |
                             {{ cluster.date_filed }}

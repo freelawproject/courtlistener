@@ -13,11 +13,15 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
-from cl.donate.management.commands.cl_send_donation_reminders import Command
+from cl.donate.factories import DonationFactory
+from cl.donate.management.commands.cl_send_donation_reminders import (
+    Command as DonationReminderCommand,
+)
 from cl.donate.models import FREQUENCIES, PROVIDERS, Donation, MonthlyDonation
 
 # From: https://stripe.com/docs/testing#cards
 from cl.donate.utils import emails
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.cases import TestCase
 
 stripe_test_numbers = {
@@ -27,24 +31,22 @@ stripe_test_numbers = {
 
 
 class EmailCommandTest(TestCase):
-    fixtures = ["donate_test_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        about_a_year_ago = now() - timedelta(days=354, hours=12)
+        d = DonationFactory.create(
+            send_annual_reminder=True, status=Donation.PROCESSED
+        )
+        d.date_created = about_a_year_ago
+        d.save()
 
     def test_sending_an_email(self) -> None:
         """Do we send emails correctly?"""
-        # Set this value since the JSON will get stale and can't have dynamic
-        # dates. Note that we need to get hours involved because this way we
-        # can be sure that our donation happens in the middle of the period of
-        # time when the alert script will check for donations.
-        about_a_year_ago = now() - timedelta(days=354, hours=12)
-
-        Donation.objects.filter(pk=1).update(date_created=about_a_year_ago)
-
-        comm = Command()
-        comm.handle()
+        DonationReminderCommand().handle()
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("you donated $1", mail.outbox[0].body)
-        self.assertIn("you donated $1", mail.outbox[0].alternatives[0][0])
+        self.assertIn("you donated $", mail.outbox[0].body)
+        self.assertIn("you donated $", mail.outbox[0].alternatives[0][0])
 
 
 @skipIf(
@@ -253,13 +255,11 @@ class StripeTest(TestCase):
     "Only run PayPal tests if we have an API key available.",
 )
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
-class DonationIntegrationTest(TestCase):
+class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
     """Attempt to handle all types/rates/providers/etc of payments
 
     See discussion in: https://github.com/freelawproject/courtlistener/issues/928
     """
-
-    fixtures = ["authtest_data.json"]
 
     credentials = {
         "username": "pandora",

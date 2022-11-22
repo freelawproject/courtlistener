@@ -12,7 +12,8 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
+from django.shortcuts import HttpResponseRedirect, get_object_or_404
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import make_aware, utc
 from django.views.decorators.cache import never_cache
@@ -253,9 +254,6 @@ def get_homepage_stats():
         "queries_in_last_ten": Stat.objects.filter(
             name="search.results", date_logged__gte=ten_days_ago
         ).aggregate(Sum("count"))["count__sum"],
-        "bulk_in_last_ten": Stat.objects.filter(
-            name__contains="bulk_data", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
         "opinions_in_last_ten": Opinion.objects.filter(
             date_created__gte=ten_days_ago
         ).count(),
@@ -362,7 +360,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # with the errors
             render_dict.update(do_search(request.GET.copy()))
             render_dict.update({"alert_form": alert_form})
-            return render(request, "search.html", render_dict)
+            return TemplateResponse(request, "search.html", render_dict)
 
     else:
         # Either a search or the homepage
@@ -409,7 +407,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             stats = get_homepage_stats()
             render_dict.update(stats)
 
-            return render(request, "homepage.html", render_dict)
+            return TemplateResponse(request, "homepage.html", render_dict)
         else:
             # User placed a search or is trying to edit an alert
             if request.GET.get("edit_alert"):
@@ -452,7 +450,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 "search_summary_str"
             ]
             render_dict.update({"alert_form": alert_form})
-            return render(request, "search.html", render_dict)
+            return TemplateResponse(request, "search.html", render_dict)
 
 
 def advanced(request: HttpRequest) -> HttpResponse:
@@ -472,7 +470,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         )
         render_dict.update(o_results)
         render_dict["search_form"] = SearchForm({"type": obj_type})
-        return render(request, "advanced.html", render_dict)
+        return TemplateResponse(request, "advanced.html", render_dict)
     else:
         courts = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
@@ -499,4 +497,4 @@ def advanced(request: HttpRequest) -> HttpResponse:
                 "court_count": court_count,
             }
         )
-        return render(request, "advanced.html", render_dict)
+        return TemplateResponse(request, "advanced.html", render_dict)

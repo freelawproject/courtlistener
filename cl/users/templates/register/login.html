@@ -1,5 +1,8 @@
 {% extends "base.html" %}
+{% load extras %}
 
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}Sign In – CourtListener.com{% endblock %}
 {% block description %}
   Sign into CourtListener to turn on features like alerts, favorites and more.
@@ -36,5 +39,5 @@
     <p class="v-offset-above-2"><a href="{% url "password_reset" %}">Forgot username/password?</a></p>
     <p><a href="{% url "register" %}?next={{ next|urlencode }}">Need to register?</a></p>
   </div>
-  <div class="col-xs-1 col-sm-2 col-med-3"></div>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
 {% endblock %}

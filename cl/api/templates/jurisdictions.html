@@ -64,9 +64,9 @@
                             </a>
                         </td>
                         <td>
-                            <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc">
-                                {{ court.pk }}
-                            </a>
+                            <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
+                               rel="nofollow"
+                            >{{ court.pk }}</a>
                         </td>
                         <td>{{ court.citation_string }}</td>
                         <td>{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}</td>

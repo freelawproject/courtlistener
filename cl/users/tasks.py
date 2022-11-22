@@ -2,13 +2,12 @@ import logging
 from urllib.parse import urljoin
 
 import requests
-from botocore import exceptions as botocore_exception
 from celery import Task
 from django.conf import settings
 
+from cl.api.models import Webhook
 from cl.celery_init import app
-from cl.users.email_handlers import schedule_failed_email
-from cl.users.models import FLAG_TYPES, STATUS_TYPES, EmailFlag, FailedEmail
+from cl.lib.email_utils import make_multipart_email
 
 logger = logging.getLogger(__name__)
 
@@ -75,57 +74,61 @@ def update_moosend_subscription(self: Task, email: str, action: str) -> None:
         )
 
 
-@app.task(bind=True, max_retries=3, interval_start=5 * 60)
-def send_failed_email(
-    self: Task,
-    failed_pk: int,
+@app.task(ignore_result=True)
+def notify_new_or_updated_webhook(
+    webhook_pk: int,
+    created: bool,
 ) -> None:
-    """Task to retry failed email messages"""
+    """Send a notification to the admins if a webhook was created or updated.
 
-    failed_email = FailedEmail.objects.get(pk=failed_pk)
-    if failed_email.status != STATUS_TYPES.SUCCESSFUL:
-        # Only execute this task if it has not been previously processed.
-        failed_email.status = STATUS_TYPES.IN_PROGRESS
-        failed_email.save()
-        # Compose email from stored message.
-        email = failed_email.stored_email.convert_to_email_multipart()
-        try:
-            email.send()
-        except (
-            botocore_exception.HTTPClientError,
-            botocore_exception.ConnectionError,
-        ) as exc:
-            # In case of error when sending e.g: SES downtime, retry the task.
-            raise self.retry(exc=exc)
-        failed_email.status = STATUS_TYPES.SUCCESSFUL
-        failed_email.save()
-
-
-@app.task
-def check_recipient_deliverability(
-    recipient: str,
-    backoff_prev_counter: int,
-) -> None:
-    """This task checks if the recipient's email address is deliverable. It
-    works by verifying if the backoff event retry counter was updated since the
-    task was scheduled if so it means that it came in a new bounce event for
-    the recipient. Otherwise, it means that the recipient is deliverable.
-    Then waiting failed emails are scheduled to be sent.
-
-    :param recipient: The recipient email address
-    :param backoff_prev_counter: The previous backoff event retry counter
+    :param webhook_pk: The webhook PK that was created or updated.
+    :param created: Whether the webhook was just created or not.
     :return: None
     """
 
-    backoff_event = EmailFlag.objects.filter(
-        email_address=recipient, flag_type=FLAG_TYPES.BACKOFF
-    )
-    if not backoff_event.exists():
-        schedule_failed_email(recipient)
-        return
+    webhook = Webhook.objects.get(pk=webhook_pk)
 
-    if backoff_event.last().retry_counter == backoff_prev_counter:
-        # There wasn't a new bounce after the last retry, seems that the
-        # recipient accepted the email, so we can schedule the waiting failed
-        # emails to be sent.
-        schedule_failed_email(recipient)
+    action = "created" if created else "updated"
+    subject = f"A webhook was {action}"
+    txt_template = "emails/new_or_updated_webhook.txt"
+    html_template = "emails/new_or_updated_webhook.html"
+    context = {"webhook": webhook, "action": action}
+    msg = make_multipart_email(
+        subject,
+        html_template,
+        txt_template,
+        context,
+        [a[1] for a in settings.MANAGERS],
+    )
+    msg.send()
+
+
+@app.task(ignore_result=True)
+def notify_failing_webhook(
+    webhook_pk: int,
+    disabled: bool,
+) -> None:
+    """Send a notification to the webhook user when a webhook event fails, or
+    it has been disabled.
+
+    :param webhook_pk: The related webhook PK.
+    :param disabled: Whether the webhook has been disabled.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    first_name = webhook.user.first_name
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is failing."
+    if disabled:
+        subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is now disabled."
+    txt_template = "emails/failing_webhook.txt"
+    html_template = "emails/failing_webhook.html"
+    context = {
+        "webhook": webhook,
+        "first_name": first_name,
+        "disabled": disabled,
+    }
+    msg = make_multipart_email(
+        subject, html_template, txt_template, context, [webhook.user.email]
+    )
+    msg.send()

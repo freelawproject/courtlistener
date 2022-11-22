@@ -1,0 +1,9 @@
+{% load text_filters %}
+<h2 class="v-offset-below-3">
+  <a href="{{ docket_alert.docket.get_absolute_url }}"
+     class="no-underline black-link">{{ docket_alert.docket|best_case_name|safe|v_wrapper }}
+     {% if docket_alert.docket.docket_number %}
+       ({{ docket_alert.docket.docket_number }})
+     {% endif %}
+  </a>
+</h2>

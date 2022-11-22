@@ -3,17 +3,36 @@
 Test Issue 412: Add admin-visible notice to various pages showing if they are
 blocked from search engines
 """
+from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.search.models import Docket
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
+from cl.users.factories import UserProfileWithParentsFactory
 
 BLOCKED_MSG = "Blocked"
 
 
-class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
+class Base412Test(BaseSeleniumTest):
+    def setUp(self) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+        # Do this in two steps to avoid triggering profile creation signal
+        admin = UserProfileWithParentsFactory.create(
+            user__username="admin",
+            user__password=make_password("password"),
+        )
+        admin.user.is_superuser = True
+        admin.user.is_staff = True
+        admin.user.save()
+        super().setUp()
+
+
+class OpinionBlockedFromSearchEnginesTest(Base412Test):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Opinions are blocked from Search Engines
@@ -21,7 +40,6 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "judge_judy.json",
         "opinions-issue-412.json",
         "audio-issue-412.json",
@@ -76,7 +94,7 @@ class OpinionBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.assertNotIn(BLOCKED_MSG, sidebar.text)
 
 
-class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
+class DocketBlockedFromSearchEnginesTest(Base412Test):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Dockets are blocked from Search Engines
@@ -84,7 +102,6 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "judge_judy.json",
         "opinions-issue-412.json",
         "audio-issue-412.json",
@@ -145,7 +162,7 @@ class DocketBlockedFromSearchEnginesTest(BaseSeleniumTest):
         self.assertNotIn(BLOCKED_MSG, btn.text)
 
 
-class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
+class AudioBlockedFromSearchEnginesTest(Base412Test):
     """
     Tests for validating UX elements of showing or not showing visual
     indications of whether Audio pages are blocked from Search Engines
@@ -153,7 +170,6 @@ class AudioBlockedFromSearchEnginesTest(BaseSeleniumTest):
 
     fixtures = [
         "test_court.json",
-        "authtest_data.json",
         "judge_judy.json",
         "opinions-issue-412.json",
         "audio-issue-412.json",

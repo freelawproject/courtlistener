@@ -31,15 +31,26 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
-DOCUMENT_STATUSES = (
-    ("Published", "Precedential"),
-    ("Unpublished", "Non-Precedential"),
-    ("Errata", "Errata"),
-    ("Separate", "Separate Opinion"),
-    ("In-chambers", "In-chambers"),
-    ("Relating-to", "Relating-to orders"),
-    ("Unknown", "Unknown Status"),
-)
+
+class PRECEDENTIAL_STATUS:
+    PUBLISHED = "Published"
+    UNPUBLISHED = "Unpublished"
+    ERRATA = "Errata"
+    SEPARATE = "Separate"
+    IN_CHAMBERS = "In-chambers"
+    RELATING_TO = "Relating-to"
+    UNKNOWN = "Unknown"
+
+    NAMES = (
+        (PUBLISHED, "Precedential"),
+        (UNPUBLISHED, "Non-Precedential"),
+        (ERRATA, "Errata"),
+        (SEPARATE, "Separate Opinion"),
+        (IN_CHAMBERS, "In-chambers"),
+        (RELATING_TO, "Relating-to orders"),
+        (UNKNOWN, "Unknown Status"),
+    )
+
 
 SOURCES = (
     ("C", "court website"),
@@ -1692,6 +1703,12 @@ class FederalCourtsQuerySet(models.QuerySet):
     def appellate_courts(self) -> models.QuerySet:
         return self.filter(jurisdiction=Court.FEDERAL_APPELLATE)
 
+    def tribal_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TRIBAL_JURISDICTIONS)
+
+    def territorial_courts(self) -> models.QuerySet:
+        return self.filter(jurisdictions__in=Court.TERRITORY_JURISDICTIONS)
+
 
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -1709,6 +1726,14 @@ class Court(models.Model):
     STATE_TRIAL = "ST"
     STATE_SPECIAL = "SS"
     STATE_ATTORNEY_GENERAL = "SAG"
+    TRIBAL_SUPREME = "TRS"
+    TRIBAL_APPELLATE = "TRA"
+    TRIBAL_TRIAL = "TRT"
+    TRIBAL_SPECIAL = "TRX"
+    TERRITORY_SUPREME = "TS"
+    TERRITORY_APPELLATE = "TA"
+    TERRITORY_TRIAL = "TT"
+    TERRITORY_SPECIAL = "TSP"
     COMMITTEE = "C"
     INTERNATIONAL = "I"
     TESTING_COURT = "T"
@@ -1722,6 +1747,14 @@ class Court(models.Model):
         (STATE_APPELLATE, "State Appellate"),
         (STATE_TRIAL, "State Trial"),
         (STATE_SPECIAL, "State Special"),
+        (TRIBAL_SUPREME, "Tribal Supreme"),
+        (TRIBAL_APPELLATE, "Tribal Appellate"),
+        (TRIBAL_TRIAL, "Tribal Trial"),
+        (TRIBAL_SPECIAL, "Tribal Special"),
+        (TERRITORY_SUPREME, "Territory Supreme"),
+        (TERRITORY_APPELLATE, "Territory Appellate"),
+        (TERRITORY_TRIAL, "Territory Trial"),
+        (TERRITORY_SPECIAL, "Territory Special"),
         (STATE_ATTORNEY_GENERAL, "State Attorney General"),
         (COMMITTEE, "Committee"),
         (INTERNATIONAL, "International"),
@@ -1745,6 +1778,19 @@ class Court(models.Model):
         FEDERAL_BANKRUPTCY,
         FEDERAL_BANKRUPTCY_PANEL,
     ]
+    TRIBAL_JURISDICTIONS = [
+        TRIBAL_SUPREME,
+        TRIBAL_APPELLATE,
+        TRIBAL_TRIAL,
+        TRIBAL_SPECIAL,
+    ]
+    TERRITORY_JURISDICTIONS = [
+        TERRITORY_SUPREME,
+        TERRITORY_APPELLATE,
+        TERRITORY_TRIAL,
+        TERRITORY_SPECIAL,
+    ]
+
     id = models.CharField(
         help_text="a unique ID for each court as used in URLs",
         max_length=15,  # Changes here will require updates in urls.py
@@ -2129,10 +2175,10 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     precedential_status = models.CharField(
         help_text="The precedential status of document, one of: "
-        "%s" % ", ".join([t[0] for t in DOCUMENT_STATUSES]),
+        "%s" % ", ".join([t[0] for t in PRECEDENTIAL_STATUS.NAMES]),
         max_length=50,
         blank=True,
-        choices=DOCUMENT_STATUSES,
+        choices=PRECEDENTIAL_STATUS.NAMES,
         db_index=True,
     )
     date_blocked = models.DateField(

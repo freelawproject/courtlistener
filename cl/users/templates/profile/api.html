@@ -1,7 +1,7 @@
 {% extends "profile/nav.html" %}
 {% load waffle_tags %}
 
-{% block title %}{% flag "user-webhooks" %}Developer Tools{% else %}API{% endflag %} &ndash; CourtListener.com{% endblock %}
+{% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
 
 {% block nav-api %}active{% endblock %}
 
@@ -13,7 +13,7 @@
   <div class="col-xs-12 col-sm-10 col-md-6 text-center">
 
     {% if page == "api_info" %}
-      <h1>{% flag "user-webhooks" %}Developer Tools{% else %}CourtListener API{% endflag %}</h1>
+      <h1>Developer Tools</h1>
       <h3 class="caps gray">REST APIs and Bulk Data for Developers</h3>
       <p>The CourtListener API is a powerful, first-of-its-kind tool that programmers can use to access the contents of the CourtListener database. By allowing programmers and researchers to access this data, we hope to fulfill our mission of stimulating legal innovation.
       </p>

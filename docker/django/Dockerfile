@@ -18,7 +18,7 @@ RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.1.13 \
+ENV POETRY_VERSION=1.2.1 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
@@ -131,3 +131,8 @@ FROM python-base as rss-scraper
 USER www-data
 CMD /opt/courtlistener/manage.py scrape_rss
 
+
+FROM python-base as retry-webhooks
+
+USER www-data
+CMD /opt/courtlistener/manage.py cl_retry_webhooks

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% load humanize %}
-{% load static %}
+{% load extras humanize static %}
+
 
 {% block head %}
   {% if DEBUG %}
@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
   {% endif %}
 {% endblock %}
+
+{% block canonical %}{% get_canonical_element %}{% endblock %}
 
 {% block title %}
     {% if search_form.type.value == SEARCH_TYPES.OPINION %}

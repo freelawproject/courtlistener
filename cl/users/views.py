@@ -19,8 +19,8 @@ from django.http import (
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import render
 from django.template.defaultfilters import urlencode
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
@@ -30,9 +30,10 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import Webhook
+from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import FavoriteForm
 from cl.lib.crypto import sha1_activation_key
@@ -49,7 +50,6 @@ from cl.users.forms import (
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
-    WebhookForm,
 )
 from cl.users.models import UserProfile
 from cl.users.tasks import update_moosend_subscription
@@ -72,13 +72,14 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
         # default to 'o' because if there's no 'type' param in the search UI,
         # that's an opinion search.
         a.type = QueryDict(a.query).get("type", SEARCH_TYPES.OPINION)
-    return render(
+    return TemplateResponse(
         request,
         "profile/alerts.html",
         {
             "search_alerts": search_alerts,
             "page": "search_alerts",
             "private": True,
+            "page_title": "Search Alerts",
         },
     )
 
@@ -89,13 +90,14 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     ).order_by("date_created")
-    return render(
+    return TemplateResponse(
         request,
         "profile/alerts.html",
         {
             "docket_alerts": docket_alerts,
             "page": "docket_alerts",
             "private": True,
+            "page_title": "Docket Alerts",
         },
     )
 
@@ -153,7 +155,7 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
         )
         + ")&stat_Precedential=on&stat_Non-Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on&stat_In-chambers=on&stat_Relating-to%20orders=on&stat_Unknown%20Status=on"
     )
-    return render(
+    return TemplateResponse(
         request,
         "profile/favorites.html",
         {
@@ -171,7 +173,7 @@ def view_favorites(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "profile/donations.html",
         {"page": "profile_donations", "private": True},
@@ -194,7 +196,7 @@ def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
         paged_vizes = paginator.page(1)
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
-    return render(
+    return TemplateResponse(
         request,
         "profile/visualizations.html",
         {
@@ -227,7 +229,7 @@ def view_deleted_visualizations(
     except EmptyPage:
         paged_vizes = paginator.page(paginator.num_pages)
 
-    return render(
+    return TemplateResponse(
         request,
         "profile/visualizations_deleted.html",
         {
@@ -241,30 +243,34 @@ def view_deleted_visualizations(
 @login_required
 @never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_info"},
+        {
+            "private": True,
+            "page": "api_info",
+            "page_title": "API Documentation",
+        },
     )
 
 
 @login_required
 @never_cache
 def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_token"},
+        {"private": True, "page": "api_token", "page_title": "API Token"},
     )
 
 
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_usage"},
+        {"private": True, "page": "api_usage", "page_title": "API Usage"},
     )
 
 
@@ -338,7 +344,7 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
 
         return HttpResponseRedirect(reverse("view_settings"))
 
-    return render(
+    return TemplateResponse(
         request,
         "profile/settings.html",
         {
@@ -350,7 +356,9 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_post_parameters("password")
 @login_required
+@ratelimiter_unsafe_10_per_m
 def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
     non_deleted_map_count = request.user.scotus_maps.filter(
         deleted=False
@@ -376,7 +384,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     else:
         delete_form = AccountDeleteForm(request=request)
-    return render(
+    return TemplateResponse(
         request,
         "profile/delete.html",
         {
@@ -388,7 +396,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 
 def delete_profile_done(request: HttpRequest) -> HttpResponse:
-    return render(request, "profile/deleted.html", {"private": True})
+    return TemplateResponse(request, "profile/deleted.html", {"private": True})
 
 
 @login_required
@@ -404,11 +412,19 @@ def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
 
         return HttpResponseRedirect(reverse("take_out_done"))
 
-    return render(request, "profile/take_out.html", {"private": True})
+    return TemplateResponse(
+        request,
+        "profile/take_out.html",
+        {"private": True},
+    )
 
 
 def take_out_done(request: HttpRequest) -> HttpResponse:
-    return render(request, "profile/take_out_done.html", {"private": True})
+    return TemplateResponse(
+        request,
+        "profile/take_out_done.html",
+        {"private": True},
+    )
 
 
 @sensitive_post_parameters("password1", "password2")
@@ -498,7 +514,7 @@ def register(request: HttpRequest) -> HttpResponse:
         else:
             form = UserCreationFormExtended()
             consent_form = OptInConsentForm()
-        return render(
+        return TemplateResponse(
             request,
             "register/register.html",
             {"form": form, "consent_form": consent_form, "private": False},
@@ -516,7 +532,7 @@ def register_success(request: HttpRequest) -> HttpResponse:
     redirect_to = get_redirect_or_login_url(request, "next")
     email = request.GET.get("email", "")
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
-    return render(
+    return TemplateResponse(
         request,
         "register/registration_complete.html",
         {
@@ -539,7 +555,7 @@ def confirm_email(request, activation_key):
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
-        return render(
+        return TemplateResponse(
             request,
             "register/confirm.html",
             {"invalid": True, "private": True},
@@ -555,14 +571,14 @@ def confirm_email(request, activation_key):
 
     if confirmed_accounts_count == len(ups):
         # All the accounts were already confirmed.
-        return render(
+        return TemplateResponse(
             request,
             "register/confirm.html",
             {"already_confirmed": True, "private": True},
         )
 
     if expired_key_count > 0:
-        return render(
+        return TemplateResponse(
             request,
             "register/confirm.html",
             {"expired": True, "private": True},
@@ -575,7 +591,7 @@ def confirm_email(request, activation_key):
         up.email_confirmed = True
         up.save()
 
-    return render(
+    return TemplateResponse(
         request, "register/confirm.html", {"success": True, "private": True}
     )
 
@@ -631,7 +647,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
             return HttpResponseRedirect(reverse("email_confirm_success"))
     else:
         form = EmailConfirmationForm()
-    return render(
+    return TemplateResponse(
         request,
         "register/request_email_confirmation.html",
         {"private": True, "form": form},
@@ -640,7 +656,7 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
 
 @never_cache
 def email_confirm_success(request: HttpRequest) -> HttpResponse:
-    return render(
+    return TemplateResponse(
         request,
         "register/request_email_confirmation_success.html",
         {"private": False},
@@ -662,7 +678,7 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
             return HttpResponseRedirect(reverse("password_change"))
     else:
         form = CustomPasswordChangeForm(user=request.user)
-    return render(
+    return TemplateResponse(
         request,
         "profile/password_form.html",
         {"form": form, "page": "profile_password", "private": False},
@@ -712,20 +728,76 @@ def moosend_webhook(request: HttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        instance = Webhook()
-        form = WebhookForm(request.POST, instance=instance)
-        if form.is_valid():
-            instance.user = request.user
-            form.save()
-            return HttpResponseRedirect(reverse("view_webhooks"))
-    else:
-        form = WebhookForm()
-
-    return render(
+    """Render the webhooks page"""
+    return TemplateResponse(
         request,
         "profile/webhooks.html",
-        {"webhook_form": form, "private": True, "page": "api_webhooks"},
+        {
+            "private": True,
+            "page": "api_webhooks",
+            "sub_page": "webhooks",
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_webhook_logs(
+    request: AuthenticatedHttpRequest,
+    route_prefix: str,
+) -> HttpResponse:
+    """Render the webhooks logs page"""
+
+    page_title = "Webhook Logs"
+    sub_page = "logs"
+    debug = False
+    if route_prefix == "test-logs":
+        page_title = "Webhook Test Logs"
+        sub_page = "test_logs"
+        debug = True
+
+    return TemplateResponse(
+        request,
+        "profile/webhooks_logs.html",
+        {
+            "private": True,
+            "page": "api_webhooks",
+            "page_title": page_title,
+            "sub_page": sub_page,
+            "debug": debug,
+            "event_types": WebhookEventType,
+            "event_statuses": WEBHOOK_EVENT_STATUS.STATUS,
+        },
+    )
+
+
+@login_required
+@never_cache
+def view_webhook_logs_detail(
+    request: AuthenticatedHttpRequest, pk: int
+) -> HttpResponse:
+    """Render the webhook event detail page"""
+
+    webhook_event = WebhookEvent.objects.get(webhook__user=request.user, pk=pk)
+    renderer = JSONRenderer()
+    json_content = renderer.render(
+        webhook_event.content,
+        accepted_media_type="application/json; indent=2;",
+    ).decode()
+    sub_page = "logs"
+    if webhook_event.debug:
+        sub_page = "test_logs"
+
+    return TemplateResponse(
+        request,
+        "includes/webhook-event-detail.html",
+        {
+            "private": True,
+            "page": "api_webhooks",
+            "sub_page": sub_page,
+            "webhook_event": webhook_event,
+            "json_content": json_content,
+        },
     )
 
 
@@ -753,7 +825,7 @@ def toggle_recap_email_auto_subscription(
 @never_cache
 def view_recap_email(request: AuthenticatedHttpRequest) -> HttpResponse:
     auto_subscribe = request.user.profile.auto_subscribe
-    return render(
+    return TemplateResponse(
         request,
         "profile/recap_email.html",
         {

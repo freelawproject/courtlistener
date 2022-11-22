@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from pathlib import Path
 
 from django.conf import settings
@@ -34,7 +35,7 @@ class ScraperIngestionTest(TestCase):
             service="buffer-extension",
             params={"mime": True},
         )
-        self.assertEqual(r.status_code, 406)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     def test_ingest_opinions_from_scraper(self) -> None:
         """Can we successfully ingest opinions at a high level?"""
@@ -459,6 +460,6 @@ class AudioFileTaskTest(TestCase):
 
         self.assertEqual(
             audio_response.status_code,
-            200,
+            HTTPStatus.OK,
             msg="Unsuccessful audio conversion",
         )

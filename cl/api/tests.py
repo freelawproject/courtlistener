@@ -1,47 +1,31 @@
 import json
-import shutil
 from datetime import date, timedelta
 from typing import Any, Dict
 from unittest import mock
 
-from django.conf import settings
-from django.contrib.auth.models import Permission, User
-from django.core.cache import cache
-from django.core.management import call_command
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Permission
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test import Client, RequestFactory, override_settings
+from django.test import Client, RequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import ResolverMatch, reverse
-from django.utils.timezone import now
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
 from cl.api.pagination import ShallowOnlyPageNumberPagination
-from cl.api.utils import BulkJsonHistory
 from cl.api.views import coverage_data
 from cl.audio.api_views import AudioViewSet
-from cl.audio.models import Audio
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import IndexedSolrTestCase
-from cl.scrapers.management.commands.cl_scrape_oral_arguments import (
-    Command as OralArgumentCommand,
-)
-from cl.scrapers.test_assets import test_oral_arg_scraper
-from cl.search.factories import CourtFactory
-from cl.search.models import (
-    Court,
-    Docket,
-    Opinion,
-    OpinionCluster,
-    OpinionsCited,
-)
+from cl.lib.test_helpers import IndexedSolrTestCase, SimpleUserDataMixin
+from cl.recap.factories import ProcessingQueueFactory
+from cl.search.models import Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
-from cl.users.factories import UserFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.models import UserProfile
 
 
 class BasicAPIPageTest(TestCase):
@@ -154,23 +138,25 @@ class ApiQueryCountTests(TransactionTestCase):
     fixtures = [
         "test_objects_query_counts.json",
         "attorney_party.json",
-        "user_with_recap_api_access.json",
         "test_objects_audio.json",
-        "recap_processing_queue_query_counts.json",
     ]
 
     def setUp(self) -> None:
         # Add the permissions to the user.
-        u = User.objects.get(pk=6)
+        up = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
         ps = Permission.objects.filter(codename="has_recap_api_access")
-        u.user_permissions.add(*ps)
-
+        up.user.user_permissions.add(*ps)
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
 
+        ProcessingQueueFactory.create(court_id="scotus", uploader=up.user)
+
     def tearDown(self) -> None:
-        cache.clear()
+        UserProfile.objects.all().delete()
 
     def test_audio_api_query_counts(self) -> None:
         with self.assertNumQueries(4):
@@ -244,20 +230,21 @@ class ApiEventCreationTestCase(TestCase):
     def setUpTestData(cls) -> None:
         cls.user = UserFactory.create()
 
-    def flush_stats(self) -> None:
-        # Flush existing stats (else previous tests cause issues)
-        self.r.flushdb()
-
     def setUp(self) -> None:
         self.r = make_redis_interface("STATS")
         self.flush_stats()
         self.endpoint_name = "audio-list"
 
     def tearDown(self) -> None:
-        Event.objects.all().delete()
         self.flush_stats()
 
-    def hit_the_api(self):
+    def flush_stats(self) -> None:
+        # Flush existing stats (else previous tests cause issues)
+        keys = self.r.keys("api:*")
+        if keys:
+            self.r.delete(*keys)
+
+    def hit_the_api(self) -> None:
         path = reverse("audio-list", kwargs={"version": "v3"})
         request = RequestFactory().get(path)
 
@@ -268,11 +255,6 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-        request.resolver_match = ResolverMatch(
-            view,
-            {"version": "v3"},
-            self.endpoint_name,
-        )
 
         view(request)
 
@@ -283,39 +265,44 @@ class ApiEventCreationTestCase(TestCase):
         expected_event_count = 1
         self.assertEqual(expected_event_count, Event.objects.count())
 
-    def test_api_logged_correctly(self) -> None:
-        self.hit_the_api()
-
+    # Set the api prefix so that other tests
+    # run in parallel do not affect this one.
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
-        self.assertEqual(self.r.get("api:v3.count"), "1")
+        self.assertEqual(mock_logging_prefix.called, 0)
+        self.hit_the_api()
+        self.assertEqual(mock_logging_prefix.called, 1)
+        self.assertEqual(int(self.r.get("api:Test.count")), 1)
 
         # User stats
         self.assertEqual(
-            self.r.zscore("api:v3.user.counts", self.user.pk), 1.0
+            self.r.zscore("api:Test.user.counts", self.user.pk), 1.0
         )
 
         # IP address
-        keys = self.r.keys("api:v3.d:*")
+        keys = self.r.keys("api:Test.d:*")
         ip_key = [k for k in keys if k.endswith("ip_map")][0]
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
         self.assertEqual(
-            self.r.zscore("api:v3.endpoint.counts", self.endpoint_name), 1
+            self.r.zscore("api:Test.endpoint.counts", self.endpoint_name), 1
         )
 
         # Timings
-        self.assertAlmostEqual(int(self.r.get("api:v3.timing")), 10, delta=500)
+        self.assertAlmostEqual(
+            int(self.r.get("api:Test.timing")), 10, delta=500
+        )
 
 
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
-    fixtures = [
-        "judge_judy.json",
-        "authtest_data.json",
-        "test_objects_search.json",
-    ]
+    fixtures = ["judge_judy.json", "test_objects_search.json"]
 
     def test_position_ordering(self):
         path = reverse("position-list", kwargs={"version": "v3"})
@@ -352,7 +339,12 @@ class FilteringCountTestCase(object):
         """Do we get the correct number of API results from the endpoint?"""
         print(f"Path and q are: {self.path}, {self.q}")
         r = self.client.get(self.path, self.q)
-        self.assertLess(r.status_code, 400)  # A valid status code?
+        self.assertLess(
+            r.status_code,
+            400,
+            msg=f"Status code of {r.status_code} is higher than 400. Here's "
+            f"the JSON: \n{r.json()}",
+        )
         got = len(r.data["results"])
         self.assertEqual(
             got,
@@ -361,10 +353,12 @@ class FilteringCountTestCase(object):
         )
 
 
-class DRFJudgeApiFilterTests(TestCase, FilteringCountTestCase):
+class DRFJudgeApiFilterTests(
+    SimpleUserDataMixin, TestCase, FilteringCountTestCase
+):
     """Do the filters work properly?"""
 
-    fixtures = ["judge_judy.json", "authtest_data.json"]
+    fixtures = ["judge_judy.json"]
 
     def setUp(self) -> None:
         self.assertTrue(
@@ -555,15 +549,19 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     fixtures = [
         "recap_docs.json",
         "attorney_party.json",
-        "user_with_recap_api_access.json",
     ]
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
         # Add the permissions to the user.
-        u = User.objects.get(pk=6)
+        up = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
         ps = Permission.objects.filter(codename="has_recap_api_access")
-        u.user_permissions.add(*ps)
+        up.user.user_permissions.add(*ps)
 
+    def setUp(self) -> None:
         self.assertTrue(
             self.client.login(username="recap-user", password="password")
         )
@@ -705,9 +703,14 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         "judge_judy.json",
         "test_objects_search.json",
         "test_objects_audio.json",
-        "authtest_data.json",
-        "user_with_recap_api_access.json",
     ]
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
 
     def setUp(self) -> None:
         self.assertTrue(
@@ -848,16 +851,15 @@ class DRFSearchAppAndAudioAppApiFilterTest(TestCase, FilteringCountTestCase):
         self.assertCountInResults(4)
 
 
-class DRFFieldSelectionTest(TestCase):
+class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
     """Test selecting only certain fields"""
 
     fixtures = [
         "judge_judy.json",
         "test_objects_search.json",
-        "authtest_data.json",
     ]
 
-    def test_only_some_fields_returned(self):
+    def test_only_some_fields_returned(self) -> None:
         """Can we return only some of the fields?"""
 
         # First check the Judge endpoint, one of our more complicated ones.
@@ -912,15 +914,22 @@ class DRFPaginationTest(SimpleTestCase):
 
 
 class DRFRecapPermissionTest(TestCase):
-    fixtures = ["user_with_recap_api_access.json", "authtest_data.json"]
-
-    def setUp(self) -> None:
+    @classmethod
+    def setUpTestData(cls) -> None:
         # Add the permissions to the user.
-        u = User.objects.get(pk=6)
+        up = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
         ps = Permission.objects.filter(codename="has_recap_api_access")
-        u.user_permissions.add(*ps)
+        up.user.user_permissions.add(*ps)
 
-        self.paths = [
+        UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+
+        cls.paths = [
             reverse(path, kwargs={"version": "v3"})
             for path in [
                 "recapdocument-list",
@@ -951,102 +960,3 @@ class DRFRecapPermissionTest(TestCase):
             r = self.client.get(path)
             self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
             print("✓")
-
-
-class BulkJsonHistoryTest(SimpleTestCase):
-    def setUp(self) -> None:
-        self.history = BulkJsonHistory("test", settings.BULK_DATA_DIR)
-
-    def tearDown(self) -> None:
-        self.history.delete_from_disk()
-
-    def test_load_the_file(self) -> None:
-        data = self.history.load_json_file()
-        self.assertEqual({}, data)
-
-    def test_load_date_when_none(self) -> None:
-        d = self.history.get_last_good_date()
-        self.assertIsNone(d)
-
-    def test_set_date_then_load_it(self) -> None:
-        self.history.add_current_attempt_and_save()
-        self.history.mark_success_and_save()
-        d = self.history.get_last_good_date()
-        self.assertAlmostEqual(
-            # The date serialized is within ten seconds of now.
-            d,
-            now(),
-            delta=timedelta(seconds=10),
-        )
-
-    def test_add_current_attempt(self) -> None:
-        self.history.add_current_attempt_and_save()
-        d = self.history.get_last_attempt()
-        self.assertAlmostEqual(d, now(), delta=timedelta(seconds=10))
-
-
-class BulkDataTest(TestCase):
-    tmp_data_dir = "/tmp/bulk-dir/"
-
-    def setUp(self) -> None:
-        docket = Docket(
-            case_name="foo",
-            court=Court.objects.get(pk="test"),
-            source=Docket.DEFAULT,
-        )
-        docket.save()
-        # Must be more than a year old for all tests to be runnable.
-        last_month = now().date() - timedelta(days=400)
-        self.doc_cluster = OpinionCluster(
-            case_name="foo", docket=docket, date_filed=last_month
-        )
-        self.doc_cluster.save(index=False)
-        opinion = Opinion(cluster=self.doc_cluster, type="Lead Opinion")
-        opinion.save(index=False)
-
-        opinion2 = Opinion(cluster=self.doc_cluster, type="Concurrence")
-        opinion2.save(index=False)
-
-        OpinionsCited.objects.create(
-            citing_opinion=opinion2, cited_opinion=opinion
-        )
-
-        # Scrape the audio "site" and add its contents
-        site = test_oral_arg_scraper.Site().parse()
-        with mock.patch(
-            "cl.lib.storage.get_name_by_incrementing",
-            side_effect=clobbering_get_name,
-        ):
-            OralArgumentCommand().scrape_court(site, full_crawl=True)
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.court = CourtFactory.create()
-
-    def tearDown(self) -> None:
-        OpinionCluster.objects.all().delete()
-        Docket.objects.all().delete()
-        Audio.objects.all().delete()
-        try:
-            shutil.rmtree(self.tmp_data_dir)
-        except OSError:
-            pass
-
-    @override_settings(BULK_DATA_DIR=tmp_data_dir)
-    def test_make_all_bulk_files(self) -> None:
-        """Can we successfully generate all bulk files?"""
-        call_command("cl_make_bulk_data")
-
-    def test_database_has_objects_for_bulk_export(self) -> None:
-        # This is a very weird test. It's essentially just testing the
-        # setUp function, which...OK?
-        self.assertTrue(Opinion.objects.count() > 0, "No opinions exist")
-        self.assertTrue(
-            OpinionsCited.objects.count() > 0, "No citations exist"
-        )
-        self.assertTrue(Audio.objects.count() > 0, "No audio exist")
-        self.assertTrue(Docket.objects.count() > 0, "No docket exist")
-        self.assertTrue(Court.objects.count() > 0, "No courts exist")
-        self.assertEqual(
-            Court.objects.get(pk=self.court.id).full_name, self.court.full_name
-        )

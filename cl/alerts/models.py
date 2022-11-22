@@ -58,6 +58,11 @@ class Alert(AbstractDateTimeModel):
         super(Alert, self).save(*args, **kwargs)
 
 
+class DocketAlertManager(models.Manager):
+    def subscriptions(self):
+        return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
+
+
 class DocketAlert(models.Model):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
@@ -98,6 +103,7 @@ class DocketAlert(models.Model):
         default=SUBSCRIPTION,
         choices=TYPES,
     )
+    objects = DocketAlertManager()
 
     class Meta:
         unique_together = ("docket", "user")

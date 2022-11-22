@@ -1,13 +1,24 @@
-from django.conf import settings
 from django.contrib.auth import views as auth_views
-from django.urls import path, re_path
+from django.urls import include, path, re_path
 from django.views.generic import RedirectView
 from django_ses.views import SESEventWebhookView
+from rest_framework.routers import DefaultRouter
 
 from cl.lib.AuthenticationBackend import ConfirmedEmailAuthenticationForm
 from cl.lib.ratelimiter import ratelimiter_unsafe_10_per_m
+from cl.users import api_views as user_views
 from cl.users import views
 from cl.users.forms import CustomPasswordResetForm, CustomSetPasswordForm
+
+router = DefaultRouter()
+
+# Webhooks
+router.register(r"webhooks", user_views.WebhooksViewSet, basename="webhooks")
+router.register(
+    r"webhook-events",
+    user_views.WebhookEventViewSet,
+    basename="webhook_events",
+)
 
 urlpatterns = [
     # Sign in/out and password pages
@@ -102,6 +113,16 @@ urlpatterns = [
     path("profile/api-token/", views.view_api_token, name="view_api_token"),
     path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
     path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
+    re_path(
+        "profile/webhooks/(logs|test-logs)/",
+        views.view_webhook_logs,
+        name="view_webhook_logs",
+    ),
+    path(
+        "profile/webhooks/event/<int:pk>/",
+        views.view_webhook_logs_detail,
+        name="view_webhook_logs_detail",
+    ),
     path(
         "profile/auto_subscribe/toggle/",
         views.toggle_recap_email_auto_subscription,
@@ -161,4 +182,5 @@ urlpatterns = [
         SESEventWebhookView.as_view(),
         name="handle_ses_webhook",
     ),
+    re_path(r"^api/htmx/", include(router.urls)),
 ]

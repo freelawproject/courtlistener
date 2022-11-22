@@ -16,7 +16,7 @@
     {% elif favorite_form.instance.docket_id %}
       <i class="fa-list fa grey"
          title="{{ type }}"></i>
-      <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}">
+      <a href="{{ favorite_form.instance.docket_id.get_absolute_url }}?order_by=desc">
         {{ favorite_form.instance.name }}
       </a>
     {% elif favorite_form.instance.recap_doc_id %}

@@ -23,10 +23,11 @@ from cl.search.constants import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
-    DOCUMENT_STATUSES,
+    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
     OpinionCluster,
+    RECAPDocument,
 )
 
 recap_boosts_qf = {
@@ -1083,7 +1084,7 @@ def get_related_clusters_with_cache(
     """
 
     # By default all statuses are included
-    available_statuses = dict(DOCUMENT_STATUSES).values()
+    available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
     url_search_params = {f"stat_{v}": "on" for v in available_statuses}
 
     # Opinions that belong to the targeted cluster
@@ -1236,3 +1237,21 @@ def get_mlt_query(
     )
 
     return si.mlt_query(hl_fields).add_extra(**q)
+
+
+def clean_up_recap_document_file(item: RECAPDocument) -> None:
+    """Clean up the RecapDocument file-related fields after detecting the file
+    doesn't exist in the storage.
+
+    :param item: The RECAPDocument to work on.
+    :return: None
+    """
+
+    if type(item) == RECAPDocument:
+        item.filepath_local.delete()
+        item.sha1 = ""
+        item.date_upload = None
+        item.file_size = None
+        item.page_count = None
+        item.is_available = False
+        item.save()
