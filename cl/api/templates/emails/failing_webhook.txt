@@ -5,7 +5,7 @@ Hello,
 {% endif %}
 
 {% if disabled %}
-After eight failed tries over the last two days, one of your webhooks has been disabled and will no longer receive events.
+After eight failed attempts over the last two days, one of your webhooks has been disabled and will no longer receive events.
 {% else %}
 We couldn't deliver events to one of your webhooks. If this problem persists for approximately 48 hours, this webhook will be disabled until it is fixed on your server.
 {% endif %}

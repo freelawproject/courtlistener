@@ -621,29 +621,28 @@ def check_webhook_failure_count_and_notify(
     current_try_counter = webhook_event.retry_counter
     notify = notify_on[current_try_counter]
     if notify:
-        disabled = False
-        all_enqueued_for_retry_we = WebhookEvent.objects.filter(
+        oldest_enqueued_for_retry = WebhookEvent.objects.filter(
             webhook=webhook_event.webhook,
             event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
             debug=False,
-        ).order_by("date_created")
-        all_enqueued_for_retry_we_list = list(all_enqueued_for_retry_we)
-
+        ).earliest("date_created")
         if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             webhook.enabled = False
             update_fields.append("enabled")
-            disabled = True
             # If the parent webhook is disabled mark all current ENQUEUED_RETRY
             # events as ENDPOINT_DISABLED
-            all_enqueued_for_retry_we.update(
-                event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED
+            WebhookEvent.objects.filter(
+                webhook=webhook_event.webhook,
+                event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                debug=False,
+            ).update(
+                event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
+                date_modified=now(),
             )
-
-        oldest_enqueued_for_retry = all_enqueued_for_retry_we_list[0]
         if oldest_enqueued_for_retry.pk == webhook_event.pk:
             failure_counter = current_try_counter + 1
             notify_failing_webhook.delay(
-                webhook_event.pk, failure_counter, disabled
+                webhook_event.pk, failure_counter, webhook.enabled
             )
 
     # Save webhook and avoid emailing admins via signal in cl.users.signals

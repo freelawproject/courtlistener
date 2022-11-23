@@ -107,14 +107,14 @@ def notify_new_or_updated_webhook(
 def notify_failing_webhook(
     webhook_event_pk: int,
     failure_counter: int,
-    disabled: bool,
+    webhook_enabled: bool,
 ) -> None:
     """Send a notification to the webhook user when a webhook event fails, or
     it has been disabled.
 
     :param webhook_event_pk: The related webhook event PK.
     :param failure_counter: The current webhook event failure counter.
-    :param disabled: Whether the webhook has been disabled.
+    :param webhook_enabled: Whether the webhook has been disabled.
     :return: None
     """
 
@@ -122,7 +122,7 @@ def notify_failing_webhook(
     webhook = webhook_event.webhook
     first_name = webhook.user.first_name
     subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is failing."
-    if disabled:
+    if not webhook_enabled:
         subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is now disabled."
     txt_template = "emails/failing_webhook.txt"
     html_template = "emails/failing_webhook.html"
@@ -131,7 +131,7 @@ def notify_failing_webhook(
         "webhook_event_pk": webhook_event_pk,
         "failure_counter": failure_counter,
         "first_name": first_name,
-        "disabled": disabled,
+        "disabled": not webhook_enabled,
     }
     msg = make_multipart_email(
         subject, html_template, txt_template, context, [webhook.user.email]
