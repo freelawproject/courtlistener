@@ -1000,17 +1000,17 @@ def winnow_case_name(case_name: str) -> Set:
     )
 
     # Fix case name to be cleaner
-    case_name = harmonize(case_name)
+    prepared_case_name = harmonize(case_name)
 
     # Join abbreviations/acronyms. e.g. "D.L.M. v. T.J.S." -> "DLM v. TJS"
-    case_name = re.sub(
+    prepared_case_name = re.sub(
         r"\b[a-zA-Z][a-zA-Z\.]*[A-Za-z]\b\.?",
         lambda m: m.group().replace(".", ""),
-        case_name,
+        prepared_case_name,
     )
 
     # Remove all non-alphanumeric characters
-    case_title = re.sub(r"[^a-z0-9 ]", " ", case_name.lower())
+    case_title = re.sub(r"[^a-z0-9 ]", " ", prepared_case_name.lower())
 
     # Remove strings that can cause an unnecessary overlap
     case_title = false_positive_strings_regex.sub("", case_title)
@@ -1020,7 +1020,8 @@ def winnow_case_name(case_name: str) -> Set:
 
     if not case_title:
         # Log case name if the process reduce it to blank
-        logger.warning(f"Case name: {case_name} reduced to blank.")
+        logger.warning(f"Case name: \"{case_name}\" reduced to blank.")
+        print(f"Case name: \"{case_name}\" reduced to blank.")
 
     # Convert case name to set of words
     cleaned_set = set(case_title.split())
