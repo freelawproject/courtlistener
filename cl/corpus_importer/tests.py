@@ -855,8 +855,9 @@ label="194">*194</page-number>
                               "v. The Engel Company, Inc., et al., "
                               "Appellants, et al., Defendants",
             "case_name_abbreviation": "Wesselman v. Engel Co.",
-            "case_name_cl": " McQuillan v. Schechter", "overlaps": 0}
+            "case_name_cl": "McQuillan v. Schechter", "overlaps": 0}
 
+        # Case failing in server and being reduced to blank
         case_4_data = {
             "case_name_full": "AIRTRANS, INC., Plaintiff-Appellant, "
                               "v. Kenneth MEAD, individually and in his "
