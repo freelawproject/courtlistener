@@ -870,15 +870,16 @@ def process_case_query_page(self, pk):
     d = find_docket_object(
         pq.court_id, pq.pacer_case_id, data["docket_number"]
     )
-    content_updated = False
     current_case_name = d.case_name
     d.add_recap_source()
     update_docket_metadata(d, data)
 
-    if current_case_name != d.case_name or not d.pk:
-        # This docket should be added to Solr or updated since is new or the
-        # case name has changed.
-        content_updated = True
+    # Update the docket in SOLR if the case name has changed and contains
+    # docket entries
+    content_updated = False
+    if current_case_name != d.case_name and d.pk:
+        if d.docket_entries.exists():
+            content_updated = True
 
     if pq.debug:
         mark_pq_successful(pq, d_id=d.pk)
