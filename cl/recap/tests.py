@@ -2952,6 +2952,17 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
         self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
 
+        # Trigger the recap.email notification again for the same user, it
+        # should be processed.
+        self.client.post(self.path, self.data_4, format="json")
+
+        # No new recap documents should be added.
+        self.assertEqual(len(recap_document), 10)
+
+        # No new docket alert or webhooks should be triggered.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(webhook_triggered.count(), 1)
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         side_effect=lambda x: True,

@@ -1993,7 +1993,6 @@ def process_recap_email(
         # Get NEF attachments and merge them.
         all_attachment_rds = []
         if data["contains_attachments"] is True:
-            rd = dockets_updated[0].rds_created[0]
             # Try to get the attachment page without being logged into PACER
             att_report_text = get_attachment_page_by_url(
                 document_url, epq.court
@@ -2001,14 +2000,22 @@ def process_recap_email(
             if att_report_text:
                 att_report = AttachmentPage(epq.court_id)
             else:
+                main_rd = (
+                    dockets_updated[0]
+                    .des_returned[0]
+                    .recap_documents.earliest("date_created")
+                )
                 # Get the attachment page being logged into PACER
-                att_report = get_attachment_page_by_rd(rd.pk, cookies)
+                att_report = get_attachment_page_by_rd(main_rd.pk, cookies)
 
             for docket_entry in dockets_updated:
-                # Merge the attachments for each recap document
+                # Merge the attachments for each docket/recap document
+                main_rd_local = docket_entry.des_returned[
+                    0
+                ].recap_documents.earliest("date_created")
                 pq_pk = make_attachment_pq_object(
                     att_report,
-                    docket_entry.rds_created[0].pk,
+                    main_rd_local.pk,
                     user_pk,
                     att_report_text,
                 )
@@ -2019,9 +2026,7 @@ def process_recap_email(
                     # first docket entry. The only field that needs to be
                     # overwritten is the document number since it changes from
                     # case to case. Assigns it from its main RECAPDocument.
-                    rd_att.document_number = docket_entry.rds_created[
-                        0
-                    ].document_number
+                    rd_att.document_number = main_rd_local.document_number
                     rd_att.save()
                 all_attachment_rds += rds_affected
 
