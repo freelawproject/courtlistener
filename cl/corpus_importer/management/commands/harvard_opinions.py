@@ -1018,7 +1018,7 @@ def winnow_case_name(case_name: str) -> Set:
     # Remove one-letter words, initials etc.
     case_title = re.sub(r"\b[^ ]\b", "", case_title)
 
-    if not case_title:
+    if not case_title and case_name:
         # Log case name if the process reduce it to blank
         logger.warning(f"Case name: \"{case_name}\" reduced to blank.")
 

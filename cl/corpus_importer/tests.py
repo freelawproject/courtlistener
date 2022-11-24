@@ -857,30 +857,10 @@ label="194">*194</page-number>
             "case_name_abbreviation": "Wesselman v. Engel Co.",
             "case_name_cl": "McQuillan v. Schechter", "overlaps": 0}
 
-        # Case failing in server and being reduced to blank
-        case_4_data = {
-            "case_name_full": "AIRTRANS, INC., Plaintiff-Appellant, "
-                              "v. Kenneth MEAD, individually and in his "
-                              "capacity as Inspector General, "
-                              "U.S. Department of Transportation; Joseph "
-                              "Zschiesche, Special Agent, Office of "
-                              "Inspector General; Jeff Holt, Dyer County "
-                              "Sheriff; Larry Bell, Captain, Dyer County "
-                              "Sheriff's Department; Dyer County, Tennessee; "
-                              "Samsung International, Inc.; U.S. Logistics "
-                              "Inc.; and Christopher Asworth, Esq., "
-                              "Defendants-Appellees, United States of "
-                              "America, Intervenor, Four Unnamed Agents of "
-                              "the Tennessee Department of Transportation; "
-                              "Jimmy Porter, Dyer County Investigator "
-                              "Sheriff's Department, Defendants",
-            "case_name_abbreviation": "AirTrans, Inc. v. Mead",
-            "case_name_cl": "Airtrans Inc v. Mead", "overlaps": 2}
-
-        cases = [case_1_data, case_2_data, case_3_data, case_4_data]
+        cases = [case_1_data, case_2_data, case_3_data]
 
         for case in cases:
-            harvard_case = f"{case.get('case_name_full')} {case.get('case_name_abbreviation')}"
+            harvard_case = f"{case.get('case_name_full', '')} {case.get('case_name_abbreviation', '')}"
             overlap = winnow_case_name(
                 case.get('case_name_cl')) & winnow_case_name(
                 harvard_case
