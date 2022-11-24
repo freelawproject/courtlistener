@@ -3324,6 +3324,17 @@ class RecapEmailDocketAlerts(TestCase):
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
 
+        # Trigger the recap.email notification again for the same user, it
+        # should be processed.
+        self.client.post(self.path, self.data_multi_jpml, format="json")
+
+        # No new recap documents should be added.
+        self.assertEqual(len(recap_documents), 6)
+
+        # No new docket alert or webhooks should be triggered.
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(webhook_triggered.count(), 3)
+
 
 class GetAndCopyRecapAttachments(TestCase):
     """Test the get_and_copy_recap_attachment_docs method"""

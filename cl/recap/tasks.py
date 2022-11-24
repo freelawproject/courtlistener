@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
-from django.utils.timezone import now
+from django.utils.timezone import now, timedelta
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -2013,6 +2013,24 @@ def process_recap_email(
                 main_rd_local = docket_entry.des_returned[
                     0
                 ].recap_documents.earliest("date_created")
+
+                # If there is an attachment processing queue for this docket
+                # entry created by recap.email in the last hour. It means that
+                # this notification has been sent before by another recap.email
+                # user and the attachments have already been processed.
+                # Avoid processing them again.
+                cut_off_date = now() - timedelta(hours=1)
+                exists_att_processing_queue = ProcessingQueue.objects.filter(
+                    court_id=main_rd_local.docket_entry.docket.court_id,
+                    uploader_id=user_pk,
+                    upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+                    pacer_case_id=main_rd_local.docket_entry.docket.pacer_case_id,
+                    docket_entry_id=main_rd_local.docket_entry.pk,
+                    date_created__gt=cut_off_date,
+                ).exists()
+                if exists_att_processing_queue:
+                    continue
+
                 pq_pk = make_attachment_pq_object(
                     att_report,
                     main_rd_local.pk,
