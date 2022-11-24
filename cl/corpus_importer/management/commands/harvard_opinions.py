@@ -1020,7 +1020,7 @@ def winnow_case_name(case_name: str) -> Set:
 
     if not case_title and case_name:
         # Log case name if the process reduce it to blank
-        logger.warning(f"Case name: \"{case_name}\" reduced to blank.")
+        logger.warning(f'Case name: "{case_name}" reduced to blank.')
 
     # Convert case name to set of words
     cleaned_set = set(case_title.split())
