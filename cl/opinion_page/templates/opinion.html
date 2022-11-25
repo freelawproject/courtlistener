@@ -105,7 +105,6 @@
         </div>
         {% endif %}
 
-        {# Show cases that cite this case #}
         <div id="cited-by" class="sidebar-section">
           <h3>
             <span>Cited By ({{ citing_cluster_count|intcomma }}) <a
@@ -212,6 +211,20 @@
 
         {% include "includes/social_links.html" %}
         {% include "includes/donate_sidebar.html" with referrer="o-donate-now" %}
+
+        {# Sponsored by #}
+        {% if sponsored %}
+            <div id="sponsored-by" class="sidebar-section">
+                <h3>
+                  <span>Sponsored By</span>
+                </h3>
+                <a href="https://www.vlex.com" rel="sponsored">
+                    <img id="vlex" src="{% static "img/vlex-white.png" %}" class="img-responsive v-offset-below-1" width="150" height="75" >
+                </a>
+                <p class="v-offset-below-2">This opinion added to CourtListener with support from v|Lex.</p>
+            </div>
+        {% endif %}
+
     </div>
 {% endblock %}
 
