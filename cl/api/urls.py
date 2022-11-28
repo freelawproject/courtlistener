@@ -1,4 +1,5 @@
 from django.urls import include, path, re_path
+from django.views.generic import RedirectView
 from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
@@ -150,9 +151,14 @@ urlpatterns_base = [
     path("api/", views.api_index, name="api_index"),
     path("api/jurisdictions/", views.court_index, name="court_index"),
     re_path(
-        r"^api/rest-info/(?P<version>v[123])?/?$",
+        r"^help/api/rest/(?P<version>v[123])?/?$",
         views.rest_docs,
         name="rest_docs",
+    ),
+    # Redirect api/rest-info/ and api/rest-info/vX to new location
+    re_path(
+        r"^api/rest-info/(?P<version>v[123])?/?$",
+        RedirectView.as_view(pattern_name="rest_docs", permanent=True),
     ),
     path("api/bulk-info/", views.bulk_data_index, name="bulk_data_index"),
     path("api/replication/", views.replication_docs, name="replication_docs"),
@@ -173,6 +179,17 @@ urlpatterns_base = [
         r"^api/rest/v(?P<v>[12])/.*",
         views.deprecated_api,
         name="deprecated_api",
+    ),
+    # Webhooks Documentation
+    path(
+        "help/api/webhooks/getting-started/",
+        views.webhooks_getting_started,
+        name="webhooks_getting_started",
+    ),
+    re_path(
+        r"^help/api/webhooks/(?P<version>v[123])?/?$",
+        views.webhooks_docs,
+        name="webhooks_docs",
     ),
 ]
 

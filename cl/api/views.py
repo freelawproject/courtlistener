@@ -204,3 +204,19 @@ def deprecated_api(request, v):
         safe=False,
         status=status.HTTP_410_GONE,
     )
+
+
+def webhooks_getting_started(request):
+
+    context = {"private": False}
+    return render(request, "webhooks-getting-started.html", context)
+
+
+def webhooks_docs(request, version=None):
+    """Show the correct version of the webhooks docs"""
+
+    context = {"private": False}
+    try:
+        return render(request, f"webhooks-docs-{version}.html", context)
+    except TemplateDoesNotExist:
+        return render(request, "webhooks-docs-vlatest.html", context)

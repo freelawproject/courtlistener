@@ -1391,6 +1391,17 @@ textarea {
 .webhook-detail{
   padding: 1em;
 }
+.webhook-child {
+    padding-left: 1rem;
+}
+
+.payload p{
+  margin: 0 0 5px;
+}
+.payload hr{
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
 /* END Webhooks styles */
 
 

@@ -67,6 +67,14 @@ class BasicAPIPageTest(TestCase):
         r = self.client.get(reverse("rest_docs"))
         self.assertEqual(r.status_code, 200)
 
+    def test_webhook_docs(self) -> None:
+        r = self.client.get(reverse("webhooks_docs"))
+        self.assertEqual(r.status_code, 200)
+
+    def test_webhooks_getting_started(self) -> None:
+        r = self.client.get(reverse("webhooks_getting_started"))
+        self.assertEqual(r.status_code, 200)
+
     def test_bulk_data_index(self) -> None:
         r = self.client.get(reverse("bulk_data_index"))
         self.assertEqual(r.status_code, 200)
