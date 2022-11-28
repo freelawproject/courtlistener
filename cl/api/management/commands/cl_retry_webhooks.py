@@ -1,5 +1,6 @@
 import sys
 import time
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils.timezone import now
@@ -15,18 +16,39 @@ def retry_webhook_events() -> int:
     :return: Number of retried webhooks .
     """
 
-    # Using select_for_update() and transaction.atomic() here will prevent more
-    # than one instance retry pending webhooks, avoiding duplicated retries.
-    webhook_events = WebhookEvent.objects.select_for_update().filter(
-        event_status=WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
-        next_retry_date__lte=now(),
-        debug=False,
-        webhook__enabled=True,
-    )
     with transaction.atomic():
-        for webhook_event in webhook_events:
+        cut_off_date_two_days = now() - timedelta(days=2)
+        base_events = WebhookEvent.objects.select_for_update().filter(
+            next_retry_date__lte=now(),
+            debug=False,
+            webhook__enabled=True,
+        )
+        # Mark as failed webhook events older than 2 days, avoid retrying.
+        failed_webhook_events = base_events.filter(
+            event_status__in=[
+                WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
+            ],
+            date_created__lt=cut_off_date_two_days,
+        ).update(event_status=WEBHOOK_EVENT_STATUS.FAILED, date_modified=now())
+
+        # Restore retry counter to 0 for ENDPOINT_DISABLED events after
+        # webhook is re-enabled.
+        webhook_events_to_restart = base_events.filter(
+            event_status=WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
+            date_created__gte=cut_off_date_two_days,
+        ).update(retry_counter=0, date_modified=now())
+
+        webhook_events_to_retry = base_events.filter(
+            event_status__in=[
+                WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
+                WEBHOOK_EVENT_STATUS.ENDPOINT_DISABLED,
+            ],
+            date_created__gte=cut_off_date_two_days,
+        ).order_by("date_created")
+        for webhook_event in webhook_events_to_retry:
             send_webhook_event(webhook_event)
-    return len(webhook_events)
+    return len(webhook_events_to_retry)
 
 
 class Command(VerboseCommand):

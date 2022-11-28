@@ -56,11 +56,13 @@ class WEBHOOK_EVENT_STATUS(object):
     ENQUEUED_RETRY = 1
     SUCCESSFUL = 2
     FAILED = 3
+    ENDPOINT_DISABLED = 4
     STATUS = (
         (IN_PROGRESS, "Delivery in progress"),
         (ENQUEUED_RETRY, "Enqueued for retry"),
         (SUCCESSFUL, "Delivered successfully"),
         (FAILED, "Failed"),
+        (ENDPOINT_DISABLED, "Endpoint disabled"),
     )
 
 
