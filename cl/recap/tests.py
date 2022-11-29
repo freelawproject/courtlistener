@@ -3419,12 +3419,10 @@ class GetAndCopyRecapAttachments(TestCase):
         cf_2 = ContentFile(att2_content)
         pq_att2.filepath_local.save(filename_att2, cf_2)
 
-        cookies = None
         get_and_copy_recap_attachment_docs(
             self,
             self.rds_att,
             "scotus",
-            cookies,
             "magic1234",
             "12345",
             self.user.pk,
@@ -3469,12 +3467,10 @@ class GetAndCopyRecapAttachments(TestCase):
 
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
-        cookies = None
         get_and_copy_recap_attachment_docs(
             self,
             self.rds_att,
             "scotus",
-            cookies,
             "magic1234",
             "12345",
             self.user.pk,

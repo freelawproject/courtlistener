@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
-from django.utils.timezone import now, timedelta
+from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -575,6 +575,7 @@ def process_recap_attachment(
     self: Task,
     pk: int,
     tag_names: Optional[List[str]] = None,
+    document_number: int | None = None,
 ) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
@@ -582,9 +583,12 @@ def process_recap_attachment(
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
+    :param document_number: The main RECAP document number. If provided use it
+    to merge the attachments instead of using the one from the attachment page.
     :return: Tuple indicating the status of the processing and a related
     message
     """
+
     pq = ProcessingQueue.objects.get(pk=pk)
     mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
@@ -617,12 +621,14 @@ def process_recap_attachment(
         pq.pacer_case_id = att_data.get("pacer_case_id")
         pq.save()
 
+    if document_number is None:
+        document_number = att_data["document_number"]
     try:
         rds_affected, de = merge_attachment_page_data(
             pq.court,
             pq.pacer_case_id,
             att_data["pacer_doc_id"],
-            att_data["document_number"],
+            document_number,
             text,
             att_data["attachments"],
             pq.debug,
@@ -1630,12 +1636,12 @@ def get_recap_email_recipients(
     return recap_email_recipients
 
 
-def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
+def get_attachment_page_by_url(att_page_url: str, court_id: str) -> str | None:
     """Get the attachment page report for recap.email documents without being
     logged into PACER.
 
     :param att_page_url: The free look link url to the attachment page
-    :param court: The court object we're working with
+    :param court_id: The court ID we're working with
     :return: The HTML page text or None if it's not a valid attachment page
     """
 
@@ -1644,7 +1650,7 @@ def get_attachment_page_by_url(att_page_url: str, court: Court) -> str | None:
     )
     req_timeout = (60, 300)
     att_response = requests.get(att_page_url, timeout=req_timeout)
-    att_data = get_data_from_att_report(att_response.text, court.pk)
+    att_data = get_data_from_att_report(att_response.text, court_id)
     if att_data == {}:
         msg = "Not a valid attachment page upload for recap.email"
         logger.warning(msg)
@@ -1781,7 +1787,6 @@ def get_and_copy_recap_attachment_docs(
     self: Task,
     att_rds: list[RECAPDocument],
     court_id: str,
-    cookies: RequestsCookieJar,
     magic_number: str,
     pacer_case_id: str,
     user_pk: int,
@@ -1792,13 +1797,13 @@ def get_and_copy_recap_attachment_docs(
     :param self: The parent celery task.
     :param att_rds: A list for RECAPDocument attachments to process.
     :param court_id: A CourtListener court ID to query the free document.
-    :param cookies: The cookies of a logged in PACER session
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param user_pk: The user to associate with the ProcessingQueue object.
     :return: None
     """
 
+    cookies = get_pacer_cookie_from_cache(user_pk)
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
@@ -1836,6 +1841,62 @@ class DocketUpdatedData:
     des_returned: list
     rds_created: list
     content_updated: bool
+
+
+def get_and_merge_rd_attachments(
+    document_url: str,
+    court_id: str,
+    dockets_updated: list[DocketUpdatedData],
+    user_pk: int,
+) -> list[RECAPDocument]:
+    """Get the attachment page and merge the data into the dockets returned
+    by the recap.email notification.
+
+    :param document_url: The document URL including the magic number to get the
+     attachment page without being logged into PACER.
+    :param court_id: The court ID we're working with.
+    :param dockets_updated: A list of DocketUpdatedData containing the dockets
+    to merge the attachments in.
+    :param user_pk: The user to associate with the ProcessingQueue object.
+    :return: A list of RECAPDocuments modified or created during the process
+    """
+
+    all_attachment_rds = []
+    cookies = get_pacer_cookie_from_cache(user_pk)
+    # Try to get the attachment page without being logged into PACER
+    att_report_text = get_attachment_page_by_url(document_url, court_id)
+    if att_report_text:
+        att_report = AttachmentPage(court_id)
+    else:
+        main_rd = (
+            dockets_updated[0]
+            .des_returned[0]
+            .recap_documents.earliest("date_created")
+        )
+        # Get the attachment page being logged into PACER
+        att_report = get_attachment_page_by_rd(main_rd.pk, cookies)
+
+    for docket_entry in dockets_updated:
+        # Merge the attachments for each docket/recap document
+        main_rd_local = docket_entry.des_returned[0].recap_documents.earliest(
+            "date_created"
+        )
+        pq_pk = make_attachment_pq_object(
+            att_report,
+            main_rd_local.pk,
+            user_pk,
+            att_report_text,
+        )
+        # We only query and parse the Attachment report for the first
+        # docket entry. The only field that needs to be overwritten is
+        # the document number since it changes from case to case.
+        # Assigns it from its main RECAPDocument.
+        main_rd_document_number = int(main_rd_local.document_number)
+        pq_status, msg, rds_affected = process_recap_attachment(
+            pq_pk, document_number=main_rd_document_number
+        )
+        all_attachment_rds += rds_affected
+    return all_attachment_rds
 
 
 @app.task(
@@ -1880,12 +1941,9 @@ def process_recap_email(
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
-
-    # Check if is a valid notification, there would exist at least one valid
-    # docket/docket entry. In multi-docket nefs the pacer_doc_id is the same
-    # in all docket entries.
     if (
         data == {}
+        or len(data["dockets"]) == 0
         or len(data["dockets"][0]["docket_entries"]) == 0
         or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
     ):
@@ -1926,7 +1984,6 @@ def process_recap_email(
         user_pk,
         appellate,
     )
-
     if appellate:
         # Get the document number for appellate documents.
         appellate_doc_num = get_document_number_for_appellate(
@@ -1967,7 +2024,6 @@ def process_recap_email(
             des_returned, rds_created, content_updated = add_docket_entries(
                 docket, docket_data["docket_entries"]
             )
-
             d_updated = DocketUpdatedData(
                 docket=docket,
                 des_returned=des_returned,
@@ -1993,66 +2049,13 @@ def process_recap_email(
         # Get NEF attachments and merge them.
         all_attachment_rds = []
         if data["contains_attachments"] is True:
-            # Try to get the attachment page without being logged into PACER
-            att_report_text = get_attachment_page_by_url(
-                document_url, epq.court
+            all_attachment_rds = get_and_merge_rd_attachments(
+                document_url, epq.court_id, dockets_updated, user_pk
             )
-            if att_report_text:
-                att_report = AttachmentPage(epq.court_id)
-            else:
-                main_rd = (
-                    dockets_updated[0]
-                    .des_returned[0]
-                    .recap_documents.earliest("date_created")
-                )
-                # Get the attachment page being logged into PACER
-                att_report = get_attachment_page_by_rd(main_rd.pk, cookies)
-
-            for docket_entry in dockets_updated:
-                # Merge the attachments for each docket/recap document
-                main_rd_local = docket_entry.des_returned[
-                    0
-                ].recap_documents.earliest("date_created")
-
-                # If there is an attachment processing queue for this docket
-                # entry created by recap.email in the last hour. It means that
-                # this notification has been sent before by another recap.email
-                # user and the attachments have already been processed.
-                # Avoid processing them again.
-                cut_off_date = now() - timedelta(hours=1)
-                exists_att_processing_queue = ProcessingQueue.objects.filter(
-                    court_id=main_rd_local.docket_entry.docket.court_id,
-                    uploader_id=user_pk,
-                    upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-                    pacer_case_id=main_rd_local.docket_entry.docket.pacer_case_id,
-                    docket_entry_id=main_rd_local.docket_entry.pk,
-                    date_created__gt=cut_off_date,
-                ).exists()
-                if exists_att_processing_queue:
-                    continue
-
-                pq_pk = make_attachment_pq_object(
-                    att_report,
-                    main_rd_local.pk,
-                    user_pk,
-                    att_report_text,
-                )
-                pq_status, msg, rds_affected = process_recap_attachment(pq_pk)
-
-                for rd_att in rds_affected:
-                    # We only query and parse the Attachment report for the
-                    # first docket entry. The only field that needs to be
-                    # overwritten is the document number since it changes from
-                    # case to case. Assigns it from its main RECAPDocument.
-                    rd_att.document_number = main_rd_local.document_number
-                    rd_att.save()
-                all_attachment_rds += rds_affected
-
             get_and_copy_recap_attachment_docs(
                 self,
                 all_attachment_rds,
                 epq.court_id,
-                cookies,
                 magic_number,
                 pacer_case_id,
                 user_pk,
