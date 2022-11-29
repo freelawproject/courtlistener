@@ -5,7 +5,7 @@ default_language_version:
   python: "python3.10"
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v4.4.0
     hooks:
      - id: check-added-large-files
      - id: check-ast
@@ -23,7 +23,7 @@ repos:
        args: [--markdown-linebreak-ext=md]
 
   - repo: https://github.com/ikamensh/flynt/
-    rev: '0.76'
+    rev: '0.77'
     hooks:
      - id: flynt
        args: [--line-length=79, --transform-concats]
