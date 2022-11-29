@@ -5,7 +5,7 @@ import requests
 from celery import Task
 from django.conf import settings
 
-from cl.api.models import Webhook
+from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
 from cl.lib.email_utils import make_multipart_email
 
@@ -105,28 +105,33 @@ def notify_new_or_updated_webhook(
 
 @app.task(ignore_result=True)
 def notify_failing_webhook(
-    webhook_pk: int,
-    disabled: bool,
+    webhook_event_pk: int,
+    failure_counter: int,
+    webhook_enabled: bool,
 ) -> None:
     """Send a notification to the webhook user when a webhook event fails, or
     it has been disabled.
 
-    :param webhook_pk: The related webhook PK.
-    :param disabled: Whether the webhook has been disabled.
+    :param webhook_event_pk: The related webhook event PK.
+    :param failure_counter: The current webhook event failure counter.
+    :param webhook_enabled: Whether the webhook has been disabled.
     :return: None
     """
 
-    webhook = Webhook.objects.get(pk=webhook_pk)
+    webhook_event = WebhookEvent.objects.get(pk=webhook_event_pk)
+    webhook = webhook_event.webhook
     first_name = webhook.user.first_name
     subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is failing."
-    if disabled:
+    if not webhook_enabled:
         subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is now disabled."
     txt_template = "emails/failing_webhook.txt"
     html_template = "emails/failing_webhook.html"
     context = {
         "webhook": webhook,
+        "webhook_event_pk": webhook_event_pk,
+        "failure_counter": failure_counter,
         "first_name": first_name,
-        "disabled": disabled,
+        "disabled": not webhook_enabled,
     }
     msg = make_multipart_email(
         subject, html_template, txt_template, context, [webhook.user.email]
