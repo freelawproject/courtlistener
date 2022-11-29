@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -29,6 +29,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
+from juriscraper.pacer.email import DocketType
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
@@ -1843,6 +1844,44 @@ class DocketUpdatedData:
     content_updated: bool
 
 
+def open_and_validate_email_notification(
+    epq: EmailProcessingQueue,
+) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
+    """Open and read a recap.email notification from S3, then validate if it's
+    a valid NEF or NDA.
+
+    :param epq: The EmailProcessingQueue object.
+    :return: A two tuple of a dict containing the notification data if valid
+    or None otherwise, the raw notification body to store in next steps.
+    """
+
+    message_id = epq.message_id
+    bucket = RecapEmailSESStorage()
+    # Try to read the file using utf-8.
+    # If it fails fallback on iso-8859-1
+    try:
+        with bucket.open(message_id, "rb") as f:
+            body = f.read().decode("utf-8")
+    except UnicodeDecodeError:
+        with bucket.open(message_id, "rb") as f:
+            body = f.read().decode("iso-8859-1")
+    report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
+    report._parse_text(body)
+    data = report.data
+    if (
+        data == {}
+        or len(data["dockets"]) == 0
+        or len(data["dockets"][0]["docket_entries"]) == 0
+        or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
+    ):
+        msg = "Not a valid notification email. No message content."
+        mark_pq_status(
+            epq, msg, PROCESSING_STATUS.INVALID_CONTENT, "status_message"
+        )
+        data = None
+    return data, body
+
+
 def get_and_merge_rd_attachments(
     document_url: str,
     court_id: str,
@@ -1887,10 +1926,9 @@ def get_and_merge_rd_attachments(
             user_pk,
             att_report_text,
         )
-        # We only query and parse the Attachment report for the first
-        # docket entry. The only field that needs to be overwritten is
-        # the document number since it changes from case to case.
-        # Assigns it from its main RECAPDocument.
+        # We only query and parse the Attachment page for one document in PACER
+        # The only field that needs to be overwritten is the document number
+        # since it changes from case to case. Assigns it from its main document
         main_rd_document_number = int(main_rd_local.document_number)
         pq_status, msg, rds_affected = process_recap_attachment(
             pq_pk, document_number=main_rd_document_number
@@ -1928,29 +1966,8 @@ def process_recap_email(
 
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
-    message_id = epq.message_id
-    bucket = RecapEmailSESStorage()
-    # Try to read the file using utf-8.
-    # If it fails fallback on iso-8859-1
-    try:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("utf-8")
-    except UnicodeDecodeError:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("iso-8859-1")
-    report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
-    report._parse_text(body)
-    data = report.data
-    if (
-        data == {}
-        or len(data["dockets"]) == 0
-        or len(data["dockets"][0]["docket_entries"]) == 0
-        or data["dockets"][0]["docket_entries"][0]["pacer_doc_id"] is None
-    ):
-        msg = "Not a valid notification email. No message content."
-        mark_pq_status(
-            epq, msg, PROCESSING_STATUS.INVALID_CONTENT, "status_message"
-        )
+    data, body = open_and_validate_email_notification(epq)
+    if data is None:
         self.request.chain = None
         return None
 
