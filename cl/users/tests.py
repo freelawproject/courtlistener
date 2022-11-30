@@ -3044,7 +3044,7 @@ class WebhooksHTMXTests(APITestCase):
             response = self.client.post(webhook_1_path_test, {})
         # Compare the test webhook event data.
         self.assertEqual(response.status_code, HTTP_200_OK)
-        webhook_event = WebhookEvent.objects.all()
+        webhook_event = WebhookEvent.objects.all().order_by("date_created")
         self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
         self.assertEqual(webhook_event[0].debug, True)
         self.assertEqual(
