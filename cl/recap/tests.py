@@ -482,6 +482,10 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     "cl.recap.tasks.get_pacer_cookie_from_cache",
     return_value={"cookie": "foo"},
 )
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
 class RecapPdfFetchApiTest(TestCase):
     """Can we fetch PDFs properly?"""
 
@@ -503,7 +507,9 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
     )
-    def test_fetch_unavailable_pdf(self, mock_get_cookie, mock_get_name):
+    def test_fetch_unavailable_pdf(
+        self, mock_get_cookie, mock_get_name, mock_court_accessible
+    ):
         """Can we do a simple fetch of a PDF from PACER?"""
         self.rd.is_available = False
         self.rd.save()
@@ -516,7 +522,7 @@ class RecapPdfFetchApiTest(TestCase):
         self.assertEqual(self.fq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertTrue(self.rd.is_available)
 
-    def test_fetch_available_pdf(self, mock_get_cookie):
+    def test_fetch_available_pdf(self, mock_get_cookie, mock_court_accessible):
         orig_date_modified = self.rd.date_modified
 
         response = fetch_pacer_doc_by_rd(self.rd.pk, self.fq.pk)
@@ -537,6 +543,10 @@ class RecapPdfFetchApiTest(TestCase):
         )
 
 
+@mock.patch(
+    "cl.recap.tasks.is_pacer_court_accessible",
+    side_effect=lambda a: True,
+)
 class RecapAttPageFetchApiTest(TestCase):
     fixtures = ["recap_docs.json"]
 
@@ -550,7 +560,9 @@ class RecapAttPageFetchApiTest(TestCase):
         self.rd.pacer_doc_id = "17711118263"
         self.rd.save()
 
-    def test_fetch_attachment_page_no_pacer_doc_id(self) -> None:
+    def test_fetch_attachment_page_no_pacer_doc_id(
+        self, mock_court_accessible
+    ) -> None:
         """Can we do a simple fetch of an attachment page from PACER?"""
         self.rd.pacer_doc_id = ""
         self.rd.save()
@@ -561,7 +573,7 @@ class RecapAttPageFetchApiTest(TestCase):
         self.fq.refresh_from_db()
         self.assertEqual(self.fq.status, PROCESSING_STATUS.NEEDS_INFO)
 
-    def test_fetch_att_page_no_cookies(self) -> None:
+    def test_fetch_att_page_no_cookies(self, mock_court_accessible) -> None:
         result = do_pacer_fetch(self.fq)
         result.get()
 
@@ -580,7 +592,9 @@ class RecapAttPageFetchApiTest(TestCase):
     @mock.patch(
         "cl.recap.mergers.AttachmentPage", new=fakes.FakeAttachmentPage
     )
-    def test_fetch_att_page_all_systems_go(self, mock_get_cookies):
+    def test_fetch_att_page_all_systems_go(
+        self, mock_get_cookies, mock_court_accessible
+    ):
         result = do_pacer_fetch(self.fq)
         result.get()
 
@@ -2952,6 +2966,17 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(recap_documents_webhook[1]["document_number"], "16")
         self.assertEqual(recap_documents_webhook[1]["attachment_number"], 1)
 
+        # Trigger the recap.email notification again for the same user, it
+        # should be processed.
+        self.client.post(self.path, self.data_4, format="json")
+
+        # No new recap documents should be added.
+        self.assertEqual(len(recap_document), 10)
+
+        # No new docket alert or webhooks should be triggered.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(webhook_triggered.count(), 1)
+
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
         side_effect=lambda x: True,
@@ -3313,6 +3338,17 @@ class RecapEmailDocketAlerts(TestCase):
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
 
+        # Trigger the recap.email notification again for the same user, it
+        # should be processed.
+        self.client.post(self.path, self.data_multi_jpml, format="json")
+
+        # No new recap documents should be added.
+        self.assertEqual(len(recap_documents), 6)
+
+        # No new docket alert or webhooks should be triggered.
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(webhook_triggered.count(), 3)
+
 
 class GetAndCopyRecapAttachments(TestCase):
     """Test the get_and_copy_recap_attachment_docs method"""
@@ -3397,12 +3433,10 @@ class GetAndCopyRecapAttachments(TestCase):
         cf_2 = ContentFile(att2_content)
         pq_att2.filepath_local.save(filename_att2, cf_2)
 
-        cookies = None
         get_and_copy_recap_attachment_docs(
             self,
             self.rds_att,
             "scotus",
-            cookies,
             "magic1234",
             "12345",
             self.user.pk,
@@ -3447,12 +3481,10 @@ class GetAndCopyRecapAttachments(TestCase):
 
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
-        cookies = None
         get_and_copy_recap_attachment_docs(
             self,
             self.rds_att,
             "scotus",
-            cookies,
             "magic1234",
             "12345",
             self.user.pk,
