@@ -4971,7 +4971,6 @@ class WebhooksRetries(TestCase):
 
         # The delete method should be executed at 12:00 UTC.
         time_to_delete = now().replace(hour=12, minute=0, second=0)
-        print("Time to delete: ", time_to_delete)
         with time_machine.travel(time_to_delete, tick=False):
             deleted_count = delete_old_webhook_events()
             self.assertEqual(deleted_count, 2)

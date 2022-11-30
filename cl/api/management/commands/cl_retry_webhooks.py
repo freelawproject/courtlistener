@@ -61,18 +61,14 @@ def delete_old_webhook_events() -> int | None:
     execute the method.
     """
 
-    minute_of_the_day = now().hour * 60 + now().minute
-    # 12:00 UTC -> 4:00 PDT (minute 720 of the day)
-    if minute_of_the_day == 720:
+    # 12:00 UTC -> 4:00 PDT
+    if now().hour == 12 and now().minute == 0:
         # Older than DAYS_TO_DELETE days
-        days = DAYS_TO_DELETE
-        older_than = now() - timedelta(days=days)
+        older_than = now() - timedelta(days=DAYS_TO_DELETE)
         webhooks_events_to_delete = WebhookEvent.objects.filter(
             date_created__lt=older_than
-        )
-        deleted_count = len(webhooks_events_to_delete)
-        webhooks_events_to_delete.delete()
-        return deleted_count
+        ).delete()
+        return webhooks_events_to_delete[0]
     return None
 
 
@@ -88,13 +84,13 @@ class Command(VerboseCommand):
 
         # Execute it continuously with a delay of one minute between iterations
         while True:
-            sys.stdout.write("Retrying failed webhooks...")
-            webhooks_retried = retry_webhook_events()
-            sys.stdout.write(f"{webhooks_retried} webhooks retried.")
-
             # Delete old webhook events.
             deleted_count = delete_old_webhook_events()
             if deleted_count is not None:
-                sys.stdout.write(f"{deleted_count} webhook events deleted.")
+                sys.stdout.write(f"{deleted_count} webhook events deleted.\n")
+
+            sys.stdout.write("Retrying failed webhooks...\n")
+            webhooks_retried = retry_webhook_events()
+            sys.stdout.write(f"{webhooks_retried} webhooks retried.\n")
 
             time.sleep(self.DELAY_BETWEEN_ITERATIONS)
