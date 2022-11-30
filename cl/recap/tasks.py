@@ -1926,9 +1926,13 @@ def get_and_merge_rd_attachments(
             user_pk,
             att_report_text,
         )
-        # We only query and parse the Attachment page for one document in PACER
-        # The only field that needs to be overwritten is the document number
-        # since it changes from case to case. Assigns it from its main document
+
+        # Attachments for multi-docket NEFs are the same for every case
+        # mentioned in the notification. The only difference between them is a
+        # different document_number in every case for the main document the
+        # attachments belong to. So we only query and parse the Attachment page
+        # one time in PACER and provide the correct document_number to use for
+        # every case when merging the attachments into each docket.
         main_rd_document_number = int(main_rd_local.document_number)
         pq_status, msg, rds_affected = process_recap_attachment(
             pq_pk, document_number=main_rd_document_number
