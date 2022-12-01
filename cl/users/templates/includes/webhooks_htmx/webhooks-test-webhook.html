@@ -17,7 +17,7 @@
         </div>
       </div>
     </div>
-  {% if da_type == webhook.event_type %}
+  {% if  webhook.event_type in da_type %}
     <div class="row form-group">
       <div class="col-xs-12" hx-ext="loading-states" data-loading-states>
         <button id="webhook-send-test" class="btn btn-primary"
@@ -44,7 +44,7 @@
           <textarea readonly class="form-control v-offset-below-1" id="dummy_curl" rows="6">{{ dummy_curl }}</textarea>
           <label for="dummy_curl">Use this command locally to replicate this event from our servers.</label>
         </div>
-        {% if da_type == webhook.event_type %}
+        {% if webhook.event_type in da_type %}
           <button id="webhook-curl" class="btn btn-primary" onclick="copy_text('dummy_curl')">Copy Command</button>
         {% endif %}
       </div>

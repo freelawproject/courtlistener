@@ -130,6 +130,17 @@ class WebhooksViewSet(ModelViewSet):
                 da_dummy_curl = da_curl_template.render(
                     {"endpoint_url": webhook.url}
                 ).strip()
+            case WebhookEventType.SEARCH_ALERT:
+                da_template = loader.get_template(
+                    "includes/search_alert_webhook_dummy.txt"
+                )
+                da_dummy_content = da_template.render().strip()
+                da_curl_template = loader.get_template(
+                    "includes/search_alert_webhook_dummy_curl.txt"
+                )
+                da_dummy_curl = da_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
             case _:
                 # Webhook types with no support yet.
                 da_dummy_content = (
@@ -147,7 +158,10 @@ class WebhooksViewSet(ModelViewSet):
                     "webhook": webhook,
                     "dummy_content": da_dummy_content,
                     "dummy_curl": da_dummy_curl,
-                    "da_type": WebhookEventType.DOCKET_ALERT,
+                    "da_type": [
+                        WebhookEventType.DOCKET_ALERT,
+                        WebhookEventType.SEARCH_ALERT,
+                    ],
                 },
                 template_name="includes/webhooks_htmx/webhooks-test-webhook.html",
             )

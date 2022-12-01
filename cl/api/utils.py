@@ -709,30 +709,30 @@ def update_webhook_event_after_request(
 
 
 def send_webhook_event(
-    webhook_event: WebhookEvent, content_str: str | None = None
+    webhook_event: WebhookEvent, content_bytes: bytes | None = None
 ) -> None:
     """Send the webhook POST request.
 
     :param webhook_event: An WebhookEvent to send.
-    :param content_str: Optional, the str JSON content to send the first time
+    :param content_bytes: Optional, the bytes JSON content to send the first time
     the webhook is sent.
     """
     headers = {
         "Content-type": "application/json",
         "Idempotency-Key": str(webhook_event.event_id),
     }
-    if content_str:
-        json_str = content_str
+    if content_bytes:
+        json_bytes = content_bytes
     else:
         renderer = JSONRenderer()
-        json_str = renderer.render(
+        json_bytes = renderer.render(
             webhook_event.content,
             accepted_media_type="application/json;",
-        ).decode()
+        )
     try:
         response = requests.post(
             webhook_event.webhook.url,
-            data=json_str,
+            data=json_bytes,
             timeout=(1, 1),
             stream=True,
             headers=headers,
