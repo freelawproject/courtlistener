@@ -32,7 +32,11 @@ from cl.api.factories import (
     WebhookEventFactory,
     WebhookFactory,
 )
-from cl.api.management.commands.cl_retry_webhooks import retry_webhook_events
+from cl.api.management.commands.cl_retry_webhooks import (
+    DAYS_TO_DELETE,
+    delete_old_webhook_events,
+    retry_webhook_events,
+)
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_next_webhook_retry_date
 from cl.lib.pacer import is_pacer_court_accessible
@@ -4927,3 +4931,50 @@ class WebhooksRetries(TestCase):
                     webhook_e2_compare.update(
                         next_retry_date=webhook_e2.next_retry_date,
                     )
+
+    def test_delete_old_webhook_events(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """Can we properly delete webhook events older than DAYS_TO_DELETE days?
+
+        The delete_old_webhook_events is only executed once a day at 12:00 UTC.
+        """
+
+        fake_days_ago = now() - timedelta(days=DAYS_TO_DELETE + 1)
+        with time_machine.travel(fake_days_ago, tick=False):
+            webhook_e1 = WebhookEventFactory(
+                webhook=self.webhook,
+            )
+            webhook_e2 = WebhookEventFactory(
+                webhook=self.webhook,
+            )
+
+        webhook_e3 = WebhookEventFactory(
+            webhook=self.webhook,
+        )
+
+        # It's not time to execute the delete method, one minute ahead.
+        no_time_to_delete = now().replace(hour=12, minute=1, second=0)
+        with time_machine.travel(no_time_to_delete, tick=False):
+            deleted_count = delete_old_webhook_events()
+            self.assertEqual(deleted_count, None)
+
+        # It's not time to execute the delete method, one minute behind.
+        no_time_to_delete_1 = now().replace(hour=11, minute=59, second=0)
+        with time_machine.travel(no_time_to_delete_1, tick=False):
+            deleted_count = delete_old_webhook_events()
+            self.assertEqual(deleted_count, None)
+
+        # The delete method should be executed at 12:00 UTC.
+        time_to_delete = now().replace(hour=12, minute=0, second=0)
+        with time_machine.travel(time_to_delete, tick=False):
+            deleted_count = delete_old_webhook_events()
+            self.assertEqual(deleted_count, 2)
+
+        webhook_events = WebhookEvent.objects.all()
+        # webhook_e3 should still exist.
+        self.assertEqual(webhook_events[0].pk, webhook_e3.pk)

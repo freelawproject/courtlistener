@@ -9,6 +9,8 @@ from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent
 from cl.api.utils import send_webhook_event
 from cl.lib.command_utils import VerboseCommand
 
+DAYS_TO_DELETE = 90
+
 
 def retry_webhook_events() -> int:
     """Retry Webhook events that need to be retried.
@@ -51,6 +53,25 @@ def retry_webhook_events() -> int:
     return len(webhook_events_to_retry)
 
 
+def delete_old_webhook_events() -> int | None:
+    """Delete webhook events older than DAYS_TO_DELETE days.
+    This is executed once a day at 12:00 UTC (4:00 PDT)
+
+    :return: The number of deleted webhooks events or None if it's not time to
+    execute the method.
+    """
+
+    # 12:00 UTC -> 4:00 PDT
+    if now().hour == 12 and now().minute == 0:
+        # Older than DAYS_TO_DELETE days
+        older_than = now() - timedelta(days=DAYS_TO_DELETE)
+        webhooks_events_to_delete = WebhookEvent.objects.filter(
+            date_created__lt=older_than
+        ).delete()
+        return webhooks_events_to_delete[0]
+    return None
+
+
 class Command(VerboseCommand):
     """Command to retry enqueued failed webhooks."""
 
@@ -63,7 +84,13 @@ class Command(VerboseCommand):
 
         # Execute it continuously with a delay of one minute between iterations
         while True:
-            sys.stdout.write("Retrying failed webhooks...")
+            # Delete old webhook events.
+            deleted_count = delete_old_webhook_events()
+            if deleted_count is not None:
+                sys.stdout.write(f"{deleted_count} webhook events deleted.\n")
+
+            sys.stdout.write("Retrying failed webhooks...\n")
             webhooks_retried = retry_webhook_events()
-            sys.stdout.write(f"{webhooks_retried} webhooks retried.")
+            sys.stdout.write(f"{webhooks_retried} webhooks retried.\n")
+
             time.sleep(self.DELAY_BETWEEN_ITERATIONS)
