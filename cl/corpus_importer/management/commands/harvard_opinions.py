@@ -599,11 +599,12 @@ def add_citations(cites: List[CitationType], cluster_id: int) -> None:
                     reporter=citation[0].corrected_reporter(),
                     page=citation[0].groups["page"],
                     cluster_id=cluster_id,
-                    type=reporter_type
+                    type=reporter_type,
                 )
             except IntegrityError:
                 logger.warning(
-                    f"Reporter mismatch for cluster: {cluster_id} on cite: {cite['cite']}")
+                    f"Reporter mismatch for cluster: {cluster_id} on cite: {cite['cite']}"
+                )
 
 
 def add_opinions(
@@ -1157,7 +1158,7 @@ class Command(VerboseCommand):
             required=False,
             type=_argparse_volumes,
             help="Ex. '2:10' will fetch volumes 2 to 10 inclusive;"
-                 "'1:' will start at 1 and to 2000; '5' will do volume 5",
+            "'1:' will start at 1 and to 2000; '5' will do volume 5",
         )
         parser.add_argument(
             "--reporter",
@@ -1182,7 +1183,7 @@ class Command(VerboseCommand):
             "--location",
             type=str,
             help="The location of the court (if applicable) ex. Florida"
-                 "for courts-db differentiation.",
+            "for courts-db differentiation.",
             required=False,
             default=None,
         )
@@ -1190,13 +1191,13 @@ class Command(VerboseCommand):
             "--make-searchable",
             action="store_true",
             help="Add items to solr as we create opinions. "
-                 "Items are not searchable unless flag is raised.",
+            "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
             "--bankruptcy",
             action="store_true",
             help="Tells function to use bankruptcy courts for bankruptcy "
-                 "cases.",
+            "cases.",
         )
         parser.add_argument(
             "--no-debug",
