@@ -119,7 +119,7 @@ class Command(VerboseCommand):
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
-        self.send_emails(options["rate"])
+        self.send_emails_and_webhooks(options["rate"])
         if options["rate"] == Alert.REAL_TIME:
             self.clean_rt_queue()
 
@@ -190,9 +190,9 @@ class Command(VerboseCommand):
         logger.info(f"There were {len(results)} results.")
         return qd, results
 
-    def send_emails(self, rate):
-        """Send out an email to every user whose alert has a new hit for a
-        rate.
+    def send_emails_and_webhooks(self, rate):
+        """Send out an email and webhook events to every user whose alert has a
+        new hit for a rate.
         """
         users = User.objects.filter(alerts__rate=rate).distinct()
 
@@ -238,9 +238,9 @@ class Command(VerboseCommand):
                     user_webhooks = user.webhooks.filter(
                         event_type=WebhookEventType.SEARCH_ALERT, enabled=True
                     )
-                    if user_webhooks.exists():
+                    for user_webhook in user_webhooks:
                         self.send_search_alert_webhook(
-                            results, user_webhooks.first(), search_type, alert
+                            results, user_webhook, search_type, alert
                         )
 
             if len(hits) > 0:
@@ -350,8 +350,10 @@ class Command(VerboseCommand):
                 "date_created": webhook.date_created.isoformat(),
                 "deprecation_date": None,
             },
-            "search_alert": serialized_alert,
-            "results": serialized_results,
+            "payload": {
+                "results": serialized_results,
+                "alert": serialized_alert,
+            },
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(

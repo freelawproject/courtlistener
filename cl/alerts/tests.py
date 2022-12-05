@@ -598,11 +598,11 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
 
         alert_data = {
             self.search_alert.pk: {
-                "search_alert": self.search_alert,
+                "alert": self.search_alert,
                 "result": self.dly_opinion.cluster,
             },
             self.search_alert_oa.pk: {
-                "search_alert": self.search_alert_oa,
+                "alert": self.search_alert_oa,
                 "result": self.dly_oral_argument,
             },
         }
@@ -623,21 +623,21 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                 WebhookEventType.SEARCH_ALERT,
             )
 
-            alert_data_compare = alert_data[content["search_alert"]["id"]]
+            alert_data_compare = alert_data[content["payload"]["alert"]["id"]]
             self.assertEqual(
-                content["search_alert"]["name"],
-                alert_data_compare["search_alert"].name,
+                content["payload"]["alert"]["name"],
+                alert_data_compare["alert"].name,
             )
             self.assertEqual(
-                content["search_alert"]["query"],
-                alert_data_compare["search_alert"].query,
+                content["payload"]["alert"]["query"],
+                alert_data_compare["alert"].query,
             )
             self.assertEqual(
-                content["search_alert"]["rate"],
-                alert_data_compare["search_alert"].rate,
+                content["payload"]["alert"]["rate"],
+                alert_data_compare["alert"].rate,
             )
             self.assertEqual(
-                content["results"][0]["caseName"],
+                content["payload"]["results"][0]["caseName"],
                 alert_data_compare["result"].case_name,
             )
 
@@ -703,31 +703,31 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                     WebhookEventType.SEARCH_ALERT,
                 )
                 alert_to_compare = Alert.objects.get(
-                    pk=content["search_alert"]["id"]
+                    pk=content["payload"]["alert"]["id"]
                 )
                 self.assertEqual(
-                    content["search_alert"]["name"],
+                    content["payload"]["alert"]["name"],
                     alert_to_compare.name,
                 )
                 self.assertEqual(
-                    content["search_alert"]["query"],
+                    content["payload"]["alert"]["query"],
                     alert_to_compare.query,
                 )
                 self.assertEqual(
-                    content["search_alert"]["rate"],
+                    content["payload"]["alert"]["rate"],
                     rate,
                 )
 
                 # The oral argument webhook is sent independently not grouped
                 # with opinions webhooks results.
-                if content["search_alert"]["query"] == "type=oa":
+                if content["payload"]["alert"]["query"] == "type=oa":
                     self.assertEqual(
-                        len(content["results"]),
+                        len(content["payload"]["results"]),
                         1,
                     )
                 else:
                     self.assertEqual(
-                        len(content["results"]),
+                        len(content["payload"]["results"]),
                         results,
                     )
             webhook_events.delete()

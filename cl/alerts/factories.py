@@ -30,6 +30,7 @@ class AlertFactory(DjangoModelFactory):
     class Meta:
         model = Alert
 
+    name = Faker("text", max_nb_chars=75)
     user = SubFactory(UserFactory)
     secret_key = Faker(
         "password",
