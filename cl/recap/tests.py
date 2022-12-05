@@ -2172,7 +2172,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
@@ -2496,7 +2496,7 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(webhook_triggered.count(), 1)
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
@@ -2535,7 +2535,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
         content = webhook_triggered_2.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
@@ -2943,10 +2943,12 @@ class RecapEmailDocketAlerts(TestCase):
         )
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        recap_documents_webhook = content["results"][0]["recap_documents"]
+        recap_documents_webhook = content["payload"]["results"][0][
+            "recap_documents"
+        ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
         # We should send 10 recap documents in this webhook example
         self.assertEqual(len(recap_documents_webhook), 10)
@@ -3138,7 +3140,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
@@ -3302,7 +3304,7 @@ class RecapEmailDocketAlerts(TestCase):
             )
 
         webhook_entry_numbers = [
-            webhook.content["results"][0]["entry_number"]
+            webhook.content["payload"]["results"][0]["entry_number"]
             for webhook in webhook_triggered
         ]
         # Check that all the webhook entry numbers are different between them
@@ -3311,7 +3313,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         webhook_document_numbers = [
-            webhook.content["results"][0]["recap_documents"][0][
+            webhook.content["payload"]["results"][0]["recap_documents"][0][
                 "document_number"
             ]
             for webhook in webhook_triggered
@@ -3323,7 +3325,7 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         webhook_att_document_numbers = [
-            webhook.content["results"][0]["recap_documents"][1][
+            webhook.content["payload"]["results"][0]["recap_documents"][1][
                 "document_number"
             ]
             for webhook in webhook_triggered
@@ -4304,9 +4306,9 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhook_triggered.count(), 1)
                 content = webhook_triggered.first().content
                 # Compare the content of the webhook to the recap document
-                pacer_doc_id = content["results"][0]["recap_documents"][0][
-                    "pacer_doc_id"
-                ]
+                pacer_doc_id = content["payload"]["results"][0][
+                    "recap_documents"
+                ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
                 self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
@@ -4364,9 +4366,9 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhook_triggered.count(), 1)
                 content = webhook_triggered.first().content
                 # Compare the content of the webhook to the recap document
-                pacer_doc_id = content["results"][0]["recap_documents"][0][
-                    "pacer_doc_id"
-                ]
+                pacer_doc_id = content["payload"]["results"][0][
+                    "recap_documents"
+                ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
                 self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
@@ -4427,9 +4429,9 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhook_triggered.count(), 1)
                 content = webhook_triggered.first().content
                 # Compare the content of the webhook to the recap document
-                pacer_doc_id = content["results"][0]["recap_documents"][0][
-                    "pacer_doc_id"
-                ]
+                pacer_doc_id = content["payload"]["results"][0][
+                    "recap_documents"
+                ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
                 self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
 
@@ -4484,9 +4486,9 @@ class WebhooksRetries(TestCase):
                 self.assertEqual(webhook_triggered.count(), 1)
                 content = webhook_triggered.first().content
                 # Compare the content of the webhook to the recap document
-                pacer_doc_id = content["results"][0]["recap_documents"][0][
-                    "pacer_doc_id"
-                ]
+                pacer_doc_id = content["payload"]["results"][0][
+                    "recap_documents"
+                ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
                 self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
                 self.assertNotEqual(webhook_triggered[0].event_id, "")

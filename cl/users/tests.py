@@ -3048,7 +3048,7 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(webhook_event[0].status_code, HTTP_200_OK)
         self.assertEqual(webhook_event[0].debug, True)
         self.assertEqual(
-            webhook_event[0].content["results"][0]["id"], 2208776613
+            webhook_event[0].content["payload"]["results"][0]["id"], 2208776613
         )
 
         with mock.patch(
@@ -3065,7 +3065,7 @@ class WebhooksHTMXTests(APITestCase):
         )
         self.assertEqual(webhook_event[1].debug, True)
         self.assertEqual(
-            webhook_event[1].content["results"][0]["id"], 2208776613
+            webhook_event[1].content["payload"]["results"][0]["id"], 2208776613
         )
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event[1].webhook.failure_count, 0)
