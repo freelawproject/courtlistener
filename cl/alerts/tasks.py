@@ -385,7 +385,9 @@ def send_docket_alert_webhooks(
                 "date_created": webhook.date_created.isoformat(),
                 "deprecation_date": None,
             },
-            "results": serialized_docket_entries,
+            "payload": {
+                "results": serialized_docket_entries,
+            },
         }
         renderer = JSONRenderer()
         json_str = renderer.render(

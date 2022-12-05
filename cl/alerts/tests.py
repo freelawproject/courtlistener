@@ -166,7 +166,7 @@ class DocketAlertTest(TestCase):
         self.assertEqual(webhook_triggered.count(), 1)
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
