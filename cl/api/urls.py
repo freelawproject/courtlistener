@@ -148,20 +148,19 @@ urlpatterns_base = [
         name="deprecated_core_api_schema",
     ),
     # Documentation
-    path("api/", views.api_index, name="api_index"),
-    path("api/jurisdictions/", views.court_index, name="court_index"),
+    path("help/api/", views.api_index, name="api_index"),
+    path("help/api/jurisdictions/", views.court_index, name="court_index"),
     re_path(
         r"^help/api/rest/(?P<version>v[123])?/?$",
         views.rest_docs,
         name="rest_docs",
     ),
-    # Redirect api/rest-info/ and api/rest-info/vX to new location
-    re_path(
-        r"^api/rest-info/(?P<version>v[123])?/?$",
-        RedirectView.as_view(pattern_name="rest_docs", permanent=True),
+    path("help/api/bulk-data/", views.bulk_data_index, name="bulk_data_index"),
+    path(
+        "help/api/replication/",
+        views.replication_docs,
+        name="replication_docs",
     ),
-    path("api/bulk-info/", views.bulk_data_index, name="bulk_data_index"),
-    path("api/replication/", views.replication_docs, name="replication_docs"),
     re_path(
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,
@@ -171,14 +170,6 @@ urlpatterns_base = [
         r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",
         views.get_result_count,
         name="alert_frequency",
-    ),
-    # Deprecation Dates:
-    # v1: 2016-04-01
-    # v2: 2016-04-01
-    re_path(
-        r"^api/rest/v(?P<v>[12])/.*",
-        views.deprecated_api,
-        name="deprecated_api",
     ),
     # Webhooks Documentation
     path(
@@ -190,6 +181,36 @@ urlpatterns_base = [
         r"^help/api/webhooks/(?P<version>v[123])?/?$",
         views.webhooks_docs,
         name="webhooks_docs",
+    ),
+    # Deprecation Dates:
+    # v1: 2016-04-01
+    # v2: 2016-04-01
+    re_path(
+        r"^api/rest/v(?P<v>[12])/.*",
+        views.deprecated_api,
+        name="deprecated_api",
+    ),
+    # Redirect api docs from /api/* to /help/api/*
+    # Started: 2022-12-05
+    re_path(
+        r"^api/rest-info/(?P<version>v[123])?/?$",
+        RedirectView.as_view(pattern_name="rest_docs", permanent=True),
+    ),
+    path(
+        "api/",
+        RedirectView.as_view(pattern_name="api_index", permanent=True),
+    ),
+    path(
+        "api/jurisdictions/",
+        RedirectView.as_view(pattern_name="court_index", permanent=True),
+    ),
+    path(
+        "api/bulk-info/",
+        RedirectView.as_view(pattern_name="bulk_data_index", permanent=True),
+    ),
+    path(
+        "api/replication/",
+        RedirectView.as_view(pattern_name="replication_docs", permanent=True),
     ),
 ]
 
