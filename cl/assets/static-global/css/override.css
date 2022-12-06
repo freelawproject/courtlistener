@@ -1402,6 +1402,9 @@ textarea {
   margin-top: 5px;
   margin-bottom: 5px;
 }
+#toc > ul > ul  {
+  padding-inline-start: 20px;
+}
 /* END Webhooks styles */
 
 
