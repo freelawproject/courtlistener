@@ -29,6 +29,7 @@
       <li><a href="#event-types">Event Types</a></li>
       <ul>
         <li><a href="#docket-alerts">Docket Alerts</a></li>
+        <li><a href="#search-alerts">Search Alerts</a></li>
       </ul>
       <li><a href="#maintenance">Maintenance Schedule</a></li>
       <li><a href="#change-log">Change Log</a></li>
@@ -42,7 +43,7 @@
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
-  <p>Currently, CourtListener can send webhook events whenever dockets are updated. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/2382" rel="nofollow" target="_blank">docket alerts expire</a>, when <a href="https://github.com/freelawproject/courtlistener/issues/854" rel="nofollow" target="_blank">search alerts are triggered</a>, when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
+  <p>Currently, CourtListener can send webhook events whenever dockets are updated or search alerts are triggered. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/2382" rel="nofollow" target="_blank">docket alerts expire</a>, when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
@@ -241,6 +242,44 @@
   <p>
     <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">Click here to see an example Docket Entry object</a>. You can also learn more about the API in the API documentation, where we explain how to <a href="{% url 'rest_docs' %}#downloading-files">download files from the API</a> and list <a href="{% url 'rest_docs' %}#field-details">a few field-specific tips</a>.
   </p>
+
+  <h3 id="search-alerts">Search Alert Events</h3>
+  <p>With this webhook,  a Search Alert event is sent each time there is a new result that matches your search and the selected alert rate.
+  </p>
+  <p>You can create a Search Alert in one of two ways:</p>
+  <ol>
+    <li><strong>For normal users</strong>, create it <a href="{% url 'alert_help' %}#search-alerts">via the CourtListener website itself</a>.</li>
+    <li>
+      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'rest_docs' %}#alerts-endpoint">Search Alert endpoint</a> of our REST API.
+      </p>
+      <p>For example, this shell code creates a Search Alert for opinions of the Obergefell v. Hodges case.</p>
+      <pre class="v-offset-below-1 scrollable" >curl --request POST \
+  --url {% get_full_host %}{% url "alert-list" version="v3" %} \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --header 'Content-Type: multipart/form-data' \
+  --form 'name=Obergefell v. Hodges' \
+  --form 'query=q=Obergefell+v.+Hodges&type=o&order_by=score+desc&stat_Precedential=on&docket_number=14-556' \
+  --form 'rate=wly'</pre>
+    </li>
+  </ol>
+  <p>After you’ve created a Search Alert, we’ll send webhook events to your Search Alert endpoint each time new results are available for your search.
+  </p>
+  <p>
+    The webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has two keys <code>results</code> that contains the search results and <code>alert</code> for the search alert details.
+  </p>
+  <p>The shape of the data is thus:</p>
+  <pre>{
+   "payload":{
+      "results":[...],
+      "alert":{...}
+   },
+   "webhook":{...}
+} </pre>
+  <p>The <code>results</code> key is based on the <a href="{% url 'rest_docs' %}#search-endpoint">Search API endpoint</a> and has all of the same fields.
+  </p>
+  <p>The <code>alert</code> key contains the search alert details. It is based on the <a href="{% url 'rest_docs' %}#alerts-endpoint">Search Alert endpoint</a> and has all the same fields except for the <code>resource_uri</code> field. To get a description of the fields, do an HTTP <code>OPTIONS</code> request to the endpoint:
+  </p>
+  <pre>curl -X OPTIONS --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' '{% get_full_host %}{% url "alert-list" version="v3" %}'</pre>
 
   <h2 id="maintenance">Maintenance Schedule</h2>
   <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
