@@ -19,3 +19,16 @@ class SearchAlertSerializer(
             "secret_key",
             "date_last_hit",
         )
+
+
+class SearchAlertSerializerModel(
+    DynamicFieldsMixin, serializers.ModelSerializer
+):
+    """This serializer is used to serialize an alert when a webhook is sent
+    because SearchAlertSerializer inherits from HyperlinkedModelSerializerWithId
+    which requires an HTTP request to work.
+    """
+
+    class Meta:
+        model = Alert
+        fields = "__all__"

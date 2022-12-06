@@ -9,12 +9,19 @@ from django.db.models import Q
 from django.http import QueryDict
 from django.template import loader
 from django.utils.timezone import now
+from rest_framework.renderers import JSONRenderer
+from scorched.response import SolrResponse
 
+from cl.alerts.api_serializers import SearchAlertSerializerModel
 from cl.alerts.models import Alert, RealTimeQueue
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.utils import send_webhook_event
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
+from cl.search.api_serializers import SearchResultSerializer
+from cl.search.api_utils import SolrObject
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
@@ -112,7 +119,7 @@ class Command(VerboseCommand):
             self.remove_stale_rt_items()
             self.valid_ids = self.get_new_ids()
 
-        self.send_emails(options["rate"])
+        self.send_emails_and_webhooks(options["rate"])
         if options["rate"] == Alert.REAL_TIME:
             self.clean_rt_queue()
 
@@ -147,7 +154,11 @@ class Command(VerboseCommand):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results
 
-            main_params = search_utils.build_main_query(cd, facet=False)
+            main_params = search_utils.build_main_query(
+                cd,
+                highlight="text",  # Required to show all field as in Search API
+                facet=False,
+            )
             main_params.update(
                 {
                     "rows": "20",
@@ -179,9 +190,9 @@ class Command(VerboseCommand):
         logger.info(f"There were {len(results)} results.")
         return qd, results
 
-    def send_emails(self, rate):
-        """Send out an email to every user whose alert has a new hit for a
-        rate.
+    def send_emails_and_webhooks(self, rate):
+        """Send out an email and webhook events to every user whose alert has a
+        new hit for a rate.
         """
         users = User.objects.filter(alerts__rate=rate).distinct()
 
@@ -216,12 +227,21 @@ class Command(VerboseCommand):
                 # paired with a list of document dicts, of the form:
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
-                    hits.append(
-                        [alert, qd.get("type", SEARCH_TYPES.OPINION), results]
-                    )
+                    search_type = qd.get("type", SEARCH_TYPES.OPINION)
+                    hits.append([alert, search_type, results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
+
+                    # Send webhook event if the user has a SEARCH_ALERT
+                    # endpoint enabled.
+                    user_webhooks = user.webhooks.filter(
+                        event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+                    )
+                    for user_webhook in user_webhooks:
+                        self.send_search_alert_webhook(
+                            results, user_webhook, search_type, alert
+                        )
 
             if len(hits) > 0:
                 alerts_sent_count += 1
@@ -289,3 +309,59 @@ class Command(VerboseCommand):
             else:
                 valid_ids[item_type] = []
         return valid_ids
+
+    def send_search_alert_webhook(
+        self,
+        results: SolrResponse,
+        webhook: Webhook,
+        search_type: str,
+        alert: Alert,
+    ) -> None:
+        """Send a search alert webhook event containing search results from a
+        search alert object.
+
+        :param results: The search results returned by SOLR for this alert.
+        :param webhook: The webhook endpoint object to send the event to.
+        :param search_type: The search type of the alert.
+        :param alert: The search alert object.
+        """
+
+        serialized_alert = SearchAlertSerializerModel(alert).data
+        solr_results = []
+        for result in results.result.docs:
+            # Pull the text snippet up a level
+            result["snippet"] = "&hellip;".join(
+                result["solr_highlights"]["text"]
+            )
+            # This transformation is required before serialization so that null
+            # fields are shown in the results, as in Search API.
+            solr_results.append(SolrObject(initial=result))
+
+        serialized_results = SearchResultSerializer(
+            solr_results,
+            many=True,
+            context={"schema": self.sis[search_type].schema},
+        ).data
+
+        post_content = {
+            "webhook": {
+                "event_type": webhook.event_type,
+                "version": webhook.version,
+                "date_created": webhook.date_created.isoformat(),
+                "deprecation_date": None,
+            },
+            "payload": {
+                "results": serialized_results,
+                "alert": serialized_alert,
+            },
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
