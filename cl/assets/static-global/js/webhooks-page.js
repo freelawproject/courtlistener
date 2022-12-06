@@ -109,12 +109,3 @@ htmx.on('htmx:beforeSwap', (e) => {
     alert('We ran into an error processing your request and will be looking into it. Please try again later.');
   }
 });
-
-/*
-  Method to copy the webhook test content to the clipboard.
-*/
-function copy_text(selector_id) {
-  let text_area = document.getElementById(selector_id).closest('textarea');
-  text_area.select();
-  navigator.clipboard.writeText(text_area.value);
-}
