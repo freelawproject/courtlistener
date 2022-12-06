@@ -21,6 +21,7 @@ class UPLOAD_TYPE:
     DOCUMENT_ZIP = 10
     SES_EMAIL = 11
     CASE_QUERY_PAGE = 12
+    APPELLATE_CASE_QUERY_PAGE = 13
 
     NAMES = (
         (DOCKET, "HTML Docket"),
@@ -35,6 +36,7 @@ class UPLOAD_TYPE:
         (DOCUMENT_ZIP, "Zip archive of RECAP Documents"),
         (SES_EMAIL, "Email in the SES storage format"),
         (CASE_QUERY_PAGE, "Case query page"),
+        (APPELLATE_CASE_QUERY_PAGE, "Appellate Case query page"),
     )
 
 

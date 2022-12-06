@@ -91,6 +91,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
+            UPLOAD_TYPE.CASE_QUERY_PAGE,
         ]:
             # These are district court dockets. Is the court valid?
             district_court_ids = (
@@ -118,7 +119,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "should have claims registry pages." % attrs["court"]
                 )
 
-        if attrs["upload_type"] == UPLOAD_TYPE.APPELLATE_DOCKET:
+        if attrs["upload_type"] in [
+            UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
+            UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
+        ]:
             # Appellate court dockets. Is the court valid?
             appellate_court_ids = (
                 Court.federal_courts.appellate_pacer_courts().values_list(
