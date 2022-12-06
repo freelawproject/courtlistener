@@ -14,7 +14,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="col-sm-7">
+<div class="hidden-xs col-sm-2 col-md-3">
+  <div id="toc">
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#getting-started">Getting Started</a></li>
+      <li><a href="#overview-of-events">Overview of Events</a></li>
+      <ul>
+        <li><a href="#headers">Headers</a></li>
+        <li><a href="#fields">Fields</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#retries">Retries and Disablement</a></li>
+      </ul>
+      <li><a href="#event-types">Event Types</a></li>
+      <ul>
+        <li><a href="#docket-alerts">Docket Alerts</a></li>
+      </ul>
+      <li><a href="#maintenance">Maintenance Schedule</a></li>
+      <li><a href="#change-log">Change Log</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-sm-8 col-md-6">
   <h1 id="about">Webhook API</h1>
   <p class="lead">CourtListener’s webhook system allows us to push information to you, enabling bi-directional APIs without the need for polling.
   </p>
@@ -24,11 +46,12 @@
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
-  <p>Creating your first webhook working can be complicated. To get an overview of the process, please read <a href="{% url 'webhooks_getting_started' %}">our documentation on getting started</a>.
+  <p>Creating your first webhook working can be complicated. To get an overview of the process, please read our documentation on getting started.
   </p>
+  <p><a href="{% url 'webhooks_getting_started' %}" class="btn btn-primary btn-lg">Get Started</a></p>
 
   <h2 id="overview-of-events">Overview of Events</h2>
-  <h3 id="headers">Headers</h3>
+  <h3 id="headers">Standard Headers</h3>
   <p>Each webhook event contains two HTTP headers with additional context for the event:
   </p>
   <ul>
@@ -42,7 +65,7 @@
     </li>
   </ul>
 
-  <h2>Fields</h2>
+  <h3 id="fields">Standard Fields</h3>
   <p>Each webhook event is a JSON hash with two keys, <code>payload</code> and <code>webhook</code>. The <code>payload</code> key contains the specific data for the event that occurred. Its values are described in the <a href="#event-types">event-specific descriptions below</a>.
   </p>
   <p>The <code>webhook</code> key helps with maintenance and compatibility. It contains information about the webhook itself. This key should be monitored by administrators and used to track the deprecation schedule for the webhook events.
@@ -67,16 +90,16 @@
           <li>RECAP_FETCH = 3</li>
         </ul>
         <hr>
-        <p><strong>date_created</strong> <span class="text-muted">string</span></p>
-        <p>The DateTime (ISO 8601 format) in which the webhook endpoint was created.</p>
+        <p><strong>date_created</strong> <span class="text-muted">ISO 8601 string</span></p>
+        <p>The date time the webhook endpoint was created.</p>
         <hr>
-        <p><strong>deprecation_date</strong> <span class="text-muted">string or null </span></p>
+        <p><strong>deprecation_date</strong> <span class="text-muted">ISO 8601 string or null </span></p>
         <p>The next deprecation date if scheduled, otherwise null.</p>
       </div>
     </div>
   </div>
   <hr>
-  <h2 id="security">Webhook Security</h2>
+  <h3 id="security">Webhook Security</h3>
   <p>At present, our webhook system does not have an authentication mechanism to verify that a POST to your endpoint came from CourtListener. To provide some level of safety, <strong>we recommend you use a long, random URL as your endpoint</strong>, and we advise you to keep that URL secret.
   </p>
   <p>The <a href="https://github.com/freelawproject/courtlistener/issues/1650" rel="nofollow" target="_blank">decision not to support an authentication mechanism</a> was made after analyzing the risk of lacking authentication and after completing a review of the Stripe payments platform (which defaults to not using authentication despite being a high-risk environment).
@@ -84,66 +107,76 @@
   <p>So far, none of our clients have requested that we add this feature nor demonstrated a need for it. If the need for webhook authentication is a blocker for your organization, <a href="{% url 'contact' %}">please let us know</a> and we can build a solution together.
   </p>
 
-  <h2 id="retries">Retries and Automatic Endpoint Disablement</h2>
-  <p>Errors across distributed systems like webhooks are inevitable. To make our webhooks system resilient, we automatically retry events POSTed to your application that do not receive a 2xx status code response within one second.
+  <h3 id="retries">Retries and Automatic Endpoint Disablement</h3>
+  <p>Errors across distributed systems are inevitable. To make our webhook system resilient, we automatically retry events POSTed to your application that do not receive a 2xx status code response within one second.
   </p>
-  <p>Events are retried up to seven times after the first failure. The retry logic uses an exponential backoff starting at roughly three minutes with a 3× multiplier. As shown in the table below, this gives you around 54 hours to fix any issues in your system. The next attempt date and time for a specific event can be found <a href="{% url 'view_webhook_logs' 'logs' %}">in the webhook logs</a>.
+  <p>Events are retried up to seven times after the first failure. The retry logic uses an exponential backoff starting at roughly three minutes with a 3× multiplier. As shown in the table below, this gives you around 54 hours to fix any issues in your system.
   </p>
-  <p>As webhooks fail to be delivered, we will send emails to your account informing you of the issue. Email notifications are sent per webhook endpoint based on the first failing event for that endpoint — Notifications are not sent for every failing event, since that would flood your inbox.
+  <p>The next attempt date and time for a specific event can be found <a href="{% url 'view_webhook_logs' 'logs' %}">in your webhook logs</a>.
   </p>
-  <p>This table explains the retry and notification schedule (in minutes) for failing events:</p>
+  <p>As webhooks fail to be delivered, we will send emails to your account to inform you of the issue. Email notifications are sent per webhook endpoint based on the first failing event for that endpoint — Notifications are not sent for every failing event, since that would flood your inbox.
+  </p>
+  <p>This table explains the retry and notification schedule for failing events (in minutes):</p>
 
   <table class="table">
+  <thead>
+    <tr>
+      <th class="text-center">Retry Count</th>
+      <th class="text-center">New Delay</th>
+      <th class="text-center">Elapsed</th>
+      <th class="text-center">Send Failure<br>Notification Email?</th>
+    </tr>
+  </thead>
   <tbody>
-      <tr>
-          <td class="text-center"><p><strong>Retry Count</strong></p></td>
-          <td class="text-center"><p><strong>New Delay</strong></p></td>
-          <td class="text-center"><p><strong>Elapsed</strong></p></td>
-          <td class="text-center"><p><strong>Send Failure Notification Email?</strong></p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>1</p></td>
-          <td class="text-center"><p>0:03</p></td>
-          <td class="text-center"><p>0:03</p></td>
-          <td class="text-center"><p>Yes</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>2</p></td>
-          <td class="text-center"><p>0:09</p></td>
-          <td class="text-center"><p>0:12</p></td>
-          <td class="text-center"><p>No</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>3</p></td>
-          <td class="text-center"><p>0:27</p></td>
-          <td class="text-center"><p>0:39</p></td>
-          <td class="text-center"><p>No</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>4</p></td>
-          <td class="text-center"><p>1:21</p></td>
-          <td class="text-center"><p>2:00</p></td>
-          <td class="text-center"><p>No</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>5</p></td>
-          <td class="text-center"><p>4:03</p></td>
-          <td class="text-center"><p>6:03</p></td>
-          <td class="text-center"><p>Yes</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>6</p></td>
-          <td class="text-center"><p>12:09</p></td>
-          <td class="text-center"><p>18:12</p></td>
-          <td class="text-center"><p>No</p></td>
-      </tr>
-      <tr>
-          <td class="text-center"><p>7</p></td>
-          <td class="text-center"><p>36:27</p></td>
-          <td class="text-center"><p>54:39</p></td>
-          <td class="text-center"><p>Yes</p></td>
-      </tr>
-      </tbody>
+    <tr>
+      <td class="text-center"><p>Initial Event</p></td>
+      <td class="text-center"><p>N/A</p></td>
+      <td class="text-center"><p>0:00</p></td>
+      <td class="text-center"><p>No</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>1</p></td>
+      <td class="text-center"><p>0:03</p></td>
+      <td class="text-center"><p>0:03</p></td>
+      <td class="text-center"><p>Yes</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>2</p></td>
+      <td class="text-center"><p>0:09</p></td>
+      <td class="text-center"><p>0:12</p></td>
+      <td class="text-center"><p>No</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>3</p></td>
+      <td class="text-center"><p>0:27</p></td>
+      <td class="text-center"><p>0:39</p></td>
+      <td class="text-center"><p>No</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>4</p></td>
+      <td class="text-center"><p>1:21</p></td>
+      <td class="text-center"><p>2:00</p></td>
+      <td class="text-center"><p>No</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>5</p></td>
+      <td class="text-center"><p>4:03</p></td>
+      <td class="text-center"><p>6:03</p></td>
+      <td class="text-center"><p>Yes</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>6</p></td>
+      <td class="text-center"><p>12:09</p></td>
+      <td class="text-center"><p>18:12</p></td>
+      <td class="text-center"><p>No</p></td>
+    </tr>
+    <tr>
+      <td class="text-center"><p>7</p></td>
+      <td class="text-center"><p>36:27</p></td>
+      <td class="text-center"><p>54:39</p></td>
+      <td class="text-center"><p>Yes</p></td>
+    </tr>
+  </tbody>
   </table>
   <p>After a webhook fails eight times, it is disabled in our system and we immediately stop sending it new or undelivered events.
   </p>
@@ -162,7 +195,7 @@
   </p>
 
   <h2 id="event-types">Event Types</h2>
-  <h3>Docket Alert Events</h3>
+  <h3 id="docket-alerts">Docket Alert Events</h3>
   <p>If you wish to receive events when particular dockets are updated in CourtListener, you must first “subscribe” to dockets.</p>
   <p>A docket subscription can be created in one of three ways:
   </p>
@@ -189,53 +222,38 @@
     Once subscribed to a case, we will begin POSTing events to your Docket Alert webhook endpoint whenever that case gets new filings.
   </p>
   <p>
-    The webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>, as described above. The <code>payload</code> key  for Docket Alert events is a JSON hash <code>payload: {results: []}</code> that contains the <code>results</code> key that’s based on the  <a href="{% url 'rest_docs' %}#docket-entry-endpoint">Docket Entry API endpoint</a> and has all of the same fields. To get a description of the fields, do an HTTP OPTIONS request to the endpoint:
+    The docket alert event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has a key for new filings that is called <code>results</code>.
   </p>
-  <pre class="v-offset-below-1 scrollable" >curl -X OPTIONS --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' '{% get_full_host %}{% url "recapdocument-list" version="v3" %}'</pre>
+  <p>The shape of the data is thus:</p>
+  <pre>
+{
+  "payload": {
+    "results": [...]
+  },
+  "webhook": {...}
+}
+  </pre>
   <p>
-    You can also learn more about the API in the API documentation, where we explain how to <a href="{% url 'rest_docs' %}#downloading-files">download files from the API</a> and list <a href="{% url 'rest_docs' %}#field-details">a few field-specific tips</a>.
+    The <code>results</code> key is based on the  <a href="{% url 'rest_docs' %}#docket-entry-endpoint">Docket Entry API endpoint</a> and has all the same fields. To get a description of those fields, do an HTTP OPTIONS request to the endpoint:
   </p>
-</div>
+  <pre class="v-offset-below-1 scrollable" >curl -X OPTIONS --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  '{% get_full_host %}{% url "recapdocument-list" version="v3" %}'</pre>
+  <p>
+    <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">Click here to see an example Docket Entry object</a>. You can also learn more about the API in the API documentation, where we explain how to <a href="{% url 'rest_docs' %}#downloading-files">download files from the API</a> and list <a href="{% url 'rest_docs' %}#field-details">a few field-specific tips</a>.
+  </p>
 
+  <h2 id="maintenance">Maintenance Schedule</h2>
+  <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
+  </p>
+  <p>Bulk processing tasks on our servers can create delays while running. We maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking these tasks.
+  </p>
 
-<div class="col-sm-5">
-  <div class="sidebar-section">
-    <h3><span>Table of Contents</span></h3>
-    <ul>
-      <li><a href="#getting-started">Getting Started With Webhooks</a></li>
-      <li><a href="#overview-of-events">Overview of Events</a></li>
-      <li><a href="#event-types">Event Types</a></li>
-    </ul>
-  </div>
-
-
-  <div class="sidebar-section">
-    <h3><span>Powered By</span></h3>
-    <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
-    </p>
-    <a href="https://free.law/press-assets/">
-      <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
-    </a>
-  </div>
-
-  <div class="sidebar-section">
-    <h3><span>Maintenance Schedule</span></h3>
-    <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
-    </p>
-    <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
-    </p>
-  </div>
-
-
-  {% include "includes/deprecated_webhooks_sidebar_section.html" %}
-
-  <div class="sidebar-section">
-    <h3 id="copyright"><span>Copyright</span></h3>
-    <p>Our data is free of known copyright restrictions.<br />
-      <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
-        <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
-      </a>
-    </p>
-  </div>
+  <h2 id="change-log">Change Log</h2>
+  <ul>
+    <li>
+      <p><strong>v1</strong> First release
+      </p>
+    </li>
+  </ul>
 </div>
 {% endblock %}
