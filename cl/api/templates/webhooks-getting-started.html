@@ -155,7 +155,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
       <p><strong>In the “As JSON” tab</strong>, you can ask our server to send a test event to your endpoint. When you click “Send Webhook Test Event” a new event is created with the information shown and is sent to your endpoint. Test events are not retried, but can be seen in the “Test Logs” tab.
       </p>
       <p>
-        <img src="{% static "png/test-webhook-json.png" %}"
+        <img src="{% static "png/test-json-webhook-event.png" %}"
            alt="screenshot of the webhook json test modal"
            class="img-responsive img-rounded shadow center-block"
            height="261"
@@ -165,7 +165,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
     <li>
       <p><strong>In the “As cURL”</strong> tab, you can copy/paste a curl command that can be used to send a test event to your local dev environment.</p>
       <p>
-        <img src="{% static "png/test-webhook-curl.png" %}"
+        <img src="{% static "png/test-curl-webhook-event.png" %}"
            alt="screenshot of the webhook curl test modal"
            class="img-responsive img-rounded shadow center-block"
            height="261"
