@@ -253,10 +253,9 @@ class Command(VerboseCommand):
             # force it all to be bytes, pleasing hashlib.
             sha1_hash = sha1(force_bytes(content))
             if (
-                (court_str == "nev"
-                 and item["precedential_statuses"] == "Unpublished")
-                or court_str in ["neb"]
-            ):
+                court_str == "nev"
+                and item["precedential_statuses"] == "Unpublished"
+            ) or court_str in ["neb"]:
                 # Nevada's non-precedential cases have different SHA1 sums
                 # every time.
 
