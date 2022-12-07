@@ -137,3 +137,27 @@ def notify_failing_webhook(
         subject, html_template, txt_template, context, [webhook.user.email]
     )
     msg.send()
+
+
+@app.task(ignore_result=True)
+def send_webhook_still_disabled_email(webhook_pk: int) -> None:
+    """Send an email to the webhook owner when a webhook endpoint is
+    still disabled after 1, 2, and 3 days.
+
+    :param webhook_pk: The related webhook PK.
+    :return: None
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    first_name = webhook.user.first_name
+    subject = f"[Action Needed]: Your {webhook.get_event_type_display()} webhook is still disabled."
+    txt_template = "emails/webhook_still_disabled.txt"
+    html_template = "emails/webhook_still_disabled.html"
+    context = {
+        "webhook": webhook,
+        "first_name": first_name,
+    }
+    msg = make_multipart_email(
+        subject, html_template, txt_template, context, [webhook.user.email]
+    )
+    msg.send()

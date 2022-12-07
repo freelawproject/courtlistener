@@ -628,7 +628,9 @@ def check_webhook_failure_count_and_notify(
         ).earliest("date_created")
         if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             webhook.enabled = False
+            webhook.date_modified = now()
             update_fields.append("enabled")
+            update_fields.append("date_modified")
             # If the parent webhook is disabled mark all current ENQUEUED_RETRY
             # events as ENDPOINT_DISABLED
             WebhookEvent.objects.filter(
