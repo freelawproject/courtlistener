@@ -125,6 +125,8 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
             process_case_query_page.s(pq.pk),
             add_or_update_recap_docket.s(),
         ).apply_async()
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
+        process_recap_appellate_case_query_page.delay(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -1034,6 +1036,19 @@ def process_recap_appellate_attachment(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate attachment pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_appellate_case_query_page(self, pk):
+    """Process the appellate case query pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate case query pages not yet supported. Coming soon."
     mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     return None
 
