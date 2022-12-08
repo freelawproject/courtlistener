@@ -705,6 +705,9 @@ def update_webhook_event_after_request(
         )
         webhook_event.retry_counter = F("retry_counter") + 1
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        if webhook_event.debug:
+            # Test events are not enqueued for retry.
+            webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
     webhook_event.save()
