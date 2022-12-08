@@ -4,20 +4,23 @@ Hello {{ first_name }},
 Hello,
 {% endif %}
 
-This is a reminder about one of your webhook endpoints is still disabled.
+This is a reminder that one of your webhook endpoints is still disabled.
 It was disabled on {{webhook.date_modified}} due to multiple consecutive failures.
 
 Please find more details below:
-Webhook Type: {{ webhook.get_event_type_display }}
-Webhook Endpoint: {{ webhook.url }}
+- Webhook Type: {{ webhook.get_event_type_display }}
+- Webhook Endpoint: {{ webhook.url }}
 
 
-To re-enable this webhook, review your logs in the webhook settings to see the responses we are getting from your server. Once your server is fixed, you can re-enable the webhook in your settings:
+To re-enable this webhook, review your webhook logs to see the responses we are getting from your server.
+https://www.courtlistener.com{% url 'view_webhook_logs' 'logs' %}
+
+Once your server is fixed, re-enable the webhook in your settings:
 https://www.courtlistener.com{% url 'view_webhooks' %}
 
 Thank you for looking into this.
 
-If you need further assistance, please contact support:
+If you need further assistance, please let us know:
 https://www.courtlistener.com{% url 'contact' %}
 
 Sincerely,

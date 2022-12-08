@@ -5080,15 +5080,15 @@ class WebhooksRetries(TestCase):
                 self.assertIn(subject_to_compare, message.subject)
 
         iterations = [
-            (12, 1),  # 12 hours after disabled, no new email out
-            (24, 2),  # 1 day after, 1° webhook still disabled notification
-            (48, 3),  # 2 days after, 2° webhook still disabled notification
-            (72, 4),  # 3 days after, 3° webhook still disabled notification
-            (96, 4),  # 4 days after, No new email out
+            (12, 1, 0),  # 12 hours after disabled, no new email out
+            (24, 2, 1),  # 1 day after, 1° webhook still disabled notification
+            (48, 3, 2),  # 2 days after, 2° webhook still disabled notification
+            (72, 4, 3),  # 3 days after, 3° webhook still disabled notification
+            (96, 4, 3),  # 4 days after, No new email out
         ]
         time_to_check = now_time.replace(hour=12, minute=00)
         minute_delay = 0
-        for hours, email_out in iterations:
+        for hours, email_out, days in iterations:
             minute_delay += 1
             hours_after = time_to_check + timedelta(
                 hours=hours, minutes=minute_delay
@@ -5100,6 +5100,11 @@ class WebhooksRetries(TestCase):
 
                 subject_to_compare = "webhook is now disabled"
                 if email_out > 1:
-                    subject_to_compare = "webhook is still disabled"
+                    day_str = "day"
+                    if days > 1:
+                        day_str = "days"
+                    subject_to_compare = (
+                        f"has been disabled for {days} {day_str}"
+                    )
                 message = mail.outbox[email_out - 1]
                 self.assertIn(subject_to_compare, message.subject)

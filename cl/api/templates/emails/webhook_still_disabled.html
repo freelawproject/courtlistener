@@ -25,7 +25,7 @@
   {% endif %}
 </p>
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
-      font-style: inherit; margin: 0 0 1.5em; padding: 0;">This is a reminder about one of your webhook endpoints is still disabled.</p>
+      font-style: inherit; margin: 0 0 1.5em; padding: 0;">This is a reminder that one of your webhook endpoints is still disabled.</p>
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
       font-style: inherit; margin: 0 0 1.5em; padding: 0;">It was disabled on {{webhook.date_modified}} due to multiple consecutive failures.</p>
 
@@ -38,13 +38,17 @@
 
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
           font-style: inherit; margin: 0 0 1.5em; padding: 0;">
-    To re-enable this webhook, review your logs in the webhook settings to see the responses we are getting from your server. Once your server is fixed, you can re-enable the webhook in your <a href="https://www.courtlistener.com{% url 'view_webhooks' %}">settings</a>.
+    To re-enable this webhook, review your <a href="https://www.courtlistener.com{% url 'view_webhook_logs' 'logs' %}">webhook logs</a> to see the responses we are getting from your server.
+</p>
+<p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
+          font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+    Once your server is fixed, re-enable the webhook in your <a href="https://www.courtlistener.com{% url 'view_webhooks' %}">settings</a>.
 </p>
 
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
           font-style: inherit; margin: 0; padding: 0;">Thank you for looking into this.</p>
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
-          font-style: inherit; margin: 0; padding: 0;">If you need further assistance, please contact <a href="https://www.courtlistener.com{% url 'contact' %}">support</a>.</p>
+          font-style: inherit; margin: 0; padding: 0;">If you need further assistance, please <a href="https://www.courtlistener.com{% url 'contact' %}">let us know</a>.</p>
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
           font-style: inherit; margin: 0; padding: 0;">Sincerely,</p>
 <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline;
