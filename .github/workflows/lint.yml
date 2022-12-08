@@ -76,6 +76,7 @@ jobs:
           --exclude 'migrations/*' \
           cl/api/api_permissions.py \
           cl/api/models.py \
+          cl/api/management/commands/cl_retry_webhooks.py \
           cl/api/routers.py \
           cl/api/tests.py \
           cl/api/utils.py \
