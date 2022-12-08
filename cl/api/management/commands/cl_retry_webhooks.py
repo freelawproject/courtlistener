@@ -12,6 +12,8 @@ from cl.lib.redis_utils import make_redis_interface
 from cl.users.tasks import send_webhook_still_disabled_email
 
 DAYS_TO_DELETE = 90
+
+# It must be greater than the elapsed time after reaching the max retries.
 HOURS_WEBHOOKS_CUT_OFF = 60
 
 
@@ -28,7 +30,8 @@ def retry_webhook_events() -> int:
             debug=False,
             webhook__enabled=True,
         )
-        # Mark as failed webhook events older than 2 days, avoid retrying.
+        # Mark as failed webhook events older than HOURS_WEBHOOKS_CUT_OFF hours
+        # avoid retrying.
         failed_webhook_events = base_events.filter(
             event_status__in=[
                 WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
