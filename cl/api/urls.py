@@ -132,6 +132,11 @@ router.register(
 # Search Alerts
 router.register(r"alerts", alert_views.SearchAlertViewSet, basename="alert")
 
+# DocketAlerts
+router.register(
+    r"docket-alerts", alert_views.DocketAlertViewSet, basename="docket-alert"
+)
+
 API_TITLE = "CourtListener Legal Data API"
 
 

@@ -205,7 +205,7 @@
       <strong>For normal users</strong>, the best way is <a href="{% url 'alert_help' %}#recap-alerts">via the CourtListener website itself</a>.
     </li>
     <li>
-      <p><strong>For servers</strong>, the best way is to use the Docket Alert endpoint of our REST API.</p>
+      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alert endpoint</a> of our REST API.</p>
       <p>For example, this shell code searches for the <a href="{% url 'view_docket' '64911367' 'trump-v-united-states' %}">Trump Mar-A-Lago</a> case and then subscribes your account to it:</p>
       <pre class="v-offset-below-1 scrollable" >curl --silent \
   --url '{% get_full_host %}{% url "search-list" version="v3" %}?type=d&docket_number=22-cv-81294&case_name=trump' \

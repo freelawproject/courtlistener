@@ -986,6 +986,23 @@ PACER_TO_CL_IDS = {
   "{% get_full_host %}{% url "alert-detail" version="v3" pk=9999 %}"</pre>
     <p>As always, for more details place an <code>OPTIONS</code> request to the endpoint.</p>
 
+    <h3 id="docket-alerts-endpoint">{% url "docket-alert-list" version="v3" %}</h3>
+    <p><a href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a> can be made, viewed, modified, and deleted using this endpoint. This can be useful for organizations using <a href="{% url 'webhooks_docs' %}#docket-alerts">Docket Alert Webhooks</a> or if you need docket alerts on many dockets. To create a docket alert, send:
+    </p>
+    <ul>
+      <li><strong><code>docket</code></strong> &mdash; The docket to subscribe to.</li>
+      <li><strong><code>alert_type</code></strong> &mdash; Optional, by default <code>1</code> Subscription or <code>0</code> Unsubscription (docket alert disabled).</li>
+    </ul>
+    <p>For more details place an <code>OPTIONS</code> request to the endpoint.</p>
+
+    <p>Here’s an example of creating a docket alert subscription on a docket with <code>ID</code> 1.</p>
+    <pre class="scrollable">curl -X POST \
+  --data 'docket=/api/rest/v3/dockets/1/' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
+    <p>Note that the docket parameter use URLs instead of IDs. This is in keeping with our API, which uses hyperlinks as identifiers.</p>
+
+
     <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
       <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
     <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
