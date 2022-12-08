@@ -14,6 +14,7 @@ from cl.users.tasks import send_webhook_still_disabled_email
 DAYS_TO_DELETE = 90
 
 # It must be greater than the elapsed time after reaching the max retries.
+# Currently, that's about 54 hours (3 min delay with 3× backoff).
 HOURS_WEBHOOKS_CUT_OFF = 60
 
 
