@@ -36,22 +36,12 @@ class SearchAlertSerializerModel(
         fields = "__all__"
 
 
-class DocketAlertSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
-):
+class DocketAlertSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-
-    docket: HyperlinkedRelatedField = HyperlinkedRelatedField(
-        many=False,
-        view_name="docket-detail",
-        queryset=Docket.objects.all(),
-        style={"base_template": "input.html"},
-    )
 
     class Meta:
         model = DocketAlert
         fields = "__all__"
-        extra_kwargs = {"resource_uri": {"view_name": "docket-alert-detail"}}
         read_only_fields = (
             "date_created",
             "date_modified",

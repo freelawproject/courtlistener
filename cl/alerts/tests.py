@@ -775,9 +775,7 @@ class DocketAlertAPITests(APITestCase):
             docket_id = docket_pk
 
         data = {
-            "docket": reverse(
-                "docket-detail", kwargs={"version": "v3", "pk": docket_id}
-            ),
+            "docket": docket_id,
         }
         return client.post(self.docket_alert_path, data, format="json")
 
@@ -881,9 +879,7 @@ class DocketAlertAPITests(APITestCase):
 
         # Update the docket alert
         data_updated = {
-            "docket": reverse(
-                "docket-detail", kwargs={"version": "v3", "pk": self.docket.pk}
-            ),
+            "docket": self.docket.pk,
             "alert_type": DocketAlert.UNSUBSCRIPTION,
         }
         response = self.client.put(docket_alert_1_path_detail, data_updated)
