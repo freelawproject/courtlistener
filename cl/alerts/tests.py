@@ -35,7 +35,7 @@ from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
-from cl.search.factories import OpinionWithParentsFactory
+from cl.search.factories import DocketFactory, OpinionWithParentsFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     Court,
@@ -731,3 +731,161 @@ class SearchAlertsWebhooksTest(EmptySolrTestCase):
                         results,
                     )
             webhook_events.delete()
+
+
+class DocketAlertAPITests(APITestCase):
+    """Check that API CRUD operations are working well for docket alerts."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+        cls.court = Court.objects.get(id="scotus")
+        cls.docket = DocketFactory(
+            case_name="BARTON v. State Board for Rodgers Educator Certification",
+            docket_number_core="0600078",
+            docket_number="No. 06-11-00078-CV",
+            court=cls.court,
+        )
+        cls.docket_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number_core="7101462",
+            docket_number="No. 07-11-1462-CR",
+            court=cls.court,
+        )
+
+    def setUp(self) -> None:
+        self.docket_alert_path = reverse(
+            "docket-alert-list", kwargs={"version": "v3"}
+        )
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        DocketAlert.objects.all().delete()
+
+    def make_a_docket_alert(
+        self,
+        client,
+        docket_pk=None,
+    ):
+        docket_id = self.docket.id
+        if docket_pk:
+            docket_id = docket_pk
+
+        data = {
+            "docket": docket_id,
+        }
+        return client.post(self.docket_alert_path, data, format="json")
+
+    def test_make_a_docket_alert(self) -> None:
+        """Can we make a docket alert?"""
+
+        # Make a simple docket alert
+        docket_alert = DocketAlert.objects.all()
+        response = self.make_a_docket_alert(self.client)
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+    def test_list_users_docket_alerts(self) -> None:
+        """Can we list user's own alerts?"""
+
+        # Make two docket alerts for user_1
+        self.make_a_docket_alert(self.client)
+        self.make_a_docket_alert(self.client, docket_pk=self.docket_1.id)
+
+        # Make one docket alert for user_2
+        self.make_a_docket_alert(self.client_2)
+
+        # Get the docket alerts for user_1, should be 2
+        response = self.client.get(self.docket_alert_path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        # Get the docket alerts for user_2, should be 1
+        response_2 = self.client_2.get(self.docket_alert_path)
+        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.json()["count"], 1)
+
+    def test_delete_docket_alert(self) -> None:
+        """Can we delete an docket alert?
+        Avoid users from deleting other users' docket alerts.
+        """
+
+        # Make two docket alerts for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert_2 = self.make_a_docket_alert(
+            self.client, docket_pk=self.docket_1.id
+        )
+
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 2)
+
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Delete the docket_alert for user_1
+        response = self.client.delete(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(docket_alert.count(), 1)
+
+        docket_alert_2_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_2.json()["id"], "version": "v3"},
+        )
+
+        # user_2 tries to delete a user_1 docket alert, it should fail
+        response = self.client_2.delete(docket_alert_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(docket_alert.count(), 1)
+
+    def test_docket_alert_detail(self) -> None:
+        """Can we get the details of a docket alert?
+        Avoid users from getting other users' docket alerts.
+        """
+
+        # Make one docket alert for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 1)
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Get the docket alert detail for user_1
+        response = self.client.get(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 docket alert, it should fail
+        response = self.client_2.get(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_docket_alert_update(self) -> None:
+        """Can we update a docket alert?"""
+
+        # Make one alerts for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Update the docket alert
+        data_updated = {
+            "docket": self.docket.pk,
+            "alert_type": DocketAlert.UNSUBSCRIPTION,
+        }
+        response = self.client.put(docket_alert_1_path_detail, data_updated)
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(
+            response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
+        )
+        self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])
