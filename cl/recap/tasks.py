@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from io import BytesIO
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -65,6 +65,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
     add_tags_to_objs,
     find_docket_object,
+    get_data_from_appellate_att_report,
     get_data_from_att_report,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
@@ -1028,16 +1029,77 @@ def process_recap_appellate_docket(self, pk):
 
 
 @app.task(bind=True)
-def process_recap_appellate_attachment(self, pk):
-    """Process the appellate attachment pages.
+def process_recap_appellate_attachment(
+    self: Task, pk: int
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+    """Process an uploaded appellate attachment page.
 
-    For now, this is a stub until we can get the parser working properly in
-    Juriscraper.
+    :param self: The Celery task
+    :param pk: The primary key of the processing queue item you want to work on
+    :return: Tuple indicating the status of the processing, a related
+    message and the recap documents affected.
     """
+
     pq = ProcessingQueue.objects.get(pk=pk)
-    msg = "Appellate attachment pages not yet supported. Coming soon."
-    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
-    return None
+    mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+
+    try:
+        text = pq.filepath_local.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        if (self.request.retries == self.max_retries) or pq.debug:
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
+    att_data = get_data_from_appellate_att_report(text, pq.court_id)
+    logger.info(f"Parsing completed for item {pq}")
+
+    if att_data == {}:
+        # Bad attachment page.
+        msg = "Not a valid appellate attachment page upload."
+        self.request.chain = None
+        pq_status, msg = mark_pq_status(
+            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
+        )
+        return pq_status, msg, []
+
+    if pq.pacer_case_id in ["undefined", "null"]:
+        # Bad data from the client. Fix it with parsed data.
+        pq.pacer_case_id = att_data.get("pacer_case_id")
+        pq.save()
+
+    try:
+        rds_affected, de = merge_attachment_page_data(
+            pq.court,
+            pq.pacer_case_id,
+            att_data["pacer_doc_id"],
+            None,  # Appellate attachments don't contain a document_number
+            text,
+            att_data["attachments"],
+            pq.debug,
+        )
+    except RECAPDocument.MultipleObjectsReturned:
+        msg = (
+            "Too many documents found when attempting to associate "
+            "attachment data"
+        )
+        pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return pq_status, msg, []
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        if (self.request.retries == self.max_retries) or pq.debug:
+            pq_status, msg = mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+            return pq_status, msg, []
+        else:
+            mark_pq_status(pq, msg, PROCESSING_STATUS.QUEUED_FOR_RETRY)
+            raise self.retry(exc=exc)
+
+    pq_status, msg = mark_pq_successful(pq, d_id=de.docket_id, de_id=de.pk)
+    return pq_status, msg, rds_affected
 
 
 @app.task(bind=True)

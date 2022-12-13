@@ -11,7 +11,7 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Prefetch, Q, QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import AttachmentPage
+from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
@@ -665,6 +665,29 @@ def add_docket_entries(d, docket_entries, tags=None):
         else:
             params["document_type"] = RECAPDocument.PACER_DOCUMENT
 
+        appellate_court_ids = (
+            Court.federal_courts.appellate_pacer_courts().values_list(
+                "pk", flat=True
+            )
+        )
+
+        # Unlike district and bankr. dockets, where you always have a main
+        # RD and can optionally have attachments to the main RD, Appellate
+        # docket entries can either they *only* have a main RD (with no
+        # attachments) or they *only* have attachments (with no main doc).
+        # Unfortunately, when we ingest a docket, we don't know if the entries
+        # have attachments, so we begin by assuming they don't and create
+        # main RDs for each entry. Later, if/when we get attachment pages for
+        # particular entries, we convert the main documents into attachment
+        # RDs. The check here ensures that if that happens for a particular
+        # entry, we avoid creating the main RD a second+ time when we get the
+        # docket sheet a second+ time.
+        if de_created is False and d.court.pk in appellate_court_ids:
+            appellate_rd_att_exists = de.recap_documents.filter(
+                document_type=RECAPDocument.ATTACHMENT
+            ).exists()
+            if appellate_rd_att_exists:
+                params["document_type"] = RECAPDocument.ATTACHMENT
         try:
             rd = RECAPDocument.objects.get(**params)
         except RECAPDocument.DoesNotExist:
@@ -1160,6 +1183,21 @@ def get_data_from_att_report(text: str, court_id: str) -> Dict[str, str]:
     return att_data
 
 
+def get_data_from_appellate_att_report(
+    text: str, court_id: str
+) -> Dict[str, str]:
+    """Get attachments data from Juriscraper AppellateAttachmentPage
+
+    :param text: The attachment page text to parse.
+    :param court_id: The CourtListener court_id we're working with
+    :return: The appellate attachment page data
+    """
+    att_page = AppellateAttachmentPage(map_cl_to_pacer_id(court_id))
+    att_page._parse_text(text)
+    att_data = att_page.data
+    return att_data
+
+
 def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     """Add tags by name to objects
 
@@ -1230,7 +1268,7 @@ def merge_attachment_page_data(
     court: Court,
     pacer_case_id: int,
     pacer_doc_id: int,
-    document_number: int,
+    document_number: int | None,
     text: str,
     attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
@@ -1273,7 +1311,8 @@ def merge_attachment_page_data(
     # the docket entry.
     de = main_rd.docket_entry
     if document_number is None:
-        # Bankruptcy attachment page. Use the document number from the Main doc
+        # Bankruptcy or Appellate attachment page. Use the document number from
+        # the Main doc
         document_number = main_rd.document_number
 
     if debug:
@@ -1291,6 +1330,11 @@ def merge_attachment_page_data(
     # Create/update the attachment items.
     rds_created = []
     rds_affected = []
+    appellate_court_ids = (
+        Court.federal_courts.appellate_pacer_courts().values_list(
+            "pk", flat=True
+        )
+    )
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1303,12 +1347,24 @@ def merge_attachment_page_data(
         if not all(sanity_checks):
             continue
 
-        rd, created = RECAPDocument.objects.update_or_create(
-            docket_entry=de,
-            document_number=document_number,
-            attachment_number=attachment["attachment_number"],
-            document_type=RECAPDocument.ATTACHMENT,
-        )
+        # Appellate entries with attachments don't have a main RD, transform it
+        # to an attachment.
+        if (
+            court.pk in appellate_court_ids
+            and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
+        ):
+            main_rd.document_type = RECAPDocument.ATTACHMENT
+            main_rd.attachment_number = attachment["attachment_number"]
+            rd = main_rd
+            created = False
+        else:
+            rd, created = RECAPDocument.objects.update_or_create(
+                docket_entry=de,
+                document_number=document_number,
+                attachment_number=attachment["attachment_number"],
+                document_type=RECAPDocument.ATTACHMENT,
+            )
+
         if created:
             rds_created.append(rd)
         rds_affected.append(rd)
@@ -1321,7 +1377,7 @@ def merge_attachment_page_data(
         # we got the real value by measuring.
         if rd.page_count is None:
             rd.page_count = attachment["page_count"]
-        if rd.file_size is None and attachment["file_size_str"]:
+        if rd.file_size is None and attachment.get("file_size_str", None):
             try:
                 rd.file_size = convert_size_to_bytes(
                     attachment["file_size_str"]

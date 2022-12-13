@@ -55,6 +55,10 @@ from cl.people_db.models import (
 )
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
+    AppellateAttachmentFactory,
+    AppellateAttachmentPageFactory,
+    DocketEntriesDataFactory,
+    DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
     ProcessingQueueFactory,
 )
@@ -85,6 +89,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_appellate_attachment,
     process_recap_appellate_docket,
     process_recap_attachment,
     process_recap_claims_register,
@@ -121,19 +126,36 @@ class RecapUploadsTest(TestCase):
             id="ca9", jurisdiction="F", in_use=True
         )
 
+        cls.att_data = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(pacer_doc_id="04505578698"),
+                AppellateAttachmentFactory(),
+            ],
+            pacer_doc_id="04505578698",
+            pacer_case_id="104490",
+        )
+        cls.de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="04505578698",
+                    document_number=1,
+                )
+            ],
+        )
+
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.get(username="recap")
         token = f"Token {self.user.auth_token.key}"
         self.client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
-        f = SimpleUploadedFile("file.txt", b"file content more content")
+        self.f = SimpleUploadedFile("file.txt", b"file content more content")
         self.data = {
             "court": self.court.id,
             "pacer_case_id": "asdf",
             "pacer_doc_id": 24,
             "document_number": 1,
-            "filepath_local": f,
+            "filepath_local": self.f,
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
@@ -338,6 +360,161 @@ class RecapUploadsTest(TestCase):
         )
         r = self.client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_appellate_attachment_page(self, mock):
+        """Can we upload an appellate attachment page and have it be saved
+        correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        docket due to the mock.
+        """
+
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
+                "court": self.court_appellate.id,
+            }
+        )
+        del self.data["pacer_doc_id"]
+        del self.data["document_number"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_processing_an_appellate_attachment_page(self, mock_upload):
+        """Can we process an appellate attachment and transform the main recap
+        document to an attachment correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        docket due to the mock.
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        add_docket_entries(d, self.de_data["docket_entries"])
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+
+        # After adding 1 docket entry, it should only exist its main RD.
+        self.assertEqual(recap_documents.count(), 1)
+        main_rd = recap_documents[0]
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            # Process the appellate attachment page containing 2 attachments.
+            process_recap_appellate_attachment(pq.pk)
+
+        # After adding attachments, it should only exist 2 RD attachments.
+        self.assertEqual(recap_documents.count(), 2)
+
+        # Confirm that the main RD is transformed into an attachment.
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+        pq_1 = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+
+            process_recap_appellate_attachment(pq_1.pk)
+
+        # Process the attachment page again, no new attachments should be added
+        self.assertEqual(recap_documents.count(), 2)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+    def test_reprocess_appellate_docket_after_adding_attachments(
+        self, mock_upload
+    ):
+        """Can we reprocess an appellate docket page after adding attachments
+        and avoid creating the main recap document again?
+        """
+
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court_appellate,
+            pacer_case_id="104490",
+        )
+        # Merge docket entries
+        add_docket_entries(d, self.de_data["docket_entries"])
+
+        pq = ProcessingQueue.objects.create(
+            court=self.court_appellate,
+            uploader=self.user,
+            pacer_case_id="104490",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        self.assertEqual(recap_documents.count(), 1)
+
+        main_rd = recap_documents[0]
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_appellate_att_report",
+            side_effect=lambda x, y: self.att_data,
+        ):
+            process_recap_appellate_attachment(pq.pk)
+
+        # Confirm attachments were added correctly.
+        self.assertEqual(recap_documents.count(), 2)
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
+
+        # Merge docket entries data again
+        add_docket_entries(d, self.de_data["docket_entries"])
+
+        # No new main recap document should be created
+        self.assertEqual(recap_documents.count(), 2)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            main_attachment[0].description,
+            self.att_data["attachments"][0]["description"],
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
