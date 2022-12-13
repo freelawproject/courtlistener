@@ -670,9 +670,18 @@ def add_docket_entries(d, docket_entries, tags=None):
                 "pk", flat=True
             )
         )
-        # Appellate docket entries with attachments don't have a main RD.
-        # The main RD is transformed to an attachment when merging attachments.
-        # Avoid re-creating the main RD if the Docket page is submitted again.
+
+        # Unlike district and bankr. dockets, where you always have a main
+        # RD and can optionally have attachments to the main RD, Appellate
+        # docket entries can either they *only* have a main RD (with no
+        # attachments) or they *only* have attachments (with no main doc).
+        # Unfortunately, when we ingest a docket, we don't know if the entries
+        # have attachments, so we begin by assuming they don't and create
+        # main RDs for each entry. Later, if/when we get attachment pages for
+        # particular entries, we convert the main documents into attachment
+        # RDs. The check here ensures that if that happens for a particular
+        # entry, we avoid creating the main RD a second+ time when we get the
+        # docket sheet a second+ time.
         if de_created is False and d.court.pk in appellate_court_ids:
             appellate_rd_att_exists = de.recap_documents.filter(
                 document_type=RECAPDocument.ATTACHMENT
