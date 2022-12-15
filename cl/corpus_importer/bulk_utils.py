@@ -63,6 +63,7 @@ def get_petitions(
             tags__name=tag,
             document_number="1",
             document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
         )
         .exclude(pacer_doc_id="")
         .order_by("pk")
