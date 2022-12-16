@@ -1683,7 +1683,7 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def appellate_pacer_courts(self) -> models.QuerySet:
         return self.filter(
-            Q(jurisdiction__in=[Court.FEDERAL_APPELLATE]) |
+            Q(jurisdiction=Court.FEDERAL_APPELLATE) |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
