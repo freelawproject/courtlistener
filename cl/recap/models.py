@@ -22,6 +22,7 @@ class UPLOAD_TYPE:
     SES_EMAIL = 11
     CASE_QUERY_PAGE = 12
     APPELLATE_CASE_QUERY_PAGE = 13
+    BASE_CASE_QUERY_ADVANCED = 14
 
     NAMES = (
         (DOCKET, "HTML Docket"),
@@ -37,6 +38,7 @@ class UPLOAD_TYPE:
         (SES_EMAIL, "Email in the SES storage format"),
         (CASE_QUERY_PAGE, "Case query page"),
         (APPELLATE_CASE_QUERY_PAGE, "Appellate Case query page"),
+        (BASE_CASE_QUERY_ADVANCED, "Base case query advanced page"),
     )
 
 

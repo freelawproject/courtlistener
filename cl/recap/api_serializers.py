@@ -92,6 +92,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.DOCKET_HISTORY_REPORT,
             UPLOAD_TYPE.CASE_QUERY_PAGE,
+            UPLOAD_TYPE.BASE_CASE_QUERY_ADVANCED,
         ]:
             # These are district court dockets. Is the court valid?
             district_court_ids = (

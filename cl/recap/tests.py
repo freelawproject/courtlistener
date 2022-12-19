@@ -516,6 +516,31 @@ class RecapUploadsTest(TestCase):
             self.att_data["attachments"][0]["description"],
         )
 
+    def test_uploading_a_base_case_query_advanced_page(self, mock):
+        """Can we upload a base case query advanced page and have it be saved
+        correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        base case query advanced page due to the mock.
+        """
+
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.BASE_CASE_QUERY_ADVANCED,
+                "document_number": "",
+            }
+        )
+        del self.data["pacer_doc_id"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
