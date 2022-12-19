@@ -516,8 +516,8 @@ class RecapUploadsTest(TestCase):
             self.att_data["attachments"][0]["description"],
         )
 
-    def test_uploading_a_base_case_query_advanced_page(self, mock):
-        """Can we upload a base case query advanced page and have it be saved
+    def test_uploading_a_case_query_result_page(self, mock):
+        """Can we upload a case query result page and have it be saved
         correctly?
 
         Note that this works fine even though we're not actually uploading a
@@ -526,11 +526,38 @@ class RecapUploadsTest(TestCase):
 
         self.data.update(
             {
-                "upload_type": UPLOAD_TYPE.BASE_CASE_QUERY_ADVANCED,
-                "document_number": "",
+                "upload_type": UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
             }
         )
         del self.data["pacer_doc_id"]
+        del self.data["pacer_case_id"]
+        del self.data["document_number"]
+        r = self.client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = self.client.get(path)
+        self.assertEqual(r.status_code, HTTP_200_OK)
+
+    def test_uploading_an_appellate_case_query_result_page(self, mock):
+        """Can we upload an appellate case query result page and have it be
+        saved correctly?
+
+        Note that this works fine even though we're not actually uploading a
+        case query page due to the mock.
+        """
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
+                "court": self.court_appellate.id,
+            }
+        )
+        del self.data["pacer_case_id"]
+        del self.data["pacer_doc_id"]
+        del self.data["document_number"]
         r = self.client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
