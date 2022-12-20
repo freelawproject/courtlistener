@@ -6,6 +6,10 @@ from celery.canvas import chain
 from django.conf import settings
 from juriscraper.pacer import PacerSession
 
+from cl.corpus_importer.bulk_utils import (
+    get_petitions,
+    make_bankr_docket_number,
+)
 from cl.corpus_importer.tasks import (
     get_docket_by_pacer_case_id,
     get_pacer_case_id_and_title,
@@ -23,19 +27,6 @@ PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 TAG = "ILNB-KESSLER"
 TAG_PETITIONS = "ILNB-KESSLER-PETITIONS"
 TAG_FINALS = "ILNB-KESSLER-FINAL"
-
-
-def make_docket_number(year, docket_number):
-    """The docket number field kind of sucks for lookup. Combine it with the
-    year to make a better version.
-
-    :param year: The four digit year field from the "filecy" field.
-    :param docket_number: The 5-6 digit docket number from the "docket" field.
-    :return a string like 20-bk-39238
-    """
-    docket_serial = docket_number[-5:]
-    two_digit_year = year[-2:]
-    return f"{two_digit_year}-bk-{docket_serial}"
 
 
 def get_dockets(options):
@@ -65,7 +56,9 @@ def get_dockets(options):
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
-                docket_number=make_docket_number(row["filecy"], row["docket"]),
+                docket_number=make_bankr_docket_number(
+                    row["docket"], row["office"]
+                ),
                 court_id="ilnb",
                 cookies=pacer_session.cookies,
                 office_number=row["office"],
@@ -82,52 +75,6 @@ def get_dockets(options):
                 },
             ).set(queue=q),
             add_or_update_recap_docket.s().set(queue=q),
-        ).apply_async()
-
-
-def get_petitions(options):
-    """Just get document number one for every docket that's tagged in this
-    collection.
-    """
-    rds = (
-        RECAPDocument.objects.filter(
-            tags__name=TAG,
-            document_number="1",
-            document_type=RECAPDocument.PACER_DOCUMENT,
-        )
-        .exclude(pacer_doc_id="")
-        .order_by("pk")
-        .values_list("pk", flat=True)
-        .iterator()
-    )
-    q = options["queue"]
-    throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
-        username=PACER_USERNAME, password=PACER_PASSWORD
-    )
-    pacer_session.login()
-    for i, rd_pk in enumerate(rds):
-        if i < options["offset"]:
-            i += 1
-            continue
-        if i >= options["limit"] > 0:
-            break
-
-        if i % 1000 == 0:
-            pacer_session = PacerSession(
-                username=PACER_USERNAME, password=PACER_PASSWORD
-            )
-            pacer_session.login()
-            logger.info(f"Sent {i} tasks to celery so far.")
-        logger.info("Doing row %s", i)
-        throttle.maybe_wait()
-
-        chain(
-            get_pacer_doc_by_rd.s(
-                rd_pk, pacer_session.cookies, tag=TAG_PETITIONS
-            ).set(queue=q),
-            extract_recap_pdf.si(rd_pk).set(queue=q),
-            add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()
 
 
@@ -186,7 +133,7 @@ class Command(VerboseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--queue",
-            default="io_bound",
+            default="batch0",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
@@ -222,6 +169,8 @@ class Command(VerboseCommand):
         if options["task"] == "all_dockets":
             get_dockets(options)
         elif options["task"] == "all_petitions":
-            get_petitions(options)
+            get_petitions(
+                options, PACER_USERNAME, PACER_PASSWORD, TAG, TAG_PETITIONS
+            )
         elif options["task"] == "final_docs":
             get_final_docs(options)

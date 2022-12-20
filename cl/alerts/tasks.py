@@ -385,19 +385,21 @@ def send_docket_alert_webhooks(
                 "date_created": webhook.date_created.isoformat(),
                 "deprecation_date": None,
             },
-            "results": serialized_docket_entries,
+            "payload": {
+                "results": serialized_docket_entries,
+            },
         }
         renderer = JSONRenderer()
-        json_str = renderer.render(
+        json_bytes = renderer.render(
             post_content,
             accepted_media_type="application/json;",
-        ).decode()
+        )
 
         webhook_event = WebhookEvent.objects.create(
             webhook=webhook,
             content=post_content,
         )
-        send_webhook_event(webhook_event, json_str)
+        send_webhook_event(webhook_event, json_bytes)
 
 
 def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:

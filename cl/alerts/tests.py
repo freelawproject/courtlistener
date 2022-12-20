@@ -4,6 +4,7 @@ from unittest import mock
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
+from django.core.management import call_command
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -16,16 +17,34 @@ from rest_framework.status import (
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.alerts.factories import DocketAlertWithParentsFactory
+from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
-from cl.alerts.models import Alert, DocketAlert
+from cl.alerts.models import SEARCH_TYPES, Alert, DocketAlert, RealTimeQueue
 from cl.alerts.tasks import send_alert_and_webhook
 from cl.api.factories import WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
-from cl.lib.test_helpers import SimpleUserDataMixin
-from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+)
+from cl.audio.factories import AudioWithParentsFactory
+from cl.audio.models import Audio
+from cl.donate.factories import DonationFactory
+from cl.donate.models import Donation
+from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
+from cl.search.factories import DocketFactory, OpinionWithParentsFactory
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    Court,
+    Docket,
+    DocketEntry,
+    Opinion,
+    RECAPDocument,
+)
+from cl.search.tasks import add_items_to_solr
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.utils import MockResponse, make_client
@@ -166,7 +185,7 @@ class DocketAlertTest(TestCase):
         self.assertEqual(webhook_triggered.count(), 1)
         content = webhook_triggered.first().content
         # Compare the content of the webhook to the recap document
-        pacer_doc_id = content["results"][0]["recap_documents"][0][
+        pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         self.assertEqual("232322332", pacer_doc_id)
@@ -459,3 +478,414 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
+
+
+class SearchAlertsWebhooksTest(EmptySolrTestCase):
+    """Test Search Alerts Webhooks"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.donation = DonationFactory(
+            donor=cls.user_profile.user,
+            amount=20,
+            status=Donation.PROCESSED,
+            send_annual_reminder=True,
+        )
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.search_alert = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="type=o&stat_Precedential=on",
+        )
+        cls.search_alert_rt = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert O rt",
+            query="type=o&stat_Precedential=on",
+        )
+        cls.search_alert_oa = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA",
+            query="type=oa",
+        )
+        cls.search_alert_o_wly = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert O wly",
+            query="type=o&stat_Precedential=on",
+        )
+        cls.search_alert_o_mly = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert O mly",
+            query="type=o&stat_Precedential=on",
+        )
+
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=False,
+        )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile_2.user,
+            rate=Alert.DAILY,
+            name="Test Alert O Disabled",
+            query="type=o&stat_Precedential=on",
+        )
+
+        cls.dly_opinion = OpinionWithParentsFactory.create(
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            cluster__date_filed=now() - timedelta(hours=5),
+        )
+        cls.dly_oral_argument = AudioWithParentsFactory.create(
+            case_name="Dly Test OA",
+            docket__date_argued=now() - timedelta(hours=5),
+        )
+
+        cls.wly_opinion = OpinionWithParentsFactory.create(
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            cluster__date_filed=now() - timedelta(days=2),
+        )
+        cls.mly_opinion = OpinionWithParentsFactory.create(
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            cluster__date_filed=now() - timedelta(days=25),
+        )
+
+    def setUp(self) -> None:
+        super(SearchAlertsWebhooksTest, self).setUp()
+        obj_types = {
+            "audio.Audio": Audio,
+            "search.Opinion": Opinion,
+        }
+        for obj_name, obj_type in obj_types.items():
+            ids = obj_type.objects.all().values_list("pk", flat=True)
+            add_items_to_solr(ids, obj_name, force_commit=True)
+
+    def test_send_search_alert_webhooks(self):
+        """Can we send search alert webhooks for Opinions and Oral Arguments
+        independently?
+        """
+
+        webhooks_enabled = Webhook.objects.filter(enabled=True)
+        self.assertEqual(len(webhooks_enabled), 1)
+        search_alerts = Alert.objects.all()
+        self.assertEqual(len(search_alerts), 6)
+
+        with mock.patch(
+            "cl.api.utils.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_alerts", rate="dly")
+
+        # Two search alert should one to user_profile and one to user_profile_2
+        self.assertEqual(len(mail.outbox), 2)
+
+        # Two webhook events should be sent, both of them to user_profile user
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 2)
+
+        alert_data = {
+            self.search_alert.pk: {
+                "alert": self.search_alert,
+                "result": self.dly_opinion.cluster,
+            },
+            self.search_alert_oa.pk: {
+                "alert": self.search_alert_oa,
+                "result": self.dly_oral_argument,
+            },
+        }
+
+        for webhook_sent in webhook_events:
+            self.assertEqual(
+                webhook_sent.event_status,
+                WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+            )
+            self.assertEqual(
+                webhook_sent.webhook.user,
+                self.user_profile.user,
+            )
+            content = webhook_sent.content
+            # Check if the webhook event payload is correct.
+            self.assertEqual(
+                content["webhook"]["event_type"],
+                WebhookEventType.SEARCH_ALERT,
+            )
+
+            alert_data_compare = alert_data[content["payload"]["alert"]["id"]]
+            self.assertEqual(
+                content["payload"]["alert"]["name"],
+                alert_data_compare["alert"].name,
+            )
+            self.assertEqual(
+                content["payload"]["alert"]["query"],
+                alert_data_compare["alert"].query,
+            )
+            self.assertEqual(
+                content["payload"]["alert"]["rate"],
+                alert_data_compare["alert"].rate,
+            )
+            self.assertEqual(
+                content["payload"]["results"][0]["caseName"],
+                alert_data_compare["result"].case_name,
+            )
+
+    def test_send_search_alert_webhooks_rates(self):
+        """Can we send search alert webhooks for different alert rates?"""
+
+        # Get ready the RT opinion for the test.
+        rt_opinion = OpinionWithParentsFactory.create(
+            cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            cluster__date_filed=now(),
+        )
+        RealTimeQueue.objects.create(
+            item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
+        )
+        add_items_to_solr(
+            [
+                rt_opinion.pk,
+            ],
+            "search.Opinion",
+            force_commit=True,
+        )
+
+        webhooks_enabled = Webhook.objects.filter(enabled=True)
+        self.assertEqual(len(webhooks_enabled), 1)
+        search_alerts = Alert.objects.all()
+        self.assertEqual(len(search_alerts), 6)
+
+        # (rate, events expected, number of search results expected per event)
+        # The number of expected results increases with every iteration since
+        # daily events include results created for the RT test, weekly results
+        # include results from RT and Daily tests, and so on...
+        rates = [
+            (Alert.REAL_TIME, 1, 1),
+            (Alert.DAILY, 2, 2),
+            (Alert.WEEKLY, 1, 3),
+            (Alert.MONTHLY, 1, 4),
+        ]
+        for rate, events, results in rates:
+            with mock.patch(
+                "cl.api.utils.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ):
+                call_command("cl_send_alerts", rate=rate)
+
+            webhook_events = WebhookEvent.objects.all()
+            self.assertEqual(len(webhook_events), events)
+
+            for webhook_sent in webhook_events:
+                self.assertEqual(
+                    webhook_sent.event_status,
+                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                )
+                self.assertEqual(
+                    webhook_sent.webhook.user,
+                    self.user_profile.user,
+                )
+                content = webhook_sent.content
+                # Check if the webhook event payload is correct.
+                self.assertEqual(
+                    content["webhook"]["event_type"],
+                    WebhookEventType.SEARCH_ALERT,
+                )
+                alert_to_compare = Alert.objects.get(
+                    pk=content["payload"]["alert"]["id"]
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["name"],
+                    alert_to_compare.name,
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["query"],
+                    alert_to_compare.query,
+                )
+                self.assertEqual(
+                    content["payload"]["alert"]["rate"],
+                    rate,
+                )
+
+                # The oral argument webhook is sent independently not grouped
+                # with opinions webhooks results.
+                if content["payload"]["alert"]["query"] == "type=oa":
+                    self.assertEqual(
+                        len(content["payload"]["results"]),
+                        1,
+                    )
+                else:
+                    self.assertEqual(
+                        len(content["payload"]["results"]),
+                        results,
+                    )
+            webhook_events.delete()
+
+
+class DocketAlertAPITests(APITestCase):
+    """Check that API CRUD operations are working well for docket alerts."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+
+        cls.court = Court.objects.get(id="scotus")
+        cls.docket = DocketFactory(
+            case_name="BARTON v. State Board for Rodgers Educator Certification",
+            docket_number_core="0600078",
+            docket_number="No. 06-11-00078-CV",
+            court=cls.court,
+        )
+        cls.docket_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number_core="7101462",
+            docket_number="No. 07-11-1462-CR",
+            court=cls.court,
+        )
+
+    def setUp(self) -> None:
+        self.docket_alert_path = reverse(
+            "docket-alert-list", kwargs={"version": "v3"}
+        )
+        self.client = make_client(self.user_1.pk)
+        self.client_2 = make_client(self.user_2.pk)
+
+    def tearDown(cls):
+        DocketAlert.objects.all().delete()
+
+    def make_a_docket_alert(
+        self,
+        client,
+        docket_pk=None,
+    ):
+        docket_id = self.docket.id
+        if docket_pk:
+            docket_id = docket_pk
+
+        data = {
+            "docket": docket_id,
+        }
+        return client.post(self.docket_alert_path, data, format="json")
+
+    def test_make_a_docket_alert(self) -> None:
+        """Can we make a docket alert?"""
+
+        # Make a simple docket alert
+        docket_alert = DocketAlert.objects.all()
+        response = self.make_a_docket_alert(self.client)
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(response.status_code, HTTP_201_CREATED)
+
+    def test_list_users_docket_alerts(self) -> None:
+        """Can we list user's own alerts?"""
+
+        # Make two docket alerts for user_1
+        self.make_a_docket_alert(self.client)
+        self.make_a_docket_alert(self.client, docket_pk=self.docket_1.id)
+
+        # Make one docket alert for user_2
+        self.make_a_docket_alert(self.client_2)
+
+        # Get the docket alerts for user_1, should be 2
+        response = self.client.get(self.docket_alert_path)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        # Get the docket alerts for user_2, should be 1
+        response_2 = self.client_2.get(self.docket_alert_path)
+        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.json()["count"], 1)
+
+    def test_delete_docket_alert(self) -> None:
+        """Can we delete an docket alert?
+        Avoid users from deleting other users' docket alerts.
+        """
+
+        # Make two docket alerts for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert_2 = self.make_a_docket_alert(
+            self.client, docket_pk=self.docket_1.id
+        )
+
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 2)
+
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Delete the docket_alert for user_1
+        response = self.client.delete(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(docket_alert.count(), 1)
+
+        docket_alert_2_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_2.json()["id"], "version": "v3"},
+        )
+
+        # user_2 tries to delete a user_1 docket alert, it should fail
+        response = self.client_2.delete(docket_alert_2_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(docket_alert.count(), 1)
+
+    def test_docket_alert_detail(self) -> None:
+        """Can we get the details of a docket alert?
+        Avoid users from getting other users' docket alerts.
+        """
+
+        # Make one docket alert for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 1)
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Get the docket alert detail for user_1
+        response = self.client.get(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_200_OK)
+
+        # user_2 tries to get user_1 docket alert, it should fail
+        response = self.client_2.get(docket_alert_1_path_detail)
+        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+
+    def test_docket_alert_update(self) -> None:
+        """Can we update a docket alert?"""
+
+        # Make one alerts for user_1
+        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert = DocketAlert.objects.all()
+        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        docket_alert_1_path_detail = reverse(
+            "docket-alert-detail",
+            kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
+        )
+
+        # Update the docket alert
+        data_updated = {
+            "docket": self.docket.pk,
+            "alert_type": DocketAlert.UNSUBSCRIPTION,
+        }
+        response = self.client.put(docket_alert_1_path_detail, data_updated)
+        # Check that the alert was updated
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(
+            response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
+        )
+        self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])

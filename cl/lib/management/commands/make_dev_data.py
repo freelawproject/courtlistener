@@ -1,6 +1,6 @@
 from django.core.management.base import CommandParser
 
-from cl.alerts.factories import DocketAlertWithParentsFactory
+from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.api.factories import WebhookEventWithParentsFactory
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.command_utils import VerboseCommand, logger
@@ -36,6 +36,7 @@ FACTORIES = {
     400: CitationWithParentsFactory,
     # Alerts
     500: DocketAlertWithParentsFactory,
+    501: AlertFactory,
     # Audio
     600: AudioWithParentsFactory,
     # API

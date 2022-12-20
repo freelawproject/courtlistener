@@ -2,6 +2,7 @@ import uuid
 from http import HTTPStatus
 
 from django.contrib.auth.models import User
+from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
@@ -32,6 +33,7 @@ class Webhook(AbstractDateTimeModel):
     url = models.URLField(
         help_text="The URL that receives a POST request from the webhook.",
         max_length=2000,
+        validators=[URLValidator(schemes=["https"])],
     )
     enabled = models.BooleanField(
         help_text="An on/off switch for the webhook.", default=False

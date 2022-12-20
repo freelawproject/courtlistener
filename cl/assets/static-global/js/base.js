@@ -306,3 +306,12 @@ function debounce(func, wait, immediate) {
     if (callNow) func.apply(context, args);
   };
 };
+
+/*
+  Method to copy the content from a textarea to the clipboard.
+*/
+function copy_text(selector_id) {
+  let text_area = document.getElementById(selector_id).closest('textarea');
+  text_area.select();
+  navigator.clipboard.writeText(text_area.value);
+}

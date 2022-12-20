@@ -1,3 +1,4 @@
+import datetime
 from collections import OrderedDict, defaultdict
 from itertools import groupby
 from typing import Dict, Tuple, Union
@@ -521,6 +522,14 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         cluster,
     ).prefetch_related("representative",)[:3]
 
+    # Identify opinions updated/added in partnership with v|lex for 3 years
+    sponsored = False
+    if (
+        cluster.date_created.date() > datetime.datetime(2022, 6, 1).date()
+        and cluster.filepath_json_harvard
+    ):
+        sponsored = True
+
     return TemplateResponse(
         request,
         "opinion.html",
@@ -542,6 +551,7 @@ def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "related_clusters": related_clusters,
             "related_cluster_ids": [item["id"] for item in related_clusters],
             "related_search_params": f"&{urlencode(related_search_params)}",
+            "sponsored": sponsored,
         },
     )
 

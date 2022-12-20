@@ -22,4 +22,4 @@ def send_test_webhook_event(
     webhook_event = WebhookEvent.objects.create(
         webhook=webhook, content=json_obj, debug=True
     )
-    send_webhook_event(webhook_event, content_str)
+    send_webhook_event(webhook_event, content_str.encode("utf-8"))

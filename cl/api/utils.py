@@ -629,6 +629,7 @@ def check_webhook_failure_count_and_notify(
         if current_try_counter >= WEBHOOK_MAX_RETRY_COUNTER:
             webhook.enabled = False
             update_fields.append("enabled")
+            update_fields.append("date_modified")
             # If the parent webhook is disabled mark all current ENQUEUED_RETRY
             # events as ENDPOINT_DISABLED
             WebhookEvent.objects.filter(
@@ -703,36 +704,39 @@ def update_webhook_event_after_request(
         )
         webhook_event.retry_counter = F("retry_counter") + 1
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
+        if webhook_event.debug:
+            # Test events are not enqueued for retry.
+            webhook_event.event_status = WEBHOOK_EVENT_STATUS.FAILED
     else:
         webhook_event.event_status = WEBHOOK_EVENT_STATUS.SUCCESSFUL
     webhook_event.save()
 
 
 def send_webhook_event(
-    webhook_event: WebhookEvent, content_str: str | None = None
+    webhook_event: WebhookEvent, content_bytes: bytes | None = None
 ) -> None:
     """Send the webhook POST request.
 
     :param webhook_event: An WebhookEvent to send.
-    :param content_str: Optional, the str JSON content to send the first time
+    :param content_bytes: Optional, the bytes JSON content to send the first time
     the webhook is sent.
     """
     headers = {
         "Content-type": "application/json",
         "Idempotency-Key": str(webhook_event.event_id),
     }
-    if content_str:
-        json_str = content_str
+    if content_bytes:
+        json_bytes = content_bytes
     else:
         renderer = JSONRenderer()
-        json_str = renderer.render(
+        json_bytes = renderer.render(
             webhook_event.content,
             accepted_media_type="application/json;",
-        ).decode()
+        )
     try:
         response = requests.post(
             webhook_event.webhook.url,
-            data=json_str,
+            data=json_bytes,
             timeout=(1, 1),
             stream=True,
             headers=headers,
