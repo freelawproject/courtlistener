@@ -58,6 +58,7 @@ REST_FRAMEWORK = {
         "ellliottt": "15000/hour",
         "flooie": "20000/hour",  # Needed for testing
         "WarrenLex": "10000/hour",  # For big litigation days (wow)
+        "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
