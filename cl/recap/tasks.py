@@ -128,6 +128,10 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         ).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         process_recap_appellate_case_query_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
+        process_recap_case_query_result_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE:
+        process_recap_appellate_case_query_result_page.delay(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -1111,6 +1115,32 @@ def process_recap_appellate_case_query_page(self, pk):
     """
     pq = ProcessingQueue.objects.get(pk=pk)
     msg = "Appellate case query pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Case query result pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_appellate_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate case query result pages not yet supported. Coming soon."
     mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
     return None
 
