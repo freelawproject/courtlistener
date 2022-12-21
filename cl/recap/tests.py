@@ -61,6 +61,9 @@ from cl.recap.factories import (
     DocketEntryDataFactory,
     FjcIntegratedDatabaseFactory,
     ProcessingQueueFactory,
+    RECAPEmailDocketDataFactory,
+    RECAPEmailDocketEntryDataFactory,
+    RECAPEmailNotificationDataFactory,
 )
 from cl.recap.management.commands.import_idb import Command
 from cl.recap.management.commands.reprocess_recap_dockets import (
@@ -2345,6 +2348,16 @@ class RecapEmailDocketAlerts(TestCase):
             "mail": recap_mail_receipt_multi_nef_jpml["mail"],
             "receipt": recap_mail_receipt_multi_nef_jpml["receipt"],
         }
+        cls.no_magic_number_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(pacer_magic_num=None)
+                    ],
+                )
+            ],
+        )
 
     def setUp(self) -> None:
         self.client = APIClient()
@@ -3611,6 +3624,67 @@ class RecapEmailDocketAlerts(TestCase):
         # No new docket alert or webhooks should be triggered.
         self.assertEqual(len(mail.outbox), 3)
         self.assertEqual(webhook_triggered.count(), 3)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d: (None, ""),
+    )
+    @mock.patch(
+        "cl.api.utils.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    @mock.patch(
+        "cl.recap.tasks.get_document_number_for_appellate",
+        side_effect=lambda z, x, y: "011112443447",
+    )
+    def test_recap_email_no_magic_number(
+        self,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_download_pacer_pdf_by_rd,
+        mock_webhook_post,
+        mock_get_document_number_appellate,
+    ):
+        """Can we add docket entries from a recap email notification that don't
+        contain a valid magic number?
+        """
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda y: (self.no_magic_number_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            self.client.post(self.path, self.data, format="json")
+
+        # Can we get the recap.email recipient properly?
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(
+            email_processing[0].destination_emails, ["testing_1@recap.email"]
+        )
+
+        recap_document = RECAPDocument.objects.all()
+        self.assertEqual(len(recap_document), 1)
+        # A DocketAlert should be created when receiving the first notification
+        # for this case with Subscription type, since user has
+        # auto-subscribe True.
+        docket = recap_document[0].docket_entry.docket
+        docket_alert = DocketAlert.objects.filter(
+            user=self.recipient_user.user,
+            docket=docket,
+            alert_type=DocketAlert.SUBSCRIPTION,
+        )
+        self.assertEqual(docket_alert.count(), 1)
+        # A DocketAlert email for the recap.email user should go out
+        self.assertEqual(len(mail.outbox), 1)
+
+        pq = ProcessingQueue.objects.all()
+        self.assertEqual(len(pq), 1)
+        self.assertEqual(
+            pq[0].error_message,
+            "No magic number available to download the document.",
+        )
 
 
 class GetAndCopyRecapAttachments(TestCase):
