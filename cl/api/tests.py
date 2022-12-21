@@ -1008,10 +1008,10 @@ class WebhooksProxySecurityTest(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
         )
         send_webhook_event(webhook_event)
-        webhook_to_compare = WebhookEvent.objects.get(pk=webhook_event.pk)
-        self.assertIn("IP 127.0.0.1 is blocked", webhook_to_compare.response)
+        webhook_event.refresh_from_db()
+        self.assertIn("IP 127.0.0.1 is blocked", webhook_event.response)
         self.assertEqual(
-            webhook_to_compare.status_code,
+            webhook_event.status_code,
             HTTP_403_FORBIDDEN,
         )
 
@@ -1021,10 +1021,10 @@ class WebhooksProxySecurityTest(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
         )
         send_webhook_event(webhook_event_2)
-        webhook_to_compare = WebhookEvent.objects.get(pk=webhook_event_2.pk)
-        self.assertIn("IP 127.0.0.1 is blocked", webhook_to_compare.response)
+        webhook_event_2.refresh_from_db()
+        self.assertIn("IP 127.0.0.1 is blocked", webhook_event_2.response)
         self.assertEqual(
-            webhook_to_compare.status_code,
+            webhook_event_2.status_code,
             HTTP_403_FORBIDDEN,
         )
 
@@ -1034,9 +1034,9 @@ class WebhooksProxySecurityTest(TestCase):
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
         )
         send_webhook_event(webhook_event_3)
-        webhook_to_compare = WebhookEvent.objects.get(pk=webhook_event_3.pk)
-        self.assertIn("IP 0.0.0.0 is blocked", webhook_to_compare.response)
+        webhook_event_3.refresh_from_db()
+        self.assertIn("IP 0.0.0.0 is blocked", webhook_event_3.response)
         self.assertEqual(
-            webhook_to_compare.status_code,
+            webhook_event_3.status_code,
             HTTP_403_FORBIDDEN,
         )

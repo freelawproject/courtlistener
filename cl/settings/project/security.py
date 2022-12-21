@@ -9,8 +9,8 @@ ALLOWED_HOSTS: list[str] = env(
     "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
 
-WEBHOOKS_PROXY_HOST = env(
-    "WEBHOOKS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
+EGRESS_PROXY_HOST = env(
+    "EGRESS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
 )
 
 SECURE_BROWSER_XSS_FILTER = True
