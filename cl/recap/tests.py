@@ -3652,7 +3652,7 @@ class RecapEmailDocketAlerts(TestCase):
 
         with mock.patch(
             "cl.recap.tasks.open_and_validate_email_notification",
-            side_effect=lambda y: (self.no_magic_number_data, "HTML"),
+            side_effect=lambda x, y: (self.no_magic_number_data, "HTML"),
         ):
             # Trigger a new recap.email notification from testing_1@recap.email
             # auto-subscription option enabled

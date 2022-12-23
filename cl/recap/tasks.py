@@ -1954,11 +1954,13 @@ class DocketUpdatedData:
 
 
 def open_and_validate_email_notification(
+    self: Task,
     epq: EmailProcessingQueue,
 ) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's
     a valid NEF or NDA.
 
+    :param self: The Celery task
     :param epq: The EmailProcessingQueue object.
     :return: A two tuple of a dict containing the notification data if valid
     or None otherwise, the raw notification body to store in next steps.
@@ -1974,6 +1976,17 @@ def open_and_validate_email_notification(
     except UnicodeDecodeError:
         with bucket.open(message_id, "rb") as f:
             body = f.read().decode("iso-8859-1")
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "File not found."
+            mark_pq_status(
+                epq, msg, PROCESSING_STATUS.FAILED, "status_message"
+            )
+            return None, ""
+        else:
+            # Do a retry. Hopefully the file will be in place soon.
+            raise self.retry(exc=exc)
+
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
@@ -2079,7 +2092,7 @@ def process_recap_email(
 
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
-    data, body = open_and_validate_email_notification(epq)
+    data, body = open_and_validate_email_notification(self, epq)
     if data is None:
         self.request.chain = None
         return None
