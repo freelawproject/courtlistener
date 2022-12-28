@@ -30,6 +30,7 @@
       <ul>
         <li><a href="#docket-alerts">Docket Alerts</a></li>
         <li><a href="#search-alerts">Search Alerts</a></li>
+        <li><a href="#old-da-alerts-report">Old Docket Alerts Report</a></li>
       </ul>
       <li><a href="#maintenance">Maintenance Schedule</a></li>
       <li><a href="#change-log">Change Log</a></li>
@@ -43,7 +44,7 @@
   </p>
   <p>To set this up, you create a URL on your server where CourtListener can send data. Then, whenever something important happens in CourtListener, we will POST an “event” to that URL as JSON data. When you receive the event, you can process it and perform whatever actions your system needs in response.
   </p>
-  <p>Currently, CourtListener can send webhook events whenever dockets are updated or search alerts are triggered. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/2382" rel="nofollow" target="_blank">docket alerts expire</a>, when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
+  <p>Currently, CourtListener can send webhook events whenever dockets are updated, search alerts are triggered or docket alerts expire. We are also contemplating or working on sending events when <a href="https://github.com/freelawproject/courtlistener/issues/703" rel="nofollow" target="_blank">RECAP Fetch tasks complete</a>, and more. If you have other events of interest, please get in touch.
   </p>
 
   <h2 id="getting-started">Getting Started With Webhooks</h2>
@@ -292,6 +293,65 @@ xargs curl -X POST \
   <pre>curl -X OPTIONS \
   --url '{% get_full_host %}{% url "alert-list" version="v3" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' </pre>
+
+  <h3 id="old-da-alerts-report">Old Docket Alerts Report Events</h3>
+  <p>We sent a weekly email report for <a href="{% url 'alert_help' %}#recap-alerts">Docket Alerts</a> on long-stagnant cases, this report might include:
+  </p>
+  <ul>
+    <li>Automatically Disabled Alerts</li>
+    <li>Old Terminated Cases and Cases</li>
+    <li>Terminated about 90 Days Ago</li>
+  </ul>
+  <p>If you have an Old Docket Alerts Report webhook <a href="{% url 'webhooks_getting_started' %}#setup-a-webhook">endpoint enabled</a>, you’ll receive a webhook event with the same weekly report you received by email.
+  </p>
+  <p>The webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>. <code>payload</code> has three keys:</p>
+  <ul>
+    <li>
+      <p><code>disabled_alerts</code> (Automatically Disabled Alerts):</p>
+      <p>Contains a list of docket alerts that have been disabled automatically by our system on terminated cases that haven’t had updates for over 180 days. You can re-enable these alerts if they were disabled by mistake.</p>
+    </li>
+    <li>
+      <p><code>very_old_alerts</code> (Old Terminated Cases):</p>
+      <p>Contains a list of docket alerts terminated cases that were last updated about 180 days ago. These alerts will be disabled in a week if you don’t take action. If you are still monitoring these cases please disable and re-enable these alerts. Doing so will keep them running for another 180 days.</p>
+    </li>
+    <li>
+      <p><code>old_alerts</code> (Terminated about 90 Days Ago):</p>
+      <p>Contains a list of docket alerts on terminated cases that were last updated about 90 days ago. If you are no longer monitoring these cases, you may want to disable these alerts.</p>
+    </li>
+  </ul>
+  <p>The shape of the data is thus:</p>
+  <pre>{
+   "payload":{
+      "old_alerts":[
+         {
+            "id":1,
+            "date_created":"2022-09-23T19:53:36.903277-07:00",
+            "date_last_hit":null,
+            "secret_key":"ehT7V9rmnBNIOV6rTMmMH0x6EvxeA0nYXfpN3Ks3",
+            "alert_type":1,
+            "docket":1
+         }
+      ],
+      "very_old_alerts":[...],
+      "disabled_alerts":[...]
+   },
+   "webhook":{...}
+}</pre>
+  <p><code>old_alerts</code>, <code>very_old_alerts</code>, and <code>disabled_alerts</code> as mentioned above contain a list of docket alert objects based on the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts API</a> and have all the same fields. </p>
+  <h4>Disabling and re-enabling docket alerts</h4>
+  <p>If you want to disable and re-enable a docket alert to keep them running for another 180 days or just re-enable a docket alert that was disabled by mistake, you can do it by sending a patch to the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts</a> API endpoint.</p>
+  <p>Disabling a Docket Alert:</p>
+  <pre>curl -X PATCH \
+  --data 'alert_type=0' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+</pre>
+<p>Enabling a Docket Alert:</p>
+  <pre>curl -X PATCH \
+  --data 'alert_type=1' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}{id}/"
+</pre>
 
   <h2 id="maintenance">Maintenance Schedule</h2>
   <p>Major server maintenance is scheduled on Thursday nights from 21:00PT to 23:59PT. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.

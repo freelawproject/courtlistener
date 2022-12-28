@@ -1,26 +1,51 @@
 from argparse import RawTextHelpFormatter
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 from django.utils.timezone import now
+from rest_framework.renderers import JSONRenderer
 
+from cl.alerts.api_serializers import DocketAlertSerializer
+from cl.alerts.models import DocketAlert
+from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.utils import send_webhook_event
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.date_time import dt_as_local_date
+from cl.search.models import Docket
+
+
+@dataclass
+class DocketAlertReportObject:
+    da_alert: DocketAlert
+    docket: Docket
 
 
 class OldAlertReport:
     def __init__(self):
-        self.ninety_ago = []
-        self.one_eighty_ago = []
-        self.disabled_dockets = []
+        self.old_alerts = []
+        self.very_old_alerts = []
+        self.disabled_alerts = []
+
+    @property
+    def old_dockets(self):
+        return [obj.docket for obj in self.old_alerts]
+
+    @property
+    def very_old_dockets(self):
+        return [obj.docket for obj in self.very_old_alerts]
+
+    @property
+    def disabled_dockets(self):
+        return [obj.docket for obj in self.disabled_alerts]
 
     def total_count(self):
         return (
-            len(self.ninety_ago)
-            + len(self.one_eighty_ago)
-            + len(self.disabled_dockets)
+            len(self.old_alerts)
+            + len(self.very_old_alerts)
+            + len(self.disabled_alerts)
         )
 
 
@@ -31,49 +56,129 @@ def build_user_report(user, delete=False):
     :param delete: Whether to nuke really old alerts
     :return A dict indicating the counts of old alerts.
     """
+
     report = OldAlertReport()
-    alerts = user.docket_alerts.exclude(
-        docket__date_terminated=None
-    ).select_related("docket")
+    alerts = (
+        user.docket_alerts.filter(alert_type=DocketAlert.SUBSCRIPTION)
+        .exclude(docket__date_terminated=None)
+        .select_related("docket")
+    )
+
     for alert in alerts:
         # Use the most recent of several fields that might be related to the
         # docket or the alert.
+
         threshold_date = max(
             alert.docket.date_terminated, dt_as_local_date(alert.date_created)
         )
+
         if alert.date_last_hit is not None:
             threshold_date = max(
                 threshold_date, dt_as_local_date(alert.date_last_hit)
             )
         if alert.docket.date_last_filing:
             threshold_date = max(threshold_date, alert.docket.date_last_filing)
+
         days_since_last_touch = (dt_as_local_date(now()) - threshold_date).days
         if delete:
             if days_since_last_touch >= 187:
-                report.disabled_dockets.append(alert.docket)
-                alert.delete()
+                report.disabled_alerts.append(
+                    DocketAlertReportObject(alert, alert.docket)
+                )
+                # Toggle docket alert to unsubscription type
+                alert.alert_type = DocketAlert.UNSUBSCRIPTION
+                alert.save()
             elif 180 <= days_since_last_touch <= 186:
-                report.one_eighty_ago.append(alert.docket)
+                report.very_old_alerts.append(
+                    DocketAlertReportObject(alert, alert.docket)
+                )
             elif 90 <= days_since_last_touch <= 96:
-                report.ninety_ago.append(alert.docket)
+                report.old_alerts.append(
+                    DocketAlertReportObject(alert, alert.docket)
+                )
         else:
             # Useful for first run, when ew *only* want to warn and not to
             # disable.
             if days_since_last_touch >= 180:
-                report.one_eighty_ago.append(alert.docket)
+                report.very_old_alerts.append(
+                    DocketAlertReportObject(alert, alert.docket)
+                )
             elif 90 <= days_since_last_touch <= 96:
-                report.ninety_ago.append(alert.docket)
+                report.old_alerts.append(
+                    DocketAlertReportObject(alert, alert.docket)
+                )
 
     return report
 
 
-def send_old_alert_warning(user, report):
-    """Send alerts for old alerts
+def send_old_alerts_webhook_event(
+    webhook: Webhook, report: OldAlertReport
+) -> None:
+    """Send webhook event for old alerts
+
+    :param webhook:The Webhook object to send the event to.
+    :param report: A dict containing information about old alerts
+    :return None
+    """
+
+    serialized_old_alerts = []
+    serialized_very_old_alerts = []
+    serialized_disabled_alerts = []
+
+    for old_alert in report.old_alerts:
+        serialized_old_alerts.append(
+            DocketAlertSerializer(old_alert.da_alert).data
+        )
+
+    for very_old_alert in report.very_old_alerts:
+        serialized_very_old_alerts.append(
+            DocketAlertSerializer(very_old_alert.da_alert).data
+        )
+
+    for disabled_alert in report.disabled_alerts:
+        serialized_disabled_alerts.append(
+            DocketAlertSerializer(disabled_alert.da_alert).data
+        )
+
+    post_content = {
+        "webhook": {
+            "event_type": webhook.event_type,
+            "version": webhook.version,
+            "date_created": webhook.date_created.isoformat(),
+            "deprecation_date": None,
+        },
+        "payload": {
+            "old_alerts": serialized_old_alerts,
+            "very_old_alerts": serialized_very_old_alerts,
+            "disabled_alerts": serialized_disabled_alerts,
+        },
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
+
+
+def send_old_alert_warning_email_and_webhook(user, report):
+    """Send alerts emails and webhooks for old alerts
 
     :param user: The user with terminated dockets
     :param report: A dict containing information about old alerts
     :return None
     """
+
+    user_webhooks = user.webhooks.filter(
+        event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT, enabled=True
+    )
+    for user_webhook in user_webhooks:
+        send_old_alerts_webhook_event(user_webhook, report)
+
     count = report.total_count()
     subject_template = loader.get_template("emails/old_email_subject.txt")
     subject = subject_template.render({"count": count}).strip()
@@ -135,7 +240,8 @@ The schedule is thus:
 
         # Needs to be user-oriented so that we only send one email per person.
         users_with_alerts = User.objects.filter(
-            docket_alerts__docket__date_terminated__isnull=False
+            docket_alerts__docket__date_terminated__isnull=False,
+            docket_alerts__alert_type=DocketAlert.SUBSCRIPTION,
         ).distinct()
         logger.info(
             "%s users have terminated alerts to check.", len(users_with_alerts)
@@ -146,11 +252,11 @@ The schedule is thus:
             report = build_user_report(
                 user, delete=options["delete_old_alerts"]
             )
-            alerts_deleted += len(report.disabled_dockets)
+            alerts_deleted += len(report.disabled_alerts)
             count = report.total_count()
             if options["send_alerts"] and count > 0:
                 emails_sent += 1
-                send_old_alert_warning(user, report)
+                send_old_alert_warning_email_and_webhook(user, report)
 
         logger.info(
             "%s alerts deleted (or skipped if arg not provided).",

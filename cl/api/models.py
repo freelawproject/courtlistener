@@ -12,6 +12,7 @@ class WebhookEventType(models.IntegerChoices):
     DOCKET_ALERT = 1, "Docket Alert"
     SEARCH_ALERT = 2, "Search Alert"
     RECAP_FETCH = 3, "Recap Fetch"
+    OLD_DOCKET_ALERTS_REPORT = 4, "Old Docket Alerts Report"
 
 
 HttpStatusCodes = models.IntegerChoices(  # type: ignore
