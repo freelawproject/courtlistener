@@ -935,7 +935,7 @@ a.gray:hover, a.gray:focus, a.grey:hover, a.grey:focus {
 }
 
 span.star-pagination {
-  color: #999999;
+  color: #555555;
 }
 
 span.star-pagination::after {

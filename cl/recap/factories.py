@@ -1,10 +1,15 @@
-from factory import DictFactory, Faker, List, SubFactory
+import string
+
+from factory import DictFactory, Faker, LazyAttribute, List, SubFactory
 from factory.django import DjangoModelFactory, FileField
-from factory.fuzzy import FuzzyChoice, FuzzyInteger
+from factory.fuzzy import FuzzyChoice, FuzzyInteger, FuzzyText
 
 from cl.recap.constants import DATASET_SOURCES
 from cl.recap.models import UPLOAD_TYPE, FjcIntegratedDatabase, ProcessingQueue
 from cl.search.factories import CourtFactory
+from cl.tests.providers import LegalProvider
+
+Faker.add_provider(LegalProvider)
 
 
 class FjcIntegratedDatabaseFactory(DjangoModelFactory):
@@ -48,3 +53,34 @@ class DocketEntryDataFactory(DictFactory):
 
 class DocketEntriesDataFactory(DictFactory):
     docket_entries = List([SubFactory(DocketEntryDataFactory)])
+
+
+class RECAPEmailDocketEntryDataFactory(DictFactory):
+    date_filed = Faker("date_object")
+    description = Faker("text", max_nb_chars=75)
+    document_number = Faker("pyint", min_value=1, max_value=100)
+    document_url = Faker("url")
+    pacer_case_id = Faker("random_id_string")
+    pacer_doc_id = Faker("random_id_string")
+    pacer_magic_num = Faker("random_id_string")
+    pacer_seq_no = Faker("random_id_string")
+
+
+class RECAPEmailDocketDataFactory(DictFactory):
+    case_name = Faker("case_name")
+    date_filed = Faker("date_object")
+    docket_entries = List([SubFactory(RECAPEmailDocketEntryDataFactory)])
+    docket_number = Faker("federal_district_docket_number")
+
+
+class RECAPEmailRecipientsDataFactory(DictFactory):
+    email_addresses = List([Faker("email")])
+    name = Faker("name_female")
+
+
+class RECAPEmailNotificationDataFactory(DictFactory):
+    appellate = Faker("boolean")
+    contains_attachments = Faker("boolean")
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    dockets = List([SubFactory(RECAPEmailDocketDataFactory)])
+    email_recipients = List([SubFactory(RECAPEmailRecipientsDataFactory)])

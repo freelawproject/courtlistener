@@ -128,6 +128,10 @@ def process_recap_upload(pq: ProcessingQueue) -> None:
         ).apply_async()
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         process_recap_appellate_case_query_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
+        process_recap_case_query_result_page.delay(pq.pk)
+    elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE:
+        process_recap_appellate_case_query_result_page.delay(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -1115,6 +1119,32 @@ def process_recap_appellate_case_query_page(self, pk):
     return None
 
 
+@app.task(bind=True)
+def process_recap_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Case query result pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
+@app.task(bind=True)
+def process_recap_appellate_case_query_result_page(self, pk):
+    """Process case query result pages.
+
+    For now, this is a stub until we can get the parser working properly in
+    Juriscraper.
+    """
+    pq = ProcessingQueue.objects.get(pk=pk)
+    msg = "Appellate case query result pages not yet supported. Coming soon."
+    mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+    return None
+
+
 @app.task
 def create_new_docket_from_idb(idb_row):
     """Create a new docket for the IDB item found. Populate it with all
@@ -1853,7 +1883,9 @@ def download_pacer_pdf_and_save_to_pq(
                 pq.save()
                 return pq
 
-            # PACER document not available via magic link.
+        if not magic_number:
+            r_msg = "No magic number available to download the document."
+        if created:
             mark_pq_status(
                 pq, r_msg, PROCESSING_STATUS.FAILED, "error_message"
             )
@@ -1922,11 +1954,13 @@ class DocketUpdatedData:
 
 
 def open_and_validate_email_notification(
+    self: Task,
     epq: EmailProcessingQueue,
 ) -> tuple[dict[str, str | bool | list[DocketType]] | None, str]:
     """Open and read a recap.email notification from S3, then validate if it's
     a valid NEF or NDA.
 
+    :param self: The Celery task
     :param epq: The EmailProcessingQueue object.
     :return: A two tuple of a dict containing the notification data if valid
     or None otherwise, the raw notification body to store in next steps.
@@ -1942,6 +1976,17 @@ def open_and_validate_email_notification(
     except UnicodeDecodeError:
         with bucket.open(message_id, "rb") as f:
             body = f.read().decode("iso-8859-1")
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            msg = "File not found."
+            mark_pq_status(
+                epq, msg, PROCESSING_STATUS.FAILED, "status_message"
+            )
+            return None, ""
+        else:
+            # Do a retry. Hopefully the file will be in place soon.
+            raise self.retry(exc=exc)
+
     report = S3NotificationEmail(map_cl_to_pacer_id(epq.court_id))
     report._parse_text(body)
     data = report.data
@@ -2047,14 +2092,14 @@ def process_recap_email(
 
     epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     mark_pq_status(epq, "", PROCESSING_STATUS.IN_PROGRESS, "status_message")
-    data, body = open_and_validate_email_notification(epq)
+    data, body = open_and_validate_email_notification(self, epq)
     if data is None:
         self.request.chain = None
         return None
 
     dockets = data["dockets"]
     # Look for the main docket that has the valid magic number
-    magic_number = None
+    magic_number = pacer_doc_id = pacer_case_id = document_url = None
     for docket_data in dockets:
         docket_entry = docket_data["docket_entries"][0]
         if docket_entry["pacer_magic_num"] is not None:
@@ -2063,6 +2108,13 @@ def process_recap_email(
             pacer_case_id = docket_entry["pacer_case_id"]
             document_url = docket_entry["document_url"]
             break
+
+    # Some notifications don't contain a magic number at all, assign the
+    # pacer_doc_id, pacer_case_id and document_url from the first docket entry.
+    if magic_number is None:
+        pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
+        pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
+        document_url = dockets[0]["docket_entries"][0]["document_url"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.
