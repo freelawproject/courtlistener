@@ -1160,7 +1160,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             )
 
     @property
-    def pacer_url(self):
+    def pacer_url(self) -> str | None:
         """Construct a doc1 URL for any item, if we can. Else, return None."""
         from cl.lib.pacer import map_cl_to_pacer_id
 
@@ -1168,12 +1168,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if court.jurisdiction == Court.FEDERAL_APPELLATE:
-                path = "docs1"
+                template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
-                path = "doc1"
-            return "https://ecf.%s.uscourts.gov/%s/%s?caseid=%s" % (
+                template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
+            return template % (
                 court_id,
-                path,
                 self.pacer_doc_id,
                 self.docket_entry.docket.pacer_case_id,
             )
