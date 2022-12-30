@@ -1,8 +1,18 @@
 """
-This page is meant to be run in conjunction with a running developer
-environment for courtlistener.com.  It is not meant to be perfect or to make
-exact replicas of the data but to be a quick and dirty way to get data into
-our systems and for testing and review purposes.
+This tool allows you to partially clone an opinion cluster, and its related
+docket and opinions from courtlistener.com to your local environment, you only
+need to pass the docket_id and run it.
+
+e.g.
+
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_cl_opinion --cluster_id 9355884
+
+This tool is only for development purposes, to enable it you need to set
+environment variable DEVELOPMENT to True. Also need to set CL_API_TOKEN env
+variable.
+
+This is still work in progress, some data is not cloned yet.
+
 """
 import os
 

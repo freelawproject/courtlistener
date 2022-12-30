@@ -4,7 +4,7 @@ local environment, you only need to pass the docket_id and run it.
 
 e.g.
 
-docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py cl_clone_docket --docket 66691997
+docker-compose -f docker/courtlistener/docker-compose.yml exec cl-django python manage.py clone_cl_docket --docket_id 66691997
 
 This tool is only for development purposes, to enable it you need to set
 environment variable DEVELOPMENT to True. Also need to set CL_API_TOKEN env
